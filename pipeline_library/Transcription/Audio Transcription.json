@@ -267,7 +267,7 @@
             "method": "process_content",
             "parameters": {
               "content_source": "transcript",
-              "model_id": "amazon.nova-lite-v1:0",
+              "model_id_text": "amazon.nova-lite-v1:0",
               "prompt_name": "summary_100"
             }
           }

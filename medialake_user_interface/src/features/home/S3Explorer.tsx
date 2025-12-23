@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-} from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -38,10 +32,7 @@ import { QUERY_KEYS } from "../../api/queryKeys";
 import { API_ENDPOINTS } from "../../api/endpoints";
 import { apiClient } from "../../api/apiClient";
 import { logger } from "../../common/helpers/logger";
-import type {
-  ApiResponse,
-  S3ListObjectsResponse,
-} from "../../api/types/api.types";
+import type { ApiResponse, S3ListObjectsResponse } from "../../api/types/api.types";
 
 interface S3ExplorerProps {
   connectorId: string;
@@ -100,19 +91,17 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [currentPath, setCurrentPath] = useState<string>(initialPath || "");
-  const [continuationToken, setContinuationToken] = useState<string | null>(
-    null,
-  );
+  const [continuationToken, setContinuationToken] = useState<string | null>(null);
   const [nameFilter, setNameFilter] = useState<string>("");
   const [debouncedFilter, setDebouncedFilter] = useState<string>("");
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [hoverTimeout, setHoverTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const typeAheadBuffer = useRef<string>("");
-  const typeAheadTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typeAheadTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoverPrefetchTime = useRef<number>(0);
   const prefetchedPrefixes = useRef<Set<string>>(new Set());
 
@@ -164,8 +153,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
 
       // Extract prefix root label (last segment of base or localized "Root")
       const baseSegments = normalizedBase.split("/").filter(Boolean);
-      const prefixRootLabel =
-        baseSegments[baseSegments.length - 1] || t("common.root");
+      const prefixRootLabel = baseSegments[baseSegments.length - 1] || t("common.root");
 
       // Build items starting with prefix root
       const items = [
@@ -176,8 +164,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
           ariaLabel: t("s3Explorer.breadcrumbs.prefixRoot"),
         },
         ...relativeSegments.map((segment, index) => {
-          const relativeFullPath =
-            relativeSegments.slice(0, index + 1).join("/") + "/";
+          const relativeFullPath = relativeSegments.slice(0, index + 1).join("/") + "/";
           return {
             label: segment,
             fullPath: normalizedBase + relativeFullPath,
@@ -239,16 +226,12 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
     showInlineError: true, // Suppress global error modal since we handle errors inline
   });
 
-  const s3Data = data
-    ? (data as ApiResponse<S3ListObjectsResponse>).data
-    : undefined;
+  const s3Data = data ? (data as ApiResponse<S3ListObjectsResponse>).data : undefined;
 
   useEffect(() => {
     const startTime = performance.now();
     return () => {
-      logger.debug(
-        `S3Explorer component mounted for ${performance.now() - startTime}ms`,
-      );
+      logger.debug(`S3Explorer component mounted for ${performance.now() - startTime}ms`);
     };
   }, []);
 
@@ -268,7 +251,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
         // Allow empty path only if restrictedBasePath is also empty
         if (path === "" && restrictedBasePath !== "") {
           logger.debug(
-            `Navigation blocked: attempted to navigate to root with restricted base "${restrictedBasePath}"`,
+            `Navigation blocked: attempted to navigate to root with restricted base "${restrictedBasePath}"`
           );
           return; // Prevent navigation to root if we have a restricted base
         }
@@ -276,7 +259,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
         // Prevent navigation above the restricted base path
         if (path !== "" && !normalizedPath.startsWith(normalizedBase)) {
           logger.debug(
-            `Navigation blocked: path "${normalizedPath}" does not start with base "${normalizedBase}"`,
+            `Navigation blocked: path "${normalizedPath}" does not start with base "${normalizedBase}"`
           );
           return; // Silently ignore attempts to navigate outside the restricted base
         }
@@ -286,7 +269,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
       setContinuationToken(null);
       setSelectedIndex(-1);
     },
-    [restrictedBasePath, normalizePath],
+    [restrictedBasePath, normalizePath]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -321,15 +304,11 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
         prefetchedPrefixes.current.add(prefix);
 
         queryClient.prefetchQuery({
-          queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(
-            connectorId,
-            prefix,
-            null,
-          ),
+          queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
           queryFn: async () => {
             const response = await apiClient.get(
               `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
-              { params: { prefix, delimiter: "/" } },
+              { params: { prefix, delimiter: "/" } }
             );
             return response.data;
           },
@@ -338,7 +317,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
 
       setHoverTimeout(timeout);
     },
-    [connectorId, queryClient, hoverTimeout],
+    [connectorId, queryClient, hoverTimeout]
   );
 
   const handleFolderLeave = useCallback(() => {
@@ -351,7 +330,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
   const filteredPrefixes = useMemo(() => {
     if (!s3Data?.commonPrefixes) return [];
     return s3Data.commonPrefixes.filter((prefix) =>
-      prefix.toLowerCase().includes(debouncedFilter.toLowerCase()),
+      prefix.toLowerCase().includes(debouncedFilter.toLowerCase())
     );
   }, [s3Data?.commonPrefixes, debouncedFilter]);
 
@@ -383,8 +362,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
 
     for (
       let i = lastVisibleIndex + 1;
-      i <
-      Math.min(lastVisibleIndex + prefetchCount + 1, virtualizedItems.length);
+      i < Math.min(lastVisibleIndex + prefetchCount + 1, virtualizedItems.length);
       i++
     ) {
       const item = virtualizedItems[i];
@@ -398,15 +376,11 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
           // Prefetch in the background
           queryClient
             .prefetchQuery({
-              queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(
-                connectorId,
-                prefix,
-                null,
-              ),
+              queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
               queryFn: async () => {
                 const response = await apiClient.get(
                   `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
-                  { params: { prefix, delimiter: "/" } },
+                  { params: { prefix, delimiter: "/" } }
                 );
                 return response.data;
               },
@@ -418,12 +392,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
         }
       }
     }
-  }, [
-    virtualizer.getVirtualItems(),
-    connectorId,
-    queryClient,
-    virtualizedItems,
-  ]);
+  }, [virtualizer.getVirtualItems(), connectorId, queryClient, virtualizedItems]);
 
   // Clamp selectedIndex when virtualizedItems change
   useEffect(() => {
@@ -474,9 +443,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((prev) =>
-            prev < virtualizedItems.length - 1 ? prev + 1 : prev,
-          );
+          setSelectedIndex((prev) => (prev < virtualizedItems.length - 1 ? prev + 1 : prev));
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -544,8 +511,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
   const renderErrorState = (error: any) => {
     const errorStatus = (error as any)?.status;
     // Read allowedPrefixes from error object first, fallback to s3Data for backward compatibility
-    const allowedPrefixes =
-      (error as any)?.allowedPrefixes || s3Data?.allowedPrefixes;
+    const allowedPrefixes = (error as any)?.allowedPrefixes || s3Data?.allowedPrefixes;
 
     let errorMessage = t("s3Explorer.error.loading", {
       message: error.message,
@@ -631,9 +597,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
           minHeight="200px"
           p={3}
         >
-          <SearchIcon
-            sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 2 }}
-          />
+          <SearchIcon sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 2 }} />
           <Typography variant="body1" color="text.secondary">
             {t("s3Explorer.empty.noResults")}
           </Typography>
@@ -651,9 +615,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
           minHeight="200px"
           p={3}
         >
-          <FolderIcon
-            sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 2 }}
-          />
+          <FolderIcon sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 2 }} />
           <Typography variant="body1" color="text.secondary">
             {t("s3Explorer.empty.folder")}
           </Typography>
@@ -664,10 +626,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
     return null;
   };
 
-  const renderVirtualizedItem = (
-    item: VirtualizedItem,
-    isSelected: boolean,
-  ) => {
+  const renderVirtualizedItem = (item: VirtualizedItem, isSelected: boolean) => {
     const prefix = item.data as string;
     const folderName = prefix.split("/").slice(-2)[0];
 
@@ -680,9 +639,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
           cursor: "pointer",
           borderRadius: "8px",
           my: 0.5,
-          backgroundColor: isSelected
-            ? alpha(theme.palette.primary.main, 0.08)
-            : "transparent",
+          backgroundColor: isSelected ? alpha(theme.palette.primary.main, 0.08) : "transparent",
           "&:hover": {
             backgroundColor: alpha(theme.palette.primary.main, 0.04),
             transform: "scale(1.01)",
@@ -691,24 +648,16 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
         }}
       >
         <ListItemIcon>
-          <FolderIcon
-            sx={{ color: theme.palette.primary.main, fontSize: 24 }}
-          />
+          <FolderIcon sx={{ color: theme.palette.primary.main, fontSize: 24 }} />
         </ListItemIcon>
         <ListItemText
           primary={
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 500, color: theme.palette.primary.main }}
-            >
+            <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.primary.main }}>
               {highlightMatch(folderName, debouncedFilter)}
             </Typography>
           }
           secondary={
-            <Typography
-              variant="caption"
-              sx={{ color: theme.palette.text.secondary }}
-            >
+            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
               {t("common.folder")}
             </Typography>
           }
@@ -851,8 +800,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
                     ) : (
                       <HomeIcon fontSize="small" />
                     )}
-                    {!isMobile &&
-                      (restrictedBasePath ? item.label : t("common.root"))}
+                    {!isMobile && (restrictedBasePath ? item.label : t("common.root"))}
                   </>
                 ) : (
                   item.label

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, IconButton, useTheme, TextField } from "@mui/material";
+import { Box, IconButton, TextField } from "@mui/material";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 
@@ -13,12 +13,10 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({
   onColumnMenuOpen,
 }) => {
   const { t } = useTranslation();
-  const theme = useTheme();
-
   return (
     <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
       <TextField
-        placeholder="Search pipelines..."
+        placeholder={t("integrations.pipelines.searchPlaceholder")}
         size="small"
         onChange={(e) => onFilterChange(e.target.value)}
       />

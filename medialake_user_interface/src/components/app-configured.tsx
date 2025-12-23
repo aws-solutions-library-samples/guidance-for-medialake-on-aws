@@ -18,6 +18,7 @@ import { Box, CircularProgress } from "@mui/material";
 import { NotificationProvider } from "./NotificationCenter";
 import { JobNotificationSync } from "./JobNotificationSync";
 import { TokenRefreshManager } from "./TokenRefreshManager";
+import { useTranslation } from "react-i18next";
 
 const LoadingFallback = () => (
   <Box
@@ -32,21 +33,24 @@ const LoadingFallback = () => (
   </Box>
 );
 
-const ErrorFallback = ({ error }: { error: Error }) => (
-  <Box
-    sx={{
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      height: "100vh",
-      flexDirection: "column",
-      gap: 2,
-    }}
-  >
-    <h2>Something went wrong:</h2>
-    <pre style={{ color: "red" }}>{error.message}</pre>
-  </Box>
-);
+const ErrorFallback = ({ error }: { error: Error }) => {
+  const { t } = useTranslation();
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh",
+        flexDirection: "column",
+        gap: 2,
+      }}
+    >
+      <h2>{t("app.errors.somethingWentWrong")}:</h2>
+      <pre style={{ color: "red" }}>{error.message}</pre>
+    </Box>
+  );
+};
 
 const AppConfigured = () => {
   return (

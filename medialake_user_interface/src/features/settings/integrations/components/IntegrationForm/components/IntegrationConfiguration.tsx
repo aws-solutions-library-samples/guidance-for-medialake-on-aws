@@ -1,18 +1,10 @@
 import React from "react";
-import {
-  Box,
-  Button,
-  IconButton,
-  InputAdornment,
-  FormControlLabel,
-  Switch,
-} from "@mui/material";
+import { Box, Button, IconButton, InputAdornment, FormControlLabel, Switch } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { Form } from "@/forms/components/Form";
 import { FormField } from "@/forms/components/FormField";
-import { FormSelect } from "@/forms/components/FormSelect";
 import { useFormWithValidation } from "@/forms/hooks/useFormWithValidation";
 import {
   IntegrationConfigurationProps,
@@ -30,7 +22,7 @@ export const IntegrationConfiguration: React.FC<
   const validationSchema = React.useMemo(() => {
     return z
       .object({
-        nodeId: z.string().min(1, "Integration selection is required"),
+        nodeId: z.string().min(1, t("common.validation.integrationMustBeSelected")),
         description: z.string().optional(), // Made optional
         auth: z.object({
           type: z.enum(["apiKey", "awsIam"]),
@@ -51,11 +43,11 @@ export const IntegrationConfiguration: React.FC<
           return true;
         },
         {
-          message: "API Key is required",
+          message: t("common.validation.apiKeyRequired"),
           path: ["auth", "credentials", "apiKey"],
-        },
+        }
       );
-  }, []);
+  }, [t]);
 
   // Ensure form data matches schema structure exactly
   const initialFormData = React.useMemo(() => {
@@ -88,14 +80,8 @@ export const IntegrationConfiguration: React.FC<
 
   React.useEffect(() => {
     // Reset if we have a new nodeId (different integration) or haven't initialized yet
-    if (
-      (!hasInitialized || lastNodeId !== initialFormData.nodeId) &&
-      initialFormData.nodeId
-    ) {
-      console.log(
-        "[IntegrationConfiguration] Initial form setup:",
-        initialFormData,
-      );
+    if ((!hasInitialized || lastNodeId !== initialFormData.nodeId) && initialFormData.nodeId) {
+      console.log("[IntegrationConfiguration] Initial form setup:", initialFormData);
       form.reset(initialFormData);
       setHasInitialized(true);
       setLastNodeId(initialFormData.nodeId);
@@ -135,13 +121,8 @@ export const IntegrationConfiguration: React.FC<
       // Close the form immediately before any validation or submission
       onClose();
 
-      console.log(
-        "[IntegrationConfiguration] Starting submission with data:",
-        data,
-      );
+      console.log("[IntegrationConfiguration] Starting submission with data:", data);
       try {
-        const now = new Date().toISOString();
-
         // Handle the case where API key is the placeholder (not changed in edit mode)
         const submissionData = { ...data };
         if (data.auth.credentials.apiKey === "***existing***") {
@@ -155,22 +136,16 @@ export const IntegrationConfiguration: React.FC<
           };
         }
 
-        console.log(
-          "[IntegrationConfiguration] Prepared submission data:",
-          submissionData,
-        );
+        console.log("[IntegrationConfiguration] Prepared submission data:", submissionData);
 
         await onSubmit(submissionData);
         console.log("[IntegrationConfiguration] Submission completed");
       } catch (error) {
-        console.error(
-          "[IntegrationConfiguration] Error during submission:",
-          error,
-        );
+        console.error("[IntegrationConfiguration] Error during submission:", error);
         throw error; // Re-throw to allow parent component to handle the error
       }
     },
-    [onSubmit, enabled, onClose],
+    [onSubmit, enabled, onClose]
   );
 
   const authMethod = formData.auth.type;
@@ -225,10 +200,7 @@ export const IntegrationConfiguration: React.FC<
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    edge="end"
-                  >
+                  <IconButton onClick={() => setShowApiKey(!showApiKey)} edge="end">
                     {showApiKey ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
                 </InputAdornment>
@@ -254,11 +226,7 @@ export const IntegrationConfiguration: React.FC<
           <Button onClick={onClose} variant="outlined">
             {t("common.cancel")}
           </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={!form.formState.isValid}
-          >
+          <Button type="submit" variant="contained" disabled={!form.formState.isValid}>
             {t("common.save")}
           </Button>
         </Box>

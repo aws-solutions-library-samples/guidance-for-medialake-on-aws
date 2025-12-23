@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { ActionButton } from "./button/ActionButton";
+import { useTranslation } from "react-i18next";
 
 interface RenameDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
   onCancel,
   isLoading = false,
 }) => {
+  const { t } = useTranslation();
   const [newName, setNewName] = useState(currentName);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
                         fullWidth
                     /> */}
           <TextField
-            label="New Name"
+            label={t("rename.newName")}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             fullWidth
@@ -91,19 +93,11 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <ActionButton
-          variant="outlined"
-          onClick={handleCancel}
-          disabled={isLoading}
-        >
-          Cancel
+        <ActionButton variant="outlined" onClick={handleCancel} disabled={isLoading}>
+          {t("common.actions.cancel")}
         </ActionButton>
-        <ActionButton
-          variant="contained"
-          onClick={handleConfirm}
-          loading={isLoading}
-        >
-          Rename
+        <ActionButton variant="contained" onClick={handleConfirm} loading={isLoading}>
+          {t("common.actions.rename")}
         </ActionButton>
       </DialogActions>
     </Dialog>

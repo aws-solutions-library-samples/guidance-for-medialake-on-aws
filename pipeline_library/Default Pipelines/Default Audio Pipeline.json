@@ -36,6 +36,7 @@
             "operationId": "",
             "method": "trigger",
             "parameters": {
+              "Max Concurrent Executions": 10,
               "Prefix": "",
               "Format": "WAV, AIFF, AIF, MP3, PCM, M4A"
             },
@@ -169,7 +170,7 @@
         },
         "data": {
           "nodeId": "audio_proxy",
-          "label": "Audio Proxy (extract) (extract) (extract) (extract)",
+          "label": "Audio Proxy (extract)",
           "description": "Create an audio proxy from an audio file stored in S3",
           "icon": {
             "key": null,

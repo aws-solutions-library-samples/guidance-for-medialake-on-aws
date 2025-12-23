@@ -58,7 +58,7 @@ class GlobalPermissionCache {
     ability: AppAbility,
     permissionSets: any[],
     token: string,
-    expiresIn: number,
+    expiresIn: number
   ): void {
     const serializedAbility = this.serializeAbility(ability);
     const cacheData: GlobalCacheData = {
@@ -75,13 +75,10 @@ class GlobalPermissionCache {
 
     try {
       // Store in localStorage for persistence across page reloads
-      localStorage.setItem(
-        GlobalPermissionCache.CACHE_KEY,
-        JSON.stringify(cacheData),
-      );
+      localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(cacheData));
       console.log(
         "Global permission cache updated, expires at:",
-        new Date(cacheData.expiresAt).toISOString(),
+        new Date(cacheData.expiresAt).toISOString()
       );
     } catch (error) {
       console.error("Failed to store global permission cache:", error);
@@ -193,10 +190,7 @@ class GlobalPermissionCache {
       this.memoryCache.lastUpdated = Date.now();
 
       try {
-        localStorage.setItem(
-          GlobalPermissionCache.CACHE_KEY,
-          JSON.stringify(this.memoryCache),
-        );
+        localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(this.memoryCache));
         console.log("Token updated in global cache");
       } catch (error) {
         console.error("Failed to update token in cache:", error);
@@ -249,9 +243,7 @@ class GlobalPermissionCache {
         }
       }
 
-      const checkCache = localStorage.getItem(
-        GlobalPermissionCache.CHECK_CACHE_KEY,
-      );
+      const checkCache = localStorage.getItem(GlobalPermissionCache.CHECK_CACHE_KEY);
       if (checkCache) {
         this.checkCache = JSON.parse(checkCache);
       }
@@ -274,10 +266,7 @@ class GlobalPermissionCache {
 
     // Persist cleaned cache
     try {
-      localStorage.setItem(
-        GlobalPermissionCache.CHECK_CACHE_KEY,
-        JSON.stringify(this.checkCache),
-      );
+      localStorage.setItem(GlobalPermissionCache.CHECK_CACHE_KEY, JSON.stringify(this.checkCache));
     } catch (error) {
       console.error("Failed to persist permission check cache:", error);
     }

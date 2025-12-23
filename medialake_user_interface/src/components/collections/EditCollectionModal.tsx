@@ -67,24 +67,20 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
     }
   }, [collection, open]);
 
-  const handleInputChange =
-    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value =
-        event.target.type === "checkbox"
-          ? event.target.checked
-          : event.target.value;
-      setFormData((prev) => ({
+  const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors((prev) => ({
         ...prev,
-        [field]: value,
+        [field]: "",
       }));
-      // Clear error when user starts typing
-      if (errors[field]) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
-      }
-    };
+    }
+  };
 
   const handleSelectChange = (field: string) => (event: any) => {
     setFormData((prev) => ({
@@ -114,9 +110,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
 
     // Description validation
     if (formData.description && formData.description.length > 500) {
-      newErrors.description = t(
-        "collectionsPage.form.validation.descriptionMaxLength",
-      );
+      newErrors.description = t("collectionsPage.form.validation.descriptionMaxLength");
     }
 
     setErrors(newErrors);
@@ -203,10 +197,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
 
           {/* Collection Type */}
           {collectionTypes.length > 0 && (
-            <FormControl
-              fullWidth
-              disabled={updateCollectionMutation.isPending}
-            >
+            <FormControl fullWidth disabled={updateCollectionMutation.isPending}>
               <InputLabel>{t("collectionsPage.form.type")}</InputLabel>
               <Select
                 value={formData.collectionTypeId}
@@ -214,7 +205,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
                 onChange={handleSelectChange("collectionTypeId")}
               >
                 <MenuItem value="">
-                  <em>None</em>
+                  <em>{t("common.none")}</em>
                 </MenuItem>
                 {collectionTypes
                   .filter((type) => type.isActive)
@@ -245,13 +236,8 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
 
           {/* Parent Collection */}
           {collections.length > 0 && (
-            <FormControl
-              fullWidth
-              disabled={updateCollectionMutation.isPending}
-            >
-              <InputLabel>
-                {t("collectionsPage.form.parentCollection")}
-              </InputLabel>
+            <FormControl fullWidth disabled={updateCollectionMutation.isPending}>
+              <InputLabel>{t("collectionsPage.form.parentCollection")}</InputLabel>
               <Select
                 value={formData.parentId}
                 label={t("collectionsPage.form.parentCollection")}
@@ -284,32 +270,21 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
           />
 
           {/* Error Alert */}
-          {updateCollectionMutation.isError && (
-            <Alert severity="error">{t("common.error")}</Alert>
-          )}
+          {updateCollectionMutation.isError && <Alert severity="error">{t("common.error")}</Alert>}
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button
-          onClick={handleClose}
-          disabled={updateCollectionMutation.isPending}
-        >
+        <Button onClick={handleClose} disabled={updateCollectionMutation.isPending}>
           {t("common.cancel")}
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={updateCollectionMutation.isPending || !formData.name.trim()}
-          startIcon={
-            updateCollectionMutation.isPending ? (
-              <CircularProgress size={20} />
-            ) : null
-          }
+          startIcon={updateCollectionMutation.isPending ? <CircularProgress size={20} /> : null}
         >
-          {updateCollectionMutation.isPending
-            ? t("common.saving")
-            : t("common.save")}
+          {updateCollectionMutation.isPending ? t("common.saving") : t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

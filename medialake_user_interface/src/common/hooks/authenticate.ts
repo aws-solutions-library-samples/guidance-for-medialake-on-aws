@@ -12,39 +12,29 @@ export const useAuthenticate = () => {
   const { userPool, reinitializeUserPool } = useUserPool();
   const awsConfig = useAwsConfig();
 
-  const initiateAuth = async (
-    Email: string,
-    Password: string,
-  ): Promise<any> => {
+  const initiateAuth = async (Email: string, Password: string): Promise<any> => {
     if (!awsConfig) {
       throw new Error("AWS configuration is not initialized");
     }
 
     // Find SAML provider if configured
     const samlProvider = awsConfig.Auth.identity_providers.find(
-      (provider) => provider.identity_provider_method === "saml",
+      (provider) => provider.identity_provider_method === "saml"
     );
 
     // If SAML is configured, redirect to SAML login
     if (samlProvider) {
-      try {
-        await signInWithRedirect({
-          provider: { custom: samlProvider.identity_provider_name || "" },
-        });
-        return { type: "SAML_REDIRECT" };
-      } catch (error) {
-        throw error;
-      }
+      await signInWithRedirect({
+        provider: { custom: samlProvider.identity_provider_name || "" },
+      });
+      return { type: "SAML_REDIRECT" };
     }
 
     // Otherwise, proceed with Cognito authentication
     return authenticate(Email, Password);
   };
 
-  const authenticate = async (
-    Email: string,
-    Password: string,
-  ): Promise<any> => {
+  const authenticate = async (Email: string, Password: string): Promise<any> => {
     // This is now an internal method for Cognito authentication
     if (!userPool) {
       reinitializeUserPool();
@@ -84,7 +74,7 @@ export const useAuthenticate = () => {
   const changePassword = async (
     user: CognitoUser,
     newPassword: string,
-    userAttributes: any,
+    userAttributes: any
   ): Promise<any> => {
     return new Promise((resolve, reject) => {
       user.completeNewPasswordChallenge(newPassword, userAttributes, {

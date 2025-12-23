@@ -22,7 +22,7 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 class OpenSearchClusterProps:
     domain_name: str
 
-    engine_version: str = "OpenSearch_2.15"
+    engine_version: opensearch.EngineVersion = opensearch.EngineVersion.OPENSEARCH_2_19
     use_dedicated_master_nodes: bool = (
         config.resolved_opensearch_cluster_settings.use_dedicated_master_nodes
     )
@@ -264,7 +264,7 @@ class OpenSearchCluster(Construct):
                 self,
                 "OpenSearchDomain",
                 domain_name=props.domain_name,
-                engine_version=props.engine_version,
+                engine_version=props.engine_version.version,
                 cluster_config=opensearch.CfnDomain.ClusterConfigProperty(
                     instance_type=props.data_node_instance_type,
                     instance_count=props.data_node_count,

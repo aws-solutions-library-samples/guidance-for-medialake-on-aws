@@ -30,11 +30,7 @@ export const useGetGroups = (enabled: boolean = true) => {
         }
 
         // Handle nested body.data.groups format
-        if (
-          data.body &&
-          data.body.data &&
-          Array.isArray(data.body.data.groups)
-        ) {
+        if (data.body && data.body.data && Array.isArray(data.body.data.groups)) {
           console.log("Groups from data.body:", data.body.data.groups);
           return data.body.data.groups;
         }
@@ -67,7 +63,7 @@ export const useGetGroup = (id: string) => {
     queryKey: QUERY_KEYS.GROUPS.detail(id),
     queryFn: async () => {
       const { data } = await apiClient.get<{ statusCode: number; body: any }>(
-        API_ENDPOINTS.GROUPS.GET(id),
+        API_ENDPOINTS.GROUPS.GET(id)
       );
 
       if (typeof data.body === "string") {
@@ -105,11 +101,7 @@ export const useCreateGroup = () => {
 export const useUpdateGroup = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    GroupResponse,
-    Error,
-    { id: string; updates: UpdateGroupRequest }
-  >({
+  return useMutation<GroupResponse, Error, { id: string; updates: UpdateGroupRequest }>({
     mutationFn: async ({ id, updates }) => {
       const { data } = await apiClient.put<{
         statusCode: number;
@@ -172,9 +164,7 @@ export const useRemoveGroupMember = () => {
 
   return useMutation<void, Error, { groupId: string; userId: string }>({
     mutationFn: async ({ groupId, userId }) => {
-      await apiClient.delete(
-        API_ENDPOINTS.GROUPS.REMOVE_MEMBER(groupId, userId),
-      );
+      await apiClient.delete(API_ENDPOINTS.GROUPS.REMOVE_MEMBER(groupId, userId));
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

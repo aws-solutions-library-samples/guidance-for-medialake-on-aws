@@ -11,7 +11,7 @@ import type {
 
 export const usePipelineExecutions = (
   pageSize: number = 20,
-  filters?: PipelineExecutionFilters,
+  filters?: PipelineExecutionFilters
 ) => {
   const { showError } = useErrorModal();
 
@@ -48,7 +48,7 @@ export const usePipelineExecutions = (
 
         const searchParams = new URLSearchParams(params);
         const response = await apiClient.get<PipelineExecutionsResponse>(
-          `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${searchParams.toString()}`,
+          `${API_ENDPOINTS.PIPELINE_EXECUTIONS}?${searchParams.toString()}`
         );
         return response.data;
       } catch (error) {

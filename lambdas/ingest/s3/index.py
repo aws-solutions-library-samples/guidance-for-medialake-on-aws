@@ -215,8 +215,23 @@ def initialize_global_clients():
 
     if s3_vector_client is None and VECTOR_BUCKET_NAME:
         try:
-            s3_vector_client = boto3.client("s3vectors", region_name=AWS_REGION)
-            logger.info("Initialized global S3 Vector Store client")
+            # Configure retry strategy for transient errors
+            retry_config = Config(
+                retries={
+                    "max_attempts": 10,
+                    "mode": "adaptive",
+                },
+                connect_timeout=5,
+                read_timeout=60,
+            )
+
+            s3_vector_client = boto3.client(
+                "s3vectors", region_name=AWS_REGION, config=retry_config
+            )
+            logger.info(
+                "Initialized global S3 Vector Store client with retry configuration",
+                extra={"max_attempts": 10, "retry_mode": "adaptive"},
+            )
         except Exception as e:
             logger.warning(f"Failed to initialize S3 Vector Store client: {e}")
             s3_vector_client = None
@@ -1736,7 +1751,10 @@ class AssetProcessor:
         is_delete_event: bool = True,
         version_id: str = None,
     ) -> None:
-        """Delete asset record from DynamoDB based on S3 object deletion"""
+        """
+        Delete asset record from DynamoDB based on S3 object deletion.
+        Uses centralized AssetDeletionService for actual deletion.
+        """
         try:
             # Check if this deletion should be processed based on versioning
             if not self._should_process_deletion(
@@ -1768,35 +1786,13 @@ class AssetProcessor:
             # Find the record by S3 path first (this uses DynamoDB, not S3)
             response = find_by_s3path()
             inventory_id = None
+            asset_data = None
 
             if response["Items"]:
                 # Found the item in DynamoDB
-                asset_record = response["Items"][0]
-                inventory_id = asset_record["InventoryID"]
+                asset_data = response["Items"][0]
+                inventory_id = asset_data["InventoryID"]
                 logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
-
-                # Delete all associated S3 files BEFORE deleting DynamoDB record
-                self._delete_associated_s3_files(asset_record, bucket, key)
-
-                # Delete from DynamoDB
-                self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
-                metrics.add_metric(
-                    name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1
-                )
-
-                # Delete associated OpenSearch docs
-                self.delete_opensearch_docs(inventory_id)
-
-                # Delete S3 vectors
-                vector_count = self.delete_s3_vectors(inventory_id)
-                logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
-
-                # Publish deletion event
-                self.publish_deletion_event(inventory_id)
-
-                logger.info(
-                    f"Successfully deleted asset {inventory_id} and all associated files"
-                )
 
             else:
                 # For deletion events, skip trying to find by tags as the object is gone
@@ -1815,22 +1811,6 @@ class AssetProcessor:
                         if "InventoryID" in tags:
                             inventory_id = tags["InventoryID"]
                             logger.info(f"Found InventoryID in S3 tags: {inventory_id}")
-
-                            # Delete from DynamoDB
-                            self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
-
-                            # Delete S3 vectors
-                            vector_count = self.delete_s3_vectors(inventory_id)
-                            logger.info(
-                                f"Deleted {vector_count} vectors for asset {inventory_id}"
-                            )
-
-                            # Publish deletion event
-                            self.publish_deletion_event(inventory_id)
-
-                            logger.info(
-                                f"Successfully deleted asset from DynamoDB: {inventory_id}"
-                            )
                         else:
                             logger.warning(
                                 f"No InventoryID found for object: {bucket}/{key}"
@@ -1842,10 +1822,44 @@ class AssetProcessor:
                         f"No DynamoDB record found by S3 path and skipping tag lookup for deletion event: {bucket}/{key}"
                     )
 
-            # Add metrics
-            metrics.add_metric(
-                name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1
-            )
+            # If we found an inventory_id, use centralized deletion service
+            if inventory_id:
+                # Delete associated S3 files BEFORE using deletion service
+                if asset_data:
+                    self._delete_associated_s3_files(asset_data, bucket, key)
+
+                # Import and use centralized deletion service
+                from asset_deletion_service import AssetDeletionService
+
+                deletion_service = AssetDeletionService(
+                    dynamodb_table_name=os.environ.get("MEDIALAKE_ASSET_TABLE"),
+                    logger=logger,
+                    metrics=metrics,
+                    tracer=tracer,
+                )
+
+                # Perform deletion using centralized service
+                result = deletion_service.delete_asset(
+                    inventory_id=inventory_id,
+                    asset_data=asset_data,  # Pass pre-fetched data if available
+                    publish_event=True,
+                )
+
+                logger.info(
+                    f"Successfully deleted asset {inventory_id} using centralized service",
+                    extra={
+                        "s3_objects": result.s3_objects_deleted,
+                        "opensearch_docs": result.opensearch_docs_deleted,
+                        "vectors": result.vectors_deleted,
+                    },
+                )
+
+                # Add metrics
+                metrics.add_metric(
+                    name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1
+                )
+            else:
+                logger.warning(f"No asset found for deletion: {bucket}/{key}")
 
         except Exception as e:
             logger.exception(f"Error in delete_asset: {bucket}/{key}, error: {e}")

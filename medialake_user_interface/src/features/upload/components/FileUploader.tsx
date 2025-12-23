@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import Uppy from "@uppy/core";
 import Dashboard from "@uppy/react/dashboard";
 import AwsS3, { type AwsS3Options } from "@uppy/aws-s3";
-import type { BasePlugin } from "@uppy/core";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import {
@@ -74,8 +73,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadPath, setUploadPath] = useState<string>(path || "");
   const [isPathBrowserOpen, setIsPathBrowserOpen] = useState<boolean>(false);
-  const { data: connectorsResponse, isLoading: isLoadingConnectors } =
-    useGetConnectors();
+  const { data: connectorsResponse, isLoading: isLoadingConnectors } = useGetConnectors();
   const {
     getPresignedUrl,
     signPart: signPartBackend,
@@ -84,14 +82,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   } = useS3Upload();
 
   // Store multipart upload metadata keyed by file ID
-  const multipartDataRef = useRef<Map<string, MultipartUploadMetadata>>(
-    new Map(),
-  );
+  const multipartDataRef = useRef<Map<string, MultipartUploadMetadata>>(new Map());
 
   // Filter only S3 connectors that are active
   const connectors =
     connectorsResponse?.data?.connectors.filter(
-      (connector) => connector.type === "s3" && connector.status === "active",
+      (connector) => connector.type === "s3" && connector.status === "active"
     ) || [];
 
   // Sync uploadPath with path prop
@@ -100,23 +96,19 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   }, [path]);
 
   // Helper function to parse objectPrefix into array
-  const parseObjectPrefix = (
-    objectPrefix: string | string[] | undefined,
-  ): string[] => {
+  const parseObjectPrefix = (objectPrefix: string | string[] | undefined): string[] => {
     if (!objectPrefix) return [];
     if (typeof objectPrefix === "string") {
       const trimmed = objectPrefix.trim();
       return trimmed ? [trimmed] : [];
     }
-    return objectPrefix
-      .map((prefix) => prefix.trim())
-      .filter((prefix) => prefix !== "");
+    return objectPrefix.map((prefix) => prefix.trim()).filter((prefix) => prefix !== "");
   };
 
   // Get the selected connector object
   const selectedConnectorObj = useMemo(
     () => connectors.find((c) => c.id === selectedConnector),
-    [connectors, selectedConnector],
+    [connectors, selectedConnector]
   );
 
   // Extract and parse allowedPrefixes from selected connector
@@ -124,8 +116,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const allowedPrefixes = useMemo(() => {
     const topLevelPrefix = selectedConnectorObj?.objectPrefix;
     const configPrefix = selectedConnectorObj?.configuration?.objectPrefix;
-    const prefixToUse =
-      topLevelPrefix !== undefined ? topLevelPrefix : configPrefix;
+    const prefixToUse = topLevelPrefix !== undefined ? topLevelPrefix : configPrefix;
     return parseObjectPrefix(prefixToUse);
   }, [selectedConnectorObj]);
 
@@ -136,16 +127,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     // 1. A connector is selected
     // 2. The connector has prefix restrictions (allowedPrefixes.length > 0)
     // 3. The current uploadPath is empty or root ("/")
-    if (
-      selectedConnector &&
-      allowedPrefixes.length > 0 &&
-      (!uploadPath || uploadPath === "/")
-    ) {
+    if (selectedConnector && allowedPrefixes.length > 0 && (!uploadPath || uploadPath === "/")) {
       const firstPrefix = allowedPrefixes[0];
       // Ensure the prefix has proper formatting (trailing slash)
-      const normalizedPrefix = firstPrefix.endsWith("/")
-        ? firstPrefix
-        : `${firstPrefix}/`;
+      const normalizedPrefix = firstPrefix.endsWith("/") ? firstPrefix : `${firstPrefix}/`;
 
       setUploadPath(normalizedPrefix);
 
@@ -169,7 +154,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         uppyInstance.info(
           `Filename "${file.name}" contains invalid characters. Only alphanumeric characters, dashes, underscores, dots, exclamation marks, asterisks, single quotes, and parentheses are allowed.`,
           "error",
-          5000,
+          5000
         );
         uppyInstance.removeFile(file.id);
       }
@@ -319,14 +304,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
               if (!result.multipart) {
                 throw new Error(
-                  `Expected multipart upload for file ${file.name}, but backend returned single-part.`,
+                  `Expected multipart upload for file ${file.name}, but backend returned single-part.`
                 );
               }
 
               if (!result.upload_id || !result.key || !result.bucket) {
-                throw new Error(
-                  `Missing required multipart data for file ${file.name}.`,
-                );
+                throw new Error(`Missing required multipart data for file ${file.name}.`);
               }
 
               // Store multipart data for later use in signPart (on-demand)
@@ -357,15 +340,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             const data = multipartDataRef.current.get(file.id);
             if (!data) {
               throw new Error(
-                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`,
+                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`
               );
             }
 
             const partNumber = partData.partNumber;
 
-            console.log(
-              `Requesting presigned URL for part ${partNumber} of ${file.name}`,
-            );
+            console.log(`Requesting presigned URL for part ${partNumber} of ${file.name}`);
 
             try {
               // Call backend to sign this specific part on-demand
@@ -376,18 +357,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 part_number: partNumber,
               });
 
-              console.log(
-                `Part ${partNumber} signed successfully for ${file.name}`,
-              );
+              console.log(`Part ${partNumber} signed successfully for ${file.name}`);
 
               return {
                 url: signResponse.presigned_url,
               };
             } catch (error) {
-              console.error(
-                `Failed to sign part ${partNumber} for ${file.name}:`,
-                error,
-              );
+              console.error(`Failed to sign part ${partNumber} for ${file.name}:`, error);
               throw error;
             }
           },
@@ -397,7 +373,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             const multipartData = multipartDataRef.current.get(file.id);
             if (!multipartData) {
               throw new Error(
-                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`,
+                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`
               );
             }
 
@@ -409,10 +385,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 parts: data.parts,
               });
 
-              console.log(
-                `Multipart upload completed for ${file.name}:`,
-                result,
-              );
+              console.log(`Multipart upload completed for ${file.name}:`, result);
 
               // Clean up stored metadata
               multipartDataRef.current.delete(file.id);
@@ -421,17 +394,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 location: result.location,
               };
             } catch (error) {
-              console.error(
-                `Error completing multipart upload for ${file.name}:`,
-                error,
-              );
+              console.error(`Error completing multipart upload for ${file.name}:`, error);
               multipartDataRef.current.delete(file.id);
               throw error;
             }
           },
 
           // Abort multipart upload - calls backend to abort
-          abortMultipartUpload: async (file: any, data: any) => {
+          abortMultipartUpload: async (file: any) => {
             const multipartData = multipartDataRef.current.get(file.id);
             if (multipartData) {
               try {
@@ -442,10 +412,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 });
                 console.log(`Multipart upload aborted for ${file.name}`);
               } catch (error) {
-                console.error(
-                  `Error aborting multipart upload for ${file.name}:`,
-                  error,
-                );
+                console.error(`Error aborting multipart upload for ${file.name}:`, error);
               }
               // Clean up stored metadata regardless of abort success
               multipartDataRef.current.delete(file.id);
@@ -490,9 +457,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <FormControl fullWidth>
-        <InputLabel id="connector-select-label">
-          {t("upload.connectorLabel")}
-        </InputLabel>
+        <InputLabel id="connector-select-label">{t("upload.connectorLabel")}</InputLabel>
         <Select
           labelId="connector-select-label"
           id="connector-select"
@@ -570,11 +535,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             </Button>
           </Box>
           {allowedPrefixes.length > 0 && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mt: 1 }}
-            >
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
               {t("upload.allowedPrefixesInfo", {
                 count: allowedPrefixes.length,
               })}

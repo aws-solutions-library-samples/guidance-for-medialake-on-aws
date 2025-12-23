@@ -5,7 +5,7 @@ import {
   CircularProgress,
   Tooltip,
   Typography,
-  Chip,
+  // Chip,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -30,6 +30,7 @@ import { TriggerTypeChips } from "./TriggerTypeChips";
 import { PipelineStatusCell } from "./PipelineStatusCell";
 import type { Pipeline } from "../types/pipelines.types";
 import type { TableState, TableActions } from "../types/table.types";
+import { useTranslation } from "react-i18next";
 
 interface PipelineTableProps {
   data: Pipeline[];
@@ -54,17 +55,14 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
   onToggleActive,
   togglingPipelines = {},
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo<ColumnDef<Pipeline, any>[]>(
     () => [
       columnHelper.accessor("name", {
         header: "Name",
-        cell: (info) => (
-          <TableCellContent variant="primary">
-            {info.getValue()}
-          </TableCellContent>
-        ),
+        cell: (info) => <TableCellContent variant="primary">{info.getValue()}</TableCellContent>,
         enableSorting: true,
         size: 200,
       }),
@@ -147,7 +145,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         header: "Actions",
         cell: (info) => (
           <Box sx={{ display: "flex", gap: 1 }}>
-            <Tooltip title="Edit Pipeline">
+            <Tooltip title={t("common.editPipeline")}>
               <IconButton
                 size="small"
                 onClick={() => tableActions.handleEdit(info.row.original.id)}
@@ -156,21 +154,18 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Delete Pipeline">
+            <Tooltip title={t("common.deletePipeline")}>
               <IconButton
                 size="small"
                 onClick={() =>
-                  tableActions.openDeleteDialog(
-                    info.row.original.id,
-                    info.row.original.name,
-                  )
+                  tableActions.openDeleteDialog(info.row.original.id, info.row.original.name)
                 }
                 disabled={info.row.original.system}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Start Pipeline">
+            <Tooltip title={t("common.startPipeline")}>
               <IconButton
                 size="small"
                 onClick={() => onStartPipeline(info.row.original.id)}
@@ -179,7 +174,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
                 <PlayIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Stop Pipeline">
+            <Tooltip title={t("common.stopPipeline")}>
               <IconButton
                 size="small"
                 onClick={() => onStopPipeline(info.row.original.id)}
@@ -193,7 +188,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
         size: 200,
       }),
     ],
-    [tableActions, onStartPipeline, onStopPipeline, onToggleActive],
+    [tableActions, onStartPipeline, onStopPipeline, onToggleActive]
   );
 
   const table = useReactTable({
@@ -249,11 +244,9 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
           value: f.value as string,
         }))}
         onRemoveFilter={(columnId) => {
-          tableActions.setColumnFilters(
-            tableState.columnFilters.filter((f) => f.id !== columnId),
-          );
+          tableActions.setColumnFilters(tableState.columnFilters.filter((f) => f.id !== columnId));
         }}
-        searchPlaceholder="Search pipelines..."
+        searchPlaceholder={t("pipelines.searchPlaceholder")}
       />
       <ResizableTable
         table={table}

@@ -7,8 +7,13 @@ node:
   type: trigger
   integration:
     config:
-      aws_event_bridge:
+      aws_eventbridge:
         aws_eventbridge_rule: workflow_completed_trigger
+        event_pattern:
+          detail:
+            metadata:
+              pipelineName: ["${pipeline_name}"]
+              pipelineStatus: ["Completed"]
 actions:
   trigger:
     summary: Trigger after a workflow is completed
@@ -24,10 +29,18 @@ actions:
       - in: body
         name: asset_representation
         label: Representation
-        required: true
+        required: false
         schema:
           type: select
-          options: ["Source", "Proxy", "Thumbnail"]
+          options:
+            - label: "Any (All representations)"
+              value: ""
+            - label: "Source (Original file)"
+              value: "Source"
+            - label: "Proxy (Web-optimized version)"
+              value: "Proxy"
+            - label: "Thumbnail (Preview image)"
+              value: "Thumbnail"
     connections:
       incoming:
         type: [any]

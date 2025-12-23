@@ -28,9 +28,11 @@ export interface FormFieldDefinition {
     | "multiselect"
     | "switch"
     | "number"
-    | "password";
+    | "password"
+    | "json_editor";
   label: string;
   tooltip?: string;
+  placeholder?: string;
   required?: boolean;
   multiline?: boolean;
   rows?: number;

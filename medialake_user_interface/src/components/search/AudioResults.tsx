@@ -4,7 +4,6 @@ import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetResults from "@/components/shared/AssetResults";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
-import { RecentlyViewedProvider } from "@/contexts/RecentlyViewedContext";
 
 interface AudioResultsProps {
   audios: AudioItem[];
@@ -40,8 +39,7 @@ const defaultColumns: AssetTableColumn<AudioItem>[] = [
     visible: true,
     minWidth: 300,
     accessorFn: (audio) =>
-      audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name,
+      audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
     cell: (info) => info.getValue() as string,
   },
   {
@@ -66,8 +64,7 @@ const defaultColumns: AssetTableColumn<AudioItem>[] = [
     visible: false,
     minWidth: 100,
     accessorFn: (audio) =>
-      audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .FileInfo.Size,
+      audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
     cell: (info) => formatFileSize(info.getValue() as number),
   },
 ];
@@ -82,27 +79,19 @@ const sortOptions = [
 const renderCardField = (fieldId: string, audio: AudioItem): string => {
   switch (fieldId) {
     case "name":
-      return audio.DigitalSourceAsset.MainRepresentation.StorageInfo
-        .PrimaryLocation.ObjectKey.Name;
+      return audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
     case "format":
       return audio.DigitalSourceAsset.MainRepresentation.Format;
     case "createDate":
       return formatDate(audio.DigitalSourceAsset.CreateDate);
     case "fileSize":
       return formatFileSize(
-        audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        audio.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
       );
     default:
       return "";
   }
 };
-
-const actions = [
-  { id: "rename", label: "Rename" },
-  { id: "download", label: "Download" },
-  { id: "share", label: "Share" },
-];
 
 const AudioResults: React.FC<AudioResultsProps> = ({ audios, ...props }) => {
   return (
@@ -113,8 +102,7 @@ const AudioResults: React.FC<AudioResultsProps> = ({ audios, ...props }) => {
         defaultCardFields,
         defaultColumns,
         sortOptions,
-        renderCardField: (fieldId, audio) =>
-          renderCardField(fieldId, audio as AudioItem),
+        renderCardField: (fieldId, audio) => renderCardField(fieldId, audio as AudioItem),
       }}
       {...props}
     />

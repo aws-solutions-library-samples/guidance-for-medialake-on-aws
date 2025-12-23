@@ -30,8 +30,6 @@ import {
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   CloudUpload as CloudUploadIcon,
   History as HistoryIcon,
 } from "@mui/icons-material";
@@ -77,7 +75,7 @@ export const UpgradeSection: React.FC = () => {
 
   // Poll for status updates when upgrade is in progress
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (status?.upgrade_status === "in_progress") {
       interval = setInterval(() => {
@@ -170,9 +168,7 @@ export const UpgradeSection: React.FC = () => {
       // Refresh status after triggering
       await fetchStatus();
     } catch (err: any) {
-      setError(
-        err.response?.data?.error?.message || "Failed to trigger upgrade",
-      );
+      setError(err.response?.data?.error?.message || "Failed to trigger upgrade");
     } finally {
       setUpgrading(false);
       setSelectedVersion(null);
@@ -200,7 +196,7 @@ export const UpgradeSection: React.FC = () => {
       <Typography variant="body2" color="text.secondary" paragraph>
         {t(
           "settings.systemSettings.upgrade.description",
-          "Manage MediaLake system upgrades and view version history.",
+          "Manage MediaLake system upgrades and view version history."
         )}
       </Typography>
 
@@ -231,10 +227,7 @@ export const UpgradeSection: React.FC = () => {
             }}
           >
             <Typography variant="h6">
-              {t(
-                "settings.systemSettings.upgrade.currentVersion",
-                "Current Version",
-              )}
+              {t("settings.systemSettings.upgrade.currentVersion", "Current Version")}
             </Typography>
             <Button
               startIcon={<RefreshIcon />}
@@ -265,17 +258,11 @@ export const UpgradeSection: React.FC = () => {
           {status?.active_upgrade && (
             <Box sx={{ mt: 3 }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                {t(
-                  "settings.systemSettings.upgrade.upgradingTo",
-                  "Upgrading to {{version}}",
-                  {
-                    version: status.active_upgrade.target_version,
-                  },
-                )}
+                {t("settings.systemSettings.upgrade.upgradingTo", "Upgrading to {{version}}", {
+                  version: status.active_upgrade.target_version,
+                })}
               </Typography>
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 2, mt: 1 }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 1 }}>
                 <LinearProgress
                   variant="determinate"
                   value={status.active_upgrade.progress.percentage}
@@ -285,11 +272,7 @@ export const UpgradeSection: React.FC = () => {
                   {status.active_upgrade.progress.percentage}%
                 </Typography>
               </Box>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 1, display: "block" }}
-              >
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
                 {status.active_upgrade.progress.stage}:{" "}
                 {status.active_upgrade.progress.current_action}
               </Typography>
@@ -306,11 +289,8 @@ export const UpgradeSection: React.FC = () => {
               }}
             >
               <Typography variant="caption" color="text.secondary">
-                {t(
-                  "settings.systemSettings.upgrade.lastUpgrade",
-                  "Last upgrade",
-                )}
-                : {status.last_upgrade.version} -{" "}
+                {t("settings.systemSettings.upgrade.lastUpgrade", "Last upgrade")}:{" "}
+                {status.last_upgrade.version} -{" "}
                 {new Date(status.last_upgrade.timestamp).toLocaleString()}
               </Typography>
             </Box>
@@ -334,10 +314,7 @@ export const UpgradeSection: React.FC = () => {
           <Tab
             icon={<CloudUploadIcon />}
             iconPosition="start"
-            label={t(
-              "settings.systemSettings.upgrade.availableVersions",
-              "Available Versions",
-            )}
+            label={t("settings.systemSettings.upgrade.availableVersions", "Available Versions")}
           />
           <Tab
             icon={<HistoryIcon />}
@@ -351,11 +328,7 @@ export const UpgradeSection: React.FC = () => {
             {versions && versions.branches && versions.tags ? (
               <Box>
                 {/* Tags */}
-                <Typography
-                  variant="subtitle1"
-                  gutterBottom
-                  sx={{ fontWeight: 600 }}
-                >
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
                   {t("settings.systemSettings.upgrade.tags", "Release Tags")}
                 </Typography>
                 <List>
@@ -384,14 +357,14 @@ export const UpgradeSection: React.FC = () => {
                                 </Typography>
                                 {version.is_latest && (
                                   <Chip
-                                    label="Latest"
+                                    label={t("upgradeSection.labels.latest")}
                                     size="small"
                                     color="primary"
                                   />
                                 )}
                                 {version.name === status?.current_version && (
                                   <Chip
-                                    label="Current"
+                                    label={t("upgradeSection.labels.current")}
                                     size="small"
                                     color="success"
                                   />
@@ -399,12 +372,8 @@ export const UpgradeSection: React.FC = () => {
                               </Box>
                             }
                             secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {new Date(version.date).toLocaleDateString()} -{" "}
-                                {version.message}
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(version.date).toLocaleDateString()} - {version.message}
                               </Typography>
                             }
                           />
@@ -412,15 +381,8 @@ export const UpgradeSection: React.FC = () => {
                       </ListItem>
                     ))
                   ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ p: 2 }}
-                    >
-                      {t(
-                        "settings.systemSettings.upgrade.noTags",
-                        "No release tags available",
-                      )}
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                      {t("settings.systemSettings.upgrade.noTags", "No release tags available")}
                     </Typography>
                   )}
                 </List>
@@ -428,11 +390,7 @@ export const UpgradeSection: React.FC = () => {
                 <Divider sx={{ my: 2 }} />
 
                 {/* Branches */}
-                <Typography
-                  variant="subtitle1"
-                  gutterBottom
-                  sx={{ fontWeight: 600 }}
-                >
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
                   {t("settings.systemSettings.upgrade.branches", "Branches")}
                 </Typography>
                 <List>
@@ -461,14 +419,14 @@ export const UpgradeSection: React.FC = () => {
                                 </Typography>
                                 {version.is_default && (
                                   <Chip
-                                    label="Default"
+                                    label={t("upgradeSection.labels.default")}
                                     size="small"
                                     color="info"
                                   />
                                 )}
                                 {version.name === status?.current_version && (
                                   <Chip
-                                    label="Current"
+                                    label={t("upgradeSection.labels.current")}
                                     size="small"
                                     color="success"
                                   />
@@ -476,12 +434,8 @@ export const UpgradeSection: React.FC = () => {
                               </Box>
                             }
                             secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {new Date(version.date).toLocaleDateString()} -{" "}
-                                {version.message}
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(version.date).toLocaleDateString()} - {version.message}
                               </Typography>
                             }
                           />
@@ -489,28 +443,17 @@ export const UpgradeSection: React.FC = () => {
                       </ListItem>
                     ))
                   ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ p: 2 }}
-                    >
-                      {t(
-                        "settings.systemSettings.upgrade.noBranches",
-                        "No branches available",
-                      )}
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                      {t("settings.systemSettings.upgrade.noBranches", "No branches available")}
                     </Typography>
                   )}
                 </List>
               </Box>
             ) : (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ p: 2, textAlign: "center" }}
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
                 {t(
                   "settings.systemSettings.upgrade.loadingVersions",
-                  "Loading available versions...",
+                  "Loading available versions..."
                 )}
               </Typography>
             )}
@@ -523,41 +466,30 @@ export const UpgradeSection: React.FC = () => {
       </Card>
 
       {/* Confirmation Dialog */}
-      <Dialog
-        open={confirmDialogOpen}
-        onClose={handleCancelUpgrade}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={confirmDialogOpen} onClose={handleCancelUpgrade} maxWidth="sm" fullWidth>
         <DialogTitle>
           {t("settings.systemSettings.upgrade.confirmTitle", "Confirm Upgrade")}
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {t(
-              "settings.systemSettings.upgrade.confirmMessage",
-              "Are you sure you want to upgrade to {{version}}? This will trigger a deployment pipeline and may cause temporary service interruption.",
-              { version: selectedVersion?.name },
-            )}
+            {t("upgradeSection.dialogs.confirmUpgrade", {
+              version: selectedVersion?.name || "unknown",
+            })}
           </DialogContentText>
           <Alert severity="warning" sx={{ mt: 2 }}>
             {t(
               "settings.systemSettings.upgrade.confirmWarning",
-              "This action cannot be undone. The upgrade process typically takes 15-20 minutes.",
+              "This action cannot be undone. The upgrade process typically takes 15-20 minutes."
             )}
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelUpgrade}>
-            {t("common.cancel", "Cancel")}
-          </Button>
+          <Button onClick={handleCancelUpgrade}>{t("common.cancel", "Cancel")}</Button>
           <Button
             onClick={handleConfirmUpgrade}
             variant="contained"
             color="primary"
-            startIcon={
-              upgrading ? <CircularProgress size={16} /> : <CloudUploadIcon />
-            }
+            startIcon={upgrading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
             disabled={upgrading}
           >
             {upgrading

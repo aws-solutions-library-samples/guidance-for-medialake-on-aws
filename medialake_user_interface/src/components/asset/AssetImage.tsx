@@ -36,11 +36,7 @@ const AssetImage: React.FC<AssetImageProps> = ({ src, alt }) => {
           },
         }}
       >
-        <ImageViewer
-          imageSrc={src}
-          maxHeight="100%"
-          filename={alt || "asset_preview"}
-        />
+        <ImageViewer imageSrc={src} maxHeight="100%" filename={alt || "asset_preview"} />
       </Paper>
     </Box>
   );

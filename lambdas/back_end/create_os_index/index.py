@@ -401,6 +401,80 @@ def handler(event, context):
                         "EmbeddedMetadata": {"type": "object", "dynamic": True},
                     },
                 },
+                "asset_embeddings": {
+                    "type": "nested",
+                    "properties": {
+                        "inventory_id": {"type": "keyword"},
+                        "embedding_type": {"type": "keyword"},
+                        "model_provider": {"type": "keyword"},
+                        "model_name": {"type": "keyword"},
+                        "model_version": {"type": "keyword"},
+                        "start_seconds": {"type": "integer"},
+                        "end_seconds": {"type": "integer"},
+                        "start_smpte_timecode": {"type": "keyword"},
+                        "end_smpte_timecode": {"type": "keyword"},
+                        "created_at": {"type": "date"},
+                        "embedding_granularity": {"type": "keyword"},
+                        "segmentation_method": {"type": "keyword"},
+                        "embedding_representation": {"type": "keyword"},
+                        "embedding_dimension": {"type": "integer"},
+                        "space_type": {"type": "keyword"},
+                        "embedding_256_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 256,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                        "embedding_384_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 384,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                        "embedding_512_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 512,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                        "embedding_1024_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 1024,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                        "embedding_1536_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 1536,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                        "embedding_3072_cosine": {
+                            "type": "knn_vector",
+                            "dimension": 3072,
+                            "method": {
+                                "engine": "nmslib",
+                                "space_type": "cosinesimil",
+                                "name": "hnsw",
+                            },
+                        },
+                    },
+                },
             }
         },
     }

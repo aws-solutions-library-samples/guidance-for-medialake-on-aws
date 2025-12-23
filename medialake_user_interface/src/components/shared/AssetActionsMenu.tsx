@@ -49,15 +49,11 @@ function AssetActionsMenu<T extends AssetBase>({
         <MenuItem
           key={action.id}
           onClick={() => onAction(action.id)}
-          disabled={
-            !selectedAsset || (action.id === "download" && isLoading.download)
-          }
+          disabled={!selectedAsset || (action.id === "download" && isLoading.download)}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {action.label}
-            {action.id === "download" && isLoading.download && (
-              <CircularProgress size={16} />
-            )}
+            {action.id === "download" && isLoading.download && <CircularProgress size={16} />}
           </Box>
         </MenuItem>
       ))}

@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  keepPreviousData,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { QUERY_KEYS } from "@/api/queryKeys";
@@ -261,7 +256,7 @@ export const useGetSharedCollections = () => {
       try {
         const response = await apiClient.get<CollectionsResponse>(
           API_ENDPOINTS.COLLECTIONS.SHARED,
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -285,7 +280,7 @@ export const useGetCollection = (id: string, enabled = true) => {
       try {
         const response = await apiClient.get<CollectionResponse>(
           API_ENDPOINTS.COLLECTIONS.GET(id),
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -312,7 +307,7 @@ export const useGetChildCollections = (parentId: string, enabled = true) => {
 
         const response = await apiClient.get<CollectionsResponse>(
           `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`,
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -334,7 +329,7 @@ export const useCreateCollection = () => {
       try {
         const response = await apiClient.post<CollectionResponse>(
           API_ENDPOINTS.COLLECTIONS.BASE,
-          data,
+          data
         );
         return response.data;
       } catch (error) {
@@ -357,16 +352,12 @@ export const useUpdateCollection = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<
-    CollectionResponse,
-    Error,
-    { id: string; data: UpdateCollectionRequest }
-  >({
+  return useMutation<CollectionResponse, Error, { id: string; data: UpdateCollectionRequest }>({
     mutationFn: async ({ id, data }) => {
       try {
         const response = await apiClient.patch<CollectionResponse>(
           API_ENDPOINTS.COLLECTIONS.UPDATE(id),
-          data,
+          data
         );
         return response.data;
       } catch (error) {
@@ -424,9 +415,7 @@ export const useDeleteItemFromCollection = () => {
       try {
         // URL-encode the itemId to handle special characters like #
         const encodedItemId = encodeURIComponent(itemId);
-        await apiClient.delete(
-          `/collections/${collectionId}/items/${encodedItemId}`,
-        );
+        await apiClient.delete(`/collections/${collectionId}/items/${encodedItemId}`);
       } catch (error) {
         logger.error("Delete item from collection error:", error);
         showError("Failed to remove item from collection");
@@ -451,25 +440,23 @@ export const useShareCollection = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<void, Error, { id: string; data: ShareCollectionRequest }>(
-    {
-      mutationFn: async ({ id, data }) => {
-        try {
-          await apiClient.post(API_ENDPOINTS.COLLECTIONS.SHARE(id), data);
-        } catch (error) {
-          logger.error("Share collection error:", error);
-          showError("Failed to share collection");
-          throw error;
-        }
-      },
-      onSuccess: (data, { id }) => {
-        // Invalidate collection shares
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.COLLECTIONS.shares(id),
-        });
-      },
+  return useMutation<void, Error, { id: string; data: ShareCollectionRequest }>({
+    mutationFn: async ({ id, data }) => {
+      try {
+        await apiClient.post(API_ENDPOINTS.COLLECTIONS.SHARE(id), data);
+      } catch (error) {
+        logger.error("Share collection error:", error);
+        showError("Failed to share collection");
+        throw error;
+      }
     },
-  );
+    onSuccess: (data, { id }) => {
+      // Invalidate collection shares
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.shares(id),
+      });
+    },
+  });
 };
 
 // Hook to unshare a collection
@@ -501,17 +488,10 @@ export const useAddItemToCollection = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<
-    void,
-    Error,
-    { collectionId: string; data: AddItemToCollectionRequest }
-  >({
+  return useMutation<void, Error, { collectionId: string; data: AddItemToCollectionRequest }>({
     mutationFn: async ({ collectionId, data }) => {
       try {
-        await apiClient.post(
-          API_ENDPOINTS.COLLECTIONS.ITEMS(collectionId),
-          data,
-        );
+        await apiClient.post(API_ENDPOINTS.COLLECTIONS.ITEMS(collectionId), data);
       } catch (error) {
         logger.error("Add item to collection error:", error);
         showError("Failed to add item to collection");
@@ -541,7 +521,7 @@ export const useGetCollectionShares = (id: string, enabled = true) => {
       try {
         const response = await apiClient.get<CollectionSharesResponse>(
           API_ENDPOINTS.COLLECTIONS.SHARES(id),
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -562,7 +542,7 @@ export const useGetCollectionAssets = (
     sortBy?: string;
     sortDirection?: "asc" | "desc";
   },
-  enabled = true,
+  enabled = true
 ) => {
   const { showError } = useErrorModal();
 
@@ -620,7 +600,7 @@ export const useGetCollectionAncestors = (id: string, enabled = true) => {
       try {
         const response = await apiClient.get<CollectionAncestorsResponse>(
           API_ENDPOINTS.COLLECTIONS.ANCESTORS(id),
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -648,7 +628,7 @@ export const useGetCollectionTypes = (filters?: Record<string, any>) => {
       try {
         const response = await apiClient.get<CollectionTypesResponse>(
           API_ENDPOINTS.COLLECTION_TYPES.BASE,
-          { params: filters, signal },
+          { params: filters, signal }
         );
         return response.data;
       } catch (error) {
@@ -673,7 +653,7 @@ export const useGetCollectionType = (id: string, enabled = true) => {
       try {
         const response = await apiClient.get<CollectionTypeResponse>(
           API_ENDPOINTS.COLLECTION_TYPES.GET(id),
-          { signal },
+          { signal }
         );
         return response.data;
       } catch (error) {
@@ -697,7 +677,7 @@ export const useCreateCollectionType = () => {
       try {
         const response = await apiClient.post<CollectionTypeResponse>(
           API_ENDPOINTS.COLLECTION_TYPES.BASE,
-          data,
+          data
         );
         return response.data;
       } catch (error) {
@@ -723,17 +703,11 @@ export const useUpdateCollectionType = () => {
   const { showError } = useErrorModal();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: UpdateCollectionTypeRequest;
-    }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCollectionTypeRequest }) => {
       try {
         const response = await apiClient.put<CollectionTypeResponse>(
           API_ENDPOINTS.COLLECTION_TYPES.UPDATE(id),
-          data,
+          data
         );
         return response.data;
       } catch (error) {
@@ -798,7 +772,7 @@ export const useMigrateCollectionType = () => {
       try {
         const response = await apiClient.post<MigrateCollectionTypeResponse>(
           API_ENDPOINTS.COLLECTION_TYPES.MIGRATE(sourceTypeId),
-          { targetTypeId },
+          { targetTypeId }
         );
         return response.data;
       } catch (error) {

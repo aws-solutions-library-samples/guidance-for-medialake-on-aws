@@ -9,8 +9,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Chip,
-  IconButton,
   Button,
   Tooltip,
 } from "@mui/material";
@@ -23,22 +21,10 @@ import DownloadIcon from "@mui/icons-material/Download";
 type PermissionStatus = "Allow" | "Deny" | "Not Set";
 
 // Define the resource types based on the auth_seeder
-type ResourceType =
-  | "assets"
-  | "pipelines"
-  | "pipelinesExecutions"
-  | "collections"
-  | "settings";
+type ResourceType = "assets" | "pipelines" | "pipelinesExecutions" | "collections" | "settings";
 
 // Define the action types
-type ActionType =
-  | "view"
-  | "edit"
-  | "delete"
-  | "create"
-  | "admin"
-  | "retry"
-  | "cancel";
+type ActionType = "view" | "edit" | "delete" | "create" | "admin" | "retry" | "cancel";
 
 // Interface for the permission matrix props
 interface PermissionMatrixProps {
@@ -46,11 +32,7 @@ interface PermissionMatrixProps {
   title?: string;
   showExport?: boolean;
   onExport?: () => void;
-  onCellClick?: (
-    resource: string,
-    action: string,
-    status: PermissionStatus,
-  ) => void;
+  onCellClick?: (resource: string, action: string, status: PermissionStatus) => void;
   interactive?: boolean;
 }
 
@@ -58,7 +40,7 @@ interface PermissionMatrixProps {
 const getPermissionStatus = (
   permissions: any,
   resource: string,
-  action: string,
+  action: string
 ): PermissionStatus => {
   if (!permissions) return "Not Set";
 
@@ -71,10 +53,7 @@ const getPermissionStatus = (
 
       // Navigate through the nested structure
       for (let i = 0; i < actionParts.length - 1; i++) {
-        if (
-          current[actionParts[i]] &&
-          typeof current[actionParts[i]] === "object"
-        ) {
+        if (current[actionParts[i]] && typeof current[actionParts[i]] === "object") {
           current = current[actionParts[i]];
         } else {
           return "Not Set";
@@ -103,9 +82,7 @@ const getPermissionStatus = (
   // Handle array of permission objects
   if (Array.isArray(permissions)) {
     // Try exact match first
-    const exactPermission = permissions.find(
-      (p) => p.resource === resource && p.action === action,
-    );
+    const exactPermission = permissions.find((p) => p.resource === resource && p.action === action);
     if (exactPermission) {
       return exactPermission.effect === "Allow" ? "Allow" : "Deny";
     }
@@ -113,9 +90,7 @@ const getPermissionStatus = (
     // Try with dot notation for nested actions
     if (action.includes(".")) {
       const nestedPermission = permissions.find(
-        (p) =>
-          p.resource === resource &&
-          (p.action === action || action.startsWith(`${p.action}.`)),
+        (p) => p.resource === resource && (p.action === action || action.startsWith(`${p.action}.`))
       );
       if (nestedPermission) {
         return nestedPermission.effect === "Allow" ? "Allow" : "Deny";
@@ -127,9 +102,7 @@ const getPermissionStatus = (
 };
 
 // Component to render the permission status icon
-const PermissionStatusIcon: React.FC<{ status: PermissionStatus }> = ({
-  status,
-}) => {
+const PermissionStatusIcon: React.FC<{ status: PermissionStatus }> = ({ status }) => {
   switch (status) {
     case "Allow":
       return <CheckCircleIcon color="success" />;
@@ -230,29 +203,20 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
         <Table aria-label="permission matrix table">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold", width: "200px" }}>
-                RESOURCE
-              </TableCell>
+              <TableCell sx={{ fontWeight: "bold", width: "200px" }}>RESOURCE</TableCell>
               {/* Get all unique actions across all resources */}
-              {Array.from(
-                new Set(resources.flatMap((r) => getActionsForResource(r))),
-              ).map((action) => (
-                <TableCell
-                  key={action}
-                  align="center"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  {actionDisplayNames[action]}
-                </TableCell>
-              ))}
+              {Array.from(new Set(resources.flatMap((r) => getActionsForResource(r)))).map(
+                (action) => (
+                  <TableCell key={action} align="center" sx={{ fontWeight: "bold" }}>
+                    {actionDisplayNames[action]}
+                  </TableCell>
+                )
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
             {resources.map((resource) => (
-              <TableRow
-                key={resource}
-                sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-              >
+              <TableRow key={resource} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                 <TableCell component="th" scope="row">
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     {/* Resource icon would go here */}
@@ -264,20 +228,16 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                   let status: PermissionStatus;
                   if (resource === "settings" && action === "edit") {
                     // Check if any settings edit permissions exist
-                    const hasUsersEdit = getPermissionStatus(
-                      permissions,
-                      "settings",
-                      "users.edit",
-                    );
+                    const hasUsersEdit = getPermissionStatus(permissions, "settings", "users.edit");
                     const hasSystemEdit = getPermissionStatus(
                       permissions,
                       "settings",
-                      "system.edit",
+                      "system.edit"
                     );
                     const hasRegionsEdit = getPermissionStatus(
                       permissions,
                       "settings",
-                      "regions.edit",
+                      "regions.edit"
                     );
 
                     if (
@@ -304,9 +264,7 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                       key={`${resource}-${action}`}
                       align="center"
                       onClick={() =>
-                        interactive &&
-                        onCellClick &&
-                        onCellClick(resource, action, status)
+                        interactive && onCellClick && onCellClick(resource, action, status)
                       }
                       sx={
                         interactive

@@ -8,9 +8,6 @@ export default {
     hindi: "Hindi",
     arabic: "Arabe",
     hebrew: "Hébreu",
-    japanese: "Japonais",
-    korean: "Coréen",
-    spanish: "Espagnol",
   },
   assetsPage: {
     title: "Actifs",
@@ -25,18 +22,11 @@ export default {
     browsePath: "Parcourir le chemin",
     uploadingTo: "Téléchargement vers",
     restrictedToPrefix: "restreint",
-    allowedPrefixesInfo:
-      "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
-    pathInfo:
-      "Les fichiers seront téléchargés vers le chemin sélectionné dans le compartiment S3",
-    selectPathFirst: "Sélectionnez un chemin avant de télécharger",
-    pathResetWarning:
-      "Le changement de connecteur réinitialisera le chemin sélectionné",
+    allowedPrefixesInfo: "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
     connectorLabel: "Connecteur S3",
     selectConnectorPlaceholder: "Sélectionnez un connecteur S3",
     loadingConnectors: "Chargement des connecteurs...",
-    noConnectors:
-      "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
+    noConnectors: "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
     dashboardNote:
       "Seuls les fichiers de type audio/*, video/*, image/*, HLS (application/x-mpegURL) et MPEG-DASH (application/dash+xml) sont autorisés",
     meta: {
@@ -52,24 +42,98 @@ export default {
     prefixLabel: "Chemin autorisé",
     prefixHelper:
       "Vous ne pouvez parcourir et télécharger que vers les dossiers dans le chemin sélectionné.",
-    selectedPath: "Chemin sélectionné",
     currentPath: "Chemin actuel",
     confirm: "Utiliser ce chemin",
     validation: {
-      invalidPath:
-        "Le chemin sélectionné est en dehors des préfixes autorisés.",
+      invalidPath: "Le chemin sélectionné est en dehors des préfixes autorisés.",
       noPathSelected: "Veuillez naviguer vers un dossier avant de confirmer.",
     },
     error: {
       invalidConnector: "ID de connecteur non valide fourni.",
-      loadingFailed: "Échec du chargement des informations du connecteur.",
     },
     hints: {
-      clickFolder:
-        "Cliquez sur un dossier pour y naviguer, puis cliquez sur 'Sélectionner le dossier actuel' pour le choisir.",
       navigateAndConfirm:
         "Naviguez vers le dossier souhaité, puis cliquez sur 'Utiliser ce chemin' pour confirmer.",
-      rootPath: "Vous êtes actuellement au niveau racine.",
+    },
+  },
+  connectors: {
+    title: "Connecteurs",
+    description: "Gérez les connecteurs de stockage pour vos actifs multimédias",
+    addConnector: "Ajouter un connecteur",
+    editConnector: "Modifier le connecteur",
+    syncConnector: "Synchroniser le connecteur",
+    noConnectorsFound: "Aucun connecteur trouvé.",
+    fields: {
+      bucket: "Compartiment",
+      region: "Région",
+      description: "Description",
+      prefix: "Préfixe",
+      prefixes: "Préfixes",
+      integrationMethod: "Méthode d'intégration",
+      lastUpdated: "Dernière mise à jour",
+    },
+    apiMessages: {
+      creating: {
+        loading: "Création du connecteur...",
+        success: "Connecteur créé",
+        error: "Échec de la création du connecteur",
+      },
+      updating: {
+        loading: "Mise à jour du connecteur...",
+        success: "Connecteur mis à jour",
+        error: "Échec de la mise à jour du connecteur",
+      },
+      deleting: {
+        error: "Échec de la suppression du connecteur",
+      },
+      enabling: {
+        loading: "Activation du connecteur...",
+        success: "Connecteur activé",
+        successMessage: "Le connecteur a été activé avec succès.",
+        error: "Échec de l'activation du connecteur",
+      },
+      disabling: {
+        loading: "Désactivation du connecteur...",
+        success: "Connecteur désactivé",
+        successMessage: "Le connecteur a été désactivé avec succès.",
+        error: "Échec de la désactivation du connecteur",
+      },
+    },
+    form: {
+      connectorName: "Nom du connecteur",
+      connectorNameHelper: "Le nom du connecteur ne peut pas être modifié après la création",
+      description: "Description",
+      s3ConnectorType: "Type de connecteur S3",
+      s3IntegrationMethod: "Méthode d'intégration S3",
+      s3Bucket: "Compartiment S3",
+      newBucketName: "Nouveau nom de compartiment",
+      pathHelper: "Préfixe optionnel pour filtrer les objets (par ex., 'dossier/')",
+      bucket: "Compartiment",
+      region: "Région",
+      path: "Chemin",
+      objectPrefix: "Préfixe d'objet",
+      objectPrefixNumbered: "Préfixe d'objet {{number}}",
+      bucketNameHelper:
+        "Le nom du compartiment doit être globalement unique et suivre les règles de nommage S3.",
+      addPrefix: "Ajouter un préfixe",
+      allowUploads: "Autoriser les téléchargements",
+    },
+    status: {
+      active: "Actif",
+    },
+    dialogs: {
+      deleteTitle: "Supprimer le connecteur",
+      deleteConnectorConfirmation:
+        'Êtes-vous sûr de vouloir supprimer le connecteur "{{connectorName}}" ? Cette action est irréversible.',
+      eventBridgeWarning:
+        "Veuillez vous assurer de désactiver l'intégration EventBridge pour ce compartiment S3 si elle n'est plus nécessaire.",
+    },
+  },
+  assets: {
+    fileInformation: "Informations sur le Fichier",
+    technicalDetails: "Détails Techniques",
+    fields: {
+      size: "Taille",
     },
   },
   assetExplorer: {
@@ -85,16 +149,70 @@ export default {
     },
     deleteDialog: {
       title: "Confirmer la suppression",
-      description:
-        "Êtes-vous sûr de vouloir supprimer cet actif ? Cette action est irréversible.",
+      description: "Êtes-vous sûr de vouloir supprimer cet actif ? Cette action est irréversible.",
       cancel: "Annuler",
       confirm: "Supprimer",
+      deleting: "Suppression en cours...",
     },
+    failedToLoadAssets: "Échec du chargement des ressources",
+  },
+  home: {
+    description: "",
+    favorites: "Favoris",
+    stats: {
+      assignedTasks: "Tâches assignées",
+      activeTasks: "Tâches actives",
+      pipelineExecutions: "Exécutions de pipeline",
+      last24Hours: "Dernières 24 heures",
+      newAssets: "Nouveaux actifs",
+      uploadedToday: "Téléchargés aujourd'hui",
+    },
+  },
+  collectionsPage: {
+    title: "Collections",
+    description: "Organisez et gérez vos actifs multimédias dans des collections",
+    createCollection: "Créer une collection",
+    editCollection: "Modifier la collection",
+    noCollections: "Aucune collection trouvée",
+    collectionTypes: {
+      public: "Publique",
+      private: "Privée",
+    },
+    form: {
+      name: "Nom de la collection",
+      namePlaceholder: "Entrez le nom de la collection",
+      description: "Description",
+      descriptionPlaceholder: "Entrez une description pour cette collection",
+      type: "Type de collection",
+      parentCollection: "Collection parente",
+      selectParent: "Aucune (Niveau racine)",
+      isPublic: "Rendre cette collection publique",
+      validation: {
+        nameRequired: "Le nom de la collection est requis",
+        nameMinLength: "Le nom de la collection doit contenir au moins 2 caractères",
+        nameMaxLength: "Le nom de la collection ne doit pas dépasser 100 caractères",
+        descriptionMaxLength: "La description ne doit pas dépasser 500 caractères",
+      },
+    },
+    labels: {
+      public: "Publique",
+      private: "Privée",
+      shared: "Partagée",
+    },
+    dialogs: {
+      editTitle: "Modifier la collection",
+      deleteTitle: "Supprimer la collection",
+    },
+    collectionUpdated: "Collection updated successfully",
+    collectionUpdateFailed: "Failed to update collection",
+    collectionDeleted: "Collection deleted successfully",
+    collectionDeleteFailed: "Failed to delete collection",
   },
   sidebar: {
     menu: {
       home: "Accueil",
       assets: "Actifs",
+      collections: "Collections",
       pipelines: "Pipelines",
       pipelineExecutions: "Exécutions de pipeline",
       settings: "Paramètres",
@@ -102,10 +220,10 @@ export default {
     submenu: {
       system: "Paramètres système",
       connectors: "Connecteurs",
-      userManagement: "Gestion des utilisateurs",
-      roles: "Rôles",
       integrations: "Intégrations",
       environments: "Environnements",
+      usersAndGroups: "Utilisateurs et groupes",
+      permissionSets: "Permissions",
     },
   },
   profile: {
@@ -121,14 +239,16 @@ export default {
     changePassword: "Changer le mot de passe",
     twoFactorAuth: "Authentification à deux facteurs",
     appearance: "Apparence",
+    noFirstName: "L'utilisateur n'a pas de prénom configuré",
+    noLastName: "L'utilisateur n'a pas de nom de famille configuré",
   },
   app: {
     loading: "Chargement...",
     errors: {
       loadingConfig: "Erreur lors du chargement de la configuration AWS :",
-      loadingUserAttributes:
-        "Erreur lors du chargement des attributs utilisateur :",
+      loadingUserAttributes: "Erreur lors du chargement des attributs utilisateur :",
       signingOut: "Erreur lors de la déconnexion :",
+      somethingWentWrong: "Une erreur s'est produite",
     },
     navigation: {
       preventedDuplicate: "Navigation en double empêchée vers",
@@ -152,10 +272,36 @@ export default {
       },
     },
     filters: {
-      dateRange: "Plage de dates",
-      contentType: "Type de contenu",
-      storageLocation: "Emplacement de stockage",
-      comingSoon: "Plus de filtres bientôt disponibles...",
+      title: "Filtrer les résultats",
+      apply: "Appliquer les filtres",
+      reset: "Réinitialiser",
+      toDate: "Jusqu'à la date et l'heure",
+      fromDate: "À partir de la date et l'heure",
+      maxSize: "Max",
+      minSize: "Min",
+      creationDate: "Date de création",
+      after: "Après",
+      before: "Avant",
+      clearAll: "Clear All",
+      filenameSearch: "Search by filename",
+    },
+    bar: {
+      label: "Rechercher",
+      placeholder: "Rechercher (par ex., coucher de soleil type:image)",
+      helperText:
+        "Utilisez des mots-clés comme type:, format:, size:, date:, metadata: pour filtrer les résultats",
+    },
+    results: {
+      title: "Résultats",
+      error: "Erreur",
+      errorMessage: "Un problème est survenu lors de la récupération du contenu.",
+    },
+    facets: {
+      mediaType: "Type de média",
+      extension: "Extension",
+      size: "Taille",
+      date: "Date",
+      filename: "Nom de fichier",
     },
   },
   admin: {
@@ -166,16 +312,11 @@ export default {
       systemLoad: "Charge du système",
     },
     errors: {
-      userDeletionNotImplemented:
-        "La suppression d'utilisateur n'est pas encore implémentée.",
-      userCreationNotImplemented:
-        "La création d'utilisateur n'est pas encore implémentée.",
-      userEditingNotImplemented:
-        "La modification d'utilisateur n'est pas encore implémentée.",
-      analyticsExportNotImplemented:
-        "L'export des analyses n'est pas encore implémenté.",
-      systemResetNotImplemented:
-        "La réinitialisation du système n'est pas encore implémentée.",
+      userDeletionNotImplemented: "La suppression d'utilisateur n'est pas encore implémentée.",
+      userCreationNotImplemented: "La création d'utilisateur n'est pas encore implémentée.",
+      userEditingNotImplemented: "La modification d'utilisateur n'est pas encore implémentée.",
+      analyticsExportNotImplemented: "L'export des analyses n'est pas encore implémenté.",
+      systemResetNotImplemented: "La réinitialisation du système n'est pas encore implémentée.",
     },
     columns: {
       lastActive: "Dernière activité",
@@ -187,11 +328,21 @@ export default {
   },
   integrations: {
     title: "Intégrations",
-    selectProvider: "Sélectionnez une intégration",
-    selectIntegration: "Sélectionnez une intégration",
-    configureIntegration: "Configurer l'intégration",
     description: "Gérez vos intégrations et connexions",
     addIntegration: "Ajouter une intégration",
+    selectIntegration: "Sélectionner l'intégration",
+    configureIntegration: "Configurer l'intégration",
+    selectNode: {
+      title: "Sélectionner un nœud",
+      description: "Choisissez un type de nœud pour votre intégration",
+      noNodes: "Aucun nœud disponible",
+    },
+    deleteConfirmation: {
+      title: "Supprimer l'intégration",
+      message: "Êtes-vous sûr de vouloir supprimer cette intégration ?",
+      warning:
+        "Attention : La suppression de cette intégration peut entraîner l'échec des pipelines qui l'utilisent.",
+    },
     form: {
       search: {
         placeholder: "Rechercher des intégrations",
@@ -208,7 +359,6 @@ export default {
         description: {
           label: "Description",
           tooltip: "Fournissez une description pour cette intégration",
-          helper: "Brève description de cette intégration",
           errors: {
             required: "La description est requise",
           },
@@ -243,7 +393,6 @@ export default {
             apiKey: {
               label: "Clé API",
               tooltip: "Entrez votre clé API",
-              helper: "Clé API pour l'authentification avec le service",
               errors: {
                 required: "La clé API est requise",
               },
@@ -257,28 +406,59 @@ export default {
             },
           },
         },
-      },
-      errors: {
-        required: "Ce champ est requis",
-        nodeId: {
-          unrecognized_keys: "Sélection d'intégration invalide",
+        iamRole: {
+          label: "IAM Role ARN",
+          tooltip: "Enter the IAM role ARN for this integration",
+        },
+        apiKey: {
+          label: "API Key",
+          tooltip: "Enter the API key for this integration",
         },
       },
+      editTitle: "Edit Integration",
     },
-  },
-  pipelines: {
-    title: "Pipelines",
-    description: "Gérez vos pipelines de médias et métadonnées",
-    searchPlaceholder: "Recherchez des pipelines...",
     actions: {
-      create: "Ajouter un nouveau pipeline",
-      import: "Importer un pipeline",
+      edit: "Modifier l'intégration",
+      delete: "Supprimer l'intégration",
+    },
+    pipelines: {
+      searchPlaceholder: "Recherchez des pipelines...",
+      actions: {
+        edit: "Modifier le pipeline",
+        delete: "Supprimer le pipeline",
+      },
+      editor: {
+        seeLess: "Voir moins",
+        seeMore: "Voir plus",
+      },
+    },
+    editor: {
+      configureNode: "Configurer le nœud",
+      updatePipeline: "Mettre à jour le pipeline",
+      noChangesToSave: "Aucune modification à enregistrer",
+      pipelineNameRequired: "Le nom du pipeline est requis avant l'exportation",
+      atLeastOneNodeRequired: "Au moins un nœud doit être ajouté au canevas avant l'exportation",
+    },
+    integrationValidation: {
+      noIntegrationsAvailable:
+        "Aucune intégration n'est disponible dans cet environnement. Vous devrez créer des intégrations avant de pouvoir utiliser ces nœuds.",
+    },
+    triggerTypes: {
+      eventTriggered: "Déclenché par événement",
+      apiTriggered: "Déclenché par API",
+      manuallyTriggered: "Déclenché manuellement",
     },
   },
   executions: {
     title: "Exécutions de pipeline",
     description: "Surveillez et gérez vos exécutions de pipeline",
     searchPlaceholder: "Recherchez des exécutions de pipeline...",
+    fields: {
+      started: "Commencé",
+      ended: "Terminé",
+      status: "Statut",
+    },
+    details: "Détails de l'exécution",
     columns: {
       pipelineName: "Nom du pipeline",
       status: "Statut",
@@ -290,7 +470,6 @@ export default {
     actions: {
       retryFromCurrent: "Réessayer à partir de la position actuelle",
       retryFromStart: "Réessayer depuis le début",
-      viewDetails: "Voir les détails",
     },
   },
   users: {
@@ -299,11 +478,48 @@ export default {
     actions: {
       addUser: "Ajouter un utilisateur",
     },
+    apiMessages: {
+      creating: {
+        loading: "Création de l'utilisateur...",
+        success: "Utilisateur créé",
+        successMessage: "Le nouvel utilisateur a été créé avec succès.",
+        error: "Échec de la création de l'utilisateur",
+      },
+      updating: {
+        loading: "Mise à jour de l'utilisateur...",
+        success: "Utilisateur mis à jour",
+        successMessage: "L'utilisateur a été mis à jour avec succès.",
+        error: "Échec de la mise à jour de l'utilisateur",
+      },
+      deleting: {
+        loading: "Suppression de l'utilisateur...",
+        success: "Utilisateur supprimé",
+        successMessage: "L'utilisateur a été supprimé avec succès.",
+        error: "Échec de la suppression de l'utilisateur",
+      },
+      enabling: {
+        loading: "Activation de l'utilisateur...",
+        success: "Utilisateur activé",
+        successMessage: "L'utilisateur a été activé avec succès.",
+        error: "Échec de l'activation de l'utilisateur",
+      },
+      disabling: {
+        loading: "Désactivation de l'utilisateur...",
+        success: "Utilisateur désactivé",
+        successMessage: "L'utilisateur a été désactivé avec succès.",
+        error: "Échec de la désactivation de l'utilisateur",
+      },
+    },
     form: {
       title: {
         add: "Ajouter un utilisateur",
+        edit: "Edit User",
       },
       fields: {
+        groups: {
+          label: "Groupes",
+          tooltip: "Sélectionnez les groupes pour l'utilisateur",
+        },
         given_name: {
           label: "Prénom",
           tooltip: "Entrez le prénom de l'utilisateur",
@@ -338,10 +554,9 @@ export default {
         },
       },
     },
-    roles: {
-      admin: "Administrateur",
-      editor: "Éditeur",
-      viewer: "Spectateur",
+    status: {
+      active: "Active",
+      inactive: "Inactive",
     },
   },
   roles: {
@@ -350,15 +565,32 @@ export default {
     actions: {
       addRole: "Ajouter un rôle",
     },
+    tooltips: {
+      editRole: "Modifier le rôle",
+      deleteRole: "Supprimer le rôle",
+    },
   },
   settings: {
     environments: {
       title: "Environnements",
-      description:
-        "Gérez les environnements du système et leurs configurations",
+      description: "Gérez les environnements du système et leurs configurations",
       addButton: "Ajouter un environnement",
       searchPlaceholder: "Recherchez des environnements",
       createTitle: "Créer un environnement",
+      editTitle: "Modifier l'environnement",
+      updateSuccess: "Environnement mis à jour avec succès",
+      createSuccess: "Environnement créé avec succès",
+      submitError: "Échec de l'enregistrement de l'environnement",
+      deleteSuccess: "Environnement supprimé avec succès",
+      deleteError: "Échec de la suppression de l'environnement",
+      status: {
+        active: "Actif",
+        disabled: "Désactivé",
+      },
+      actions: {
+        edit: "Modifier",
+        delete: "Supprimer",
+      },
       form: {
         name: "Nom de l'environnement",
         region: "Région",
@@ -375,45 +607,86 @@ export default {
       title: "Paramètres système",
       tabs: {
         search: "Recherche",
-        notifications: "Notifications",
         security: "Sécurité",
-        performance: "Performance",
+        apiKeys: "API Keys",
+        collections: "Collections",
+        upgrades: "Upgrades",
       },
       search: {
         title: "Configuration de la recherche",
         description:
           "Configurez le fournisseur de recherche pour améliorer les capacités de recherche de vos actifs multimédias.",
-        provider: "Fournisseur de recherche :",
-        configureProvider: "Configurer le fournisseur de recherche",
-        editProvider: "Modifier le fournisseur",
-        resetProvider: "Réinitialiser le fournisseur",
-        providerDetails: "Détails du fournisseur",
-        providerName: "Nom du fournisseur",
+        provider: "Fournisseur de recherche sémantique",
         apiKey: "Clé API",
-        endpoint: "URL de l'endpoint (optionnel)",
-        enabled: "Recherche activée",
-        noProvider: "Aucun fournisseur de recherche configuré.",
-        configurePrompt:
-          "Configurez Twelve Labs pour activer les capacités de recherche.",
+        semanticEnabled: "Recherche sémantique activée",
+        semanticEnabledDesc: "Activez ou désactivez la fonctionnalité de recherche sémantique",
+        providerDesc:
+          "Sélectionnez le fournisseur d'intégration pour les capacités de recherche sémantique",
+        selectProvider: "Sélectionner le fournisseur",
+        editApiKey: "Modifier",
+        configured: "Configuré",
+        configureApiKey: "Configurer la clé API",
+        apiKeyDesc:
+          "Entrez votre clé API Twelve Labs pour activer la fonctionnalité de recherche sémantique.",
+        embeddingStore: "Magasin d'intégration de recherche sémantique",
+        embeddingStoreDesc:
+          "Choisissez le magasin d'intégration à utiliser pour les recherches sémantiques",
+        selectStore: "Sélectionner le magasin",
+        saveSuccess: "Paramètres enregistrés avec succès",
+        saveError: "Échec de l'enregistrement des paramètres",
+        cancelSuccess: "Modifications annulées",
+        errorLoading: "Erreur lors du chargement de la configuration du fournisseur de recherche",
+        preview: "Aperçu",
+        apiKeySaveError: "Failed to save API key",
+        apiKeySaveSuccess: "API key saved successfully",
+        external: "External",
+        internal: "Internal",
+        savingApiKey: "Saving API key...",
       },
-      notifications: {
-        title: "Paramètres de notifications",
-        comingSoon: "Paramètres de notification bientôt disponibles.",
+      upgrade: {
+        noHistory: "No upgrade history available",
+        historyTable: {
+          status: "Status",
+          from: "From Version",
+          to: "To Version",
+          duration: "Duration",
+          triggeredBy: "Triggered By",
+          date: "Date",
+          details: "Details",
+        },
+        title: "System Upgrade",
+        currentVersion: "Current Version",
+        upgradingTo: "Upgrading to",
+        lastUpgrade: "Last Upgrade",
+        availableVersions: "Available Versions",
+        history: "Upgrade History",
+        tags: "Tags",
+        noTags: "No tags available",
+        branches: "Branches",
+        noBranches: "No branches available",
+        confirmTitle: "Confirm Upgrade",
+        upgrading: "Upgrading...",
+        confirm: "Confirm",
       },
-      security: {
-        title: "Paramètres de sécurité",
-        comingSoon: "Paramètres de sécurité bientôt disponibles.",
-      },
-      performance: {
-        title: "Paramètres de performance",
-        comingSoon: "Paramètres de performance bientôt disponibles.",
+    },
+    apiKeys: {
+      form: {
+        importantNotice:
+          "Important : C'est la seule fois où vous pourrez voir cette clé API. Assurez-vous de la sauvegarder dans un endroit sûr.",
       },
     },
   },
   common: {
-    select: "Sélectionner",
     back: "Retour",
     search: "Rechercher",
+    batchOperations: {
+      deleteSelected: "Supprimer la sélection",
+    },
+    confirmBulkDelete: "Confirmer la suppression en masse",
+    typeDeleteToConfirm: "Tapez DELETE pour confirmer",
+    importingPipeline: "Importation du pipeline...",
+    failedToLoadNodes: "Échec du chargement des nœuds. Veuillez réessayer plus tard.",
+    alternativeTranscriptions: "Transcriptions alternatives :",
     profile: "Profil",
     logout: "Déconnexion",
     theme: "Thème",
@@ -421,22 +694,174 @@ export default {
     refresh: "Rafraîchir",
     cancel: "Annuler",
     save: "Enregistrer",
+    saving: "Enregistrement...",
     loading: "Chargement...",
+    notAvailable: "N/A",
     loadMore: "Charger plus",
     tableDensity: "Densité du tableau",
     moreInfo: "Plus d'informations",
     error: "Erreur",
     language: "Langue",
+    noUsersFound: "Aucun utilisateur trouvé",
+    noEnvironmentsFound: "Aucun environnement trouvé",
+    noIntegrationsFound: "Aucune intégration trouvée",
+    noPipelinesFound: "Aucun pipeline trouvé",
+    noPipelineExecutionsFound: "Aucune exécution de pipeline trouvée",
+    noCollectionTypesFound: "Aucun type de collection trouvé. Créez-en un pour commencer.",
+    noUpgradeHistory: "Aucun historique de mise à niveau disponible",
+    noResults: "Aucun résultat trouvé",
+    selectFilter: "Sélectionner un filtre",
+    textFilter: "Filtre textuel",
+    all: "Tous",
+    filter: "Filtrer",
     delete: "Supprimer",
-    create: "Créer",
+    validation: {
+      apiKeyRequired: "La clé API est requise",
+      integrationMustBeSelected: "Une intégration doit être sélectionnée",
+      fieldRequired: "Ce champ est requis",
+    },
+    messages: {
+      connectorDeletedSuccessfully: "Connecteur supprimé avec succès",
+      connectorSyncInitiated: "Synchronisation du connecteur initiée avec succès",
+      connectorCreatedSuccessfully: "Connecteur créé avec succès",
+      integrationDeletedSuccessfully: "L'intégration a été supprimée avec succès",
+      collectionDeletedSuccessfully: "Collection supprimée avec succès",
+      pipelineDeleted: "Le pipeline a été supprimé.",
+      failedToSyncConnector: "Échec de la synchronisation du connecteur",
+      failedToParsePipeline: "Échec de l'analyse du fichier de pipeline.",
+      unknownErrorOccurred: "Une erreur inconnue s'est produite",
+      unexpectedErrorOccurred: "Une erreur inattendue s'est produite",
+      tryAdjustingSearchOrFilter: "Essayez d'ajuster vos critères de recherche ou de filtre",
+      nameIsRequired: "Le nom est requis",
+      cannotEditSystemTypes: "Impossible de modifier les types système",
+      cannotDeleteSystemTypes: "Impossible de supprimer les types système",
+      editType: "Modifier le type",
+      deleteType: "Supprimer le type",
+      errorSavingRole: "Une erreur s'est produite lors de l'enregistrement du rôle",
+      errorDeletingRole: "Une erreur s'est produite lors de la suppression du rôle",
+      permissionSetNotFound: "Ensemble de permissions introuvable",
+      noUsersAssigned: "Aucun utilisateur assigné",
+      noGroupsAssigned: "Aucun groupe assigné",
+      connectToExistingS3Bucket: "Se connecter à un compartiment S3 existant",
+      createNewS3Bucket: "Créer un nouveau compartiment S3",
+    },
+    apply: "Appliquer",
+    clear: "Effacer",
+    clearFilter: "Effacer le filtre",
+    node: "Nœud",
+    icon: "Icône",
+    name: "Nom",
+    description: "Description",
+    category: "Catégorie",
+    enabled: "Activé",
+    disabled: "Désactivé",
+    system: "Système",
+    custom: "Personnalisé",
+    versions: "Versions",
+    full: "Complet",
+    clip: "Clip",
+    none: "Aucun",
+    clearChatHistory: "Effacer l'historique du chat",
+    closeChat: "Fermer le chat",
+    editPipeline: "Modifier le pipeline",
+    deletePipeline: "Supprimer le pipeline",
+    startPipeline: "Démarrer le pipeline",
+    stopPipeline: "Arrêter le pipeline",
+    moreOptions: "Plus d'options",
+    permit: "Autoriser",
+    deny: "Refuser",
+    notSet: "Non défini",
+    deleteApiKey: "Supprimer la clé API",
+    deleteApiKeyConfirmation:
+      'Êtes-vous sûr de vouloir supprimer la clé API "{{name}}" ? Cette action est irréversible et invalidera immédiatement toutes les applications utilisant cette clé.',
+    deleteApiKeyConfirmationGeneric: "Êtes-vous sûr de vouloir supprimer cette clé API ?",
+    editApiKey: "Modifier la clé API",
+    clickToEdit: "Cliquez pour modifier",
+    downloadVersion: "Télécharger cette version",
+    resetMarker: "Réinitialiser le marqueur à la position d'origine",
+    postComment: "Publier votre commentaire",
+    runPipeline: "Exécuter ce pipeline sur l'actif actuel",
+    browsePipelines: "Parcourir tous les pipelines disponibles",
+    loadMoreActivities: "Charger plus d'activités",
+    permissions: "Permissions",
     root: "Racine",
     folder: "Dossier",
     actions: {
       add: "Ajouter",
+      save: "Enregistrer",
+      delete: "Supprimer",
+      edit: "Modifier",
+      back: "Retour",
+      next: "Suivant",
+      activate: "Activer",
+      deactivate: "Désactiver",
+      download: "Télécharger",
+      rename: "Renommer",
+      lock: "Verrouiller",
+      restore: "Restaurer",
+      viewDetails: "Voir les détails",
+      addToCollection: "Ajouter à la collection",
+      assetDetail: "Détail de l'actif",
+      renameAsset: "Renommer l'actif",
+      viewAlternativeTranscriptions: "Voir les transcriptions alternatives",
+      exportTranscript: "Exporter la transcription",
+      downloadSelected: "Télécharger la sélection",
+      removeItem: "Retirer cet élément",
+      cancel: "Annuler",
+      deleting: "Suppression...",
+      saving: "Enregistrement...",
+      update: "Mettre à jour",
+      create: "Créer",
+      copied: "Copié !",
+    },
+    pipelineEditor: {
+      triggers: "Déclencheurs",
+      integrations: "Intégrations",
+      flow: "Flux",
+      utilities: "Utilitaires",
+    },
+    views: {
+      cardView: "Vue en carte",
+      tableView: "Vue en tableau",
+      smallCards: "Petites cartes",
+      mediumCards: "Cartes moyennes",
+      largeCards: "Grandes cartes",
+      verticalAspectRatio: "Rapport d'aspect vertical",
+      squareAspectRatio: "Rapport d'aspect carré",
+      horizontalAspectRatio: "Rapport d'aspect horizontal",
+      fitToContainer: "Ajuster au conteneur (maintenir le rapport d'aspect)",
+      fillContainer: "Remplir le conteneur (peut rogner l'image)",
+    },
+    dialogs: {
+      cancel: "Annuler",
+      close: "Fermer",
+      save: "Enregistrer",
+    },
+    labels: {
+      name: "Nom",
+      description: "Description",
+      status: "Statut",
+      enabled: "Activé",
+      disabled: "Désactivé",
+      active: "Actif",
+      inactive: "Inactif",
+      actions: "Actions",
+      region: "Région",
+    },
+    placeholders: {
+      filterValue: "Valeur du filtre",
+      apiKeyDescription: "Un nom descriptif pour cette clé API",
+      addComment: "Ajouter un commentaire...",
+      filterMetadata: "Filtrer les métadonnées…",
+      enterApiKey: "Entrez votre clé API",
+      searchPermissionSets: "Rechercher des ensembles de permissions...",
+      enterCollectionDescription: "Entrer la description de la collection",
     },
     columns: {
+      permissionSets: "Ensembles de permissions",
       username: "Nom d'utilisateur",
       firstName: "Prénom",
+      preview: "Aperçu",
       lastName: "Nom de famille",
       email: "Email",
       status: "Statut",
@@ -444,11 +869,222 @@ export default {
       created: "Créé",
       modified: "Modifié",
       actions: "Actions",
+      name: "Nom",
+      type: "Type",
+      updated: "Mis à jour",
     },
     status: {
       active: "Actif",
       inactive: "Inactif",
+      enabled: "Activé",
+      disabled: "Désactivé",
     },
+    viewControls: {
+      groupByType: "Grouper par type",
+      metadata: "Métadonnées",
+    },
+    breadcrumb: {
+      ariaLabels: {
+        deleteMarker: "Marqueur de suppression",
+        resetMarker: "Réinitialiser le marqueur",
+        pipelineFileOperations: "Opérations sur les fichiers de pipeline",
+        pipelineActions: "Actions du pipeline",
+        dataTable: "Tableau de données",
+      },
+    },
+    notifications: "Notifications",
+    noGroup: "No group",
+    darkMode: "Dark Mode",
+    toggleTheme: "Toggle theme",
+  },
+  detailPages: {
+    tabs: {
+      summary: "Résumé",
+      technical: "Métadonnées techniques",
+      descriptive: "Descriptif",
+      transcription: "Transcription",
+      relatedItems: "Éléments associés",
+    },
+    metadata: {
+      type: "Type",
+      size: "Taille",
+      format: "Format",
+      s3Bucket: "Compartiment S3",
+      objectName: "Nom de l'objet",
+      s3Uri: "URI S3",
+      duration: "Durée",
+      sampleRate: "Taux d'échantillonnage",
+      bitDepth: "Profondeur de bits",
+      channels: "Canaux",
+      bitRate: "Débit binaire",
+      codec: "Codec",
+      createdDate: "Date de création",
+      resolution: "Résolution",
+      frameRate: "Fréquence d'images",
+      dimensions: "Dimensions",
+      colorDepth: "Profondeur de couleur",
+      colorSpace: "Espace colorimétrique",
+      compression: "Compression",
+      allCategories: "Toutes les catégories",
+    },
+  },
+  permissionSets: {
+    title: "Matrice de permissions centrée sur les ressources",
+    description: "Gérez les ensembles de permissions pour contrôler l'accès aux ressources",
+    labels: {
+      permissionMatrix: "Matrice de permissions",
+    },
+    dialogs: {
+      detailsTitle: "Détails de l'ensemble de permissions",
+      deleteTitle: "Supprimer l'ensemble de permissions",
+    },
+    permissionMatrix: {
+      editTitle: "Modifier la matrice de permissions",
+    },
+    tabs: {
+      permissionMatrix: "Matrice de permissions",
+      assignedUsers: "Utilisateurs assignés",
+      assignedGroups: "Groupes assignés",
+    },
+    noAssignments: "No permission sets assigned",
+  },
+  apiKeys: {
+    title: "Gestion des clés API",
+    description: "Gérez les clés API pour l'accès programmatique au système",
+    addApiKey: "Ajouter une clé API",
+    searchPlaceholder: "Rechercher des clés API...",
+    categoryAll: "Toutes les clés API",
+    tooltips: {
+      copyApiKeyId: "Copier l'ID de la clé API",
+    },
+    form: {
+      name: "Nom",
+      description: "Description",
+      descriptionHelper: "Description optionnelle de l'utilisation de cette clé API",
+      enabled: "Activée",
+      rotateApiKey: "Rotation de la clé API",
+    },
+    loading: "Chargement des détails de la clé API...",
+    dialogs: {
+      detailsTitle: "Détails de la clé API",
+    },
+    details: {
+      description: "Description",
+      apiKeyId: "ID de la clé API",
+      created: "Créé",
+      lastUpdated: "Dernière mise à jour",
+      lastUsed: "Dernière utilisation",
+    },
+    errors: {
+      loadFailed: "Échec du chargement des détails de la clé API. Veuillez réessayer.",
+    },
+    emptyState: {
+      noApiKeys: "Aucune clé API trouvée",
+      noMatchingApiKeys: "Aucune clé API ne correspond à votre recherche",
+      createFirstApiKey: "Créez votre première clé API pour commencer",
+    },
+  },
+  userManagement: {
+    roleManagement: {
+      title: "Gestion des rôles",
+      addRole: "Ajouter un rôle",
+      editRole: "Modifier le rôle",
+      roleName: "Nom du rôle",
+      description: "Description",
+      addPermission: "Ajouter une permission",
+    },
+    form: {
+      roleName: "Nom du rôle",
+      permissions: "Permissions",
+    },
+  },
+  chat: {
+    typeYourMessage: "Tapez votre message...",
+    typeMessage: "Tapez un message...",
+  },
+  videoReview: {
+    title: "Revue vidéo",
+    addCommentPlaceholder: "Ajouter un commentaire...",
+  },
+  assetSidebar: {
+    thumbnailGeneration: "Génération de miniatures",
+    aiAnalysis: "Analyse IA",
+    tabs: {
+      markers: "Marqueurs",
+    },
+  },
+  favorites: {
+    noFavorites: "Aucun actif favori pour le moment",
+  },
+  transcription: {
+    searchPlaceholder: "Rechercher dans la transcription...",
+    quickSearchPlaceholder: "Recherche rapide...",
+  },
+  rightSidebar: {
+    filterOptions: "OPTIONS DE FILTRE",
+  },
+  collectionTypes: {
+    title: "Types de collection",
+    createType: "Créer un type",
+    description: "Gérez les types de collection pour organiser vos actifs multimédias",
+    labels: {
+      system: "Système",
+    },
+    alerts: {
+      cannotDeleteSystem: "Impossible de supprimer les types de collection système",
+      confirmDelete: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ?',
+    },
+    form: {
+      name: "Nom",
+      description: "Description",
+      customColor: "Couleur personnalisée (Hex)",
+      active: "Actif",
+      nameHelper: "{{count}}/50 caractères",
+      descriptionHelper: "{{count}}/255 caractères",
+      color: "Couleur",
+      preview: "Aperçu",
+      collectionNamePlaceholder: "Nom de la collection",
+      descriptionPlaceholder: "Description",
+      colorFormatHelper: "Entrez une couleur hexadécimale valide (ex. #FF5733)",
+    },
+    dialogs: {
+      editTitle: "Modifier le type de collection",
+      createTitle: "Créer un type de collection",
+      migrateTitle: "Migrer les collections",
+    },
+  },
+  upgradeSection: {
+    labels: {
+      latest: "Dernière",
+      current: "Actuelle",
+      default: "Par défaut",
+    },
+    dialogs: {
+      confirmUpgrade:
+        "Êtes-vous sûr de vouloir effectuer la mise à niveau vers {{version}} ? Cela déclenchera un pipeline de déploiement et pourrait causer une interruption temporaire du service.",
+    },
+  },
+  migrateCollectionType: {
+    targetType: "Type cible",
+  },
+  emptyStates: {
+    noRelatedItems: "Aucun élément associé trouvé",
+  },
+  errors: {
+    errorDetails: "Détails de l'erreur",
+    tryAgain: "Réessayer",
+    failedToLoadCollectionTypes: "Échec du chargement des types de collection",
+    somethingWentWrong: "Une erreur s'est produite !",
+    componentError: "Erreur de composant",
+    refreshPage: "Actualiser la page",
+    showDetails: "Afficher les détails",
+    hideDetails: "Masquer les détails",
+    saveFailed: "Failed to save changes",
+    loadFailed: "Failed to load data",
+    goToHomepage: "Go to Homepage",
+  },
+  rename: {
+    newName: "Nouveau nom",
   },
   s3Explorer: {
     filter: {
@@ -458,7 +1094,6 @@ export default {
     },
     loading: {
       initializing: "Chargement...",
-      fetchingContents: "Récupération du contenu...",
     },
     empty: {
       folder: "Ce dossier est vide",
@@ -468,460 +1103,155 @@ export default {
       navigation:
         "Utilisez les touches fléchées pour naviguer, Entrée pour ouvrir, Retour arrière pour revenir",
     },
-    menu: {
-      rename: "Renommer",
-      delete: "Supprimer",
+    breadcrumbs: {
+      prefixRoot: "Root",
+      navigateTo: "Navigate to {{path}}",
     },
-  },
-  translation: {
-    common: {
-      actions: {
-        add: "Ajouter",
-        edit: "Modifier",
-        delete: "Supprimer",
-        activate: "Activer",
-        deactivate: "Désactiver",
-        create: "Créer",
-      },
-      tableDensity: "Densité du tableau",
-      theme: "Thème",
-      back: "Retour",
-      loading: "Chargement...",
-      error: "Quelque chose s'est mal passé",
-      save: "Enregistrer",
-      cancel: "Annuler",
-      delete: "Supprimer",
-      edit: "Modifier",
-      search: "Rechercher",
-      profile: "Profil",
-      filterColumn: "Filtrer",
-      searchValue: "Rechercher",
-      logout: "Déconnexion",
-      language: "Langue",
-      alerts: "Alertes",
-      warnings: "Avertissements",
-      notifications: "Notifications",
-      searchPlaceholder: "Recherchez ou utilisez clé:valeur...",
-      close: "Fermer",
-      success: "Succès",
-      refresh: "Rafraîchir",
-      previous: "Précédent",
-      next: "Suivant",
-      show: "Afficher",
-      all: "Tous",
-      status: {
-        active: "Actif",
-        inactive: "Inactif",
-      },
-      rename: "Renommer",
-      root: "Racine",
-      folder: "Dossier",
-      loadMore: "Charger plus",
-      darkMode: "Mode sombre",
-      lightMode: "Mode clair",
-      filter: "Filtrer",
-      textFilter: "Filtre textuel",
-      selectFilter: "Sélectionner un filtre",
-      clearFilter: "Effacer le filtre",
-      columns: {
-        username: "Nom d'utilisateur",
-        firstName: "Prénom",
-        lastName: "Nom de famille",
-        email: "Email",
-        status: "Statut",
-        groups: "Groupes",
-        created: "Créé",
-        modified: "Modifié",
-        actions: "Actions",
-      },
-      noGroups: "Aucun groupe",
-      select: "Sélectionner",
-      moreInfo: "Plus d'informations",
-    },
-    users: {
-      title: "Gestion des utilisateurs",
-      search: "Rechercher des utilisateurs",
-      description: "Gérez les utilisateurs du système et leurs accès",
-      form: {
-        fields: {
-          given_name: {
-            label: "Prénom",
-            tooltip: "Entrez le prénom de l'utilisateur",
-            errors: {
-              required: "Le prénom est requis",
-            },
-          },
-          family_name: {
-            label: "Nom de famille",
-            tooltip: "Entrez le nom de famille de l'utilisateur",
-            errors: {
-              required: "Le nom de famille est requis",
-            },
-          },
-          email: {
-            label: "Email",
-            tooltip: "Entrez l'adresse email de l'utilisateur",
-            errors: {
-              required: "L'email est requis",
-              invalid: "Adresse email invalide",
-            },
-          },
-          enabled: {
-            label: "Activé",
-            tooltip: "Activez ou désactivez l'utilisateur",
-            errors: {
-              required: "L'activation est requise",
-            },
-          },
-          roles: {
-            label: "Rôles",
-            tooltip: "Sélectionnez les rôles pour l'utilisateur",
-            errors: {
-              required: "Les rôles sont requis",
-            },
-          },
-          email_verified: {
-            label: "Email vérifié",
-            tooltip: "Indiquez si l'email de l'utilisateur a été vérifié",
-            errors: {
-              required: "La vérification de l'email est requise",
-            },
-          },
-        },
-      },
-    },
-    roles: {
-      title: "Gestion des rôles",
-      description: "Gérez les rôles du système et leurs permissions",
-      admin: "Administrateur",
-      editor: "Éditeur",
-      viewer: "Spectateur",
-      actions: {
-        addRole: "Ajouter un rôle",
-      },
-    },
-    columns: {
-      username: "Nom d'utilisateur",
-      firstName: "Prénom",
-      lastName: "Nom de famille",
-      email: "Email",
-      status: "Statut",
-      groups: "Groupes",
-      created: "Créé",
-      modified: "Modifié",
-      actions: "Actions",
-    },
-    actions: {
-      addUser: "Ajouter un utilisateur",
-      edit: "Modifier l'utilisateur",
-      delete: "Supprimer l'utilisateur",
-      activate: "Activer l'utilisateur",
-      deactivate: "Désactiver l'utilisateur",
-    },
-    status: {
-      active: "Actif",
-      inactive: "Inactif",
-    },
-    errors: {
-      loadFailed: "Échec du chargement des utilisateurs",
-      saveFailed: "Échec de l'enregistrement de l'utilisateur",
-      deleteFailed: "Échec de la suppression de l'utilisateur",
-    },
-    navigation: {
-      home: "Accueil",
-      collections: "Collections",
-      settings: "Paramètres",
-    },
-    home: {
-      welcome: "Bienvenue sur Media Lake",
-      description: "Gérez et organisez efficacement vos fichiers multimédias",
-      statistics: "Statistiques",
-      collections: "Collections",
-      sharedCollections: "Collections partagées",
-      favorites: "Favoris",
-      smartFolders: "Dossiers intelligents",
-      connectedStorage: "Stockage connecté",
-      sharing: "Partage",
-      comingSoon: "Bientôt disponible",
-    },
-    notifications: {
-      "Pipeline Complete": "Pipeline terminé",
-      "Asset processing pipeline completed successfully":
-        "Le pipeline de traitement des actifs s'est terminé avec succès",
-      "Storage Warning": "Avertissement de stockage",
-      "Storage capacity reaching 80%": "Capacité de stockage atteignant 80%",
-      "Pipeline Failed": "Pipeline échoué",
-      "Video processing pipeline failed":
-        "Le pipeline de traitement vidéo a échoué",
-    },
-    modal: {
-      confirmDelete: "Êtes-vous sûr de vouloir supprimer cet élément ?",
-      confirmAction: "Êtes-vous sûr de vouloir effectuer cette action ?",
-      error: "Une erreur est survenue",
-      success: "Opération terminée avec succès",
-    },
-    executions: {
-      title: "Exécutions de pipeline",
-      description: "Surveillez et gérez vos exécutions de pipeline",
-      searchPlaceholder: "Recherchez des exécutions de pipeline...",
-      columns: {
-        pipelineName: "Nom du pipeline",
-        status: "Statut",
-        startTime: "Heure de début",
-        endTime: "Heure de fin",
-        duration: "Durée",
-        actions: "Actions",
-      },
-      status: {
-        succeeded: "Réussi",
-        failed: "Échoué",
-        running: "En cours",
-        timedOut: "Temps écoulé",
-        aborted: "Annulé",
-      },
-      actions: {
-        retryFromCurrent: "Réessayer à partir de la position actuelle",
-        retryFromStart: "Réessayer depuis le début",
-        viewDetails: "Voir les détails",
-      },
-      pagination: {
-        page: "Page {{page}} sur {{total}}",
-        showEntries: "Afficher {{count}}",
-      },
-    },
-    s3Explorer: {
-      filter: {
-        label: "Filtrer par nom",
-        clear: "Effacer le filtre",
-        resultsCount: "Affichage de {{count}} sur {{total}} éléments",
-      },
-      error: {
-        loading: "Erreur lors du chargement des objets S3 : {{message}}",
-        network:
-          "Erreur réseau. Veuillez vérifier votre connexion et réessayer.",
-        permission:
-          "Accès refusé. Vous n'avez pas la permission d'accéder à ce chemin.",
-        permissionWithPrefixes:
-          "Accès refusé. Vous ne pouvez accéder qu'aux chemins suivants : {{prefixes}}",
-        notFound: "Le chemin demandé n'existe pas.",
-        timeout: "Délai d'attente dépassé. Veuillez réessayer.",
-        retry: "Réessayer",
-      },
-      loading: {
-        initializing: "Chargement...",
-        fetchingContents: "Récupération des contenus...",
-      },
-      empty: {
-        folder: "Ce dossier est vide",
-        noResults: "Aucun élément ne correspond à votre filtre",
-      },
-      keyboard: {
-        navigation:
-          "Utilisez les touches fléchées pour naviguer, Entrée pour ouvrir, Retour arrière pour revenir en arrière",
-      },
-      menu: {
-        rename: "Renommer",
-        delete: "Supprimer",
-      },
-    },
-    assets: {
-      title: "Actifs",
-      connectedStorage: "Stockage connecté",
-    },
-    metadata: {
-      title: "Bientôt disponible",
-      description:
-        "Nous travaillons à vous offrir des fonctionnalités de gestion des métadonnées. Restez à l'écoute !",
-    },
-    pipelines: {
-      title: "Pipelines",
-      description: "Gérez vos pipelines de médias et métadonnées",
-      searchPlaceholder: "Recherchez des pipelines...",
-      actions: {
-        create: "Ajouter un nouveau pipeline",
-        deploy: "Déployer le pipeline d'images",
-        addNew: "Ajouter un nouveau pipeline",
-        viewAll: "Voir tous les pipelines",
-        import: "Importer un pipeline",
-      },
-      search: "Rechercher des pipelines",
-      deploy: "Déployer le pipeline d'images",
-      addNew: "Ajouter un nouveau pipeline",
-      columns: {
-        name: "Nom",
-        creationDate: "Date de création",
-        system: "Système",
-        type: "Type",
-        actions: "Actions",
-      },
-      editor: {
-        title: "Éditeur de pipeline",
-        save: "Enregistrer le pipeline",
-        validate: "Valider le pipeline",
-        sidebar: {
-          title: "Nœuds",
-          dragNodes: "Faites glisser les nœuds sur le canevas",
-          loading: "Chargement des nœuds...",
-          error: "Erreur lors du chargement des nœuds",
-        },
-        node: {
-          configure: "Configurer {{type}}",
-          delete: "Supprimer le nœud",
-          edit: "Modifier le nœud",
-        },
-        edge: {
-          title: "Modifier l'étiquette de la connexion",
-          label: "Étiquette de connexion",
-          delete: "Supprimer la connexion",
-        },
-        modals: {
-          error: {
-            title: "Erreur",
-            incompatibleNodes:
-              "La sortie du nœud précédent n'est pas compatible avec l'entrée du nœud de destination.",
-            validation: "La validation du pipeline a échoué",
-          },
-          delete: {
-            title: "Supprimer le pipeline",
-            message:
-              "Êtes-vous sûr de vouloir supprimer ce pipeline ? Cette action est irréversible.",
-            confirm: "Tapez le nom du pipeline pour confirmer la suppression :",
-          },
-        },
-        controls: {
-          undo: "Annuler",
-          redo: "Rétablir",
-          zoomIn: "Agrandir",
-          zoomOut: "Rétrécir",
-          fitView: "Adapter la vue",
-          lockView: "Verrouiller la vue",
-        },
-        notifications: {
-          saved: "Pipeline enregistré avec succès",
-          validated: "Validation du pipeline réussie",
-          error: {
-            save: "Échec de l'enregistrement du pipeline",
-            validation: "La validation du pipeline a échoué",
-            incompatibleNodes: "Connexion de nœud incompatible",
-          },
-        },
-      },
-    },
-    integrations: {
-      title: "Intégrations",
-      description: "Gérez vos intégrations et connexions",
-      addIntegration: "Ajouter une intégration",
-      selectIntegration: "Sélectionnez une intégration",
-      selectProvider: "Sélectionnez un fournisseur",
-      configureIntegration: "Configurer l'intégration",
-      deleteConfirmation: {
-        title: "Supprimer l'intégration",
-        message: "Êtes-vous sûr de vouloir supprimer cette intégration ?",
-        warning:
-          "Attention : La suppression de cette intégration peut entraîner l'échec des pipelines qui l'utilisent.",
-      },
-      form: {
-        title: "Ajouter une intégration",
-        fields: {
-          nodeId: {
-            label: "Intégration",
-            tooltip: "Sélectionnez un fournisseur d'intégration",
-            errors: {
-              required: "La sélection d'une intégration est requise",
-            },
-          },
-          description: {
-            label: "Description",
-            tooltip: "Fournissez une description pour cette intégration",
-            helper: "Brève description de cette intégration",
-            errors: {
-              required: "La description est requise",
-            },
-          },
-          environmentId: {
-            label: "Environnement",
-            tooltip: "Sélectionnez l'environnement pour cette intégration",
-            errors: {
-              required: "La sélection d'un environnement est requise",
-            },
-          },
-          enabled: {
-            label: "Activé",
-            tooltip: "Activez ou désactivez cette intégration",
-            errors: {
-              required: "L'activation est requise",
-            },
-          },
-          auth: {
-            type: {
-              label: "Type d'authentification",
-              tooltip: "Sélectionnez la méthode d'authentification",
-              options: {
-                awsIam: "AWS IAM",
-                apiKey: "Clé API",
-              },
-              errors: {
-                required: "Le type d'authentification est requis",
-              },
-            },
-            credentials: {
-              apiKey: {
-                label: "Clé API",
-                tooltip: "Entrez votre clé API",
-                helper: "Clé API pour l'authentification avec le service",
-                errors: {
-                  required: "La clé API est requise",
-                },
-              },
-              iamRole: {
-                label: "Rôle IAM",
-                tooltip: "Entrez l'ARN du rôle IAM",
-                errors: {
-                  required: "Le rôle IAM est requis",
-                },
-              },
-            },
-          },
-        },
-        search: {
-          placeholder: "Recherchez des intégrations",
-        },
-        errors: {
-          required: "Ce champ est requis",
-          nodeId: {
-            unrecognized_keys: "Sélection d'intégration invalide",
-          },
-        },
-      },
-      columns: {
-        nodeName: "Nom du nœud",
-        environment: "Environnement",
-        createdDate: "Date de création",
-        modifiedDate: "Date de modification",
-        actions: "Actions",
-      },
-      settings: {
-        environments: {
-          title: "Environnements",
-        },
-      },
+    error: {
+      loading: "Error loading contents",
+      permissionWithPrefixes:
+        "You don't have permission to access this path. Please select from the allowed prefixes.",
+      permission: "You don't have permission to access this path.",
+      notFound: "The requested path was not found.",
+      timeout: "Request timed out. Please try again.",
+      network: "Network error. Please check your connection.",
+      retry: "Retry",
     },
   },
   groups: {
     actions: {
-      addGroup: "Ajouter un groupe",
       editGroup: "Modifier le groupe",
-      deleteGroup: "Supprimer le groupe",
       createGroup: "Créer un groupe",
       manageGroups: "Gérer les groupes",
+      assignPermissionSet: "Assigner un ensemble de permissions",
+    },
+    permissionSets: "Ensembles de permissions",
+    noPermissionSets: "Aucun ensemble de permissions assigné",
+    noGroups: "No groups found",
+    noDescription: "No description",
+    noAvailableGroups: "No available groups",
+    noAvailablePermissionSets: "No available permission sets",
+    fields: {
+      name: "Name",
+      id: "Group ID",
+      idHelp: "A unique identifier for the group (lowercase, no spaces)",
+      description: "Description",
+      department: "Department",
+    },
+    messages: {
+      createSuccess: "Group created successfully",
+      createError: "Failed to create group",
+      updateSuccess: "Group updated successfully",
+      updateError: "Failed to update group",
+      deleteSuccess: "Group deleted successfully",
+      deleteError: "Failed to delete group",
+      confirmDelete: "Are you sure you want to delete this group?",
+      deleteWarning: "This action cannot be undone. All users will be removed from this group.",
+      assignPermissionSetSuccess: "Permission set assigned successfully",
+      assignPermissionSetError: "Failed to assign permission set",
+      removePermissionSetSuccess: "Permission set removed successfully",
+      removePermissionSetError: "Failed to remove permission set",
     },
   },
-  permissionSets: {
-    noAssignments: "Aucun ensemble de permissions",
-    actions: {
-      addPermissionSet: "Ajouter un ensemble de permissions",
-      editPermissionSet: "Modifier l'ensemble de permissions",
-      deletePermissionSet: "Supprimer l'ensemble de permissions",
+  fileUpload: {
+    errorMessages: {
+      errorDeletingPipeline: "Erreur lors de la suppression du pipeline",
     },
+  },
+  notifications: {
+    label: "Notification",
+    tooltip: {
+      new: "{{count}} Nouveau",
+      running: "{{count}} En cours",
+      none: "Aucune notification",
+    },
+    clearJobs: "Effacer les tâches",
+    clearJobsTooltip:
+      "Effacer les téléchargements terminés et échoués (les téléchargements actifs resteront)",
+    empty: "Aucune notification",
+    dismiss: "Ignorer",
+    fileSize: {
+      unknown: "Taille inconnue",
+    },
+    date: {
+      unknown: "Inconnu",
+    },
+    jobDetails: {
+      assets: "{{count}} actifs",
+      created: "Créé : {{date}}",
+      lastUpdated: "Dernière mise à jour : {{date}}",
+      filesBreakdown: "Fichiers compressés : {{zipped}}, Fichiers volumineux : {{large}}",
+    },
+  },
+  downloads: {
+    expired: "EXPIRÉ",
+    expires: "Expire",
+  },
+  pipelines: {
+    title: "Pipelines",
+    description: "Gérez vos pipelines de médias et de métadonnées",
+    searchPlaceholder: "Rechercher des pipelines...",
+    eventBridgeEditor: {
+      patternOperatorsGuide: "Guide des opérateurs de motifs",
+      formatJson: "Formater JSON",
+      exportToJson: "Exporter vers JSON",
+      importFromJson: "Importer depuis JSON",
+    },
+    actions: {
+      create: "Ajouter un nouveau pipeline",
+      import: "Importer un pipeline",
+    },
+    viewAll: "Voir tous les pipelines",
+    selectType: "Sélectionner le type",
+    selectS3Type: "Sélectionner le type S3",
+    configuration: "Configuration",
+    editConnector: "Modifier le connecteur",
+    addConnector: "Ajouter un connecteur",
+    saveChanges: "Enregistrer les modifications",
+    loadingNodeConfiguration: "Loading node configuration...",
+    updatePipeline: "Update Pipeline",
+    savePipeline: "Save Pipeline",
+    namePlaceholder: "Enter pipeline name",
+    integrationValidation: {
+      title: "Integration Validation Required",
+      invalidIntegrationId: "Invalid integration ID",
+      replacementIntegration: "Replacement Integration",
+      selectIntegration: "Select Integration",
+    },
+    dialogs: {
+      deleteTitle: "Supprimer le Pipeline",
+      deleteConfirmation: "Are you sure you want to delete this pipeline?",
+      deleteWarning: "This action cannot be undone.",
+    },
+    editor: {
+      searchNodes: "Search nodes...",
+      updatePipeline: "Update Pipeline",
+      update: "Update",
+      rotateNode: "Rotate ({{rotation}}°)",
+      updateWarning: "Are you sure you want to update this pipeline?",
+    },
+  },
+  actions: {
+    addUser: "Ajouter User",
+    delete: "Supprimer",
+    edit: "Modifier",
+  },
+  columns: {
+    actions: "Actions",
+    email: "E-mail",
+    firstName: "Prénom",
+    status: "Statut",
+  },
+  nodes: {
+    noConfiguration: "No configuration required for this node",
+  },
+  config: {
+    loadingAwsConfiguration: "Chargement AWS configuration...",
+  },
+  permissions: {
+    accessDenied: "Access Denied - You don't have permission to view this page",
+  },
+  validation: {
+    required: "This field is required",
   },
 };

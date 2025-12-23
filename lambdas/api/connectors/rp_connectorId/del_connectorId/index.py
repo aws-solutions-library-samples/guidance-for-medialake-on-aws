@@ -370,9 +370,18 @@ def remove_event_notification_by_name(
                 "EventBridgeConfiguration"
             ]
 
-        # Process all configuration types except EventBridgeConfiguration
-        for config_type, configs in current_config.items():
-            if config_type != "EventBridgeConfiguration":
+        # Configuration types that contain lists of notification configs
+        # Exclude ResponseMetadata and EventBridgeConfiguration
+        notification_config_types = [
+            "TopicConfigurations",
+            "QueueConfigurations",
+            "LambdaFunctionConfigurations",
+        ]
+
+        # Process only valid notification configuration types
+        for config_type in notification_config_types:
+            configs = current_config.get(config_type)
+            if configs and isinstance(configs, list):
                 filtered_configs = [
                     config
                     for config in configs

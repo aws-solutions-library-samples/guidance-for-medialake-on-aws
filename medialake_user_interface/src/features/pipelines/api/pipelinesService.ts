@@ -11,16 +11,12 @@ import type {
 
 export class PipelinesService {
   static async getPipelines(): Promise<PipelinesResponse> {
-    const response = await apiClient.get<PipelinesResponse>(
-      PIPELINES_API.endpoints.GET_PIPELINES,
-    );
+    const response = await apiClient.get<PipelinesResponse>(PIPELINES_API.endpoints.GET_PIPELINES);
     return response.data;
   }
 
   static async getPipeline(id: string): Promise<Pipeline> {
-    const response = await apiClient.get<any>(
-      PIPELINES_API.endpoints.GET_PIPELINE(id),
-    );
+    const response = await apiClient.get<any>(PIPELINES_API.endpoints.GET_PIPELINE(id));
 
     // Check if the response has the expected structure
     if (response.data && response.data.data && response.data.data.pipeline) {
@@ -32,10 +28,7 @@ export class PipelinesService {
         return {
           id: pipelineData.id,
           name: pipelineData.definition.name || pipelineData.name || "",
-          description:
-            pipelineData.definition.description ||
-            pipelineData.description ||
-            "",
+          description: pipelineData.definition.description || pipelineData.description || "",
           configuration: pipelineData.definition.configuration ||
             pipelineData.configuration || {
               nodes: [],
@@ -70,10 +63,7 @@ export class PipelinesService {
     pipeline_name: string;
     message: string;
   }> {
-    const response = await apiClient.post<any>(
-      PIPELINES_API.endpoints.CREATE_PIPELINE,
-      data,
-    );
+    const response = await apiClient.post<any>(PIPELINES_API.endpoints.CREATE_PIPELINE, data);
     return response.data;
   }
 
@@ -84,16 +74,11 @@ export class PipelinesService {
     pipeline: Pipeline | null;
   }> {
     const encodedArn = encodeURIComponent(executionArn);
-    const response = await apiClient.get<any>(
-      `/pipelines/status/${encodedArn}`,
-    );
+    const response = await apiClient.get<any>(`/pipelines/status/${encodedArn}`);
     return response.data;
   }
 
-  static async updatePipeline(
-    id: string,
-    data: UpdatePipelineDto,
-  ): Promise<Pipeline> {
+  static async updatePipeline(id: string, data: UpdatePipelineDto): Promise<Pipeline> {
     // For deployed pipelines, use the pipelines endpoint with pipeline_id
     if (data.updateDeployed) {
       // Create a new request object with the pipeline_id
@@ -106,7 +91,7 @@ export class PipelinesService {
 
       const response = await apiClient.post<any>(
         PIPELINES_API.endpoints.CREATE_PIPELINE,
-        updateData,
+        updateData
       );
       return response.data;
     }
@@ -114,7 +99,7 @@ export class PipelinesService {
     // For non-deployed pipelines, use the existing update endpoint
     const response = await apiClient.put<Pipeline>(
       PIPELINES_API.endpoints.UPDATE_PIPELINE(id),
-      data,
+      data
     );
     return response.data;
   }
@@ -122,32 +107,24 @@ export class PipelinesService {
   static async deletePipeline(id: string): Promise<void> {
     console.log(`[PipelinesService] Deleting pipeline with ID: ${id}`);
     console.log(
-      `[PipelinesService] Using endpoint: ${PIPELINES_API.endpoints.DELETE_PIPELINE(id)}`,
+      `[PipelinesService] Using endpoint: ${PIPELINES_API.endpoints.DELETE_PIPELINE(id)}`
     );
 
     // Simple, direct approach - let the controller handle timeouts and retries
     await apiClient.delete(PIPELINES_API.endpoints.DELETE_PIPELINE(id));
-    console.log(
-      `[PipelinesService] Delete request sent for pipeline ID: ${id}`,
-    );
+    console.log(`[PipelinesService] Delete request sent for pipeline ID: ${id}`);
   }
 
-  static async updateStatus(
-    id: string,
-    status: Partial<PipelineStatus>,
-  ): Promise<Pipeline> {
-    const response = await apiClient.patch<Pipeline>(
-      PIPELINES_API.endpoints.UPDATE_STATUS(id),
-      {
-        status,
-      },
-    );
+  static async updateStatus(id: string, status: Partial<PipelineStatus>): Promise<Pipeline> {
+    const response = await apiClient.patch<Pipeline>(PIPELINES_API.endpoints.UPDATE_STATUS(id), {
+      status,
+    });
     return response.data;
   }
 
   static async getPipelineRuns(id: string): Promise<PipelineRun[]> {
     const response = await apiClient.get<PipelineRun[]>(
-      PIPELINES_API.endpoints.GET_PIPELINE_RUNS(id),
+      PIPELINES_API.endpoints.GET_PIPELINE_RUNS(id)
     );
     return response.data;
   }

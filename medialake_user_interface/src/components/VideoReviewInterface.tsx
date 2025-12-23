@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Typography,
   Paper,
@@ -17,7 +18,7 @@ import {
 import { ThumbUp, ThumbDown, Comment, Close } from "@mui/icons-material";
 import { PLACEHOLDER_IMAGE } from "../utils/placeholderSvg";
 
-interface Comment {
+interface ReviewComment {
   id: string;
   text: string;
   timestamp: Date;
@@ -30,16 +31,15 @@ interface VideoReviewData {
   description: string;
   thumbnailUrl: string;
   status: "pending" | "approved" | "denied";
-  comments: Comment[];
+  comments: ReviewComment[];
 }
 
 interface VideoReviewInterfaceProps {
   onClose: () => void;
 }
 
-const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
-  onClose,
-}) => {
+const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({ onClose }) => {
+  const { t } = useTranslation();
   const [currentReview, setCurrentReview] = useState<VideoReviewData>({
     id: "1",
     title: "Sample Video",
@@ -63,7 +63,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
   const handleAddComment = () => {
     if (!newComment.trim()) return;
 
-    const comment: Comment = {
+    const comment: ReviewComment = {
       id: Date.now().toString(),
       text: newComment,
       timestamp: new Date(),
@@ -88,7 +88,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
           mb: 2,
         }}
       >
-        <Typography variant="h5">Video Review</Typography>
+        <Typography variant="h5">{t("videoReview.title")}</Typography>
         <IconButton onClick={onClose}>
           <Close />
         </IconButton>
@@ -158,7 +158,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
             multiline
             rows={2}
             variant="outlined"
-            placeholder="Add a comment..."
+            placeholder={t("videoReview.addCommentPlaceholder")}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
           />
@@ -179,9 +179,7 @@ const VideoReviewInterface: React.FC<VideoReviewInterfaceProps> = ({
                 <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
                   <Avatar>{comment.author[0]}</Avatar>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2">
-                      {comment.author}
-                    </Typography>
+                    <Typography variant="subtitle2">{comment.author}</Typography>
                     <Typography variant="body2" color="text.secondary">
                       {comment.timestamp.toLocaleString()}
                     </Typography>

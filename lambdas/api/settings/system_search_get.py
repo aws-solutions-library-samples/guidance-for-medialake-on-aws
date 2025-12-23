@@ -14,12 +14,12 @@ dynamodb = boto3.resource("dynamodb")
 # Provider metadata with capabilities and location info
 PROVIDER_METADATA = {
     "twelvelabs-api": {
-        "name": "TwelveLabs API",
-        "isExternal": True,
+        "name": "TwelveLabs Marengo Embed 2.7 API",
+        "isExternal": False,
         "supportedMediaTypes": ["image", "video", "audio"],
     },
     "twelvelabs-bedrock": {
-        "name": "TwelveLabs Bedrock",
+        "name": "TwelveLabs Marengo Embed 2.7 on Bedrock",
         "isExternal": False,
         "supportedMediaTypes": ["image", "video", "audio"],
     },
@@ -101,7 +101,7 @@ def register_route(app):
                         search_provider
                         if search_provider
                         else {
-                            "name": "TwelveLabs API",
+                            "name": "TwelveLabs Marengo Embed 2.7 API",
                             "type": "twelvelabs-api",
                             "isConfigured": False,
                             "isEnabled": False,

@@ -1,23 +1,8 @@
 // src/permissions/context/permission-context.tsx
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-} from "react";
-import { Ability } from "@casl/ability";
-import {
-  AppAbility,
-  Actions,
-  Subjects,
-  createAppAbility,
-} from "../types/ability.types";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { AppAbility, createAppAbility } from "../types/ability.types";
 import { PermissionContextType, User } from "../types/permission.types";
-import {
-  defineAbilityFor,
-  extractUserFromClaims,
-} from "../utils/ability-factory";
+import { defineAbilityFor, extractUserFromClaims } from "../utils/ability-factory";
 import { transformPermissions } from "../transformers/permission-transformer";
 import { useGetPermissionSets } from "../../api/hooks/usePermissionSets";
 import { useAuth } from "../../common/hooks/auth-context";
@@ -36,11 +21,7 @@ const PermissionContext = createContext<PermissionContextType>({
  * Permission Provider component that makes the ability instance available
  * throughout the app
  */
-export function PermissionProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function PermissionProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
@@ -88,15 +69,9 @@ export function PermissionProvider({
           if (tokenParts.length === 3) {
             const payload = JSON.parse(atob(tokenParts[1]));
             console.log("=== JWT Token Claims ===");
-            console.log(
-              "Full token payload:",
-              JSON.stringify(payload, null, 2),
-            );
+            console.log("Full token payload:", JSON.stringify(payload, null, 2));
             console.log("cognito:groups claim:", payload["cognito:groups"]);
-            console.log(
-              "custom:permissions claim:",
-              payload["custom:permissions"],
-            );
+            console.log("custom:permissions claim:", payload["custom:permissions"]);
             console.log("cognito:username claim:", payload["cognito:username"]);
             console.log("sub claim:", payload.sub);
             console.log("email claim:", payload.email);
@@ -159,20 +134,12 @@ export function PermissionProvider({
               // Parse custom:permissions from JWT
               if (payload["custom:permissions"]) {
                 try {
-                  const customPermissions = JSON.parse(
-                    payload["custom:permissions"],
-                  );
-                  console.log(
-                    "Parsed custom permissions from refreshed token:",
-                    customPermissions,
-                  );
+                  const customPermissions = JSON.parse(payload["custom:permissions"]);
+                  console.log("Parsed custom permissions from refreshed token:", customPermissions);
                   // Store permissions in user object
                   extractedUser.customPermissions = customPermissions;
                 } catch (e) {
-                  console.error(
-                    "Failed to parse custom:permissions from refreshed token:",
-                    e,
-                  );
+                  console.error("Failed to parse custom:permissions from refreshed token:", e);
                 }
               }
 
@@ -229,16 +196,11 @@ export function PermissionProvider({
 
         // Check if we have custom permissions from JWT
         if ((user as any).customPermissions) {
-          console.log(
-            "Using custom permissions from JWT, skipping permission sets API",
-          );
+          console.log("Using custom permissions from JWT, skipping permission sets API");
 
           // Create ability using custom permissions (empty permission sets)
           const newAbility = defineAbilityFor(user, []);
-          console.log(
-            "New ability created with custom permissions:",
-            newAbility,
-          );
+          console.log("New ability created with custom permissions:", newAbility);
           setAbility(newAbility);
           setPermissionsInitialized(true);
 
@@ -252,15 +214,13 @@ export function PermissionProvider({
               newAbility,
               [],
               token,
-              expiresIn,
+              expiresIn
             );
           }
         } else if (permissionSets) {
           // If no custom permissions but we have permission sets from API
           // Transform permission sets to the format expected by CASL
-          const transformedPermissions = transformPermissions(
-            permissionSets || [],
-          );
+          const transformedPermissions = transformPermissions(permissionSets || []);
           console.log("Transformed permissions:", transformedPermissions);
 
           // Create the ability instance
@@ -279,15 +239,13 @@ export function PermissionProvider({
               newAbility,
               permissionSets,
               token,
-              expiresIn,
+              expiresIn
             );
           }
         } else if (!shouldFetchPermissions) {
           // If no custom permissions and no permission sets yet, enable fetching
           // but only if we haven't already enabled it
-          console.log(
-            "No custom permissions in JWT, enabling permission sets API fetch",
-          );
+          console.log("No custom permissions in JWT, enabling permission sets API fetch");
           setShouldFetchPermissions(true);
           setPermissionsInitialized(false);
         }
@@ -319,19 +277,12 @@ export function PermissionProvider({
   const value = {
     ability,
     loading:
-      isLoading ||
-      authLoading ||
-      !isInitialized ||
-      (isAuthenticated && !permissionsInitialized),
+      isLoading || authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
     error,
     refreshPermissions,
   };
 
-  return (
-    <PermissionContext.Provider value={value}>
-      {children}
-    </PermissionContext.Provider>
-  );
+  return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
 
 /**
@@ -341,9 +292,7 @@ export function PermissionProvider({
 export function usePermissionContext() {
   const context = useContext(PermissionContext);
   if (context === undefined) {
-    throw new Error(
-      "usePermissionContext must be used within a PermissionProvider",
-    );
+    throw new Error("usePermissionContext must be used within a PermissionProvider");
   }
   return context;
 }

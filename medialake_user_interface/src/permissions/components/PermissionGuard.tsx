@@ -53,17 +53,12 @@ export function PermissionGuard({
 
   // If not authenticated after initialization, redirect to sign-in
   if (isInitialized && !isAuthenticated) {
-    console.log(
-      "PermissionGuard: User not authenticated, redirecting to sign-in",
-    );
+    console.log("PermissionGuard: User not authenticated, redirecting to sign-in");
     return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 
   // Check if the user has permission
-  console.log(
-    "🔒 PermissionGuard: Starting permission check for route:",
-    location.pathname,
-  );
+  console.log("🔒 PermissionGuard: Starting permission check for route:", location.pathname);
   console.log("🔒 Required permission:", { action, subject, field });
   console.log("🔒 Auth state:", {
     isAuthenticated,
@@ -83,10 +78,7 @@ export function PermissionGuard({
 
   // If fallback is provided, render it
   if (fallback) {
-    console.log(
-      "🔒 PermissionGuard: Using fallback component for",
-      location.pathname,
-    );
+    console.log("🔒 PermissionGuard: Using fallback component for", location.pathname);
     return <>{fallback}</>;
   }
 
@@ -105,11 +97,7 @@ export function PermissionGuard({
  * @param field Optional field to check
  * @returns A function that takes a component and returns a guarded component
  */
-export function withPermission(
-  action: Actions,
-  subject: Subjects,
-  field?: string,
-) {
+export function withPermission(action: Actions, subject: Subjects, field?: string) {
   return function (Component: React.ComponentType<any>) {
     return function WithPermissionComponent(props: any) {
       return (
@@ -140,7 +128,7 @@ export function RoutePermissionGuard({
     "🛡️  RoutePermissionGuard: Protecting route",
     location.pathname,
     "with permission:",
-    permission,
+    permission
   );
 
   return (

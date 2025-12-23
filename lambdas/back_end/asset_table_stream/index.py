@@ -221,6 +221,15 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], dict, List[di
 
             if event_name == "REMOVE":
                 document_id = record["dynamodb"]["OldImage"]["InventoryID"]["S"]
+
+                # Skip internal LOCK records - they should never be indexed
+                if document_id.startswith("LOCK#"):
+                    if VERBOSE_LOGGING:
+                        logger.info(
+                            f"Skipping LOCK record: {document_id}",
+                            extra={"document_id": document_id, "operation": "skip"},
+                        )
+                    continue
                 bulk_actions.append(
                     {
                         "_op_type": "delete",
@@ -244,6 +253,15 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], dict, List[di
 
                 document = dynamodb_item_to_dict(new_image)
                 document_id = document["InventoryID"]
+
+                # Skip internal LOCK records - they should never be indexed
+                if document_id.startswith("LOCK#"):
+                    if VERBOSE_LOGGING:
+                        logger.info(
+                            f"Skipping LOCK record: {document_id}",
+                            extra={"document_id": document_id, "operation": "skip"},
+                        )
+                    continue
 
                 bulk_actions.append(
                     {
@@ -269,6 +287,15 @@ def prepare_bulk_actions(records: List[dict]) -> Tuple[List[dict], dict, List[di
 
                 document = dynamodb_item_to_dict(new_image)
                 document_id = document["InventoryID"]
+
+                # Skip internal LOCK records - they should never be indexed
+                if document_id.startswith("LOCK#"):
+                    if VERBOSE_LOGGING:
+                        logger.info(
+                            f"Skipping LOCK record: {document_id}",
+                            extra={"document_id": document_id, "operation": "skip"},
+                        )
+                    continue
 
                 bulk_actions.append(
                     {
@@ -349,7 +376,7 @@ def chunk_bulk_actions(actions: List[dict]) -> List[List[dict]]:
 @retry_with_backoff(max_retries=15, base_delay=3, max_delay=60)
 def execute_bulk_operation(
     actions: List[dict], action_to_record_map: dict
-) -> Tuple[int, List[dict]]:
+) -> Tuple[int, List[dict], dict]:
     """
     Execute bulk operation on OpenSearch with retry logic for 429 errors.
 
@@ -358,10 +385,11 @@ def execute_bulk_operation(
         action_to_record_map: Mapping of document_id to original DynamoDB record
 
     Returns:
-        Tuple of (success_count, failed_records)
+        Tuple of (success_count, failed_records, error_details_map)
+        error_details_map: dict mapping document_id to error details
     """
     if not actions:
-        return 0, []
+        return 0, [], {}
 
     logger.info(f"Executing bulk operation with {len(actions)} actions")
 
@@ -392,6 +420,7 @@ def execute_bulk_operation(
     )
 
     failed_records = []
+    error_details_map = {}
     has_429_errors = False
 
     if failed:
@@ -402,6 +431,27 @@ def execute_bulk_operation(
             error_info = item.get("index", item.get("update", item.get("delete", {})))
             status = error_info.get("status", 0)
             item_id = error_info.get("_id", "unknown")
+            error_details = error_info.get("error", {})
+
+            detailed_error_info = {
+                "status": status,
+                "error_type": (
+                    error_details.get("type", "unknown")
+                    if isinstance(error_details, dict)
+                    else "unknown"
+                ),
+                "error_reason": (
+                    error_details.get("reason", str(error_details))
+                    if error_details
+                    else "No error details provided"
+                ),
+                "error_index": error_info.get("_index", INDEX),
+                "opensearch_error": (
+                    json.dumps(error_details, cls=DecimalEncoder)
+                    if error_details
+                    else "{}"
+                ),
+            }
 
             if status == 429:
                 has_429_errors = True
@@ -413,15 +463,18 @@ def execute_bulk_operation(
                 logger.error(
                     "Bulk operation item failed",
                     extra={
-                        "error": error_info.get("error"),
+                        "error": error_details,
                         "status": status,
                         "item_id": item_id,
+                        "error_type": detailed_error_info["error_type"],
+                        "error_reason": detailed_error_info["error_reason"],
                     },
                 )
 
             # Map failed action back to original record
             if item_id in action_to_record_map:
                 failed_records.append(action_to_record_map[item_id])
+                error_details_map[item_id] = detailed_error_info
                 if VERBOSE_LOGGING:
                     logger.info(
                         f"Mapped failed action to original record",
@@ -429,6 +482,7 @@ def execute_bulk_operation(
                             "item_id": item_id,
                             "status": status,
                             "failed_item_index": idx,
+                            "error_type": detailed_error_info["error_type"],
                         },
                     )
             else:
@@ -456,11 +510,21 @@ def execute_bulk_operation(
     metrics.add_metric(name="BulkOperationSuccess", unit="Count", value=success)
     metrics.add_metric(name="BulkOperationFailed", unit="Count", value=len(failed))
 
-    return success, failed_records
+    return success, failed_records, error_details_map
 
 
-def send_to_dlq(records: List[dict], reason: str):
-    """Send failed records to DLQ."""
+def send_to_dlq(records: List[dict], reason: str, error_details_map: dict = None):
+    """
+    Send failed records to DLQ with detailed error information.
+
+    Args:
+        records: List of DynamoDB stream records that failed
+        reason: General failure reason
+        error_details_map: Optional dict mapping InventoryID to detailed error info
+    """
+    if error_details_map is None:
+        error_details_map = {}
+
     for record in records:
         try:
             event_name = record.get("eventName")
@@ -476,17 +540,65 @@ def send_to_dlq(records: List[dict], reason: str):
             else:
                 continue
 
+            inventory_id = document.get("InventoryID", "unknown")
+            error_details = error_details_map.get(inventory_id, {})
+
+            message_attributes = {
+                "MessageType": {"DataType": "String", "StringValue": message_type},
+                "FailureReason": {"DataType": "String", "StringValue": reason},
+                "EventName": {"DataType": "String", "StringValue": event_name},
+                "InventoryID": {"DataType": "String", "StringValue": inventory_id},
+            }
+
+            if error_details:
+                message_attributes.update(
+                    {
+                        "ErrorStatus": {
+                            "DataType": "Number",
+                            "StringValue": str(error_details.get("status", 0)),
+                        },
+                        "ErrorType": {
+                            "DataType": "String",
+                            "StringValue": error_details.get("error_type", "unknown"),
+                        },
+                        "ErrorReason": {
+                            "DataType": "String",
+                            "StringValue": error_details.get(
+                                "error_reason", "No reason provided"
+                            )[:256],
+                        },
+                        "ErrorIndex": {
+                            "DataType": "String",
+                            "StringValue": error_details.get("error_index", INDEX),
+                        },
+                    }
+                )
+
+                opensearch_error = error_details.get("opensearch_error", "{}")
+                if len(opensearch_error) <= 256:
+                    message_attributes["OpenSearchError"] = {
+                        "DataType": "String",
+                        "StringValue": opensearch_error,
+                    }
+
             sqs.send_message(
                 QueueUrl=SQS_URL,
                 MessageBody=json.dumps(document, cls=DecimalEncoder),
-                MessageAttributes={
-                    "MessageType": {"DataType": "String", "StringValue": message_type},
-                    "FailureReason": {"DataType": "String", "StringValue": reason},
-                    "EventName": {"DataType": "String", "StringValue": event_name},
-                },
+                MessageAttributes=message_attributes,
             )
 
             metrics.add_metric(name="DLQMessagesSent", unit="Count", value=1)
+
+            if VERBOSE_LOGGING:
+                logger.info(
+                    "Sent record to DLQ",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "reason": reason,
+                        "error_status": error_details.get("status"),
+                        "error_type": error_details.get("error_type"),
+                    },
+                )
 
         except Exception as e:
             logger.error(
@@ -555,7 +667,7 @@ def lambda_handler(event, context):
                     f"Processing chunk {i+1}/{len(action_chunks)} with {len(chunk)} actions"
                 )
 
-                success_count, failed_records = execute_bulk_operation(
+                success_count, failed_records, error_details = execute_bulk_operation(
                     chunk, action_to_record_map
                 )
                 total_success += success_count
@@ -569,9 +681,15 @@ def lambda_handler(event, context):
                             extra={
                                 "chunk_number": i + 1,
                                 "failed_count": len(failed_records),
+                                "error_types": list(
+                                    set(
+                                        e.get("error_type")
+                                        for e in error_details.values()
+                                    )
+                                ),
                             },
                         )
-                    send_to_dlq(failed_records, "Bulk operation failed")
+                    send_to_dlq(failed_records, "Bulk operation failed", error_details)
                 elif VERBOSE_LOGGING:
                     logger.info(f"Chunk {i+1} completed successfully with no failures")
 

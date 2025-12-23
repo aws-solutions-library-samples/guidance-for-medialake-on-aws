@@ -17,7 +17,7 @@ import { TableHeader } from "./TableHeader";
 import { TableCellContent } from "./TableCellContent";
 import { EmptyTableState, EmptyTableStateProps } from "./EmptyTableState";
 import { useTableDensity } from "../../../contexts/TableDensityContext";
-import { Table as MUITable } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 interface ResizableTableProps<T> {
   table: TanStackTable<T>;
@@ -26,10 +26,7 @@ interface ResizableTableProps<T> {
   rows: Row<T>[];
   maxHeight?: string;
   onRowClick?: (row: Row<T>) => void;
-  onFilterClick?: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterClick?: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   activeFilters?: Array<{ columnId: string; value: string }>;
   activeSorting?: Array<{ columnId: string; desc: boolean }>;
   onRemoveFilter?: (columnId: string) => void;
@@ -41,13 +38,11 @@ interface ResizableTableProps<T> {
   emptyState?: EmptyTableStateProps;
 }
 
-type TableProps = React.ComponentProps<typeof MUITable>;
-
 const useTableStyles = (
   theme: any,
   mode: "compact" | "normal",
   hasRowClick: boolean,
-  rowCount: number,
+  rowCount: number
 ) => {
   const isDark = theme.palette.mode === "dark";
 
@@ -122,6 +117,9 @@ const useTableStyles = (
           "& .MuiIconButton-root, & .MuiChip-root": {
             cursor: "pointer",
           },
+          "& .column-resizer": {
+            cursor: "col-resize !important",
+          },
         },
         "& .MuiTableHead-root .MuiTableCell-root": {
           backgroundColor: isDark
@@ -168,33 +166,23 @@ const useTableStyles = (
         borderRadius: "12px",
       },
     }),
-    [
-      theme.palette.mode,
-      theme.palette.primary.main,
-      mode,
-      isDark,
-      hasRowClick,
-      rowCount,
-    ],
+    [theme.palette.mode, theme.palette.primary.main, mode, isDark, hasRowClick, rowCount]
   );
 };
 
 export function ResizableTable<T>({
   table,
   containerRef,
-  virtualizer,
+  // virtualizer,
   rows,
-  maxHeight = "100%",
   onRowClick,
   onFilterClick,
-  activeFilters = [],
-  activeSorting = [],
-  onRemoveFilter,
-  onRemoveSort,
-  togglingPipelines = {},
-  onToggleActive,
+  // onRemoveFilter,
+  // onRemoveSort,
+  // onToggleActive,
   emptyState,
 }: ResizableTableProps<T>) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { mode } = useTableDensity();
   const styles = useTableStyles(theme, mode, Boolean(onRowClick), rows.length);
@@ -211,7 +199,7 @@ export function ResizableTable<T>({
         onRowClick?.(row);
       }
     },
-    [onRowClick],
+    [onRowClick]
   );
 
   return (
@@ -223,7 +211,7 @@ export function ResizableTable<T>({
         flexDirection: "column",
       }}
       role="grid"
-      aria-label="Data table"
+      aria-label={t("common.breadcrumb.ariaLabels.dataTable", "Data table")}
     >
       <Paper
         elevation={0}
@@ -248,8 +236,7 @@ export function ResizableTable<T>({
             minHeight:
               rows.length > 0
                 ? `${
-                    rows.length * (mode === "compact" ? 40 : 48) +
-                    (mode === "compact" ? 32 : 40)
+                    rows.length * (mode === "compact" ? 40 : 48) + (mode === "compact" ? 32 : 40)
                   }px`
                 : "auto",
             overflow: rows.length <= 3 ? "visible" : "auto",
@@ -264,11 +251,7 @@ export function ResizableTable<T>({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} role="row">
                   {headerGroup.headers.map((header) => (
-                    <TableHeader
-                      key={header.id}
-                      header={header}
-                      onFilterClick={onFilterClick}
-                    />
+                    <TableHeader key={header.id} header={header} onFilterClick={onFilterClick} />
                   ))}
                 </TableRow>
               ))}
@@ -276,10 +259,7 @@ export function ResizableTable<T>({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={table.getAllColumns().length}
-                    sx={{ p: 0, border: 0 }}
-                  >
+                  <TableCell colSpan={table.getAllColumns().length} sx={{ p: 0, border: 0 }}>
                     <EmptyTableState
                       message={emptyState?.message}
                       icon={emptyState?.icon}
@@ -304,10 +284,7 @@ export function ResizableTable<T>({
                     }}
                   >
                     {row.getVisibleCells().map((cell) => {
-                      const content = flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      );
+                      const content = flexRender(cell.column.columnDef.cell, cell.getContext());
 
                       return (
                         <TableCell

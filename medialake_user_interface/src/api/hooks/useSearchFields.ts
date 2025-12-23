@@ -35,13 +35,13 @@ export const useSearchFields = () => {
       try {
         const response = await apiClient.get<SearchFieldsResponseType>(
           `${API_ENDPOINTS.SEARCH}/fields`,
-          { signal },
+          { signal }
         );
 
         // Check if the response status is not a success (2xx)
         if (response.data?.status && !response.data.status.startsWith("2")) {
           const error = new Error(
-            response.data.message || "Search fields request failed",
+            response.data.message || "Search fields request failed"
           ) as SearchFieldsError;
           error.apiResponse = response.data;
           throw error;
@@ -58,7 +58,7 @@ export const useSearchFields = () => {
         // Handle axios errors
         if (axios.isAxiosError(error) && error.response?.data) {
           const apiError = new Error(
-            error.response.data.message || "Search fields request failed",
+            error.response.data.message || "Search fields request failed"
           ) as SearchFieldsError;
           apiError.apiResponse = error.response.data;
           throw apiError;

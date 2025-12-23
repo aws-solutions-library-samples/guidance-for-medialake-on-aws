@@ -167,8 +167,6 @@ export interface PipelineResponse {
   };
 }
 
-export interface Pipeline extends PipelineResponse {}
-
 export interface PipelineListResponse {
   status: string;
   message: string;

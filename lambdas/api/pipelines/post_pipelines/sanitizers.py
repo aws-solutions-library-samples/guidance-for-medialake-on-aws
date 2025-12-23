@@ -5,6 +5,8 @@ Sanitization utilities for Step Functions state machine names and IAM roles.
 import os
 import re
 
+from aws_lambda_powertools import Logger
+
 # Get resource prefix from environment
 resource_prefix = os.environ.get("RESOURCE_PREFIX", "")
 
@@ -75,22 +77,82 @@ def sanitize_state_name(name: str, node_id: str) -> str:
     """
     Create a sanitized state name for a Step Functions state.
 
+    AWS Step Functions enforces an 80-character limit on state names.
+    This function ensures the name is valid and within the limit while
+    maintaining uniqueness through the node_id suffix.
+
     Args:
         name: The original name (typically node label)
         node_id: The node ID to ensure uniqueness
 
     Returns:
-        A sanitized state name suitable for Step Functions states
+        A sanitized state name suitable for Step Functions states (max 80 chars)
     """
-    # Create a unique state name that combines the name and node ID
-    unique_state_name = f"{name} ({node_id})"
+    logger = Logger()
 
-    # Sanitize the state name to ensure it's valid for Step Functions
+    # AWS Step Functions has an 80-character limit for state names
+    max_length = 80
+
+    # Sanitize the node_id part first
+    sanitized_node_id = "".join(c if c.isalnum() else "_" for c in node_id)
+
+    # Reserve space for the node_id suffix (including separators)
+    # Format will be: "name_part__node_id_"
+    node_id_suffix = f"__{sanitized_node_id}_"
+    reserved_space = len(node_id_suffix)
+
+    # Sanitize the descriptive name part
     # Remove special characters and spaces that might cause issues
-    sanitized_state_name = "".join(c if c.isalnum() else "_" for c in unique_state_name)
+    sanitized_name = "".join(c if c.isalnum() else "_" for c in name)
 
-    # Ensure it starts with a letter or number
-    if not sanitized_state_name[0].isalnum():
-        sanitized_state_name = "state_" + sanitized_state_name
+    # Remove consecutive underscores to reduce length
+    while "__" in sanitized_name:
+        sanitized_name = sanitized_name.replace("__", "_")
+
+    # Remove leading/trailing underscores
+    sanitized_name = sanitized_name.strip("_")
+
+    # Ensure it starts with a letter or number, add prefix if needed
+    prefix = ""
+    if sanitized_name and not sanitized_name[0].isalnum():
+        prefix = "state_"
+        sanitized_name = sanitized_name.lstrip("_")
+    elif not sanitized_name:
+        prefix = "state_"
+
+    # Calculate available space for the descriptive name part (including prefix)
+    available_space = max_length - reserved_space - len(prefix)
+
+    # Truncate the name part if necessary
+    if len(sanitized_name) > available_space:
+        original_length = len(sanitized_name)
+        sanitized_name = sanitized_name[:available_space]
+        logger.info(
+            f"Truncated state name from {original_length} to {len(sanitized_name)} characters "
+            f"to fit 80-char limit. Original: '{name}', Node ID: '{node_id}'"
+        )
+
+    # Combine the parts
+    sanitized_state_name = f"{prefix}{sanitized_name}{node_id_suffix}"
+
+    # Final verification and safety check
+    if len(sanitized_state_name) > max_length:
+        logger.warning(
+            f"State name '{sanitized_state_name}' ({len(sanitized_state_name)} chars) still exceeds {max_length} chars. "
+            f"Applying emergency truncation. Original: '{name}', Node ID: '{node_id}'"
+        )
+        # Emergency truncation: Keep only the suffix to ensure uniqueness
+        # and fit as much of the name as possible
+        available_for_name = max_length - reserved_space - len(prefix)
+        sanitized_name = sanitized_name[:available_for_name]
+        sanitized_state_name = f"{prefix}{sanitized_name}{node_id_suffix}"
+
+    # Absolute final check - this should never trigger but ensures correctness
+    if len(sanitized_state_name) > max_length:
+        logger.error(
+            f"CRITICAL: State name '{sanitized_state_name}' ({len(sanitized_state_name)} chars) "
+            f"STILL exceeds {max_length} chars after all processing. Forcing truncation."
+        )
+        sanitized_state_name = sanitized_state_name[:max_length]
 
     return sanitized_state_name

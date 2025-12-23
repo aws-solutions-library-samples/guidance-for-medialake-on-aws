@@ -23,8 +23,7 @@ export function usePermission() {
   const can = useCallback(
     (action: Actions, subject: Subjects | any, field?: string) => {
       // Generate a cache key based on the parameters
-      const subjectKey =
-        typeof subject === "string" ? subject : JSON.stringify(subject);
+      const subjectKey = typeof subject === "string" ? subject : JSON.stringify(subject);
       const cacheKey = `${action}:${subjectKey}:${field || ""}`;
 
       // Check global cache first for performance
@@ -49,7 +48,7 @@ export function usePermission() {
 
       return result;
     },
-    [ability, loading],
+    [ability, loading]
   );
 
   /**
@@ -64,7 +63,7 @@ export function usePermission() {
     (action: Actions, subject: Subjects | any, field?: string) => {
       return !can(action, subject, field);
     },
-    [can],
+    [can]
   );
 
   return { ability, can, cannot, loading, error };
@@ -90,7 +89,7 @@ export function useSubjectPermission(subject: any) {
     (action: Actions, field?: string) => {
       return can(action, subject, field);
     },
-    [can, subject],
+    [can, subject]
   );
 
   /**
@@ -104,7 +103,7 @@ export function useSubjectPermission(subject: any) {
     (action: Actions, field?: string) => {
       return cannot(action, subject, field);
     },
-    [cannot, subject],
+    [cannot, subject]
   );
 
   return { can: canOnSubject, cannot: cannotOnSubject, loading, error };

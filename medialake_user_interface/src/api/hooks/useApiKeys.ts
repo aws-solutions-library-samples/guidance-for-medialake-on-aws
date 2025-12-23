@@ -30,20 +30,18 @@ export const useGetApiKeys = (enabled = false) => {
     queryFn: async ({ signal }) => {
       try {
         console.log(
-          `Fetching API keys... [${new Date().toISOString()}] from hook instance: ${hookId}`,
+          `Fetching API keys... [${new Date().toISOString()}] from hook instance: ${hookId}`
         );
         const { data } = await apiClient.get<any>(API_ENDPOINTS.API_KEYS.BASE, {
           signal,
         });
         console.log(
-          `API keys API response [${new Date().toISOString()}] for hook instance: ${hookId}`,
+          `API keys API response [${new Date().toISOString()}] for hook instance: ${hookId}`
         );
 
         // Use robust parser to handle all response formats
         const apiKeys = parseApiKeysList(data);
-        console.log(
-          `Parsed ${apiKeys.length} API keys for hook instance: ${hookId}`,
-        );
+        console.log(`Parsed ${apiKeys.length} API keys for hook instance: ${hookId}`);
         return apiKeys;
       } catch (error: any) {
         // Use centralized error handling for 403 errors
@@ -62,7 +60,7 @@ export const useGetApiKey = (id: string, enabled = true) => {
       const { data } = await apiClient.get<ApiKeyListResponse>(
         // const { data } = await apiClient.get<any>(
         API_ENDPOINTS.API_KEYS.GET(id),
-        { signal },
+        { signal }
       );
       console.log("API key API response:", data);
 
@@ -106,9 +104,7 @@ export const useUpdateApiKey = () => {
         statusCode: number;
         body: string;
       }>(API_ENDPOINTS.API_KEYS.UPDATE(id), updates);
-      return parseStringBodyResponse<ApiKeyResponse | RotateApiKeyResponse>(
-        data,
-      );
+      return parseStringBodyResponse<ApiKeyResponse | RotateApiKeyResponse>(data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

@@ -382,6 +382,143 @@ class VpcConfig(BaseModel):
         return self
 
 
+class CloudFrontCustomDomainConfig(BaseModel):
+    """Configuration for CloudFront custom domain settings"""
+
+    domain_name: Optional[str] = None
+    certificate_arn: Optional[str] = None
+
+    @field_validator("domain_name")
+    @classmethod
+    def validate_domain_name_format(cls, v):
+        """Validate DNS hostname format.
+
+        Domain name must:
+        - Contain only alphanumeric characters, hyphens, and dots
+        - Not start or end with a hyphen or dot
+        - Have valid label structure (labels separated by dots)
+        - Each label must be 1-63 characters
+        - Total length must not exceed 253 characters
+        """
+        # Skip validation if value is None or empty/whitespace
+        if not v or not v.strip():
+            return v
+
+        import re
+
+        domain = v.strip()
+
+        # Check total length
+        if len(domain) > 253:
+            raise ValueError(
+                f"Invalid domain name: total length exceeds 253 characters. "
+                f"Domain name: {domain}"
+            )
+
+        # Check for leading or trailing dots or hyphens
+        if domain.startswith(".") or domain.endswith("."):
+            raise ValueError(
+                f"Invalid domain name: cannot start or end with a dot. "
+                f"Domain name: {domain}"
+            )
+
+        if domain.startswith("-") or domain.endswith("-"):
+            raise ValueError(
+                f"Invalid domain name: cannot start or end with a hyphen. "
+                f"Domain name: {domain}"
+            )
+
+        # Split into labels and validate each
+        labels = domain.split(".")
+
+        if len(labels) < 2:
+            raise ValueError(
+                f"Invalid domain name: must contain at least one dot (e.g., example.com). "
+                f"Domain name: {domain}"
+            )
+
+        # Pattern for valid DNS label: alphanumeric and hyphens, not starting/ending with hyphen
+        label_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
+
+        for label in labels:
+            if not label:
+                raise ValueError(
+                    f"Invalid domain name: contains empty label (consecutive dots). "
+                    f"Domain name: {domain}"
+                )
+
+            if len(label) > 63:
+                raise ValueError(
+                    f"Invalid domain name: label '{label}' exceeds 63 characters. "
+                    f"Domain name: {domain}"
+                )
+
+            if not re.match(label_pattern, label):
+                raise ValueError(
+                    f"Invalid domain name: label '{label}' contains invalid characters "
+                    f"or starts/ends with a hyphen. Labels must contain only alphanumeric "
+                    f"characters and hyphens, and cannot start or end with a hyphen. "
+                    f"Domain name: {domain}"
+                )
+
+        return domain
+
+    @field_validator("certificate_arn")
+    @classmethod
+    def validate_certificate_arn_format(cls, v):
+        """Validate ACM certificate ARN format and region.
+
+        Certificate ARN must:
+        - Match the AWS ACM ARN format pattern
+        - Be in us-east-1 region (CloudFront requirement)
+        """
+        # Skip validation if value is None or empty/whitespace
+        if not v or not v.strip():
+            return v
+
+        import re
+
+        # ACM certificate ARN pattern: arn:aws:acm:region:account-id:certificate/certificate-id
+        arn_pattern = r"^arn:aws:acm:([a-z0-9-]+):(\d{12}):certificate/([a-f0-9-]+)$"
+
+        match = re.match(arn_pattern, v)
+        if not match:
+            raise ValueError(
+                f"Invalid certificate ARN format. Expected format: "
+                f"arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID. "
+                f"Received: {v}"
+            )
+
+        # Extract region from ARN
+        region = match.group(1)
+
+        # CloudFront requires certificates to be in us-east-1
+        if region != "us-east-1":
+            raise ValueError(
+                f"ACM certificate must be in us-east-1 region for CloudFront custom domains. "
+                f"Certificate is in {region} region. Please create or import a certificate in us-east-1."
+            )
+
+        return v
+
+    @model_validator(mode="after")
+    def validate_both_or_neither(self):
+        """Validate that both domain_name and certificate_arn are provided together or both omitted.
+
+        Treats null, empty string, and whitespace-only values as "not configured".
+        """
+        # Normalize values - treat None, empty, and whitespace-only as "not configured"
+        has_domain = bool(self.domain_name and self.domain_name.strip())
+        has_cert = bool(self.certificate_arn and self.certificate_arn.strip())
+
+        if has_domain != has_cert:
+            raise ValueError(
+                "Both domain_name and certificate_arn must be provided together, "
+                "or both must be omitted. Custom domain configuration requires both fields."
+            )
+        return self
+
+
 class CDKConfig(BaseModel):
     """Configuration for CDK Application"""
 
@@ -403,6 +540,7 @@ class CDKConfig(BaseModel):
     )
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
+    cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
 
     @property
     def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:

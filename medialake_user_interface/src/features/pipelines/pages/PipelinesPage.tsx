@@ -11,14 +11,10 @@ import {
   ClickAwayListener,
   MenuList,
   MenuItem,
-  useTheme,
-  alpha,
-  IconButton,
+  // alpha,
+  // IconButton,
 } from "@mui/material";
-import {
-  Add as AddIcon,
-  FileUpload as FileUploadIcon,
-} from "@mui/icons-material";
+import { Add as AddIcon, FileUpload as FileUploadIcon } from "@mui/icons-material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -43,10 +39,7 @@ import { PipelinesService } from "../api/pipelinesService";
 import { PipelineDeleteDialog } from "../components";
 import PipelineList from "../components/PipelineList";
 import { usePipelineManager } from "../hooks/usePipelineManager";
-import {
-  usePipelineColumns,
-  defaultColumnVisibility,
-} from "../hooks/usePipelineColumns";
+import { usePipelineColumns, defaultColumnVisibility } from "../hooks/usePipelineColumns";
 import { TableFiltersProvider } from "../context/TableFiltersContext";
 
 // Define query keys for prefetching
@@ -58,7 +51,6 @@ const PIPELINES_QUERY_KEYS = {
 const PipelinesPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const theme = useTheme();
 
   // Add Pipeline Button Menu state
   const addPipelineButtonRef = useRef<HTMLDivElement>(null);
@@ -86,28 +78,17 @@ const PipelinesPage: React.FC = () => {
   const [columnVisibility, setColumnVisibility] = useState(() => {
     try {
       const saved = localStorage.getItem("pipelineTableColumns");
-      return saved && saved !== "undefined"
-        ? JSON.parse(saved)
-        : defaultColumnVisibility;
+      return saved && saved !== "undefined" ? JSON.parse(saved) : defaultColumnVisibility;
     } catch (error) {
-      console.error(
-        "Error parsing column visibility from localStorage:",
-        error,
-      );
+      console.error("Error parsing column visibility from localStorage:", error);
       return defaultColumnVisibility;
     }
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [isDeletingInProgress, setIsDeletingInProgress] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -218,8 +199,8 @@ const PipelinesPage: React.FC = () => {
       setApiStatus({
         open: true,
         status: "success",
-        action: "Pipeline deleted successfully",
-        message: "The pipeline has been deleted.",
+        action: t("integrations.pipelines.actions.delete"),
+        message: t("common.messages.pipelineDeleted"),
       });
 
       // Auto-close the modal after a few seconds
@@ -231,9 +212,8 @@ const PipelinesPage: React.FC = () => {
       setApiStatus({
         open: true,
         status: "error",
-        action: "Error deleting pipeline",
-        message:
-          error instanceof Error ? error.message : "An unknown error occurred",
+        action: t("fileUpload.errorMessages.errorDeletingPipeline"),
+        message: error instanceof Error ? error.message : t("common.messages.unknownErrorOccurred"),
       });
     } finally {
       // Reset deletion in progress
@@ -268,10 +248,7 @@ const PipelinesPage: React.FC = () => {
   };
 
   // Handle filter column
-  const handleFilterColumn = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterColumn = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
     setActiveFilterColumn(columnId);
     setFilterMenuAnchor(event.currentTarget);
   };
@@ -283,17 +260,12 @@ const PipelinesPage: React.FC = () => {
   };
 
   // Handle column visibility changes with persistence
-  const handleColumnVisibilityChange = (
-    updatedVisibility: Record<string, boolean>,
-  ) => {
+  const handleColumnVisibilityChange = (updatedVisibility: Record<string, boolean>) => {
     if (!updatedVisibility) return;
     setColumnVisibility(updatedVisibility);
     try {
       if (Object.keys(updatedVisibility).length > 0) {
-        localStorage.setItem(
-          "pipelineTableColumns",
-          JSON.stringify(updatedVisibility),
-        );
+        localStorage.setItem("pipelineTableColumns", JSON.stringify(updatedVisibility));
       }
     } catch (error) {
       console.error("Error saving column visibility to localStorage:", error);
@@ -343,7 +315,7 @@ const PipelinesPage: React.FC = () => {
         });
       },
     }),
-    [columnFilters, sorting],
+    [columnFilters, sorting]
   );
 
   // Create columns
@@ -383,15 +355,19 @@ const PipelinesPage: React.FC = () => {
   });
 
   return (
-    <Box
-      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
-    >
+    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title={t("pipelines.title")}
         description={t("pipelines.description")}
         action={
           <>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 3.5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 1, md: 3.5 },
+              }}
+            >
               <RefreshButton
                 onRefresh={handleRefresh}
                 isRefreshing={isRefreshing}
@@ -401,7 +377,7 @@ const PipelinesPage: React.FC = () => {
               <ButtonGroup
                 variant="contained"
                 ref={addPipelineButtonRef}
-                aria-label="Pipeline actions"
+                aria-label={t("common.breadcrumb.ariaLabels.pipelineActions")}
                 sx={{
                   boxShadow: "none",
                   "&:hover": {
@@ -415,21 +391,33 @@ const PipelinesPage: React.FC = () => {
                   sx={{
                     borderRadius: "8px 0 0 8px",
                     textTransform: "none",
-                    px: 3,
+                    px: { xs: 1.5, md: 3 },
                     height: 40,
+                    minWidth: { xs: "auto", md: "auto" },
+                    "& .MuiButton-startIcon": {
+                      marginRight: { xs: 0, md: 1 },
+                      marginLeft: 0,
+                    },
                   }}
                 >
-                  {t("pipelines.actions.create")}
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: "none", md: "inline" },
+                    }}
+                  >
+                    {t("pipelines.actions.create")}
+                  </Box>
                 </Button>
                 <Button
                   size="small"
                   sx={{
                     borderRadius: "0 8px 8px 0",
                     height: 40,
+                    minWidth: { xs: 32, md: "auto" },
+                    px: { xs: 0.5, md: 1 },
                   }}
-                  aria-controls={
-                    addPipelineMenuOpen ? "add-pipeline-menu" : undefined
-                  }
+                  aria-controls={addPipelineMenuOpen ? "add-pipeline-menu" : undefined}
                   aria-expanded={addPipelineMenuOpen ? "true" : undefined}
                   aria-label="select pipeline action"
                   aria-haspopup="menu"
@@ -471,63 +459,47 @@ const PipelinesPage: React.FC = () => {
                           processedFlow.configuration.edges
                         ) {
                           console.log(
-                            "[PipelinesPage] Found nodes and edges under configuration property",
+                            "[PipelinesPage] Found nodes and edges under configuration property"
                           );
                           // Move nodes and edges to the top level
-                          processedFlow.nodes =
-                            processedFlow.configuration.nodes;
-                          processedFlow.edges =
-                            processedFlow.configuration.edges;
+                          processedFlow.nodes = processedFlow.configuration.nodes;
+                          processedFlow.edges = processedFlow.configuration.edges;
                         }
 
                         // If the flow has edges, ensure each edge has a data field
-                        if (
-                          processedFlow.edges &&
-                          Array.isArray(processedFlow.edges)
-                        ) {
-                          processedFlow.edges = processedFlow.edges.map(
-                            (edge) => {
-                              // Ensure edge has data field with at least a text property
-                              if (!edge.data) {
-                                return {
-                                  ...edge,
-                                  data: {
-                                    text: "",
-                                    id: edge.id,
-                                    type: "custom",
-                                  },
-                                };
-                              } else if (
-                                typeof edge.data === "object" &&
-                                !edge.data.id
-                              ) {
-                                // If data exists but doesn't have id and type fields, add them
-                                return {
-                                  ...edge,
-                                  data: {
-                                    ...edge.data,
-                                    id: edge.id,
-                                    type: "custom",
-                                  },
-                                };
-                              }
-                              return edge;
-                            },
-                          );
+                        if (processedFlow.edges && Array.isArray(processedFlow.edges)) {
+                          processedFlow.edges = processedFlow.edges.map((edge) => {
+                            // Ensure edge has data field with at least a text property
+                            if (!edge.data) {
+                              return {
+                                ...edge,
+                                data: {
+                                  text: "",
+                                  id: edge.id,
+                                  type: "custom",
+                                },
+                              };
+                            } else if (typeof edge.data === "object" && !edge.data.id) {
+                              // If data exists but doesn't have id and type fields, add them
+                              return {
+                                ...edge,
+                                data: {
+                                  ...edge.data,
+                                  id: edge.id,
+                                  type: "custom",
+                                },
+                              };
+                            }
+                            return edge;
+                          });
                         }
 
                         const importedFlow = {
                           ...processedFlow,
-                          active:
-                            processedFlow.active !== undefined
-                              ? processedFlow.active
-                              : true,
+                          active: processedFlow.active !== undefined ? processedFlow.active : true,
                         };
 
-                        console.log(
-                          "[PipelinesPage] Processed imported flow:",
-                          importedFlow,
-                        );
+                        console.log("[PipelinesPage] Processed imported flow:", importedFlow);
 
                         // Navigate to new pipeline page with the imported flow and name
                         // Pass showImporting flag to indicate the editor should show the importing state
@@ -545,12 +517,12 @@ const PipelinesPage: React.FC = () => {
                         open: true,
                         status: "error",
                         action: "Import Failed",
-                        message: "Failed to parse the pipeline file.",
+                        message: t("common.messages.failedToParsePipeline"),
                       });
                     } finally {
                       // Reset the file input
                       const fileInput = document.getElementById(
-                        "pipeline-import-input",
+                        "pipeline-import-input"
                       ) as HTMLInputElement;
                       if (fileInput) fileInput.value = "";
                     }
@@ -571,16 +543,14 @@ const PipelinesPage: React.FC = () => {
                 <Grow
                   {...TransitionProps}
                   style={{
-                    transformOrigin:
-                      placement === "bottom" ? "center top" : "center bottom",
+                    transformOrigin: placement === "bottom" ? "center top" : "center bottom",
                   }}
                 >
                   <Paper>
                     <ClickAwayListener onClickAway={handleAddPipelineMenuClose}>
                       <MenuList id="add-pipeline-menu" autoFocusItem>
                         <MenuItem onClick={handleImportPipeline}>
-                          <FileUploadIcon sx={{ mr: 1 }} />{" "}
-                          {t("pipelines.actions.import")}
+                          <FileUploadIcon sx={{ mr: 1 }} /> {t("pipelines.actions.import")}
                         </MenuItem>
                       </MenuList>
                     </ClickAwayListener>
@@ -615,9 +585,7 @@ const PipelinesPage: React.FC = () => {
 
         <BaseFilterPopover
           anchorEl={filterMenuAnchor}
-          column={
-            activeFilterColumn ? table.getColumn(activeFilterColumn) : null
-          }
+          column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
           onClose={handleFilterMenuClose}
           data={pipelines || []}
           getUniqueValues={(columnId, data) => {
@@ -626,8 +594,8 @@ const PipelinesPage: React.FC = () => {
                 data.map((item) => {
                   const value = item[columnId as keyof typeof item];
                   return value ? String(value) : "";
-                }),
-              ),
+                })
+              )
             ).filter(Boolean);
           }}
         />
@@ -648,16 +616,8 @@ const PipelinesPage: React.FC = () => {
           isDeleting={isDeleting || isDeletingInProgress}
         />
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            sx={{ width: "100%" }}
-          >
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
             {snackbar.message}
           </Alert>
         </Snackbar>

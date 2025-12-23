@@ -21,7 +21,7 @@ const CommentPopper: React.FC<CommentPopperProps> = ({
   open,
   anchorEl,
   comment,
-  onClose,
+  // onClose,
 }) => {
   return (
     <Popper id={id} open={open} anchorEl={anchorEl}>
@@ -67,7 +67,7 @@ const StyledPopperDiv = styled("div")(
     font-weight: 500;
     opacity: 1;
     margin: 0.25rem 0;
-  `,
+  `
 );
 
 export default CommentPopper;

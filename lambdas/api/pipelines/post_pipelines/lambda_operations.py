@@ -1,7 +1,10 @@
 import os
 import re
+import tempfile
 import time
 import traceback
+import uuid
+import zipfile
 from typing import Any, Dict, List, Optional
 
 import boto3
@@ -126,6 +129,139 @@ def read_yaml_from_s3(bucket: str, key: str) -> Dict[str, Any]:
         return yaml.safe_load(yaml_content)
     except Exception as e:
         logger.exception(f"Failed to read YAML file {bucket}/{key} from S3: {e}")
+        raise
+
+
+def is_multiline_parameter(yaml_data: Dict[str, Any], param_key: str) -> bool:
+    """
+    Check if a parameter is defined as multiline in the YAML schema.
+
+    Args:
+        yaml_data: Parsed YAML configuration
+        param_key: Parameter key name to check
+
+    Returns:
+        True if the parameter has multiline: true in its schema, False otherwise
+    """
+    try:
+        logger.info(f"Checking if parameter '{param_key}' is multiline in YAML schema")
+
+        # Parameters are located in node.actions.{operation}.parameters
+        node_data = yaml_data.get("node", {})
+        logger.info(f"Node data keys: {list(node_data.keys())}")
+
+        # Actions are at root level of YAML, not inside node
+        actions = yaml_data.get("actions", {})
+        logger.info(f"Found {len(actions)} actions in YAML: {list(actions.keys())}")
+
+        # Search through all actions
+        for action_name, action_data in actions.items():
+            parameters = action_data.get("parameters", [])
+            logger.info(f"Action '{action_name}' has {len(parameters)} parameters")
+
+            for param in parameters:
+                # Check if this is the parameter we're looking for
+                param_name = param.get("name", "")
+                if param_name == param_key:
+                    # Check if schema has multiline: true
+                    schema = param.get("schema", {})
+                    is_multiline = schema.get("multiline", False)
+                    logger.info(
+                        f"Parameter '{param_key}' found in action '{action_name}': "
+                        f"multiline={is_multiline}, schema={schema}"
+                    )
+                    return is_multiline
+                else:
+                    logger.debug(
+                        f"Skipping parameter '{param_name}' (looking for '{param_key}')"
+                    )
+
+        logger.warning(f"Parameter '{param_key}' not found in any action parameters")
+        return False
+    except Exception as e:
+        logger.error(
+            f"Error checking if parameter '{param_key}' is multiline: {e}",
+            exc_info=True,
+        )
+        return False
+
+
+def add_multiline_params_to_zip(
+    zip_bucket: str,
+    zip_key: str,
+    multiline_params: Dict[str, str],
+) -> str:
+    """
+    Download Lambda zip, add multiline parameter text files, and upload modified zip.
+
+    Args:
+        zip_bucket: S3 bucket containing the original Lambda zip
+        zip_key: S3 key of the original Lambda zip
+        multiline_params: Dict mapping parameter names to their text content
+
+    Returns:
+        S3 key of the modified zip file
+    """
+    if not multiline_params:
+        return zip_key
+
+    s3_client = boto3.client("s3")
+
+    try:
+        # Download the original zip to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_zip:
+            logger.info(
+                f"Downloading original Lambda zip from s3://{zip_bucket}/{zip_key}"
+            )
+            s3_client.download_fileobj(zip_bucket, zip_key, temp_zip)
+            temp_zip_path = temp_zip.name
+
+        # Create a new zip with the original content + parameter files
+        modified_zip_path = temp_zip_path + ".modified"
+
+        with zipfile.ZipFile(temp_zip_path, "r") as original_zip:
+            with zipfile.ZipFile(
+                modified_zip_path, "w", zipfile.ZIP_DEFLATED
+            ) as modified_zip:
+                # Copy all files from original zip
+                for item in original_zip.infolist():
+                    data = original_zip.read(item.filename)
+                    modified_zip.writestr(item, data)
+
+                # Add multiline parameter files
+                for param_name, param_content in multiline_params.items():
+                    # Create filename: parameters/{param_name}.txt
+                    sanitized_name = param_name.replace(" ", "_").lower()
+                    file_path = f"parameters/{sanitized_name}.txt"
+
+                    logger.info(
+                        f"Adding multiline parameter '{param_name}' to Lambda zip as {file_path} "
+                        f"(size: {len(param_content)} bytes)"
+                    )
+
+                    modified_zip.writestr(file_path, param_content)
+
+        # Upload the modified zip back to S3 with a unique key to avoid concurrent conflicts
+        # Use UUID to ensure uniqueness across concurrent pipeline creations
+        unique_id = str(uuid.uuid4())
+        modified_key = zip_key.replace(".zip", f"_with_params_{unique_id}.zip")
+
+        with open(modified_zip_path, "rb") as modified_zip_file:
+            s3_client.upload_fileobj(modified_zip_file, zip_bucket, modified_key)
+
+        logger.info(
+            f"Uploaded modified Lambda zip to s3://{zip_bucket}/{modified_key} "
+            f"with {len(multiline_params)} multiline parameters (unique ID: {unique_id})"
+        )
+
+        # Clean up temporary files
+        os.unlink(temp_zip_path)
+        os.unlink(modified_zip_path)
+
+        return modified_key
+
+    except Exception as e:
+        logger.error(f"Failed to add multiline parameters to Lambda zip: {e}")
         raise
 
 
@@ -570,6 +706,57 @@ def create_lambda_function(
     # Get the actual zip file key
     zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
 
+    # Collect multiline parameters that need to be embedded in the Lambda zip
+    multiline_params = {}
+    if hasattr(node.data, "configuration") and "parameters" in node.data.configuration:
+        logger.info(
+            f"Node has {len(node.data.configuration['parameters'])} parameters to check"
+        )
+        for param_key, param_value in node.data.configuration["parameters"].items():
+            # Skip numeric keys as they are just parameter definitions
+            if param_key.isdigit():
+                logger.debug(f"Skipping numeric key: {param_key}")
+                continue
+
+            logger.info(
+                f"Checking parameter '{param_key}' (has value: {param_value is not None})"
+            )
+
+            # Check if this parameter is multiline
+            if param_value:
+                is_ml = is_multiline_parameter(yaml_data, param_key)
+                logger.info(f"Parameter '{param_key}' multiline check result: {is_ml}")
+
+                if is_ml:
+                    param_str = str(param_value)
+                    logger.info(
+                        f"✓ Found multiline parameter '{param_key}' (size: {len(param_str)} bytes), "
+                        f"will embed in Lambda deployment package"
+                    )
+                    multiline_params[param_key] = param_str
+                else:
+                    logger.info(
+                        f"Parameter '{param_key}' is not multiline, will use env var"
+                    )
+            else:
+                logger.info(f"Parameter '{param_key}' has no value, skipping")
+    else:
+        logger.info("Node has no configuration parameters")
+
+    # If we have multiline parameters, modify the zip to include them
+    if multiline_params:
+        logger.info(
+            f"Modifying Lambda zip to include {len(multiline_params)} multiline parameters: {list(multiline_params.keys())}"
+        )
+        zip_file_key = add_multiline_params_to_zip(
+            IAC_ASSETS_BUCKET, zip_file_key, multiline_params
+        )
+    else:
+        logger.info("No multiline parameters found, using original zip file")
+
+    # Track if we need to clean up a temporary zip file
+    temp_zip_to_cleanup = zip_file_key if multiline_params else None
+
     runtime = lambda_config["runtime"].lower()
 
     # Extract configurable Lambda parameters with defaults
@@ -692,6 +879,18 @@ def create_lambda_function(
                         # Get the parameter value or default if not available
                         if param_value:
                             env_var_value = str(param_value)
+
+                            # Check if this is a multiline parameter embedded in the Lambda zip
+                            if param_key in multiline_params:
+                                # For multiline params, set FILE_PATH env var instead of direct value
+                                sanitized_name = param_key.replace(" ", "_").lower()
+                                file_path = f"/var/task/parameters/{sanitized_name}.txt"
+                                file_path_var = f"{env_var_name}_FILE_PATH"
+                                common_env_vars[file_path_var] = file_path
+                                logger.info(
+                                    f"Added multiline parameter file path: {file_path_var}={file_path}"
+                                )
+                                continue
 
                             # Check if the value is in the format ${VARIABLE_NAME}
                             # Check for standard environment variables
@@ -908,7 +1107,44 @@ def create_lambda_function(
                 if vpc_config:
                     create_function_params["VpcConfig"] = vpc_config
 
+                # Configure reserved concurrency if specified in YAML or node parameters
+                # Priority: User parameter > YAML config > No limit
+                reserved_concurrency = None
+
+                # First, check YAML configuration
+                lambda_config = (
+                    yaml_data.get("node", {})
+                    .get("integration", {})
+                    .get("config", {})
+                    .get("lambda", {})
+                )
+                if lambda_config and "reserved_concurrency" in lambda_config:
+                    reserved_concurrency = lambda_config["reserved_concurrency"]
+                    logger.info(
+                        f"Found reserved_concurrency in YAML config: {reserved_concurrency}"
+                    )
+
+                # Second, check if user provided override via node parameters
+                # Parameters are stored in node.data.configuration
+                if hasattr(node.data, "configuration") and isinstance(
+                    node.data.configuration, dict
+                ):
+                    user_concurrency = node.data.configuration.get(
+                        "Reserved Concurrency"
+                    ) or node.data.configuration.get("reservedConcurrency")
+                    if user_concurrency is not None:
+                        try:
+                            reserved_concurrency = int(user_concurrency)
+                            logger.info(
+                                f"User override for reserved_concurrency: {reserved_concurrency}"
+                            )
+                        except (ValueError, TypeError):
+                            logger.warning(
+                                f"Invalid reserved_concurrency value from user: {user_concurrency}"
+                            )
+
                 # Create the Lambda function with the appropriate parameters
+                # Note: ReservedConcurrentExecutions must be set AFTER creation via put_function_concurrency
                 response = lambda_client.create_function(**create_function_params)
 
                 function_arn = response["FunctionArn"]
@@ -923,6 +1159,22 @@ def create_lambda_function(
                 logger.info(
                     f"Created Lambda function '{function_name}' with ARN: {function_arn}"
                 )
+
+                # Set reserved concurrency AFTER function creation if configured
+                if reserved_concurrency is not None and reserved_concurrency > 0:
+                    try:
+                        lambda_client.put_function_concurrency(
+                            FunctionName=function_name,
+                            ReservedConcurrentExecutions=reserved_concurrency,
+                        )
+                        logger.info(
+                            f"Set reserved concurrency to {reserved_concurrency} for Lambda: {function_name}"
+                        )
+                    except Exception as concurrency_error:
+                        logger.warning(
+                            f"Failed to set reserved concurrency for {function_name}: {concurrency_error}. "
+                            "Function will run without concurrency limits."
+                        )
                 break
             except lambda_client.exceptions.InvalidParameterValueException as e:
                 if "role" in str(e).lower() and attempt < max_retries - 1:
@@ -950,6 +1202,23 @@ def create_lambda_function(
                 backoff_time = retry_delay * (2**attempt)
                 logger.info(f"Waiting {backoff_time} seconds before retry")
                 time.sleep(backoff_time)
+
+        # Clean up temporary zip file if one was created
+        if temp_zip_to_cleanup and temp_zip_to_cleanup != get_zip_file_key(
+            IAC_ASSETS_BUCKET, zip_file_prefix
+        ):
+            try:
+                s3_client = boto3.client("s3")
+                s3_client.delete_object(
+                    Bucket=IAC_ASSETS_BUCKET, Key=temp_zip_to_cleanup
+                )
+                logger.info(
+                    f"Cleaned up temporary zip file: s3://{IAC_ASSETS_BUCKET}/{temp_zip_to_cleanup}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to clean up temporary zip file {temp_zip_to_cleanup}: {e}"
+                )
 
         return {
             "function_arn": function_arn,

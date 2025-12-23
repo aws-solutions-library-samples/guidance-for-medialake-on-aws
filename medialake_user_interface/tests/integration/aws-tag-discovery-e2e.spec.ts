@@ -126,7 +126,7 @@ function getE2ETagFilters(): TagFilter[] {
 async function performComprehensiveDiscovery(
   discoveryEngine: ResourceDiscoveryEngine,
   cognitoAdapter: CognitoServiceAdapter,
-  cloudFrontAdapter: CloudFrontServiceAdapter,
+  cloudFrontAdapter: CloudFrontServiceAdapter
 ): Promise<{
   cognitoUserPool: CognitoUserPool | null;
   cloudFrontDistribution: CloudFrontDistribution | null;
@@ -142,14 +142,11 @@ async function performComprehensiveDiscovery(
   let cognitoUserPool: CognitoUserPool | null = null;
 
   try {
-    const cognitoPools = await discoveryEngine.discoverByTags(
-      "cognito-user-pool",
-      tagFilters,
-    );
+    const cognitoPools = await discoveryEngine.discoverByTags("cognito-user-pool", tagFilters);
     if (cognitoPools.length > 0) {
       cognitoUserPool = cognitoPools[0] as CognitoUserPool;
       console.log(
-        `[E2E] Found Cognito user pool via tags: ${cognitoUserPool.name} (${cognitoUserPool.id})`,
+        `[E2E] Found Cognito user pool via tags: ${cognitoUserPool.name} (${cognitoUserPool.id})`
       );
     } else {
       // Fallback to service adapter
@@ -157,7 +154,7 @@ async function performComprehensiveDiscovery(
       if (fallbackPools.length > 0) {
         cognitoUserPool = fallbackPools[0];
         console.log(
-          `[E2E] Found Cognito user pool via fallback: ${cognitoUserPool.name} (${cognitoUserPool.id})`,
+          `[E2E] Found Cognito user pool via fallback: ${cognitoUserPool.name} (${cognitoUserPool.id})`
         );
       }
     }
@@ -174,21 +171,20 @@ async function performComprehensiveDiscovery(
   try {
     const distributions = await discoveryEngine.discoverByTags(
       "cloudfront-distribution",
-      tagFilters,
+      tagFilters
     );
     if (distributions.length > 0) {
       cloudFrontDistribution = distributions[0] as CloudFrontDistribution;
       console.log(
-        `[E2E] Found CloudFront distribution via tags: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`,
+        `[E2E] Found CloudFront distribution via tags: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`
       );
     } else {
       // Fallback to service adapter
-      const fallbackDistributions =
-        await cloudFrontAdapter.fallbackDiscovery(tagFilters);
+      const fallbackDistributions = await cloudFrontAdapter.fallbackDiscovery(tagFilters);
       if (fallbackDistributions.length > 0) {
         cloudFrontDistribution = fallbackDistributions[0];
         console.log(
-          `[E2E] Found CloudFront distribution via fallback: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`,
+          `[E2E] Found CloudFront distribution via fallback: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`
         );
       }
     }
@@ -214,7 +210,7 @@ async function performComprehensiveDiscovery(
 async function createE2ETestUser(
   cognitoAdapter: CognitoServiceAdapter,
   userPool: CognitoUserPool,
-  workerIndex: number,
+  workerIndex: number
 ): Promise<{
   testUser: any;
   creationTime: number;
@@ -225,18 +221,11 @@ async function createE2ETestUser(
   const uniqueEmail = `mne-medialake+e2etest-${workerIndex}-${randomId}@amazon.com`;
 
   // Get password policy and generate secure password
-  const passwordPolicy = await cognitoAdapter.getUserPoolPasswordPolicy(
-    userPool.id,
-  );
+  const passwordPolicy = await cognitoAdapter.getUserPoolPasswordPolicy(userPool.id);
   const password = generateSecurePassword(passwordPolicy?.PasswordPolicy);
 
   // Create user with permanent password
-  await cognitoAdapter.createTestUser(
-    userPool.id,
-    uniqueEmail,
-    password,
-    uniqueEmail,
-  );
+  await cognitoAdapter.createTestUser(userPool.id, uniqueEmail, password, uniqueEmail);
 
   const testUser = {
     username: uniqueEmail,
@@ -313,9 +302,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
 
   // Fill to minimum length
   while (password.length < minLength) {
-    password += availableChars.charAt(
-      Math.floor(Math.random() * availableChars.length),
-    );
+    password += availableChars.charAt(Math.floor(Math.random() * availableChars.length));
   }
 
   // Shuffle the password to randomize character positions
@@ -329,9 +316,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
   const alphanumeric = uppercase + lowercase + numbers;
   if (!/^[a-zA-Z0-9]/.test(shuffled)) {
     // Replace first character with random alphanumeric
-    const safeStart = alphanumeric.charAt(
-      Math.floor(Math.random() * alphanumeric.length),
-    );
+    const safeStart = alphanumeric.charAt(Math.floor(Math.random() * alphanumeric.length));
     return safeStart + shuffled.slice(1);
   }
 
@@ -343,9 +328,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
  */
 function generateE2ETestUrls(distribution: CloudFrontDistribution): any {
   const primaryDomain =
-    distribution.aliases.length > 0
-      ? distribution.aliases[0]
-      : distribution.domainName;
+    distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
 
   const baseUrl = `https://${primaryDomain}`;
 
@@ -364,7 +347,7 @@ async function performE2ELogin(
   page: Page,
   loginUrl: string,
   username: string,
-  password: string,
+  password: string
 ): Promise<{ success: boolean; responseTime: number; error?: string }> {
   const startTime = Date.now();
 
@@ -378,16 +361,13 @@ async function performE2ELogin(
     });
 
     if (!response || response.status() >= 400) {
-      throw new Error(
-        `Login page returned status: ${response?.status() || "unknown"}`,
-      );
+      throw new Error(`Login page returned status: ${response?.status() || "unknown"}`);
     }
 
     // Wait for login form
-    await page.waitForSelector(
-      'input[name="email"], [role="textbox"][name*="Email"]',
-      { timeout: 10000 },
-    );
+    await page.waitForSelector('input[name="email"], [role="textbox"][name*="Email"]', {
+      timeout: 10000,
+    });
 
     // Fill and submit login form
     await page.getByRole("textbox", { name: "Email" }).fill(username);
@@ -400,7 +380,7 @@ async function performE2ELogin(
         url.toString().includes("/dashboard") ||
         url.toString().endsWith("/") ||
         !url.toString().includes("/sign-in"),
-      { timeout: 15000 },
+      { timeout: 15000 }
     );
 
     await page.waitForLoadState("networkidle");
@@ -424,9 +404,7 @@ async function performE2ELogin(
 /**
  * Validate backward compatibility with existing fixtures
  */
-async function validateBackwardCompatibility(
-  context: E2EIntegrationContext,
-): Promise<boolean> {
+async function validateBackwardCompatibility(context: E2EIntegrationContext): Promise<boolean> {
   try {
     // Validate that discovered resources match expected patterns
     if (context.cognitoUserPool) {
@@ -438,8 +416,7 @@ async function validateBackwardCompatibility(
     }
 
     // Validate test user format matches existing patterns
-    const expectedEmailPattern =
-      /^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/;
+    const expectedEmailPattern = /^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/;
     if (!expectedEmailPattern.test(context.testUser.email)) {
       console.warn("[E2E] Test user email does not match expected pattern");
       return false;
@@ -447,9 +424,7 @@ async function validateBackwardCompatibility(
 
     // Validate password meets requirements
     if (context.testUser.password.length < 8) {
-      console.warn(
-        "[E2E] Test user password does not meet minimum requirements",
-      );
+      console.warn("[E2E] Test user password does not meet minimum requirements");
       return false;
     }
 
@@ -470,14 +445,11 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
     async ({}, use, testInfo) => {
       const setupStartTime = Date.now();
       console.log(
-        `[E2E Worker ${testInfo.workerIndex}] Setting up comprehensive integration context`,
+        `[E2E Worker ${testInfo.workerIndex}] Setting up comprehensive integration context`
       );
 
       const config = createE2EDiscoveryConfig();
-      const discoveryEngine = createResourceDiscoveryEngine(
-        config,
-        testInfo.workerIndex,
-      );
+      const discoveryEngine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
       const cognitoAdapter = createCognitoServiceAdapter(config);
       const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
 
@@ -492,32 +464,26 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
         const discoveryResult = await performComprehensiveDiscovery(
           discoveryEngine,
           cognitoAdapter,
-          cloudFrontAdapter,
+          cloudFrontAdapter
         );
 
         if (!discoveryResult.cognitoUserPool) {
-          throw new Error(
-            "No Cognito user pool could be discovered for E2E testing",
-          );
+          throw new Error("No Cognito user pool could be discovered for E2E testing");
         }
 
         if (!discoveryResult.cloudFrontDistribution) {
-          throw new Error(
-            "No CloudFront distribution could be discovered for E2E testing",
-          );
+          throw new Error("No CloudFront distribution could be discovered for E2E testing");
         }
 
         // Create test user
         const userCreationResult = await createE2ETestUser(
           cognitoAdapter,
           discoveryResult.cognitoUserPool,
-          testInfo.workerIndex,
+          testInfo.workerIndex
         );
 
         // Generate test URLs
-        const testUrls = generateE2ETestUrls(
-          discoveryResult.cloudFrontDistribution,
-        );
+        const testUrls = generateE2ETestUrls(discoveryResult.cloudFrontDistribution);
 
         const totalSetupTime = Date.now() - setupStartTime;
 
@@ -532,15 +498,13 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
           testUrls,
           discoveryMetrics: {
             cognitoDiscoveryTime: discoveryResult.metrics.cognitoDiscoveryTime,
-            cloudFrontDiscoveryTime:
-              discoveryResult.metrics.cloudFrontDiscoveryTime,
+            cloudFrontDiscoveryTime: discoveryResult.metrics.cloudFrontDiscoveryTime,
             userCreationTime: userCreationResult.creationTime,
             totalSetupTime,
           },
           validationResults: {
             tagBasedDiscoveryWorking:
-              discoveryResult.cognitoUserPool.tags?.DiscoveryMethod ===
-              "tag-based",
+              discoveryResult.cognitoUserPool.tags?.DiscoveryMethod === "tag-based",
             permanentPasswordWorking: true, // Validated during user creation
             cloudFrontAccessible: false, // Will be validated during login
             backwardCompatible: false, // Will be validated separately
@@ -548,19 +512,14 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
         };
 
         // Validate backward compatibility
-        context.validationResults.backwardCompatible =
-          await validateBackwardCompatibility(context);
+        context.validationResults.backwardCompatible = await validateBackwardCompatibility(context);
 
         console.log(`[E2E] Integration context ready in ${totalSetupTime}ms`);
+        console.log(`[E2E] Cognito discovery: ${context.discoveryMetrics.cognitoDiscoveryTime}ms`);
         console.log(
-          `[E2E] Cognito discovery: ${context.discoveryMetrics.cognitoDiscoveryTime}ms`,
+          `[E2E] CloudFront discovery: ${context.discoveryMetrics.cloudFrontDiscoveryTime}ms`
         );
-        console.log(
-          `[E2E] CloudFront discovery: ${context.discoveryMetrics.cloudFrontDiscoveryTime}ms`,
-        );
-        console.log(
-          `[E2E] User creation: ${context.discoveryMetrics.userCreationTime}ms`,
-        );
+        console.log(`[E2E] User creation: ${context.discoveryMetrics.userCreationTime}ms`);
 
         await use(context);
       } catch (error) {
@@ -572,7 +531,7 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
           try {
             await cognitoAdapter.deleteTestUser(
               context.testUser.userPoolId,
-              context.testUser.username,
+              context.testUser.username
             );
           } catch (cleanupError) {
             console.error("[E2E] Error during user cleanup:", cleanupError);
@@ -599,7 +558,7 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
         page,
         e2eIntegrationContext.testUrls.cloudFrontLogin,
         e2eIntegrationContext.testUser.username,
-        e2eIntegrationContext.testUser.password,
+        e2eIntegrationContext.testUser.password
       );
 
       if (!loginResult.success) {
@@ -609,15 +568,12 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
       // Update validation results
       e2eIntegrationContext.validationResults.cloudFrontAccessible = true;
 
-      console.log(
-        `[E2E] Comprehensive login successful in ${loginResult.responseTime}ms`,
-      );
+      console.log(`[E2E] Comprehensive login successful in ${loginResult.responseTime}ms`);
 
       // Configure page for E2E testing
       await page.setExtraHTTPHeaders({
         "User-Agent": "MediaLake-E2E-Integration-Test/1.0",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       });
 
       page.setDefaultTimeout(30000);
@@ -630,274 +586,234 @@ const e2eIntegrationTest = base.extend<E2EIntegrationFixtures>({
 });
 
 // Main E2E Integration Test Suite
-e2eIntegrationTest.describe(
-  "AWS Tag-Based Discovery End-to-End Integration",
-  () => {
-    e2eIntegrationTest(
-      "should perform complete workflow from tag discovery to login automation",
-      async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
-        // Validate comprehensive context setup
-        expect(e2eIntegrationContext.cognitoUserPool).toBeTruthy();
-        expect(e2eIntegrationContext.cloudFrontDistribution).toBeTruthy();
-        expect(e2eIntegrationContext.testUser).toBeTruthy();
-        expect(e2eIntegrationContext.testUrls).toBeTruthy();
+e2eIntegrationTest.describe("AWS Tag-Based Discovery End-to-End Integration", () => {
+  e2eIntegrationTest(
+    "should perform complete workflow from tag discovery to login automation",
+    async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
+      // Validate comprehensive context setup
+      expect(e2eIntegrationContext.cognitoUserPool).toBeTruthy();
+      expect(e2eIntegrationContext.cloudFrontDistribution).toBeTruthy();
+      expect(e2eIntegrationContext.testUser).toBeTruthy();
+      expect(e2eIntegrationContext.testUrls).toBeTruthy();
 
-        // Validate discovery metrics
-        expect(
-          e2eIntegrationContext.discoveryMetrics.cognitoDiscoveryTime,
-        ).toBeGreaterThan(0);
-        expect(
-          e2eIntegrationContext.discoveryMetrics.cloudFrontDiscoveryTime,
-        ).toBeGreaterThan(0);
-        expect(
-          e2eIntegrationContext.discoveryMetrics.userCreationTime,
-        ).toBeGreaterThan(0);
-        expect(
-          e2eIntegrationContext.discoveryMetrics.totalSetupTime,
-        ).toBeLessThan(60000); // Should complete within 1 minute
+      // Validate discovery metrics
+      expect(e2eIntegrationContext.discoveryMetrics.cognitoDiscoveryTime).toBeGreaterThan(0);
+      expect(e2eIntegrationContext.discoveryMetrics.cloudFrontDiscoveryTime).toBeGreaterThan(0);
+      expect(e2eIntegrationContext.discoveryMetrics.userCreationTime).toBeGreaterThan(0);
+      expect(e2eIntegrationContext.discoveryMetrics.totalSetupTime).toBeLessThan(60000); // Should complete within 1 minute
 
-        // Validate all validation results
-        expect(
-          e2eIntegrationContext.validationResults.permanentPasswordWorking,
-        ).toBe(true);
-        expect(
-          e2eIntegrationContext.validationResults.cloudFrontAccessible,
-        ).toBe(true);
-        expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(
-          true,
-        );
+      // Validate all validation results
+      expect(e2eIntegrationContext.validationResults.permanentPasswordWorking).toBe(true);
+      expect(e2eIntegrationContext.validationResults.cloudFrontAccessible).toBe(true);
+      expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(true);
 
-        // Validate authenticated page is ready
-        expect(authenticatedE2EPage).toBeTruthy();
+      // Validate authenticated page is ready
+      expect(authenticatedE2EPage).toBeTruthy();
 
-        // Test navigation to various endpoints
-        const testEndpoints = [
-          e2eIntegrationContext.testUrls.cloudFrontRoot,
-          e2eIntegrationContext.testUrls.cloudFrontDashboard,
-        ];
+      // Test navigation to various endpoints
+      const testEndpoints = [
+        e2eIntegrationContext.testUrls.cloudFrontRoot,
+        e2eIntegrationContext.testUrls.cloudFrontDashboard,
+      ];
 
-        for (const endpoint of testEndpoints) {
-          const response = await authenticatedE2EPage.goto(endpoint, {
-            waitUntil: "networkidle",
-            timeout: 30000,
-          });
-
-          expect(response).toBeTruthy();
-          expect(response!.status()).toBeLessThan(400);
-        }
-
-        console.log("[Test] Complete E2E workflow validation successful");
-        console.log(
-          `[Test] Total setup time: ${e2eIntegrationContext.discoveryMetrics.totalSetupTime}ms`,
-        );
-        console.log(
-          `[Test] Cognito pool: ${e2eIntegrationContext.cognitoUserPool!.name}`,
-        );
-        console.log(
-          `[Test] CloudFront distribution: ${e2eIntegrationContext.cloudFrontDistribution!.name}`,
-        );
-      },
-    );
-
-    e2eIntegrationTest(
-      "should validate tag-based discovery performance and caching",
-      async ({ e2eIntegrationContext }) => {
-        // Validate discovery performance
-        expect(
-          e2eIntegrationContext.discoveryMetrics.cognitoDiscoveryTime,
-        ).toBeLessThan(10000); // Should complete within 10 seconds
-        expect(
-          e2eIntegrationContext.discoveryMetrics.cloudFrontDiscoveryTime,
-        ).toBeLessThan(10000);
-
-        // Test discovery engine statistics
-        const discoveryStats = await AWSDiscoveryUtils.getDiscoveryStats(
-          e2eIntegrationContext.discoveryEngine,
-        );
-        expect(discoveryStats).toBeDefined();
-
-        // Test cache invalidation and refresh
-        await AWSDiscoveryUtils.invalidateCache(
-          e2eIntegrationContext.discoveryEngine,
-          "cognito-user-pool",
-        );
-
-        // Perform second discovery to test caching
-        const tagFilters = getE2ETagFilters();
-        const secondDiscoveryStart = Date.now();
-        const secondCognitoDiscovery =
-          await e2eIntegrationContext.discoveryEngine.discoverByTags(
-            "cognito-user-pool",
-            tagFilters,
-          );
-        const secondDiscoveryTime = Date.now() - secondDiscoveryStart;
-
-        expect(secondCognitoDiscovery.length).toBeGreaterThan(0);
-        console.log(
-          `[Test] Second discovery time: ${secondDiscoveryTime}ms (should be faster due to caching)`,
-        );
-      },
-    );
-
-    e2eIntegrationTest(
-      "should validate backward compatibility with existing fixture patterns",
-      async ({ e2eIntegrationContext }) => {
-        // Validate backward compatibility flag
-        expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(
-          true,
-        );
-
-        // Validate user pool structure matches existing patterns
-        const userPool = e2eIntegrationContext.cognitoUserPool!;
-        expect(userPool.id).toBeTruthy();
-        expect(userPool.name).toBeTruthy();
-        expect(userPool.clients).toBeDefined();
-        expect(userPool.clients.length).toBeGreaterThan(0);
-
-        // Validate test user structure matches existing patterns
-        const testUser = e2eIntegrationContext.testUser;
-        expect(testUser.username).toMatch(
-          /^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/,
-        );
-        expect(testUser.email).toMatch(
-          /^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/,
-        );
-        expect(testUser.password.length).toBeGreaterThanOrEqual(8);
-        expect(testUser.userPoolId).toBeTruthy();
-        expect(testUser.userPoolClientId).toBeTruthy();
-
-        // Validate discovery method is properly tracked
-        expect(["tag-based", "name-based", "fallback"]).toContain(
-          testUser.discoveryMethod,
-        );
-
-        console.log(
-          `[Test] Backward compatibility validated - discovery method: ${testUser.discoveryMethod}`,
-        );
-      },
-    );
-
-    e2eIntegrationTest(
-      "should validate error handling and edge cases",
-      async ({ e2eIntegrationContext }) => {
-        // Test custom tag filter creation
-        const customTags = {
-          CustomTag: "test-value",
-          Environment: "integration-test",
-        };
-
-        const customFilters =
-          AWSDiscoveryUtils.createCustomTagFilters(customTags);
-        expect(customFilters).toHaveLength(2);
-        expect(customFilters[0].key).toBe("CustomTag");
-        expect(customFilters[0].values).toEqual(["test-value"]);
-
-        // Test discovery with non-existent tags (should handle gracefully)
-        const nonExistentFilters = AWSDiscoveryUtils.createCustomTagFilters({
-          NonExistentTag: "non-existent-value",
-        });
-
-        const emptyResults =
-          await e2eIntegrationContext.discoveryEngine.discoverByTags(
-            "cognito-user-pool",
-            nonExistentFilters,
-          );
-        expect(emptyResults).toBeDefined();
-        expect(Array.isArray(emptyResults)).toBe(true);
-
-        // Test that context handles missing resources gracefully
-        expect(e2eIntegrationContext.cognitoUserPool).toBeTruthy(); // Should have found resources
-        expect(e2eIntegrationContext.cloudFrontDistribution).toBeTruthy();
-
-        console.log("[Test] Error handling and edge cases validated");
-      },
-    );
-
-    e2eIntegrationTest(
-      "should validate parallel execution and worker isolation",
-      async ({ e2eIntegrationContext }, testInfo) => {
-        // Validate worker-specific isolation
-        expect(e2eIntegrationContext.testUser.username).toContain(
-          `-${testInfo.workerIndex}-`,
-        );
-
-        // Validate unique test context per worker
-        expect(e2eIntegrationContext.testUser.userPoolId).toBeTruthy();
-        expect(e2eIntegrationContext.testUrls.cloudFrontLogin).toBeTruthy();
-
-        // Test that context is properly isolated
-        const contextInfo = {
-          workerIndex: testInfo.workerIndex,
-          testTitle: testInfo.title,
-          testUser: e2eIntegrationContext.testUser.username,
-          userPoolId: e2eIntegrationContext.testUser.userPoolId,
-          distributionId: e2eIntegrationContext.cloudFrontDistribution!.id,
-          discoveryMethod: e2eIntegrationContext.testUser.discoveryMethod,
-        };
-
-        console.log(
-          `[Test] Worker ${testInfo.workerIndex} isolation validated:`,
-          JSON.stringify(contextInfo, null, 2),
-        );
-
-        // Validate that each worker has its own resources
-        expect(contextInfo.testUser).toMatch(
-          new RegExp(`-${testInfo.workerIndex}-`),
-        );
-        expect(contextInfo.userPoolId).toBeTruthy();
-        expect(contextInfo.distributionId).toBeTruthy();
-      },
-    );
-
-    e2eIntegrationTest(
-      "should validate CloudFront performance and caching behavior",
-      async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
-        const testUrl = e2eIntegrationContext.testUrls.cloudFrontRoot;
-
-        // Test initial request performance
-        const startTime = Date.now();
-        const response = await authenticatedE2EPage.goto(testUrl, {
+      for (const endpoint of testEndpoints) {
+        const response = await authenticatedE2EPage.goto(endpoint, {
           waitUntil: "networkidle",
           timeout: 30000,
         });
-        const responseTime = Date.now() - startTime;
 
         expect(response).toBeTruthy();
         expect(response!.status()).toBeLessThan(400);
-        expect(responseTime).toBeLessThan(10000); // Should respond within 10 seconds
+      }
 
-        // Validate CloudFront headers
-        const headers = await response!.allHeaders();
-        const cacheValidation =
-          CloudFrontTestUtils.validateCacheHeaders(headers);
+      console.log("[Test] Complete E2E workflow validation successful");
+      console.log(
+        `[Test] Total setup time: ${e2eIntegrationContext.discoveryMetrics.totalSetupTime}ms`
+      );
+      console.log(`[Test] Cognito pool: ${e2eIntegrationContext.cognitoUserPool!.name}`);
+      console.log(
+        `[Test] CloudFront distribution: ${e2eIntegrationContext.cloudFrontDistribution!.name}`
+      );
+    }
+  );
 
-        expect(cacheValidation).toBeDefined();
+  e2eIntegrationTest(
+    "should validate tag-based discovery performance and caching",
+    async ({ e2eIntegrationContext }) => {
+      // Validate discovery performance
+      expect(e2eIntegrationContext.discoveryMetrics.cognitoDiscoveryTime).toBeLessThan(10000); // Should complete within 10 seconds
+      expect(e2eIntegrationContext.discoveryMetrics.cloudFrontDiscoveryTime).toBeLessThan(10000);
 
-        // Test multiple requests to validate caching
-        const secondStartTime = Date.now();
-        const secondResponse = await authenticatedE2EPage.goto(testUrl, {
-          waitUntil: "networkidle",
-          timeout: 30000,
-        });
-        const secondResponseTime = Date.now() - secondStartTime;
+      // Test discovery engine statistics
+      const discoveryStats = await AWSDiscoveryUtils.getDiscoveryStats(
+        e2eIntegrationContext.discoveryEngine
+      );
+      expect(discoveryStats).toBeDefined();
 
-        expect(secondResponse).toBeTruthy();
-        expect(secondResponse!.status()).toBeLessThan(400);
+      // Test cache invalidation and refresh
+      await AWSDiscoveryUtils.invalidateCache(
+        e2eIntegrationContext.discoveryEngine,
+        "cognito-user-pool"
+      );
 
-        // Second request should be faster due to caching
-        console.log(
-          `[Test] First request: ${responseTime}ms, Second request: ${secondResponseTime}ms`,
-        );
+      // Perform second discovery to test caching
+      const tagFilters = getE2ETagFilters();
+      const secondDiscoveryStart = Date.now();
+      const secondCognitoDiscovery = await e2eIntegrationContext.discoveryEngine.discoverByTags(
+        "cognito-user-pool",
+        tagFilters
+      );
+      const secondDiscoveryTime = Date.now() - secondDiscoveryStart;
 
-        // Log cache information
-        const cacheStatus =
-          headers["x-cache"] || headers["cloudfront-cache-status"] || "unknown";
-        console.log(`[Test] CloudFront cache status: ${cacheStatus}`);
-        console.log(`[Test] Cache headers validation:`, cacheValidation);
-      },
-    );
-  },
-);
+      expect(secondCognitoDiscovery.length).toBeGreaterThan(0);
+      console.log(
+        `[Test] Second discovery time: ${secondDiscoveryTime}ms (should be faster due to caching)`
+      );
+    }
+  );
+
+  e2eIntegrationTest(
+    "should validate backward compatibility with existing fixture patterns",
+    async ({ e2eIntegrationContext }) => {
+      // Validate backward compatibility flag
+      expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(true);
+
+      // Validate user pool structure matches existing patterns
+      const userPool = e2eIntegrationContext.cognitoUserPool!;
+      expect(userPool.id).toBeTruthy();
+      expect(userPool.name).toBeTruthy();
+      expect(userPool.clients).toBeDefined();
+      expect(userPool.clients.length).toBeGreaterThan(0);
+
+      // Validate test user structure matches existing patterns
+      const testUser = e2eIntegrationContext.testUser;
+      expect(testUser.username).toMatch(/^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/);
+      expect(testUser.email).toMatch(/^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/);
+      expect(testUser.password.length).toBeGreaterThanOrEqual(8);
+      expect(testUser.userPoolId).toBeTruthy();
+      expect(testUser.userPoolClientId).toBeTruthy();
+
+      // Validate discovery method is properly tracked
+      expect(["tag-based", "name-based", "fallback"]).toContain(testUser.discoveryMethod);
+
+      console.log(
+        `[Test] Backward compatibility validated - discovery method: ${testUser.discoveryMethod}`
+      );
+    }
+  );
+
+  e2eIntegrationTest(
+    "should validate error handling and edge cases",
+    async ({ e2eIntegrationContext }) => {
+      // Test custom tag filter creation
+      const customTags = {
+        CustomTag: "test-value",
+        Environment: "integration-test",
+      };
+
+      const customFilters = AWSDiscoveryUtils.createCustomTagFilters(customTags);
+      expect(customFilters).toHaveLength(2);
+      expect(customFilters[0].key).toBe("CustomTag");
+      expect(customFilters[0].values).toEqual(["test-value"]);
+
+      // Test discovery with non-existent tags (should handle gracefully)
+      const nonExistentFilters = AWSDiscoveryUtils.createCustomTagFilters({
+        NonExistentTag: "non-existent-value",
+      });
+
+      const emptyResults = await e2eIntegrationContext.discoveryEngine.discoverByTags(
+        "cognito-user-pool",
+        nonExistentFilters
+      );
+      expect(emptyResults).toBeDefined();
+      expect(Array.isArray(emptyResults)).toBe(true);
+
+      // Test that context handles missing resources gracefully
+      expect(e2eIntegrationContext.cognitoUserPool).toBeTruthy(); // Should have found resources
+      expect(e2eIntegrationContext.cloudFrontDistribution).toBeTruthy();
+
+      console.log("[Test] Error handling and edge cases validated");
+    }
+  );
+
+  e2eIntegrationTest(
+    "should validate parallel execution and worker isolation",
+    async ({ e2eIntegrationContext }, testInfo) => {
+      // Validate worker-specific isolation
+      expect(e2eIntegrationContext.testUser.username).toContain(`-${testInfo.workerIndex}-`);
+
+      // Validate unique test context per worker
+      expect(e2eIntegrationContext.testUser.userPoolId).toBeTruthy();
+      expect(e2eIntegrationContext.testUrls.cloudFrontLogin).toBeTruthy();
+
+      // Test that context is properly isolated
+      const contextInfo = {
+        workerIndex: testInfo.workerIndex,
+        testTitle: testInfo.title,
+        testUser: e2eIntegrationContext.testUser.username,
+        userPoolId: e2eIntegrationContext.testUser.userPoolId,
+        distributionId: e2eIntegrationContext.cloudFrontDistribution!.id,
+        discoveryMethod: e2eIntegrationContext.testUser.discoveryMethod,
+      };
+
+      console.log(
+        `[Test] Worker ${testInfo.workerIndex} isolation validated:`,
+        JSON.stringify(contextInfo, null, 2)
+      );
+
+      // Validate that each worker has its own resources
+      expect(contextInfo.testUser).toMatch(new RegExp(`-${testInfo.workerIndex}-`));
+      expect(contextInfo.userPoolId).toBeTruthy();
+      expect(contextInfo.distributionId).toBeTruthy();
+    }
+  );
+
+  e2eIntegrationTest(
+    "should validate CloudFront performance and caching behavior",
+    async ({ e2eIntegrationContext, authenticatedE2EPage }) => {
+      const testUrl = e2eIntegrationContext.testUrls.cloudFrontRoot;
+
+      // Test initial request performance
+      const startTime = Date.now();
+      const response = await authenticatedE2EPage.goto(testUrl, {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
+      const responseTime = Date.now() - startTime;
+
+      expect(response).toBeTruthy();
+      expect(response!.status()).toBeLessThan(400);
+      expect(responseTime).toBeLessThan(10000); // Should respond within 10 seconds
+
+      // Validate CloudFront headers
+      const headers = await response!.allHeaders();
+      const cacheValidation = CloudFrontTestUtils.validateCacheHeaders(headers);
+
+      expect(cacheValidation).toBeDefined();
+
+      // Test multiple requests to validate caching
+      const secondStartTime = Date.now();
+      const secondResponse = await authenticatedE2EPage.goto(testUrl, {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
+      const secondResponseTime = Date.now() - secondStartTime;
+
+      expect(secondResponse).toBeTruthy();
+      expect(secondResponse!.status()).toBeLessThan(400);
+
+      // Second request should be faster due to caching
+      console.log(
+        `[Test] First request: ${responseTime}ms, Second request: ${secondResponseTime}ms`
+      );
+
+      // Log cache information
+      const cacheStatus = headers["x-cache"] || headers["cloudfront-cache-status"] || "unknown";
+      console.log(`[Test] CloudFront cache status: ${cacheStatus}`);
+      console.log(`[Test] Cache headers validation:`, cacheValidation);
+    }
+  );
+});
 
 // Backward Compatibility Test Suite
 e2eIntegrationTest.describe("Backward Compatibility Validation", () => {
@@ -915,9 +831,7 @@ e2eIntegrationTest.describe("Backward Compatibility Validation", () => {
       expect(testUser).toHaveProperty("userPoolClientId");
 
       // Validate email format matches existing pattern
-      expect(testUser.email).toMatch(
-        /^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/,
-      );
+      expect(testUser.email).toMatch(/^mne-medialake\+e2etest-\d+-[a-f0-9]+@amazon\.com$/);
       expect(testUser.username).toBe(testUser.email); // Username should be email
 
       // Validate password meets existing requirements
@@ -928,7 +842,7 @@ e2eIntegrationTest.describe("Backward Compatibility Validation", () => {
       expect(testUser.userPoolClientId).toMatch(/^[a-zA-Z0-9]+$/);
 
       console.log("[Test] Backward compatibility with auth fixtures validated");
-    },
+    }
   );
 
   e2eIntegrationTest(
@@ -937,20 +851,16 @@ e2eIntegrationTest.describe("Backward Compatibility Validation", () => {
       // While this test doesn't directly use S3, validate that worker isolation
       // patterns match existing S3 bucket naming conventions
       const expectedWorkerPattern = new RegExp(`-${testInfo.workerIndex}-`);
-      expect(e2eIntegrationContext.testUser.username).toMatch(
-        expectedWorkerPattern,
-      );
+      expect(e2eIntegrationContext.testUser.username).toMatch(expectedWorkerPattern);
 
       // Validate that the pattern would work with existing S3 bucket naming
-      const mockBucketName = `medialake-pw-test-${Math.random().toString(36).substring(2, 8)}-worker-${testInfo.workerIndex}`;
-      expect(mockBucketName).toMatch(
-        /^medialake-pw-test-[a-f0-9]+-worker-\d+$/,
-      );
+      const mockBucketName = `medialake-pw-test-${Math.random()
+        .toString(36)
+        .substring(2, 8)}-worker-${testInfo.workerIndex}`;
+      expect(mockBucketName).toMatch(/^medialake-pw-test-[a-f0-9]+-worker-\d+$/);
 
-      console.log(
-        `[Test] Worker isolation pattern compatible with S3 naming: ${mockBucketName}`,
-      );
-    },
+      console.log(`[Test] Worker isolation pattern compatible with S3 naming: ${mockBucketName}`);
+    }
   );
 });
 
@@ -965,22 +875,14 @@ e2eIntegrationTest.describe("Error Handling and Resilience", () => {
 
       // Test discovery method fallback chain
       const discoveryMethod = e2eIntegrationContext.testUser.discoveryMethod;
-      expect(["tag-based", "name-based", "fallback"]).toContain(
-        discoveryMethod,
-      );
+      expect(["tag-based", "name-based", "fallback"]).toContain(discoveryMethod);
 
       // Test that validation results indicate successful recovery
-      expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(
-        true,
-      );
-      expect(
-        e2eIntegrationContext.validationResults.permanentPasswordWorking,
-      ).toBe(true);
+      expect(e2eIntegrationContext.validationResults.backwardCompatible).toBe(true);
+      expect(e2eIntegrationContext.validationResults.permanentPasswordWorking).toBe(true);
 
-      console.log(
-        `[Test] Error recovery successful - discovery method: ${discoveryMethod}`,
-      );
-    },
+      console.log(`[Test] Error recovery successful - discovery method: ${discoveryMethod}`);
+    }
   );
 
   e2eIntegrationTest(
@@ -1006,33 +908,28 @@ e2eIntegrationTest.describe("Error Handling and Resilience", () => {
       expect(typeof validation.backwardCompatible).toBe("boolean");
 
       console.log("[Test] Comprehensive error scenario validation completed");
-    },
+    }
   );
 });
 
 // Performance and Scalability Test Suite
 e2eIntegrationTest.describe("Performance and Scalability", () => {
-  e2eIntegrationTest(
-    "should meet performance benchmarks",
-    async ({ e2eIntegrationContext }) => {
-      const metrics = e2eIntegrationContext.discoveryMetrics;
+  e2eIntegrationTest("should meet performance benchmarks", async ({ e2eIntegrationContext }) => {
+    const metrics = e2eIntegrationContext.discoveryMetrics;
 
-      // Validate discovery performance benchmarks
-      expect(metrics.cognitoDiscoveryTime).toBeLessThan(10000); // 10 seconds max
-      expect(metrics.cloudFrontDiscoveryTime).toBeLessThan(10000); // 10 seconds max
-      expect(metrics.userCreationTime).toBeLessThan(5000); // 5 seconds max
-      expect(metrics.totalSetupTime).toBeLessThan(30000); // 30 seconds max for complete setup
+    // Validate discovery performance benchmarks
+    expect(metrics.cognitoDiscoveryTime).toBeLessThan(10000); // 10 seconds max
+    expect(metrics.cloudFrontDiscoveryTime).toBeLessThan(10000); // 10 seconds max
+    expect(metrics.userCreationTime).toBeLessThan(5000); // 5 seconds max
+    expect(metrics.totalSetupTime).toBeLessThan(30000); // 30 seconds max for complete setup
 
-      // Log performance metrics
-      console.log("[Test] Performance benchmarks:");
-      console.log(`  - Cognito discovery: ${metrics.cognitoDiscoveryTime}ms`);
-      console.log(
-        `  - CloudFront discovery: ${metrics.cloudFrontDiscoveryTime}ms`,
-      );
-      console.log(`  - User creation: ${metrics.userCreationTime}ms`);
-      console.log(`  - Total setup: ${metrics.totalSetupTime}ms`);
-    },
-  );
+    // Log performance metrics
+    console.log("[Test] Performance benchmarks:");
+    console.log(`  - Cognito discovery: ${metrics.cognitoDiscoveryTime}ms`);
+    console.log(`  - CloudFront discovery: ${metrics.cloudFrontDiscoveryTime}ms`);
+    console.log(`  - User creation: ${metrics.userCreationTime}ms`);
+    console.log(`  - Total setup: ${metrics.totalSetupTime}ms`);
+  });
 
   e2eIntegrationTest(
     "should support concurrent test execution",
@@ -1045,31 +942,23 @@ e2eIntegrationTest.describe("Performance and Scalability", () => {
 
       // Test that discovery engine supports concurrent access
       const discoveryStats = await AWSDiscoveryUtils.getDiscoveryStats(
-        e2eIntegrationContext.discoveryEngine,
+        e2eIntegrationContext.discoveryEngine
       );
       expect(discoveryStats).toBeDefined();
 
       // Test concurrent discovery operations
       const tagFilters = getE2ETagFilters();
       const concurrentPromises = [
-        e2eIntegrationContext.discoveryEngine.discoverByTags(
-          "cognito-user-pool",
-          tagFilters,
-        ),
-        e2eIntegrationContext.discoveryEngine.discoverByTags(
-          "cloudfront-distribution",
-          tagFilters,
-        ),
+        e2eIntegrationContext.discoveryEngine.discoverByTags("cognito-user-pool", tagFilters),
+        e2eIntegrationContext.discoveryEngine.discoverByTags("cloudfront-distribution", tagFilters),
       ];
 
       const concurrentResults = await Promise.all(concurrentPromises);
       expect(concurrentResults[0]).toBeDefined(); // Cognito results
       expect(concurrentResults[1]).toBeDefined(); // CloudFront results
 
-      console.log(
-        `[Test] Concurrent execution validated for worker ${testInfo.workerIndex}`,
-      );
-    },
+      console.log(`[Test] Concurrent execution validated for worker ${testInfo.workerIndex}`);
+    }
   );
 });
 

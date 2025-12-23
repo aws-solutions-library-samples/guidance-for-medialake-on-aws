@@ -1,13 +1,11 @@
-import React, { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 
 interface SidebarContextType {
   isCollapsed: boolean;
   setIsCollapsed: (isCollapsed: boolean) => void;
 }
 
-export const SidebarContext = createContext<SidebarContextType | undefined>(
-  undefined,
-);
+export const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const useSidebar = () => {
   const context = useContext(SidebarContext);

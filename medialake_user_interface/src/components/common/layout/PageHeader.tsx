@@ -7,11 +7,7 @@ interface PageHeaderProps {
   description: string;
   action?: React.ReactNode;
 }
-const PageHeader: React.FC<PageHeaderProps> = ({
-  title,
-  description,
-  action,
-}) => {
+const PageHeader: React.FC<PageHeaderProps> = ({ title, description, action }) => {
   const theme = useTheme();
   const { direction } = useDirection();
   const isRTL = direction === "rtl";

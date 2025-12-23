@@ -1,15 +1,10 @@
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   CircularProgress,
@@ -20,7 +15,6 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Divider,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -28,6 +22,7 @@ import {
   Lock as PrivateIcon,
   Share as SharedIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { useGetCollections } from "../../api/hooks/useCollections";
 
 interface AddToCollectionModalProps {
@@ -42,9 +37,7 @@ interface AddToCollectionModalProps {
 export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   open,
   onClose,
-  assetId,
   assetName,
-  assetType,
   onAddToCollection,
 }) => {
   const { t } = useTranslation();
@@ -62,7 +55,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
       collection.status === "ACTIVE" &&
       (collection.userRole === "owner" ||
         collection.userRole === "admin" ||
-        collection.userRole === "editor"),
+        collection.userRole === "editor")
   );
 
   const handleSubmit = async () => {
@@ -97,8 +90,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
 
   const getCollectionTypeIcon = (collection: any) => {
     if (collection.isPublic) return <PublicIcon fontSize="small" />;
-    if (collection.userRole === "owner")
-      return <PrivateIcon fontSize="small" />;
+    if (collection.userRole === "owner") return <PrivateIcon fontSize="small" />;
     return <SharedIcon fontSize="small" />;
   };
 
@@ -106,7 +98,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     if (collection.isPublic) {
       return (
         <Chip
-          label="Public"
+          label={t("collectionsPage.labels.public")}
           size="small"
           sx={{
             backgroundColor: "#e8f5e8",
@@ -119,7 +111,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     if (collection.userRole === "owner") {
       return (
         <Chip
-          label="Private"
+          label={t("collectionsPage.labels.private")}
           size="small"
           sx={{
             backgroundColor: "#e3f2fd",
@@ -131,7 +123,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     }
     return (
       <Chip
-        label="Shared"
+        label={t("collectionsPage.labels.shared")}
         size="small"
         sx={{
           backgroundColor: "#fff3e0",
@@ -171,9 +163,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
             </Box>
           ) : availableCollections.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 4 }}>
-              <FolderIcon
-                sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
-              />
+              <FolderIcon sx={{ fontSize: 48, color: "text.secondary", mb: 2 }} />
               <Typography variant="body1" color="text.secondary">
                 No collections available
               </Typography>
@@ -220,9 +210,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                               gap: 1,
                             }}
                           >
-                            <Typography variant="body1">
-                              {collection.name}
-                            </Typography>
+                            <Typography variant="body1">{collection.name}</Typography>
                             {getCollectionTypeBadge(collection)}
                           </Box>
                         }
@@ -258,11 +246,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={
-            !selectedCollectionId ||
-            isAdding ||
-            availableCollections.length === 0
-          }
+          disabled={!selectedCollectionId || isAdding || availableCollections.length === 0}
           startIcon={isAdding ? <CircularProgress size={20} /> : null}
         >
           {isAdding ? "Adding..." : "Add to Collection"}

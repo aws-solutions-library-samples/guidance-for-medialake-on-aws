@@ -6,10 +6,7 @@ interface TabContentContainerProps {
   noPaper?: boolean;
 }
 
-const TabContentContainer: React.FC<TabContentContainerProps> = ({
-  children,
-  noPaper = false,
-}) => {
+const TabContentContainer: React.FC<TabContentContainerProps> = ({ children, noPaper = false }) => {
   const theme = useTheme();
 
   if (noPaper) {

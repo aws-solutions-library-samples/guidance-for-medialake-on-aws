@@ -102,30 +102,37 @@ erDiagram
 ## Entity Descriptions
 
 1. **User**: Represents a user of the MediaLake system.
+
    - Primary attributes: id, username, email, firstName, lastName, role
    - Relationships: Can be a member of multiple groups, can own multiple assets
 
 2. **Group**: Represents a collection of users with similar permissions.
+
    - Primary attributes: id, name, description, memberCount, permissions
    - Relationships: Contains multiple group members, has multiple permission sets
 
 3. **GroupMember**: Represents the relationship between users and groups.
+
    - Primary attributes: userId, groupId, username, email, firstName, lastName, addedAt
    - Relationships: Links a user to a group
 
 4. **PermissionSet**: Represents a collection of permissions that can be assigned to groups.
+
    - Primary attributes: id, name, description, permissions, isBuiltIn
    - Relationships: Associated with groups
 
 5. **Asset**: Represents a media asset in the system.
+
    - Primary attributes: id, name, type, mimeType, size, metadata, tags, url
    - Relationships: Owned by a user, stored by a connector, processed by pipelines
 
 6. **Connector**: Represents a storage connector for assets.
+
    - Primary attributes: id, name, type, config, status
    - Relationships: Stores multiple assets
 
 7. **Pipeline**: Represents a processing workflow for assets.
+
    - Primary attributes: id, name, description, status
    - Relationships: Contains multiple nodes, processes multiple assets
 

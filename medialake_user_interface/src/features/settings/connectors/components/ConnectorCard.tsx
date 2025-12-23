@@ -19,31 +19,22 @@ import {
   alpha,
 } from "@mui/material";
 import {
-  Edit as EditIcon,
   Delete as DeleteIcon,
   CloudUpload as CloudUploadIcon,
-  PowerSettingsNew as PowerIcon,
   AccessTime as AccessTimeIcon,
   Sync as SyncIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import { ConnectorResponse } from "@/api/types/api.types";
 import ConnectorEditModal from "@/features/settings/connectors/components/ConnectorEditModal";
 import { useDateFormat } from "@/shared/hooks/useDateFormat";
 import { Warning as WarningIcon } from "@mui/icons-material";
 
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-};
-
 interface ConnectorCardProps {
   connector: ConnectorResponse;
   onEdit: (connector: ConnectorResponse) => void;
   onDelete: (id: string) => Promise<void>;
-  onToggleStatus: (id: string, enabled: boolean) => Promise<void>;
+  onToggleStatus?: (id: string, enabled: boolean) => Promise<void>;
   onSync?: (id: string) => Promise<void>;
   showSeconds?: boolean;
   allowSecondsToggle?: boolean;
@@ -53,29 +44,24 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   connector,
   onEdit,
   onDelete,
-  onToggleStatus,
   onSync,
   showSeconds: initialShowSeconds = false,
   allowSecondsToggle = true,
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const {
-    formattedDate,
-    absoluteDate,
-    showSeconds,
-    toggleSeconds,
-    canToggleSeconds,
-  } = useDateFormat(connector.updatedAt, {
-    showRelative: false,
-    showSeconds: initialShowSeconds,
-    allowSecondsToggle,
-    updateInterval: 60000,
-  });
+  const { formattedDate, absoluteDate, showSeconds, toggleSeconds, canToggleSeconds } =
+    useDateFormat(connector.updatedAt, {
+      showRelative: false,
+      showSeconds: initialShowSeconds,
+      allowSecondsToggle,
+      updateInterval: 60000,
+    });
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
@@ -89,10 +75,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
-  };
-
-  const handleToggleStatus = async () => {
-    await onToggleStatus(connector.id, connector.status === "disabled");
   };
 
   const handleSyncClick = async () => {
@@ -123,6 +105,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   return (
     <>
       <Card
+        data-testid={`connector-card-${connector.id}`}
         sx={{
           height: "100%",
           display: "flex",
@@ -157,7 +140,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               {getConnectorTypeLabel(connector.type)}
               <Chip
                 size="small"
-                label={connector.status || "active"}
+                label={connector.status || t("connectors.status.active")}
                 sx={{
                   backgroundColor:
                     connector.status === "error"
@@ -246,30 +229,29 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 /> */}
         <CardContent sx={{ flexGrow: 1 }}>
           <Typography variant="body2">
-            <strong>Bucket:</strong>{" "}
+            <strong>{t("connectors.fields.bucket")}:</strong>{" "}
             {connector.storageIdentifier || connector.configuration?.bucket}
           </Typography>
           {(connector.region || connector.configuration?.region) && (
             <Typography variant="body2">
-              <strong>Region:</strong>{" "}
+              <strong>{t("connectors.fields.region")}:</strong>{" "}
               {connector.region || connector.configuration?.region}
             </Typography>
           )}
           {connector.description && (
             <Typography variant="body2">
-              <strong>Description:</strong> {connector.description}
+              <strong>{t("connectors.fields.description")}:</strong> {connector.description}
             </Typography>
           )}
           {connector.objectPrefix &&
             (typeof connector.objectPrefix === "string" ? (
               <Typography variant="body2">
-                <strong>Prefix:</strong> {connector.objectPrefix}
+                <strong>{t("connectors.fields.prefix")}:</strong> {connector.objectPrefix}
               </Typography>
-            ) : Array.isArray(connector.objectPrefix) &&
-              connector.objectPrefix.length > 0 ? (
+            ) : Array.isArray(connector.objectPrefix) && connector.objectPrefix.length > 0 ? (
               <>
                 <Typography variant="body2">
-                  <strong>Prefixes:</strong>
+                  <strong>{t("connectors.fields.prefixes")}:</strong>
                 </Typography>
                 {connector.objectPrefix.map((prefix, index) => (
                   <Typography key={index} variant="body2" sx={{ pl: 2 }}>
@@ -282,13 +264,14 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             !connector.objectPrefix &&
             (typeof connector.configuration.objectPrefix === "string" ? (
               <Typography variant="body2">
-                <strong>Prefix:</strong> {connector.configuration.objectPrefix}
+                <strong>{t("connectors.fields.prefix")}:</strong>{" "}
+                {connector.configuration.objectPrefix}
               </Typography>
             ) : Array.isArray(connector.configuration.objectPrefix) &&
               connector.configuration.objectPrefix.length > 0 ? (
               <>
                 <Typography variant="body2">
-                  <strong>Prefixes:</strong>
+                  <strong>{t("connectors.fields.prefixes")}:</strong>
                 </Typography>
                 {connector.configuration.objectPrefix.map((prefix, index) => (
                   <Typography key={index} variant="body2" sx={{ pl: 2 }}>
@@ -297,12 +280,10 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                 ))}
               </>
             ) : null)}
-          {(connector.integrationMethod ||
-            connector.configuration?.s3IntegrationMethod) && (
+          {(connector.integrationMethod || connector.configuration?.s3IntegrationMethod) && (
             <Typography variant="body2">
-              <strong>Integration Method:</strong>{" "}
-              {connector.integrationMethod ||
-                connector.configuration?.s3IntegrationMethod}
+              <strong>{t("connectors.fields.integrationMethod")}:</strong>{" "}
+              {connector.integrationMethod || connector.configuration?.s3IntegrationMethod}
             </Typography>
           )}
           <Box sx={{ mt: 2 }}>
@@ -342,7 +323,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                         : theme.palette.text.secondary,
                     }}
                   />
-                  <strong>Last Updated:</strong> {formattedDate}
+                  <strong>{t("connectors.fields.lastUpdated")}:</strong> {formattedDate}
                 </Box>
               </Tooltip>
             </Typography>
@@ -396,11 +377,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                             <PowerIcon fontSize="small" />
                         </IconButton> */}
             {onSync && connector.type === "s3" && (
-              <Tooltip title="Sync connector">
+              <Tooltip title={t("connectors.syncConnector")}>
                 <IconButton
                   onClick={handleSyncClick}
                   size="small"
                   disabled={isSyncing}
+                  data-testid={`connector-sync-button-${connector.id}`}
                   sx={{
                     backgroundColor: alpha(theme.palette.primary.main, 0.1),
                     width: 40,
@@ -430,6 +412,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             <IconButton
               onClick={handleDeleteClick}
               size="small"
+              data-testid={`connector-delete-button-${connector.id}`}
               sx={{
                 backgroundColor: alpha(theme.palette.error.main, 0.1),
                 width: 40,
@@ -458,11 +441,12 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ fontWeight: 600 }}>Delete Connector</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600 }}>{t("connectors.dialogs.deleteTitle")}</DialogTitle>
         <DialogContent>
           <Typography sx={{ color: theme.palette.text.secondary }}>
-            Are you sure you want to delete the connector "{connector.name}"?
-            This action cannot be undone.
+            {t("connectors.dialogs.deleteConnectorConfirmation", {
+              connectorName: connector.name,
+            })}
           </Typography>
           {connector.integrationMethod?.toLowerCase() === "eventbridge" && (
             <Typography
@@ -478,8 +462,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               }}
             >
               <WarningIcon fontSize="small" />
-              Please ensure you disable the EventBridge integration for this S3
-              bucket if it is no longer required.
+              {t("connectors.dialogs.eventBridgeWarning")}
             </Typography>
           )}
         </DialogContent>
@@ -494,7 +477,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               },
             }}
           >
-            Cancel
+            {t("common.dialogs.cancel")}
           </Button>
           <Button
             onClick={handleDeleteConfirm}
@@ -508,7 +491,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               },
             }}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isDeleting ? t("common.actions.deleting") : t("common.actions.delete")}
           </Button>
         </DialogActions>
       </Dialog>

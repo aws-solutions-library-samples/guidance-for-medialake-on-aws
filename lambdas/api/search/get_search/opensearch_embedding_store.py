@@ -65,7 +65,7 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
             return False
 
     def build_semantic_query(self, params) -> Dict[str, Any]:
-        """Build OpenSearch semantic query using Twelve Labs embeddings"""
+        """Build OpenSearch semantic query using Twelve Labs embeddings with dual-structure support"""
         start_time = time.time()
         self.logger.info(
             f"[PERF] Starting OpenSearch semantic query build for: {params.q}"
@@ -73,13 +73,24 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
 
         # Use centralized embedding generation
         embedding = self.generate_text_embedding(params.q)
+        embedding_dimension = len(embedding)
 
+        # Determine which field name to use for asset_embeddings structure
+        field_name = self._get_embedding_field_name(embedding_dimension)
+
+        self.logger.info(
+            f"Generated embedding with dimension {embedding_dimension}, using field: {field_name}"
+        )
+
+        # Build dual-query that works with both legacy and new asset_embeddings structure
+        # This uses a "should" clause so it matches documents in either structure
         query = {
             "size": params.pageSize * 20,
             "query": {
                 "bool": {
                     "filter": {"bool": {"must": []}},
-                    "must": [
+                    "should": [
+                        # Legacy structure: root-level embedding field
                         {
                             "knn": {
                                 "embedding": {
@@ -87,20 +98,73 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
                                     "k": params.pageSize * 20,
                                 }
                             }
-                        }
+                        },
+                        # New structure: asset_embeddings nested array with dimension-specific field
+                        {
+                            "nested": {
+                                "path": "asset_embeddings",
+                                "score_mode": "max",  # Use the best matching embedding
+                                "query": {
+                                    "knn": {
+                                        f"asset_embeddings.{field_name}": {
+                                            "vector": embedding,
+                                            "k": params.pageSize * 20,
+                                        }
+                                    }
+                                },
+                            }
+                        },
                     ],
+                    "minimum_should_match": 1,  # Match at least one structure
                 }
             },
-            "_source": {"excludes": ["embedding"]},
+            "_source": {
+                "excludes": [
+                    "embedding",
+                    "audio_embedding",
+                    "asset_embeddings.embedding_256_cosine",
+                    "asset_embeddings.embedding_384_cosine",
+                    "asset_embeddings.embedding_512_cosine",
+                    "asset_embeddings.embedding_1024_cosine",
+                    "asset_embeddings.embedding_1536_cosine",
+                    "asset_embeddings.embedding_3072_cosine",
+                ]
+            },
         }
 
         # Add filters based on parameters
         self._add_filters_to_query(query, params)
 
         self.logger.info(
+            f"Built dual-structure query supporting both legacy and asset_embeddings formats"
+        )
+        self.logger.info(
             f"[PERF] Total OpenSearch semantic query build time: {time.time() - start_time:.3f}s"
         )
         return query
+
+    def _get_embedding_field_name(
+        self, dimension: int, space_type: str = "cosine"
+    ) -> str:
+        """
+        Get the field name for an embedding based on its dimension and space type.
+
+        Args:
+            dimension: The embedding dimension (256, 384, 512, 1024, 1536, 3072)
+            space_type: The similarity space type (default: "cosine")
+
+        Returns:
+            Field name like "embedding_1024_cosine"
+        """
+        supported_dimensions = [256, 384, 512, 1024, 1536, 3072]
+        if dimension not in supported_dimensions:
+            self.logger.warning(
+                f"Unsupported embedding dimension: {dimension}. Using closest supported dimension."
+            )
+            # Find closest supported dimension
+            dimension = min(supported_dimensions, key=lambda x: abs(x - dimension))
+
+        return f"embedding_{dimension}_{space_type}"
 
     def _add_filters_to_query(self, query: Dict, params):
         """Add filters to OpenSearch query based on parameters"""

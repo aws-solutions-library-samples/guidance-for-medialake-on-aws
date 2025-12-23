@@ -1,0 +1,3 @@
+# Files with environment-specific prettier formatting issues
+tests/integration/comprehensive-user-lifecycle-e2e.spec.ts
+src/types/shared/assetComponents.ts

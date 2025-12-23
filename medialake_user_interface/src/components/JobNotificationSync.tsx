@@ -8,9 +8,7 @@ import { useJobNotifications } from "@/hooks/useJobNotifications";
 export const JobNotificationSync: React.FC = () => {
   // Add basic logging to verify the component is working
   useEffect(() => {
-    console.log(
-      "JobNotificationSync: Starting bulk download job polling every 15 seconds",
-    );
+    console.log("JobNotificationSync: Starting bulk download job polling every 15 seconds");
   }, []);
 
   // This hook will automatically sync jobs with notifications

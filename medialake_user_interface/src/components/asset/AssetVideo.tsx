@@ -2,29 +2,21 @@ import React from "react";
 import { Box } from "@mui/material";
 import { VideoViewer, VideoViewerRef } from "../common/VideoViewer";
 
-import { forwardRef, useImperativeHandle, useRef, useEffect } from "react";
-import { OmakasePlayer } from "@byomakase/omakase-player";
+import { forwardRef, useEffect } from "react";
 
 interface AssetVideoProps {
   src: string;
   alt?: string;
   onTimeUpdate?: (time: number) => void;
-  onVideoElementReady?: (
-    videoViewerRef: React.RefObject<VideoViewerRef>,
-  ) => void;
+  onVideoElementReady?: (videoViewerRef: React.RefObject<VideoViewerRef>) => void;
   protocol?: "audio" | "video";
 }
 
 export const AssetVideo = forwardRef<VideoViewerRef, AssetVideoProps>(
-  ({ src, alt, onTimeUpdate, onVideoElementReady, protocol }, ref) => {
+  ({ src, onTimeUpdate, onVideoElementReady, protocol }, ref) => {
     // Register the video element when the component mounts
     useEffect(() => {
-      if (
-        onVideoElementReady &&
-        ref &&
-        typeof ref === "object" &&
-        ref.current
-      ) {
+      if (onVideoElementReady && ref && typeof ref === "object" && ref.current) {
         onVideoElementReady(ref as React.RefObject<VideoViewerRef>);
       }
     }, [onVideoElementReady, ref]);
@@ -46,15 +38,10 @@ export const AssetVideo = forwardRef<VideoViewerRef, AssetVideoProps>(
           },
         }}
       >
-        <VideoViewer
-          ref={ref}
-          videoSrc={src}
-          onTimeUpdate={onTimeUpdate}
-          protocol={protocol}
-        />
+        <VideoViewer ref={ref} videoSrc={src} onTimeUpdate={onTimeUpdate} protocol={protocol} />
       </Box>
     );
-  },
+  }
 );
 
 AssetVideo.displayName = "AssetVideo";

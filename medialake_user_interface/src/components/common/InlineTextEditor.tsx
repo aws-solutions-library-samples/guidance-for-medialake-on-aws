@@ -1,10 +1,4 @@
-import React, {
-  useRef,
-  useEffect,
-  useState,
-  useLayoutEffect,
-  useCallback,
-} from "react";
+import React, { useRef, useEffect, useState, useLayoutEffect, useCallback } from "react";
 import { TextField, TextFieldProps } from "@mui/material";
 
 interface InlineTextEditorProps extends Omit<TextFieldProps, "value"> {
@@ -26,7 +20,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(
     initialValue,
     onChangeCommit,
     onComplete,
-    isEditing,
+
     editingCellId,
     preventCommitRef,
     commitRef,
@@ -135,7 +129,7 @@ export const InlineTextEditor: React.FC<InlineTextEditorProps> = React.memo(
         fullWidth
       />
     );
-  },
+  }
 );
 
 InlineTextEditor.displayName = "InlineTextEditor";

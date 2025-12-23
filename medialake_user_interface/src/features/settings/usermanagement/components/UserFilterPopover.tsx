@@ -6,7 +6,6 @@ import {
   Select,
   MenuItem,
   Button,
-  useTheme,
   Typography,
   Stack,
 } from "@mui/material";
@@ -28,7 +27,6 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
   users,
 }) => {
   const { t } = useTranslation();
-  const theme = useTheme();
 
   const formatDateOnly = (dateString: string) => {
     const date = new Date(dateString);
@@ -121,11 +119,7 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
     >
       <Stack spacing={2}>
         <Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mb: 1, display: "block" }}
-          >
+          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
             {t("common.textFilter")}
           </Typography>
           <TextField
@@ -144,11 +138,7 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
         </Box>
 
         <Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mb: 1, display: "block" }}
-          >
+          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
             {t("common.selectFilter")}
           </Typography>
           <Select
@@ -177,11 +167,7 @@ export const UserFilterPopover: React.FC<UserFilterPopoverProps> = ({
         </Box>
 
         {currentValue && (
-          <Button
-            size="small"
-            onClick={handleClearFilter}
-            sx={{ alignSelf: "flex-start" }}
-          >
+          <Button size="small" onClick={handleClearFilter} sx={{ alignSelf: "flex-start" }}>
             {t("common.clearFilter")}
           </Button>
         )}

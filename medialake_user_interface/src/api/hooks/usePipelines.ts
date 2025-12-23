@@ -26,10 +26,7 @@ export const useCreatePipeline = () => {
   return useMutation<PipelineResponse, Error, CreatePipelineRequest>({
     mutationFn: async (data) => {
       validatePipelineRequest(data);
-      const response = await apiClient.post<PipelineResponse>(
-        API_ENDPOINTS.PIPELINES,
-        data,
-      );
+      const response = await apiClient.post<PipelineResponse>(API_ENDPOINTS.PIPELINES, data);
       return response.data;
     },
     onError: (error) => {
@@ -41,25 +38,22 @@ export const useCreatePipeline = () => {
       }
     },
     onSuccess: (newPipeline) => {
-      queryClient.setQueryData<PipelineListResponse>(
-        [QUERY_KEYS.PIPELINES],
-        (old) => {
-          if (!old)
-            return {
-              status: "success",
-              message: "Pipelines retrieved successfully",
-              data: { pipelines: [newPipeline] },
-            };
+      queryClient.setQueryData<PipelineListResponse>([QUERY_KEYS.PIPELINES], (old) => {
+        if (!old)
           return {
-            status: old.status,
-            message: old.message,
-            data: {
-              ...old.data,
-              connectors: [...old.data.pipelines, newPipeline],
-            },
+            status: "success",
+            message: "Pipelines retrieved successfully",
+            data: { pipelines: [newPipeline] },
           };
-        },
-      );
+        return {
+          status: old.status,
+          message: old.message,
+          data: {
+            ...old.data,
+            connectors: [...old.data.pipelines, newPipeline],
+          },
+        };
+      });
     },
   });
 };
@@ -80,29 +74,21 @@ export const useDeletePipeline = () => {
       }
     },
     onSuccess: (_, deletedPipelineId) => {
-      queryClient.setQueryData<PipelineListResponse>(
-        [QUERY_KEYS.PIPELINES],
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              pipelines: old.data.pipelines.filter(
-                (pipeline) => pipeline.id !== deletedPipelineId,
-              ),
-            },
-          };
-        },
-      );
+      queryClient.setQueryData<PipelineListResponse>([QUERY_KEYS.PIPELINES], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            pipelines: old.data.pipelines.filter((pipeline) => pipeline.id !== deletedPipelineId),
+          },
+        };
+      });
     },
   });
 };
 
-export const usePipeline = (
-  pageSize: number = 20,
-  filters?: PipelineFilters,
-) => {
+export const usePipeline = (pageSize: number = 20, filters?: PipelineFilters) => {
   const { showError } = useErrorModal();
 
   return useInfiniteQuery({
@@ -138,7 +124,7 @@ export const usePipeline = (
 
         const searchParams = new URLSearchParams(params);
         const response = await apiClient.get<PipelineResponse>(
-          `${API_ENDPOINTS.PIPELINES}?${searchParams.toString()}`,
+          `${API_ENDPOINTS.PIPELINES}?${searchParams.toString()}`
         );
         return response.data;
       } catch (error) {

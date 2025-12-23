@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Box, Typography, Button, Container, Paper } from "@mui/material";
 import LockIcon from "@mui/icons-material/Lock";
 
@@ -11,8 +11,6 @@ import LockIcon from "@mui/icons-material/Lock";
  */
 const AccessDeniedPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
 
   const handleGoBack = () => {
     navigate(-1);
@@ -40,14 +38,9 @@ const AccessDeniedPage: React.FC = () => {
           Access Denied
         </Typography>
 
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          align="center"
-          sx={{ mb: 4 }}
-        >
-          You don't have permission to access this page. Please contact your
-          administrator if you believe this is an error.
+        <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+          You don't have permission to access this page. Please contact your administrator if you
+          believe this is an error.
         </Typography>
 
         <Box sx={{ display: "flex", gap: 2 }}>

@@ -17,6 +17,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { Can } from "@/permissions/components/Can";
 import { ApiKey } from "@/api/types/apiKey.types";
+import { useTranslation } from "react-i18next";
 
 interface ApiKeyCardProps {
   apiKey: ApiKey;
@@ -25,12 +26,8 @@ interface ApiKeyCardProps {
   onDelete: (apiKey: ApiKey) => void;
 }
 
-const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
-  apiKey,
-  onView,
-  onEdit,
-  onDelete,
-}) => {
+const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelete }) => {
+  const { t } = useTranslation();
   const formatDate = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   };
@@ -51,12 +48,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
     >
       <CardContent sx={{ flexGrow: 1, pb: 1 }}>
         {/* Header with name and status */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          mb={1}
-        >
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
           <Typography
             variant="h6"
             component="h3"
@@ -70,7 +62,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
             {apiKey.name}
           </Typography>
           <Chip
-            label={apiKey.isEnabled ? "Enabled" : "Disabled"}
+            label={apiKey.isEnabled ? t("common.labels.enabled") : t("common.labels.disabled")}
             size="small"
             color={apiKey.isEnabled ? "success" : "default"}
             sx={{
@@ -105,20 +97,12 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
             Created {formatDate(apiKey.createdAt)}
           </Typography>
           {apiKey.updatedAt !== apiKey.createdAt && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
+            <Typography variant="caption" color="text.secondary" display="block">
               Updated {formatDate(apiKey.updatedAt)}
             </Typography>
           )}
           {apiKey.lastUsed && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
+            <Typography variant="caption" color="text.secondary" display="block">
               Last used {formatDate(apiKey.lastUsed)}
             </Typography>
           )}
@@ -135,7 +119,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
       >
         {/* View Button */}
         <Can I="view" a="api-key">
-          <Tooltip title="View details">
+          <Tooltip title={t("common.actions.viewDetails")}>
             <IconButton
               size="small"
               onClick={() => onView(apiKey)}
@@ -154,7 +138,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
 
         {/* Edit Button */}
         <Can I="edit" a="api-key">
-          <Tooltip title="Edit API key">
+          <Tooltip title={t("common.editApiKey")}>
             <IconButton
               size="small"
               onClick={() => onEdit(apiKey)}
@@ -173,7 +157,7 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({
 
         {/* Delete Button */}
         <Can I="delete" a="api-key">
-          <Tooltip title="Delete API key">
+          <Tooltip title={t("common.deleteApiKey")}>
             <IconButton
               size="small"
               onClick={() => onDelete(apiKey)}

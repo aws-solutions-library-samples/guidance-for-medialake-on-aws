@@ -4,8 +4,7 @@ import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
-import { useFeatureFlag } from "@/utils/featureFlags";
-import { useSnackbar, closeSnackbar } from "notistack";
+import { useSnackbar } from "notistack";
 import { useAuth } from "@/common/hooks/auth-context";
 
 interface Asset {
@@ -90,31 +89,6 @@ interface DeleteAssetResponse {
   data: {
     InventoryID: string;
   };
-}
-
-interface RelatedVersionHit {
-  InventoryID: string;
-  DigitalSourceAsset: {
-    ID: string;
-    Type: string;
-    CreateDate: string;
-    MainRepresentation: {
-      Format: string;
-      StorageInfo: {
-        PrimaryLocation: {
-          ObjectKey: {
-            Name: string;
-          };
-          FileInfo: {
-            Size: number;
-          };
-        };
-      };
-    };
-  };
-  thumbnailUrl?: string;
-  proxyUrl?: string;
-  score: number;
 }
 
 interface TranscriptionResponse {
@@ -225,15 +199,23 @@ interface BulkDownloadResponse {
   message: string;
   data: {
     jobId: string;
-    status:
-      | "INITIATED"
-      | "ASSESSED"
-      | "STAGING"
-      | "PROCESSING"
-      | "COMPLETED"
-      | "FAILED";
+    status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
     downloadUrl?: string;
     estimatedSize?: number;
+    createdAt: string;
+  };
+}
+interface BatchDeleteRequest {
+  assetIds: string[];
+  confirmationToken: string;
+}
+
+interface BatchDeleteResponse {
+  status: string;
+  message: string;
+  data: {
+    jobId: string;
+    status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
     createdAt: string;
   };
 }
@@ -243,13 +225,7 @@ interface BulkDownloadStatusResponse {
   message: string;
   data: {
     jobId: string;
-    status:
-      | "INITIATED"
-      | "ASSESSED"
-      | "STAGING"
-      | "PROCESSING"
-      | "COMPLETED"
-      | "FAILED";
+    status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
     downloadUrl?: string;
     progress?: number;
     estimatedSize?: number;
@@ -268,9 +244,7 @@ export const useAsset = (inventoryId: string) => {
     queryKey: QUERY_KEYS.ASSETS.detail(inventoryId),
     queryFn: async () => {
       try {
-        const response = await apiClient.get<AssetResponse>(
-          `assets/${inventoryId}`,
-        );
+        const response = await apiClient.get<AssetResponse>(`assets/${inventoryId}`);
         return response.data;
       } catch (error) {
         logger.error("Error fetching asset details:", error);
@@ -296,9 +270,7 @@ export const useDeleteAsset = () => {
   return useMutation({
     mutationFn: async (inventoryId: string) => {
       try {
-        const response = await apiClient.delete<DeleteAssetResponse>(
-          `assets/${inventoryId}`,
-        );
+        const response = await apiClient.delete<DeleteAssetResponse>(`assets/${inventoryId}`);
         return response.data;
       } catch (error) {
         logger.error("Error deleting asset:", error);
@@ -331,20 +303,11 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
   const { enqueueSnackbar } = useSnackbar();
 
   return useMutation({
-    mutationFn: async ({
-      inventoryId,
-      newName,
-    }: {
-      inventoryId: string;
-      newName: string;
-    }) => {
+    mutationFn: async ({ inventoryId, newName }: { inventoryId: string; newName: string }) => {
       try {
-        const response = await apiClient.post<AssetResponse>(
-          `assets/${inventoryId}/rename`,
-          {
-            newName,
-          },
-        );
+        const response = await apiClient.post<AssetResponse>(`assets/${inventoryId}/rename`, {
+          newName,
+        });
         return response.data;
       } catch (error: any) {
         logger.error("Error renaming asset:", error);
@@ -379,10 +342,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
     },
     onSuccess: (data, variables) => {
       // Update the specific asset cache
-      queryClient.setQueryData(
-        QUERY_KEYS.ASSETS.detail(variables.inventoryId),
-        data,
-      );
+      queryClient.setQueryData(QUERY_KEYS.ASSETS.detail(variables.inventoryId), data);
 
       // Update asset in any search results cache
       queryClient
@@ -397,9 +357,7 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
                   // (in case there's a duplicate with the same ID)
                   asset.InventoryID !== variables.inventoryId ||
                   asset ===
-                    queryData.data.results.find(
-                      (a: any) => a.InventoryID === variables.inventoryId,
-                    ),
+                    queryData.data.results.find((a: any) => a.InventoryID === variables.inventoryId)
               )
               .map((asset: any) => {
                 if (asset.InventoryID === variables.inventoryId) {
@@ -433,17 +391,8 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
   });
 };
 
-export const useRelatedVersions = (
-  assetId: string,
-  page: number = 1,
-  pageSize: number = 20,
-) => {
-  console.log(
-    "useRelatedVersions - Called with assetId:",
-    assetId,
-    "page:",
-    page,
-  );
+export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 20) => {
+  console.log("useRelatedVersions - Called with assetId:", assetId, "page:", page);
 
   return useQuery<RelatedVersionsResponse, Error>({
     queryKey: ["relatedVersions", assetId, page, pageSize],
@@ -457,7 +406,7 @@ export const useRelatedVersions = (
             pageSize,
             min_score: 0.6,
           },
-        },
+        }
       );
       console.log("useRelatedVersions - Received response:", response.data);
       return response.data;
@@ -480,7 +429,7 @@ export const useTranscription = (inventoryId: string) => {
     queryFn: async () => {
       try {
         const response = await apiClient.get<TranscriptionResponse>(
-          `assets/${inventoryId}/transcript`,
+          `assets/${inventoryId}/transcript`
         );
         console.log("Transcription API response:", response.data);
         return response.data;
@@ -509,7 +458,7 @@ export const useBulkDownload = () => {
       try {
         const response = await apiClient.post<BulkDownloadResponse>(
           API_ENDPOINTS.ASSETS.BULK_DOWNLOAD,
-          request,
+          request
         );
         return response.data;
       } catch (error) {
@@ -526,10 +475,7 @@ export const useBulkDownload = () => {
 };
 
 // Hook to check bulk download status
-export const useBulkDownloadStatus = (
-  jobId: string,
-  enabled: boolean = true,
-) => {
+export const useBulkDownloadStatus = (jobId: string, enabled: boolean = true) => {
   const { showError } = useErrorModal();
 
   return useQuery({
@@ -537,7 +483,7 @@ export const useBulkDownloadStatus = (
     queryFn: async () => {
       try {
         const response = await apiClient.get<BulkDownloadStatusResponse>(
-          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`,
+          `${API_ENDPOINTS.ASSETS.BULK_DOWNLOAD}/${jobId}/status`
         );
         return response.data;
       } catch (error) {
@@ -556,10 +502,6 @@ export const useBulkDownloadStatus = (
 export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
   const { showError } = useErrorModal();
   const { isAuthenticated } = useAuth();
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
 
   return useQuery({
     queryKey: ["userBulkDownloadJobs"],
@@ -571,13 +513,7 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
           data: {
             jobs: Array<{
               jobId: string;
-              status:
-                | "INITIATED"
-                | "ASSESSED"
-                | "STAGING"
-                | "PROCESSING"
-                | "COMPLETED"
-                | "FAILED";
+              status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
               progress?: number;
               createdAt: string;
               updatedAt: string;
@@ -606,7 +542,7 @@ export const useUserBulkDownloadJobs = (enabled: boolean = true) => {
         throw error;
       }
     },
-    enabled: enabled && isAuthenticated && multiSelectFeature.value,
+    enabled: enabled && isAuthenticated,
     refetchInterval: 15000, // Poll every 15 seconds
     refetchIntervalInBackground: true, // Continue polling when tab is not active
     retry: 1,
@@ -639,6 +575,118 @@ export const useDeleteBulkDownloadJob = () => {
   });
 };
 
+// Hook to initiate batch delete
+export const useBatchDelete = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (request: BatchDeleteRequest) => {
+      try {
+        const response = await apiClient.delete<BatchDeleteResponse>(
+          API_ENDPOINTS.ASSETS.BATCH_DELETE,
+          { data: request }
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Error initiating batch delete:", error);
+        showError("Failed to initiate batch delete");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.ASSETS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.all,
+      });
+      // Invalidate batch delete jobs list
+      queryClient.invalidateQueries({ queryKey: ["userBatchDeleteJobs"] });
+    },
+    onError: (error) => {
+      logger.error("Error in batch delete mutation:", error);
+      showError("Failed to initiate batch delete");
+    },
+  });
+};
+
+// Hook to get all batch delete jobs for the current user
+export const useUserBatchDeleteJobs = (enabled: boolean = true) => {
+  const { showError } = useErrorModal();
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ["userBatchDeleteJobs"],
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get<{
+          status: string;
+          message: string;
+          data: {
+            jobs: Array<{
+              jobId: string;
+              status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
+              totalAssets: number;
+              processedAssets: number;
+              failedAssets: number;
+              progress?: number;
+              createdAt: string;
+              updatedAt: string;
+              executionArn?: string;
+              completedAt?: string;
+              error?: string;
+            }>;
+          };
+        }>(API_ENDPOINTS.ASSETS.BATCH_DELETE_USER_JOBS);
+        return response.data;
+      } catch (error) {
+        logger.error("Error fetching user batch delete jobs:", error);
+        showError("Failed to fetch delete jobs");
+        throw error;
+      }
+    },
+    enabled: enabled && isAuthenticated,
+    refetchInterval: 15000, // Poll every 15 seconds
+    refetchIntervalInBackground: true,
+    retry: 1,
+  });
+};
+
+// Hook to cancel a batch delete job
+export const useCancelBatchDelete = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      try {
+        const response = await apiClient.put<{
+          status: string;
+          message: string;
+          job?: {
+            jobId: string;
+            status: string;
+          };
+        }>(API_ENDPOINTS.ASSETS.BATCH_DELETE_CANCEL(jobId));
+        return response.data;
+      } catch (error) {
+        logger.error("Error cancelling batch delete:", error);
+        showError("Failed to cancel batch delete");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate batch delete jobs list to refresh status
+      queryClient.invalidateQueries({ queryKey: ["userBatchDeleteJobs"] });
+    },
+    onError: (error) => {
+      logger.error("Error in cancel batch delete mutation:", error);
+      showError("Failed to cancel batch delete");
+    },
+  });
+};
+
 // Export types for use in components
 export type {
   Asset,
@@ -648,4 +696,6 @@ export type {
   BulkDownloadRequest,
   BulkDownloadResponse,
   BulkDownloadStatusResponse,
+  BatchDeleteRequest,
+  BatchDeleteResponse,
 };

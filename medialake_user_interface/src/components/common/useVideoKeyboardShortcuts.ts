@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { PeriodMarker } from "@byomakase/omakase-player";
 import { PERIOD_MARKER_STYLE } from "./OmakaseTimeLineConstants";
 import { randomHexColor } from "./utils";
@@ -26,7 +26,7 @@ interface UseVideoKeyboardShortcutsProps {
   setMuted: (muted: boolean) => void;
   setIsVolumeHovered: (hovered: boolean) => void;
   lastNonZeroVolumeRef: React.MutableRefObject<number>;
-  volumeHoverTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  volumeHoverTimeoutRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
 
   // Marker functionality
   markerLaneRef: React.MutableRefObject<any | null>;
@@ -73,13 +73,10 @@ export const useVideoKeyboardShortcuts = ({
 }: UseVideoKeyboardShortcutsProps) => {
   // --- Jog/Shuttle helpers ---
   const SHUTTLE_STOPS = useMemo(
-    () =>
-      [-16, -8, -4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4, 8, 16] as const,
-    [],
+    () => [-16, -8, -4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4, 8, 16] as const,
+    []
   );
-  const [shuttleIdx, setShuttleIdx] = useState(
-    SHUTTLE_STOPS.indexOf(1 as (typeof SHUTTLE_STOPS)[number]),
-  );
+  const [, setShuttleIdx] = useState(SHUTTLE_STOPS.indexOf(1 as (typeof SHUTTLE_STOPS)[number]));
 
   // virtual rate to show UI state
   const [currentPlaybackRate, setCurrentPlaybackRate] = useState(1);
@@ -101,7 +98,7 @@ export const useVideoKeyboardShortcuts = ({
   const play = useCallback(() => {
     console.log(
       `PLAY() called from keyboard shortcuts - Stack:`,
-      new Error().stack?.split("\n").slice(1, 4).join("\n"),
+      new Error().stack?.split("\n").slice(1, 4).join("\n")
     );
     originalPlay();
   }, [originalPlay]);
@@ -109,7 +106,7 @@ export const useVideoKeyboardShortcuts = ({
   const pause = useCallback(() => {
     console.log(
       `PAUSE() called from keyboard shortcuts - Stack:`,
-      new Error().stack?.split("\n").slice(1, 4).join("\n"),
+      new Error().stack?.split("\n").slice(1, 4).join("\n")
     );
     originalPause();
   }, [originalPause]);
@@ -127,9 +124,7 @@ export const useVideoKeyboardShortcuts = ({
       htmlVideoElement.setAttribute("tabindex", "-1");
       // Remove any existing focus
       htmlVideoElement.blur();
-      console.log(
-        `VIDEO ELEMENT configured to prevent native keyboard controls`,
-      );
+      console.log(`VIDEO ELEMENT configured to prevent native keyboard controls`);
     }
   }, [omakaseRef]);
   useEffect(() => {
@@ -162,7 +157,9 @@ export const useVideoKeyboardShortcuts = ({
       try {
         const fr = v.getFrameRate();
         if (Number.isFinite(fr) && fr > 0) fpsRef.current = fr;
-      } catch {}
+      } catch {
+        // Ignore frame rate detection errors
+      }
     });
     return () => sub?.unsubscribe();
   }, [omakaseRef]);
@@ -200,30 +197,25 @@ export const useVideoKeyboardShortcuts = ({
 
         reverseTimerRef.current = window.setInterval(
           () => {
-            omakaseRef.current?.video
-              .seekFromCurrentFrame(-framesPerTick)
-              .subscribe();
+            omakaseRef.current?.video.seekFromCurrentFrame(-framesPerTick).subscribe();
           },
-          Math.max(8, intervalMs),
+          Math.max(8, intervalMs)
         );
       }
     },
-    [play, pause, setPlaybackRate, omakaseRef, clearReverseTimer],
+    [play, pause, setPlaybackRate, omakaseRef, clearReverseTimer]
   );
 
   // helpers to bump the shuttle speed up/down the ladder
   const bumpShuttle = useCallback(
     (dir: 1 | -1) => {
       setShuttleIdx((prev) => {
-        const next = Math.min(
-          SHUTTLE_STOPS.length - 1,
-          Math.max(0, prev + dir),
-        );
+        const next = Math.min(SHUTTLE_STOPS.length - 1, Math.max(0, prev + dir));
         applyShuttleSpeed(SHUTTLE_STOPS[next]);
         return next;
       });
     },
-    [applyShuttleSpeed, SHUTTLE_STOPS],
+    [applyShuttleSpeed, SHUTTLE_STOPS]
   );
 
   // Add a ref to track the last toggle time to prevent rapid toggles
@@ -237,18 +229,13 @@ export const useVideoKeyboardShortcuts = ({
     const callCount = ++toggleCallCountRef.current;
 
     console.log(
-      `TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`,
+      `TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`
     );
-    console.log(
-      `Call stack:`,
-      new Error().stack?.split("\n").slice(1, 4).join("\n"),
-    );
+    console.log(`Call stack:`, new Error().stack?.split("\n").slice(1, 4).join("\n"));
 
     // Prevent rapid toggles within 150ms
     if (timeSinceLastToggle < 150) {
-      console.log(
-        `Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`,
-      );
+      console.log(`Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`);
       return;
     }
 
@@ -313,7 +300,7 @@ export const useVideoKeyboardShortcuts = ({
         // leave paused
       }
     },
-    [SHUTTLE_STOPS, applyShuttleSpeed, clearReverseTimer, setPlaybackRate],
+    [SHUTTLE_STOPS, applyShuttleSpeed, clearReverseTimer, setPlaybackRate]
   );
 
   // Stop transport (keeps lastNonZeroShuttleRef) then step one frame
@@ -330,7 +317,7 @@ export const useVideoKeyboardShortcuts = ({
       // 2) step exactly one frame (Omakase requires paused state for frame-seek)
       omakaseRef.current?.video.seekFromCurrentFrame(dir).subscribe();
     },
-    [stopTransport, omakaseRef],
+    [stopTransport, omakaseRef]
   );
 
   // keep UI rate in sync when forward rate changes
@@ -388,9 +375,7 @@ export const useVideoKeyboardShortcuts = ({
   // Marker navigation functions
   const navigateToNextMarker = useCallback(() => {
     if (!markerLaneRef.current) {
-      console.warn(
-        "Marker lane is not available yet. Video may still be loading.",
-      );
+      console.warn("Marker lane is not available yet. Video may still be loading.");
       return;
     }
 
@@ -414,7 +399,7 @@ export const useVideoKeyboardShortcuts = ({
       if (currentMarkerInFocus) {
         // Find current marker index in sorted array and move to next
         const currentIndex = sortedMarkers.findIndex(
-          (marker) => marker.id === currentMarkerInFocus.id,
+          (marker) => marker.id === currentMarkerInFocus.id
         );
         nextMarkerIndex = (currentIndex + 1) % sortedMarkers.length;
       }
@@ -427,12 +412,7 @@ export const useVideoKeyboardShortcuts = ({
         if (timeObservation && timeObservation.start !== undefined) {
           seek(timeObservation.start);
         }
-        console.log(
-          "Navigated to next marker:",
-          nextMarker.id,
-          "at time:",
-          timeObservation?.start,
-        );
+        console.log("Navigated to next marker:", nextMarker.id, "at time:", timeObservation?.start);
       }
     } catch (error) {
       console.error("Error navigating to next marker:", error);
@@ -441,9 +421,7 @@ export const useVideoKeyboardShortcuts = ({
 
   const navigateToPreviousMarker = useCallback(() => {
     if (!markerLaneRef.current) {
-      console.warn(
-        "Marker lane is not available yet. Video may still be loading.",
-      );
+      console.warn("Marker lane is not available yet. Video may still be loading.");
       return;
     }
 
@@ -467,10 +445,9 @@ export const useVideoKeyboardShortcuts = ({
       if (currentMarkerInFocus) {
         // Find current marker index in sorted array and move to previous
         const currentIndex = sortedMarkers.findIndex(
-          (marker) => marker.id === currentMarkerInFocus.id,
+          (marker) => marker.id === currentMarkerInFocus.id
         );
-        prevMarkerIndex =
-          currentIndex > 0 ? currentIndex - 1 : sortedMarkers.length - 1;
+        prevMarkerIndex = currentIndex > 0 ? currentIndex - 1 : sortedMarkers.length - 1;
       }
 
       const prevMarker = sortedMarkers[prevMarkerIndex];
@@ -485,7 +462,7 @@ export const useVideoKeyboardShortcuts = ({
           "Navigated to previous marker:",
           prevMarker.id,
           "at time:",
-          timeObservation?.start,
+          timeObservation?.start
         );
       }
     } catch (error) {
@@ -512,8 +489,7 @@ export const useVideoKeyboardShortcuts = ({
       // Double-tap detection
       const now = performance.now();
       const isDoubleTap =
-        event.key === lastKeyRef.current &&
-        now - lastKeyTimeRef.current < DOUBLE_TAP_MS;
+        event.key === lastKeyRef.current && now - lastKeyTimeRef.current < DOUBLE_TAP_MS;
       lastKeyRef.current = event.key;
       lastKeyTimeRef.current = now;
 
@@ -617,9 +593,7 @@ export const useVideoKeyboardShortcuts = ({
               console.error("Error adding marker:", error);
             }
           } else {
-            console.warn(
-              "Marker lane is not available yet. Video may still be loading.",
-            );
+            console.warn("Marker lane is not available yet. Video may still be loading.");
           }
           break;
         case ",": // frame backward
@@ -715,9 +689,7 @@ export const useVideoKeyboardShortcuts = ({
     htmlVideoElement.addEventListener("pointerdown", blurAfterPointer);
     htmlVideoElement.addEventListener("click", blurAfterPointer);
 
-    console.log(
-      "✅ VIDEO ELEMENT configured to prevent focus after mouse interactions",
-    );
+    console.log("✅ VIDEO ELEMENT configured to prevent focus after mouse interactions");
 
     return () => {
       htmlVideoElement.removeEventListener("pointerdown", blurAfterPointer);

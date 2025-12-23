@@ -1,15 +1,14 @@
+import React from "react";
 import { Suspense } from "react";
 import { Box, CircularProgress, Typography, Grid, Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   useGetConnectors,
   useDeleteConnector,
   useToggleConnector,
   useSyncConnector,
 } from "@/api/hooks/useConnectors";
-import {
-  ConnectorResponse,
-  ConnectorListResponse,
-} from "@/api/types/api.types";
+import { ConnectorResponse, ConnectorListResponse } from "@/api/types/api.types";
 import ConnectorCard from "./ConnectorCard";
 import { UseQueryResult } from "@tanstack/react-query";
 
@@ -17,9 +16,7 @@ interface ConnectorsListProps {
   onAddConnector: () => void;
 }
 
-export const ConnectorsList: React.FC<ConnectorsListProps> = ({
-  onAddConnector,
-}) => {
+export const ConnectorsList: React.FC<ConnectorsListProps> = ({ onAddConnector }) => {
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <ConnectorsListContent onAddConnector={onAddConnector} />
@@ -28,12 +25,7 @@ export const ConnectorsList: React.FC<ConnectorsListProps> = ({
 };
 
 const LoadingSpinner = () => (
-  <Box
-    display="flex"
-    justifyContent="center"
-    alignItems="center"
-    minHeight="200px"
-  >
+  <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
     <CircularProgress />
   </Box>
 );
@@ -42,9 +34,8 @@ interface ConnectorsListContentProps {
   onAddConnector: () => void;
 }
 
-const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
-  onAddConnector,
-}) => {
+const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConnector }) => {
+  const { t } = useTranslation();
   const {
     data: connectorsData,
     isLoading,
@@ -91,9 +82,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
   if (error) {
     return (
       <Box p={3}>
-        <Typography color="error">
-          Error loading connectors: {error.message}
-        </Typography>
+        <Typography color="error">Error loading connectors: {error.message}</Typography>
       </Box>
     );
   }
@@ -104,11 +93,11 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({
     <Box p={3}>
       <Box display="flex" justifyContent="flex-end" mb={2}>
         <Button variant="contained" color="primary" onClick={onAddConnector}>
-          Add Connector
+          {t("connectors.addConnector")}
         </Button>
       </Box>
       {connectors.length === 0 ? (
-        <Typography>No connectors found.</Typography>
+        <Typography>{t("connectors.noConnectorsFound")}</Typography>
       ) : (
         <Grid container spacing={3}>
           {connectors.map((connector) => (

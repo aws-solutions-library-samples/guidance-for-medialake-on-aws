@@ -81,15 +81,15 @@ class StateDefinitionFactory:
         Returns:
             The appropriate ItemsPath
         """
-        # First check if there's an explicit configuration
-        if "itemsPath" in node.data.configuration:
-            configured_path = node.data.configuration["itemsPath"]
+        # Get ItemsPath from parameters (matching YAML template casing)
+        parameters = node.data.configuration.get("parameters", {})
+        configured_path = parameters.get("ItemsPath")
+
+        if configured_path:
             logger.info(f"Using explicitly configured ItemsPath: {configured_path}")
             return configured_path
 
-        # We need to check for both externalPayloadLocation and externalTaskResults
-        # Since we can't use intrinsic functions directly in ItemsPath, we'll use a simple approach
-        # that works with Step Functions' limitations
+        # Default fallback when no ItemsPath is configured
         logger.info(f"Using $.payload.data as default ItemsPath for Map node {node.id}")
         return "$.payload.data"
 
@@ -216,18 +216,33 @@ class StateDefinitionFactory:
                         "Result": {"message": f"No Lambda function for {node.data.id}"},
                     }
                 else:
-                    # Create the base Task state
+                    # Create the base Task state with enhanced retry policies
+                    # Includes MediaConvert-specific throttling handling
                     task_state = {
                         "Type": "Task",
                         "Resource": lambda_arn,
                         "Retry": [
                             {
+                                # MediaConvert-specific throttling errors
+                                # These errors indicate MediaConvert API rate limiting
+                                "ErrorEquals": [
+                                    "MediaConvert.ThrottlingException",
+                                    "MediaConvert.TooManyRequestsException",
+                                    "MediaConvertEndpointThrottlingError",  # Custom error from utility
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 8,
+                                "BackoffRate": 2.0,
+                            },
+                            {
+                                # Lambda throttling errors
                                 "ErrorEquals": ["Lambda.TooManyRequestsException"],
                                 "IntervalSeconds": 1,
                                 "MaxAttempts": 5,
                                 "BackoffRate": 2.0,
                             },
                             {
+                                # General errors - catch-all for other retriable errors
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
                                 "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
@@ -235,6 +250,12 @@ class StateDefinitionFactory:
                             },
                         ],
                     }
+
+                    logger.info(
+                        f"Created Task state for {state_name} with enhanced retry policies: "
+                        f"MediaConvert throttling (8 retries), Lambda throttling (5 retries), "
+                        f"General errors ({self.pipeline.configuration.settings.retryAttempts} retries)"
+                    )
 
                     # Add execution context properties to the first Lambda in the step function
                     if (
@@ -468,18 +489,31 @@ class StateDefinitionFactory:
                     if i == 0:
                         first_state_name = processor_state_name
 
-                    # Create the processor state
+                    # Create the processor state with enhanced retry policies
                     processor_state = {
                         "Type": "Task",
                         "Resource": processor_lambda_arn,
                         "Retry": [
                             {
+                                # MediaConvert-specific throttling errors
+                                "ErrorEquals": [
+                                    "MediaConvert.ThrottlingException",
+                                    "MediaConvert.TooManyRequestsException",
+                                    "MediaConvertEndpointThrottlingError",
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 8,
+                                "BackoffRate": 2.0,
+                            },
+                            {
+                                # Lambda throttling errors
                                 "ErrorEquals": ["Lambda.TooManyRequestsException"],
                                 "IntervalSeconds": 1,
                                 "MaxAttempts": 5,
                                 "BackoffRate": 2.0,
                             },
                             {
+                                # General errors
                                 "ErrorEquals": ["States.ALL"],
                                 "IntervalSeconds": 2,
                                 "MaxAttempts": self.pipeline.configuration.settings.retryAttempts,
@@ -598,12 +632,25 @@ class StateDefinitionFactory:
                     "End": True,
                     "Retry": [
                         {
+                            # MediaConvert-specific throttling errors
+                            "ErrorEquals": [
+                                "MediaConvert.ThrottlingException",
+                                "MediaConvert.TooManyRequestsException",
+                                "MediaConvertEndpointThrottlingError",
+                            ],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 8,
+                            "BackoffRate": 2.0,
+                        },
+                        {
+                            # Lambda throttling errors
                             "ErrorEquals": ["Lambda.TooManyRequestsException"],
                             "IntervalSeconds": 1,
                             "MaxAttempts": 5,
                             "BackoffRate": 2.0,
                         },
                         {
+                            # General errors
                             "ErrorEquals": ["States.ALL"],
                             "IntervalSeconds": 2,
                             "MaxAttempts": 5,
@@ -644,12 +691,25 @@ class StateDefinitionFactory:
                     "Parameters": {"item.$": "$$.Map.Item.Value"},
                     "Retry": [
                         {
+                            # MediaConvert-specific throttling errors
+                            "ErrorEquals": [
+                                "MediaConvert.ThrottlingException",
+                                "MediaConvert.TooManyRequestsException",
+                                "MediaConvertEndpointThrottlingError",
+                            ],
+                            "IntervalSeconds": 2,
+                            "MaxAttempts": 8,
+                            "BackoffRate": 2.0,
+                        },
+                        {
+                            # Lambda throttling errors
                             "ErrorEquals": ["Lambda.TooManyRequestsException"],
                             "IntervalSeconds": 1,
                             "MaxAttempts": 5,
                             "BackoffRate": 2.0,
                         },
                         {
+                            # General errors
                             "ErrorEquals": ["States.ALL"],
                             "IntervalSeconds": 2,
                             "MaxAttempts": 5,
@@ -684,7 +744,4 @@ class StateDefinitionFactory:
             logger.warning(f"Unknown flow step type: {step_name}")
             state_def = {"Type": "Pass", "End": True}
 
-        logger.info(
-            f"DEBUG: Returning state_def for node {node.id} with Type={state_def.get('Type')}, has __metadata__={('__metadata__' in state_def)}"
-        )
         return state_def

@@ -136,9 +136,11 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 ### Deployment Steps
 
 1. **Download the CloudFormation template**
+
    - Download `medialake.template` from the GitHub repository
 
 2. **Deploy using AWS Console**
+
    - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
    - Choose **Upload a template file**, select `medialake.template`
    - Set stack name to `medialake-cf`
@@ -146,11 +148,13 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 3. **Configure template parameters:**
 
    #### Initial Media Lake User
+
    - **InitialUserEmail**: Email address for the initial administrator account (required)
    - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
    - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
 
    #### Media Lake Configuration
+
    - **MediaLakeEnvironmentName**: Environment identifier (1-4 alphanumeric characters, default: `dev`)
    - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
      - `small`: Suitable for development and testing environments
@@ -158,6 +162,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
      - `large`: Designed for high-volume production environments
 
    #### Media Lake Deployment Configuration
+
    - **SourceType**: Deployment source method
      - `Git`: Deploy directly from a public Git repository
      - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
@@ -167,10 +172,12 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
    > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
 
 4. **Complete deployment**
+
    - Accept the required IAM capabilities and deploy
    - Monitor the stack creation progress in the CloudFormation console
 
 5. **Initiate deployment**
+
    - Click "Create stack" to begin the deployment process
    - The initial CloudFormation stack will be created first
 
@@ -251,6 +258,16 @@ Key configuration parameters include:
 - **initial_user**: Initial user configuration with email and name
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML)
+- **cloudfront_custom_domain** (optional): Custom domain configuration for CloudFront distribution
+  - **domain_name**: Your custom domain name (e.g., "medialake.example.com")
+  - **certificate_arn**: ARN of your ACM certificate in us-east-1 region
+  - **Requirements**:
+    - Both `domain_name` and `certificate_arn` must be provided together, or both omitted
+    - ACM certificate must be in `us-east-1` region (CloudFront requirement)
+    - Certificate must be in `ISSUED` status before deployment
+    - Certificate must cover the specified domain name (exact match or wildcard)
+    - After deployment, you must create a DNS CNAME or Alias record pointing your domain to the CloudFront distribution domain
+  - **Note**: This configuration is entirely optional. If omitted, MediaLake will use the default CloudFront domain name
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
@@ -295,6 +312,85 @@ cdk deploy --all --profile <profile> --region <region>
    - Username (your email)
    - Temporary password
 3. Log in at the URL provided. You should see the media lake user interface and be able to add storage connectors and media.
+
+---
+
+## Custom Domain Setup (Optional)
+
+If you configured a custom domain in your `config.json`, follow these additional steps to complete the setup:
+
+### Prerequisites
+
+Before deploying with a custom domain, ensure you have:
+
+1. **Domain Ownership**: You must own or control the domain name you want to use
+2. **ACM Certificate**: Create an SSL/TLS certificate in AWS Certificate Manager (ACM)
+   - **Region Requirement**: Certificate MUST be in `us-east-1` region (CloudFront requirement)
+   - **Status**: Certificate must be in `ISSUED` status before deployment
+   - **Domain Coverage**: Certificate must cover your domain name (exact match or wildcard)
+
+### Creating an ACM Certificate
+
+If you don't have a certificate yet:
+
+1. Open the AWS Certificate Manager console in `us-east-1` region
+2. Click **Request a certificate**
+3. Choose **Request a public certificate**
+4. Enter your domain name (e.g., `medialake.example.com` or `*.example.com` for wildcard)
+5. Choose validation method (DNS or Email)
+6. Complete the validation process
+7. Wait for certificate status to become `ISSUED`
+8. Copy the certificate ARN for use in your `config.json`
+
+### Configuration
+
+Add the following to your `config.json`:
+
+```json
+{
+  "cloudfront_custom_domain": {
+    "domain_name": "medialake.example.com",
+    "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+  }
+}
+```
+
+**Important**: Both `domain_name` and `certificate_arn` must be provided together, or both must be omitted.
+
+### DNS Configuration (Post-Deployment)
+
+After successful deployment with custom domain configuration:
+
+1. **Get CloudFront Domain**: Find your CloudFront distribution domain name in the AWS Console or deployment outputs
+2. **Create DNS Record**: In your DNS provider (Route 53, GoDaddy, Cloudflare, etc.):
+   - **For Route 53**: Create an Alias record pointing to the CloudFront distribution
+   - **For Other Providers**: Create a CNAME record pointing to the CloudFront domain
+3. **Wait for Propagation**: DNS changes typically take 5-60 minutes to propagate
+4. **Verify**: Access your custom domain in a browser to confirm it's working
+
+### Example DNS Configuration
+
+**Route 53 (Recommended)**:
+
+- Record Type: A (Alias)
+- Name: medialake.example.com
+- Alias Target: Your CloudFront distribution
+- Routing Policy: Simple
+
+**Other DNS Providers**:
+
+- Record Type: CNAME
+- Name: medialake
+- Value: d111111abcdef8.cloudfront.net (your CloudFront domain)
+- TTL: 300
+
+### Troubleshooting
+
+- **Certificate not found**: Verify the certificate ARN is correct and in `us-east-1` region
+- **Certificate not validated**: Complete the ACM certificate validation process
+- **Domain mismatch**: Ensure the certificate covers your domain name
+- **DNS not resolving**: Wait for DNS propagation (up to 48 hours in rare cases)
+- **HTTPS errors**: Verify the certificate is in `ISSUED` status and covers the domain
 
 ---
 

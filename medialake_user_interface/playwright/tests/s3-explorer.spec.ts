@@ -65,16 +65,13 @@ const mockPermissionErrorWithPrefixes = {
 
 // Helper to setup API mocks
 async function setupApiMocks(page: Page, responseData: any, status = 200) {
-  await page.route(
-    `**/api/connectors/s3/explorer/${MOCK_CONNECTOR_ID}*`,
-    (route) => {
-      route.fulfill({
-        status,
-        contentType: "application/json",
-        body: JSON.stringify(responseData),
-      });
-    },
-  );
+  await page.route(`**/api/connectors/s3/explorer/${MOCK_CONNECTOR_ID}*`, (route) => {
+    route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify(responseData),
+    });
+  });
 }
 
 test.describe("S3Explorer Page", () => {
@@ -84,9 +81,7 @@ test.describe("S3Explorer Page", () => {
   });
 
   test.describe("Page Load Tests", () => {
-    test("should load S3Explorer page with valid connectorId", async ({
-      page,
-    }) => {
+    test("should load S3Explorer page with valid connectorId", async ({ page }) => {
       await setupApiMocks(page, mockS3Response);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
@@ -96,17 +91,14 @@ test.describe("S3Explorer Page", () => {
 
     test("should show loading state initially", async ({ page }) => {
       // Delay the API response
-      await page.route(
-        `**/api/connectors/s3/explorer/${MOCK_CONNECTOR_ID}*`,
-        async (route) => {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(mockS3Response),
-          });
-        },
-      );
+      await page.route(`**/api/connectors/s3/explorer/${MOCK_CONNECTOR_ID}*`, async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(mockS3Response),
+        });
+      });
 
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
       await expect(page.locator("text=Loading...")).toBeVisible();
@@ -185,9 +177,7 @@ test.describe("S3Explorer Page", () => {
       // Wait for debounce
       await page.waitForTimeout(400);
 
-      await expect(
-        page.locator("text=/Showing \\d+ of \\d+ items/"),
-      ).toBeVisible();
+      await expect(page.locator("text=/Showing \\d+ of \\d+ items/")).toBeVisible();
     });
 
     test("should clear filter with clear button", async ({ page }) => {
@@ -204,9 +194,7 @@ test.describe("S3Explorer Page", () => {
       await expect(filterInput).toHaveValue("");
     });
 
-    test("should show no results message when appropriate", async ({
-      page,
-    }) => {
+    test("should show no results message when appropriate", async ({ page }) => {
       await setupApiMocks(page, mockS3Response);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
@@ -216,9 +204,7 @@ test.describe("S3Explorer Page", () => {
       // Wait for debounce
       await page.waitForTimeout(400);
 
-      await expect(
-        page.locator("text=No items match your filter"),
-      ).toBeVisible();
+      await expect(page.locator("text=No items match your filter")).toBeVisible();
     });
   });
 
@@ -275,9 +261,7 @@ test.describe("S3Explorer Page", () => {
       await page.waitForTimeout(100);
     });
 
-    test("should jump to first/last item with Home/End keys", async ({
-      page,
-    }) => {
+    test("should jump to first/last item with Home/End keys", async ({ page }) => {
       await setupApiMocks(page, mockS3Response);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
@@ -299,9 +283,7 @@ test.describe("S3Explorer Page", () => {
       await setupApiMocks(page, mockErrorResponse, 500);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
-      await expect(
-        page.locator("text=/Error loading S3 objects/"),
-      ).toBeVisible();
+      await expect(page.locator("text=/Error loading S3 objects/")).toBeVisible();
     });
 
     test("should show retry button on network failure", async ({ page }) => {
@@ -312,18 +294,14 @@ test.describe("S3Explorer Page", () => {
       await expect(retryButton).toBeVisible();
     });
 
-    test("should display permission error for 403 responses", async ({
-      page,
-    }) => {
+    test("should display permission error for 403 responses", async ({ page }) => {
       await setupApiMocks(page, mockErrorResponse, 403);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
       await expect(page.locator("text=/Access denied/")).toBeVisible();
     });
 
-    test("should show allowed prefixes when access is restricted", async ({
-      page,
-    }) => {
+    test("should show allowed prefixes when access is restricted", async ({ page }) => {
       await setupApiMocks(page, mockPermissionErrorWithPrefixes, 403);
       await page.goto(`${BASE_URL}${S3_EXPLORER_ROUTE}`);
 
@@ -408,9 +386,7 @@ test.describe("S3Explorer Page", () => {
       await page.keyboard.press("Tab");
 
       // Verify focus is visible
-      const focusedElement = await page.evaluateHandle(
-        () => document.activeElement,
-      );
+      const focusedElement = await page.evaluateHandle(() => document.activeElement);
       expect(focusedElement).toBeTruthy();
     });
 
@@ -475,9 +451,7 @@ test.describe("S3Explorer Page", () => {
       await expect(page.locator("text=Another Connector")).toBeVisible();
     });
 
-    test("should navigate to S3Explorer when connector is selected", async ({
-      page,
-    }) => {
+    test("should navigate to S3Explorer when connector is selected", async ({ page }) => {
       // Mock connectors API
       await page.route("**/api/connectors*", (route) => {
         route.fulfill({
@@ -521,9 +495,7 @@ test.describe("S3Explorer Page", () => {
       expect(consoleErrors.length).toBe(0);
     });
 
-    test("should maintain connector selection when navigating", async ({
-      page,
-    }) => {
+    test("should maintain connector selection when navigating", async ({ page }) => {
       // Mock connectors API
       await page.route("**/api/connectors*", (route) => {
         route.fulfill({

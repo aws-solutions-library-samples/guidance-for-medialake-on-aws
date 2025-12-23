@@ -3,7 +3,6 @@ import { apiClient } from "@/api/apiClient";
 import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
 import {
-  Environment,
   EnvironmentsResponse,
   EnvironmentResponse,
   EnvironmentError,
@@ -21,7 +20,7 @@ export const useEnvironments = () => {
       try {
         const response = await apiClient.get<EnvironmentsResponse>(
           ENVIRONMENTS_API.endpoints.GET_ENVIRONMENTS,
-          { signal },
+          { signal }
         );
 
         if (!response.data?.data) {
@@ -47,7 +46,7 @@ export const useEnvironment = (id: string) => {
       try {
         const response = await apiClient.get<EnvironmentResponse>(
           ENVIRONMENTS_API.endpoints.GET_ENVIRONMENT(id),
-          { signal },
+          { signal }
         );
 
         if (!response.data?.data) {
@@ -74,7 +73,7 @@ export const useCreateEnvironment = () => {
       try {
         const response = await apiClient.post<EnvironmentResponse>(
           ENVIRONMENTS_API.endpoints.CREATE_ENVIRONMENT,
-          environment,
+          environment
         );
 
         return response.data;
@@ -95,17 +94,11 @@ export const useUpdateEnvironment = () => {
   const { showError } = useErrorModal();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      environment,
-    }: {
-      id: string;
-      environment: EnvironmentUpdate;
-    }) => {
+    mutationFn: async ({ id, environment }: { id: string; environment: EnvironmentUpdate }) => {
       try {
         const response = await apiClient.put<EnvironmentResponse>(
           ENVIRONMENTS_API.endpoints.UPDATE_ENVIRONMENT(id),
-          environment,
+          environment
         );
 
         return response.data;

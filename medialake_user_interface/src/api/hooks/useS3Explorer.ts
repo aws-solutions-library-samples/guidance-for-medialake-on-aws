@@ -1,4 +1,4 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../apiClient";
 import { API_ENDPOINTS } from "../endpoints";
 import { QUERY_KEYS } from "../queryKeys";
@@ -21,8 +21,7 @@ const defaultQueryConfig = {
   retry: 3,
   refetchOnMount: "always" as const, // Using literal type for proper typing
   refetchOnWindowFocus: false,
-  retryDelay: (attemptIndex: number) =>
-    Math.min(1000 * 2 ** attemptIndex, 30000),
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
 };
 
 interface S3ExplorerParams {
@@ -61,36 +60,31 @@ export const useS3Explorer = ({
   }, [prefix]);
 
   return useQuery<ApiResponse<S3ListObjectsResponse>, Error>({
-    queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(
-      connectorId,
-      prefix,
-      continuationToken,
-    ),
+    queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, continuationToken),
     queryFn: async ({ signal }) => {
       try {
         // Log request start time
         const requestStart = performance.now();
 
-        const response = await apiClient.get<
-          ApiResponse<S3ListObjectsResponse>
-        >(`${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`, {
-          params: {
-            prefix,
-            delimiter,
-            continuationToken,
-          },
-          signal,
-          // Add HTTP cache control headers aligned with our stale time
-          headers: {
-            "Cache-Control": "max-age=300", // 5 minutes cache
-          },
-        });
+        const response = await apiClient.get<ApiResponse<S3ListObjectsResponse>>(
+          `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
+          {
+            params: {
+              prefix,
+              delimiter,
+              continuationToken,
+            },
+            signal,
+            // Add HTTP cache control headers aligned with our stale time
+            headers: {
+              "Cache-Control": "max-age=300", // 5 minutes cache
+            },
+          }
+        );
 
         // Log request duration
         const requestDuration = performance.now() - requestStart;
-        logger.debug(
-          `S3Explorer API call took ${requestDuration}ms for path ${prefix}`,
-        );
+        logger.debug(`S3Explorer API call took ${requestDuration}ms for path ${prefix}`);
 
         return response.data;
       } catch (error: any) {
@@ -101,8 +95,7 @@ export const useS3Explorer = ({
         if (error.response) {
           const status = error.response.status;
           if (status === 403) {
-            errorMessage =
-              "Access denied. You don't have permission to access this path.";
+            errorMessage = "Access denied. You don't have permission to access this path.";
           } else if (status === 404) {
             errorMessage = "The requested path does not exist.";
           } else if (status === 408 || status === 504) {
@@ -110,12 +103,8 @@ export const useS3Explorer = ({
           } else if (status >= 500) {
             errorMessage = "Server error. Please try again later.";
           }
-        } else if (
-          error.code === "ECONNABORTED" ||
-          error.message === "Network Error"
-        ) {
-          errorMessage =
-            "Network error. Please check your connection and try again.";
+        } else if (error.code === "ECONNABORTED" || error.message === "Network Error") {
+          errorMessage = "Network error. Please check your connection and try again.";
         }
 
         // Only show global error modal if not handling errors inline
@@ -129,8 +118,7 @@ export const useS3Explorer = ({
         enhancedError.originalError = error;
         // Attach allowedPrefixes if available (for 403 errors)
         enhancedError.allowedPrefixes =
-          error.response?.data?.data?.allowedPrefixes ||
-          error.response?.data?.allowedPrefixes;
+          error.response?.data?.data?.allowedPrefixes || error.response?.data?.allowedPrefixes;
         throw enhancedError;
       }
     },
@@ -155,15 +143,16 @@ export const usePrefetchS3FolderContents = () => {
         queryKey: QUERY_KEYS.CONNECTORS.s3.explorer(connectorId, prefix, null),
         queryFn: async ({ signal }) => {
           try {
-            const response = await apiClient.get<
-              ApiResponse<S3ListObjectsResponse>
-            >(`${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`, {
-              params: { prefix, delimiter: "/" },
-              headers: {
-                "Cache-Control": "max-age=300", // Match our stale time
-              },
-              signal,
-            });
+            const response = await apiClient.get<ApiResponse<S3ListObjectsResponse>>(
+              `${API_ENDPOINTS.CONNECTORS}/s3/explorer/${connectorId}`,
+              {
+                params: { prefix, delimiter: "/" },
+                headers: {
+                  "Cache-Control": "max-age=300", // Match our stale time
+                },
+                signal,
+              }
+            );
             return response.data;
           } catch (error) {
             // Silently fail prefetch - don't disrupt UI
@@ -174,6 +163,6 @@ export const usePrefetchS3FolderContents = () => {
         ...defaultQueryConfig,
       });
     },
-    [queryClient],
+    [queryClient]
   );
 };

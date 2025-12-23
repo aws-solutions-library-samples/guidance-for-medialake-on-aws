@@ -29,7 +29,7 @@ export const useRetryFromCurrent = () => {
     mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
       try {
         const response = await apiClient.post<UnifiedRetryResponse>(
-          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_CURRENT(executionId),
+          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_CURRENT(executionId)
         );
         return response.data;
       } catch (error: any) {
@@ -39,9 +39,7 @@ export const useRetryFromCurrent = () => {
         if (error.response?.status === 400) {
           const errorData = error.response.data as RetryError;
           if (errorData.suggestedAction === "USE_RETRY_FROM_START") {
-            throw new Error(
-              `${errorData.message}. Try "Retry from Start" instead.`,
-            );
+            throw new Error(`${errorData.message}. Try "Retry from Start" instead.`);
           }
           throw new Error(errorData.message);
         } else if (error.response?.status === 404) {
@@ -86,7 +84,7 @@ export const useRetryFromStart = () => {
     mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
       try {
         const response = await apiClient.post<UnifiedRetryResponse>(
-          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_START(executionId),
+          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.FROM_START(executionId)
         );
         return response.data;
       } catch (error: any) {
@@ -98,8 +96,7 @@ export const useRetryFromStart = () => {
         } else if (error.response?.status === 500) {
           const errorData = error.response.data as RetryError;
           throw new Error(
-            errorData.message ||
-              "Failed to start new execution. Please try again later.",
+            errorData.message || "Failed to start new execution. Please try again later."
           );
         }
 
@@ -140,7 +137,7 @@ export const useRetryExecution = () => {
     mutationFn: async (executionId: string): Promise<UnifiedRetryResponse> => {
       try {
         const response = await apiClient.post<UnifiedRetryResponse>(
-          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.BASE(executionId),
+          API_ENDPOINTS.PIPELINE_EXECUTION_RETRY.BASE(executionId)
         );
         return response.data;
       } catch (error: any) {

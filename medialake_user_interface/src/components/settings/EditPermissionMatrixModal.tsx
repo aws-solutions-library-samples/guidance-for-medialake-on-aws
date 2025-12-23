@@ -18,6 +18,7 @@ import {
   ToggleButton,
   Tooltip,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -26,12 +27,7 @@ import RemoveIcon from "@mui/icons-material/Remove";
 type PermissionStatus = "Allow" | "Deny" | "Not Set";
 
 // Define the resource types
-type ResourceType =
-  | "assets"
-  | "collections"
-  | "pipelines"
-  | "integrations"
-  | "settings";
+type ResourceType = "assets" | "collections" | "pipelines" | "integrations" | "settings";
 
 // Define the action types
 type ActionType = "view" | "create" | "edit" | "delete" | "admin";
@@ -52,9 +48,12 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   onClose,
   onSave,
   permissions: initialPermissions,
-  title = "Edit Permissions",
+  title,
   resourceName,
 }) => {
+  const { t } = useTranslation();
+  const modalTitle = title || t("permissionSets.permissionMatrix.editTitle");
+
   // State to track the edited permissions
   const [permissions, setPermissions] = useState<any>(initialPermissions || {});
 
@@ -103,17 +102,12 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   };
 
   // Helper function to get permission status
-  const getPermissionStatus = (
-    resource: string,
-    action: string,
-  ): PermissionStatus => {
+  const getPermissionStatus = (resource: string, action: string): PermissionStatus => {
     if (!permissions) return "Not Set";
 
     // Handle array of permission objects
     if (Array.isArray(permissions)) {
-      const permission = permissions.find(
-        (p) => p.resource === resource && p.action === action,
-      );
+      const permission = permissions.find((p) => p.resource === resource && p.action === action);
       if (permission) {
         return permission.effect === "Allow" ? "Allow" : "Deny";
       }
@@ -137,11 +131,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
   };
 
   // Function to update permission status
-  const updatePermissionStatus = (
-    resource: string,
-    action: string,
-    status: PermissionStatus,
-  ) => {
+  const updatePermissionStatus = (resource: string, action: string, status: PermissionStatus) => {
     // Create a copy of the permissions to modify
     let updatedPermissions;
 
@@ -149,7 +139,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
     if (Array.isArray(permissions)) {
       updatedPermissions = [...permissions];
       const existingIndex = updatedPermissions.findIndex(
-        (p) => p.resource === resource && p.action === action,
+        (p) => p.resource === resource && p.action === action
       );
 
       if (status === "Not Set") {
@@ -213,7 +203,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
     action: string;
     status: PermissionStatus;
     onChange: (status: PermissionStatus) => void;
-  }> = ({ resource, action, status, onChange }) => {
+  }> = ({ status, onChange }) => {
     return (
       <ToggleButtonGroup
         value={status}
@@ -227,19 +217,17 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         aria-label="permission status"
       >
         <ToggleButton value="Allow" aria-label="allow">
-          <Tooltip title="Permit">
-            <CheckCircleIcon
-              color={status === "Allow" ? "success" : "inherit"}
-            />
+          <Tooltip title={t("common.permit")}>
+            <CheckCircleIcon color={status === "Allow" ? "success" : "inherit"} />
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="Deny" aria-label="deny">
-          <Tooltip title="Deny">
+          <Tooltip title={t("common.deny")}>
             <CancelIcon color={status === "Deny" ? "error" : "inherit"} />
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="Not Set" aria-label="not set">
-          <Tooltip title="Not Set">
+          <Tooltip title={t("common.notSet")}>
             <RemoveIcon color={status === "Not Set" ? "action" : "inherit"} />
           </Tooltip>
         </ToggleButton>
@@ -249,7 +237,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle>{modalTitle}</DialogTitle>
       <DialogContent>
         <Box sx={{ width: "100%", mt: 2 }}>
           {resourceName && (
@@ -262,21 +250,15 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
             <Table aria-label="permission matrix table">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", width: "200px" }}>
-                    RESOURCE
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", width: "200px" }}>RESOURCE</TableCell>
                   {/* Get all unique actions across all resources */}
-                  {Array.from(
-                    new Set(resources.flatMap((r) => getActionsForResource(r))),
-                  ).map((action) => (
-                    <TableCell
-                      key={action}
-                      align="center"
-                      sx={{ fontWeight: "bold" }}
-                    >
-                      {actionDisplayNames[action]}
-                    </TableCell>
-                  ))}
+                  {Array.from(new Set(resources.flatMap((r) => getActionsForResource(r)))).map(
+                    (action) => (
+                      <TableCell key={action} align="center" sx={{ fontWeight: "bold" }}>
+                        {actionDisplayNames[action]}
+                      </TableCell>
+                    )
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -286,12 +268,8 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
                     sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                   >
                     <TableCell component="th" scope="row">
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography>
-                          {resourceDisplayNames[resource]}
-                        </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Typography>{resourceDisplayNames[resource]}</Typography>
                       </Box>
                     </TableCell>
                     {getActionsForResource(resource).map((action) => {
@@ -304,11 +282,7 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
                             action={action}
                             status={status}
                             onChange={(newStatus) =>
-                              updatePermissionStatus(
-                                resource,
-                                action,
-                                newStatus,
-                              )
+                              updatePermissionStatus(resource, action, newStatus)
                             }
                           />
                         </TableCell>
@@ -322,9 +296,9 @@ const EditPermissionMatrixModal: React.FC<EditPermissionMatrixModalProps> = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button onClick={handleSave} variant="contained" color="primary">
-          Save Changes
+          {t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

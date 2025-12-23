@@ -1,3 +1,5 @@
+import React from "react";
+
 export interface TableState {
   globalFilter: string;
   columnFilters: any[];
@@ -35,10 +37,7 @@ export interface TableActions {
   handleDeleteConfirm?: () => void;
   handleColumnMenuOpen: (event: React.MouseEvent<HTMLElement>) => void;
   handleColumnMenuClose: () => void;
-  handleFilterMenuOpen: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  handleFilterMenuOpen: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   handleFilterMenuClose: () => void;
   setDeleteDialogInput: (input: string) => void;
 }

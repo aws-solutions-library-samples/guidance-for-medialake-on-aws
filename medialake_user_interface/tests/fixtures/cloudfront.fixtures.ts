@@ -87,7 +87,7 @@ function getCloudFrontTagFilters(): TagFilter[] {
  */
 async function discoverCloudFrontDistribution(
   discoveryEngine: ResourceDiscoveryEngine,
-  serviceAdapter: CloudFrontServiceAdapter,
+  serviceAdapter: CloudFrontServiceAdapter
 ): Promise<{
   distribution: CloudFrontDistribution | null;
   method: "tag-based" | "fallback";
@@ -99,20 +99,18 @@ async function discoverCloudFrontDistribution(
     console.log("[CloudFront] Attempting tag-based distribution discovery...");
     const tagBasedDistributions = await discoveryEngine.discoverByTags(
       "cloudfront-distribution",
-      tagFilters,
+      tagFilters
     );
 
     if (tagBasedDistributions.length > 0) {
       const distribution = tagBasedDistributions[0] as CloudFrontDistribution;
       console.log(
-        `[CloudFront] Found distribution via tags: ${distribution.name} (${distribution.id})`,
+        `[CloudFront] Found distribution via tags: ${distribution.name} (${distribution.id})`
       );
       return { distribution, method: "tag-based" };
     }
 
-    console.warn(
-      "[CloudFront] No distributions found via tag-based discovery, trying fallback...",
-    );
+    console.warn("[CloudFront] No distributions found via tag-based discovery, trying fallback...");
   } catch (error) {
     console.warn("[CloudFront] Tag-based discovery failed:", error);
   }
@@ -120,13 +118,12 @@ async function discoverCloudFrontDistribution(
   try {
     // Fallback: Service adapter fallback discovery
     console.log("[CloudFront] Using service adapter fallback discovery...");
-    const fallbackDistributions =
-      await serviceAdapter.fallbackDiscovery(tagFilters);
+    const fallbackDistributions = await serviceAdapter.fallbackDiscovery(tagFilters);
 
     if (fallbackDistributions.length > 0) {
       const distribution = fallbackDistributions[0];
       console.log(
-        `[CloudFront] Found distribution via fallback: ${distribution.name} (${distribution.id})`,
+        `[CloudFront] Found distribution via fallback: ${distribution.name} (${distribution.id})`
       );
       return { distribution, method: "fallback" };
     }
@@ -141,13 +138,9 @@ async function discoverCloudFrontDistribution(
 /**
  * Generate test URLs for CloudFront distribution
  */
-function generateTestUrls(
-  distribution: CloudFrontDistribution,
-): CloudFrontTestUrls {
+function generateTestUrls(distribution: CloudFrontDistribution): CloudFrontTestUrls {
   const primaryDomain =
-    distribution.aliases.length > 0
-      ? distribution.aliases[0]
-      : distribution.domainName;
+    distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
 
   const baseUrl = `https://${primaryDomain}`;
 
@@ -164,7 +157,7 @@ function generateTestUrls(
  */
 async function testDistributionAccess(
   page: Page,
-  testUrls: CloudFrontTestUrls,
+  testUrls: CloudFrontTestUrls
 ): Promise<CloudFrontTestResult[]> {
   const results: CloudFrontTestResult[] = [];
 
@@ -202,9 +195,7 @@ async function testDistributionAccess(
         success: (response?.status() || 0) < 400,
       };
 
-      console.log(
-        `[CloudFront] ${name} test result: ${result.status} (${result.responseTime}ms)`,
-      );
+      console.log(`[CloudFront] ${name} test result: ${result.status} (${result.responseTime}ms)`);
       if (result.cacheStatus) {
         console.log(`[CloudFront] Cache status: ${result.cacheStatus}`);
       }
@@ -235,13 +226,11 @@ async function testDistributionAccess(
 async function waitForDistributionReady(
   serviceAdapter: CloudFrontServiceAdapter,
   distributionId: string,
-  maxWaitTime: number = 300000, // 5 minutes
+  maxWaitTime: number = 300000 // 5 minutes
 ): Promise<boolean> {
   const startTime = Date.now();
 
-  console.log(
-    `[CloudFront] Waiting for distribution ${distributionId} to be ready...`,
-  );
+  console.log(`[CloudFront] Waiting for distribution ${distributionId} to be ready...`);
 
   while (Date.now() - startTime < maxWaitTime) {
     try {
@@ -252,22 +241,15 @@ async function waitForDistributionReady(
         return true;
       }
 
-      console.log(
-        `[CloudFront] Distribution ${distributionId} not ready, waiting...`,
-      );
+      console.log(`[CloudFront] Distribution ${distributionId} not ready, waiting...`);
       await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds
     } catch (error) {
-      console.warn(
-        `[CloudFront] Error checking distribution readiness:`,
-        error,
-      );
+      console.warn(`[CloudFront] Error checking distribution readiness:`, error);
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }
   }
 
-  console.warn(
-    `[CloudFront] Distribution ${distributionId} not ready after ${maxWaitTime}ms`,
-  );
+  console.warn(`[CloudFront] Distribution ${distributionId} not ready after ${maxWaitTime}ms`);
   return false;
 }
 
@@ -277,16 +259,11 @@ async function waitForDistributionReady(
 async function createTestInvalidation(
   serviceAdapter: CloudFrontServiceAdapter,
   distributionId: string,
-  paths: string[] = ["/*"],
+  paths: string[] = ["/*"]
 ): Promise<string | null> {
   try {
-    console.log(
-      `[CloudFront] Creating invalidation for distribution ${distributionId}`,
-    );
-    const invalidationId = await serviceAdapter.createInvalidation(
-      distributionId,
-      paths,
-    );
+    console.log(`[CloudFront] Creating invalidation for distribution ${distributionId}`);
+    const invalidationId = await serviceAdapter.createInvalidation(distributionId, paths);
 
     console.log(`[CloudFront] Invalidation created: ${invalidationId}`);
     return invalidationId;
@@ -305,9 +282,7 @@ export const test = base.extend<CloudFrontFixtures>({
     const config = createCloudFrontDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
-    console.log(
-      `[CloudFront Worker ${testInfo.workerIndex}] Initializing discovery engine`,
-    );
+    console.log(`[CloudFront Worker ${testInfo.workerIndex}] Initializing discovery engine`);
 
     // Register CloudFront service adapter
     const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
@@ -318,10 +293,7 @@ export const test = base.extend<CloudFrontFixtures>({
       const cloudFrontFilters = getCloudFrontTagFilters();
       await engine.prefetchResources(cloudFrontFilters);
     } catch (error) {
-      console.warn(
-        `[CloudFront Worker ${testInfo.workerIndex}] Prefetch failed:`,
-        error,
-      );
+      console.warn(`[CloudFront Worker ${testInfo.workerIndex}] Prefetch failed:`, error);
     }
 
     await use(engine);
@@ -346,14 +318,8 @@ export const test = base.extend<CloudFrontFixtures>({
    * CloudFront test context with discovered distribution
    */
   cloudFrontContext: [
-    async (
-      { cloudFrontDiscoveryEngine, cloudFrontServiceAdapter },
-      use,
-      testInfo,
-    ) => {
-      console.log(
-        `[CloudFront Test ${testInfo.title}] Setting up CloudFront context`,
-      );
+    async ({ cloudFrontDiscoveryEngine, cloudFrontServiceAdapter }, use, testInfo) => {
+      console.log(`[CloudFront Test ${testInfo.title}] Setting up CloudFront context`);
 
       let distribution: CloudFrontDistribution | null = null;
       let discoveryMethod: "tag-based" | "fallback" = "fallback";
@@ -362,7 +328,7 @@ export const test = base.extend<CloudFrontFixtures>({
         // Discover CloudFront distribution
         const discoveryResult = await discoverCloudFrontDistribution(
           cloudFrontDiscoveryEngine,
-          cloudFrontServiceAdapter,
+          cloudFrontServiceAdapter
         );
 
         distribution = discoveryResult.distribution;
@@ -373,23 +339,16 @@ export const test = base.extend<CloudFrontFixtures>({
         }
 
         // Wait for distribution to be ready
-        const isReady = await waitForDistributionReady(
-          cloudFrontServiceAdapter,
-          distribution.id,
-        );
+        const isReady = await waitForDistributionReady(cloudFrontServiceAdapter, distribution.id);
 
         if (!isReady) {
-          console.warn(
-            `[CloudFront] Distribution ${distribution.id} may not be fully ready`,
-          );
+          console.warn(`[CloudFront] Distribution ${distribution.id} may not be fully ready`);
         }
 
         // Generate test URLs
         const testUrls = generateTestUrls(distribution);
         const primaryDomain =
-          distribution.aliases.length > 0
-            ? distribution.aliases[0]
-            : distribution.domainName;
+          distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
 
         const context: CloudFrontTestContext = {
           distribution,
@@ -399,22 +358,17 @@ export const test = base.extend<CloudFrontFixtures>({
         };
 
         console.log(
-          `[CloudFront] Context ready for distribution: ${distribution.name} (${discoveryMethod})`,
+          `[CloudFront] Context ready for distribution: ${distribution.name} (${discoveryMethod})`
         );
         console.log(`[CloudFront] Primary domain: ${primaryDomain}`);
 
         await use(context);
       } catch (error) {
-        console.error(
-          `[CloudFront] Error setting up CloudFront context:`,
-          error,
-        );
+        console.error(`[CloudFront] Error setting up CloudFront context:`, error);
         throw error;
       }
 
-      console.log(
-        `[CloudFront Test ${testInfo.title}] CloudFront context cleanup completed`,
-      );
+      console.log(`[CloudFront Test ${testInfo.title}] CloudFront context cleanup completed`);
     },
     { scope: "test" },
   ],
@@ -427,8 +381,7 @@ export const test = base.extend<CloudFrontFixtures>({
       // Configure page for CloudFront testing
       await page.setExtraHTTPHeaders({
         "User-Agent": "MediaLake-E2E-Test/1.0",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       });
 
       // Set longer timeout for CloudFront responses
@@ -438,19 +391,18 @@ export const test = base.extend<CloudFrontFixtures>({
       // Add request/response logging for debugging
       page.on("request", (request) => {
         if (request.url().includes(cloudFrontContext.primaryDomain)) {
-          console.log(
-            `[CloudFront] Request: ${request.method()} ${request.url()}`,
-          );
+          console.log(`[CloudFront] Request: ${request.method()} ${request.url()}`);
         }
       });
 
       page.on("response", (response) => {
         if (response.url().includes(cloudFrontContext.primaryDomain)) {
           const cacheStatus =
-            response.headers()["x-cache"] ||
-            response.headers()["cloudfront-cache-status"];
+            response.headers()["x-cache"] || response.headers()["cloudfront-cache-status"];
           console.log(
-            `[CloudFront] Response: ${response.status()} ${response.url()} ${cacheStatus ? `(${cacheStatus})` : ""}`,
+            `[CloudFront] Response: ${response.status()} ${response.url()} ${
+              cacheStatus ? `(${cacheStatus})` : ""
+            }`
           );
         }
       });
@@ -473,7 +425,7 @@ export const CloudFrontTestUtils = {
    */
   async testDistributionAccess(
     page: Page,
-    testUrls: CloudFrontTestUrls,
+    testUrls: CloudFrontTestUrls
   ): Promise<CloudFrontTestResult[]> {
     return await testDistributionAccess(page, testUrls);
   },
@@ -484,7 +436,7 @@ export const CloudFrontTestUtils = {
   async createTestInvalidation(
     serviceAdapter: CloudFrontServiceAdapter,
     distributionId: string,
-    paths: string[] = ["/*"],
+    paths: string[] = ["/*"]
   ): Promise<string | null> {
     return await createTestInvalidation(serviceAdapter, distributionId, paths);
   },
@@ -495,7 +447,7 @@ export const CloudFrontTestUtils = {
   async waitForInvalidation(
     serviceAdapter: CloudFrontServiceAdapter,
     distributionId: string,
-    invalidationId: string,
+    invalidationId: string
   ): Promise<void> {
     await serviceAdapter.waitForInvalidation(distributionId, invalidationId);
   },
@@ -509,8 +461,7 @@ export const CloudFrontTestUtils = {
     maxAge?: number;
     etag?: string;
   } {
-    const cacheStatus =
-      headers["x-cache"] || headers["cloudfront-cache-status"];
+    const cacheStatus = headers["x-cache"] || headers["cloudfront-cache-status"];
     const cacheControl = headers["cache-control"];
     const etag = headers["etag"];
 

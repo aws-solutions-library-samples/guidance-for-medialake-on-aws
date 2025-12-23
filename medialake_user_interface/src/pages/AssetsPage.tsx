@@ -27,7 +27,7 @@ import {
   ChevronRight,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
-import { S3Explorer } from "../features/home/S3Explorer";
+// import { S3Explorer } from "../features/home/S3Explorer";
 import AssetExplorer from "../features/assets/AssetExplorer";
 import { useGetConnectors } from "../api/hooks/useConnectors";
 
@@ -37,9 +37,7 @@ const COLLAPSED_DRAWER_WIDTH = 60; // Wider collapsed width to avoid overlap
 const AssetsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
-  const [selectedConnector, setSelectedConnector] = useState<string | null>(
-    null,
-  );
+  const [selectedConnector, setSelectedConnector] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { data: connectorsResponse, isLoading } = useGetConnectors();
@@ -51,16 +49,14 @@ const AssetsPage: React.FC = () => {
   console.log("Selected connector:", selectedConnector);
   console.log(
     "Selected bucket:",
-    selectedConnector
-      ? connectors.find((c) => c.id === selectedConnector)?.storageIdentifier
-      : null,
+    selectedConnector ? connectors.find((c) => c.id === selectedConnector)?.storageIdentifier : null
   );
 
   // Filter connectors based on search text
   const filteredConnectors = connectors.filter(
     (connector) =>
       connector.name.toLowerCase().includes(filterText.toLowerCase()) ||
-      connector.type.toLowerCase().includes(filterText.toLowerCase()),
+      connector.type.toLowerCase().includes(filterText.toLowerCase())
   );
 
   const handleClearFilter = () => {
@@ -72,14 +68,12 @@ const AssetsPage: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
-    >
+    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title={t("assetsPage.title", "Assets")}
         description={t(
           "assetsPage.description",
-          "Browse and manage your media assets from connected storage",
+          "Browse and manage your media assets from connected storage"
         )}
       />
 
@@ -103,13 +97,10 @@ const AssetsPage: React.FC = () => {
               flexDirection: "column",
               backgroundColor: "background.paper",
               borderRadius: 2,
-              transition: theme.transitions.create(
-                ["width", "margin", "min-width"],
-                {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.enteringScreen,
-                },
-              ),
+              transition: theme.transitions.create(["width", "margin", "min-width"], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
               overflow: "visible", // Allow button to be visible outside
               position: "relative",
               zIndex: 1,
@@ -230,9 +221,7 @@ const AssetsPage: React.FC = () => {
                 <Divider />
                 <Box sx={{ flexGrow: 1, overflow: "auto" }}>
                   {isLoading ? (
-                    <Box
-                      sx={{ display: "flex", justifyContent: "center", p: 2 }}
-                    >
+                    <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
                       <CircularProgress size={24} />
                     </Box>
                   ) : filteredConnectors.length === 0 ? (
@@ -253,15 +242,9 @@ const AssetsPage: React.FC = () => {
                               borderRadius: 1,
                               mx: 1,
                               "&.Mui-selected": {
-                                backgroundColor: alpha(
-                                  theme.palette.primary.main,
-                                  0.1,
-                                ),
+                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                 "&:hover": {
-                                  backgroundColor: alpha(
-                                    theme.palette.primary.main,
-                                    0.15,
-                                  ),
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.15),
                                 },
                               },
                             }}
@@ -273,10 +256,7 @@ const AssetsPage: React.FC = () => {
                                     width: 24,
                                     height: 24,
                                     borderRadius: "50%",
-                                    bgcolor: alpha(
-                                      theme.palette.primary.main,
-                                      0.15,
-                                    ),
+                                    bgcolor: alpha(theme.palette.primary.main, 0.15),
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -321,10 +301,7 @@ const AssetsPage: React.FC = () => {
                               primary={connector.name}
                               secondary={connector.type.toUpperCase()}
                               primaryTypographyProps={{
-                                fontWeight:
-                                  selectedConnector === connector.id
-                                    ? 600
-                                    : 400,
+                                fontWeight: selectedConnector === connector.id ? 600 : 400,
                                 color:
                                   selectedConnector === connector.id
                                     ? theme.palette.primary.main
@@ -367,10 +344,7 @@ const AssetsPage: React.FC = () => {
               >
                 <AssetExplorer
                   connectorId={selectedConnector}
-                  bucketName={
-                    connectors.find((c) => c.id === selectedConnector)
-                      ?.storageIdentifier
-                  }
+                  bucketName={connectors.find((c) => c.id === selectedConnector)?.storageIdentifier}
                 />
               </Paper>
             ) : (

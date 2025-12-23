@@ -1,12 +1,11 @@
 import React from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
   List,
   ListItem,
   ListItemText,
-  Divider,
   Button,
   IconButton,
   Tooltip,
@@ -14,7 +13,7 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
-import ShareIcon from "@mui/icons-material/Share";
+// import ShareIcon from "@mui/icons-material/Share";
 import { useRightSidebar } from "./SidebarContext";
 
 interface BatchOperationsProps {
@@ -29,24 +28,21 @@ interface BatchOperationsProps {
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
   isDownloadLoading?: boolean;
+  isDeleteLoading?: boolean;
 }
 
 const BatchOperations: React.FC<BatchOperationsProps> = ({
   selectedAssets,
   onBatchDelete,
   onBatchDownload,
-  onBatchShare,
+
   onClearSelection,
   onRemoveItem,
   isDownloadLoading = false,
+  isDeleteLoading = false,
 }) => {
+  const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
-
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
 
   // Update selected items state
   React.useEffect(() => {
@@ -54,7 +50,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       console.log(
         "BatchOperations: Setting selected items state for",
         selectedAssets.length,
-        "selected assets",
+        "selected assets"
       );
       setHasSelectedItems(true);
     } else {
@@ -72,7 +68,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
         acc[asset.type].push(asset);
         return acc;
       },
-      {} as Record<string, typeof selectedAssets>,
+      {} as Record<string, typeof selectedAssets>
     );
   }, [selectedAssets]);
 
@@ -87,8 +83,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     }
   };
 
-  // Don't render anything if feature flag is disabled or no assets are selected
-  if (!multiSelectFeature.value || selectedAssets.length === 0) {
+  // Don't render anything if no assets are selected
+  if (selectedAssets.length === 0) {
     return null;
   }
 
@@ -104,35 +100,46 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           borderColor: "divider",
         }}
       >
-        {/* <Tooltip title="Delete selected">
+        <Tooltip title={t("common.batchOperations.deleteSelected")}>
           <Button
-            variant="outlined"
-            color="error"
+            variant="contained"
             size="small"
-            startIcon={<DeleteIcon />}
-            onClick={onBatchDelete}
+            data-testid="batch-delete-button"
+            startIcon={isDeleteLoading ? <CircularProgress size={16} /> : <DeleteIcon />}
+            onClick={() => {
+              console.log("Delete button clicked, onBatchDelete:", onBatchDelete);
+              if (onBatchDelete) {
+                onBatchDelete();
+              }
+            }}
+            disabled={isDeleteLoading || !onBatchDelete}
+            sx={{
+              bgcolor: "error.main",
+              color: "white",
+              "&:hover": {
+                bgcolor: "error.dark",
+              },
+              "&:disabled": {
+                bgcolor: "action.disabledBackground",
+              },
+            }}
           >
-            Delete
+            {isDeleteLoading ? t("common.actions.deleting") : t("common.actions.delete")}
           </Button>
-        </Tooltip> */}
-        <Tooltip title="Download selected">
+        </Tooltip>
+        <Tooltip title={t("common.actions.downloadSelected")}>
           <Button
             variant="outlined"
             size="small"
-            startIcon={
-              isDownloadLoading ? (
-                <CircularProgress size={16} />
-              ) : (
-                <DownloadIcon />
-              )
-            }
+            startIcon={isDownloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />}
             onClick={onBatchDownload}
             disabled={isDownloadLoading}
           >
             {isDownloadLoading ? "Starting..." : "Download"}
           </Button>
         </Tooltip>
-        {/* <Tooltip title="Share selected">
+        {/* i18n-ignore - commented out code
+        <Tooltip title="Share selected">
           <Button
             variant="outlined"
             size="small"
@@ -141,7 +148,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           >
             Share
           </Button>
-        </Tooltip> */}
+        </Tooltip>
+        */}
       </Box>
 
       {/* Selected items list */}
@@ -168,7 +176,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                       edge="end"
                       size="small"
                       onClick={() => handleRemoveItem(asset.id)}
-                      title="Remove this item"
+                      title={t("common.actions.removeItem")}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>

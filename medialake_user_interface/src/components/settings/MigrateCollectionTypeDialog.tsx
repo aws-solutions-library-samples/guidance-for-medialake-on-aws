@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -43,9 +44,13 @@ interface MigrateCollectionTypeDialogProps {
   availableTypes: CollectionType[];
 }
 
-const MigrateCollectionTypeDialog: React.FC<
-  MigrateCollectionTypeDialogProps
-> = ({ open, onClose, sourceType, availableTypes }) => {
+const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = ({
+  open,
+  onClose,
+  sourceType,
+  availableTypes,
+}) => {
+  const { t } = useTranslation();
   const [targetTypeId, setTargetTypeId] = useState("");
 
   const migrateMutation = useMigrateCollectionType();
@@ -80,12 +85,12 @@ const MigrateCollectionTypeDialog: React.FC<
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Migrate Collections</DialogTitle>
+      <DialogTitle>{t("collectionTypes.dialogs.migrateTitle")}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <Alert severity="warning">
-            This collection type is in use and cannot be deleted directly. You
-            must first migrate all collections to another type.
+            This collection type is in use and cannot be deleted directly. You must first migrate
+            all collections to another type.
           </Alert>
 
           {sourceType && (
@@ -126,10 +131,10 @@ const MigrateCollectionTypeDialog: React.FC<
           )}
 
           <FormControl fullWidth>
-            <InputLabel>Target Type</InputLabel>
+            <InputLabel>{t("migrateCollectionType.targetType")}</InputLabel>
             <Select
               value={targetTypeId}
-              label="Target Type"
+              label={t("migrateCollectionType.targetType")}
               onChange={(e) => setTargetTypeId(e.target.value)}
             >
               {availableTypes
@@ -161,8 +166,8 @@ const MigrateCollectionTypeDialog: React.FC<
 
           {targetTypeId && (
             <Alert severity="info">
-              All collections will be migrated to the selected type, and the
-              source type will be deleted.
+              All collections will be migrated to the selected type, and the source type will be
+              deleted.
             </Alert>
           )}
         </Box>

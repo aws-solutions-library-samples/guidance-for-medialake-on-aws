@@ -11,15 +11,18 @@
    ![Upload Template](../images/installation-guide/CF-Install-2.png)
    ![Upload Template2](../images/installation-guide/CF-Install-3.png)
 4. **Configure Stack and Media Lake Settings**:
+
    - **Stack Name**: Name the stack `medialake-cf`
      ![Stack Details](../images/installation-guide/CF-Install-4.png)
 
    - **Configure Initial Media Lake User**:
+
      - **Email** (`InitialUserEmail`): Enter your email address to receive a welcome email (required)
      - **First Name** (`InitialUserFirstName`): Enter the administrator's first name (1-50 characters, letters/spaces/hyphens/periods only)
      - **Last Name** (`InitialUserLastName`): Enter the administrator's last name (1-50 characters, letters/spaces/hyphens/periods only)
 
    - **Configure Media Lake Settings**:
+
      - **Media Lake Environment Name** (`MediaLakeEnvironmentName`): Set environment identifier (1-10 alphanumeric characters, default: `dev`)
      - **OpenSearch Deployment Size** (`OpenSearchDeploymentSize`): Choose deployment size:
        - `small` - Suitable for development and testing environments
@@ -53,6 +56,7 @@ After deployment, you'll need to configure storage connectors to connect media l
 ### 2.2 Configure S3 Storage Connectors
 
 1. **Navigate to Connectors**:
+
    - Log in to media lake
    - Go to **Settings** > **Connectors**
    - Click **Add Connector**
@@ -61,11 +65,13 @@ After deployment, you'll need to configure storage connectors to connect media l
 2. **Configure Connector Settings**:
 
    **Step 1: Select Type**
+
    - Choose **Amazon S3**
    - Click **Next** to proceed
      ![Select Amazon S3](../images/installation-guide/MediaLake-Configuration-3.png)
 
    **Step 2: Select S3 Type**
+
    - Choose your S3 bucket option:
      - **Existing S3 Bucket**: Connect to an existing S3 bucket
      - **New S3 Bucket**: Create a new S3 bucket
@@ -75,6 +81,7 @@ After deployment, you'll need to configure storage connectors to connect media l
    **Step 3: Configuration**
 
    **For Existing S3 Bucket:**
+
    - **Connector Name**: Enter a descriptive name for your connector
    - **Description**: Add an optional description for the connector
    - **S3 Connector Type**: Select from the dropdown options
@@ -87,6 +94,7 @@ After deployment, you'll need to configure storage connectors to connect media l
    > **Note**: If you have existing assets in the bucket, you can optionally use sync to ingest the content. After creating the connector, navigate back to the Connectors list, find your connector, and click the sync button to perform an initial scan of existing media files.
 
    **For New S3 Bucket:**
+
    - **Connector Name**: Enter a descriptive name for your connector
    - **Description**: Add an optional description for the connector
    - **S3 Connector Type**: Select from the dropdown options
@@ -122,10 +130,12 @@ After deployment, you'll need to configure storage connectors to connect media l
 ## 3. Semantic Search & Integrations
 
 - **Enable Semantic Search**:
+
   - Configure your semantic search provider in media lake.
   - Media lake supports two architectural patterns for semantic search:
 
   **1. Provider + Store Architecture (TwelveLabs)**
+
   - Uses an AI provider to generate embeddings, which are then stored in an embedding store
   - **Embedding Store Options**:
     - **OpenSearch**: Recommended for production deployments due to enhanced reliability and performance
@@ -135,12 +145,14 @@ After deployment, you'll need to configure storage connectors to connect media l
     - **TwelveLabs via AWS Bedrock**: Uses TwelveLabs Marengo 2.7 model through AWS Bedrock with automatic regional inference profile selection. Supports US, EU, and APAC regions with optimal performance routing. For current region availability, see [AWS Bedrock Models Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html). (**No integration configuration required** - uses IAM role permissions)
 
   **2. External Semantic Service Architecture (Coactive)**
+
   - Uses an external service that manages both embedding generation and storage
   - Media assets are ingested directly into the external service's platform
   - Search queries are executed against the external service, with results enriched by MediaLake metadata
   - **Coactive Integration**: Direct integration with Coactive API for multimodal search capabilities (requires Coactive API key - **integration configuration required**)
 
 - **When to Configure Integrations**:
+
   - Integrations provide secure credential storage for pipeline nodes requiring external API access
   - **Configure integrations before importing dependent pipelines**
   - Navigate to **Settings > Integrations** to add required integrations
@@ -148,6 +160,7 @@ After deployment, you'll need to configure storage connectors to connect media l
   - **No integration required for**: TwelveLabs Bedrock pipelines, Default pipelines, Transcription pipelines, and others
 
 - **Import Processing Pipelines**:
+
   - Navigate to the **Pipelines** menu and click the **Import pipelines** button.
     ![Configure Twelve Labs Integration 3](../images/installation-guide/MediaLake-Configuration-9.png)
   - In the file selection dialog, choose from the available pipelines in the [`pipeline_library`](../../pipeline_library/) directory:
@@ -155,6 +168,7 @@ After deployment, you'll need to configure storage connectors to connect media l
     **Semantic Search Pipelines:**
 
     _TwelveLabs API-based Pipelines (Provider + Store Architecture):_
+
     - [`TwelveLabs API Audio Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs API
     - [`TwelveLabs API Video Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs API
     - [`TwelveLabs API Image Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs API
@@ -163,6 +177,7 @@ After deployment, you'll need to configure storage connectors to connect media l
     - [`TwelveLabs API Image Embedding to S3 Vectors.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/S3%20Vectors/TwelveLabs%20API%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs API
 
     _TwelveLabs Bedrock-based Pipelines (Provider + Store Architecture):_
+
     - [`TwelveLabs Bedrock Audio Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
     - [`TwelveLabs Bedrock Video Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
     - [`TwelveLabs Bedrock Image Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
@@ -171,13 +186,16 @@ After deployment, you'll need to configure storage connectors to connect media l
     - [`TwelveLabs Bedrock Image Embedding to S3 Vectors.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/S3%20Vectors/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
 
     _Coactive Pipelines (External Semantic Service Architecture):_
+
     - [`Coactive API Image Ingestion Pipeline.json`](../../pipeline_library/Semantic%20Search/Coactive/Coactive%20API%20Image%20Ingestion%20Pipeline.json) - Ingest and index images for multimodal search using Coactive API
     - [`Coactive API Video Ingestion Pipeline.json`](../../pipeline_library/Semantic%20Search/Coactive/Coactive%20API%20Video%20Ingestion%20Pipeline.json) - Ingest and index videos for multimodal search using Coactive API
 
     **Enrichment Pipelines:**
+
     - [`TwelveLabs Pegasus Bedrock Video Enrichment.json`](../../pipeline_library/Enrichment/TwelveLabs%20Pegasus%20Bedrock%20Video%20Enrichment.json) - Enrich video content with AI-generated metadata using TwelveLabs Pegasus on Bedrock
 
     **Transcription Pipelines:**
+
     - [`Audio Transcription.json`](../../pipeline_library/Audio%20Transcription.json) - Audio transcription using Amazon Transcribe with Bedrock summarization
     - [`Video Transcription.json`](../../pipeline_library/Video%20Transcription.json) - Video transcription using Amazon Transcribe with Bedrock summarization
 

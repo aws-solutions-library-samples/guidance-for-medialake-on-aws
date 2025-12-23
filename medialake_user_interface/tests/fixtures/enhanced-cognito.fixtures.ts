@@ -19,8 +19,7 @@ import {
 } from "../utils/cognito-service-adapter.js";
 import { TagFilter, STANDARD_TAG_PATTERNS } from "../utils/tag-matcher.js";
 
-const AWS_REGION =
-  process.env.DEPLOY_REGION || process.env.AWS_REGION || "us-east-1";
+const AWS_REGION = process.env.DEPLOY_REGION || process.env.AWS_REGION || "us-east-1";
 const AWS_PROFILE = process.env.AWS_PROFILE || "default";
 const ENVIRONMENT = process.env.MEDIALAKE_ENV || "dev";
 
@@ -151,9 +150,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
 
   // Fill to minimum length
   while (password.length < minLength) {
-    password += availableChars.charAt(
-      Math.floor(Math.random() * availableChars.length),
-    );
+    password += availableChars.charAt(Math.floor(Math.random() * availableChars.length));
   }
 
   // Shuffle the password to randomize character positions
@@ -167,9 +164,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
   const alphanumeric = uppercase + lowercase + numbers;
   if (!/^[a-zA-Z0-9]/.test(shuffled)) {
     // Replace first character with random alphanumeric
-    const safeStart = alphanumeric.charAt(
-      Math.floor(Math.random() * alphanumeric.length),
-    );
+    const safeStart = alphanumeric.charAt(Math.floor(Math.random() * alphanumeric.length));
     return safeStart + shuffled.slice(1);
   }
 
@@ -183,7 +178,7 @@ class CognitoDiscoveryError extends Error {
   constructor(
     message: string,
     public readonly method: string,
-    public readonly originalError?: Error,
+    public readonly originalError?: Error
   ) {
     super(message);
     this.name = "CognitoDiscoveryError";
@@ -197,7 +192,7 @@ async function retryWithBackoff<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 1000,
-  context: string = "operation",
+  context: string = "operation"
 ): Promise<T> {
   let lastError: Error;
 
@@ -208,17 +203,14 @@ async function retryWithBackoff<T>(
       lastError = error;
 
       if (attempt === maxRetries) {
-        console.error(
-          `[EnhancedCognito] ${context} failed after ${maxRetries} attempts:`,
-          error,
-        );
+        console.error(`[EnhancedCognito] ${context} failed after ${maxRetries} attempts:`, error);
         throw error;
       }
 
       const delay = baseDelay * Math.pow(2, attempt - 1);
       console.warn(
         `[EnhancedCognito] ${context} attempt ${attempt} failed, retrying in ${delay}ms:`,
-        error.message,
+        error.message
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -232,49 +224,37 @@ async function retryWithBackoff<T>(
  */
 async function discoverUserPool(
   discoveryEngine: ResourceDiscoveryEngine,
-  serviceAdapter: CognitoServiceAdapter,
+  serviceAdapter: CognitoServiceAdapter
 ): Promise<{
   userPool: CognitoUserPool | null;
   method: "tag-based" | "name-based" | "fallback";
 }> {
   console.log("[EnhancedCognito] Starting user pool discovery process...");
   const tagFilters = getCognitoTagFilters();
-  console.log(
-    "[EnhancedCognito] Tag filters:",
-    JSON.stringify(tagFilters, null, 2),
-  );
+  console.log("[EnhancedCognito] Tag filters:", JSON.stringify(tagFilters, null, 2));
 
   const discoveryMethods = [
     {
       name: "tag-based",
       operation: async () => {
-        console.log(
-          "[EnhancedCognito] Attempting tag-based user pool discovery...",
-        );
-        console.log(
-          "[EnhancedCognito] Calling discoveryEngine.discoverByTags...",
-        );
+        console.log("[EnhancedCognito] Attempting tag-based user pool discovery...");
+        console.log("[EnhancedCognito] Calling discoveryEngine.discoverByTags...");
 
         const pools = (await Promise.race([
           discoveryEngine.discoverByTags("cognito-user-pool", tagFilters),
           new Promise((_, reject) =>
             setTimeout(
-              () =>
-                reject(
-                  new Error("Tag-based discovery timeout after 60 seconds"),
-                ),
-              60000,
-            ),
+              () => reject(new Error("Tag-based discovery timeout after 60 seconds")),
+              60000
+            )
           ),
         ])) as any[];
 
-        console.log(
-          `[EnhancedCognito] Tag-based discovery completed. Found ${pools.length} pools`,
-        );
+        console.log(`[EnhancedCognito] Tag-based discovery completed. Found ${pools.length} pools`);
         if (pools.length === 0) {
           throw new CognitoDiscoveryError(
             "No user pools found via tag-based discovery",
-            "tag-based",
+            "tag-based"
           );
         }
         return pools[0] as CognitoUserPool;
@@ -283,14 +263,12 @@ async function discoverUserPool(
     {
       name: "service-fallback",
       operation: async () => {
-        console.log(
-          "[EnhancedCognito] Using service adapter fallback discovery...",
-        );
+        console.log("[EnhancedCognito] Using service adapter fallback discovery...");
         const pools = await serviceAdapter.fallbackDiscovery(tagFilters);
         if (pools.length === 0) {
           throw new CognitoDiscoveryError(
             "No user pools found via service fallback",
-            "service-fallback",
+            "service-fallback"
           );
         }
         return pools[0];
@@ -304,13 +282,13 @@ async function discoverUserPool(
           () => Promise.resolve(findUserPoolIdLegacy()),
           2,
           1000,
-          "legacy user pool discovery",
+          "legacy user pool discovery"
         );
         const userPoolClientId = await retryWithBackoff(
           () => Promise.resolve(findUserPoolClientIdLegacy(userPoolId)),
           2,
           1000,
-          "legacy client discovery",
+          "legacy client discovery"
         );
 
         return {
@@ -345,18 +323,18 @@ async function discoverUserPool(
         method.operation,
         2,
         1000,
-        `${method.name} discovery`,
+        `${method.name} discovery`
       );
 
       console.log(
-        `[EnhancedCognito] Found user pool via ${method.name}: ${userPool.name} (${userPool.id})`,
+        `[EnhancedCognito] Found user pool via ${method.name}: ${userPool.name} (${userPool.id})`
       );
 
       // Validate the discovered user pool
       const isValid = await validateUserPool(userPool);
       if (!isValid) {
         console.warn(
-          `[EnhancedCognito] User pool ${userPool.id} failed validation, trying next method...`,
+          `[EnhancedCognito] User pool ${userPool.id} failed validation, trying next method...`
         );
         continue;
       }
@@ -371,10 +349,7 @@ async function discoverUserPool(
               : "fallback",
       };
     } catch (error: any) {
-      console.warn(
-        `[EnhancedCognito] ${method.name} discovery failed:`,
-        error.message,
-      );
+      console.warn(`[EnhancedCognito] ${method.name} discovery failed:`, error.message);
 
       // For critical errors, don't continue to next method
       if (
@@ -384,16 +359,13 @@ async function discoverUserPool(
         throw new CognitoDiscoveryError(
           `Critical error in ${method.name}: ${error.message}`,
           method.name,
-          error,
+          error
         );
       }
     }
   }
 
-  throw new CognitoDiscoveryError(
-    "All discovery methods failed",
-    "all-methods",
-  );
+  throw new CognitoDiscoveryError("All discovery methods failed", "all-methods");
 }
 
 /**
@@ -403,9 +375,7 @@ async function validateUserPool(userPool: CognitoUserPool): Promise<boolean> {
   try {
     // Basic validation checks
     if (!userPool.id || !userPool.id.match(/^[a-zA-Z0-9_-]+$/)) {
-      console.warn(
-        `[EnhancedCognito] Invalid user pool ID format: ${userPool.id}`,
-      );
+      console.warn(`[EnhancedCognito] Invalid user pool ID format: ${userPool.id}`);
       return false;
     }
 
@@ -430,22 +400,18 @@ async function validateUserPool(userPool: CognitoUserPool): Promise<boolean> {
 function findUserPoolIdLegacy(): string {
   try {
     console.log("[EnhancedCognito] Finding user pool using legacy method...");
-    const userPoolsOutput = executeAwsCommand(
-      "cognito-idp list-user-pools --max-results 50",
-    );
+    const userPoolsOutput = executeAwsCommand("cognito-idp list-user-pools --max-results 50");
     const userPools = JSON.parse(userPoolsOutput);
 
-    const mediaLakePool = userPools.UserPools?.find((pool: any) =>
-      pool.Name?.toLowerCase().includes("medialake"),
+    const mediaLakePool = userPools.UserPools?.find(
+      (pool: any) => pool.Name?.toLowerCase().includes("medialake")
     );
 
     if (!mediaLakePool) {
       throw new Error("No MediaLake user pool found");
     }
 
-    console.log(
-      `[EnhancedCognito] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`,
-    );
+    console.log(`[EnhancedCognito] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`);
     return mediaLakePool.Id;
   } catch (error) {
     console.error("[EnhancedCognito] Error finding user pool:", error);
@@ -458,11 +424,9 @@ function findUserPoolIdLegacy(): string {
  */
 function findUserPoolClientIdLegacy(userPoolId: string): string {
   try {
-    console.log(
-      "[EnhancedCognito] Finding user pool client using legacy method...",
-    );
+    console.log("[EnhancedCognito] Finding user pool client using legacy method...");
     const clientsOutput = executeAwsCommand(
-      `cognito-idp list-user-pool-clients --user-pool-id ${userPoolId}`,
+      `cognito-idp list-user-pool-clients --user-pool-id ${userPoolId}`
     );
     const clients = JSON.parse(clientsOutput);
 
@@ -473,7 +437,7 @@ function findUserPoolClientIdLegacy(userPoolId: string): string {
     }
 
     console.log(
-      `[EnhancedCognito] Found user pool client: ${client.ClientName} (${client.ClientId})`,
+      `[EnhancedCognito] Found user pool client: ${client.ClientName} (${client.ClientId})`
     );
     return client.ClientId;
   } catch (error) {
@@ -487,18 +451,13 @@ function findUserPoolClientIdLegacy(userPoolId: string): string {
  */
 function getUserPoolPasswordPolicy(userPoolId: string): any {
   try {
-    console.log(
-      `[EnhancedCognito] Getting password policy for user pool: ${userPoolId}`,
-    );
+    console.log(`[EnhancedCognito] Getting password policy for user pool: ${userPoolId}`);
     const policyOutput = executeAwsCommand(
-      `cognito-idp describe-user-pool --user-pool-id ${userPoolId}`,
+      `cognito-idp describe-user-pool --user-pool-id ${userPoolId}`
     );
     const userPool = JSON.parse(policyOutput);
     const passwordPolicy = userPool.UserPool?.Policies?.PasswordPolicy;
-    console.log(
-      `[EnhancedCognito] Password policy:`,
-      JSON.stringify(passwordPolicy, null, 2),
-    );
+    console.log(`[EnhancedCognito] Password policy:`, JSON.stringify(passwordPolicy, null, 2));
     return passwordPolicy;
   } catch (error) {
     console.error("[EnhancedCognito] Error getting password policy:", error);
@@ -514,14 +473,10 @@ function deleteTestUser(userPoolId: string, username: string): void {
     console.log(`[EnhancedCognito] Deleting test user: ${username}`);
     const deleteUserCommand = `cognito-idp admin-delete-user --user-pool-id ${userPoolId} --username "${username}"`;
     executeAwsCommand(deleteUserCommand);
-    console.log(
-      `[EnhancedCognito] Test user deleted successfully: ${username}`,
-    );
+    console.log(`[EnhancedCognito] Test user deleted successfully: ${username}`);
   } catch (error: any) {
     if (error.message.includes("UserNotFoundException")) {
-      console.log(
-        `[EnhancedCognito] User ${username} not found, already deleted or never existed`,
-      );
+      console.log(`[EnhancedCognito] User ${username} not found, already deleted or never existed`);
     } else {
       console.error("[EnhancedCognito] Error deleting test user:", error);
       // Don't throw here to avoid failing test cleanup
@@ -539,9 +494,7 @@ export const test = base.extend<EnhancedCognitoFixtures>({
     const config = createDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
-    console.log(
-      `[EnhancedCognito Worker ${testInfo.workerIndex}] Initializing discovery engine`,
-    );
+    console.log(`[EnhancedCognito Worker ${testInfo.workerIndex}] Initializing discovery engine`);
 
     // Register Cognito service adapter
     const cognitoAdapter = createCognitoServiceAdapter(config);
@@ -552,10 +505,7 @@ export const test = base.extend<EnhancedCognitoFixtures>({
       const cognitoFilters = getCognitoTagFilters();
       await engine.prefetchResources(cognitoFilters);
     } catch (error) {
-      console.warn(
-        `[EnhancedCognito Worker ${testInfo.workerIndex}] Prefetch failed:`,
-        error,
-      );
+      console.warn(`[EnhancedCognito Worker ${testInfo.workerIndex}] Prefetch failed:`, error);
     }
 
     await use(engine);
@@ -581,17 +531,13 @@ export const test = base.extend<EnhancedCognitoFixtures>({
    * Enhanced Cognito test user with tag-based discovery and permanent password
    */
   enhancedCognitoTestUser: [
-    async (
-      { cognitoDiscoveryEngine, cognitoServiceAdapter },
-      use,
-      testInfo,
-    ) => {
+    async ({ cognitoDiscoveryEngine, cognitoServiceAdapter }, use, testInfo) => {
       // Generate unique email for this test run (using email as username)
       const randomId = crypto.randomBytes(4).toString("hex");
       const uniqueEmail = `mne-medialake+e2etest-${testInfo.workerIndex}-${randomId}@amazon.com`;
 
       console.log(
-        `[EnhancedCognito] Setting up enhanced test user for worker ${testInfo.workerIndex}`,
+        `[EnhancedCognito] Setting up enhanced test user for worker ${testInfo.workerIndex}`
       );
       console.log(`[EnhancedCognito] Generated unique email: ${uniqueEmail}`);
 
@@ -605,12 +551,9 @@ export const test = base.extend<EnhancedCognitoFixtures>({
           discoverUserPool(cognitoDiscoveryEngine, cognitoServiceAdapter),
           new Promise((_, reject) =>
             setTimeout(
-              () =>
-                reject(
-                  new Error("User pool discovery timeout after 120 seconds"),
-                ),
-              120000,
-            ),
+              () => reject(new Error("User pool discovery timeout after 120 seconds")),
+              120000
+            )
           ),
         ])) as {
           userPool: CognitoUserPool | null;
@@ -620,7 +563,7 @@ export const test = base.extend<EnhancedCognitoFixtures>({
         userPool = discoveryResult.userPool;
         discoveryMethod = discoveryResult.method;
         console.log(
-          `[EnhancedCognito] User pool discovery completed: ${userPool?.id} (method: ${discoveryMethod})`,
+          `[EnhancedCognito] User pool discovery completed: ${userPool?.id} (method: ${discoveryMethod})`
         );
 
         if (!userPool) {
@@ -628,40 +571,26 @@ export const test = base.extend<EnhancedCognitoFixtures>({
         }
 
         // Get password policy and generate appropriate password
-        console.log(
-          `[EnhancedCognito] Getting password policy for user pool: ${userPool.id}`,
-        );
+        console.log(`[EnhancedCognito] Getting password policy for user pool: ${userPool.id}`);
         const passwordPolicy = getUserPoolPasswordPolicy(userPool.id);
         const password = generateSecurePassword(passwordPolicy);
-        console.log(
-          `[EnhancedCognito] Generated password with length: ${password.length}`,
-        );
+        console.log(`[EnhancedCognito] Generated password with length: ${password.length}`);
 
         // Create the test user with permanent password and add to superAdministrators group
         console.log(`[EnhancedCognito] Creating test user: ${uniqueEmail}`);
         await Promise.race([
-          cognitoServiceAdapter.createTestUser(
-            userPool.id,
-            uniqueEmail,
-            password,
-            uniqueEmail,
-          ),
+          cognitoServiceAdapter.createTestUser(userPool.id, uniqueEmail, password, uniqueEmail),
           new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error("User creation timeout after 60 seconds")),
-              60000,
-            ),
+            setTimeout(() => reject(new Error("User creation timeout after 60 seconds")), 60000)
           ),
         ]);
-        console.log(
-          `[EnhancedCognito] Test user created successfully: ${uniqueEmail}`,
-        );
+        console.log(`[EnhancedCognito] Test user created successfully: ${uniqueEmail}`);
 
         // Get client ID from discovered user pool or fallback to legacy discovery
         let userPoolClientId = userPool.clients[0]?.id;
         if (!userPoolClientId) {
           console.warn(
-            "[EnhancedCognito] No client found in discovered pool, using legacy discovery...",
+            "[EnhancedCognito] No client found in discovered pool, using legacy discovery..."
           );
           userPoolClientId = findUserPoolClientIdLegacy(userPool.id);
         }
@@ -678,14 +607,11 @@ export const test = base.extend<EnhancedCognitoFixtures>({
         };
 
         console.log(
-          `[EnhancedCognito] Enhanced test user ready: ${uniqueEmail} (discovery: ${discoveryMethod})`,
+          `[EnhancedCognito] Enhanced test user ready: ${uniqueEmail} (discovery: ${discoveryMethod})`
         );
         await use(testUser);
       } catch (error) {
-        console.error(
-          "[EnhancedCognito] Error setting up enhanced test user:",
-          error,
-        );
+        console.error("[EnhancedCognito] Error setting up enhanced test user:", error);
         throw error;
       } finally {
         // Cleanup: Delete the test user
@@ -693,10 +619,7 @@ export const test = base.extend<EnhancedCognitoFixtures>({
           try {
             deleteTestUser(userPool.id, uniqueEmail);
           } catch (cleanupError) {
-            console.error(
-              "[EnhancedCognito] Error during cleanup:",
-              cleanupError,
-            );
+            console.error("[EnhancedCognito] Error during cleanup:", cleanupError);
             // Don't throw cleanup errors to avoid masking test failures
           }
         }
@@ -729,7 +652,7 @@ export const EnhancedCognitoUtils = {
    */
   validateDiscoveryMethod(
     user: EnhancedCognitoTestUser,
-    expectedMethod: "tag-based" | "name-based" | "fallback",
+    expectedMethod: "tag-based" | "name-based" | "fallback"
   ): boolean {
     return user.discoveryMethod === expectedMethod;
   },

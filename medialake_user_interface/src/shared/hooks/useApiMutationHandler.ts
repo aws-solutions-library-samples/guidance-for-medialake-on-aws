@@ -32,13 +32,9 @@ export const useApiMutationHandler = <
     message: "",
   });
 
-  const handleMutation = async <
-    TMutData = TData,
-    TMutError = TError,
-    TMutVariables = TVariables,
-  >(
+  const handleMutation = async <TMutData = TData, TMutError = TError, TMutVariables = TVariables>(
     options: UseApiMutationHandlerOptions<TMutData, TMutError, TMutVariables>,
-    variables: TMutVariables,
+    variables: TMutVariables
   ) => {
     const { mutation, actionMessages, onSuccess, onError } = options;
 
@@ -55,8 +51,7 @@ export const useApiMutationHandler = <
         show: true,
         status: "success",
         action: actionMessages.success,
-        message:
-          actionMessages.successMessage || "Operation completed successfully.",
+        message: actionMessages.successMessage || "Operation completed successfully.",
       });
       if (onSuccess) {
         onSuccess(result);
@@ -69,11 +64,7 @@ export const useApiMutationHandler = <
       let displayMessage = "An unknown error occurred.";
 
       // Check if it looks like an Axios error with a response body
-      if (
-        typeof typedError === "object" &&
-        typedError !== null &&
-        "response" in typedError
-      ) {
+      if (typeof typedError === "object" && typedError !== null && "response" in typedError) {
         const response = (typedError as any).response;
         if (response?.data) {
           try {

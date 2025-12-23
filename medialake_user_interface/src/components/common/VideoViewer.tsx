@@ -14,7 +14,6 @@ import {
   OmakasePlayer,
   PeriodMarker,
   PlayerChromingTheme,
-  StampThemeScale,
 } from "@byomakase/omakase-player";
 import {
   SCRUBBER_LANE_STYLE_DARK,
@@ -48,7 +47,6 @@ import "../../styles/player-overrides.css";
 import { createTimecodePlaceholder } from "@/utils/placeholderSvg";
 import { useVideoKeyboardShortcuts } from "./useVideoKeyboardShortcuts";
 
-import { filter } from "rxjs";
 import { randomHexColor } from "./utils";
 
 export interface VideoViewerProps {
@@ -97,12 +95,12 @@ const useOmakasePlayer = (
   containerRef: React.RefObject<HTMLDivElement>,
   callbacks: Partial<VideoViewerProps>,
   markerLaneRef: React.MutableRefObject<any | null>,
-  protocol?: "audio" | "video",
+  protocol?: "audio" | "video"
 ) => {
   const playerRef = useRef<OmakasePlayer | null>(null);
-  const [playerVolume, setPlayerVolume] = useState(1);
+  const [, setPlayerVolume] = useState(1);
 
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const callbacksRef = useRef(callbacks);
   useEffect(() => {
@@ -142,10 +140,7 @@ const useOmakasePlayer = (
 
     const subscriptions = [
       player
-        .loadVideo(
-          videoSrc,
-          protocol === "audio" ? { protocol: "audio" as const } : undefined,
-        )
+        .loadVideo(videoSrc, protocol === "audio" ? { protocol: "audio" as const } : undefined)
         .subscribe({
           next: (video) => {
             console.log(`Video loaded. Duration: ${video.duration}`);
@@ -168,7 +163,7 @@ const useOmakasePlayer = (
       player.video.onPause$.subscribe({
         next: (event) => {
           console.log(
-            `Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`,
+            `Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`
           );
           callbacksRef.current.onPause?.();
         },
@@ -192,7 +187,7 @@ const useOmakasePlayer = (
         },
       }),
       player.video.onFullscreenChange$.subscribe({
-        next: (event) => {
+        next: () => {
           // Forward fullscreen changes if needed.
         },
       }),
@@ -231,7 +226,9 @@ const useOmakasePlayer = (
           console.warn("Timeline not available for marker lane creation");
           if (retryCount < maxRetries) {
             console.log(
-              `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+              `Retrying marker lane creation in ${retryDelay}ms (attempt ${
+                retryCount + 1
+              }/${maxRetries})`
             );
             retryTimeoutRef.current = setTimeout(() => {
               markerLane1(retryCount + 1);
@@ -256,7 +253,9 @@ const useOmakasePlayer = (
 
         if (retryCount < maxRetries) {
           console.log(
-            `Retrying marker lane creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`,
+            `Retrying marker lane creation in ${retryDelay}ms (attempt ${
+              retryCount + 1
+            }/${maxRetries})`
           );
           retryTimeoutRef.current = setTimeout(() => {
             markerLane1(retryCount + 1);
@@ -285,7 +284,7 @@ const useOmakasePlayer = (
     },
     [
       /*initializePlayer*/
-    ],
+    ]
   ); //Not using UseEffect dependency array due to player inicializing everytime someone changes tabs
 
   // Responsive timeline: Listen for window resize events and trigger a timeline resize.
@@ -307,7 +306,7 @@ const useOmakasePlayer = (
     const timelineContainer = document.getElementById("omakase-timeline");
     if (!timelineContainer) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
+    const resizeObserver = new ResizeObserver(() => {
       // When the timeline container's size changes, settle the layout.
       if (playerRef.current?.timeline) {
         playerRef.current.timeline.zoomTo(100);
@@ -405,10 +404,8 @@ const useOmakasePlayer = (
 function ThumbLabel(props: any) {
   const { children, open, value, showThumbnails = true } = props;
   const lastValueRef = useRef(value);
-  const [thumbnailUrl, setThumbnailUrl] = useState(() =>
-    getThumbnailForTime(value),
-  );
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const [thumbnailUrl, setThumbnailUrl] = useState(() => getThumbnailForTime(value));
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     lastValueRef.current = value;
@@ -472,10 +469,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       onVolumeChange,
       onMute,
       onUnmute,
-      onPlaybackRateChange,
       onFullscreenChange,
-      onRemoveSafeZone,
-      onClearSafeZones,
       onBuffering,
       onEnded,
       onError,
@@ -485,7 +479,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       playerRef,
       protocol,
     },
-    ref,
+    ref
   ) => {
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const markerLaneRef = useRef<MarkerLane | null>(null);
@@ -496,9 +490,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
     const [isSmtpeFormat, setIsSmtpeFormat] = useState(true);
     const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-    const [shortcutsAnchor, setShortcutsAnchor] = useState<null | HTMLElement>(
-      null,
-    );
+    const [shortcutsAnchor, setShortcutsAnchor] = useState<null | HTMLElement>(null);
     const openShortcuts = Boolean(shortcutsAnchor);
     const handleOpenShortcuts = (event: React.MouseEvent<HTMLElement>) => {
       setShortcutsAnchor(event.currentTarget);
@@ -507,7 +499,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       setShortcutsAnchor(null);
     };
 
-    const volumeHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastNonZeroVolumeRef = useRef(100);
 
     // state near other useStates in VideoViewer
@@ -548,7 +540,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         onError,
         onTimeUpdate,
         onMarkerAdd,
-      ],
+      ]
     );
 
     const {
@@ -560,19 +552,10 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       unmute,
       setPlaybackRate,
       toggleFullscreen,
-      removeSafeZone,
-      clearSafeZones,
       currentTime,
       duration,
-      setCurrentTime,
       playerRef: omakaseRef, // get the internal ref from the hook
-    } = useOmakasePlayer(
-      videoSrc,
-      playerContainerRef,
-      customCallbacks,
-      markerLaneRef,
-      protocol,
-    );
+    } = useOmakasePlayer(videoSrc, playerContainerRef, customCallbacks, markerLaneRef, protocol);
 
     // reset UI time when the source changes (optional but nice)
     useEffect(() => {
@@ -609,8 +592,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         if (playing && mediaDelta < EPS) {
           if (coastStart === 0) coastStart = now;
           const elapsed = Math.min(now - coastStart, COAST_MS);
-          target =
-            lastMediaTime + (elapsed / 1000) * (videoEl.playbackRate || 1);
+          target = lastMediaTime + (elapsed / 1000) * (videoEl.playbackRate || 1);
 
           // don't "paint" into unbuffered territory
           const be = bufferedEndNear(lastMediaTime);
@@ -620,9 +602,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         }
 
         // clamp to duration
-        const dur = Number.isFinite(videoEl.duration)
-          ? videoEl.duration
-          : target;
+        const dur = Number.isFinite(videoEl.duration) ? videoEl.duration : target;
         target = Math.max(0, Math.min(target, dur));
 
         setUiTime(target);
@@ -635,12 +615,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
     }, [omakaseRef, videoSrc]);
 
     // Use keyboard shortcuts hook
-    const {
-      SHORTCUTS,
-      toggleTransport,
-      currentPlaybackRate,
-      isShuttlingReverse,
-    } = useVideoKeyboardShortcuts({
+    const { SHORTCUTS, isShuttlingReverse } = useVideoKeyboardShortcuts({
       play,
       pause,
       seek,
@@ -673,9 +648,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       () => ({
         hello: () => {
           if (!markerLaneRef.current) {
-            console.warn(
-              "Marker lane is not available yet. Video may still be loading.",
-            );
+            console.warn("Marker lane is not available yet. Video may still be loading.");
             return null;
           }
 
@@ -702,9 +675,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           if (markerLaneRef.current) {
             return markerLaneRef.current;
           }
-          console.warn(
-            "Marker lane is not available yet. Video may still be loading.",
-          );
+          console.warn("Marker lane is not available yet. Video may still be loading.");
           return null;
         },
         getCurrentTime: () => currentTime,
@@ -721,7 +692,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         },
         seek: (time: number) => seek(time),
       }),
-      [currentTime, customCallbacks, omakaseRef],
+      [currentTime, customCallbacks, omakaseRef]
     );
 
     const handlePlayPause = () => {
@@ -738,10 +709,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         setUiTime(newValue);
       }
     };
-    const handleSeekCommitted = (
-      _: Event | SyntheticEvent,
-      newValue: number | number[],
-    ) => {
+    const handleSeekCommitted = (_: Event | SyntheticEvent, newValue: number | number[]) => {
       if (typeof newValue === "number") seek(newValue);
     };
     const handleVolumeChange = (event: Event, newValue: number | number[]) => {
@@ -879,8 +847,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                   acc[shortcut.category].push(shortcut);
                   return acc;
                 },
-                {} as Record<string, typeof SHORTCUTS>,
-              ),
+                {} as Record<string, typeof SHORTCUTS>
+              )
             ).map(([category, shortcuts], categoryIndex) => (
               <Box
                 key={category}
@@ -896,8 +864,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                           acc[shortcut.category].push(shortcut);
                           return acc;
                         },
-                        {} as Record<string, typeof SHORTCUTS>,
-                      ),
+                        {} as Record<string, typeof SHORTCUTS>
+                      )
                     ).length -
                       1
                       ? 2
@@ -927,10 +895,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                           try {
                             shortcut.action();
                           } catch (error) {
-                            console.error(
-                              "Error executing shortcut action:",
-                              error,
-                            );
+                            console.error("Error executing shortcut action:", error);
                           }
                         }}
                         sx={{
@@ -1015,8 +980,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                         acc[shortcut.category].push(shortcut);
                         return acc;
                       },
-                      {} as Record<string, typeof SHORTCUTS>,
-                    ),
+                      {} as Record<string, typeof SHORTCUTS>
+                    )
                   ).length -
                     1 && <Divider sx={{ mt: 1.5 }} />}
               </Box>
@@ -1075,12 +1040,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               }}
             />
           </Box>
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={1}
-            sx={{ px: 2, pb: 1 }}
-          >
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, pb: 1 }}>
             <IconButton
               onClick={handlePlayPause}
               size="small"
@@ -1144,12 +1104,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                   lineHeight: 0, // avoid baseline gap from inline blocks
                 }}
               >
-                <Tooltip
-                  open={isVolumeHovered}
-                  title={`${volume}%`}
-                  placement="top"
-                  arrow
-                >
+                <Tooltip open={isVolumeHovered} title={`${volume}%`} placement="top" arrow>
                   <Slider
                     orientation="vertical"
                     value={volume}
@@ -1157,8 +1112,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                     max={100}
                     onChange={handleVolumeChange}
                     onChangeCommitted={(_, newValue) => {
-                      if (typeof newValue === "number")
-                        setPlayerVolume(newValue);
+                      if (typeof newValue === "number") setPlayerVolume(newValue);
                     }}
                     sx={{
                       height: 100,
@@ -1198,7 +1152,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
         <Box id="omakase-timeline" sx={{ width: "100%", height: "auto" }} />
       </Stack>
     );
-  },
+  }
 );
 
 VideoViewer.displayName = "VideoViewer";

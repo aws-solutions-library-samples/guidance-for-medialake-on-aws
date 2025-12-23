@@ -6,10 +6,7 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
-  fallbackRender?: (props: {
-    error: Error;
-    resetErrorBoundary: () => void;
-  }) => React.ReactNode;
+  fallbackRender?: (props: { error: Error; resetErrorBoundary: () => void }) => React.ReactNode;
   onReset?: () => void;
   onError?: (error: Error, info: { componentStack: string }) => void;
 }
@@ -19,10 +16,7 @@ interface FallbackProps {
   resetErrorBoundary: () => void;
 }
 
-const DefaultFallback: React.FC<FallbackProps> = ({
-  error,
-  resetErrorBoundary,
-}) => {
+const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary }) => {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
 
@@ -41,15 +35,13 @@ const DefaultFallback: React.FC<FallbackProps> = ({
       <Stack spacing={2}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <ErrorOutlineIcon color="error" />
-          <Typography variant="h6">
-            {t("errors.componentError", "Component Error")}
-          </Typography>
+          <Typography variant="h6">{t("errors.componentError", "Component Error")}</Typography>
         </Box>
 
         <Typography variant="body2" color="text.secondary">
           {t(
             "errors.componentErrorMessage",
-            "An error occurred in this component. You can try resetting it.",
+            "An error occurred in this component. You can try resetting it."
           )}
         </Typography>
 
@@ -84,11 +76,7 @@ const DefaultFallback: React.FC<FallbackProps> = ({
         </Box>
 
         <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outlined" size="small" onClick={() => window.location.reload()}>
             {t("errors.refreshPage", "Refresh Page")}
           </Button>
           <Button variant="contained" size="small" onClick={resetErrorBoundary}>
@@ -112,14 +100,12 @@ export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
       console.error("Caught an error:", error, info);
       onError?.(error, info);
     },
-    [onError],
+    [onError]
   );
 
   return (
     <ReactErrorBoundary
-      fallbackRender={
-        fallbackRender || ((props) => <DefaultFallback {...props} />)
-      }
+      fallbackRender={fallbackRender || ((props) => <DefaultFallback {...props} />)}
       onReset={onReset}
       onError={handleError}
     >

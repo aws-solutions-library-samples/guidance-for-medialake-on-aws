@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -11,9 +12,6 @@ import {
   FormControlLabel,
   Checkbox,
   Switch,
-  Radio,
-  ListItemIcon,
-  ListItemText,
   Tooltip,
 } from "@mui/material";
 
@@ -30,16 +28,11 @@ import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
 import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge";
 import FitScreenIcon from "@mui/icons-material/FitScreen";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import InfoIcon from "@mui/icons-material/Info";
-import { type SortingState } from "@tanstack/react-table";
 import {
-  type AssetField,
-  type SortOption,
   type CardSize,
   type AspectRatio,
   type AssetViewControlsProps as BaseAssetViewControlsProps,
 } from "../../types/shared/assetComponents";
-import { useFeatureFlag } from "@/utils/featureFlags";
 
 interface AssetViewControlsProps extends BaseAssetViewControlsProps {
   // Search fields
@@ -72,7 +65,6 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
 const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   viewMode,
   onViewModeChange,
-  title,
   sorting,
   sortOptions,
   onSortChange,
@@ -93,26 +85,17 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   showMetadata,
   onShowMetadataChange,
   // Selection props
-  hasSelectedAssets = false,
   selectAllState = "none",
   onSelectAllToggle,
 }) => {
+  const { t } = useTranslation();
   const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
-  const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(
-    null,
-  );
-  const [appearanceAnchor, setAppearanceAnchor] =
-    React.useState<null | HTMLElement>(null);
+  const [fieldsAnchor, setFieldsAnchor] = React.useState<null | HTMLElement>(null);
+  const [appearanceAnchor, setAppearanceAnchor] = React.useState<null | HTMLElement>(null);
 
   const handleSortClose = () => setSortAnchor(null);
   const handleFieldsClose = () => setFieldsAnchor(null);
   const handleAppearanceClose = () => setAppearanceAnchor(null);
-
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
 
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
@@ -130,21 +113,15 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     // Legacy nested fields (for backward compatibility)
     "DigitalSourceAsset.Type": "type",
     "DigitalSourceAsset.MainRepresentation.Format": "format",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
-      "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
-      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
     "DigitalSourceAsset.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
-      "name",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
-      "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
-      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
       "fullPath",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
-      "bucket",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
     "Metadata.Consolidated": "metadata",
     InventoryID: "id",
   };
@@ -167,33 +144,26 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
     return sortOptions.filter((option) => {
       // Special case for name field
       if (option.id === "name") {
-        return selectedFields.some(
-          (field) => field.includes("Name") || field === "objectName",
-        );
+        return selectedFields.some((field) => field.includes("Name") || field === "objectName");
       }
 
       // Special case for date field
       if (option.id === "date") {
         return selectedFields.some(
-          (field) => field.includes("CreateDate") || field === "createdAt",
+          (field) => field.includes("CreateDate") || field === "createdAt"
         );
       }
 
       // Special case for size field
       if (option.id === "size") {
         return selectedFields.some(
-          (field) =>
-            field.includes("FileSize") ||
-            field.includes("Size") ||
-            field === "fileSize",
+          (field) => field.includes("FileSize") || field.includes("Size") || field === "fileSize"
         );
       }
 
       // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
       const apiFieldIds = reverseFieldMapping[option.id] || [];
-      return apiFieldIds.some((apiFieldId) =>
-        selectedFields.includes(apiFieldId),
-      );
+      return apiFieldIds.some((apiFieldId) => selectedFields.includes(apiFieldId));
     });
   }, [sortOptions, selectedFields, reverseFieldMapping]);
 
@@ -207,18 +177,13 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={onViewModeChange}
-          size="small"
-        >
-          <Tooltip title="Card view">
+        <ToggleButtonGroup value={viewMode} exclusive onChange={onViewModeChange} size="small">
+          <Tooltip title={t("common.views.cardView")}>
             <ToggleButton value="card">
               <ViewModuleIcon />
             </ToggleButton>
           </Tooltip>
-          <Tooltip title="Table view">
+          <Tooltip title={t("common.views.tableView")}>
             <ToggleButton value="table">
               <ViewListIcon />
             </ToggleButton>
@@ -227,7 +192,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
       </Box>
 
       <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-        {multiSelectFeature.value && (
+        {
           <Box
             sx={{
               display: "flex",
@@ -267,7 +232,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               }}
             />
           </Box>
-        )}
+        }
         {/* Sort Button */}
         <Button
           size="small"
@@ -385,9 +350,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                         onChange={(e) => {
                           const newSelectedFields = e.target.checked
                             ? [...selectedFields, field.name]
-                            : selectedFields.filter(
-                                (name) => name !== field.name,
-                              );
+                            : selectedFields.filter((name) => name !== field.name);
 
                           onFieldsChange({
                             target: { value: newSelectedFields },
@@ -458,15 +421,11 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
           {viewMode === "card" && (
             <>
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Card Size
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Small cards">
+                  <Tooltip title={t("common.views.smallCards")}>
                     <ToggleButton
                       value="small"
                       selected={cardSize === "small"}
@@ -476,7 +435,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <PhotoSizeSelectSmallIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Medium cards">
+                  <Tooltip title={t("common.views.mediumCards")}>
                     <ToggleButton
                       value="medium"
                       selected={cardSize === "medium"}
@@ -486,7 +445,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <ViewModuleIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Large cards">
+                  <Tooltip title={t("common.views.largeCards")}>
                     <ToggleButton
                       value="large"
                       selected={cardSize === "large"}
@@ -500,15 +459,11 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Aspect Ratio
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Vertical aspect ratio">
+                  <Tooltip title={t("common.views.verticalAspectRatio")}>
                     <ToggleButton
                       value="vertical"
                       selected={aspectRatio === "vertical"}
@@ -518,7 +473,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <CropPortraitIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Square aspect ratio">
+                  <Tooltip title={t("common.views.squareAspectRatio")}>
                     <ToggleButton
                       value="square"
                       selected={aspectRatio === "square"}
@@ -528,7 +483,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <CropSquareIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Horizontal aspect ratio">
+                  <Tooltip title={t("common.views.horizontalAspectRatio")}>
                     <ToggleButton
                       value="horizontal"
                       selected={aspectRatio === "horizontal"}
@@ -542,15 +497,11 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Thumbnail Scale
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                  <Tooltip title="Fit to container (maintain aspect ratio)">
+                  <Tooltip title={t("common.views.fitToContainer")}>
                     <ToggleButton
                       value="fit"
                       selected={thumbnailScale === "fit"}
@@ -560,7 +511,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       <FitScreenIcon />
                     </ToggleButton>
                   </Tooltip>
-                  <Tooltip title="Fill container (may crop image)">
+                  <Tooltip title={t("common.views.fillContainer")}>
                     <ToggleButton
                       value="fill"
                       selected={thumbnailScale === "fill"}
@@ -584,7 +535,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                   size="small"
                 />
               }
-              label="Group by Type"
+              label={t("common.viewControls.groupByType")}
               sx={{
                 "& .MuiFormControlLabel-label": {
                   fontSize: "0.875rem",
@@ -600,7 +551,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     size="small"
                   />
                 }
-                label="Metadata"
+                label={t("common.viewControls.metadata")}
                 sx={{
                   "& .MuiFormControlLabel-label": {
                     fontSize: "0.875rem",

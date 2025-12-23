@@ -22,11 +22,7 @@ import {
 import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
-import {
-  User,
-  CreateUserRequest,
-  UpdateUserRequest,
-} from "@/api/types/api.types";
+import { User, CreateUserRequest, UpdateUserRequest } from "@/api/types/api.types";
 
 const UserManagement: React.FC = () => {
   const { t } = useTranslation();
@@ -34,28 +30,17 @@ const UserManagement: React.FC = () => {
   const [openCreateGroupModal, setOpenCreateGroupModal] = useState(false);
   const [openManageGroupsModal, setOpenManageGroupsModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | undefined>();
-  const [activeFilters, setActiveFilters] = useState<
-    { columnId: string; value: string }[]
-  >([]);
-  const [activeSorting, setActiveSorting] = useState<
-    { columnId: string; desc: boolean }[]
-  >([]);
+  const [activeFilters, setActiveFilters] = useState<{ columnId: string; value: string }[]>([]);
+  const [activeSorting, setActiveSorting] = useState<{ columnId: string; desc: boolean }[]>([]);
 
   // Feature flags
-  const advancedPermissionsEnabled = useFeatureFlag(
-    "advanced-permissions-enabled",
-    false,
-  );
+  const advancedPermissionsEnabled = useFeatureFlag("advanced-permissions-enabled", false);
 
   const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
-  const {
-    data: users,
-    isLoading: isLoadingUsers,
-    error: usersError,
-  } = useGetUsers();
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true); // Always fetch groups when this component loads
-  const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this page is loaded
+  useGetPermissionSets(true); // Enable API call when this page is loaded
 
   // Debug logs
   console.log("Groups data in UserManagement:", groups);
@@ -70,9 +55,7 @@ const UserManagement: React.FC = () => {
   React.useEffect(() => {
     if (editingUser && users) {
       // Find the updated user in the fresh users list
-      const updatedUser = users.find(
-        (u) => u.username === editingUser.username,
-      );
+      const updatedUser = users.find((u) => u.username === editingUser.username);
 
       if (updatedUser) {
         // Log for debugging
@@ -85,8 +68,7 @@ const UserManagement: React.FC = () => {
 
         // Only update if specific fields have changed to avoid unnecessary re-renders
         const hasChanges =
-          JSON.stringify(updatedUser.groups) !==
-            JSON.stringify(editingUser.groups) ||
+          JSON.stringify(updatedUser.groups) !== JSON.stringify(editingUser.groups) ||
           updatedUser.email !== editingUser.email ||
           updatedUser.given_name !== editingUser.given_name ||
           updatedUser.family_name !== editingUser.family_name ||
@@ -125,7 +107,7 @@ const UserManagement: React.FC = () => {
 
     if (isNewUser) {
       console.log("Creating new user with groups:", userData.groups);
-      const result = await handleMutation(
+      await handleMutation(
         {
           mutation: createUserMutation,
           actionMessages: {
@@ -137,11 +119,7 @@ const UserManagement: React.FC = () => {
           onSuccess: (data) => {
             // Check for group assignment issues and show additional notifications
             if (data?.data) {
-              const {
-                groupsAdded = [],
-                groupsFailed = [],
-                invalidGroups = [],
-              } = data.data;
+              const { groupsAdded = [], groupsFailed = [], invalidGroups = [] } = data.data;
 
               // Log the results for debugging
               console.log("User creation completed with group results:", {
@@ -154,22 +132,19 @@ const UserManagement: React.FC = () => {
               if (groupsFailed.length > 0) {
                 console.warn(
                   `Failed to assign user to ${groupsFailed.length} groups:`,
-                  groupsFailed,
+                  groupsFailed
                 );
                 // You could show a toast notification here about partial group assignment
               }
 
               if (invalidGroups.length > 0) {
-                console.warn(
-                  `${invalidGroups.length} groups were invalid:`,
-                  invalidGroups,
-                );
+                console.warn(`${invalidGroups.length} groups were invalid:`, invalidGroups);
                 // You could show a toast notification here about invalid groups
               }
             }
           },
         },
-        userData,
+        userData
       );
     } else if (editingUser) {
       const updateData: UpdateUserRequest = {
@@ -191,7 +166,7 @@ const UserManagement: React.FC = () => {
             error: t("users.apiMessages.updating.error"),
           },
         },
-        { username: editingUser.username, updates: updateData },
+        { username: editingUser.username, updates: updateData }
       );
     }
   };
@@ -207,14 +182,11 @@ const UserManagement: React.FC = () => {
           error: t("users.apiMessages.deleting.error"),
         },
       },
-      username,
+      username
     );
   };
 
-  const handleToggleUserStatus = async (
-    username: string,
-    newEnabled: boolean,
-  ) => {
+  const handleToggleUserStatus = async (username: string, newEnabled: boolean) => {
     const mutation = newEnabled ? enableUserMutation : disableUserMutation;
     const actionKey = newEnabled ? "enabling" : "disabling";
 
@@ -228,7 +200,7 @@ const UserManagement: React.FC = () => {
           error: t(`users.apiMessages.${actionKey}.error`),
         },
       },
-      username,
+      username
     );
   };
 
@@ -308,14 +280,10 @@ const UserManagement: React.FC = () => {
           activeSorting={activeSorting}
           handleMutation={handleMutation}
           onRemoveFilter={(columnId) => {
-            setActiveFilters((filters) =>
-              filters.filter((f) => f.columnId !== columnId),
-            );
+            setActiveFilters((filters) => filters.filter((f) => f.columnId !== columnId));
           }}
           onRemoveSort={(columnId) => {
-            setActiveSorting((sorts) =>
-              sorts.filter((s) => s.columnId !== columnId),
-            );
+            setActiveSorting((sorts) => sorts.filter((s) => s.columnId !== columnId));
           }}
           onFilterChange={(columnId, value) => {
             setActiveFilters((filters) => {

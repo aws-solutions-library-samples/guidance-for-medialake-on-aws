@@ -1,12 +1,7 @@
-import React, {
-  createContext,
-  useState,
-  useEffect,
-  useContext,
-  ReactNode,
-} from "react";
+import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import { StorageHelper } from "../helpers/storage-helper";
 import { Amplify } from "aws-amplify";
+import { useTranslation } from "react-i18next";
 
 interface IdentityProvider {
   identity_provider_method: "cognito" | "saml";
@@ -59,10 +54,10 @@ const configureAmplify = (config: AwsConfig) => {
 
   // Configure login methods based on identity providers
   const hasCognito = config.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "cognito",
+    (provider) => provider.identity_provider_method === "cognito"
   );
   const samlProviders = config.Auth.identity_providers.filter(
-    (provider) => provider.identity_provider_method === "saml",
+    (provider) => provider.identity_provider_method === "saml"
   );
 
   // Enable username/password login if Cognito is configured
@@ -75,7 +70,7 @@ const configureAmplify = (config: AwsConfig) => {
   if (samlProviders.length > 0) {
     console.log(
       "Configuring SAML providers:",
-      samlProviders.map((p) => p.identity_provider_name),
+      samlProviders.map((p) => p.identity_provider_name)
     );
     amplifyConfig.Auth.Cognito.loginWith.oauth = {
       ...amplifyConfig.Auth.Cognito.loginWith.oauth,
@@ -99,6 +94,7 @@ const configureAmplify = (config: AwsConfig) => {
 };
 
 export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
+  const { t } = useTranslation();
   const [awsConfig, setAwsConfig] = useState<AwsConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -125,14 +121,10 @@ export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
   }, []);
 
   if (isLoading) {
-    return <div>Loading AWS configuration...</div>;
+    return <div>{t("config.loadingAwsConfiguration")}</div>;
   }
 
-  return (
-    <AwsConfigContext.Provider value={awsConfig}>
-      {children}
-    </AwsConfigContext.Provider>
-  );
+  return <AwsConfigContext.Provider value={awsConfig}>{children}</AwsConfigContext.Provider>;
 };
 
 export const useAwsConfig = () => {

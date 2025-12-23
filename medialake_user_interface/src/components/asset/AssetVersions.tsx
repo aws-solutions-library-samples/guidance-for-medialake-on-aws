@@ -1,15 +1,6 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-} from "@mui/material";
+import { Box, Typography, List, ListItem, ListItemIcon } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
-import { formatFileSize } from "../../utils/imageUtils";
 
 interface Representation {
   id: string;
@@ -28,7 +19,7 @@ const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
   return (
     <Box sx={{ p: 2 }}>
       <List>
-        {versions.map((version, index) => (
+        {versions.map((version) => (
           <ListItem
             key={version.id}
             sx={{
@@ -41,17 +32,12 @@ const AssetVersions: React.FC<AssetVersionsProps> = ({ versions }) => {
               p: 2,
             }}
           >
-            <Box
-              sx={{ display: "flex", alignItems: "flex-start", width: "100%" }}
-            >
+            <Box sx={{ display: "flex", alignItems: "flex-start", width: "100%" }}>
               <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
                 <HistoryIcon />
               </ListItemIcon>
               <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="subtitle1"
-                  sx={{ textTransform: "capitalize" }}
-                >
+                <Typography variant="subtitle1" sx={{ textTransform: "capitalize" }}>
                   {version.type}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">

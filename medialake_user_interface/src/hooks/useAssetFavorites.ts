@@ -1,10 +1,6 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useFeatureFlag } from "../utils/featureFlags";
-import {
-  useGetFavorites,
-  useAddFavorite,
-  useRemoveFavorite,
-} from "../api/hooks/useFavorites";
+import { useGetFavorites, useAddFavorite, useRemoveFavorite } from "../api/hooks/useFavorites";
 
 export function useAssetFavorites<T>({
   getAssetId,
@@ -31,7 +27,7 @@ export function useAssetFavorites<T>({
       if (!favoritesFeature.value || !favorites) return false;
       return favorites.some((favorite) => favorite.itemId === assetId);
     },
-    [favorites, favoritesFeature.value],
+    [favorites, favoritesFeature.value]
   );
 
   // Handle favorite toggle - only if feature is enabled
@@ -78,7 +74,7 @@ export function useAssetFavorites<T>({
       getAssetType,
       getAssetThumbnail,
       favoritesFeature.value,
-    ],
+    ]
   );
 
   return {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { VideoViewerRef } from "../components/common/VideoViewer";
 
 export interface MediaController {
@@ -8,9 +8,7 @@ export interface MediaController {
   seekTo: (time: number) => void;
   onTimeUpdate: (callback: (time: number) => void) => () => void;
   registerAudioElement: (audioElement: HTMLAudioElement) => void;
-  registerVideoElement: (
-    videoViewerRef: React.RefObject<VideoViewerRef>,
-  ) => void;
+  registerVideoElement: (videoViewerRef: React.RefObject<VideoViewerRef>) => void;
   updateCurrentTime: (time: number) => void;
 }
 
@@ -73,12 +71,9 @@ export const useMediaController = (): MediaController => {
     };
   }, []);
 
-  const registerVideoElement = useCallback(
-    (videoViewerRef: React.RefObject<VideoViewerRef>) => {
-      videoElementRef.current = videoViewerRef;
-    },
-    [],
-  );
+  const registerVideoElement = useCallback((videoViewerRef: React.RefObject<VideoViewerRef>) => {
+    videoElementRef.current = videoViewerRef;
+  }, []);
 
   const updateCurrentTime = useCallback((time: number) => {
     setCurrentTime(time);

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { ColumnFiltersState, PaginationState } from "@tanstack/react-table";
 import {
   useGetPipelines,
@@ -9,31 +8,21 @@ import {
   useStopPipeline,
   useUpdatePipeline,
 } from "../api/pipelinesController";
-import type { Pipeline, PipelinesResponse } from "../types/pipelines.types";
 import queryClient from "@/api/queryClient";
 
 const PAGE_SIZE = 20;
 
 export const usePipelineManager = () => {
   // Track which pipelines are currently being toggled
-  const [togglingPipelines, setTogglingPipelines] = useState<
-    Record<string, boolean>
-  >({});
-  const { t } = useTranslation();
+  const [togglingPipelines, setTogglingPipelines] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState({});
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: PAGE_SIZE,
@@ -46,26 +35,13 @@ export const usePipelineManager = () => {
     userInput: "",
   });
 
-  const [filters, setFilters] = useState({
-    type: "",
-    name: "",
-    system: "",
-    sortBy: "createdAt",
-    sortOrder: "desc" as "asc" | "desc",
-  });
-
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success" as "success" | "error",
   });
 
-  const {
-    data: pipelinesResponse,
-    isLoading,
-    error,
-    refetch,
-  } = useGetPipelines();
+  const { data: pipelinesResponse, isLoading, error, refetch } = useGetPipelines();
 
   const deletePipelineMutation = useDeletePipeline();
   const startPipelineMutation = useStartPipeline();
@@ -82,10 +58,7 @@ export const usePipelineManager = () => {
         shiftKeyPressed = true;
       }
 
-      if (
-        shiftKeyPressed &&
-        ["d", "e", "l"].includes(event.key.toLowerCase())
-      ) {
+      if (shiftKeyPressed && ["d", "e", "l"].includes(event.key.toLowerCase())) {
         keySequence.push(event.key.toLowerCase());
         if (keySequence.join("") === "del") {
           event.preventDefault();
@@ -153,10 +126,7 @@ export const usePipelineManager = () => {
     setColumnMenuAnchor(null);
   };
 
-  const handleFilterMenuOpen = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterMenuOpen = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
     setFilterMenuAnchor(event.currentTarget);
     setActiveFilterColumn(columnId);
   };
@@ -193,15 +163,13 @@ export const usePipelineManager = () => {
     // Non-blocking function that handles errors and timeouts
     deletePipeline: (id: string) => {
       const startTime = performance.now();
-      console.log(
-        `[usePipelineManager] Starting delete operation for pipeline ID: ${id}`,
-      );
+      console.log(`[usePipelineManager] Starting delete operation for pipeline ID: ${id}`);
 
       // Create a timeout promise to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           console.error(
-            `[usePipelineManager] Delete operation timed out after 30 seconds for pipeline ID: ${id}`,
+            `[usePipelineManager] Delete operation timed out after 30 seconds for pipeline ID: ${id}`
           );
           reject(new Error("Delete operation timed out after 30 seconds"));
         }, 30000);
@@ -215,14 +183,14 @@ export const usePipelineManager = () => {
             console.log(
               `[usePipelineManager] Delete operation completed successfully for pipeline ID: ${id} in ${
                 performance.now() - startTime
-              }ms`,
+              }ms`
             );
 
             // Refresh the pipeline list in the background
             refetch().catch((refetchError) => {
               console.error(
                 `[usePipelineManager] Error refreshing pipeline list after deletion:`,
-                refetchError,
+                refetchError
               );
             });
 
@@ -233,14 +201,14 @@ export const usePipelineManager = () => {
               `[usePipelineManager] Error in delete operation for pipeline ID: ${id} after ${
                 performance.now() - startTime
               }ms`,
-              error,
+              error
             );
 
             // Still try to refresh the list in case the deletion actually succeeded
             refetch().catch((refetchError) => {
               console.error(
                 `[usePipelineManager] Error refreshing pipeline list after deletion:`,
-                refetchError,
+                refetchError
               );
             });
 
@@ -255,16 +223,14 @@ export const usePipelineManager = () => {
 
     // Enhanced toggleActive with optimistic updates
     toggleActive: (id: string, active: boolean) => {
-      console.log(
-        `[usePipelineManager] Toggling pipeline ${id} active state to ${active}`,
-      );
+      console.log(`[usePipelineManager] Toggling pipeline ${id} active state to ${active}`);
 
       // Mark this pipeline as currently toggling
       setTogglingPipelines((prev) => ({ ...prev, [id]: true }));
 
       // Create a copy of the current pipelines for optimistic update
       const updatedPipelines = pipelines.map((pipeline) =>
-        pipeline.id === id ? { ...pipeline, active } : pipeline,
+        pipeline.id === id ? { ...pipeline, active } : pipeline
       );
 
       // Optimistically update the query data
@@ -283,7 +249,7 @@ export const usePipelineManager = () => {
         })
         .then(() => {
           console.log(
-            `[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`,
+            `[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`
           );
           // Remove from toggling state
           setTogglingPipelines((prev) => {
@@ -295,10 +261,7 @@ export const usePipelineManager = () => {
           refetch();
         })
         .catch((error) => {
-          console.error(
-            `[usePipelineManager] Error toggling pipeline ${id} active state:`,
-            error,
-          );
+          console.error(`[usePipelineManager] Error toggling pipeline ${id} active state:`, error);
 
           // Revert the optimistic update on error
           queryClient.setQueryData(["pipelines", "list"], pipelinesResponse);

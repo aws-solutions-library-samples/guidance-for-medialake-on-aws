@@ -159,10 +159,32 @@ class StateMachineBuilder:
             operation_id = node.data.configuration.get("operationId", "")
             label = node.data.label or node.data.type
 
+            # Avoid duplicate operation_id in the state name
+            # Check if operation_id is already present in the label (case-insensitive)
+            # Also check for common formatting variations like "(operation_id)" or "operation_id"
+            if operation_id:
+                label_lower = label.lower()
+                operation_id_lower = operation_id.lower()
+                # Check if operation_id appears in any form in the label
+                if (
+                    operation_id_lower not in label_lower
+                    and f"({operation_id_lower})" not in label_lower
+                    and f"[{operation_id_lower}]" not in label_lower
+                ):
+                    name_with_operation = f"{label} {operation_id}"
+                    logger.info(
+                        f"Appending operation_id '{operation_id}' to label '{label}' for node {node.id}"
+                    )
+                else:
+                    name_with_operation = label
+                    logger.info(
+                        f"Skipping duplicate operation_id '{operation_id}' already in label '{label}' for node {node.id}"
+                    )
+            else:
+                name_with_operation = label
+
             # Use sanitize_state_name to create a valid state name
-            sanitized_state_name = sanitize_state_name(
-                f"{label} {operation_id}", node.id
-            )
+            sanitized_state_name = sanitize_state_name(name_with_operation, node.id)
 
             # Store the mapping from node ID to unique state name
             self.node_id_to_state_name[node.id] = sanitized_state_name

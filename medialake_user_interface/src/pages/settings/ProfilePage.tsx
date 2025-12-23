@@ -3,7 +3,6 @@ import {
   Box,
   Paper,
   Typography,
-  Avatar,
   Grid,
   List,
   ListItem,
@@ -13,11 +12,9 @@ import {
   Chip,
   CircularProgress,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   SelectChangeEvent,
-  Stack,
 } from "@mui/material";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import {
@@ -28,30 +25,9 @@ import {
 import { useGetUser } from "../../api/hooks/useUsers";
 import { getCurrentUser } from "aws-amplify/auth";
 import { useEffect, useState, useMemo } from "react";
-import { UserAttributes } from "../../api/types/api.types";
 import { useTranslation } from "react-i18next";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useDirection } from "../../contexts/DirectionContext";
-
-interface UserProfileData {
-  username: string;
-  user_status: string;
-  enabled: boolean;
-  user_created: string;
-  last_modified: string;
-  attributes: UserAttributes;
-}
-
-interface UserProfileResponse {
-  status: string;
-  message: string;
-  data: UserProfileData;
-}
-
-// Helper function to check if a language is RTL
-const isRTL = (language: string): boolean => {
-  return ["ar", "he"].includes(language);
-};
 
 const ProfilePage: React.FC = () => {
   const theme = useTheme();
@@ -67,7 +43,7 @@ const ProfilePage: React.FC = () => {
         ...theme,
         direction,
       }),
-    [theme, direction],
+    [theme, direction]
   );
 
   // Load saved language preference when component mounts
@@ -90,10 +66,7 @@ const ProfilePage: React.FC = () => {
         const { username } = await getCurrentUser();
         setUserId(username);
       } catch (error) {
-        console.error(
-          t("errors.loadFailed", "Error getting current user:"),
-          error,
-        );
+        console.error(t("errors.loadFailed", "Error getting current user:"), error);
       }
     };
     getCurrentAuthUser();
@@ -102,10 +75,7 @@ const ProfilePage: React.FC = () => {
   const { data: userProfile, isLoading, error } = useGetUser(userId || "");
 
   // Debug logging to see the actual structure of userProfile
-  console.log(
-    "User Profile Data Structure:",
-    JSON.stringify(userProfile, null, 2),
-  );
+  console.log("User Profile Data Structure:", JSON.stringify(userProfile, null, 2));
 
   if (isLoading) {
     return (
@@ -139,9 +109,7 @@ const ProfilePage: React.FC = () => {
     return (
       <ThemeProvider theme={rtlTheme}>
         <Box sx={{ direction }}>
-          <Typography>
-            {t("common.error", "No profile data available")}
-          </Typography>
+          <Typography>{t("common.error", "No profile data available")}</Typography>
         </Box>
       </ThemeProvider>
     );
@@ -151,18 +119,11 @@ const ProfilePage: React.FC = () => {
   const email = userProfile.data?.attributes?.email || unavailable;
   const firstName = userProfile.data?.attributes?.given_name || "";
   const lastName = userProfile.data?.attributes?.family_name || "";
-  const username = userProfile.data?.username || unavailable;
   const userStatus = userProfile.data?.user_status || unavailable;
 
   // Messages for missing name fields
-  const noFirstNameMsg = t(
-    "profile.noFirstName",
-    "User doesn't have a first name configured",
-  );
-  const noLastNameMsg = t(
-    "profile.noLastName",
-    "User doesn't have a last name configured",
-  );
+  const noFirstNameMsg = t("profile.noFirstName", "User doesn't have a first name configured");
+  const noLastNameMsg = t("profile.noLastName", "User doesn't have a last name configured");
 
   return (
     <ThemeProvider theme={rtlTheme}>
@@ -179,10 +140,7 @@ const ProfilePage: React.FC = () => {
             {t("profile.title", "Profile")}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            {t(
-              "profile.description",
-              "Manage your account settings and preferences",
-            )}
+            {t("profile.description", "Manage your account settings and preferences")}
           </Typography>
         </Box>
 
@@ -214,23 +172,14 @@ const ProfilePage: React.FC = () => {
               >
                 {email}
               </Typography>
-              <Chip
-                label={userStatus}
-                color="success"
-                size="small"
-                sx={{ mt: 1 }}
-              />
+              <Chip label={userStatus} color="success" size="small" sx={{ mt: 1 }} />
             </Paper>
           </Grid>
 
           {/* Profile Details */}
           <Grid item xs={12} md={8}>
             <Paper sx={{ p: 3 }}>
-              <Typography
-                variant="h6"
-                gutterBottom
-                sx={{ textAlign: isRTL ? "right" : "left" }}
-              >
+              <Typography variant="h6" gutterBottom sx={{ textAlign: isRTL ? "right" : "left" }}>
                 {t("profile.title", "Profile")}
               </Typography>
               <List sx={{ textAlign: isRTL ? "right" : "left" }}>
@@ -252,10 +201,7 @@ const ProfilePage: React.FC = () => {
                     <PersonIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText
-                    primary={t(
-                      "users.form.fields.given_name.label",
-                      "First Name",
-                    )}
+                    primary={t("users.form.fields.given_name.label", "First Name")}
                     secondary={firstName ? firstName : noFirstNameMsg}
                     primaryTypographyProps={{ align: isRTL ? "right" : "left" }}
                     secondaryTypographyProps={{
@@ -268,10 +214,7 @@ const ProfilePage: React.FC = () => {
                     <PersonIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText
-                    primary={t(
-                      "users.form.fields.family_name.label",
-                      "Last Name",
-                    )}
+                    primary={t("users.form.fields.family_name.label", "Last Name")}
                     secondary={lastName ? lastName : noLastNameMsg}
                     primaryTypographyProps={{ align: isRTL ? "right" : "left" }}
                     secondaryTypographyProps={{
@@ -320,14 +263,12 @@ const ProfilePage: React.FC = () => {
                             i18n.changeLanguage(newLanguage);
 
                             // Log for debugging
-                            const isRtlLanguage = ["ar", "he"].includes(
-                              newLanguage,
-                            );
+                            const isRtlLanguage = ["ar", "he"].includes(newLanguage);
                             console.log(
                               "Language changed to:",
                               newLanguage,
                               "isRTL:",
-                              isRtlLanguage,
+                              isRtlLanguage
                             );
                           }}
                         >
@@ -345,14 +286,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>English</span>
+                                  <span>{t("languages.english")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -382,7 +321,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     GB
                                   </Box>
-                                  <span>English</span>
+                                  <span>{t("languages.english")}</span>
                                 </>
                               )}
                             </Box>
@@ -401,14 +340,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Deutsch</span>
+                                  <span>{t("languages.german")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -438,7 +375,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     DE
                                   </Box>
-                                  <span>Deutsch</span>
+                                  <span>{t("languages.german")}</span>
                                 </>
                               )}
                             </Box>
@@ -457,14 +394,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Português</span>
+                                  <span>{t("languages.portuguese")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -494,7 +429,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     PT
                                   </Box>
-                                  <span>Português</span>
+                                  <span>{t("languages.portuguese")}</span>
                                 </>
                               )}
                             </Box>
@@ -513,14 +448,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>Français</span>
+                                  <span>{t("languages.french")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -550,7 +483,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     FR
                                   </Box>
-                                  <span>Français</span>
+                                  <span>{t("languages.french")}</span>
                                 </>
                               )}
                             </Box>
@@ -569,14 +502,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>中文</span>
+                                  <span>{t("languages.chinese")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -606,7 +537,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     CN
                                   </Box>
-                                  <span>中文</span>
+                                  <span>{t("languages.chinese")}</span>
                                 </>
                               )}
                             </Box>
@@ -625,14 +556,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>हिन्दी</span>
+                                  <span>{t("languages.hindi")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -662,7 +591,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     IN
                                   </Box>
-                                  <span>हिन्दी</span>
+                                  <span>{t("languages.hindi")}</span>
                                 </>
                               )}
                             </Box>
@@ -681,14 +610,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>العربية</span>
+                                  <span>{t("languages.arabic")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -718,7 +645,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     SA
                                   </Box>
-                                  <span>العربية</span>
+                                  <span>{t("languages.arabic")}</span>
                                 </>
                               )}
                             </Box>
@@ -737,14 +664,12 @@ const ProfilePage: React.FC = () => {
                                 alignItems: "center",
                                 gap: "8px",
                                 width: "100%",
-                                justifyContent: isRTL
-                                  ? "flex-end"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
                               {isRTL ? (
                                 <>
-                                  <span>עברית</span>
+                                  <span>{t("languages.hebrew")}</span>
                                   <Box
                                     sx={{
                                       width: 24,
@@ -774,7 +699,7 @@ const ProfilePage: React.FC = () => {
                                   >
                                     IL
                                   </Box>
-                                  <span>עברית</span>
+                                  <span>{t("languages.hebrew")}</span>
                                 </>
                               )}
                             </Box>

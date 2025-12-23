@@ -1,5 +1,5 @@
 import { createTheme, Theme } from "@mui/material/styles";
-import { colorTokens, componentTokens, typography } from "./tokens";
+import { colorTokens, typography } from "./tokens";
 import { alpha } from "@mui/material/styles";
 
 export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
@@ -12,19 +12,12 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
             ? colorTokens.background.default.light
             : colorTokens.background.default.dark,
         paper:
-          mode === "light"
-            ? colorTokens.background.paper.light
-            : colorTokens.background.paper.dark,
+          mode === "light" ? colorTokens.background.paper.light : colorTokens.background.paper.dark,
       },
       text: {
-        primary:
-          mode === "light"
-            ? colorTokens.text.primary.light
-            : colorTokens.text.primary.dark,
+        primary: mode === "light" ? colorTokens.text.primary.light : colorTokens.text.primary.dark,
         secondary:
-          mode === "light"
-            ? colorTokens.text.secondary.light
-            : colorTokens.text.secondary.dark,
+          mode === "light" ? colorTokens.text.secondary.light : colorTokens.text.secondary.dark,
       },
       primary: colorTokens.primary,
       secondary: colorTokens.secondary,
@@ -33,31 +26,21 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
       success: colorTokens.success,
       info: colorTokens.info,
       action: {
-        active:
-          mode === "light"
-            ? colorTokens.action.active.light
-            : colorTokens.action.active.dark,
-        hover:
-          mode === "light"
-            ? colorTokens.action.hover.light
-            : colorTokens.action.hover.dark,
+        active: mode === "light" ? colorTokens.action.active.light : colorTokens.action.active.dark,
+        hover: mode === "light" ? colorTokens.action.hover.light : colorTokens.action.hover.dark,
       },
     },
     typography: {
       fontFamily: typography.fontFamily,
       allVariants: {
-        color:
-          mode === "light"
-            ? typography.colors.primary.light
-            : typography.colors.primary.dark,
+        color: mode === "light" ? typography.colors.primary.light : typography.colors.primary.dark,
       },
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            scrollbarColor:
-              mode === "dark" ? "#6b6b6b transparent" : "#959595 transparent",
+            scrollbarColor: mode === "dark" ? "#6b6b6b transparent" : "#959595 transparent",
             "&::-webkit-scrollbar": {
               width: "8px",
               height: "8px",
@@ -113,7 +96,7 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
             backgroundColor: "transparent",
             borderColor: alpha(theme.palette.divider, 0.1),
           }),
-          head: ({ theme }) => ({
+          head: () => ({
             backgroundColor:
               mode === "dark"
                 ? alpha(colorTokens.background.default.dark, 0.3)

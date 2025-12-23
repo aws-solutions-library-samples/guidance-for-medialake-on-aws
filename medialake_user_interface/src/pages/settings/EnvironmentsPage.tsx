@@ -25,47 +25,30 @@ import {
   useEnvironmentsQuery,
   useCreateEnvironmentMutation,
   useUpdateEnvironmentMutation,
-  useDeleteEnvironmentMutation,
 } from "@/features/settings/environments/hooks/useEnvironmentsQuery";
-import {
-  Environment,
-  EnvironmentCreate,
-  EnvironmentUpdate,
-} from "@/types/environment";
+import { Environment, EnvironmentCreate, EnvironmentUpdate } from "@/types/environment";
 import { defaultColumnVisibility } from "@/features/settings/environments/config";
 
 const EnvironmentsPage: React.FC = () => {
   const { t } = useTranslation();
   const [openEnvironmentForm, setOpenEnvironmentForm] = useState(false);
-  const [editingEnvironment, setEditingEnvironment] = useState<
-    Environment | undefined
-  >();
+  const [editingEnvironment, setEditingEnvironment] = useState<Environment | undefined>();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState(() => {
     try {
       const saved = localStorage.getItem("environmentTableColumns");
-      return saved && saved !== "undefined"
-        ? JSON.parse(saved)
-        : defaultColumnVisibility;
+      return saved && saved !== "undefined" ? JSON.parse(saved) : defaultColumnVisibility;
     } catch (error) {
-      console.error(
-        "Error parsing column visibility from localStorage:",
-        error,
-      );
+      console.error("Error parsing column visibility from localStorage:", error);
       return defaultColumnVisibility;
     }
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [columnVisibilityAnchor, setColumnVisibilityAnchor] =
-    useState<null | HTMLElement>(null);
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [columnVisibilityAnchor, setColumnVisibilityAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<{
     show: boolean;
     status: "loading" | "success" | "error";
@@ -85,7 +68,6 @@ const EnvironmentsPage: React.FC = () => {
   } = useEnvironmentsQuery();
   const createEnvironmentMutation = useCreateEnvironmentMutation();
   const updateEnvironmentMutation = useUpdateEnvironmentMutation();
-  const deleteEnvironmentMutation = useDeleteEnvironmentMutation();
 
   const columns = useEnvironmentColumns();
 
@@ -94,16 +76,9 @@ const EnvironmentsPage: React.FC = () => {
     setOpenEnvironmentForm(true);
   };
 
-  const handleEditEnvironment = (environment: Environment) => {
-    setEditingEnvironment(environment);
-    setOpenEnvironmentForm(true);
-  };
-
   const handleSaveEnvironment = async (environmentData: EnvironmentCreate) => {
     const isNewEnvironment = !editingEnvironment;
-    const action = isNewEnvironment
-      ? "Creating environment..."
-      : "Updating environment...";
+    const action = isNewEnvironment ? "Creating environment..." : "Updating environment...";
 
     setApiStatus({
       show: true,
@@ -143,15 +118,11 @@ const EnvironmentsPage: React.FC = () => {
       }
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : t("settings.environments.submitError");
+        error instanceof Error ? error.message : t("settings.environments.submitError");
       setApiStatus({
         show: true,
         status: "error",
-        action: isNewEnvironment
-          ? "Environment Creation Failed"
-          : "Environment Update Failed",
+        action: isNewEnvironment ? "Environment Creation Failed" : "Environment Update Failed",
         message: errorMessage,
       });
       console.error("Error saving environment:", error);
@@ -163,10 +134,7 @@ const EnvironmentsPage: React.FC = () => {
     setApiStatus((prev) => ({ ...prev, show: false }));
   };
 
-  const handleFilterColumn = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterColumn = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
     setActiveFilterColumn(columnId);
     setColumnMenuAnchor(event.currentTarget);
   };
@@ -190,17 +158,12 @@ const EnvironmentsPage: React.FC = () => {
   }, [environments]);
 
   // Handle visibility changes with persistence
-  const handleColumnVisibilityChange = (
-    updatedVisibility: Record<string, boolean>,
-  ) => {
+  const handleColumnVisibilityChange = (updatedVisibility: Record<string, boolean>) => {
     if (!updatedVisibility) return;
     setColumnVisibility(updatedVisibility);
     try {
       if (Object.keys(updatedVisibility).length > 0) {
-        localStorage.setItem(
-          "environmentTableColumns",
-          JSON.stringify(updatedVisibility),
-        );
+        localStorage.setItem("environmentTableColumns", JSON.stringify(updatedVisibility));
       }
     } catch (error) {
       console.error("Error saving column visibility to localStorage:", error);
@@ -239,7 +202,7 @@ const EnvironmentsPage: React.FC = () => {
         });
       },
     }),
-    [columnFilters, sorting],
+    [columnFilters, sorting]
   );
 
   const table = useReactTable({
@@ -309,9 +272,7 @@ const EnvironmentsPage: React.FC = () => {
         <BaseTableToolbar
           globalFilter={globalFilter}
           onGlobalFilterChange={setGlobalFilter}
-          onColumnMenuOpen={(event) =>
-            setColumnVisibilityAnchor(event.currentTarget)
-          }
+          onColumnMenuOpen={(event) => setColumnVisibilityAnchor(event.currentTarget)}
           activeFilters={tableFiltersValue.activeFilters}
           activeSorting={tableFiltersValue.activeSorting}
           onRemoveFilter={tableFiltersValue.onRemoveFilter}
@@ -319,17 +280,12 @@ const EnvironmentsPage: React.FC = () => {
           searchPlaceholder={t("settings.environments.searchPlaceholder")}
         />
 
-        <PageContent
-          isLoading={isLoadingEnvironments}
-          error={environmentsError as Error}
-        >
+        <PageContent isLoading={isLoadingEnvironments} error={environmentsError as Error}>
           <EnvironmentList table={table} onFilterColumn={handleFilterColumn} />
 
           <BaseFilterPopover
             anchorEl={columnMenuAnchor}
-            column={
-              activeFilterColumn ? table.getColumn(activeFilterColumn) : null
-            }
+            column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
             onClose={handleFilterMenuClose}
             data={environmentsList}
             getUniqueValues={(columnId, data) => {
@@ -338,8 +294,8 @@ const EnvironmentsPage: React.FC = () => {
                   data.map((item) => {
                     const value = item[columnId as keyof Environment];
                     return value ? String(value) : "";
-                  }),
-                ),
+                  })
+                )
               ).filter(Boolean);
             }}
           />

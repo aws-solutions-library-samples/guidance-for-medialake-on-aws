@@ -8,9 +8,6 @@ export default {
     hindi: "ヒンディー語",
     arabic: "アラビア語",
     hebrew: "ヘブライ語",
-    japanese: "日本語",
-    korean: "韓国語",
-    spanish: "スペイン語",
   },
   assetsPage: {
     title: "アセット",
@@ -25,16 +22,11 @@ export default {
     browsePath: "パスを参照",
     uploadingTo: "アップロード先",
     restrictedToPrefix: "制限付き",
-    allowedPrefixesInfo:
-      "{{count}}個の許可されたパスにのみアップロードできます",
-    pathInfo: "ファイルはS3バケット内の選択されたパスにアップロードされます",
-    selectPathFirst: "アップロードする前にパスを選択してください",
-    pathResetWarning: "コネクタを変更すると、選択されたパスがリセットされます",
+    allowedPrefixesInfo: "{{count}}個の許可されたパスにのみアップロードできます",
     connectorLabel: "S3コネクタ",
     selectConnectorPlaceholder: "S3コネクタを選択",
     loadingConnectors: "コネクタを読み込んでいます...",
-    noConnectors:
-      "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
+    noConnectors: "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
     dashboardNote:
       "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
     meta: {
@@ -48,9 +40,7 @@ export default {
     descriptionUnrestricted:
       "ファイルをアップロードするために、バケット内の任意のフォルダを参照して選択します。",
     prefixLabel: "許可されたパス",
-    prefixHelper:
-      "選択したパス内のフォルダのみを参照およびアップロードできます。",
-    selectedPath: "選択されたパス",
+    prefixHelper: "選択したパス内のフォルダのみを参照およびアップロードできます。",
     currentPath: "現在のパス",
     confirm: "このパスを使用",
     validation: {
@@ -59,34 +49,29 @@ export default {
     },
     error: {
       invalidConnector: "無効なコネクタIDが提供されました。",
-      loadingFailed: "コネクタ情報の読み込みに失敗しました。",
     },
     hints: {
-      clickFolder:
-        "フォルダをクリックして移動し、「現在のフォルダを選択」をクリックして選択します。",
-      navigateAndConfirm:
-        "目的のフォルダに移動し、「このパスを使用」をクリックして確認します。",
-      rootPath: "現在、ルートレベルにいます。",
+      navigateAndConfirm: "目的のフォルダに移動し、「このパスを使用」をクリックして確認します。",
     },
   },
   connectors: {
+    title: "コネクタ",
+    description: "メディアアセットのストレージコネクタを管理",
+    addConnector: "コネクタを追加",
+    editConnector: "コネクタを編集",
+    syncConnector: "コネクタを同期",
     apiMessages: {
       creating: {
         loading: "コネクタを作成中...",
         success: "コネクタが作成されました",
-        successMessage: "新しいコネクタが正常に作成されました。",
         error: "コネクタの作成に失敗しました",
       },
       updating: {
         loading: "コネクタを更新中...",
         success: "コネクタが更新されました",
-        successMessage: "コネクタが正常に更新されました。",
         error: "コネクタの更新に失敗しました",
       },
       deleting: {
-        loading: "コネクタを削除中...",
-        success: "コネクタが削除されました",
-        successMessage: "コネクタが正常に削除されました。",
         error: "コネクタの削除に失敗しました",
       },
       enabling: {
@@ -102,17 +87,51 @@ export default {
         error: "コネクタの無効化に失敗しました",
       },
     },
+    form: {
+      connectorName: "コネクタ名",
+      connectorNameHelper: "作成後はコネクタ名を変更できません",
+      description: "説明",
+      s3ConnectorType: "S3コネクタタイプ",
+      s3IntegrationMethod: "S3統合方法",
+      s3Bucket: "S3バケット",
+      newBucketName: "新しいバケット名",
+      pathHelper: "オブジェクトをフィルタリングするオプションのプレフィックス（例：'folder/'）",
+      bucket: "バケット",
+      region: "リージョン",
+      path: "パス",
+      allowUploads: "アップロードを許可",
+      objectPrefix: "オブジェクトプレフィックス",
+      objectPrefixNumbered: "Object プレフィックス {{number}}",
+      bucketNameHelper: "バケット name must be globally unique, follow S3 naming rules.",
+      addPrefix: "プレフィックスを追加",
+    },
+    dialogs: {
+      deleteTitle: "コネクタを削除",
+      deleteConnectorConfirmation:
+        'Are you sure you want to delete the connector "{{connector名前}}"? This action cannot be undone.',
+      eventBridgeWarning:
+        "Please ensure you disable the EventBridge integration for this S3 bucket if it is no longer required.",
+    },
+    noConnectorsFound: "コネクタが見つかりません。",
+    fields: {
+      bucket: "バケット",
+      region: "リージョン",
+      description: "説明",
+      prefix: "プレフィックス",
+      prefixes: "プレフィックス",
+      integrationMethod: "統合方法",
+      lastUpdated: "最終更新",
+    },
+    status: {
+      active: "アクティブ",
+    },
   },
   assets: {
-    favorite: "お気に入り",
-    unfavorite: "お気に入りを解除",
-    rename: "名前を変更",
-    delete: "削除",
-    download: "ダウンロード",
-    share: "共有",
-    viewDetails: "詳細を表示",
-    retry: "再試行",
-    retryFromCurrent: "現在の位置から再試行",
+    fileInformation: "File Information",
+    technicalDetails: "Technical Details",
+    fields: {
+      size: "Size",
+    },
   },
   assetExplorer: {
     noConnectorSelected: "アセットを表示するにはコネクタを選択してください",
@@ -127,28 +146,70 @@ export default {
     },
     deleteDialog: {
       title: "削除の確認",
-      description:
-        "このアセットを削除してもよろしいですか？この操作は元に戻せません。",
+      description: "このアセットを削除してもよろしいですか？この操作は元に戻せません。",
       cancel: "キャンセル",
       confirm: "削除",
+      deleting: "削除中...",
     },
+    failedToLoadAssets: "アセットの読み込みに失敗しました",
   },
   home: {
-    title: "ホーム",
-    description: "メディア、メタデータ、ワークフローのためのガイダンス。",
-    statistics: "統計",
-    collections: "コレクション",
-    sharedCollections: "共有コレクション",
+    description: "",
     favorites: "お気に入り",
-    smartFolders: "スマートフォルダ",
-    connectedStorage: "接続されたストレージ",
-    sharing: "共有",
-    comingSoon: "近日公開",
+    stats: {
+      assignedTasks: "Assigned Tasks",
+      activeTasks: "アクティブ tasks",
+      pipelineExecutions: "パイプライン Executions",
+      last24Hours: "Last 24 hours",
+      newAssets: "New Assets",
+      uploadedToday: "Uploaded today",
+    },
+  },
+  collectionsPage: {
+    title: "コレクション",
+    description: "コレクション内でメディアアセットを整理・管理",
+    createCollection: "コレクションを作成",
+    editCollection: "コレクションを編集",
+    noCollections: "コレクションが見つかりません",
+    collectionTypes: {
+      public: "公開",
+      private: "プライベート",
+    },
+    form: {
+      name: "コレクション名",
+      namePlaceholder: "コレクション名を入力",
+      description: "説明",
+      descriptionPlaceholder: "このコレクションの説明を入力",
+      type: "コレクションタイプ",
+      parentCollection: "親コレクション",
+      selectParent: "なし（ルートレベル）",
+      isPublic: "このコレクションを公開する",
+      validation: {
+        nameRequired: "コレクション名は必須です",
+        nameMinLength: "コレクション名は2文字以上である必要があります",
+        nameMaxLength: "コレクション名は100文字を超えてはいけません",
+        descriptionMaxLength: "説明は500文字を超えてはいけません",
+      },
+    },
+    labels: {
+      public: "公開",
+      private: "プライベート",
+      shared: "共有",
+    },
+    dialogs: {
+      editTitle: "コレクションを編集",
+      deleteTitle: "コレクションを削除",
+    },
+    collectionUpdated: "Collection updated successfully",
+    collectionUpdateFailed: "Failed to update collection",
+    collectionDeleted: "Collection deleted successfully",
+    collectionDeleteFailed: "Failed to delete collection",
   },
   sidebar: {
     menu: {
       home: "ホーム",
       assets: "アセット",
+      collections: "コレクション",
       pipelines: "パイプライン",
       pipelineExecutions: "パイプライン実行",
       settings: "設定",
@@ -156,10 +217,10 @@ export default {
     submenu: {
       system: "システム設定",
       connectors: "コネクタ",
-      userManagement: "ユーザー管理",
-      roles: "ロール",
       integrations: "統合",
       environments: "環境",
+      usersAndGroups: "ユーザーとグループ",
+      permissionSets: "権限",
     },
   },
   profile: {
@@ -181,9 +242,10 @@ export default {
   app: {
     loading: "読み込み中...",
     errors: {
-      loadingConfig: "AWS設定の読み込みエラー:",
-      loadingUserAttributes: "ユーザー属性の読み込みエラー:",
-      signingOut: "サインアウトエラー:",
+      loadingConfig: "AWS設定の読み込みエラー：",
+      loadingUserAttributes: "ユーザー属性の読み込みエラー：",
+      signingOut: "サインアウトエラー：",
+      somethingWentWrong: "Something went wrong",
     },
     navigation: {
       preventedDuplicate: "重複ナビゲーションを防止しました",
@@ -207,10 +269,36 @@ export default {
       },
     },
     filters: {
-      dateRange: "日付範囲",
-      contentType: "コンテンツタイプ",
-      storageLocation: "ストレージの場所",
-      comingSoon: "より多くのフィルターが近日公開...",
+      title: "結果をフィルタリング",
+      apply: "フィルターを適用",
+      reset: "リセット",
+      toDate: "終了日時",
+      fromDate: "開始日時",
+      maxSize: "最大",
+      minSize: "最小",
+      creationDate: "作成日",
+      after: "以降",
+      before: "以前",
+      clearAll: "Clear All",
+      filenameSearch: "Search by filename",
+    },
+    bar: {
+      label: "検索",
+      placeholder: "検索（例：sunset type:image）",
+      helperText:
+        "type:、format:、size:、date:、metadata:などのキーワードを使用して結果をフィルタリング",
+    },
+    results: {
+      title: "結果",
+      error: "エラー",
+      errorMessage: "コンテンツの取得中に問題が発生しました。",
+    },
+    facets: {
+      mediaType: "メディアタイプ",
+      extension: "拡張子",
+      size: "サイズ",
+      date: "日付",
+      filename: "ファイル名",
     },
   },
   admin: {
@@ -224,8 +312,7 @@ export default {
       userDeletionNotImplemented: "ユーザー削除はまだ実装されていません。",
       userCreationNotImplemented: "ユーザー作成はまだ実装されていません。",
       userEditingNotImplemented: "ユーザー編集はまだ実装されていません。",
-      analyticsExportNotImplemented:
-        "アナリティクスエクスポートはまだ実装されていません。",
+      analyticsExportNotImplemented: "アナリティクスエクスポートはまだ実装されていません。",
       systemResetNotImplemented: "システムリセットはまだ実装されていません。",
     },
     columns: {
@@ -238,16 +325,19 @@ export default {
   },
   integrations: {
     title: "統合",
-    selectProvider: "統合を選択",
-    selectIntegration: "統合を選択",
-    configureIntegration: "統合を設定",
     description: "統合と接続を管理",
     addIntegration: "統合を追加",
+    selectIntegration: "統合を選択",
+    configureIntegration: "統合を設定",
+    selectNode: {
+      title: "ノードを選択",
+      description: "統合のノードタイプを選択してください",
+      noNodes: "利用可能なノードがありません",
+    },
     deleteConfirmation: {
       title: "統合を削除",
       message: "この統合を削除してもよろしいですか？",
-      warning:
-        "警告: この統合を削除すると、それに依存するパイプラインが失敗する可能性があります。",
+      warning: "注意：この統合を削除すると、それに依存するパイプラインが失敗する可能性があります。",
     },
     form: {
       search: {
@@ -265,7 +355,6 @@ export default {
         description: {
           label: "説明",
           tooltip: "この統合の説明を入力",
-          helper: "この統合の簡単な説明",
           errors: {
             required: "説明が必要です",
           },
@@ -300,7 +389,6 @@ export default {
             apiKey: {
               label: "APIキー",
               tooltip: "APIキーを入力",
-              helper: "サービス認証用のAPIキー",
               errors: {
                 required: "APIキーが必要です",
               },
@@ -314,23 +402,92 @@ export default {
             },
           },
         },
-      },
-      errors: {
-        required: "このフィールドは必須です",
-        nodeId: {
-          unrecognized_keys: "無効な統合選択",
+        iamRole: {
+          label: "IAM Role ARN",
+          tooltip: "Enter the IAM role ARN for this integration",
+        },
+        apiKey: {
+          label: "API Key",
+          tooltip: "Enter the API key for this integration",
         },
       },
+      editTitle: "Edit Integration",
+    },
+    actions: {
+      edit: "統合を編集",
+      delete: "統合を削除",
+    },
+    pipelines: {
+      searchPlaceholder: "Search pipelines...",
+      actions: {
+        edit: "編集 Pipeline",
+        delete: "削除 Pipeline",
+      },
+      editor: {
+        seeLess: "折りたたむ",
+        seeMore: "もっと見る",
+      },
+    },
+    editor: {
+      configureNode: "Configure Node",
+      updatePipeline: "更新 Pipeline",
+      noChangesToSave: "No changes to save",
+      pipelineNameRequired: "パイプライン name is required before exporting",
+      atLeastOneNodeRequired: "At least one node must be added to the canvas before exporting",
+    },
+    integrationValidation: {
+      noIntegrationsAvailable:
+        "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
+    },
+    triggerTypes: {
+      eventTriggered: "Event Triggered",
+      apiTriggered: "API Triggered",
+      manuallyTriggered: "Manually Triggered",
     },
   },
   pipelines: {
     title: "パイプライン",
     description: "メディアとメタデータのパイプラインを管理",
     searchPlaceholder: "パイプラインを検索...",
+    eventBridgeEditor: {
+      patternOperatorsGuide: "パターン演算子ガイド",
+      formatJson: "JSONをフォーマット",
+      exportToJson: "JSONにエクスポート",
+      importFromJson: "JSONからインポート",
+    },
     actions: {
       create: "新しいパイプラインを追加",
       import: "パイプラインをインポート",
     },
+    editor: {
+      searchNodes: "ノードを検索...",
+      updatePipeline: "パイプラインを更新",
+      update: "更新",
+      rotateNode: "Rotate ({{rotation}}°)",
+      updateWarning: "Are you sure you want to update this pipeline?",
+    },
+    integrationValidation: {
+      title: "統合検証が必要です",
+      selectIntegration: "統合を選択",
+      invalidIntegrationId: "無効な統合ID",
+      replacementIntegration: "置換統合",
+    },
+    dialogs: {
+      deleteTitle: "Delete Pipeline",
+      deleteConfirmation: "Are you sure you want to delete this pipeline?",
+      deleteWarning: "This action cannot be undone.",
+    },
+    viewAll: "すべてのパイプラインを表示",
+    selectType: "タイプを選択",
+    selectS3Type: "S3タイプを選択",
+    configuration: "設定",
+    editConnector: "コネクタを編集",
+    addConnector: "コネクタを追加",
+    saveChanges: "変更を保存",
+    loadingNodeConfiguration: "Loading node configuration...",
+    updatePipeline: "Update Pipeline",
+    savePipeline: "Save Pipeline",
+    namePlaceholder: "Enter pipeline name",
   },
   executions: {
     title: "パイプライン実行",
@@ -343,6 +500,16 @@ export default {
       endTime: "終了時刻",
       duration: "期間",
       actions: "アクション",
+    },
+    actions: {
+      retryFromCurrent: "現在の位置から再試行",
+      retryFromStart: "最初から再試行",
+    },
+    details: "Execution Details",
+    fields: {
+      started: "Started",
+      ended: "Ended",
+      status: "ステータス",
     },
   },
   users: {
@@ -386,8 +553,13 @@ export default {
     form: {
       title: {
         add: "ユーザーを追加",
+        edit: "Edit User",
       },
       fields: {
+        groups: {
+          label: "グループ",
+          tooltip: "ユーザーのグループを選択",
+        },
         given_name: {
           label: "名前",
           tooltip: "ユーザーの名前を入力",
@@ -422,10 +594,9 @@ export default {
         },
       },
     },
-    roles: {
-      admin: "管理者",
-      editor: "編集者",
-      viewer: "閲覧者",
+    status: {
+      active: "Active",
+      inactive: "Inactive",
     },
   },
   roles: {
@@ -433,6 +604,10 @@ export default {
     description: "システムロールとその権限を管理",
     actions: {
       addRole: "ロールを追加",
+    },
+    tooltips: {
+      editRole: "編集 Role",
+      deleteRole: "削除 Role",
     },
   },
   settings: {
@@ -442,6 +617,20 @@ export default {
       addButton: "環境を追加",
       searchPlaceholder: "環境を検索",
       createTitle: "環境を作成",
+      editTitle: "環境を編集",
+      updateSuccess: "環境が正常に更新されました",
+      createSuccess: "環境が正常に作成されました",
+      submitError: "環境の保存に失敗しました",
+      deleteSuccess: "環境が正常に削除されました",
+      deleteError: "環境の削除に失敗しました",
+      status: {
+        active: "アクティブ",
+        disabled: "無効",
+      },
+      actions: {
+        edit: "編集",
+        delete: "削除",
+      },
       form: {
         name: "環境名",
         region: "リージョン",
@@ -458,45 +647,83 @@ export default {
       title: "システム設定",
       tabs: {
         search: "検索",
-        notifications: "通知",
         security: "セキュリティ",
-        performance: "パフォーマンス",
+        apiKeys: "API Keys",
+        collections: "Collections",
+        upgrades: "Upgrades",
       },
       search: {
         title: "検索設定",
-        description:
-          "メディアアセットの高度な検索機能のために検索プロバイダーを設定します。",
-        provider: "検索プロバイダー:",
-        configureProvider: "検索プロバイダーを設定",
-        editProvider: "プロバイダーを編集",
-        resetProvider: "プロバイダーをリセット",
-        providerDetails: "プロバイダー詳細",
-        providerName: "プロバイダー名",
+        description: "メディアアセットの高度な検索機能のために検索プロバイダーを設定します。",
+        provider: "セマンティック検索プロバイダー",
         apiKey: "APIキー",
-        endpoint: "エンドポイントURL（オプション）",
-        enabled: "検索有効",
-        noProvider: "検索プロバイダーが設定されていません。",
-        configurePrompt:
-          "検索機能を有効にするためにTwelve Labsを設定してください。",
+        semanticEnabled: "セマンティック検索が有効",
+        semanticEnabledDesc: "セマンティック検索機能を有効または無効にする",
+        providerDesc: "セマンティック検索機能の埋め込みプロバイダーを選択",
+        selectProvider: "プロバイダーを選択",
+        editApiKey: "編集",
+        configured: "設定済み",
+        configureApiKey: "APIキーを設定",
+        apiKeyDesc:
+          "セマンティック検索機能を有効にするためにTwelve Labs APIキーを入力してください。",
+        embeddingStore: "セマンティック検索埋め込みストア",
+        embeddingStoreDesc: "セマンティック検索に使用する埋め込みストアを選択",
+        selectStore: "ストアを選択",
+        saveSuccess: "設定が正常に保存されました",
+        saveError: "設定の保存に失敗しました",
+        cancelSuccess: "変更がキャンセルされました",
+        errorLoading: "検索プロバイダー設定の読み込みエラー",
+        preview: "プレビュー",
+        apiKeySaveError: "Failed to save API key",
+        apiKeySaveSuccess: "API key saved successfully",
+        external: "External",
+        internal: "Internal",
+        savingApiKey: "Saving API key...",
       },
-      notifications: {
-        title: "通知設定",
-        comingSoon: "通知設定は近日公開予定です。",
+      upgrade: {
+        noHistory: "No upgrade history available",
+        historyTable: {
+          status: "Status",
+          from: "From Version",
+          to: "To Version",
+          duration: "Duration",
+          triggeredBy: "Triggered By",
+          date: "Date",
+          details: "Details",
+        },
+        title: "System Upgrade",
+        currentVersion: "Current Version",
+        upgradingTo: "Upgrading to",
+        lastUpgrade: "Last Upgrade",
+        availableVersions: "Available Versions",
+        history: "Upgrade History",
+        tags: "Tags",
+        noTags: "No tags available",
+        branches: "Branches",
+        noBranches: "No branches available",
+        confirmTitle: "Confirm Upgrade",
+        upgrading: "Upgrading...",
+        confirm: "Confirm",
       },
-      security: {
-        title: "セキュリティ設定",
-        comingSoon: "セキュリティ設定は近日公開予定です。",
-      },
-      performance: {
-        title: "パフォーマンス設定",
-        comingSoon: "パフォーマンス設定は近日公開予定です。",
+    },
+    apiKeys: {
+      form: {
+        importantNotice:
+          "Important: This is the only time you'll be able to view this API key. Please save it securely.",
       },
     },
   },
   common: {
-    select: "選択",
     back: "戻る",
     search: "検索",
+    batchOperations: {
+      deleteSelected: "選択項目を削除",
+    },
+    confirmBulkDelete: "一括削除の確認",
+    typeDeleteToConfirm: "確認するには DELETE と入力してください",
+    importingPipeline: "パイプラインをインポート中...",
+    failedToLoadNodes: "ノードの読み込みに失敗しました。後でもう一度お試しください。",
+    alternativeTranscriptions: "代替トランスクリプション：",
     profile: "プロフィール",
     logout: "ログアウト",
     theme: "テーマ",
@@ -504,6 +731,7 @@ export default {
     refresh: "更新",
     cancel: "キャンセル",
     save: "保存",
+    saving: "保存中...",
     loading: "読み込み中...",
     loadMore: "さらに読み込む",
     tableDensity: "テーブル密度",
@@ -517,7 +745,23 @@ export default {
     root: "ルート",
     folder: "フォルダ",
     filter: "フィルター",
-    noGroups: "グループなし",
+    apply: "適用",
+    clear: "クリア",
+    clearFilter: "フィルターをクリア",
+    node: "ノード",
+    icon: "アイコン",
+    name: "名前",
+    description: "説明",
+    category: "カテゴリ",
+    enabled: "有効",
+    disabled: "無効",
+    system: "システム",
+    custom: "カスタム",
+    versions: "バージョン",
+    full: "フル",
+    clip: "クリップ",
+    none: "なし",
+    permissions: "権限",
     actions: {
       add: "追加",
       save: "保存",
@@ -525,6 +769,51 @@ export default {
       edit: "編集",
       activate: "有効化",
       deactivate: "無効化",
+      download: "ダウンロード",
+      rename: "名前を変更",
+      lock: "ロック",
+      restore: "復元",
+      viewDetails: "詳細を表示",
+      addToCollection: "コレクションに追加",
+      back: "Back",
+      next: "Next",
+      assetDetail: "Asset Detail",
+      renameAsset: "Rename Asset",
+      viewAlternativeTranscriptions: "View alternative transcriptions",
+      exportTranscript: "Export transcript",
+      downloadSelected: "Download selected",
+      removeItem: "Remove this item",
+      cancel: "キャンセル",
+      deleting: "Deleting...",
+      saving: "Saving...",
+      update: "更新",
+      create: "作成",
+      copied: "Copied!",
+    },
+    dialogs: {
+      cancel: "キャンセル",
+      close: "閉じる",
+      save: "保存",
+    },
+    labels: {
+      name: "名前",
+      description: "説明",
+      status: "ステータス",
+      enabled: "有効",
+      disabled: "無効",
+      active: "アクティブ",
+      inactive: "非アクティブ",
+      actions: "アクション",
+      region: "リージョン",
+    },
+    placeholders: {
+      filterValue: "フィルター値",
+      apiKeyDescription: "A descriptive name for this API key",
+      addComment: "追加 a comment...",
+      filterMetadata: "Filter metadata…",
+      enterApiKey: "Enter your API key",
+      searchPermissionSets: "Search permission sets...",
+      enterCollectionDescription: "Enter collection description",
     },
     columns: {
       permissionSets: "権限セット",
@@ -537,11 +826,295 @@ export default {
       created: "作成日",
       modified: "更新日",
       actions: "アクション",
+      name: "名前",
+      type: "タイプ",
+      preview: "プレビュー",
+      updated: "更新済み",
     },
     status: {
       active: "アクティブ",
       inactive: "非アクティブ",
+      enabled: "有効",
+      disabled: "無効",
     },
+    viewControls: {
+      groupByType: "タイプ別にグループ化",
+      metadata: "メタデータ",
+    },
+    notifications: "通知",
+    breadcrumb: {
+      ariaLabels: {
+        deleteMarker: "削除 marker",
+        resetMarker: "Reset marker",
+        pipelineFileOperations: "パイプライン file operations",
+        pipelineActions: "パイプライン actions",
+        dataTable: "データテーブル",
+      },
+    },
+    notAvailable: "N/A",
+    noUsersFound: "No users found",
+    noEnvironmentsFound: "No environments found",
+    noIntegrationsFound: "No integrations found",
+    noPipelinesFound: "No pipelines found",
+    noPipelineExecutionsFound: "No pipeline executions found",
+    noCollectionTypesFound: "No collection types found. 作成 one to get started.",
+    noUpgradeHistory: "No upgrade history available",
+    validation: {
+      apiKeyRequired: "API key is required",
+      integrationMustBeSelected: "An integration must be selected",
+      fieldRequired: "This field is required",
+    },
+    messages: {
+      connectorDeletedSuccessfully: "コネクタ deleted successfully",
+      connectorSyncInitiated: "コネクタ sync initiated successfully",
+      connectorCreatedSuccessfully: "コネクタ created successfully",
+      integrationDeletedSuccessfully: "統合 has been successfully deleted",
+      collectionDeletedSuccessfully: "Collection deleted successfully",
+      pipelineDeleted: "The pipeline has been deleted.",
+      failedToSyncConnector: "失敗 to sync connector",
+      failedToParsePipeline: "失敗 to parse the pipeline file.",
+      unknownErrorOccurred: "An unknown error occurred",
+      unexpectedErrorOccurred: "An unexpected error occurred",
+      tryAdjustingSearchOrFilter: "Try adjusting your search or filter criteria",
+      nameIsRequired: "名前 is required",
+      cannotEditSystemTypes: "Cannot edit system types",
+      cannotDeleteSystemTypes: "Cannot delete system types",
+      editType: "編集 type",
+      deleteType: "削除 type",
+      errorSavingRole: "An error occurred while saving the role",
+      errorDeletingRole: "An error occurred while deleting the role",
+      permissionSetNotFound: "権限 set not found",
+      noUsersAssigned: "No users assigned",
+      noGroupsAssigned: "No groups assigned",
+      connectToExistingS3Bucket: "Connect to an existing S3 bucket",
+      createNewS3Bucket: "作成 a new S3 bucket",
+    },
+    delete: "削除",
+    clearChatHistory: "Clear chat history",
+    closeChat: "Close chat",
+    editPipeline: "編集 Pipeline",
+    deletePipeline: "削除 Pipeline",
+    startPipeline: "Start パイプライン",
+    stopPipeline: "Stop パイプライン",
+    moreOptions: "More options",
+    permit: "Permit",
+    deny: "Deny",
+    notSet: "Not Set",
+    deleteApiKey: "削除 API Key",
+    deleteApiKeyConfirmation:
+      'Are you sure you want to delete the API key "{{name}}"? This action cannot be undone and will immediately invalidate any applications using this key.',
+    deleteApiKeyConfirmationGeneric: "Are you sure you want to delete this API key?",
+    editApiKey: "編集 API key",
+    clickToEdit: "Click to edit",
+    downloadVersion: "Download this version",
+    resetMarker: "Reset marker to original position",
+    postComment: "Post your comment",
+    runPipeline: "Run this pipeline on the current asset",
+    browsePipelines: "Browse all available pipelines",
+    loadMoreActivities: "Load more activities",
+    pipelineEditor: {
+      triggers: "Triggers",
+      integrations: "統合s",
+      flow: "Flow",
+      utilities: "Utilities",
+    },
+    views: {
+      cardView: "Card view",
+      tableView: "Table view",
+      smallCards: "Small cards",
+      mediumCards: "Medium cards",
+      largeCards: "Large cards",
+      verticalAspectRatio: "Vertical aspect ratio",
+      squareAspectRatio: "Square aspect ratio",
+      horizontalAspectRatio: "Horizontal aspect ratio",
+      fitToContainer: "Fit to container (maintain aspect ratio)",
+      fillContainer: "Fill container (may crop image)",
+    },
+    noGroup: "No group",
+    darkMode: "Dark Mode",
+    toggleTheme: "Toggle theme",
+  },
+  detailPages: {
+    tabs: {
+      summary: "概要",
+      technical: "技術的メタデータ",
+      descriptive: "説明的",
+      transcription: "転写",
+      relatedItems: "関連アイテム",
+    },
+    metadata: {
+      type: "タイプ",
+      size: "サイズ",
+      format: "フォーマット",
+      s3Bucket: "S3バケット",
+      objectName: "オブジェクト名",
+      s3Uri: "S3 URI",
+      duration: "期間",
+      sampleRate: "サンプルレート",
+      bitDepth: "ビット深度",
+      channels: "チャンネル",
+      bitRate: "ビットレート",
+      codec: "コーデック",
+      createdDate: "作成日",
+      resolution: "解像度",
+      frameRate: "フレームレート",
+      dimensions: "寸法",
+      colorDepth: "色深度",
+      colorSpace: "色空間",
+      compression: "圧縮",
+      allCategories: "すべてのカテゴリ",
+    },
+  },
+  permissionSets: {
+    title: "リソース中心の権限マトリックス",
+    description: "権限セットを管理してリソースへのアクセスを制御",
+    labels: {
+      permissionMatrix: "権限マトリックス",
+    },
+    dialogs: {
+      detailsTitle: "権限セット詳細",
+      deleteTitle: "権限セットを削除",
+    },
+    permissionMatrix: {
+      editTitle: "権限マトリックスを編集",
+    },
+    tabs: {
+      permissionMatrix: "権限マトリックス",
+      assignedUsers: "割り当てられたユーザー",
+      assignedGroups: "割り当てられたグループ",
+    },
+    noAssignments: "No permission sets assigned",
+  },
+  apiKeys: {
+    title: "APIキー管理",
+    description: "システムへのプログラマティックアクセス用のAPIキーを管理",
+    addApiKey: "APIキーを追加",
+    searchPlaceholder: "APIキーを検索...",
+    categoryAll: "すべてのAPIキー",
+    tooltips: {
+      copyApiKeyId: "Copy API Key ID",
+    },
+    form: {
+      name: "名前",
+      description: "説明",
+      descriptionHelper: "このAPIキーの用途に関するオプションの説明",
+      enabled: "有効",
+      rotateApiKey: "APIキーをローテーション",
+    },
+    dialogs: {
+      detailsTitle: "APIキー詳細",
+    },
+    loading: "読み込み中 API key details...",
+    details: {
+      description: "説明",
+      apiKeyId: "API Key ID",
+      created: "作成d",
+      lastUpdated: "最終更新",
+      lastUsed: "Last Used",
+    },
+    errors: {
+      loadFailed: "失敗 to load API key details. Please try again.",
+    },
+    emptyState: {
+      noApiKeys: "No API keys found",
+      noMatchingApiKeys: "No API keys match your search",
+      createFirstApiKey: "作成 your first API key to get started",
+    },
+  },
+  userManagement: {
+    roleManagement: {
+      title: "ロール管理",
+      addRole: "ロールを追加",
+      editRole: "ロールを編集",
+      roleName: "ロール名",
+      description: "説明",
+      addPermission: "権限を追加",
+    },
+    form: {
+      roleName: "ロール名",
+      permissions: "権限",
+    },
+  },
+  chat: {
+    typeYourMessage: "メッセージを入力...",
+    typeMessage: "タイプ a message...",
+  },
+  videoReview: {
+    title: "ビデオレビュー",
+    addCommentPlaceholder: "追加 a comment...",
+  },
+  favorites: {
+    noFavorites: "No favorite assets yet",
+  },
+  transcription: {
+    searchPlaceholder: "Search transcript...",
+    quickSearchPlaceholder: "Quick search...",
+  },
+  rightSidebar: {
+    filterOptions: "フィルターオプション",
+  },
+  collectionTypes: {
+    title: "コレクションタイプ",
+    labels: {
+      system: "システム",
+    },
+    form: {
+      name: "名前",
+      description: "説明",
+      customColor: "カスタムカラー（16進数）",
+      active: "アクティブ",
+      nameHelper: "{{count}}/50 characters",
+      descriptionHelper: "{{count}}/255 characters",
+      color: "Color",
+      preview: "プレビュー",
+      collectionNamePlaceholder: "Collection 名前",
+      descriptionPlaceholder: "説明",
+      colorFormatHelper: "有効な16進カラーを入力してください（例：#FF5733）",
+    },
+    createType: "作成 Type",
+    description: "Manage collection types for organizing your media assets",
+    alerts: {
+      cannotDeleteSystem: "Cannot delete system collection types",
+      confirmDelete: 'Are you sure you want to delete "{{name}}"?',
+    },
+    dialogs: {
+      editTitle: "編集 Collection Type",
+      createTitle: "作成 Collection Type",
+      migrateTitle: "Migrate Collections",
+    },
+  },
+  upgradeSection: {
+    labels: {
+      latest: "最新",
+      current: "現在",
+      default: "デフォルト",
+    },
+    dialogs: {
+      confirmUpgrade:
+        "Are you sure you want to upgrade to {{version}}? This will trigger a deployment pipeline and may cause temporary service interruption.",
+    },
+  },
+  migrateCollectionType: {
+    targetType: "ターゲットタイプ",
+  },
+  emptyStates: {
+    noRelatedItems: "No related items found",
+  },
+  errors: {
+    errorDetails: "エラーの詳細",
+    tryAgain: "再試行",
+    failedToLoadCollectionTypes: "失敗 to load collection types",
+    somethingWentWrong: "Something went wrong!",
+    componentError: "Component エラー",
+    refreshPage: "Refresh Page",
+    showDetails: "Show Details",
+    hideDetails: "Hide Details",
+    saveFailed: "Failed to save changes",
+    loadFailed: "Failed to load data",
+    goToHomepage: "Go to Homepage",
+  },
+  rename: {
+    newName: "新しい名前",
   },
   s3Explorer: {
     filter: {
@@ -551,7 +1124,6 @@ export default {
     },
     loading: {
       initializing: "読み込み中...",
-      fetchingContents: "コンテンツを取得中...",
     },
     empty: {
       folder: "このフォルダは空です",
@@ -560,458 +1132,118 @@ export default {
     keyboard: {
       navigation: "矢印キーでナビゲート、Enterで開く、Backspaceで戻る",
     },
-    menu: {
-      rename: "名前を変更",
-      delete: "削除",
+    breadcrumbs: {
+      prefixRoot: "Root",
+      navigateTo: "Navigate to {{path}}",
     },
-  },
-  translation: {
-    common: {
-      actions: {
-        add: "追加",
-        edit: "編集",
-        delete: "削除",
-        activate: "有効化",
-        deactivate: "無効化",
-        create: "作成",
-      },
-      tableDensity: "テーブル密度",
-      theme: "テーマ",
-      back: "戻る",
-      loading: "読み込み中...",
-      error: "何かが間違っています",
-      save: "保存",
-      cancel: "キャンセル",
-      delete: "削除",
-      edit: "編集",
-      search: "検索",
-      profile: "プロフィール",
-      filterColumn: "フィルター",
-      searchValue: "検索",
-      logout: "ログアウト",
-      language: "言語",
-      alerts: "アラート",
-      warnings: "警告",
-      notifications: "通知",
-      searchPlaceholder: "検索またはkey:valueを使用...",
-      close: "閉じる",
-      success: "成功",
-      refresh: "更新",
-      previous: "前へ",
-      next: "次へ",
-      show: "表示",
-      all: "すべて",
-      status: {
-        active: "アクティブ",
-        inactive: "非アクティブ",
-      },
-      rename: "名前を変更",
-      root: "ルート",
-      folder: "フォルダ",
-      loadMore: "さらに読み込む",
-      darkMode: "ダークモード",
-      lightMode: "ライトモード",
-      filter: "フィルター",
-      textFilter: "テキストフィルター",
-      selectFilter: "フィルターを選択",
-      clearFilter: "フィルターをクリア",
-      columns: {
-        username: "ユーザー名",
-        firstName: "名前",
-        lastName: "姓",
-        email: "メール",
-        status: "ステータス",
-        groups: "グループ",
-        created: "作成日",
-        modified: "更新日",
-        actions: "アクション",
-      },
-      noGroups: "グループなし",
-      select: "選択",
-      moreInfo: "詳細情報",
-    },
-    users: {
-      title: "ユーザー管理",
-      search: "ユーザーを検索",
-      description: "システムユーザーとそのアクセスを管理",
-      form: {
-        fields: {
-          given_name: {
-            label: "名前",
-            tooltip: "ユーザーの名前を入力",
-            errors: {
-              required: "名前は必須です",
-            },
-          },
-          family_name: {
-            label: "姓",
-            tooltip: "ユーザーの姓を入力",
-            errors: {
-              required: "姓は必須です",
-            },
-          },
-          email: {
-            label: "メール",
-            tooltip: "ユーザーのメールアドレスを入力",
-            errors: {
-              required: "メールは必須です",
-              invalid: "無効なメールアドレス",
-            },
-          },
-          enabled: {
-            label: "有効",
-            tooltip: "ユーザーを有効または無効にする",
-            errors: {
-              required: "有効化は必須です",
-            },
-          },
-          roles: {
-            label: "ロール",
-            tooltip: "ユーザーのロールを選択",
-            errors: {
-              required: "ロールは必須です",
-            },
-          },
-          email_verified: {
-            label: "メール認証済み",
-            tooltip: "ユーザーのメールが認証済みかどうかを示す",
-            errors: {
-              required: "メール認証は必須です",
-            },
-          },
-        },
-      },
-    },
-    roles: {
-      title: "ロール管理",
-      description: "システムロールとその権限を管理",
-      admin: "管理者",
-      editor: "編集者",
-      viewer: "閲覧者",
-      actions: {
-        addRole: "ロールを追加",
-      },
-    },
-    columns: {
-      username: "ユーザー名",
-      firstName: "名前",
-      lastName: "姓",
-      email: "メール",
-      status: "ステータス",
-      groups: "グループ",
-      created: "作成日",
-      modified: "更新日",
-      actions: "アクション",
-    },
-    actions: {
-      addUser: "ユーザーを追加",
-      edit: "ユーザーを編集",
-      delete: "ユーザーを削除",
-      activate: "ユーザーを有効化",
-      deactivate: "ユーザーを無効化",
-    },
-    status: {
-      active: "アクティブ",
-      inactive: "非アクティブ",
-    },
-    errors: {
-      loadFailed: "ユーザーの読み込みに失敗しました",
-      saveFailed: "ユーザーの保存に失敗しました",
-      deleteFailed: "ユーザーの削除に失敗しました",
-    },
-    navigation: {
-      home: "ホーム",
-      collections: "コレクション",
-      settings: "設定",
-    },
-    home: {
-      welcome: "Media Lakeへようこそ",
-      description: "メディアファイルを効率的に管理・整理",
-      statistics: "統計",
-      collections: "コレクション",
-      sharedCollections: "共有コレクション",
-      favorites: "お気に入り",
-      smartFolders: "スマートフォルダ",
-      connectedStorage: "接続されたストレージ",
-      sharing: "共有",
-      comingSoon: "近日公開",
-    },
-    notifications: {
-      "Pipeline Complete": "パイプライン完了",
-      "Asset processing pipeline completed successfully":
-        "アセット処理パイプラインが正常に完了しました",
-      "Storage Warning": "ストレージ警告",
-      "Storage capacity reaching 80%": "ストレージ容量が80%に達しています",
-      "Pipeline Failed": "パイプライン失敗",
-      "Video processing pipeline failed":
-        "ビデオ処理パイプラインが失敗しました",
-    },
-    modal: {
-      confirmDelete: "このアイテムを削除してもよろしいですか？",
-      confirmAction: "このアクションを実行してもよろしいですか？",
-      error: "エラーが発生しました",
-      success: "操作が正常に完了しました",
-    },
-    executions: {
-      title: "パイプライン実行",
-      description: "パイプライン実行を監視・管理",
-      searchPlaceholder: "パイプライン実行を検索...",
-      columns: {
-        pipelineName: "パイプライン名",
-        status: "ステータス",
-        startTime: "開始時刻",
-        endTime: "終了時刻",
-        duration: "期間",
-        actions: "アクション",
-      },
-      status: {
-        succeeded: "成功",
-        failed: "失敗",
-        running: "実行中",
-        timedOut: "タイムアウト",
-        aborted: "中止",
-      },
-      actions: {
-        retryFromCurrent: "現在の位置から再試行",
-        retryFromStart: "最初から再試行",
-        viewDetails: "詳細を表示",
-      },
-      pagination: {
-        page: "ページ {{page}} / {{total}}",
-        showEntries: "{{count}}件を表示",
-      },
-    },
-    s3Explorer: {
-      filter: {
-        label: "名前でフィルター",
-        clear: "フィルターをクリア",
-        resultsCount: "{{total}}件中{{count}}件を表示",
-      },
-      error: {
-        loading: "S3オブジェクトの読み込みエラー: {{message}}",
-        network: "ネットワークエラー。接続を確認して再試行してください。",
-        permission: "アクセス拒否。このパスにアクセスする権限がありません。",
-        permissionWithPrefixes:
-          "アクセス拒否。以下のパスにのみアクセスできます: {{prefixes}}",
-        notFound: "要求されたパスが存在しません。",
-        timeout: "リクエストがタイムアウトしました。再試行してください。",
-        retry: "再試行",
-      },
-      loading: {
-        initializing: "読み込み中...",
-        fetchingContents: "コンテンツを取得中...",
-      },
-      empty: {
-        folder: "このフォルダは空です",
-        noResults: "フィルターに一致するアイテムはありません",
-      },
-      keyboard: {
-        navigation: "矢印キーで移動、Enterで開く、Backspaceで戻る",
-      },
-      menu: {
-        rename: "名前を変更",
-        delete: "削除",
-      },
-    },
-    assets: {
-      title: "アセット",
-      connectedStorage: "接続されたストレージ",
-    },
-    metadata: {
-      title: "近日公開",
-      description:
-        "メタデータ管理機能をお届けするために作業中です。お楽しみに！",
-    },
-    pipelines: {
-      title: "パイプライン",
-      description: "メディアとメタデータのパイプラインを管理",
-      searchPlaceholder: "パイプラインを検索...",
-      actions: {
-        create: "新しいパイプラインを追加",
-        deploy: "画像パイプラインをデプロイ",
-        addNew: "新しいパイプラインを追加",
-        viewAll: "すべてのパイプラインを表示",
-      },
-      search: "パイプラインを検索",
-      deploy: "画像パイプラインをデプロイ",
-      addNew: "新しいパイプラインを追加",
-      columns: {
-        name: "名前",
-        creationDate: "作成日",
-        system: "システム",
-        type: "タイプ",
-        actions: "アクション",
-      },
-      editor: {
-        title: "パイプラインエディター",
-        save: "パイプラインを保存",
-        validate: "パイプラインを検証",
-        sidebar: {
-          title: "ノード",
-          dragNodes: "ノードをキャンバスにドラッグ",
-          loading: "ノードを読み込み中...",
-          error: "ノードの読み込みエラー",
-        },
-        node: {
-          configure: "{{type}}を設定",
-          delete: "ノードを削除",
-          edit: "ノードを編集",
-        },
-        edge: {
-          title: "エッジラベルを編集",
-          label: "エッジラベル",
-          delete: "接続を削除",
-        },
-        modals: {
-          error: {
-            title: "エラー",
-            incompatibleNodes:
-              "前のノードの出力が対象ノードの入力と互換性がありません。",
-            validation: "パイプライン検証に失敗しました",
-          },
-          delete: {
-            title: "パイプラインを削除",
-            message:
-              "このパイプラインを削除してもよろしいですか？この操作は元に戻せません。",
-            confirm: "削除を確認するためにパイプライン名を入力してください:",
-          },
-        },
-        controls: {
-          undo: "元に戻す",
-          redo: "やり直し",
-          zoomIn: "ズームイン",
-          zoomOut: "ズームアウト",
-          fitView: "ビューに合わせる",
-          lockView: "ビューをロック",
-        },
-        notifications: {
-          saved: "パイプラインが正常に保存されました",
-          validated: "パイプライン検証が成功しました",
-          error: {
-            save: "パイプラインの保存に失敗しました",
-            validation: "パイプライン検証に失敗しました",
-            incompatibleNodes: "互換性のないノード接続",
-          },
-        },
-      },
-    },
-    integrations: {
-      title: "統合",
-      description: "統合と接続を管理",
-      addIntegration: "統合を追加",
-      selectIntegration: "統合を選択",
-      selectProvider: "プロバイダーを選択",
-      configureIntegration: "統合を設定",
-      deleteConfirmation: {
-        title: "統合を削除",
-        message: "この統合を削除してもよろしいですか？",
-        warning:
-          "警告: この統合を削除すると、それを使用するパイプラインが破損する可能性があります。",
-      },
-      form: {
-        title: "統合を追加",
-        fields: {
-          nodeId: {
-            label: "統合",
-            tooltip: "統合プロバイダーを選択",
-            errors: {
-              required: "統合の選択が必要です",
-            },
-          },
-          description: {
-            label: "説明",
-            tooltip: "この統合の説明を入力",
-            helper: "この統合の簡単な説明",
-            errors: {
-              required: "説明が必要です",
-            },
-          },
-          environmentId: {
-            label: "環境",
-            tooltip: "この統合の環境を選択",
-            errors: {
-              required: "環境の選択が必要です",
-            },
-          },
-          enabled: {
-            label: "有効",
-            tooltip: "この統合を有効または無効にする",
-            errors: {
-              required: "有効化が必要です",
-            },
-          },
-          auth: {
-            type: {
-              label: "認証タイプ",
-              tooltip: "認証方法を選択",
-              options: {
-                awsIam: "AWS IAM",
-                apiKey: "APIキー",
-              },
-              errors: {
-                required: "認証タイプが必要です",
-              },
-            },
-            credentials: {
-              apiKey: {
-                label: "APIキー",
-                tooltip: "APIキーを入力",
-                helper: "サービス認証用のAPIキー",
-                errors: {
-                  required: "APIキーが必要です",
-                },
-              },
-              iamRole: {
-                label: "IAMロール",
-                tooltip: "IAMロールのARNを入力",
-                errors: {
-                  required: "IAMロールが必要です",
-                },
-              },
-            },
-          },
-        },
-        search: {
-          placeholder: "統合を検索",
-        },
-
-        errors: {
-          required: "このフィールドは必須です",
-          nodeId: {
-            unrecognized_keys: "無効な統合選択",
-          },
-        },
-      },
-      columns: {
-        nodeName: "ノード名",
-        environment: "環境",
-        createdDate: "作成日",
-        modifiedDate: "更新日",
-        actions: "アクション",
-      },
-
-      settings: {
-        environments: {
-          title: "環境",
-        },
-      },
+    error: {
+      loading: "Error loading contents",
+      permissionWithPrefixes:
+        "You don't have permission to access this path. Please select from the allowed prefixes.",
+      permission: "You don't have permission to access this path.",
+      notFound: "The requested path was not found.",
+      timeout: "Request timed out. Please try again.",
+      network: "Network error. Please check your connection.",
+      retry: "Retry",
     },
   },
   groups: {
     actions: {
-      addGroup: "グループを追加",
       editGroup: "グループを編集",
-      deleteGroup: "グループを削除",
       createGroup: "グループを作成",
       manageGroups: "グループを管理",
+      assignPermissionSet: "権限セットを割り当て",
+    },
+    permissionSets: "権限セット",
+    noPermissionSets: "割り当てられた権限セットはありません",
+    noGroups: "No groups found",
+    noDescription: "No description",
+    noAvailableGroups: "No available groups",
+    noAvailablePermissionSets: "No available permission sets",
+    fields: {
+      name: "Name",
+      id: "Group ID",
+      idHelp: "A unique identifier for the group (lowercase, no spaces)",
+      description: "Description",
+      department: "Department",
+    },
+    messages: {
+      createSuccess: "Group created successfully",
+      createError: "Failed to create group",
+      updateSuccess: "Group updated successfully",
+      updateError: "Failed to update group",
+      deleteSuccess: "Group deleted successfully",
+      deleteError: "Failed to delete group",
+      confirmDelete: "Are you sure you want to delete this group?",
+      deleteWarning: "This action cannot be undone. All users will be removed from this group.",
+      assignPermissionSetSuccess: "Permission set assigned successfully",
+      assignPermissionSetError: "Failed to assign permission set",
+      removePermissionSetSuccess: "Permission set removed successfully",
+      removePermissionSetError: "Failed to remove permission set",
     },
   },
-  permissionSets: {
-    noAssignments: "権限セットなし",
-    actions: {
-      addPermissionSet: "権限セットを追加",
-      editPermissionSet: "権限セットを編集",
-      deletePermissionSet: "権限セットを削除",
+  assetSidebar: {
+    thumbnailGeneration: "Thumbnail Generation",
+    aiAnalysis: "AI Analysis",
+    tabs: {
+      markers: "マーカー",
     },
+  },
+  fileUpload: {
+    errorMessages: {
+      errorDeletingPipeline: "エラー deleting pipeline",
+    },
+  },
+  notifications: {
+    label: "Notification",
+    tooltip: {
+      new: "{{count}} 件の新着",
+      running: "{{count}} 件実行中",
+      none: "通知なし",
+    },
+    clearJobs: "ジョブをクリア",
+    clearJobsTooltip:
+      "完了および失敗したダウンロードをクリア（アクティブなダウンロードは残ります）",
+    empty: "通知なし",
+    dismiss: "却下",
+    fileSize: {
+      unknown: "不明なサイズ",
+    },
+    date: {
+      unknown: "不明",
+    },
+    jobDetails: {
+      assets: "{{count}} 件のアセット",
+      created: "作成日時: {{date}}",
+      lastUpdated: "最終更新: {{date}}",
+      filesBreakdown: "圧縮ファイル: {{zipped}}、大きなファイル: {{large}}",
+    },
+  },
+  downloads: {
+    expired: "EXPIRED",
+    expires: "Expires",
+  },
+  actions: {
+    addUser: "追加 User",
+    delete: "削除",
+    edit: "編集",
+  },
+  columns: {
+    actions: "アクション",
+    email: "メール",
+    firstName: "名",
+    status: "ステータス",
+  },
+  nodes: {
+    noConfiguration: "No configuration required for this node",
+  },
+  config: {
+    loadingAwsConfiguration: "読み込み中 AWS configuration...",
+  },
+  permissions: {
+    accessDenied: "Access Denied - You don't have permission to view this page",
+  },
+  validation: {
+    required: "This field is required",
   },
 };

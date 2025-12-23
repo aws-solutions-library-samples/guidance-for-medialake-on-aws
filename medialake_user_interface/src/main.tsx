@@ -26,10 +26,7 @@ const App = () => {
         await initializeAWS();
         setIsLoading(false);
       } catch (error) {
-        console.error(
-          t("app.errors.loadingConfig", "Error loading configuration:"),
-          error,
-        );
+        console.error(t("app.errors.loadingConfig", "Error loading configuration:"), error);
         setIsLoading(false);
       }
     };
