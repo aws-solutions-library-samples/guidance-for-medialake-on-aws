@@ -1,12 +1,8 @@
 import React from "react";
-import { Box, Container, Stack, Typography, Paper, useTheme } from "@mui/material";
-import { SmartFolders } from "@/features/home/SmartFolders";
-import { ConnectedStorage } from "@/features/home/ConnectedStorage";
+import { Box, Container, Typography } from "@mui/material";
+import { DashboardGrid, ExpandedWidgetModal } from "@/features/dashboard";
 
 const Home: React.FC = () => {
-  const theme = useTheme();
-  // const _isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
   return (
     <Box
       sx={{
@@ -22,10 +18,10 @@ const Home: React.FC = () => {
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          gap: 3,
         }}
       >
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 1 }}>
           <Typography
             variant="h4"
             component="h1"
@@ -42,50 +38,8 @@ const Home: React.FC = () => {
           </Typography>
         </Box>
 
-        <Stack
-          spacing={4}
-          sx={{
-            width: "100%",
-          }}
-        >
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid",
-              borderColor: "divider",
-              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: theme.shadows[4],
-              },
-            }}
-          >
-            <SmartFolders />
-          </Paper>
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid",
-              borderColor: "divider",
-              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: theme.shadows[4],
-              },
-            }}
-          >
-            <ConnectedStorage />
-          </Paper>
-        </Stack>
+        <DashboardGrid />
+        <ExpandedWidgetModal />
       </Container>
     </Box>
   );

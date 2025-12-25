@@ -1254,4 +1254,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "Favoriten",
+        emptyTitle: "Noch keine Favoriten",
+        emptyDescription: "Markieren Sie Assets als Favoriten, um sie hier zu sehen",
+      },
+      myCollections: {
+        title: "Meine Sammlungen",
+        emptyTitle: "Noch keine Sammlungen",
+        emptyDescription: "Erstellen Sie Ihre erste Sammlung, um Ihre Assets zu organisieren",
+        createCollection: "Sammlung erstellen",
+      },
+      recentAssets: {
+        title: "Neueste Assets",
+        emptyTitle: "Keine neuesten Assets",
+        emptyDescription: "Kürzlich hochgeladene Assets werden hier angezeigt",
+      },
+    },
+    actions: {
+      addWidget: "Widget hinzufügen",
+      resetLayout: "Auf Standardlayout zurücksetzen",
+      expand: "Erweitern",
+      refresh: "Aktualisieren",
+      remove: "Entfernen",
+    },
+    resetDialog: {
+      title: "Dashboard-Layout zurücksetzen?",
+      description:
+        "Dadurch werden alle Widgets auf ihre Standardpositionen und -größen zurückgesetzt. Ihre aktuellen Layout-Anpassungen gehen verloren.",
+      cancel: "Abbrechen",
+      confirm: "Zurücksetzen",
+    },
+  },
 };

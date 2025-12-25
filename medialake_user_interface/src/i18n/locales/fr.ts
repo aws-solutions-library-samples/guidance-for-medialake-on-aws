@@ -1254,4 +1254,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "Favoris",
+        emptyTitle: "Pas encore de favoris",
+        emptyDescription: "Marquez des ressources comme favoris pour les voir ici",
+      },
+      myCollections: {
+        title: "Mes Collections",
+        emptyTitle: "Pas encore de collections",
+        emptyDescription: "Créez votre première collection pour organiser vos ressources",
+        createCollection: "Créer une collection",
+      },
+      recentAssets: {
+        title: "Ressources Récentes",
+        emptyTitle: "Pas de ressources récentes",
+        emptyDescription: "Les ressources récemment téléchargées apparaîtront ici",
+      },
+    },
+    actions: {
+      addWidget: "Ajouter un widget",
+      resetLayout: "Réinitialiser la disposition par défaut",
+      expand: "Agrandir",
+      refresh: "Actualiser",
+      remove: "Supprimer",
+    },
+    resetDialog: {
+      title: "Réinitialiser la disposition du tableau de bord ?",
+      description:
+        "Cela restaurera tous les widgets à leurs positions et tailles par défaut. Vos personnalisations de disposition actuelles seront perdues.",
+      cancel: "Annuler",
+      confirm: "Réinitialiser",
+    },
+  },
 };

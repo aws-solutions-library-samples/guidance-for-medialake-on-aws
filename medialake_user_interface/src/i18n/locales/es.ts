@@ -1251,4 +1251,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "Favoritos",
+        emptyTitle: "Aún no hay favoritos",
+        emptyDescription: "Marca recursos como favoritos para verlos aquí",
+      },
+      myCollections: {
+        title: "Mis Colecciones",
+        emptyTitle: "Aún no hay colecciones",
+        emptyDescription: "Crea tu primera colección para organizar tus recursos",
+        createCollection: "Crear Colección",
+      },
+      recentAssets: {
+        title: "Recursos Recientes",
+        emptyTitle: "No hay recursos recientes",
+        emptyDescription: "Los recursos subidos recientemente aparecerán aquí",
+      },
+    },
+    actions: {
+      addWidget: "Agregar Widget",
+      resetLayout: "Restablecer diseño predeterminado",
+      expand: "Expandir",
+      refresh: "Actualizar",
+      remove: "Eliminar",
+    },
+    resetDialog: {
+      title: "¿Restablecer diseño del panel?",
+      description:
+        "Esto restaurará todos los widgets a sus posiciones y tamaños predeterminados. Se perderán las personalizaciones de diseño actuales.",
+      cancel: "Cancelar",
+      confirm: "Restablecer",
+    },
+  },
 };

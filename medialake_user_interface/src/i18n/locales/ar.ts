@@ -1240,4 +1240,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "المفضلة",
+        emptyTitle: "لا توجد مفضلات بعد",
+        emptyDescription: "قم بتمييز الأصول كمفضلة لرؤيتها هنا",
+      },
+      myCollections: {
+        title: "مجموعاتي",
+        emptyTitle: "لا توجد مجموعات بعد",
+        emptyDescription: "أنشئ مجموعتك الأولى لتنظيم أصولك",
+        createCollection: "إنشاء مجموعة",
+      },
+      recentAssets: {
+        title: "الأصول الحديثة",
+        emptyTitle: "لا توجد أصول حديثة",
+        emptyDescription: "ستظهر الأصول المرفوعة حديثاً هنا",
+      },
+    },
+    actions: {
+      addWidget: "إضافة عنصر واجهة",
+      resetLayout: "إعادة تعيين التخطيط الافتراضي",
+      expand: "توسيع",
+      refresh: "تحديث",
+      remove: "إزالة",
+    },
+    resetDialog: {
+      title: "إعادة تعيين تخطيط لوحة التحكم؟",
+      description:
+        "سيؤدي هذا إلى استعادة جميع عناصر الواجهة إلى مواضعها وأحجامها الافتراضية. ستفقد تخصيصات التخطيط الحالية.",
+      cancel: "إلغاء",
+      confirm: "إعادة تعيين",
+    },
+  },
 };

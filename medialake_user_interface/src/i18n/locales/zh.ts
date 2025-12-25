@@ -1239,4 +1239,37 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "收藏夹",
+        emptyTitle: "暂无收藏",
+        emptyDescription: "将资源标记为收藏以在此处查看",
+      },
+      myCollections: {
+        title: "我的集合",
+        emptyTitle: "暂无集合",
+        emptyDescription: "创建您的第一个集合来整理您的资源",
+        createCollection: "创建集合",
+      },
+      recentAssets: {
+        title: "最近资源",
+        emptyTitle: "暂无最近资源",
+        emptyDescription: "最近上传的资源将显示在此处",
+      },
+    },
+    actions: {
+      addWidget: "添加小部件",
+      resetLayout: "重置为默认布局",
+      expand: "展开",
+      refresh: "刷新",
+      remove: "移除",
+    },
+    resetDialog: {
+      title: "重置仪表板布局？",
+      description: "这将把所有小部件恢复到默认位置和大小。您当前的布局自定义将丢失。",
+      cancel: "取消",
+      confirm: "重置",
+    },
+  },
 };

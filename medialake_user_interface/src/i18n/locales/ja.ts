@@ -1246,4 +1246,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "お気に入り",
+        emptyTitle: "お気に入りはまだありません",
+        emptyDescription: "アセットをお気に入りに登録するとここに表示されます",
+      },
+      myCollections: {
+        title: "マイコレクション",
+        emptyTitle: "コレクションはまだありません",
+        emptyDescription: "最初のコレクションを作成してアセットを整理しましょう",
+        createCollection: "コレクションを作成",
+      },
+      recentAssets: {
+        title: "最近のアセット",
+        emptyTitle: "最近のアセットはありません",
+        emptyDescription: "最近アップロードされたアセットがここに表示されます",
+      },
+    },
+    actions: {
+      addWidget: "ウィジェットを追加",
+      resetLayout: "デフォルトレイアウトにリセット",
+      expand: "展開",
+      refresh: "更新",
+      remove: "削除",
+    },
+    resetDialog: {
+      title: "ダッシュボードレイアウトをリセットしますか？",
+      description:
+        "すべてのウィジェットがデフォルトの位置とサイズに復元されます。現在のレイアウトのカスタマイズは失われます。",
+      cancel: "キャンセル",
+      confirm: "リセット",
+    },
+  },
 };

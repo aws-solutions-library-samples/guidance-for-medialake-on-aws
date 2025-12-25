@@ -1249,4 +1249,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "पसंदीदा",
+        emptyTitle: "अभी तक कोई पसंदीदा नहीं",
+        emptyDescription: "संपत्तियों को पसंदीदा के रूप में चिह्नित करें ताकि उन्हें यहां देख सकें",
+      },
+      myCollections: {
+        title: "मेरे संग्रह",
+        emptyTitle: "अभी तक कोई संग्रह नहीं",
+        emptyDescription: "अपनी संपत्तियों को व्यवस्थित करने के लिए अपना पहला संग्रह बनाएं",
+        createCollection: "संग्रह बनाएं",
+      },
+      recentAssets: {
+        title: "हाल की संपत्तियां",
+        emptyTitle: "कोई हाल की संपत्तियां नहीं",
+        emptyDescription: "हाल ही में अपलोड की गई संपत्तियां यहां दिखाई देंगी",
+      },
+    },
+    actions: {
+      addWidget: "विजेट जोड़ें",
+      resetLayout: "डिफ़ॉल्ट लेआउट पर रीसेट करें",
+      expand: "विस्तार करें",
+      refresh: "रीफ्रेश करें",
+      remove: "हटाएं",
+    },
+    resetDialog: {
+      title: "डैशबोर्ड लेआउट रीसेट करें?",
+      description:
+        "यह सभी विजेट्स को उनकी डिफ़ॉल्ट स्थिति और आकार में पुनर्स्थापित करेगा। आपके वर्तमान लेआउट अनुकूलन खो जाएंगे।",
+      cancel: "रद्द करें",
+      confirm: "रीसेट करें",
+    },
+  },
 };

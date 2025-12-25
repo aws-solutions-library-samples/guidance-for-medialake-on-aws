@@ -1240,4 +1240,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "מועדפים",
+        emptyTitle: "אין עדיין מועדפים",
+        emptyDescription: "סמן נכסים כמועדפים כדי לראות אותם כאן",
+      },
+      myCollections: {
+        title: "האוספים שלי",
+        emptyTitle: "אין עדיין אוספים",
+        emptyDescription: "צור את האוסף הראשון שלך כדי לארגן את הנכסים שלך",
+        createCollection: "צור אוסף",
+      },
+      recentAssets: {
+        title: "נכסים אחרונים",
+        emptyTitle: "אין נכסים אחרונים",
+        emptyDescription: "נכסים שהועלו לאחרונה יופיעו כאן",
+      },
+    },
+    actions: {
+      addWidget: "הוסף ווידג'ט",
+      resetLayout: "אפס לפריסה ברירת מחדל",
+      expand: "הרחב",
+      refresh: "רענן",
+      remove: "הסר",
+    },
+    resetDialog: {
+      title: "לאפס את פריסת לוח הבקרה?",
+      description:
+        "פעולה זו תשחזר את כל הווידג'טים למיקומים ולגדלים ברירת המחדל שלהם. ההתאמות האישיות הנוכחיות של הפריסה יאבדו.",
+      cancel: "ביטול",
+      confirm: "אפס",
+    },
+  },
 };

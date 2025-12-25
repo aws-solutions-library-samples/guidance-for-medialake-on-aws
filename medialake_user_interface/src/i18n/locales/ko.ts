@@ -1240,4 +1240,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "즐겨찾기",
+        emptyTitle: "아직 즐겨찾기가 없습니다",
+        emptyDescription: "자산을 즐겨찾기로 표시하면 여기에 표시됩니다",
+      },
+      myCollections: {
+        title: "내 컬렉션",
+        emptyTitle: "아직 컬렉션이 없습니다",
+        emptyDescription: "첫 번째 컬렉션을 만들어 자산을 정리하세요",
+        createCollection: "컬렉션 만들기",
+      },
+      recentAssets: {
+        title: "최근 자산",
+        emptyTitle: "최근 자산이 없습니다",
+        emptyDescription: "최근 업로드된 자산이 여기에 표시됩니다",
+      },
+    },
+    actions: {
+      addWidget: "위젯 추가",
+      resetLayout: "기본 레이아웃으로 재설정",
+      expand: "확장",
+      refresh: "새로고침",
+      remove: "제거",
+    },
+    resetDialog: {
+      title: "대시보드 레이아웃을 재설정하시겠습니까?",
+      description:
+        "모든 위젯이 기본 위치와 크기로 복원됩니다. 현재 레이아웃 사용자 지정이 손실됩니다.",
+      cancel: "취소",
+      confirm: "재설정",
+    },
+  },
 };

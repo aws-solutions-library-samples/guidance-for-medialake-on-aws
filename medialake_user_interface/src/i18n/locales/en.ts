@@ -1244,4 +1244,38 @@ export default {
   validation: {
     required: "This field is required",
   },
+  dashboard: {
+    widgets: {
+      favorites: {
+        title: "Favorites",
+        emptyTitle: "No favorites yet",
+        emptyDescription: "Mark assets as favorites to see them here",
+      },
+      myCollections: {
+        title: "My Collections",
+        emptyTitle: "No collections yet",
+        emptyDescription: "Create your first collection to organize your assets",
+        createCollection: "Create Collection",
+      },
+      recentAssets: {
+        title: "Recent Assets",
+        emptyTitle: "No recent assets",
+        emptyDescription: "Recently uploaded assets will appear here",
+      },
+    },
+    actions: {
+      addWidget: "Add Widget",
+      resetLayout: "Reset to default layout",
+      expand: "Expand",
+      refresh: "Refresh",
+      remove: "Remove",
+    },
+    resetDialog: {
+      title: "Reset Dashboard Layout?",
+      description:
+        "This will restore all widgets to their default positions and sizes. Your current layout customizations will be lost.",
+      cancel: "Cancel",
+      confirm: "Reset",
+    },
+  },
 };
