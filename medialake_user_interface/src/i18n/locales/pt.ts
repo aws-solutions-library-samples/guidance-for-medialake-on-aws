@@ -156,7 +156,6 @@ export default {
     failedToLoadAssets: "Falha ao carregar ativos",
   },
   home: {
-    description: "",
     favorites: "Favoritos",
     stats: {
       assignedTasks: "Tarefas Atribuídas",
@@ -722,6 +721,10 @@ export default {
   common: {
     back: "Voltar",
     search: "Pesquisar",
+    public: "Público",
+    private: "Privado",
+    items: "itens",
+    subCollections: "subcoleções",
     batchOperations: {
       deleteSelected: "Excluir selecionados",
     },
@@ -1276,6 +1279,10 @@ export default {
       expand: "Expandir",
       refresh: "Atualizar",
       remove: "Remover",
+    },
+    widgetSelector: {
+      title: "Adicionar widget",
+      allAdded: "Todos os widgets já estão no seu painel",
     },
     resetDialog: {
       title: "Redefinir layout do painel?",

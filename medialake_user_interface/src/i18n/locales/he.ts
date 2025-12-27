@@ -151,7 +151,6 @@ export default {
     failedToLoadAssets: "טעינת נכסים נכשלה",
   },
   home: {
-    description: "",
     favorites: "מועדפים",
     stats: {
       assignedTasks: "משימות שהוקצו",
@@ -711,6 +710,10 @@ export default {
   common: {
     back: "חזור",
     search: "חפש",
+    public: "ציבורי",
+    private: "פרטי",
+    items: "פריטים",
+    subCollections: "תת-אוספים",
     batchOperations: {
       deleteSelected: "מחק נבחרים",
     },
@@ -1265,6 +1268,10 @@ export default {
       expand: "הרחב",
       refresh: "רענן",
       remove: "הסר",
+    },
+    widgetSelector: {
+      title: "הוסף ווידג'ט",
+      allAdded: "כל הווידג'טים כבר נמצאים בלוח הבקרה שלך",
     },
     resetDialog: {
       title: "לאפס את פריסת לוח הבקרה?",

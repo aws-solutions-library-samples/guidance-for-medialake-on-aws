@@ -153,7 +153,6 @@ export default {
     },
   },
   home: {
-    description: "",
     favorites: "Favorites",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -670,6 +669,10 @@ export default {
   common: {
     back: "Back",
     search: "Search",
+    public: "Public",
+    private: "Private",
+    items: "items",
+    subCollections: "sub-collections",
     batchOperations: {
       deleteSelected: "Delete selected",
     },
@@ -1269,6 +1272,10 @@ export default {
       expand: "Expand",
       refresh: "Refresh",
       remove: "Remove",
+    },
+    widgetSelector: {
+      title: "Add Widget",
+      allAdded: "All widgets are already on your dashboard",
     },
     resetDialog: {
       title: "Reset Dashboard Layout?",

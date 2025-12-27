@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Paper, Alert, Button } from "@mui/material";
+import { Box, Paper, Alert, Button, alpha, useTheme } from "@mui/material";
 import { WidgetHeader } from "./WidgetHeader";
 import type { WidgetContainerProps } from "../types";
 
@@ -20,6 +20,8 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
   error,
   onRetry,
 }) => {
+  const theme = useTheme();
+
   return (
     <Paper
       elevation={0}
@@ -29,14 +31,17 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
         display: "flex",
         flexDirection: "column",
         borderRadius: 2,
-        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        backgroundColor: alpha(theme.palette.background.paper, 0.9),
         backdropFilter: "blur(10px)",
         border: "1px solid",
         borderColor: "divider",
         overflow: "hidden",
-        transition: "box-shadow 0.2s ease-in-out",
+        transition: theme.transitions.create(["box-shadow", "border-color"], {
+          duration: theme.transitions.duration.short,
+        }),
         "&:hover": {
-          boxShadow: 3,
+          boxShadow: theme.shadows[4],
+          borderColor: alpha(theme.palette.primary.main, 0.3),
         },
       }}
     >

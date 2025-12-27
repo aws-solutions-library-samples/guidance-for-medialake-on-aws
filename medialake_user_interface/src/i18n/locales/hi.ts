@@ -156,7 +156,6 @@ export default {
     failedToLoadAssets: "संपत्ति लोड करने में विफल",
   },
   home: {
-    description: "",
     favorites: "पसंदीदा",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -719,6 +718,10 @@ export default {
   common: {
     back: "वापस",
     search: "खोजें",
+    public: "सार्वजनिक",
+    private: "निजी",
+    items: "आइटम",
+    subCollections: "उप-संग्रह",
     batchOperations: {
       deleteSelected: "चयनित हटाएं",
     },
@@ -1274,6 +1277,10 @@ export default {
       expand: "विस्तार करें",
       refresh: "रीफ्रेश करें",
       remove: "हटाएं",
+    },
+    widgetSelector: {
+      title: "विजेट जोड़ें",
+      allAdded: "सभी विजेट पहले से आपके डैशबोर्ड पर हैं",
     },
     resetDialog: {
       title: "डैशबोर्ड लेआउट रीसेट करें?",

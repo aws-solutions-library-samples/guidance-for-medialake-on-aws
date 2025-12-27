@@ -16,13 +16,18 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
   const { t } = useTranslation();
   const { removeWidget, setExpandedWidget } = useDashboardActions();
 
-  const { data: unsortedFavorites, isLoading, error, refetch } = useGetFavorites("ASSET");
+  const {
+    data: unsortedFavorites,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useGetFavorites("ASSET");
 
   const { mutate: removeFavorite } = useRemoveFavorite();
 
   // Sort favorites by addedAt timestamp in descending order (newest first)
   const favorites = React.useMemo(() => {
-    if (!unsortedFavorites) return [];
+    if (!unsortedFavorites || !Array.isArray(unsortedFavorites)) return [];
 
     return [...unsortedFavorites].sort((a, b) => {
       if (a.addedAt && b.addedAt) {
@@ -33,6 +38,9 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
       return 0;
     });
   }, [unsortedFavorites]);
+
+  // Handle error gracefully - don't show error for empty/undefined data
+  const error = queryError;
 
   const handleAssetClick = useCallback(
     (assetId: string, assetType: string) => {

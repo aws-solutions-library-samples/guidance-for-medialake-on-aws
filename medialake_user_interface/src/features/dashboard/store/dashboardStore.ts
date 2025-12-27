@@ -34,9 +34,9 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Recent Assets",
     description: "Recently ingested media assets",
     icon: "schedule",
-    defaultSize: { w: 12, h: 4 },
-    minSize: { w: 4, h: 2 },
-    maxSize: { w: 12, h: 8 },
+    defaultSize: { w: 12, h: 5 },
+    minSize: { w: 4, h: 4 },
+    maxSize: { w: 12, h: 6 },
   },
 };
 
@@ -52,23 +52,23 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
     lg: [
       { i: "favorites-1", x: 0, y: 0, w: 6, h: 4, minW: 3, minH: 2, maxW: 12, maxH: 8 },
       { i: "my-collections-1", x: 6, y: 0, w: 6, h: 4, minW: 3, minH: 2, maxW: 12, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 4, w: 12, h: 4, minW: 4, minH: 2, maxW: 12, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 4, w: 12, h: 5, minW: 4, minH: 4, maxW: 12, maxH: 6 },
     ],
     md: [
       { i: "favorites-1", x: 0, y: 0, w: 5, h: 4, minW: 3, minH: 2, maxW: 10, maxH: 8 },
       { i: "my-collections-1", x: 5, y: 0, w: 5, h: 4, minW: 3, minH: 2, maxW: 10, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 4, w: 10, h: 4, minW: 4, minH: 2, maxW: 10, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 4, w: 10, h: 5, minW: 4, minH: 4, maxW: 10, maxH: 6 },
     ],
     sm: [
       { i: "favorites-1", x: 0, y: 0, w: 1, h: 4, minW: 1, minH: 2, maxW: 1, maxH: 8 },
       { i: "my-collections-1", x: 0, y: 4, w: 1, h: 4, minW: 1, minH: 2, maxW: 1, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 8, w: 1, h: 4, minW: 1, minH: 2, maxW: 1, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 8, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 6 },
     ],
   },
 };
 
 const STORAGE_KEY = "dashboard-layout";
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 // Helper to generate unique widget ID
 const generateWidgetId = (type: WidgetType): string => {

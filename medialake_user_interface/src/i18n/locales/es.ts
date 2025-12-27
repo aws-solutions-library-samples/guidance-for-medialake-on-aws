@@ -156,7 +156,6 @@ export default {
     failedToLoadAssets: "Error al cargar activos",
   },
   home: {
-    description: "",
     favorites: "Favoritos",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -721,6 +720,10 @@ export default {
   common: {
     back: "Atrás",
     search: "Buscar",
+    public: "Público",
+    private: "Privado",
+    items: "elementos",
+    subCollections: "subcolecciones",
     batchOperations: {
       deleteSelected: "Eliminar seleccionados",
     },
@@ -1276,6 +1279,10 @@ export default {
       expand: "Expandir",
       refresh: "Actualizar",
       remove: "Eliminar",
+    },
+    widgetSelector: {
+      title: "Agregar widget",
+      allAdded: "Todos los widgets ya están en tu panel",
     },
     resetDialog: {
       title: "¿Restablecer diseño del panel?",

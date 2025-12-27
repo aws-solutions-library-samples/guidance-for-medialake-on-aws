@@ -11,6 +11,8 @@ import {
   IconButton,
   Typography,
   Box,
+  alpha,
+  useTheme,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -18,6 +20,7 @@ import {
   FolderOpen as CollectionIcon,
   Schedule as RecentIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import type { WidgetSelectorProps, WidgetType } from "../types";
 
 // Map widget types to icons
@@ -33,6 +36,9 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
   availableWidgets,
   onAddWidget,
 }) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
   const handleAddWidget = (widgetType: WidgetType) => {
     onAddWidget(widgetType);
     onClose();
@@ -47,7 +53,7 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
       PaperProps={{
         sx: {
           borderRadius: 2,
-          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          backgroundColor: alpha(theme.palette.background.paper, 0.95),
           backdropFilter: "blur(10px)",
         },
       }}
@@ -61,7 +67,7 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
         }}
       >
         <Typography variant="h6" component="span">
-          Add Widget
+          {t("dashboard.widgetSelector.title", "Add Widget")}
         </Typography>
         <IconButton
           onClick={onClose}
@@ -82,7 +88,7 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
             }}
           >
             <Typography color="text.secondary">
-              All widgets are already on your dashboard
+              {t("dashboard.widgetSelector.allAdded", "All widgets are already on your dashboard")}
             </Typography>
           </Box>
         ) : (

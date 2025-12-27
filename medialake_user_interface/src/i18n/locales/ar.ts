@@ -151,7 +151,6 @@ export default {
     failedToLoadAssets: "فشل تحميل الأصول",
   },
   home: {
-    description: "",
     favorites: "المفضلة",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -711,6 +710,10 @@ export default {
   common: {
     back: "رجوع",
     search: "بحث",
+    public: "عام",
+    private: "خاص",
+    items: "عناصر",
+    subCollections: "مجموعات فرعية",
     batchOperations: {
       deleteSelected: "حذف المحدد",
     },
@@ -1265,6 +1268,10 @@ export default {
       expand: "توسيع",
       refresh: "تحديث",
       remove: "إزالة",
+    },
+    widgetSelector: {
+      title: "إضافة عنصر واجهة",
+      allAdded: "جميع العناصر موجودة بالفعل على لوحة التحكم الخاصة بك",
     },
     resetDialog: {
       title: "إعادة تعيين تخطيط لوحة التحكم؟",

@@ -1,5 +1,14 @@
 import React from "react";
-import { Dialog, DialogTitle, DialogContent, IconButton, Typography, Box } from "@mui/material";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  Typography,
+  Box,
+  alpha,
+  useTheme,
+} from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useDashboardStore, WIDGET_DEFINITIONS } from "../store/dashboardStore";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
@@ -15,6 +24,7 @@ const WIDGET_COMPONENTS: Record<WidgetType, React.FC<{ widgetId: string }>> = {
 };
 
 export const ExpandedWidgetModal: React.FC = () => {
+  const theme = useTheme();
   const expandedWidgetId = useDashboardStore((state) => state.expandedWidgetId);
   const layout = useDashboardStore((state) => state.layout);
   const setExpandedWidget = useDashboardStore((state) => state.setExpandedWidget);
@@ -54,7 +64,7 @@ export const ExpandedWidgetModal: React.FC = () => {
           height: "80vh",
           maxHeight: "80vh",
           borderRadius: 2,
-          backgroundColor: "rgba(255, 255, 255, 0.98)",
+          backgroundColor: alpha(theme.palette.background.paper, 0.98),
           backdropFilter: "blur(10px)",
         },
       }}

@@ -157,7 +157,6 @@ export default {
     failedToLoadAssets: "Échec du chargement des ressources",
   },
   home: {
-    description: "",
     favorites: "Favoris",
     stats: {
       assignedTasks: "Tâches assignées",
@@ -679,6 +678,10 @@ export default {
   common: {
     back: "Retour",
     search: "Rechercher",
+    public: "Public",
+    private: "Privé",
+    items: "éléments",
+    subCollections: "sous-collections",
     batchOperations: {
       deleteSelected: "Supprimer la sélection",
     },
@@ -1279,6 +1282,10 @@ export default {
       expand: "Agrandir",
       refresh: "Actualiser",
       remove: "Supprimer",
+    },
+    widgetSelector: {
+      title: "Ajouter un widget",
+      allAdded: "Tous les widgets sont déjà sur votre tableau de bord",
     },
     resetDialog: {
       title: "Réinitialiser la disposition du tableau de bord ?",

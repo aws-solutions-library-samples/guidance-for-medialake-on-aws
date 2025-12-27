@@ -46,7 +46,8 @@ export const useGetFavorites = (itemType?: string) => {
         : API_ENDPOINTS.FAVORITES.BASE;
 
       const { data } = await apiClient.get<FavoritesResponse>(url);
-      return data.data.favorites;
+      // Handle various response structures gracefully
+      return data?.data?.favorites ?? [];
     },
   });
 };

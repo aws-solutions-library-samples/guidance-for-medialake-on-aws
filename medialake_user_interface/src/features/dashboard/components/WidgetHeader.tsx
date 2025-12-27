@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, IconButton, Typography, CircularProgress } from "@mui/material";
+import { Box, IconButton, Typography, CircularProgress, alpha, useTheme } from "@mui/material";
 import {
   OpenInFull as ExpandIcon,
   Refresh as RefreshIcon,
@@ -19,6 +19,7 @@ export const WidgetHeader: React.FC<WidgetHeaderProps> = ({
   isDraggable = true,
 }) => {
   const { t } = useTranslation();
+  const theme = useTheme();
 
   return (
     <Box
@@ -35,7 +36,7 @@ export const WidgetHeader: React.FC<WidgetHeaderProps> = ({
         "&:active": {
           cursor: isDraggable ? "grabbing" : "default",
         },
-        backgroundColor: "rgba(255, 255, 255, 0.5)",
+        backgroundColor: alpha(theme.palette.background.default, 0.5),
         backdropFilter: "blur(4px)",
         borderTopLeftRadius: "inherit",
         borderTopRightRadius: "inherit",

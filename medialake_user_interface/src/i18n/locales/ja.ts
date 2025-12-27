@@ -154,7 +154,6 @@ export default {
     failedToLoadAssets: "アセットの読み込みに失敗しました",
   },
   home: {
-    description: "",
     favorites: "お気に入り",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -716,6 +715,10 @@ export default {
   common: {
     back: "戻る",
     search: "検索",
+    public: "公開",
+    private: "非公開",
+    items: "アイテム",
+    subCollections: "サブコレクション",
     batchOperations: {
       deleteSelected: "選択項目を削除",
     },
@@ -1271,6 +1274,10 @@ export default {
       expand: "展開",
       refresh: "更新",
       remove: "削除",
+    },
+    widgetSelector: {
+      title: "ウィジェットを追加",
+      allAdded: "すべてのウィジェットはすでにダッシュボードに追加されています",
     },
     resetDialog: {
       title: "ダッシュボードレイアウトをリセットしますか？",

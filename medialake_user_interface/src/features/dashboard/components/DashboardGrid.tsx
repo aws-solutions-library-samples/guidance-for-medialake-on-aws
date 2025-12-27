@@ -1,5 +1,11 @@
-import React, { useCallback, useState } from "react";
-import GridLayout from "react-grid-layout";
+import React, { useCallback, useState, useRef, useEffect } from "react";
+import {
+  ResponsiveGridLayout,
+  verticalCompactor,
+  type Layout,
+  type LayoutItem as RGLLayoutItem,
+  type ResponsiveLayouts,
+} from "react-grid-layout";
 import {
   Box,
   Button,
@@ -28,29 +34,9 @@ import type { WidgetType, LayoutItem } from "../types";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-// WidthProvider is exported but types don't match - use require with type assertion
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports
-const WidthProvider = (require("react-grid-layout") as any).WidthProvider;
-const ResponsiveGridLayout = WidthProvider(GridLayout);
-
-// Type for react-grid-layout Layout item
-interface RGLLayout {
-  i: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  minW?: number;
-  maxW?: number;
-  minH?: number;
-  maxH?: number;
-  static?: boolean;
-  isDraggable?: boolean;
-  isResizable?: boolean;
-}
-
 // Grid configuration
-const COLS = 12;
+const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
+const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
 const ROW_HEIGHT = 80;
 const MARGIN: [number, number] = [16, 16];
 
@@ -63,10 +49,13 @@ const WIDGET_COMPONENTS: Record<WidgetType, React.FC<{ widgetId: string }>> = {
 
 interface DashboardGridProps {
   className?: string;
+  showHeader?: boolean;
 }
 
-export const DashboardGrid: React.FC<DashboardGridProps> = ({ className }) => {
+export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHeader = true }) => {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(1200);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
   const layout = useDashboardStore((state) => state.layout);
@@ -78,12 +67,30 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className }) => {
 
   const availableWidgets = useAvailableWidgets();
 
+  // Measure container width
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   // Handle layout change from react-grid-layout
   const handleLayoutChange = useCallback(
-    (newLayout: RGLLayout[]) => {
+    (currentLayout: Layout, allLayouts: ResponsiveLayouts<string>) => {
       // Convert react-grid-layout format to our format
-      const newLayouts = {
-        lg: newLayout.map((item) => ({
+      const convertLayout = (rglLayout: Layout): LayoutItem[] =>
+        rglLayout.map((item) => ({
           i: item.i,
           x: item.x,
           y: item.y,
@@ -93,34 +100,15 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className }) => {
           minH: item.minH,
           maxW: item.maxW,
           maxH: item.maxH,
-        })) as LayoutItem[],
-        md: newLayout.map((item) => ({
-          i: item.i,
-          x: item.x,
-          y: item.y,
-          w: Math.min(item.w, 10),
-          h: item.h,
-          minW: item.minW,
-          minH: item.minH,
-          maxW: item.maxW ? Math.min(item.maxW, 10) : undefined,
-          maxH: item.maxH,
-        })) as LayoutItem[],
-        sm: newLayout.map((item) => ({
-          i: item.i,
-          x: 0,
-          y: item.y,
-          w: 1,
-          h: item.h,
-          minW: 1,
-          minH: item.minH,
-          maxW: 1,
-          maxH: item.maxH,
-        })) as LayoutItem[],
-      };
+        }));
 
       setLayout({
         ...layout,
-        layouts: newLayouts,
+        layouts: {
+          lg: convertLayout(allLayouts.lg || currentLayout),
+          md: convertLayout(allLayouts.md || currentLayout),
+          sm: convertLayout(allLayouts.sm || currentLayout),
+        },
       });
     },
     [layout, setLayout]
@@ -155,87 +143,93 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className }) => {
   }, []);
 
   // Convert our layout format to react-grid-layout format
-  const gridLayout: RGLLayout[] = layout.layouts.lg.map((item) => ({
-    i: item.i,
-    x: item.x,
-    y: item.y,
-    w: item.w,
-    h: item.h,
-    minW:
-      item.minW ??
-      WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"].minSize
-        .w,
-    minH:
-      item.minH ??
-      WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"].minSize
-        .h,
-    maxW:
-      item.maxW ??
-      WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"].maxSize
-        .w,
-    maxH:
-      item.maxH ??
-      WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"].maxSize
-        .h,
-  }));
+  const convertToRGLLayout = (items: LayoutItem[]): RGLLayoutItem[] =>
+    items.map((item) => {
+      const widgetDef =
+        WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"];
+      return {
+        i: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+        minW: item.minW ?? widgetDef.minSize.w,
+        minH: item.minH ?? widgetDef.minSize.h,
+        maxW: item.maxW ?? widgetDef.maxSize.w,
+        maxH: item.maxH ?? widgetDef.maxSize.h,
+      };
+    });
+
+  const responsiveLayouts: ResponsiveLayouts<string> = {
+    lg: convertToRGLLayout(layout.layouts.lg),
+    md: convertToRGLLayout(layout.layouts.md),
+    sm: convertToRGLLayout(layout.layouts.sm),
+  };
 
   return (
-    <Box className={className} sx={{ width: "100%" }}>
-      {/* Dashboard Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 1,
-          mb: 2,
-        }}
-      >
-        <Tooltip title={t("dashboard.actions.resetLayout")}>
-          <IconButton
-            onClick={handleResetClick}
-            size="small"
-            sx={{
-              color: "text.secondary",
-              "&:hover": {
-                color: "warning.main",
-              },
-            }}
-          >
-            <ResetIcon />
-          </IconButton>
-        </Tooltip>
-
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleOpenWidgetSelector}
-          disabled={availableWidgets.length === 0}
+    <Box className={className} sx={{ width: "100%" }} ref={containerRef}>
+      {/* Dashboard Header - conditionally rendered */}
+      {showHeader && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 1,
+            mb: 2,
+          }}
         >
-          {t("dashboard.actions.addWidget")}
-        </Button>
-      </Box>
+          <Tooltip title={t("dashboard.actions.resetLayout")}>
+            <IconButton
+              onClick={handleResetClick}
+              size="small"
+              sx={{
+                color: "text.secondary",
+                "&:hover": {
+                  color: "warning.main",
+                },
+              }}
+            >
+              <ResetIcon />
+            </IconButton>
+          </Tooltip>
 
-      {/* Grid Layout */}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={handleOpenWidgetSelector}
+            disabled={availableWidgets.length === 0}
+          >
+            {t("dashboard.actions.addWidget")}
+          </Button>
+        </Box>
+      )}
+
+      {/* Responsive Grid Layout */}
       <ResponsiveGridLayout
         className="dashboard-grid"
-        layout={gridLayout}
+        layouts={responsiveLayouts}
+        breakpoints={BREAKPOINTS}
         cols={COLS}
         rowHeight={ROW_HEIGHT}
+        width={containerWidth}
         margin={MARGIN}
         containerPadding={[0, 0]}
         onLayoutChange={handleLayoutChange}
-        draggableHandle=".widget-drag-handle"
-        isResizable={true}
-        isDraggable={true}
-        useCSSTransforms={true}
-        compactType="vertical"
-        preventCollision={false}
+        dragConfig={{
+          enabled: true,
+          handle: ".widget-drag-handle",
+        }}
+        resizeConfig={{
+          enabled: true,
+        }}
+        compactor={verticalCompactor}
+        autoSize={true}
       >
         {layout.widgets.map((widget) => {
           const WidgetComponent = WIDGET_COMPONENTS[widget.type];
           return (
-            <div key={widget.id} data-grid-id={widget.id}>
+            <div key={widget.id} data-grid-id={widget.id} style={{ height: "100%" }}>
               <WidgetComponent widgetId={widget.id} />
             </div>
           );

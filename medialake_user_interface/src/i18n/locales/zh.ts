@@ -150,7 +150,6 @@ export default {
     failedToLoadAssets: "加载资产失败",
   },
   home: {
-    description: "",
     favorites: "收藏夹",
     stats: {
       assignedTasks: "分配的任务",
@@ -710,6 +709,10 @@ export default {
   common: {
     back: "返回",
     search: "搜索",
+    public: "公开",
+    private: "私有",
+    items: "项目",
+    subCollections: "子集合",
     batchOperations: {
       deleteSelected: "删除所选",
     },
@@ -1264,6 +1267,10 @@ export default {
       expand: "展开",
       refresh: "刷新",
       remove: "移除",
+    },
+    widgetSelector: {
+      title: "添加小部件",
+      allAdded: "所有小部件已在您的仪表板上",
     },
     resetDialog: {
       title: "重置仪表板布局？",

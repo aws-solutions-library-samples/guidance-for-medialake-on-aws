@@ -158,7 +158,6 @@ export default {
     failedToLoadAssets: "Fehler beim Laden der Assets",
   },
   home: {
-    description: "",
     favorites: "Favoriten",
     stats: {
       assignedTasks: "Zugewiesene Aufgaben",
@@ -723,6 +722,10 @@ export default {
   common: {
     back: "Zurück",
     search: "Suchen",
+    public: "Öffentlich",
+    private: "Privat",
+    items: "Elemente",
+    subCollections: "Untersammlungen",
     batchOperations: {
       deleteSelected: "Ausgewählte löschen",
     },
@@ -1279,6 +1282,10 @@ export default {
       expand: "Erweitern",
       refresh: "Aktualisieren",
       remove: "Entfernen",
+    },
+    widgetSelector: {
+      title: "Widget hinzufügen",
+      allAdded: "Alle Widgets sind bereits auf Ihrem Dashboard",
     },
     resetDialog: {
       title: "Dashboard-Layout zurücksetzen?",

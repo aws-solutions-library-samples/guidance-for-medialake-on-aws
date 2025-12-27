@@ -151,7 +151,6 @@ export default {
     failedToLoadAssets: "자산 로드 실패",
   },
   home: {
-    description: "",
     favorites: "즐겨찾기",
     stats: {
       assignedTasks: "Assigned Tasks",
@@ -711,6 +710,10 @@ export default {
   common: {
     back: "뒤로",
     search: "검색",
+    public: "공개",
+    private: "비공개",
+    items: "항목",
+    subCollections: "하위 컬렉션",
     batchOperations: {
       deleteSelected: "선택 항목 삭제",
     },
@@ -1265,6 +1268,10 @@ export default {
       expand: "확장",
       refresh: "새로고침",
       remove: "제거",
+    },
+    widgetSelector: {
+      title: "위젯 추가",
+      allAdded: "모든 위젯이 이미 대시보드에 있습니다",
     },
     resetDialog: {
       title: "대시보드 레이아웃을 재설정하시겠습니까?",
