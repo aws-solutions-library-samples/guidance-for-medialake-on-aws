@@ -308,22 +308,37 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             total_nodes = len(pipeline.configuration.nodes)
             processed_nodes = 0
 
+            logger.info(
+                f"[DEBUG] About to create GraphAnalyzer for pipeline with {total_nodes} nodes"
+            )
+
             # Create a graph analyzer to identify first and last lambdas
             graph_analyzer = GraphAnalyzer(pipeline)
+            logger.info("[DEBUG] GraphAnalyzer created, calling analyze()")
             graph_analyzer.analyze()
+            logger.info(
+                "[DEBUG] GraphAnalyzer.analyze() completed, calling find_first_and_last_lambdas()"
+            )
             first_lambda_node_id, last_lambda_node_id = (
                 graph_analyzer.find_first_and_last_lambdas()
             )
+            logger.info("[DEBUG] find_first_and_last_lambdas() completed")
 
             logger.info(f"Identified first lambda node: {first_lambda_node_id}")
             logger.info(f"Identified last lambda node: {last_lambda_node_id}")
 
+            logger.info(
+                f"[DEBUG] Starting node processing loop for {total_nodes} nodes"
+            )
             for node in pipeline.configuration.nodes:
                 processed_nodes += 1
                 node_id = node.data.id
                 node_type = node.data.type.lower()
 
                 # Update status for each node being processed
+                logger.info(
+                    f"[DEBUG] About to update pipeline status for node {processed_nodes}/{total_nodes}"
+                )
                 update_pipeline_status(
                     pipeline_id, f"PROCESSING NODE {processed_nodes}/{total_nodes}"
                 )
@@ -336,8 +351,14 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 is_first = node.id == first_lambda_node_id
                 is_last = node.id == last_lambda_node_id
 
+                logger.info(
+                    f"[DEBUG] About to call create_lambda_function for node {node_id}"
+                )
                 lambda_result = create_lambda_function(
                     pipeline_name, node, pipeline, is_first=is_first, is_last=is_last
+                )
+                logger.info(
+                    f"[DEBUG] create_lambda_function returned for node {node_id}"
                 )
 
                 # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
