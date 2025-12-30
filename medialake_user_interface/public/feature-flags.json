@@ -5,9 +5,6 @@
   "chat-enabled": {
     "value": false
   },
-  "user-favorites-enabled": {
-    "value": false
-  },
   "manual-pipeline-trigger-enabled": {
     "value": false
   },

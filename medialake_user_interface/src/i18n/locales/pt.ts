@@ -1058,6 +1058,12 @@ export default {
   },
   favorites: {
     noFavorites: "Ainda não há ativos favoritos",
+    addFavorite: "Adicionar aos favoritos",
+    removeFavorite: "Remover dos favoritos",
+    errorLoading: "Erro ao carregar favoritos",
+    errorAdding: "Falha ao adicionar favorito",
+    errorRemoving: "Falha ao remover favorito",
+    retry: "Tentar novamente",
   },
   transcription: {
     searchPlaceholder: "Pesquisar transcrição...",

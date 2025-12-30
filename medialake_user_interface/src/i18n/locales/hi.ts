@@ -1048,6 +1048,12 @@ export default {
   },
   favorites: {
     noFavorites: "No favorite assets yet",
+    addFavorite: "पसंदीदा में जोड़ें",
+    removeFavorite: "पसंदीदा से हटाएं",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",
