@@ -36,7 +36,7 @@
             "operationId": "",
             "method": "trigger",
             "parameters": {
-              "Max Concurrent Executions": 10,
+              "Max Concurrent Executions": 100,
               "Prefix": "",
               "Format": "WAV, AIFF, AIF, MP3, PCM, M4A"
             },

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useFeatureFlag } from "@/utils/featureFlags";
 import { useSemanticSearch } from "@/stores/searchStore";
 import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -122,8 +121,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     // Lazy loading state for video assets
     const [isVisible, setIsVisible] = useState(false);
     const cardContainerRef = useRef<HTMLDivElement>(null);
-
-    const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
     // Get semantic mode to conditionally hide buttons
     // Only hide buttons when semantic search is active AND in clip mode
@@ -957,18 +954,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 <IconButton
                   size="small"
                   onClick={(e) => {
-                    console.log("AssetCard: Add to Collection clicked!", e);
-                    console.log(
-                      "AssetCard: onAddToCollectionClick prop is:",
-                      typeof onAddToCollectionClick,
-                      onAddToCollectionClick
-                    );
                     e.stopPropagation();
                     if (onAddToCollectionClick) {
-                      console.log("AssetCard: Calling onAddToCollectionClick");
                       onAddToCollectionClick(e);
-                    } else {
-                      console.log("AssetCard: onAddToCollectionClick is undefined!");
                     }
                   }}
                   sx={{
@@ -1018,6 +1006,32 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     {t("common.actions.assetDetail")}
                   </Box>
                 </Button>
+
+                {/* Favorite button */}
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onFavoriteToggle) {
+                      onFavoriteToggle(e);
+                    }
+                  }}
+                  sx={{
+                    color: isFavorite ? "error.main" : "primary.main",
+                    "&:hover": {
+                      bgcolor: isFavorite ? "error.main" : "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+                  data-testid="favorite-button"
+                >
+                  {isFavorite ? (
+                    <FavoriteIcon fontSize="small" />
+                  ) : (
+                    <FavoriteBorderIcon fontSize="small" />
+                  )}
+                </IconButton>
 
                 <IconButton
                   size="small"
@@ -1088,7 +1102,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 <IconButton
                   size="small"
                   onClick={(e) => {
-                    console.log("AssetCard: Add to Collection clicked!", e);
                     e.stopPropagation();
                     onAddToCollectionClick?.(e);
                   }}
@@ -1140,6 +1153,32 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   </Box>
                 </Button>
 
+                {/* Favorite button */}
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onFavoriteToggle) {
+                      onFavoriteToggle(e);
+                    }
+                  }}
+                  sx={{
+                    color: isFavorite ? "error.main" : "primary.main",
+                    "&:hover": {
+                      bgcolor: isFavorite ? "error.main" : "primary.main",
+                      color: "primary.contrastText",
+                    },
+                  }}
+                  title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+                  data-testid="favorite-button"
+                >
+                  {isFavorite ? (
+                    <FavoriteIcon fontSize="small" />
+                  ) : (
+                    <FavoriteBorderIcon fontSize="small" />
+                  )}
+                </IconButton>
+
                 {!isClipMode && (
                   <IconButton
                     size="small"
@@ -1160,7 +1199,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             </Box>
           )}
 
-          {/* Position checkbox and favorite buttons at the top left of the card */}
+          {/* Position checkbox at the top left of the card */}
           <Box
             sx={{
               position: "absolute",
@@ -1169,11 +1208,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               display: "flex",
               gap: 1,
               zIndex: 1000, // Keep high z-index to ensure it's above other elements
-              opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0, // Visible when hovering, selected, or favorited
+              opacity: shouldShowButtons || isSelected ? 1 : 0, // Visible when hovering or selected
               transition: "opacity 0.2s ease-in-out",
-              pointerEvents: shouldShowButtons || isSelected || isFavorite ? "auto" : "none", // Ensure buttons are clickable when visible
+              pointerEvents: shouldShowButtons || isSelected ? "auto" : "none", // Ensure buttons are clickable when visible
               "&:hover": {
-                opacity: shouldShowButtons || isSelected || isFavorite ? 1 : 0,
+                opacity: shouldShowButtons || isSelected ? 1 : 0,
               },
             }}
             onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
@@ -1221,28 +1260,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 />
               </Box>
             }
-
-            {/* Favorite button - only show if feature flag is enabled */}
-            {favoritesFeature.value && (
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onFavoriteToggle) {
-                    onFavoriteToggle(e);
-                  }
-                }}
-                sx={{
-                  padding: "4px",
-                }}
-              >
-                {isFavorite ? (
-                  <FavoriteIcon fontSize="small" color="error" />
-                ) : (
-                  <FavoriteBorderIcon fontSize="small" />
-                )}
-              </IconButton>
-            )}
           </Box>
 
           {/* Position buttons at the top right of the card, visible on hover or when menu is open - Removed since all assets now have bottom control bars */}

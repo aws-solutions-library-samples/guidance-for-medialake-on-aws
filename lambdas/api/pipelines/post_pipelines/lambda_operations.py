@@ -602,6 +602,7 @@ def create_lambda_function(
         )
         return None
 
+    logger.info(f"[DEBUG] create_lambda_function START for node: {node.id}")
     logger.info(f"Creating/updating Lambda function for node: {node.id}")
     lambda_client = boto3.client("lambda")
 
@@ -629,13 +630,19 @@ def create_lambda_function(
 
     # Read YAML file from S3
     yaml_file_path = f"node_templates/{node.data.type.lower()}/{node.data.id}.yaml"
+    logger.info(
+        f"[DEBUG] About to read YAML from S3: {NODE_TEMPLATES_BUCKET}/{yaml_file_path}"
+    )
     yaml_data = read_yaml_from_s3(NODE_TEMPLATES_BUCKET, yaml_file_path)
+    logger.info(f"[DEBUG] YAML read successfully for node {node.id}")
     logger.debug(yaml_data)
 
     # Create service roles defined in the YAML
+    logger.info(f"[DEBUG] About to create service roles for node {node.data.id}")
     service_roles = create_service_roles_from_yaml(
         pipeline_name, node.data.id, yaml_data
     )
+    logger.info(f"[DEBUG] Service roles created for node {node.data.id}")
     if service_roles:
         logger.info(
             f"Created {len(service_roles)} service roles for node {node.data.id}"
@@ -656,7 +663,9 @@ def create_lambda_function(
             and "integration" in yaml_data.get("node", {})
             and "api" in yaml_data["node"]["integration"]
         ):
+            logger.info(f"[DEBUG] About to call get_node_info for node {node.data.id}")
             node_info = get_node_info(node.data.id)
+            logger.info(f"[DEBUG] get_node_info returned for node {node.data.id}")
             production_server = next(
                 (
                     server
@@ -762,16 +771,20 @@ def create_lambda_function(
     # Extract configurable Lambda parameters with defaults
     config_params = get_lambda_config_with_defaults(lambda_config)
 
+    logger.info(f"[DEBUG] About to create Lambda role for node {node.data.id}")
     role_arn = create_lambda_role(
         pipeline_name, node.data.id, yaml_data, operation_id, function_name, node
     )
+    logger.info(f"[DEBUG] Lambda role created for node {node.data.id}: {role_arn}")
 
     # Wait for the role to propagate before attempting to create the Lambda function
     try:
         # Use the function name as the role name (same as in create_lambda_role)
         role_name = function_name
 
+        logger.info(f"[DEBUG] About to wait for role propagation: {role_name}")
         wait_for_role_propagation(role_name)
+        logger.info(f"[DEBUG] Role propagation complete for: {role_name}")
     except Exception as e:
         logger.warning(
             f"Error waiting for role propagation: {e}, will proceed with Lambda creation anyway"

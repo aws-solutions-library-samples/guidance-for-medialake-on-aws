@@ -1043,6 +1043,12 @@ export default {
   },
   favorites: {
     noFavorites: "No favorite assets yet",
+    addFavorite: "إضافة إلى المفضلة",
+    removeFavorite: "إزالة من المفضلة",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",

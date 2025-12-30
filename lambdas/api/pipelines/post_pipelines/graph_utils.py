@@ -2,6 +2,7 @@
 Graph analysis utilities for pipeline definitions.
 """
 
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from aws_lambda_powertools import Logger
@@ -379,33 +380,55 @@ class GraphAnalyzer:
             """
             Calculate the longest path from root to target node.
             Returns -1 if the node is not reachable from root.
+            Uses DFS with memoization to handle cycles properly.
             """
-            # BFS with path length tracking
-            queue = [(root_node_id, 0)]  # (node_id, depth)
-            visited_with_depth = {root_node_id: 0}
-            max_depth_to_target = -1
+            # Use DFS with memoization and cycle detection
+            memo = {}  # node_id -> longest path to target from this node
 
-            while queue:
-                current_id, depth = queue.pop(0)
-
-                # If we reached the target, update max depth
+            def dfs(current_id: str, visited_in_path: set, depth: int) -> int:
+                """
+                DFS to find longest path from current node to target.
+                Returns the depth at which target is found, or -1 if not reachable.
+                """
+                # If we reached the target, return current depth
                 if current_id == target_node_id:
-                    max_depth_to_target = max(max_depth_to_target, depth)
-                    continue
+                    return depth
 
-                # Explore children
+                # Cycle detection - if we've seen this node in current path, skip
+                if current_id in visited_in_path:
+                    return -1
+
+                # Check memo
+                cache_key = (current_id, depth)
+                if cache_key in memo:
+                    return memo[cache_key]
+
+                # Mark as visited in current path
+                visited_in_path.add(current_id)
+
+                max_depth = -1
                 if current_id in self.graph:
                     for child_id in self.graph[current_id]:
-                        new_depth = depth + 1
-                        # Visit if not visited, or if we found a longer path
-                        if (
-                            child_id not in visited_with_depth
-                            or visited_with_depth[child_id] < new_depth
-                        ):
-                            visited_with_depth[child_id] = new_depth
-                            queue.append((child_id, new_depth))
+                        result = dfs(child_id, visited_in_path, depth + 1)
+                        if result > max_depth:
+                            max_depth = result
 
-            return max_depth_to_target
+                # Unmark from current path
+                visited_in_path.remove(current_id)
+
+                memo[cache_key] = max_depth
+                return max_depth
+
+            # Limit recursion depth to prevent stack overflow
+            old_limit = sys.getrecursionlimit()
+            sys.setrecursionlimit(max(old_limit, 1000))
+
+            try:
+                result = dfs(root_node_id, set(), 0)
+            finally:
+                sys.setrecursionlimit(old_limit)
+
+            return result
 
         # Calculate path lengths for all terminal nodes
         terminal_nodes_with_paths = []

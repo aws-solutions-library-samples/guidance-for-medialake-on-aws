@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, Stack, CircularProgress } from "@mui/material";
+import { Box, Typography, Stack, CircularProgress, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useGetFavorites, useRemoveFavorite } from "../../api/hooks/useFavorites";
@@ -9,12 +9,7 @@ import { getOriginalAssetId } from "@/utils/clipTransformation";
 export const Favorites: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const {
-    data: unsortedFavorites,
-    isLoading,
-    error,
-    // refetch,
-  } = useGetFavorites("ASSET");
+  const { data: unsortedFavorites, isLoading, error, refetch } = useGetFavorites("ASSET");
   const { mutate: removeFavorite } = useRemoveFavorite();
 
   // Sort favorites by addedAt timestamp in descending order (newest first)
@@ -41,15 +36,6 @@ export const Favorites: React.FC = () => {
       return 0;
     });
   }, [unsortedFavorites]);
-
-  // Log when the component renders and when data changes
-  console.log("Favorites component rendering with sorted data:", favorites);
-
-  // Add effect to log when favorites data changes
-  React.useEffect(() => {
-    console.log("Favorites data changed:", unsortedFavorites);
-    console.log("Sorted favorites:", favorites);
-  }, [unsortedFavorites, favorites]);
 
   // Handle clicking on an asset to navigate to its detail page
   const handleAssetClick = (assetId: string, assetType: string) => {
@@ -91,9 +77,14 @@ export const Favorites: React.FC = () => {
     return (
       <Box>
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-          Favorites
+          {t("home.favorites")}
         </Typography>
-        <Typography color="error">Error loading favorites: {error.message}</Typography>
+        <Typography color="error" sx={{ mb: 2 }}>
+          {t("favorites.errorLoading")}
+        </Typography>
+        <Button variant="outlined" onClick={() => refetch()}>
+          {t("favorites.retry")}
+        </Button>
       </Box>
     );
   }
@@ -113,7 +104,7 @@ export const Favorites: React.FC = () => {
   return (
     <Box>
       <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-        Favorites
+        {t("home.favorites")}
       </Typography>
 
       <Stack

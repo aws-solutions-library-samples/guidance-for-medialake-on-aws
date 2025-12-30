@@ -1055,6 +1055,12 @@ export default {
   },
   favorites: {
     noFavorites: "No favorite assets yet",
+    addFavorite: "Zu Favoriten hinzufügen",
+    removeFavorite: "Aus Favoriten entfernen",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",

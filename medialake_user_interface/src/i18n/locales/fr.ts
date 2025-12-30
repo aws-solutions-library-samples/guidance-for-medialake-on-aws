@@ -1018,6 +1018,12 @@ export default {
   },
   favorites: {
     noFavorites: "Aucun actif favori pour le moment",
+    addFavorite: "Ajouter aux favoris",
+    removeFavorite: "Retirer des favoris",
+    errorLoading: "Erreur lors du chargement des favoris",
+    errorAdding: "Échec de l'ajout aux favoris",
+    errorRemoving: "Échec de la suppression des favoris",
+    retry: "Réessayer",
   },
   transcription: {
     searchPlaceholder: "Rechercher dans la transcription...",

@@ -1048,6 +1048,12 @@ export default {
   },
   favorites: {
     noFavorites: "No favorite assets yet",
+    addFavorite: "お気に入りに追加",
+    removeFavorite: "お気に入りから削除",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",

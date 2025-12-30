@@ -1,7 +1,6 @@
 import React from "react";
 import { type SortingState } from "@tanstack/react-table";
 import { AssetTable } from "./AssetTable";
-import { useFeatureFlag } from "@/utils/featureFlags";
 
 interface AssetTableViewProps<T> {
   results: T[];
@@ -60,7 +59,6 @@ function AssetTableView<T>({
   isRenaming,
   renamingAssetId,
 }: AssetTableViewProps<T>) {
-  const favoritesFeature = useFeatureFlag("user-favorites-enabled", false);
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
     if (!groupByType) return { all: results };
@@ -108,8 +106,8 @@ function AssetTableView<T>({
         onEditNameComplete={onEditNameComplete}
         isSelected={isSelected}
         onSelectToggle={onSelectToggle}
-        isFavorite={favoritesFeature.value ? isFavorite : undefined}
-        onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
+        isFavorite={isFavorite}
+        onFavoriteToggle={onFavoriteToggle}
         selectedSearchFields={selectedSearchFields}
         isRenaming={isRenaming}
         renamingAssetId={renamingAssetId}
@@ -157,8 +155,8 @@ function AssetTableView<T>({
               onEditNameComplete={onEditNameComplete}
               isSelected={isSelected}
               onSelectToggle={onSelectToggle}
-              isFavorite={favoritesFeature.value ? isFavorite : undefined}
-              onFavoriteToggle={favoritesFeature.value ? onFavoriteToggle : undefined}
+              isFavorite={isFavorite}
+              onFavoriteToggle={onFavoriteToggle}
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}

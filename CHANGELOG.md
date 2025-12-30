@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0] - 2025-12-30
+
+### Features
+
+- feat: Favorites implementation
+
+### Bug Fixes
+
+- fix: resolve infinite loop in pipeline creation for cyclic graphs
+- fix: use configured Max Concurrent Executions parameter instead of hardcoded value
+
 ## [1.2.2] - 2025-12-22
 
 ### Bug Fixes

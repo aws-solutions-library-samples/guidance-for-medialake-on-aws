@@ -1042,6 +1042,12 @@ export default {
   },
   favorites: {
     noFavorites: "No favorite assets yet",
+    addFavorite: "添加到收藏夹",
+    removeFavorite: "从收藏夹移除",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",

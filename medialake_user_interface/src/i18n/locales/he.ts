@@ -1042,7 +1042,13 @@ export default {
     addCommentPlaceholder: "הוסף a comment...",
   },
   favorites: {
-    noFavorites: "No favorite assets yet",
+    noFavorites: "מועדפים ריקים",
+    addFavorite: "הוסף למועדפים",
+    removeFavorite: "הסר מהמועדפים",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
   },
   transcription: {
     searchPlaceholder: "Search transcript...",

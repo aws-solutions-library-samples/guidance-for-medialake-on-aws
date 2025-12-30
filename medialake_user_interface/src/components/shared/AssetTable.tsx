@@ -31,7 +31,6 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { AssetAudio } from "../asset";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
-import { useFeatureFlag } from "@/utils/featureFlags";
 
 export interface AssetTableProps<T> {
   data: T[];
@@ -99,7 +98,6 @@ export function AssetTable<T>({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const preventCommitRef = useRef<boolean>(false);
   const commitRef = useRef<(() => void) | null>(null);
-  const favoritesFeature = useFeatureFlag("user-favorites-enabled", true);
 
   // Create a mapping between API field IDs and column IDs
   const fieldMapping: Record<string, string> = {
@@ -496,26 +494,24 @@ export function AssetTable<T>({
         size: 150,
         cell: (info) => (
           <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1 }}>
-            {favoritesFeature.value && (
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onFavoriteToggle) {
-                    onFavoriteToggle(info.row.original, e);
-                  }
-                }}
-                sx={{
-                  padding: "4px",
-                }}
-              >
-                {isFavorite(info.row.original) ? (
-                  <FavoriteIcon fontSize="small" color="error" />
-                ) : (
-                  <FavoriteBorderIcon fontSize="small" />
-                )}
-              </IconButton>
-            )}
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onFavoriteToggle) {
+                  onFavoriteToggle(info.row.original, e);
+                }
+              }}
+              sx={{
+                padding: "4px",
+              }}
+            >
+              {isFavorite(info.row.original) ? (
+                <FavoriteIcon fontSize="small" color="error" />
+              ) : (
+                <FavoriteBorderIcon fontSize="small" />
+              )}
+            </IconButton>
             <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
               <DeleteIcon fontSize="small" />
             </IconButton>
