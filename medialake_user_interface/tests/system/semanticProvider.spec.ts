@@ -2,9 +2,7 @@ import { test } from "../fixtures/auth.fixtures";
 import { expect } from "@playwright/test";
 
 test.describe("Semantic Provider Configuration Management", () => {
-  test("should navigate to System Settings page", async ({
-    authenticatedPage: page,
-  }) => {
+  test("should navigate to System Settings page", async ({ authenticatedPage: page }) => {
     // Navigate to System Settings
     await page.getByRole("button", { name: "Settings" }).click();
     await page.getByRole("button", { name: "System Settings" }).click();
@@ -19,9 +17,7 @@ test.describe("Semantic Provider Configuration Management", () => {
     await expect(checkbox).toBeVisible();
 
     // Verify if Edit Provider button exists - using a more flexible selector
-    await expect(
-      page.getByRole("button", { name: /Edit Provider/i }),
-    ).toBeVisible({
+    await expect(page.getByRole("button", { name: /Edit Provider/i })).toBeVisible({
       timeout: 10000,
     });
   });

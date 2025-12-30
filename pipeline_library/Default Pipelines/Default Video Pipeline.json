@@ -36,8 +36,9 @@
             "operationId": "",
             "method": "trigger",
             "parameters": {
+              "Max Concurrent Executions": 100,
               "Prefix": "",
-              "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF"
+              "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF, MTS"
             },
             "requestMapping": null,
             "responseMapping": null
@@ -55,7 +56,7 @@
         },
         "data": {
           "nodeId": "video_metadata_extractor",
-          "label": "Video Metadata Extractor (extract) (extract)",
+          "label": "Video Metadata Extractor (extract)",
           "description": "Extract metadata from an video file stored in S3",
           "icon": {
             "key": null,

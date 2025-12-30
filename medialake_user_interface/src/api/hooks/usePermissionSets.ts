@@ -22,48 +22,29 @@ export const useGetPermissionSets = (enabled = false) => {
     queryFn: async () => {
       try {
         console.log(
-          `Fetching permission sets... [${new Date().toISOString()}] from hook instance: ${hookId}`,
+          `Fetching permission sets... [${new Date().toISOString()}] from hook instance: ${hookId}`
         );
-        const { data } = await apiClient.get<any>(
-          API_ENDPOINTS.PERMISSION_SETS.BASE,
-        );
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.PERMISSION_SETS.BASE);
         console.log(
-          `Permission sets API response [${new Date().toISOString()}] for hook instance: ${hookId}`,
+          `Permission sets API response [${new Date().toISOString()}] for hook instance: ${hookId}`
         );
 
         // Handle string body format (older API format)
         if (typeof data.body === "string") {
           const parsedBody = JSON.parse(data.body) as PermissionSetListResponse;
-          console.log(
-            "Parsed permission sets from string:",
-            parsedBody.data.permissionSets,
-          );
+          console.log("Parsed permission sets from string:", parsedBody.data.permissionSets);
           return parsedBody.data.permissionSets;
         }
 
         // Handle nested body.data.permissionSets format
-        if (
-          data.body &&
-          data.body.data &&
-          Array.isArray(data.body.data.permissionSets)
-        ) {
-          console.log(
-            "Permission sets from data.body:",
-            data.body.data.permissionSets,
-          );
+        if (data.body && data.body.data && Array.isArray(data.body.data.permissionSets)) {
+          console.log("Permission sets from data.body:", data.body.data.permissionSets);
           return data.body.data.permissionSets;
         }
 
         // Handle direct response format {status, message, data: {permissionSets: []}}
-        if (
-          data.status &&
-          data.data &&
-          Array.isArray(data.data.permissionSets)
-        ) {
-          console.log(
-            "Permission sets from direct response:",
-            data.data.permissionSets,
-          );
+        if (data.status && data.data && Array.isArray(data.data.permissionSets)) {
+          console.log("Permission sets from direct response:", data.data.permissionSets);
           return data.data.permissionSets;
         }
 
@@ -72,12 +53,8 @@ export const useGetPermissionSets = (enabled = false) => {
       } catch (error: any) {
         // Handle 403 errors gracefully
         if (error?.response?.status === 403) {
-          console.log(
-            `Permission sets API returned 403 Forbidden for hook instance: ${hookId}`,
-          );
-          console.log(
-            "User likely does not have permission to access permission sets",
-          );
+          console.log(`Permission sets API returned 403 Forbidden for hook instance: ${hookId}`);
+          console.log("User likely does not have permission to access permission sets");
           // Return empty array instead of throwing an error
           return [];
         }
@@ -94,9 +71,7 @@ export const useGetPermissionSet = (id: string, enabled = true) => {
     enabled: enabled && !!id,
     queryFn: async () => {
       console.log(`Fetching permission set with id: ${id}`);
-      const { data } = await apiClient.get<any>(
-        API_ENDPOINTS.PERMISSION_SETS.GET(id),
-      );
+      const { data } = await apiClient.get<any>(API_ENDPOINTS.PERMISSION_SETS.GET(id));
       console.log("Permission set API response:", data);
 
       // Handle string body format
@@ -173,9 +148,7 @@ export const useDeletePermissionSet = () => {
 
   return useMutation<void, Error, string>({
     mutationFn: async (permissionSetId) => {
-      await apiClient.delete(
-        API_ENDPOINTS.PERMISSION_SETS.DELETE(permissionSetId),
-      );
+      await apiClient.delete(API_ENDPOINTS.PERMISSION_SETS.DELETE(permissionSetId));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

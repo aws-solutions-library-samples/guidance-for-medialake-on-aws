@@ -1,9 +1,6 @@
 import React from "react";
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { useTranslation } from "react-i18next";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
@@ -65,7 +62,7 @@ interface MasterResultsViewProps {
   // Event handlers for view preferences
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => void;
   onCardSizeChange: (size: "small" | "medium" | "large") => void;
   onAspectRatioChange: (ratio: "vertical" | "square" | "horizontal") => void;
@@ -85,26 +82,14 @@ interface MasterResultsViewProps {
 
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
-  onDeleteClick: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onEditNameComplete: (asset: AssetItem, save: boolean, value?: string) => void;
-  onSelectToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
-  onFavoriteToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
 
   // Select all functionality
   hasSelectedAssets?: boolean;
@@ -188,11 +173,13 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
+  const { t } = useTranslation();
+
   // Debug: Check if we're receiving the onAddToCollectionClick prop
   console.log(
     "MasterResultsView: onAddToCollectionClick prop is:",
     typeof onAddToCollectionClick,
-    onAddToCollectionClick,
+    onAddToCollectionClick
   );
 
   // Get semantic mode from store
@@ -219,7 +206,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
             page: searchMetadata.page,
             pageSize: searchMetadata.pageSize,
           }
-        : undefined,
+        : undefined
     );
 
     // Adjust search metadata for clip mode
@@ -247,33 +234,32 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
           // Use clip display name for clip assets
           return isClipAsset(asset)
             ? getClipDisplayName(asset)
-            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-                .PrimaryLocation.ObjectKey.Name;
+            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+                .Name;
         case "type":
           return asset.DigitalSourceAsset.Type;
         case "format":
           return asset.DigitalSourceAsset.MainRepresentation.Format;
-        case "size":
+        case "size": {
           const sizeInBytes =
-            asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-              .PrimaryLocation.FileInfo.Size;
+            asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
           return formatFileSize(sizeInBytes);
+        }
         case "createdAt":
           return formatDate(asset.DigitalSourceAsset.CreateDate);
         case "modifiedAt":
           return formatDate(
-            asset.DigitalSourceAsset.ModifiedDate ||
-              asset.DigitalSourceAsset.CreateDate,
+            asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
           );
         case "fullPath":
-          return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.ObjectKey.FullPath;
+          return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+            .FullPath;
         default:
           console.log("Unknown field ID:", fieldId);
           return "";
       }
     },
-    [],
+    []
   ); // No dependencies since this function is pure
 
   // Function to check if an asset is selected
@@ -284,10 +270,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 
   // Debounce the confidence threshold to reduce rapid filtering during slider interaction
   // Reduced debounce time for more responsive UI
-  const debouncedConfidenceThreshold = useDebounce(
-    confidenceThreshold || 0,
-    100,
-  );
+  const debouncedConfidenceThreshold = useDebounce(confidenceThreshold || 0, 100);
 
   // Filter results based on confidence threshold for semantic search
   // This is a lightweight operation that only filters the pre-computed results
@@ -308,10 +291,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       const passesThreshold = score >= debouncedConfidenceThreshold;
 
       // Debug logging for clips starting at 00:00:00
-      if (
-        isClipAsset(asset) &&
-        asset.clipData.start_timecode === "00:00:00:00"
-      ) {
+      if (isClipAsset(asset) && asset.clipData.start_timecode === "00:00:00:00") {
         console.log(`🔍 Confidence filtering clip starting at 00:00:00:00:`, {
           assetId: asset.InventoryID,
           score,
@@ -324,14 +304,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
     });
 
     const endTime = performance.now();
-    console.log(
-      `🔍 Confidence filtering completed in ${(endTime - startTime).toFixed(2)}ms`,
-      {
-        originalCount: transformedResults.length,
-        filteredCount: filtered.length,
-        threshold: debouncedConfidenceThreshold,
-      },
-    );
+    console.log(`🔍 Confidence filtering completed in ${(endTime - startTime).toFixed(2)}ms`, {
+      originalCount: transformedResults.length,
+      filteredCount: filtered.length,
+      threshold: debouncedConfidenceThreshold,
+    });
 
     return filtered;
   }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);
@@ -350,7 +327,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       availableFields={availableFields}
       onFieldsChange={onFieldsChange}
       searchTerm={searchTerm}
-      title="Results"
+      title={t("search.results.title")}
       groupByType={groupByType}
       onGroupByTypeChange={onGroupByTypeChange}
       viewMode={viewMode}
@@ -394,18 +371,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         (asset) =>
           isClipAsset(asset)
             ? getClipDisplayName(asset)
-            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-                .PrimaryLocation.ObjectKey.Name,
-        [],
+            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+                .Name,
+        []
       )}
-      getAssetType={React.useCallback(
-        (asset) => asset.DigitalSourceAsset.Type,
-        [],
-      )}
-      getAssetThumbnail={React.useCallback(
-        (asset) => asset.thumbnailUrl || "",
-        [],
-      )}
+      getAssetType={React.useCallback((asset) => asset.DigitalSourceAsset.Type, [])}
+      getAssetThumbnail={React.useCallback((asset) => asset.thumbnailUrl || "", [])}
       getAssetProxy={React.useCallback((asset) => asset.proxyUrl || "", [])}
       renderCardField={renderCardField}
     />

@@ -1,15 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   useSearchProvider,
   useCreateSearchProvider,
   useUpdateSearchProvider,
   useDeleteSearchProvider,
 } from "../api/systemHooks";
-import {
-  SearchProvider,
-  SemanticSearchSettings,
-  SystemSettingsState,
-} from "../types/system.types";
+import { SearchProvider, SemanticSearchSettings, SystemSettingsState } from "../types/system.types";
 import { SYSTEM_SETTINGS_CONFIG } from "../config";
 
 // Function to check if semantic search is properly configured and enabled
@@ -120,8 +116,7 @@ export const useSemanticSearchSettings = () => {
 
   // Check if current settings differ from original
   useEffect(() => {
-    const hasChanges =
-      JSON.stringify(settings.current) !== JSON.stringify(settings.original);
+    const hasChanges = JSON.stringify(settings.current) !== JSON.stringify(settings.original);
     setSettings((prev) => ({
       ...prev,
       hasChanges,
@@ -225,7 +220,7 @@ export const useSemanticSearchSettings = () => {
 
   // Handle provider type change
   const handleProviderTypeChange = async (
-    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive",
+    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive"
   ) => {
     if (providerType === "none") {
       // Reset to no provider
@@ -316,9 +311,7 @@ export const useSemanticSearchSettings = () => {
             provider: {
               type: "twelvelabs-bedrock",
               config: {
-                id: providerExists
-                  ? prev.original.provider.config?.id || ""
-                  : "",
+                id: providerExists ? prev.original.provider.config?.id || "" : "",
                 name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
                 type: "twelvelabs-bedrock",
                 apiKey: "",
@@ -333,9 +326,7 @@ export const useSemanticSearchSettings = () => {
             provider: {
               type: "twelvelabs-bedrock",
               config: {
-                id: providerExists
-                  ? prev.original.provider.config?.id || ""
-                  : "",
+                id: providerExists ? prev.original.provider.config?.id || "" : "",
                 name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name,
                 type: "twelvelabs-bedrock",
                 apiKey: "",
@@ -354,9 +345,7 @@ export const useSemanticSearchSettings = () => {
   };
 
   // Handle embedding store change
-  const handleEmbeddingStoreChange = (
-    storeType: "opensearch" | "s3-vector",
-  ) => {
+  const handleEmbeddingStoreChange = (storeType: "opensearch" | "s3-vector") => {
     setSettings((prev) => ({
       ...prev,
       current: {
@@ -409,11 +398,7 @@ export const useSemanticSearchSettings = () => {
   // Handle API key dialog
   const handleOpenApiKeyDialog = (isEdit = false) => {
     setIsEditingApiKey(isEdit);
-    setApiKeyInput(
-      isEdit && settings.current.provider.config?.apiKey
-        ? "••••••••••••••••"
-        : "",
-    );
+    setApiKeyInput(isEdit && settings.current.provider.config?.apiKey ? "••••••••••••••••" : "");
     setIsApiKeyDialogOpen(true);
   };
 
@@ -428,10 +413,7 @@ export const useSemanticSearchSettings = () => {
       const currentProviderType = settings.current.provider.type;
 
       let providerConfig: SearchProvider;
-      let providerTypeForState:
-        | "twelvelabs-api"
-        | "twelvelabs-bedrock"
-        | "coactive";
+      let providerTypeForState: "twelvelabs-api" | "twelvelabs-bedrock" | "coactive";
 
       if (currentProviderType === "coactive") {
         providerConfig = {
@@ -451,8 +433,7 @@ export const useSemanticSearchSettings = () => {
           name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
           type: "twelvelabs-api", // API key dialog is only for API providers
           apiKey: apiKeyInput,
-          endpoint:
-            SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+          endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
           isConfigured: true,
           isEnabled: true,
         };
@@ -480,8 +461,7 @@ export const useSemanticSearchSettings = () => {
       // Save to API immediately with the new API key
       // Check if there's already a provider configured (any provider)
       const hasExistingProvider =
-        settings.original.provider.config?.isConfigured ||
-        settings.original.provider.config?.id;
+        settings.original.provider.config?.isConfigured || settings.original.provider.config?.id;
 
       if (hasExistingProvider) {
         // Update existing provider (supports type switching now)
@@ -533,8 +513,7 @@ export const useSemanticSearchSettings = () => {
 
       if (
         current.provider.config &&
-        (current.provider.type === "twelvelabs-api" ||
-          current.provider.type === "coactive")
+        (current.provider.type === "twelvelabs-api" || current.provider.type === "coactive")
       ) {
         if (providerExists) {
           // Update existing provider
@@ -623,10 +602,7 @@ export const useSemanticSearchSettings = () => {
     handleCancel,
 
     // Mutations
-    isSaving:
-      createProvider.isPending ||
-      updateProvider.isPending ||
-      deleteProvider.isPending,
+    isSaving: createProvider.isPending || updateProvider.isPending || deleteProvider.isPending,
 
     // Dialog input handlers
     setApiKeyInput,
@@ -646,9 +622,7 @@ export const useSystemSettingsManager = () => {
 
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [newProviderDetails, setNewProviderDetails] = useState<
-    Partial<SearchProvider>
-  >({
+  const [newProviderDetails, setNewProviderDetails] = useState<Partial<SearchProvider>>({
     apiKey: "",
     endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
   });
@@ -680,8 +654,7 @@ export const useSystemSettingsManager = () => {
     setIsEditMode(false);
     setNewProviderDetails({
       apiKey: "",
-      endpoint:
-        SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+      endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };
@@ -692,8 +665,7 @@ export const useSystemSettingsManager = () => {
     setNewProviderDetails({
       apiKey: provider.apiKey || "",
       endpoint:
-        provider.endpoint ||
-        SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+        provider.endpoint || SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
     });
     setIsProviderDialogOpen(true);
   };

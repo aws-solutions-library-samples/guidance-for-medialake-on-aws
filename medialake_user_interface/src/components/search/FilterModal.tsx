@@ -1,10 +1,5 @@
 import React from "react";
-import { FacetFilters } from "../../types/facetSearch";
-import {
-  useFilterModalOpen,
-  useFilterModalDraft,
-  useUIActions,
-} from "../../stores/searchStore";
+import { useFilterModalOpen, useFilterModalDraft, useUIActions } from "../../stores/searchStore";
 import {
   Box,
   Dialog,
@@ -81,19 +76,15 @@ export interface FilterModalProps {
   };
 }
 
-const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
+const FilterModal: React.FC<FilterModalProps> = () => {
   const { t } = useTranslation();
   const theme = useTheme();
 
   // Use store state and actions
   const isOpen = useFilterModalOpen();
   const draft = useFilterModalDraft();
-  const {
-    closeFilterModal,
-    updateFilterModalDraft,
-    applyFilterModalDraft,
-    resetFilterModalDraft,
-  } = useUIActions();
+  const { closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } =
+    useUIActions();
 
   // Destructure draft state for easier access
   const {
@@ -166,7 +157,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
   };
 
   // Get available extensions from facet counts if available
-  const availableExtensions = facetCounts?.file_extensions?.buckets || [];
+  // const _availableExtensions = facetCounts?.file_extensions?.buckets || [];
 
   return (
     <Dialog
@@ -189,15 +180,8 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
           pb: 1,
         }}
       >
-        <Typography variant="h6">
-          {t("search.filters.title", "Filter Results")}
-        </Typography>
-        <IconButton
-          edge="end"
-          color="inherit"
-          onClick={handleClose}
-          aria-label="close"
-        >
+        <Typography variant="h6">{t("search.filters.title", "Filter Results")}</Typography>
+        <IconButton edge="end" color="inherit" onClick={handleClose} aria-label="close">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -213,10 +197,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
               fontWeight="medium"
               sx={{ mb: 1.5, display: "flex", alignItems: "center" }}
             >
-              <Box
-                component="span"
-                sx={{ mr: 1, display: "flex", alignItems: "center" }}
-              >
+              <Box component="span" sx={{ mr: 1, display: "flex", alignItems: "center" }}>
                 <ImageIcon fontSize="small" />
               </Box>
               Media Type and Extensions
@@ -224,10 +205,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
 
             {/* Media Types with Extensions */}
             {MEDIA_TYPES.map((mediaType) => (
-              <Box
-                key={mediaType.key}
-                sx={{ mb: 1.5, display: "flex", flexDirection: "column" }}
-              >
+              <Box key={mediaType.key} sx={{ mb: 1.5, display: "flex", flexDirection: "column" }}>
                 <Box sx={{ display: "flex", alignItems: "center" }}>
                   {/* Media Type Button */}
                   <ToggleButton
@@ -262,9 +240,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   </ToggleButton>
 
                   {/* Extensions */}
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, ml: 1 }}
-                  >
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, ml: 1 }}>
                     {mediaType.extensions.map((ext) => {
                       const isSelected = selectedExtensions.includes(ext);
 
@@ -307,10 +283,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                 fontWeight="medium"
                 sx={{ display: "flex", alignItems: "center" }}
               >
-                <Box
-                  component="span"
-                  sx={{ mr: 1, display: "flex", alignItems: "center" }}
-                >
+                <Box component="span" sx={{ mr: 1, display: "flex", alignItems: "center" }}>
                   <SizeIcon fontSize="small" />
                 </Box>
                 File Size
@@ -322,8 +295,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   size="small"
                   value={minSizeValue}
                   onChange={(e) => {
-                    const newValue =
-                      e.target.value === "" ? "" : Number(e.target.value);
+                    const newValue = e.target.value === "" ? "" : Number(e.target.value);
                     updateFilterModalDraft({ minSizeValue: newValue });
                   }}
                   inputProps={{ min: 0 }}
@@ -340,8 +312,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                   size="small"
                   value={maxSizeValue}
                   onChange={(e) => {
-                    const newValue =
-                      e.target.value === "" ? "" : Number(e.target.value);
+                    const newValue = e.target.value === "" ? "" : Number(e.target.value);
                     updateFilterModalDraft({ maxSizeValue: newValue });
                   }}
                   inputProps={{ min: 0 }}
@@ -380,10 +351,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                 fontWeight="medium"
                 sx={{ display: "flex", alignItems: "center", mr: 2 }}
               >
-                <Box
-                  component="span"
-                  sx={{ mr: 1, display: "flex", alignItems: "center" }}
-                >
+                <Box component="span" sx={{ mr: 1, display: "flex", alignItems: "center" }}>
                   <DateIcon fontSize="small" />
                 </Box>
                 Date Created
@@ -418,10 +386,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                 <Box sx={{ flex: 1, minWidth: "140px" }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ mb: 0.5, fontSize: "0.75rem" }}
-                  >
+                  <Typography variant="body2" sx={{ mb: 0.5, fontSize: "0.75rem" }}>
                     {t("search.filters.fromDate", "From Date & Time")}
                   </Typography>
                   <DateTimePicker
@@ -439,8 +404,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                         InputProps: {
                           sx: {
                             "&.Mui-disabled": {
-                              backgroundColor:
-                                theme.palette.action.disabledBackground,
+                              backgroundColor: theme.palette.action.disabledBackground,
                               opacity: 0.8,
                             },
                           },
@@ -461,10 +425,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                 </Box>
 
                 <Box sx={{ flex: 1, minWidth: "140px" }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ mb: 0.5, fontSize: "0.75rem" }}
-                  >
+                  <Typography variant="body2" sx={{ mb: 0.5, fontSize: "0.75rem" }}>
                     {t("search.filters.toDate", "To Date & Time")}
                   </Typography>
                   <DateTimePicker
@@ -482,8 +443,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ facetCounts }) => {
                         InputProps: {
                           sx: {
                             "&.Mui-disabled": {
-                              backgroundColor:
-                                theme.palette.action.disabledBackground,
+                              backgroundColor: theme.palette.action.disabledBackground,
                               opacity: 0.8,
                             },
                           },

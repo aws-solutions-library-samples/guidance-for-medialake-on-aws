@@ -4,10 +4,7 @@ interface JwtPayload {
   exp: number;
 }
 
-export const isTokenExpiringSoon = (
-  token: string,
-  bufferTimeInSeconds: number = 300,
-): boolean => {
+export const isTokenExpiringSoon = (token: string, bufferTimeInSeconds: number = 300): boolean => {
   try {
     const { exp } = jwtDecode<JwtPayload>(token);
     const currentTime = Math.floor(Date.now() / 1000);

@@ -10,6 +10,7 @@ node:
       aws_eventbridge:
         aws_eventbridge_rule: ingest_completed
         event_pattern:
+          source: ["custom.asset.processor"]
           detail-type: ["AssetCreated"]
           detail:
             DigitalSourceAsset:
@@ -22,22 +23,29 @@ actions:
     operationId: triggerIngestCompleted
     parameters:
       - in: body
+        name: Max Concurrent Executions
+        required: false
+        default: 10
+        schema:
+          type: integer
+      - in: body
         name: Prefix
         required: false
         schema:
           type: string
       - in: body
         name: Format
-        label: format
+        label: Format
         required: false
         schema:
           type: select
           options:
-            [
-              "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG",
-              "MP4, MOV, AVI, MKV, WEBM, MXF",
-              "WAV, AIFF, AIF, MP3, PCM, M4A",
-            ]
+            - label: "Image Formats (TIF, JPG, JPEG, PNG, WEBP, GIF, SVG)"
+              value: "TIF, JPG, JPEG, PNG, WEBP, GIF, SVG"
+            - label: "Video Formats (MP4, MOV, AVI, MKV, WEBM, MXF)"
+              value: "MP4, MOV, AVI, MKV, WEBM, MXF"
+            - label: "Audio Formats (WAV, AIFF, AIF, MP3, PCM, M4A)"
+              value: "WAV, AIFF, AIF, MP3, PCM, M4A"
     connections:
       incoming:
         type: [any]

@@ -2,13 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../apiClient";
 import { API_ENDPOINTS } from "../endpoints";
 import { QUERY_KEYS } from "../queryKeys";
-import {
-  Role,
-  CreateRoleRequest,
-  UpdateRoleRequest,
-  RoleListResponse,
-  RoleResponse,
-} from "../types/api.types";
+import { Role, CreateRoleRequest, UpdateRoleRequest, RoleResponse } from "../types/api.types";
 
 // export const useGetRoles = () => {
 //     return useQuery<Role[], Error>({
@@ -85,11 +79,7 @@ export const useCreateRole = () => {
 export const useUpdateRole = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    RoleResponse,
-    Error,
-    { id: string; updates: UpdateRoleRequest }
-  >({
+  return useMutation<RoleResponse, Error, { id: string; updates: UpdateRoleRequest }>({
     mutationFn: async ({ id, updates }) => {
       const { data } = await apiClient.put<{
         statusCode: number;

@@ -1,21 +1,14 @@
 import {
-  useGetNodes,
+  // useGetNodes,
   useGetNode,
   useGetUnconfiguredNodeMethods,
 } from "@/shared/nodes/api/nodesController";
-import { Node, NodesError } from "@/shared/nodes/types/nodes.types";
+import { Node } from "@/shared/nodes/types/nodes.types";
 
 export class IntegrationsNodesService {
   public static useNodes() {
-    const {
-      data,
-      isLoading,
-      error,
-      isError,
-      isFetching,
-      refetch,
-      isRefetching,
-    } = useGetUnconfiguredNodeMethods();
+    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
+      useGetUnconfiguredNodeMethods();
 
     return {
       nodes: data?.data ?? [],
@@ -35,15 +28,8 @@ export class IntegrationsNodesService {
   }
 
   public static useNode(nodeId: string) {
-    const {
-      data,
-      isLoading,
-      error,
-      isError,
-      isFetching,
-      refetch,
-      isRefetching,
-    } = useGetNode(nodeId);
+    const { data, isLoading, error, isError, isFetching, refetch, isRefetching } =
+      useGetNode(nodeId);
 
     return {
       node: data?.data?.[0],

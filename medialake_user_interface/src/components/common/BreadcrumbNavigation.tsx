@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Typography,
-  IconButton,
-  Menu,
-  MenuItem,
-  Divider,
-} from "@mui/material";
+import { Box, Typography, IconButton, Menu, MenuItem, Divider } from "@mui/material";
 import { ChevronLeft, History, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
@@ -96,11 +89,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
 
       {/* Right Section - Only History */}
       <Box sx={{ display: "flex", alignItems: "center" }}>
-        <IconButton
-          onClick={handleHistoryClick}
-          size="small"
-          aria-label="show history"
-        >
+        <IconButton onClick={handleHistoryClick} size="small" aria-label="show history">
           <History />
         </IconButton>
         <Menu
@@ -131,11 +120,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
             <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
               Recently Viewed
             </Typography>
-            <IconButton
-              size="small"
-              onClick={clearAll}
-              sx={{ color: "text.secondary" }}
-            >
+            <IconButton size="small" onClick={clearAll} sx={{ color: "text.secondary" }}>
               <Trash2 size={16} />
             </IconButton>
           </Box>
@@ -154,10 +139,8 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                   handleHistoryClose();
                   navigate(
                     `${item.path}${
-                      item.searchTerm
-                        ? `?searchTerm=${encodeURIComponent(item.searchTerm)}`
-                        : ""
-                    }`,
+                      item.searchTerm ? `?searchTerm=${encodeURIComponent(item.searchTerm)}` : ""
+                    }`
                   );
                 }}
                 sx={{
@@ -183,10 +166,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                     >
                       {item.title}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.secondary" }}
-                    >
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
                       {formatDistanceToNow(item.timestamp, { addSuffix: true })}
                     </Typography>
                   </Box>
@@ -198,26 +178,17 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
                     }}
                   >
                     {item.metadata.duration && (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         {item.metadata.duration}
                       </Typography>
                     )}
                     {item.metadata.dimensions && (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         {item.metadata.dimensions}
                       </Typography>
                     )}
                     {item.metadata.fileSize && (
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary" }}
-                      >
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         {item.metadata.fileSize}
                       </Typography>
                     )}

@@ -3,6 +3,7 @@ import { Box, CircularProgress } from "@mui/material";
 import { type Table as TanStackTable } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PlaylistPlay as ExecutionsIcon } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
 import { ResizableTable } from "@/components/common/table";
 
@@ -13,10 +14,7 @@ interface ExecutionsTableProps {
   onViewDetails: (execution: PipelineExecution) => void;
   onRetryFromCurrent: (executionId: string) => void;
   onRetryFromStart: (executionId: string) => void;
-  onFilterColumn: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  onFilterColumn: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   activeFilters?: { columnId: string; value: string }[];
   activeSorting?: { columnId: string; desc: boolean }[];
   onRemoveFilter?: (columnId: string) => void;
@@ -33,6 +31,7 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
   onRemoveFilter,
   onRemoveSort,
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { rows } = table.getRowModel();
@@ -80,7 +79,7 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
         onRemoveSort={onRemoveSort}
         maxHeight="none"
         emptyState={{
-          message: "No pipeline executions found",
+          message: t("common.noPipelineExecutionsFound"),
           icon: <ExecutionsIcon sx={{ fontSize: 40 }} />,
         }}
       />

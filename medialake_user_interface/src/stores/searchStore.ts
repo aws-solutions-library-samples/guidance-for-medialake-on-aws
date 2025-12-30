@@ -66,9 +66,7 @@ const isSameDay = (date1: Date, date2: Date) => {
 };
 
 // Helper functions for converting between form state and filters
-function convertFiltersToFormState(
-  filters: FacetFilters,
-): FilterModalFormState {
+function convertFiltersToFormState(filters: FacetFilters): FilterModalFormState {
   // Initialize media types - handle comma-separated list
   const newMediaTypes = filters.type ? filters.type.split(",") : [];
 
@@ -121,9 +119,7 @@ function convertFiltersToFormState(
     const startDateObj = new Date(filters.ingested_date_gte);
     const endDateObj = new Date(filters.ingested_date_lte);
 
-    const daysDiff = Math.round(
-      (now.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    const daysDiff = Math.round((now.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysDiff <= 1 && isSameDay(endDateObj, now)) {
       newDateRangeOption = "24h";
@@ -151,9 +147,7 @@ function convertFiltersToFormState(
   };
 }
 
-function convertFormStateToFilters(
-  formState: FilterModalFormState,
-): FacetFilters {
+function convertFormStateToFilters(formState: FilterModalFormState): FacetFilters {
   const filters: FacetFilters = {};
 
   // Apply media type filters - now supports multiple types
@@ -164,20 +158,16 @@ function convertFormStateToFilters(
   // Apply extension filters - now supports multiple extensions
   if (formState.selectedExtensions.length > 0) {
     // Convert extensions to uppercase before sending to API
-    filters.extension = formState.selectedExtensions
-      .map((ext) => ext.toUpperCase())
-      .join(",");
+    filters.extension = formState.selectedExtensions.map((ext) => ext.toUpperCase()).join(",");
   }
 
   // Convert size inputs to bytes for API
   if (formState.minSizeValue !== "") {
-    filters.asset_size_gte =
-      Number(formState.minSizeValue) * formState.sizeUnit;
+    filters.asset_size_gte = Number(formState.minSizeValue) * formState.sizeUnit;
   }
 
   if (formState.maxSizeValue !== "") {
-    filters.asset_size_lte =
-      Number(formState.maxSizeValue) * formState.sizeUnit;
+    filters.asset_size_lte = Number(formState.maxSizeValue) * formState.sizeUnit;
   }
 
   // Store the selected date range option in the filters
@@ -219,10 +209,7 @@ export interface SearchState {
     setIsSemantic: (isSemantic: boolean) => void;
     setSemanticMode: (mode: "full" | "clip") => void;
     setFilters: (filters: FacetFilters) => void;
-    updateFilter: <K extends keyof FacetFilters>(
-      key: K,
-      value: FacetFilters[K],
-    ) => void;
+    updateFilter: <K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => void;
     clearFilters: () => void;
 
     // UI actions
@@ -274,10 +261,7 @@ export const useSearchStore = create<SearchState>()(
           }
         },
 
-        updateFilter: <K extends keyof FacetFilters>(
-          key: K,
-          value: FacetFilters[K],
-        ) => {
+        updateFilter: <K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => {
           const currentFilters = get().filters;
           const updatedFilters = {
             ...currentFilters,
@@ -292,9 +276,7 @@ export const useSearchStore = create<SearchState>()(
           });
 
           // Only update if different
-          if (
-            JSON.stringify(currentFilters) !== JSON.stringify(updatedFilters)
-          ) {
+          if (JSON.stringify(currentFilters) !== JSON.stringify(updatedFilters)) {
             set({ filters: updatedFilters });
           }
         },
@@ -396,35 +378,25 @@ export const useSearchStore = create<SearchState>()(
         semanticMode: state.semanticMode,
         filters: state.filters,
       }),
-    },
-  ),
+    }
+  )
 );
 
 // Domain state selectors
 export const useSearchQuery = () => useSearchStore((state) => state.query);
-export const useSemanticSearch = () =>
-  useSearchStore((state) => state.isSemantic);
-export const useSemanticMode = () =>
-  useSearchStore((state) => state.semanticMode);
+export const useSemanticSearch = () => useSearchStore((state) => state.isSemantic);
+export const useSemanticMode = () => useSearchStore((state) => state.semanticMode);
 export const useSearchFilters = () => useSearchStore((state) => state.filters);
 
 // UI state selectors
-export const useFilterModalOpen = () =>
-  useSearchStore((state) => state.ui.filterModalOpen);
-export const useFilterModalDraft = () =>
-  useSearchStore((state) => state.ui.filterModalDraft);
+export const useFilterModalOpen = () => useSearchStore((state) => state.ui.filterModalOpen);
+export const useFilterModalDraft = () => useSearchStore((state) => state.ui.filterModalDraft);
 
 // Action selectors
 export const useSearchActions = () => useSearchStore((state) => state.actions);
 export const useDomainActions = () => {
-  const {
-    setQuery,
-    setIsSemantic,
-    setSemanticMode,
-    setFilters,
-    updateFilter,
-    clearFilters,
-  } = useSearchStore((state) => state.actions);
+  const { setQuery, setIsSemantic, setSemanticMode, setFilters, updateFilter, clearFilters } =
+    useSearchStore((state) => state.actions);
   return {
     setQuery,
     setIsSemantic,

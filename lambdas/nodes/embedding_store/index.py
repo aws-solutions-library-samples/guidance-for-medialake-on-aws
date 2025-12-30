@@ -37,6 +37,11 @@ CONTENT_TYPE = os.getenv("CONTENT_TYPE", "video").lower()  # "video" | "audio"
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
 
+# New environment variable to enable asset_embeddings nested structure
+# When True: stores embeddings in the asset_embeddings nested array with rich metadata
+# When False (default): uses legacy embedding field at root level for backward compatibility
+USE_ASSET_EMBEDDINGS = os.getenv("USE_ASSET_EMBEDDINGS", "false").lower() == "true"
+
 IS_AUDIO_CONTENT = CONTENT_TYPE == "audio"
 
 # OpenSearch client
@@ -153,18 +158,21 @@ def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
 def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
     """Extract embedding vector from container, supporting both direct vectors and S3 references.
 
-    This function supports three input patterns:
+    This function supports multiple input patterns:
     1. Direct embedding in payload (backward compatible)
     2. S3 reference in nested data structure (new pattern for distributed map)
-    3. External task results
+    3. Already-resolved embedding in nested data.data structure (retry scenario)
+    4. External task results
     """
     # Check for S3 reference in nested data structure (distributed map pattern)
     if isinstance(container.get("data"), dict):
         data = container["data"]
 
-        # Check for S3 reference in nested data.data structure
+        # Check for nested data.data structure (Bedrock Results pattern)
         if isinstance(data.get("data"), dict):
             nested_data = data["data"]
+
+            # First check if it's an S3 reference that needs to be downloaded
             if "s3_bucket" in nested_data and "s3_key" in nested_data:
                 try:
                     embedding_data = download_s3_external_payload(
@@ -182,6 +190,14 @@ def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]
                     logger.warning(
                         f"Failed to download embedding from S3 reference: {str(e)}"
                     )
+            # Handle already-resolved embedding data in nested data.data (retry scenario)
+            # This happens when Step Functions retries after an error - the S3 reference
+            # was already resolved to actual embedding data in a previous invocation
+            elif isinstance(nested_data.get("float"), list) and nested_data["float"]:
+                logger.info(
+                    "Successfully extracted embedding from nested data.data.float (already resolved)"
+                )
+                return nested_data["float"]
 
         # Check for S3 reference directly in data
         if "s3_bucket" in data and "s3_key" in data:
@@ -410,6 +426,137 @@ def _extract_fps(master_src: Dict[str, Any], inventory_id: str) -> int:
         raise RuntimeError(
             f"Master document for asset {inventory_id} is missing a valid FrameRate"
         ) from exc
+
+
+def _determine_embedding_dimension(embedding_vector: List[float]) -> int:
+    """Determine the dimension of an embedding vector."""
+    return len(embedding_vector)
+
+
+def _get_embedding_field_name(dimension: int, space_type: str = "cosine") -> str:
+    """
+    Get the field name for storing an embedding based on its dimension and space type.
+
+    Args:
+        dimension: The embedding dimension (256, 384, 512, 1024, 1536, 3072)
+        space_type: The similarity space type (default: "cosine")
+
+    Returns:
+        Field name like "embedding_1024_cosine"
+    """
+    supported_dimensions = [256, 384, 512, 1024, 1536, 3072]
+    if dimension not in supported_dimensions:
+        logger.warning(
+            f"Unsupported embedding dimension: {dimension}. Using closest supported dimension."
+        )
+        # Find closest supported dimension
+        dimension = min(supported_dimensions, key=lambda x: abs(x - dimension))
+
+    return f"embedding_{dimension}_{space_type}"
+
+
+def _extract_embedding_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract embedding metadata from payload.
+
+    Returns metadata including:
+    - model_provider: e.g., "twelvelabs", "openai"
+    - model_name: e.g., "Marengo-retrieval-2.7"
+    - model_version: e.g., "2.7"
+    - embedding_granularity: e.g., "clip", "video", "frame"
+    - segmentation_method: e.g., "shot", "scene", "fixed"
+    """
+    metadata = {}
+
+    # Check various locations for metadata
+    data = payload.get("data", {})
+    if isinstance(data, dict):
+        metadata["model_provider"] = data.get("model_provider", "unknown")
+        metadata["model_name"] = data.get("model_name", "unknown")
+        metadata["model_version"] = data.get("model_version", "unknown")
+        metadata["embedding_granularity"] = data.get("embedding_granularity")
+        metadata["segmentation_method"] = data.get("segmentation_method")
+
+    # Fallback to default values if not found
+    if not metadata.get("model_provider"):
+        metadata["model_provider"] = "twelvelabs"  # Default assumption
+    if not metadata.get("model_name"):
+        metadata["model_name"] = "Marengo-retrieval-2.7"  # Default assumption
+    if not metadata.get("model_version"):
+        # Try to extract version from model_name
+        model_name = metadata.get("model_name", "")
+        if "2.7" in model_name:
+            metadata["model_version"] = "2.7"
+        else:
+            metadata["model_version"] = "unknown"
+
+    return metadata
+
+
+def _create_asset_embedding_object(
+    embedding_vector: List[float],
+    inventory_id: str,
+    scope: str,
+    embedding_option: Optional[str],
+    start_sec: Optional[int] = None,
+    end_sec: Optional[int] = None,
+    start_tc: Optional[str] = None,
+    end_tc: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Create an asset_embeddings nested object with rich metadata.
+
+    Args:
+        embedding_vector: The embedding vector
+        inventory_id: Asset inventory ID
+        scope: Embedding scope (clip, video, frame, etc.)
+        embedding_option: Embedding option (visual-text, audio, visual-image)
+        start_sec: Start time in seconds (for clips)
+        end_sec: End time in seconds (for clips)
+        start_tc: Start SMPTE timecode (for clips)
+        end_tc: End SMPTE timecode (for clips)
+        metadata: Additional metadata (model info, etc.)
+
+    Returns:
+        Dictionary ready to be added to asset_embeddings array
+    """
+    if metadata is None:
+        metadata = {}
+
+    dimension = _determine_embedding_dimension(embedding_vector)
+    field_name = _get_embedding_field_name(dimension)
+
+    # Build the base embedding object
+    embedding_obj = {
+        "inventory_id": inventory_id,
+        "embedding_type": embedding_option or "visual-text",
+        "model_provider": metadata.get("model_provider", "twelvelabs"),
+        "model_name": metadata.get("model_name", "Marengo-retrieval-2.7"),
+        "model_version": metadata.get("model_version", "2.7"),
+        "created_at": datetime.utcnow().isoformat(),
+        "embedding_granularity": scope,
+        "embedding_dimension": dimension,
+        "space_type": "cosine",
+        field_name: embedding_vector,
+    }
+
+    # Add temporal information for clips
+    if scope == "clip" and start_sec is not None and end_sec is not None:
+        embedding_obj["start_seconds"] = start_sec
+        embedding_obj["end_seconds"] = end_sec
+        if start_tc:
+            embedding_obj["start_smpte_timecode"] = start_tc
+        if end_tc:
+            embedding_obj["end_smpte_timecode"] = end_tc
+        if metadata.get("segmentation_method"):
+            embedding_obj["segmentation_method"] = metadata["segmentation_method"]
+
+    # Add representation type
+    if embedding_option:
+        embedding_obj["embedding_representation"] = embedding_option
+
+    return embedding_obj
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -794,7 +941,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         scope = extract_scope(payload)
         embedding_option = extract_embedding_option(payload)
 
-        # ── CLIP / AUDIO SCOPE  → NEW DOC ────────────────────────────────────
+        # ── CLIP / AUDIO SCOPE  → NEW DOC OR NESTED ARRAY ────────────────────
         if scope in {"clip", "audio"}:
             start_sec, end_sec = _get_segment_bounds(payload)
 
@@ -818,7 +965,6 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             start_tc = seconds_to_smpte(start_sec, fps)
             end_tc = seconds_to_smpte(end_sec, fps)
 
-            # ── log the SMPTE strings *after* conversion ────────────────────────
             logger.info(
                 "Segment SMPTE values",
                 extra={
@@ -828,56 +974,227 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 },
             )
 
-            document: Dict[str, Any] = {
-                "type": CONTENT_TYPE,
-                "embedding": embedding_vector,
-                "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
-                "timestamp": datetime.utcnow().isoformat(),
-                "InventoryID": inventory_id,
-                "start_timecode": start_tc,
-                "end_timecode": end_tc,
-            }
-            if embedding_option is not None:
-                document["embedding_option"] = embedding_option
+            if USE_ASSET_EMBEDDINGS:
+                # NEW MODE: Append to asset_embeddings nested array in parent document
+                logger.info(
+                    "Using asset_embeddings mode - appending to parent document",
+                    extra={"inventory_id": inventory_id, "scope": scope},
+                )
 
-            logger.info(
-                "Indexing new clip/audio document",
-                extra={
-                    "index": INDEX_NAME,
-                    "doc_preview": {
-                        **document,
-                        "embedding": f"<len {len(embedding_vector)}>",
-                    },
-                },
-            )
-            try:
-                res = client.index(index=INDEX_NAME, body=document)
-                check_opensearch_response(res, "index")
-            except Exception as e:
-                logger.error(
-                    "Failed to index clip/audio document",
+                # Extract embedding metadata
+                metadata = _extract_embedding_metadata(payload)
+
+                # Create asset_embedding object
+                embedding_obj = _create_asset_embedding_object(
+                    embedding_vector=embedding_vector,
+                    inventory_id=inventory_id,
+                    scope=scope,
+                    embedding_option=embedding_option,
+                    start_sec=start_sec,
+                    end_sec=end_sec,
+                    start_tc=start_tc,
+                    end_tc=end_tc,
+                    metadata=metadata,
+                )
+
+                # Find parent master document
+                search_query = {
+                    "query": {
+                        "bool": {
+                            "filter": [
+                                {"match_phrase": {"InventoryID": inventory_id}},
+                                {
+                                    "nested": {
+                                        "path": "DerivedRepresentations",
+                                        "query": {
+                                            "exists": {
+                                                "field": "DerivedRepresentations.ID"
+                                            }
+                                        },
+                                    }
+                                },
+                            ]
+                        }
+                    }
+                }
+
+                logger.info(
+                    "Searching for parent master document",
+                    extra={"index": INDEX_NAME, "inventory_id": inventory_id},
+                )
+
+                start_time = time.time()
+                try:
+                    search_resp = client.search(
+                        index=INDEX_NAME, body=search_query, size=1
+                    )
+                    check_opensearch_response(search_resp, "search")
+                except Exception as e:
+                    logger.error(
+                        "Failed to search for parent document",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "error": str(e),
+                            "index": INDEX_NAME,
+                        },
+                    )
+                    raise RuntimeError(
+                        f"Failed to search for parent document for asset {inventory_id}: {str(e)}"
+                    ) from e
+
+                # Retry if not found (document may be being indexed)
+                while (
+                    search_resp["hits"]["total"]["value"] == 0
+                    and time.time() - start_time < 120
+                ):
+                    logger.info("Parent doc not found – refreshing index & retrying …")
+                    try:
+                        client.indices.refresh(index=INDEX_NAME)
+                        time.sleep(5)
+                        search_resp = client.search(
+                            index=INDEX_NAME, body=search_query, size=1
+                        )
+                        check_opensearch_response(search_resp, "search")
+                    except Exception as e:
+                        logger.error(
+                            "Failed to refresh index and retry search",
+                            extra={
+                                "inventory_id": inventory_id,
+                                "error": str(e),
+                                "index": INDEX_NAME,
+                            },
+                        )
+                        raise RuntimeError(
+                            f"Failed to refresh index and retry search for asset {inventory_id}: {str(e)}"
+                        ) from e
+
+                if search_resp["hits"]["total"]["value"] == 0:
+                    raise RuntimeError(
+                        f"No parent doc with InventoryID={inventory_id} in '{INDEX_NAME}'"
+                    )
+
+                parent_id = search_resp["hits"]["hits"][0]["_id"]
+
+                # Use Painless script to append to asset_embeddings array
+                dimension = _determine_embedding_dimension(embedding_vector)
+                field_name = _get_embedding_field_name(dimension)
+
+                # Build Painless script to append to nested array
+                painless_script = f"""
+                if (ctx._source.asset_embeddings == null) {{
+                    ctx._source.asset_embeddings = [];
+                }}
+                ctx._source.asset_embeddings.add(params.embedding_obj);
+                """
+
+                update_body = {
+                    "script": {
+                        "source": painless_script,
+                        "lang": "painless",
+                        "params": {"embedding_obj": embedding_obj},
+                    }
+                }
+
+                logger.info(
+                    "Appending clip embedding to parent asset_embeddings array",
                     extra={
+                        "parent_id": parent_id,
                         "inventory_id": inventory_id,
-                        "error": str(e),
-                        "index": INDEX_NAME,
-                        "scope": scope,
+                        "dimension": dimension,
+                        "field_name": field_name,
                     },
                 )
-                raise RuntimeError(
-                    f"Failed to index {scope} document for asset {inventory_id}: {str(e)}"
-                ) from e
 
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "message": "Embedding stored successfully",
+                try:
+                    res = client.update(
+                        index=INDEX_NAME, id=parent_id, body=update_body
+                    )
+                    check_opensearch_response(res, "update")
+                except Exception as e:
+                    logger.error(
+                        "Failed to append to asset_embeddings",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "parent_id": parent_id,
+                            "error": str(e),
+                            "index": INDEX_NAME,
+                        },
+                    )
+                    raise RuntimeError(
+                        f"Failed to append clip to asset_embeddings for asset {inventory_id}: {str(e)}"
+                    ) from e
+
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Clip embedding appended to asset_embeddings successfully",
+                            "index": INDEX_NAME,
+                            "parent_document_id": parent_id,
+                            "inventory_id": inventory_id,
+                            "mode": "asset_embeddings",
+                        }
+                    ),
+                }
+
+            else:
+                # LEGACY MODE: Create separate clip document (backward compatible)
+                logger.info(
+                    "Using legacy mode - creating separate clip document",
+                    extra={"inventory_id": inventory_id, "scope": scope},
+                )
+
+                document: Dict[str, Any] = {
+                    "type": CONTENT_TYPE,
+                    "embedding": embedding_vector,
+                    "embedding_scope": "clip" if IS_AUDIO_CONTENT else scope,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "InventoryID": inventory_id,
+                    "start_timecode": start_tc,
+                    "end_timecode": end_tc,
+                }
+                if embedding_option is not None:
+                    document["embedding_option"] = embedding_option
+
+                logger.info(
+                    "Indexing new clip/audio document",
+                    extra={
                         "index": INDEX_NAME,
-                        "document_id": res.get("_id", "unknown"),
-                        "inventory_id": inventory_id,
-                    }
-                ),
-            }
+                        "doc_preview": {
+                            **document,
+                            "embedding": f"<len {len(embedding_vector)}>",
+                        },
+                    },
+                )
+                try:
+                    res = client.index(index=INDEX_NAME, body=document)
+                    check_opensearch_response(res, "index")
+                except Exception as e:
+                    logger.error(
+                        "Failed to index clip/audio document",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "error": str(e),
+                            "index": INDEX_NAME,
+                            "scope": scope,
+                        },
+                    )
+                    raise RuntimeError(
+                        f"Failed to index {scope} document for asset {inventory_id}: {str(e)}"
+                    ) from e
+
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Embedding stored successfully",
+                            "index": INDEX_NAME,
+                            "document_id": res.get("_id", "unknown"),
+                            "inventory_id": inventory_id,
+                            "mode": "legacy",
+                        }
+                    ),
+                }
 
         # ── AUDIO MASTER DOCS ARE *NOT* UPDATED ───────────────────────────────
         if IS_AUDIO_CONTENT:
@@ -895,7 +1212,7 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 ),
             }
 
-        # ── MASTER-DOC UPDATE for VIDEO (existing query) ──────────────────────
+        # ── MASTER-DOC UPDATE for VIDEO ───────────────────────────────────────
         search_query = {
             "query": {
                 "bool": {
@@ -968,85 +1285,180 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             )
 
         existing_id = search_resp["hits"]["hits"][0]["_id"]
-        try:
-            meta = client.get(index=INDEX_NAME, id=existing_id)
-            check_opensearch_response(meta, "get")
-            seq_no = meta["_seq_no"]
-            p_term = meta["_primary_term"]
-        except Exception as e:
-            logger.error(
-                "Failed to get document metadata",
+
+        if USE_ASSET_EMBEDDINGS:
+            # NEW MODE: Append video-level embedding to asset_embeddings array
+            logger.info(
+                "Using asset_embeddings mode - appending video-level embedding to array",
                 extra={
                     "inventory_id": inventory_id,
+                    "scope": scope,
                     "document_id": existing_id,
-                    "error": str(e),
-                    "index": INDEX_NAME,
                 },
             )
-            raise RuntimeError(
-                f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
-            ) from e
 
-        update_body = {
-            "doc": {
-                "type": CONTENT_TYPE,
-                "embedding": embedding_vector,
-                "embedding_scope": scope,
-                "timestamp": datetime.utcnow().isoformat(),
+            # Extract embedding metadata
+            metadata = _extract_embedding_metadata(payload)
+
+            # Create asset_embedding object (no temporal info for video-level)
+            embedding_obj = _create_asset_embedding_object(
+                embedding_vector=embedding_vector,
+                inventory_id=inventory_id,
+                scope=scope or "video",
+                embedding_option=embedding_option,
+                metadata=metadata,
+            )
+
+            # Use Painless script to append to asset_embeddings array
+            dimension = _determine_embedding_dimension(embedding_vector)
+            field_name = _get_embedding_field_name(dimension)
+
+            painless_script = """
+            if (ctx._source.asset_embeddings == null) {
+                ctx._source.asset_embeddings = [];
             }
-        }
-        if embedding_option == "audio":
-            update_body["doc"]["audio_embedding"] = embedding_vector
-        else:
-            update_body["doc"]["embedding"] = embedding_vector
+            ctx._source.asset_embeddings.add(params.embedding_obj);
+            """
 
-        if embedding_option is not None:
-            update_body["doc"]["embedding_option"] = embedding_option
+            update_body = {
+                "script": {
+                    "source": painless_script,
+                    "lang": "painless",
+                    "params": {"embedding_obj": embedding_obj},
+                }
+            }
 
-        for attempt in range(50):
-            try:
-                res = client.update(
-                    index=INDEX_NAME,
-                    id=existing_id,
-                    body=update_body,
-                    if_seq_no=seq_no,
-                    if_primary_term=p_term,
-                )
-                check_opensearch_response(res, "update")
-                break
-            except exceptions.ConflictError:
-                try:
-                    meta = client.get(index=INDEX_NAME, id=existing_id)
-                    seq_no = meta["_seq_no"]
-                    p_term = meta["_primary_term"]
-                    time.sleep(1)
-                except Exception as e:
-                    logger.error(
-                        "Failed to resolve conflict during document update",
-                        extra={
-                            "inventory_id": inventory_id,
-                            "document_id": existing_id,
-                            "error": str(e),
-                            "attempt": attempt + 1,
-                        },
-                    )
-                    raise RuntimeError(
-                        f"Failed to resolve conflict for document {existing_id} (asset {inventory_id}): {str(e)}"
-                    ) from e
-        else:
-            raise RuntimeError("Failed to update master document after 50 retries")
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "message": "Embedding stored successfully",
-                    "index": INDEX_NAME,
+            logger.info(
+                "Appending video-level embedding to asset_embeddings array",
+                extra={
                     "document_id": existing_id,
                     "inventory_id": inventory_id,
+                    "dimension": dimension,
+                    "field_name": field_name,
+                },
+            )
+
+            try:
+                res = client.update(index=INDEX_NAME, id=existing_id, body=update_body)
+                check_opensearch_response(res, "update")
+            except Exception as e:
+                logger.error(
+                    "Failed to append video-level embedding to asset_embeddings",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "document_id": existing_id,
+                        "error": str(e),
+                        "index": INDEX_NAME,
+                    },
+                )
+                raise RuntimeError(
+                    f"Failed to append video-level embedding to asset_embeddings for asset {inventory_id}: {str(e)}"
+                ) from e
+
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message": "Video-level embedding appended to asset_embeddings successfully",
+                        "index": INDEX_NAME,
+                        "document_id": existing_id,
+                        "inventory_id": inventory_id,
+                        "mode": "asset_embeddings",
+                    }
+                ),
+            }
+
+        else:
+            # LEGACY MODE: Update root-level embedding field (backward compatible)
+            logger.info(
+                "Using legacy mode - updating root-level embedding field",
+                extra={
+                    "inventory_id": inventory_id,
+                    "scope": scope,
+                    "document_id": existing_id,
+                },
+            )
+
+            try:
+                meta = client.get(index=INDEX_NAME, id=existing_id)
+                check_opensearch_response(meta, "get")
+                seq_no = meta["_seq_no"]
+                p_term = meta["_primary_term"]
+            except Exception as e:
+                logger.error(
+                    "Failed to get document metadata",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "document_id": existing_id,
+                        "error": str(e),
+                        "index": INDEX_NAME,
+                    },
+                )
+                raise RuntimeError(
+                    f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
+                ) from e
+
+            update_body = {
+                "doc": {
+                    "type": CONTENT_TYPE,
+                    "embedding": embedding_vector,
+                    "embedding_scope": scope,
+                    "timestamp": datetime.utcnow().isoformat(),
                 }
-            ),
-        }
+            }
+            if embedding_option == "audio":
+                update_body["doc"]["audio_embedding"] = embedding_vector
+            else:
+                update_body["doc"]["embedding"] = embedding_vector
+
+            if embedding_option is not None:
+                update_body["doc"]["embedding_option"] = embedding_option
+
+            for attempt in range(50):
+                try:
+                    res = client.update(
+                        index=INDEX_NAME,
+                        id=existing_id,
+                        body=update_body,
+                        if_seq_no=seq_no,
+                        if_primary_term=p_term,
+                    )
+                    check_opensearch_response(res, "update")
+                    break
+                except exceptions.ConflictError:
+                    try:
+                        meta = client.get(index=INDEX_NAME, id=existing_id)
+                        seq_no = meta["_seq_no"]
+                        p_term = meta["_primary_term"]
+                        time.sleep(1)
+                    except Exception as e:
+                        logger.error(
+                            "Failed to resolve conflict during document update",
+                            extra={
+                                "inventory_id": inventory_id,
+                                "document_id": existing_id,
+                                "error": str(e),
+                                "attempt": attempt + 1,
+                            },
+                        )
+                        raise RuntimeError(
+                            f"Failed to resolve conflict for document {existing_id} (asset {inventory_id}): {str(e)}"
+                        ) from e
+            else:
+                raise RuntimeError("Failed to update master document after 50 retries")
+
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message": "Embedding stored successfully",
+                        "index": INDEX_NAME,
+                        "document_id": existing_id,
+                        "inventory_id": inventory_id,
+                        "mode": "legacy",
+                    }
+                ),
+            }
 
     except Exception:
         logger.exception("Error storing embedding")

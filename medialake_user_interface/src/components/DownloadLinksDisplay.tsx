@@ -5,6 +5,7 @@ import {
   Archive as ArchiveIcon,
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
 
 interface DownloadLinksDisplayProps {
   downloadUrls:
@@ -23,14 +24,13 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
   expiresAt,
   description,
 }) => {
+  const { t } = useTranslation();
   // Check if links have expired
   const isExpired = React.useMemo(() => {
     if (!expiresAt) return false;
 
     // Handle Unix timestamp (string of numbers) or ISO date string
-    const timestamp = /^\d+$/.test(expiresAt)
-      ? parseInt(expiresAt, 10) * 1000
-      : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
     const expirationDate = new Date(timestamp);
 
     if (isNaN(expirationDate.getTime())) return false;
@@ -40,9 +40,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Format expiration date
   const formatExpirationDate = React.useCallback((expiresAt: string) => {
-    const timestamp = /^\d+$/.test(expiresAt)
-      ? parseInt(expiresAt, 10) * 1000
-      : expiresAt;
+    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
     const date = new Date(timestamp);
     return isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
   }, []);
@@ -90,7 +88,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
               fontWeight: isExpired ? "bold" : "normal",
             }}
           >
-            {isExpired ? "EXPIRED: " : "Expires: "}
+            {isExpired ? t("downloads.expired") : t("downloads.expires")}:{" "}
             {formatExpirationDate(expiresAt)}
           </Typography>
         )}
@@ -100,8 +98,7 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
 
   // Handle new structured format
   const { zippedFiles, files = [], singleFiles = [] } = downloadUrls;
-  const hasDownloads =
-    zippedFiles || files.length > 0 || singleFiles.length > 0;
+  const hasDownloads = zippedFiles || files.length > 0 || singleFiles.length > 0;
 
   if (!hasDownloads) {
     return null;
@@ -220,7 +217,9 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
       {expiresAt && (
         <Box sx={{ mt: 1 }}>
           <Chip
-            label={`${isExpired ? "EXPIRED: " : "Expires: "}${formatExpirationDate(expiresAt)}`}
+            label={`${
+              isExpired ? t("downloads.expired") : t("downloads.expires")
+            }: ${formatExpirationDate(expiresAt)}`}
             size="small"
             color={isExpired ? "error" : "warning"}
             variant={isExpired ? "filled" : "outlined"}

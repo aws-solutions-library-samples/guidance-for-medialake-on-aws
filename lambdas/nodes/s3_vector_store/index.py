@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.config import Config
 from distributed_map_utils import download_s3_external_payload, is_s3_reference
 from lambda_middleware import lambda_middleware
 from lambda_utils import _truncate_floats
@@ -33,6 +35,30 @@ VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "media-vectors")
 INDEX_NAME = os.getenv("INDEX_NAME", "media-vectors")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
+
+# Vector batch configuration
+# AWS S3 Vectors API Limits (per vector index):
+# - Maximum 500 vectors per PutVectors call (hard limit)
+# - Maximum 1,000 combined Put/Delete requests per second
+# - Maximum 2,500 combined vectors inserted/deleted per second
+# See: https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3vectors_PutVectors.html
+#
+# With 500 vectors/batch:
+# - 5 batches = 1,000 TPS limit (2,500 vectors/sec)
+# - Optimal balance between throughput and API limits
+VECTOR_BATCH_SIZE = int(os.getenv("VECTOR_BATCH_SIZE", "500"))
+MAX_VECTOR_BATCH_SIZE = 500  # AWS service hard limit - DO NOT EXCEED
+
+# Request throttling configuration
+# Add delays between operations to avoid overwhelming the S3 Vectors service
+# Helps prevent ServiceUnavailableException during high-concurrency scenarios
+REQUEST_THROTTLE_MS = int(os.getenv("S3_VECTORS_THROTTLE_MS", "100"))  # 100ms default
+
+# Graceful degradation configuration
+# Allow pipeline to continue even if vector storage fails (non-critical operation)
+ALLOW_VECTOR_STORAGE_FAILURE = (
+    os.getenv("ALLOW_VECTOR_STORAGE_FAILURE", "true").lower() == "true"
+)
 
 # Content type will be determined dynamically from payload data
 
@@ -398,9 +424,34 @@ def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
 # ─────────────────────────────────────────────────────────────────────────────
 # S3 Vector Store client
 def get_s3_vector_client():
+    """
+    Initialize S3 Vector client with retry configuration for transient errors.
+
+    Configures exponential backoff retry logic to handle ServiceUnavailableException
+    and other transient service errors that may occur with the S3 Vectors service.
+    """
     try:
+        # Configure retry strategy with exponential backoff
+        retry_config = Config(
+            retries={
+                "max_attempts": 10,  # Increased from default 4 to handle service unavailability
+                "mode": "adaptive",  # Adaptive mode adjusts retry behavior based on service responses
+            },
+            connect_timeout=5,
+            read_timeout=60,
+        )
+
         session = boto3.Session()
-        return session.client("s3vectors", region_name=AWS_REGION)
+        client = session.client(
+            "s3vectors", region_name=AWS_REGION, config=retry_config
+        )
+
+        logger.info(
+            "S3 Vector client initialized with retry configuration",
+            extra={"region": AWS_REGION, "max_attempts": 10, "retry_mode": "adaptive"},
+        )
+
+        return client
     except Exception as e:
         logger.error(f"Failed to initialize S3 Vector client: {e}")
         raise
@@ -428,7 +479,19 @@ def _ok_no_op(vector_len: int, inventory_id: Optional[str]):
 
 # ─────────────────────────────────────────────────────────────────────────────
 def ensure_vector_bucket_exists(client, bucket_name: str) -> None:
-    """Ensure vector bucket exists or raise exception."""
+    """
+    Ensure vector bucket exists or raise exception.
+
+    This function checks if the S3 Vector bucket exists and creates it if not found.
+    The boto3 client is configured with retry logic to handle transient service errors.
+
+    Args:
+        client: Boto3 S3 Vectors client with retry configuration
+        bucket_name: Name of the vector bucket to ensure exists
+
+    Raises:
+        RuntimeError: If bucket cannot be accessed or created after retries
+    """
     if not bucket_name:
         raise RuntimeError(
             "Vector bucket name cannot be empty - check VECTOR_BUCKET_NAME environment variable"
@@ -436,20 +499,61 @@ def ensure_vector_bucket_exists(client, bucket_name: str) -> None:
 
     try:
         client.get_vector_bucket(vectorBucketName=bucket_name)
-        logger.info(f"Vector bucket {bucket_name} already exists")
+        logger.info(
+            "Vector bucket exists and is accessible", extra={"bucket_name": bucket_name}
+        )
+        # Add throttling delay after successful operation
+        if REQUEST_THROTTLE_MS > 0:
+            time.sleep(REQUEST_THROTTLE_MS / 1000.0)
     except client.exceptions.NotFoundException:
+        logger.info(
+            "Vector bucket not found, attempting to create",
+            extra={"bucket_name": bucket_name},
+        )
         try:
+            # Add throttling delay before create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
             client.create_vector_bucket(
                 vectorBucketName=bucket_name,
                 encryptionConfiguration={"sseType": "AES256"},
             )
-            logger.info(f"Created vector bucket {bucket_name}")
+            logger.info(
+                "Successfully created vector bucket", extra={"bucket_name": bucket_name}
+            )
+            # Add throttling delay after create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
         except Exception as e:
-            logger.error(f"Failed to create vector bucket {bucket_name}: {e}")
-            raise RuntimeError(f"Cannot create vector bucket {bucket_name}: {e}") from e
+            error_msg = f"Failed to create vector bucket {bucket_name}: {str(e)}"
+            logger.error(
+                error_msg,
+                extra={
+                    "bucket_name": bucket_name,
+                    "error_type": type(e).__name__,
+                    "error_details": str(e),
+                },
+                exc_info=True,
+            )
+            raise RuntimeError(error_msg) from e
     except Exception as e:
-        logger.error(f"Error checking vector bucket {bucket_name}: {e}")
-        raise RuntimeError(f"Cannot access vector bucket {bucket_name}: {e}") from e
+        error_msg = (
+            f"Cannot access vector bucket {bucket_name}. "
+            f"The S3 Vectors service may be experiencing issues. "
+            f"Error: {str(e)}"
+        )
+        logger.error(
+            error_msg,
+            extra={
+                "bucket_name": bucket_name,
+                "error_type": type(e).__name__,
+                "error_details": str(e),
+                "region": AWS_REGION,
+            },
+            exc_info=True,
+        )
+        raise RuntimeError(error_msg) from e
 
 
 def ensure_index_exists(
@@ -470,8 +574,15 @@ def ensure_index_exists(
     try:
         client.get_index(vectorBucketName=bucket_name, indexName=index_name)
         logger.info(f"Index {index_name} already exists in bucket {bucket_name}")
+        # Add throttling delay after successful operation
+        if REQUEST_THROTTLE_MS > 0:
+            time.sleep(REQUEST_THROTTLE_MS / 1000.0)
     except client.exceptions.NotFoundException:
         try:
+            # Add throttling delay before create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
             client.create_index(
                 vectorBucketName=bucket_name,
                 indexName=index_name,
@@ -480,6 +591,9 @@ def ensure_index_exists(
                 distanceMetric="cosine",
             )
             logger.info(f"Created index {index_name} (dim={vector_dimension})")
+            # Add throttling delay after create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
         except Exception as e:
             logger.error(f"Failed to create index {index_name}: {e}")
             raise RuntimeError(f"Cannot create index {index_name}: {e}") from e
@@ -576,11 +690,29 @@ def store_vectors(
                 }
             )
 
-        batch_size = 500
+        # Validate and cap batch size for safety
+        batch_size = min(VECTOR_BATCH_SIZE, MAX_VECTOR_BATCH_SIZE)
+        if batch_size != VECTOR_BATCH_SIZE:
+            logger.warning(
+                f"Configured batch size {VECTOR_BATCH_SIZE} exceeds maximum {MAX_VECTOR_BATCH_SIZE}. "
+                f"Using maximum batch size of {MAX_VECTOR_BATCH_SIZE}."
+            )
+
+        logger.info(
+            f"[VECTOR_STORAGE] Processing {len(vectors)} vectors in batches of {batch_size}"
+        )
+
         stored_keys = []
         for i in range(0, len(vectors), batch_size):
             batch = vectors[i : i + batch_size]
+            batch_number = i // batch_size + 1
+            total_batches = (len(vectors) + batch_size - 1) // batch_size
+
             try:
+                # Add throttling delay before PUT operation (except first batch)
+                if i > 0 and REQUEST_THROTTLE_MS > 0:
+                    time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
                 client.put_vectors(
                     vectorBucketName=bucket_name,
                     indexName=index_name,
@@ -589,15 +721,23 @@ def store_vectors(
                 batch_keys = [v["key"] for v in batch]
                 stored_keys.extend(batch_keys)
                 logger.info(
-                    f"[VECTOR_STORAGE] Stored batch of {len(batch)} vectors to "
-                    f"bucket='{bucket_name}', index='{index_name}'. "
+                    f"[VECTOR_STORAGE] Stored batch {batch_number}/{total_batches}: "
+                    f"{len(batch)} vectors to bucket='{bucket_name}', index='{index_name}'. "
                     f"Keys: {batch_keys[:5]}{'...' if len(batch_keys) > 5 else ''}"
                 )
 
             except Exception as e:
-                logger.error(f"Failed to store batch {i//batch_size + 1}: {e}")
+                logger.error(
+                    f"Failed to store batch {batch_number}/{total_batches}",
+                    extra={
+                        "batch_number": batch_number,
+                        "total_batches": total_batches,
+                        "batch_size": len(batch),
+                        "error": str(e),
+                    },
+                )
                 raise RuntimeError(
-                    f"Failed to store vector batch {i//batch_size + 1}: {e}"
+                    f"Failed to store vector batch {batch_number}/{total_batches}: {e}"
                 ) from e
 
         return {"stored_keys": stored_keys}
@@ -1014,7 +1154,12 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
-    """Main Lambda handler with strict error handling."""
+    """
+    Main Lambda handler with graceful degradation support.
+
+    If ALLOW_VECTOR_STORAGE_FAILURE is enabled, the Lambda will return success
+    even if vector storage fails, allowing the pipeline to continue.
+    """
     try:
         if not isinstance(event, dict):
             raise ValueError("Event must be a dictionary")
@@ -1030,7 +1175,35 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
         if not isinstance(payload, dict):
             raise ValueError("Payload must be a dictionary")
 
-        return process_store_action(payload)
+        # Attempt vector storage with graceful degradation support
+        try:
+            return process_store_action(payload)
+        except Exception as storage_error:
+            # If graceful degradation is enabled, log error and continue
+            if ALLOW_VECTOR_STORAGE_FAILURE:
+                logger.warning(
+                    "Vector storage failed but graceful degradation is enabled. "
+                    "Pipeline will continue without vector storage.",
+                    extra={
+                        "error": str(storage_error),
+                        "error_type": type(storage_error).__name__,
+                        "graceful_degradation": True,
+                    },
+                )
+                # Return success response indicating vectors were not stored
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Processing completed without vector storage (service unavailable)",
+                            "vector_storage_skipped": True,
+                            "error": str(storage_error),
+                        }
+                    ),
+                }
+            else:
+                # Graceful degradation disabled - fail hard
+                raise
 
     except ValueError as e:
         # Client errors - return 400

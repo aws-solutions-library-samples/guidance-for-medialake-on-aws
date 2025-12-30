@@ -69,7 +69,8 @@ class SearchConstruct(Construct):
                 security_groups=[props.security_group],
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
-                memory_size=9000,
+                memory_size=9000,  # High memory for vector/semantic search operations
+                provisioned_concurrent_executions=2,  # Keep 2 instances warm for search performance
                 timeout_minutes=10,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (

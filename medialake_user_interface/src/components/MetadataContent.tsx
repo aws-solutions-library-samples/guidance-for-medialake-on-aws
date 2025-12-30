@@ -1,26 +1,11 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  List,
-  ListItem,
-  useTheme,
-  alpha,
-} from "@mui/material";
+import { Box, Typography, List, ListItem, useTheme, alpha } from "@mui/material";
 import { formatCamelCase } from "../utils/stringUtils";
-import { TruncatedTextWithTooltip } from "./common/TruncatedTextWithTooltip";
 
 // Output filters for metadata categories
 export const outputFilters = {
   "Image (IFD0)": ["ImageWidth", "ImageHeight", "Make", "Model", "Software"],
-  EXIF: [
-    "ExposureTime",
-    "ShutterSpeedValue",
-    "FNumber",
-    "ApertureValue",
-    "ISO",
-    "LensModel",
-  ],
+  EXIF: ["ExposureTime", "ShutterSpeedValue", "FNumber", "ApertureValue", "ISO", "LensModel"],
   GPS: ["GPSLatitude", "GPSLongitude", "GPSAltitude"],
   "Thumbnail (IFD1)": ["ImageWidth", "ImageHeight", "ThumbnailLength"],
   IPTC: ["Headline", "Byline", "Credit", "Caption", "Source", "Country"],
@@ -36,12 +21,7 @@ export const outputFilters = {
     "ProfileDescription",
   ],
   XMP: ["Creator", "Title", "Description", "Rights"],
-  "JFIF (JPEG only)": [
-    "JFIFVersion",
-    "ResolutionUnit",
-    "XResolution",
-    "YResolution",
-  ],
+  "JFIF (JPEG only)": ["JFIFVersion", "ResolutionUnit", "XResolution", "YResolution"],
   "IHDR (PNG only)": [
     "Width",
     "Height",
@@ -61,13 +41,7 @@ export const outputFilters = {
   "Dublin Core": ["Format", "Type", "Identifier"],
   "XMP Media Management": ["DerivedFrom", "DocumentID", "InstanceID"],
   Auxiliary: ["Lens", "SerialNumber"],
-  "Camera Raw Settings": [
-    "Version",
-    "ProcessVersion",
-    "WhiteBalance",
-    "Temperature",
-    "Tint",
-  ],
+  "Camera Raw Settings": ["Version", "ProcessVersion", "WhiteBalance", "Temperature", "Tint"],
   "EXIF Extended": ["Gamma", "CameraOwnerName", "BodySerialNumber"],
   "XMP Dynamic Media": [
     "AudioSampleRate",
@@ -100,9 +74,7 @@ const MetadataContent: React.FC<MetadataContentProps> = ({
     if (category && outputFilters[category]) {
       const preferredOrder = outputFilters[category];
       return [
-        ...preferredOrder
-          .map((key) => entries.find(([k]) => k === key))
-          .filter(Boolean),
+        ...preferredOrder.map((key) => entries.find(([k]) => k === key)).filter(Boolean),
         ...entries.filter(([key]) => !preferredOrder.includes(key)),
       ];
     }
@@ -172,9 +144,7 @@ const MetadataContent: React.FC<MetadataContentProps> = ({
     const sortedEntries = sortEntries(entries);
     // Flatten nested metadata
     const flattenedEntries = flattenNestedMetadata(sortedEntries);
-    const displayEntries = showAll
-      ? flattenedEntries
-      : flattenedEntries.slice(0, 5);
+    const displayEntries = showAll ? flattenedEntries : flattenedEntries.slice(0, 5);
 
     // Create rows with simple key-value pairs (one per row)
     const rows: [string, any][] = displayEntries.map(([key, value]) => {

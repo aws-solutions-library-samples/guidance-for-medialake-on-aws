@@ -8,9 +8,6 @@ export default {
     hindi: "Hindi",
     arabic: "Árabe",
     hebrew: "Hebreo",
-    japanese: "Japonés",
-    korean: "Coreano",
-    spanish: "Español",
   },
   assetsPage: {
     title: "Activos",
@@ -26,14 +23,10 @@ export default {
     uploadingTo: "Subiendo a",
     restrictedToPrefix: "restringido",
     allowedPrefixesInfo: "Solo puedes subir a {{count}} ruta(s) permitida(s)",
-    pathInfo: "Los archivos se subirán a la ruta seleccionada en el bucket S3",
-    selectPathFirst: "Selecciona una ruta antes de subir",
-    pathResetWarning: "Cambiar el conector restablecerá la ruta seleccionada",
     connectorLabel: "Conector S3",
     selectConnectorPlaceholder: "Selecciona un conector S3",
     loadingConnectors: "Cargando conectores...",
-    noConnectors:
-      "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
+    noConnectors: "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
     dashboardNote:
       "Solo se permiten archivos de tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) y MPEG-DASH (application/dash+xml)",
     meta: {
@@ -47,46 +40,39 @@ export default {
     descriptionUnrestricted:
       "Explora y selecciona cualquier carpeta en el bucket para subir tus archivos.",
     prefixLabel: "Ruta permitida",
-    prefixHelper:
-      "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
-    selectedPath: "Ruta seleccionada",
+    prefixHelper: "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
     currentPath: "Ruta actual",
     confirm: "Usar esta ruta",
     validation: {
-      invalidPath:
-        "La ruta seleccionada está fuera de los prefijos permitidos.",
+      invalidPath: "La ruta seleccionada está fuera de los prefijos permitidos.",
       noPathSelected: "Por favor, navega a una carpeta antes de confirmar.",
     },
     error: {
       invalidConnector: "ID de conector no válido proporcionado.",
-      loadingFailed: "Error al cargar la información del conector.",
     },
     hints: {
-      clickFolder:
-        "Haz clic en una carpeta para navegar a ella, luego haz clic en 'Seleccionar carpeta actual' para elegirla.",
       navigateAndConfirm:
         "Navega a la carpeta que deseas y luego haz clic en 'Usar esta ruta' para confirmar.",
-      rootPath: "Actualmente estás en el nivel raíz.",
     },
   },
   connectors: {
+    title: "Conectores",
+    description: "Gestiona los conectores de almacenamiento para tus activos multimedia",
+    addConnector: "Agregar conector",
+    editConnector: "Editar conector",
+    syncConnector: "Sincronizar conector",
     apiMessages: {
       creating: {
         loading: "Creando conector...",
         success: "Conector creado",
-        successMessage: "El nuevo conector se ha creado exitosamente.",
         error: "Error al crear el conector",
       },
       updating: {
         loading: "Actualizando conector...",
         success: "Conector actualizado",
-        successMessage: "El conector se ha actualizado exitosamente.",
         error: "Error al actualizar el conector",
       },
       deleting: {
-        loading: "Eliminando conector...",
-        success: "Conector eliminado",
-        successMessage: "El conector se ha eliminado exitosamente.",
         error: "Error al eliminar el conector",
       },
       enabling: {
@@ -102,17 +88,51 @@ export default {
         error: "Error al deshabilitar el conector",
       },
     },
+    form: {
+      connectorName: "Nombre del conector",
+      connectorNameHelper: "El nombre del conector no se puede modificar después de la creación",
+      description: "Descripción",
+      s3ConnectorType: "Tipo de conector S3",
+      s3IntegrationMethod: "Método de integración S3",
+      s3Bucket: "Bucket S3",
+      newBucketName: "Nuevo nombre de bucket",
+      pathHelper: "Prefijo opcional para filtrar objetos (ej., 'carpeta/')",
+      bucket: "Bucket",
+      region: "Región",
+      path: "Ruta",
+      objectPrefix: "Prefijo de objeto",
+      objectPrefixNumbered: "Prefijo de objeto {{number}}",
+      allowUploads: "Permitir cargas",
+      bucketNameHelper: "Bucket name must be globally unique, follow S3 naming rules.",
+      addPrefix: "Agregar prefijo",
+    },
+    status: {
+      active: "Activo",
+    },
+    dialogs: {
+      deleteTitle: "Eliminar conector",
+      deleteConnectorConfirmation:
+        'Are you sure you want to delete the connector "{{connectorNombre}}"? This action cannot be undone.',
+      eventBridgeWarning:
+        "Please ensure you disable the EventBridge integration for this S3 bucket if it is no longer required.",
+    },
+    noConnectorsFound: "No se encontraron conectores.",
+    fields: {
+      bucket: "Bucket",
+      region: "Región",
+      description: "Descripción",
+      prefix: "Prefijo",
+      prefixes: "Prefijos",
+      integrationMethod: "Método de integración",
+      lastUpdated: "Última actualización",
+    },
   },
   assets: {
-    favorite: "Favorito",
-    unfavorite: "Quitar de favoritos",
-    rename: "Renombrar",
-    delete: "Eliminar",
-    download: "Descargar",
-    share: "Compartir",
-    viewDetails: "Ver detalles",
-    retry: "Reintentar",
-    retryFromCurrent: "Reintentar desde la posición actual",
+    fileInformation: "Información del Archivo",
+    technicalDetails: "Detalles Técnicos",
+    fields: {
+      size: "Size",
+    },
   },
   assetExplorer: {
     noConnectorSelected: "Selecciona un conector para ver los activos",
@@ -131,24 +151,67 @@ export default {
         "¿Estás seguro de que quieres eliminar este activo? Esta acción no se puede deshacer.",
       cancel: "Cancelar",
       confirm: "Eliminar",
+      deleting: "Eliminando...",
     },
+    failedToLoadAssets: "Error al cargar activos",
   },
   home: {
-    title: "Inicio",
-    description: "Guía para tus medios, metadatos y flujos de trabajo.",
-    statistics: "Estadísticas",
-    collections: "Colecciones",
-    sharedCollections: "Colecciones compartidas",
+    description: "",
     favorites: "Favoritos",
-    smartFolders: "Carpetas inteligentes",
-    connectedStorage: "Almacenamiento conectado",
-    sharing: "Compartir",
-    comingSoon: "Próximamente",
+    stats: {
+      assignedTasks: "Assigned Tasks",
+      activeTasks: "Activo tasks",
+      pipelineExecutions: "Pipeline Executions",
+      last24Hours: "Last 24 hours",
+      newAssets: "New Assets",
+      uploadedToday: "Uploaded today",
+    },
+  },
+  collectionsPage: {
+    title: "Colecciones",
+    description: "Organiza y gestiona tus activos multimedia en colecciones",
+    createCollection: "Crear colección",
+    editCollection: "Editar colección",
+    noCollections: "No se encontraron colecciones",
+    collectionTypes: {
+      public: "Pública",
+      private: "Privada",
+    },
+    form: {
+      name: "Nombre de la colección",
+      namePlaceholder: "Ingresa el nombre de la colección",
+      description: "Descripción",
+      descriptionPlaceholder: "Ingresa una descripción para esta colección",
+      type: "Tipo de colección",
+      parentCollection: "Colección padre",
+      selectParent: "Ninguna (Nivel raíz)",
+      isPublic: "Hacer esta colección pública",
+      validation: {
+        nameRequired: "El nombre de la colección es requerido",
+        nameMinLength: "El nombre de la colección debe tener al menos 2 caracteres",
+        nameMaxLength: "El nombre de la colección no debe exceder 100 caracteres",
+        descriptionMaxLength: "La descripción no debe exceder 500 caracteres",
+      },
+    },
+    labels: {
+      public: "Pública",
+      private: "Privada",
+      shared: "Compartida",
+    },
+    dialogs: {
+      editTitle: "Editar colección",
+      deleteTitle: "Eliminar colección",
+    },
+    collectionUpdated: "Collection updated successfully",
+    collectionUpdateFailed: "Failed to update collection",
+    collectionDeleted: "Collection deleted successfully",
+    collectionDeleteFailed: "Failed to delete collection",
   },
   sidebar: {
     menu: {
       home: "Inicio",
       assets: "Activos",
+      collections: "Colecciones",
       pipelines: "Pipelines",
       pipelineExecutions: "Ejecuciones de pipeline",
       settings: "Configuración",
@@ -156,10 +219,10 @@ export default {
     submenu: {
       system: "Configuración del sistema",
       connectors: "Conectores",
-      userManagement: "Gestión de usuarios",
-      roles: "Roles",
       integrations: "Integraciones",
       environments: "Entornos",
+      usersAndGroups: "Usuarios y grupos",
+      permissionSets: "Permisos",
     },
   },
   profile: {
@@ -184,6 +247,7 @@ export default {
       loadingConfig: "Error al cargar la configuración de AWS:",
       loadingUserAttributes: "Error al cargar los atributos del usuario:",
       signingOut: "Error al cerrar sesión:",
+      somethingWentWrong: "Something went wrong",
     },
     navigation: {
       preventedDuplicate: "Se previno la navegación duplicada a",
@@ -207,10 +271,36 @@ export default {
       },
     },
     filters: {
-      dateRange: "Rango de fechas",
-      contentType: "Tipo de contenido",
-      storageLocation: "Ubicación de almacenamiento",
-      comingSoon: "Más filtros próximamente...",
+      title: "Filtrar resultados",
+      apply: "Aplicar filtros",
+      reset: "Restablecer",
+      toDate: "Hasta fecha y hora",
+      fromDate: "Desde fecha y hora",
+      maxSize: "Máximo",
+      minSize: "Mínimo",
+      creationDate: "Fecha de creación",
+      after: "Después",
+      before: "Antes",
+      clearAll: "Clear All",
+      filenameSearch: "Search by filename",
+    },
+    bar: {
+      label: "Buscar",
+      placeholder: "Buscar (ej., atardecer type:imagen)",
+      helperText:
+        "Usa palabras clave como type:, format:, size:, date:, metadata: para filtrar resultados",
+    },
+    results: {
+      title: "Resultados",
+      error: "Error",
+      errorMessage: "Hubo un problema al recuperar el contenido.",
+    },
+    facets: {
+      mediaType: "Tipo de medio",
+      extension: "Extensión",
+      size: "Tamaño",
+      date: "Fecha",
+      filename: "Nombre de archivo",
     },
   },
   admin: {
@@ -221,16 +311,11 @@ export default {
       systemLoad: "Carga del sistema",
     },
     errors: {
-      userDeletionNotImplemented:
-        "La eliminación de usuarios aún no está implementada.",
-      userCreationNotImplemented:
-        "La creación de usuarios aún no está implementada.",
-      userEditingNotImplemented:
-        "La edición de usuarios aún no está implementada.",
-      analyticsExportNotImplemented:
-        "La exportación de analíticas aún no está implementada.",
-      systemResetNotImplemented:
-        "El reinicio del sistema aún no está implementado.",
+      userDeletionNotImplemented: "La eliminación de usuarios aún no está implementada.",
+      userCreationNotImplemented: "La creación de usuarios aún no está implementada.",
+      userEditingNotImplemented: "La edición de usuarios aún no está implementada.",
+      analyticsExportNotImplemented: "La exportación de analíticas aún no está implementada.",
+      systemResetNotImplemented: "El reinicio del sistema aún no está implementado.",
     },
     columns: {
       lastActive: "Última actividad",
@@ -242,11 +327,15 @@ export default {
   },
   integrations: {
     title: "Integraciones",
-    selectProvider: "Seleccionar integración",
-    selectIntegration: "Seleccionar integración",
-    configureIntegration: "Configurar integración",
     description: "Gestiona tus integraciones y conexiones",
     addIntegration: "Agregar integración",
+    selectIntegration: "Seleccionar integración",
+    configureIntegration: "Configurar integración",
+    selectNode: {
+      title: "Seleccionar nodo",
+      description: "Elige un tipo de nodo para tu integración",
+      noNodes: "No hay nodos disponibles",
+    },
     deleteConfirmation: {
       title: "Eliminar integración",
       message: "¿Estás seguro de que quieres eliminar esta integración?",
@@ -269,7 +358,6 @@ export default {
         description: {
           label: "Descripción",
           tooltip: "Proporciona una descripción para esta integración",
-          helper: "Breve descripción de esta integración",
           errors: {
             required: "La descripción es requerida",
           },
@@ -304,7 +392,6 @@ export default {
             apiKey: {
               label: "Clave API",
               tooltip: "Ingresa tu clave API",
-              helper: "Clave API para autenticación con el servicio",
               errors: {
                 required: "La clave API es requerida",
               },
@@ -318,23 +405,92 @@ export default {
             },
           },
         },
-      },
-      errors: {
-        required: "Este campo es requerido",
-        nodeId: {
-          unrecognized_keys: "Selección de integración inválida",
+        iamRole: {
+          label: "IAM Role ARN",
+          tooltip: "Enter the IAM role ARN for this integration",
+        },
+        apiKey: {
+          label: "API Key",
+          tooltip: "Enter the API key for this integration",
         },
       },
+      editTitle: "Edit Integration",
+    },
+    actions: {
+      edit: "Editar integración",
+      delete: "Eliminar integración",
+    },
+    pipelines: {
+      searchPlaceholder: "Search pipelines...",
+      actions: {
+        edit: "Editar Pipeline",
+        delete: "Eliminar Pipeline",
+      },
+      editor: {
+        seeLess: "Ver menos",
+        seeMore: "Ver más",
+      },
+    },
+    editor: {
+      configureNode: "Configure Node",
+      updatePipeline: "Actualizar Pipeline",
+      noChangesToSave: "No changes to save",
+      pipelineNameRequired: "Pipeline name is required before exporting",
+      atLeastOneNodeRequired: "At least one node must be added to the canvas before exporting",
+    },
+    integrationValidation: {
+      noIntegrationsAvailable:
+        "No integrations are available in this environment. You'll need to create integrations before you can use these nodes.",
+    },
+    triggerTypes: {
+      eventTriggered: "Event Triggered",
+      apiTriggered: "API Triggered",
+      manuallyTriggered: "Manually Triggered",
     },
   },
   pipelines: {
     title: "Pipelines",
-    description: "Gestiona tus pipelines de medios y metadatos",
+    description: "Administre sus pipelines de medios y metadatos",
     searchPlaceholder: "Buscar pipelines...",
+    eventBridgeEditor: {
+      patternOperatorsGuide: "Guía de operadores de patrones",
+      formatJson: "Formatear JSON",
+      exportToJson: "Exportar a JSON",
+      importFromJson: "Importar desde JSON",
+    },
     actions: {
       create: "Agregar nuevo pipeline",
       import: "Importar pipeline",
     },
+    editor: {
+      searchNodes: "Buscar nodos...",
+      updatePipeline: "Actualizar pipeline",
+      update: "Actualizar",
+      rotateNode: "Rotar ({{rotation}}°)",
+      updateWarning: "Are you sure you want to update this pipeline?",
+    },
+    integrationValidation: {
+      title: "Validación de integración requerida",
+      selectIntegration: "Seleccionar integración",
+      invalidIntegrationId: "ID de integración inválido",
+      replacementIntegration: "Integración de reemplazo",
+    },
+    dialogs: {
+      deleteTitle: "Eliminar Pipeline",
+      deleteConfirmation: '¿Estás seguro de que quieres eliminar el pipeline "{{pipelineName}}"?',
+      deleteWarning: "Esta acción no se puede deshacer.",
+    },
+    viewAll: "Ver todos los pipelines",
+    selectType: "Seleccionar tipo",
+    selectS3Type: "Seleccionar tipo S3",
+    configuration: "Configuración",
+    editConnector: "Editar conector",
+    addConnector: "Agregar conector",
+    saveChanges: "Guardar cambios",
+    loadingNodeConfiguration: "Loading node configuration...",
+    updatePipeline: "Update Pipeline",
+    savePipeline: "Save Pipeline",
+    namePlaceholder: "Enter pipeline name",
   },
   executions: {
     title: "Ejecuciones de pipeline",
@@ -347,6 +503,16 @@ export default {
       endTime: "Hora de fin",
       duration: "Duración",
       actions: "Acciones",
+    },
+    actions: {
+      retryFromCurrent: "Reintentar desde la posición actual",
+      retryFromStart: "Reintentar desde el inicio",
+    },
+    details: "Execution Details",
+    fields: {
+      started: "Started",
+      ended: "Ended",
+      status: "Estado",
     },
   },
   users: {
@@ -390,8 +556,13 @@ export default {
     form: {
       title: {
         add: "Agregar usuario",
+        edit: "Edit User",
       },
       fields: {
+        groups: {
+          label: "Grupos",
+          tooltip: "Selecciona grupos para el usuario",
+        },
         given_name: {
           label: "Nombre",
           tooltip: "Ingresa el nombre del usuario",
@@ -426,10 +597,9 @@ export default {
         },
       },
     },
-    roles: {
-      admin: "Administrador",
-      editor: "Editor",
-      viewer: "Visualizador",
+    status: {
+      active: "Active",
+      inactive: "Inactive",
     },
   },
   roles: {
@@ -437,6 +607,10 @@ export default {
     description: "Gestiona los roles del sistema y sus permisos",
     actions: {
       addRole: "Agregar rol",
+    },
+    tooltips: {
+      editRole: "Editar rol",
+      deleteRole: "Eliminar rol",
     },
   },
   settings: {
@@ -446,6 +620,20 @@ export default {
       addButton: "Agregar entorno",
       searchPlaceholder: "Buscar entornos",
       createTitle: "Crear entorno",
+      editTitle: "Editar entorno",
+      updateSuccess: "Entorno actualizado correctamente",
+      createSuccess: "Entorno creado correctamente",
+      submitError: "Error al guardar el entorno",
+      deleteSuccess: "Entorno eliminado correctamente",
+      deleteError: "Error al eliminar el entorno",
+      status: {
+        active: "Activo",
+        disabled: "Deshabilitado",
+      },
+      actions: {
+        edit: "Editar",
+        delete: "Eliminar",
+      },
       form: {
         name: "Nombre del entorno",
         region: "Región",
@@ -462,45 +650,85 @@ export default {
       title: "Configuración del sistema",
       tabs: {
         search: "Búsqueda",
-        notifications: "Notificaciones",
         security: "Seguridad",
-        performance: "Rendimiento",
+        apiKeys: "API Keys",
+        collections: "Collections",
+        upgrades: "Upgrades",
       },
       search: {
         title: "Configuración de búsqueda",
         description:
           "Configura el proveedor de búsqueda para capacidades de búsqueda mejoradas en tus activos multimedia.",
-        provider: "Proveedor de búsqueda:",
-        configureProvider: "Configurar proveedor de búsqueda",
-        editProvider: "Editar proveedor",
-        resetProvider: "Reiniciar proveedor",
-        providerDetails: "Detalles del proveedor",
-        providerName: "Nombre del proveedor",
+        provider: "Proveedor de búsqueda semántica",
         apiKey: "Clave API",
-        endpoint: "URL del endpoint (Opcional)",
-        enabled: "Búsqueda habilitada",
-        noProvider: "No hay proveedor de búsqueda configurado.",
-        configurePrompt:
-          "Configura Twelve Labs para habilitar las capacidades de búsqueda.",
+        semanticEnabled: "Búsqueda semántica habilitada",
+        semanticEnabledDesc: "Habilita o deshabilita la funcionalidad de búsqueda semántica",
+        providerDesc:
+          "Selecciona el proveedor de incrustación para capacidades de búsqueda semántica",
+        selectProvider: "Seleccionar proveedor",
+        editApiKey: "Editar",
+        configured: "Configurado",
+        configureApiKey: "Configurar clave API",
+        apiKeyDesc:
+          "Ingresa tu clave API de Twelve Labs para habilitar la funcionalidad de búsqueda semántica.",
+        embeddingStore: "Almacén de incrustación de búsqueda semántica",
+        embeddingStoreDesc: "Elige qué almacén de incrustación usar para búsquedas semánticas",
+        selectStore: "Seleccionar almacén",
+        saveSuccess: "Configuración guardada exitosamente",
+        saveError: "Error al guardar la configuración",
+        cancelSuccess: "Cambios cancelados",
+        errorLoading: "Error al cargar la configuración del proveedor de búsqueda",
+        preview: "Vista previa",
+        apiKeySaveError: "Failed to save API key",
+        apiKeySaveSuccess: "API key saved successfully",
+        external: "External",
+        internal: "Internal",
+        savingApiKey: "Saving API key...",
       },
-      notifications: {
-        title: "Configuración de notificaciones",
-        comingSoon: "Configuración de notificaciones próximamente.",
+      upgrade: {
+        noHistory: "No upgrade history available",
+        historyTable: {
+          status: "Status",
+          from: "From Version",
+          to: "To Version",
+          duration: "Duration",
+          triggeredBy: "Triggered By",
+          date: "Date",
+          details: "Details",
+        },
+        title: "System Upgrade",
+        currentVersion: "Current Version",
+        upgradingTo: "Upgrading to",
+        lastUpgrade: "Last Upgrade",
+        availableVersions: "Available Versions",
+        history: "Upgrade History",
+        tags: "Tags",
+        noTags: "No tags available",
+        branches: "Branches",
+        noBranches: "No branches available",
+        confirmTitle: "Confirm Upgrade",
+        upgrading: "Upgrading...",
+        confirm: "Confirm",
       },
-      security: {
-        title: "Configuración de seguridad",
-        comingSoon: "Configuración de seguridad próximamente.",
-      },
-      performance: {
-        title: "Configuración de rendimiento",
-        comingSoon: "Configuración de rendimiento próximamente.",
+    },
+    apiKeys: {
+      form: {
+        importantNotice:
+          "Important: This is the only time you'll be able to view this API key. Please save it securely.",
       },
     },
   },
   common: {
-    select: "Seleccionar",
     back: "Atrás",
     search: "Buscar",
+    batchOperations: {
+      deleteSelected: "Eliminar seleccionados",
+    },
+    confirmBulkDelete: "Confirmar eliminación masiva",
+    typeDeleteToConfirm: "Escriba DELETE para confirmar",
+    importingPipeline: "Importando pipeline...",
+    failedToLoadNodes: "Error al cargar los nodos. Por favor, inténtelo de nuevo más tarde.",
+    alternativeTranscriptions: "Transcripciones alternativas:",
     profile: "Perfil",
     logout: "Cerrar sesión",
     theme: "Tema",
@@ -508,6 +736,7 @@ export default {
     refresh: "Actualizar",
     cancel: "Cancelar",
     save: "Guardar",
+    saving: "Guardando...",
     loading: "Cargando...",
     loadMore: "Cargar más",
     tableDensity: "Densidad de tabla",
@@ -521,7 +750,42 @@ export default {
     root: "Raíz",
     folder: "Carpeta",
     filter: "Filtro",
-    noGroups: "Sin grupos",
+    apply: "Aplicar",
+    clear: "Limpiar",
+    clearFilter: "Limpiar filtro",
+    node: "Nodo",
+    icon: "Icono",
+    name: "Nombre",
+    description: "Descripción",
+    category: "Categoría",
+    enabled: "Habilitado",
+    disabled: "Deshabilitado",
+    system: "Sistema",
+    custom: "Personalizado",
+    versions: "Versiones",
+    full: "Completo",
+    clip: "Clip",
+    none: "Ninguno",
+    clearChatHistory: "Borrar historial de chat",
+    closeChat: "Cerrar chat",
+    editPipeline: "Editar Pipeline",
+    deletePipeline: "Eliminar Pipeline",
+    startPipeline: "Iniciar Pipeline",
+    stopPipeline: "Detener Pipeline",
+    moreOptions: "Más opciones",
+    permit: "Permitir",
+    deny: "Denegar",
+    notSet: "No configurado",
+    deleteApiKey: "Eliminar clave API",
+    editApiKey: "Editar clave API",
+    clickToEdit: "Haga clic para editar",
+    downloadVersion: "Descargar esta versión",
+    resetMarker: "Restablecer marcador a la posición original",
+    postComment: "Publicar tu comentario",
+    runPipeline: "Ejecutar este pipeline en el activo actual",
+    browsePipelines: "Explorar todos los pipelines disponibles",
+    loadMoreActivities: "Cargar más actividades",
+    permissions: "Permisos",
     actions: {
       add: "Agregar",
       save: "Guardar",
@@ -529,6 +793,69 @@ export default {
       edit: "Editar",
       activate: "Activar",
       deactivate: "Desactivar",
+      download: "Descargar",
+      rename: "Renombrar",
+      lock: "Bloquear",
+      restore: "Restaurar",
+      viewDetails: "Ver Detalles",
+      addToCollection: "Agregar a Colección",
+      assetDetail: "Detalle del Activo",
+      renameAsset: "Renombrar Activo",
+      viewAlternativeTranscriptions: "Ver transcripciones alternativas",
+      exportTranscript: "Exportar transcripción",
+      downloadSelected: "Descargar seleccionados",
+      removeItem: "Eliminar este elemento",
+      cancel: "Cancelar",
+      deleting: "Eliminando...",
+      saving: "Guardando...",
+      update: "Actualizar",
+      create: "Crear",
+      copied: "¡Copiado!",
+      back: "Back",
+      next: "Next",
+    },
+    status: {
+      active: "Activo",
+      inactive: "Inactivo",
+      enabled: "Habilitado",
+      disabled: "Deshabilitado",
+    },
+    views: {
+      cardView: "Vista de tarjeta",
+      tableView: "Vista de tabla",
+      smallCards: "Tarjetas pequeñas",
+      mediumCards: "Tarjetas medianas",
+      largeCards: "Tarjetas grandes",
+      verticalAspectRatio: "Relación de aspecto vertical",
+      squareAspectRatio: "Relación de aspecto cuadrada",
+      horizontalAspectRatio: "Relación de aspecto horizontal",
+      fitToContainer: "Ajustar al contenedor (mantener relación de aspecto)",
+      fillContainer: "Llenar contenedor (puede recortar imagen)",
+    },
+    dialogs: {
+      cancel: "Cancelar",
+      close: "Cerrar",
+      save: "Guardar",
+    },
+    labels: {
+      name: "Nombre",
+      description: "Descripción",
+      status: "Estado",
+      enabled: "Habilitado",
+      disabled: "Deshabilitado",
+      active: "Activo",
+      inactive: "Inactivo",
+      actions: "Acciones",
+      region: "Región",
+    },
+    placeholders: {
+      filterValue: "Valor del filtro",
+      apiKeyDescription: "A descriptive name for this API key",
+      addComment: "Agregar a comment...",
+      filterMetadata: "Filter metadata…",
+      enterApiKey: "Enter your API key",
+      searchPermissionSets: "Search permission sets...",
+      enterCollectionDescription: "Enter collection description",
     },
     columns: {
       permissionSets: "Conjuntos de permisos",
@@ -541,11 +868,264 @@ export default {
       created: "Creado",
       modified: "Modificado",
       actions: "Acciones",
+      name: "Nombre",
+      type: "Tipo",
+      preview: "Vista previa",
+      updated: "Actualizado",
     },
-    status: {
+    viewControls: {
+      groupByType: "Agrupar por tipo",
+      metadata: "Metadatos",
+    },
+    notifications: "Notificaciones",
+    breadcrumb: {
+      ariaLabels: {
+        deleteMarker: "Eliminar marker",
+        resetMarker: "Reset marker",
+        pipelineFileOperations: "Pipeline file operations",
+        pipelineActions: "Pipeline actions",
+        dataTable: "Tabla de datos",
+      },
+    },
+    notAvailable: "N/A",
+    noUsersFound: "No users found",
+    noEnvironmentsFound: "No environments found",
+    noIntegrationsFound: "No integrations found",
+    noPipelinesFound: "No pipelines found",
+    noPipelineExecutionsFound: "No pipeline executions found",
+    noCollectionTypesFound: "No collection types found. Crear one to get started.",
+    noUpgradeHistory: "No upgrade history available",
+    validation: {
+      apiKeyRequired: "API key is required",
+      integrationMustBeSelected: "An integration must be selected",
+      fieldRequired: "This field is required",
+    },
+    messages: {
+      connectorDeletedSuccessfully: "Conector deleted successfully",
+      connectorSyncInitiated: "Conector sync initiated successfully",
+      connectorCreatedSuccessfully: "Conector created successfully",
+      integrationDeletedSuccessfully: "Integración has been successfully deleted",
+      collectionDeletedSuccessfully: "Collection deleted successfully",
+      pipelineDeleted: "The pipeline has been deleted.",
+      failedToSyncConnector: "Fallido to sync connector",
+      failedToParsePipeline: "Fallido to parse the pipeline file.",
+      unknownErrorOccurred: "An unknown error occurred",
+      unexpectedErrorOccurred: "An unexpected error occurred",
+      tryAdjustingSearchOrFilter: "Try adjusting your search or filter criteria",
+      nameIsRequired: "Nombre is required",
+      cannotEditSystemTypes: "Cannot edit system types",
+      cannotDeleteSystemTypes: "Cannot delete system types",
+      editType: "Editar type",
+      deleteType: "Eliminar type",
+      errorSavingRole: "An error occurred while saving the role",
+      errorDeletingRole: "An error occurred while deleting the role",
+      permissionSetNotFound: "Permiso set not found",
+      noUsersAssigned: "No users assigned",
+      noGroupsAssigned: "No groups assigned",
+      connectToExistingS3Bucket: "Connect to an existing S3 bucket",
+      createNewS3Bucket: "Crear a new S3 bucket",
+    },
+    delete: "Eliminar",
+    deleteApiKeyConfirmation:
+      'Are you sure you want to delete the API key "{{name}}"? This action cannot be undone and will immediately invalidate any applications using this key.',
+    deleteApiKeyConfirmationGeneric: "Are you sure you want to delete this API key?",
+    pipelineEditor: {
+      triggers: "Triggers",
+      integrations: "Integracións",
+      flow: "Flow",
+      utilities: "Utilities",
+    },
+    noGroup: "No group",
+    darkMode: "Dark Mode",
+    toggleTheme: "Toggle theme",
+  },
+  detailPages: {
+    tabs: {
+      summary: "Resumen",
+      technical: "Metadatos técnicos",
+      descriptive: "Descriptivo",
+      transcription: "Transcripción",
+      relatedItems: "Elementos relacionados",
+    },
+    metadata: {
+      type: "Tipo",
+      size: "Tamaño",
+      format: "Formato",
+      s3Bucket: "Bucket S3",
+      objectName: "Nombre del objeto",
+      s3Uri: "URI S3",
+      duration: "Duración",
+      sampleRate: "Tasa de muestreo",
+      bitDepth: "Profundidad de bits",
+      channels: "Canales",
+      bitRate: "Tasa de bits",
+      codec: "Códec",
+      createdDate: "Fecha de creación",
+      resolution: "Resolución",
+      frameRate: "Velocidad de fotogramas",
+      dimensions: "Dimensiones",
+      colorDepth: "Profundidad de color",
+      colorSpace: "Espacio de color",
+      compression: "Compresión",
+      allCategories: "Todas las categorías",
+    },
+  },
+  permissionSets: {
+    title: "Matriz de permisos centrada en recursos",
+    description: "Gestiona conjuntos de permisos para controlar el acceso a los recursos",
+    labels: {
+      permissionMatrix: "Matriz de permisos",
+    },
+    dialogs: {
+      detailsTitle: "Detalles del conjunto de permisos",
+      deleteTitle: "Eliminar conjunto de permisos",
+    },
+    permissionMatrix: {
+      editTitle: "Editar matriz de permisos",
+    },
+    tabs: {
+      permissionMatrix: "Matriz de permisos",
+      assignedUsers: "Usuarios asignados",
+      assignedGroups: "Grupos asignados",
+    },
+    noAssignments: "No permission sets assigned",
+  },
+  apiKeys: {
+    title: "Gestión de claves API",
+    description: "Gestiona claves API para acceso programático al sistema",
+    addApiKey: "Agregar clave API",
+    searchPlaceholder: "Buscar claves API...",
+    categoryAll: "Todas las claves API",
+    tooltips: {
+      copyApiKeyId: "Copiar ID de clave API",
+    },
+    form: {
+      name: "Nombre",
+      description: "Descripción",
+      descriptionHelper: "Descripción opcional de para qué se usará esta clave API",
+      enabled: "Habilitada",
+      rotateApiKey: "Rotar clave API",
+    },
+    dialogs: {
+      detailsTitle: "Detalles de la clave API",
+    },
+    loading: "Cargando API key details...",
+    details: {
+      description: "Descripción",
+      apiKeyId: "API Key ID",
+      created: "Creard",
+      lastUpdated: "Última actualización",
+      lastUsed: "Last Used",
+    },
+    errors: {
+      loadFailed: "Fallido to load API key details. Please try again.",
+    },
+    emptyState: {
+      noApiKeys: "No API keys found",
+      noMatchingApiKeys: "No API keys match your search",
+      createFirstApiKey: "Crear your first API key to get started",
+    },
+  },
+  userManagement: {
+    roleManagement: {
+      title: "Gestión de roles",
+      addRole: "Agregar rol",
+      editRole: "Editar rol",
+      roleName: "Nombre del rol",
+      description: "Descripción",
+      addPermission: "Agregar permiso",
+    },
+    form: {
+      roleName: "Nombre del rol",
+      permissions: "Permisos",
+    },
+  },
+  chat: {
+    typeYourMessage: "Escribe tu mensaje...",
+    typeMessage: "Tipo a message...",
+  },
+  videoReview: {
+    title: "Revisión de video",
+    addCommentPlaceholder: "Agregar a comment...",
+  },
+  favorites: {
+    noFavorites: "No favorite assets yet",
+    addFavorite: "Agregar a favoritos",
+    removeFavorite: "Eliminar de favoritos",
+    errorLoading: "Error loading favorites",
+    errorAdding: "Failed to add favorite",
+    errorRemoving: "Failed to remove favorite",
+    retry: "Retry",
+  },
+  transcription: {
+    searchPlaceholder: "Search transcript...",
+    quickSearchPlaceholder: "Quick search...",
+  },
+  rightSidebar: {
+    filterOptions: "OPCIONES DE FILTRO",
+  },
+  collectionTypes: {
+    title: "Tipos de colección",
+    labels: {
+      system: "Sistema",
+    },
+    form: {
+      name: "Nombre",
+      description: "Descripción",
+      customColor: "Color personalizado (Hex)",
       active: "Activo",
-      inactive: "Inactivo",
+      nameHelper: "{{count}}/50 characters",
+      descriptionHelper: "{{count}}/255 characters",
+      color: "Color",
+      preview: "Vista previa",
+      collectionNamePlaceholder: "Collection Nombre",
+      descriptionPlaceholder: "Descripción",
+      colorFormatHelper: "Ingrese un color hexadecimal válido (ej. #FF5733)",
     },
+    createType: "Crear Type",
+    description: "Manage collection types for organizing your media assets",
+    alerts: {
+      cannotDeleteSystem: "Cannot delete system collection types",
+      confirmDelete: 'Are you sure you want to delete "{{name}}"?',
+    },
+    dialogs: {
+      editTitle: "Editar Collection Type",
+      createTitle: "Crear Collection Type",
+      migrateTitle: "Migrate Collections",
+    },
+  },
+  upgradeSection: {
+    labels: {
+      latest: "Último",
+      current: "Actual",
+      default: "Predeterminado",
+    },
+    dialogs: {
+      confirmUpgrade:
+        "¿Estás seguro de que quieres actualizar a {{version}}? Esto activará un pipeline de despliegue y puede causar una interrupción temporal del servicio.",
+    },
+  },
+  migrateCollectionType: {
+    targetType: "Tipo de destino",
+  },
+  emptyStates: {
+    noRelatedItems: "No related items found",
+  },
+  errors: {
+    errorDetails: "Detalles del error",
+    tryAgain: "Intentar de nuevo",
+    failedToLoadCollectionTypes: "Fallido to load collection types",
+    somethingWentWrong: "Something went wrong!",
+    componentError: "Component Error",
+    refreshPage: "Refresh Page",
+    showDetails: "Show Details",
+    hideDetails: "Hide Details",
+    saveFailed: "Failed to save changes",
+    loadFailed: "Failed to load data",
+    goToHomepage: "Go to Homepage",
+  },
+  rename: {
+    newName: "Nuevo nombre",
   },
   s3Explorer: {
     filter: {
@@ -555,474 +1135,126 @@ export default {
     },
     loading: {
       initializing: "Cargando...",
-      fetchingContents: "Obteniendo contenidos...",
     },
     empty: {
       folder: "Esta carpeta está vacía",
       noResults: "No hay elementos que coincidan con tu filtro",
     },
     keyboard: {
-      navigation:
-        "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
+      navigation: "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
     },
-    menu: {
-      rename: "Renombrar",
-      delete: "Eliminar",
+    breadcrumbs: {
+      prefixRoot: "Root",
+      navigateTo: "Navigate to {{path}}",
     },
-  },
-  translation: {
-    common: {
-      actions: {
-        add: "Agregar",
-        edit: "Editar",
-        delete: "Eliminar",
-        activate: "Activar",
-        deactivate: "Desactivar",
-        create: "Crear",
-      },
-      tableDensity: "Densidad de tabla",
-      theme: "Tema",
-      back: "Atrás",
-      loading: "Cargando...",
-      error: "Algo salió mal",
-      save: "Guardar",
-      cancel: "Cancelar",
-      delete: "Eliminar",
-      edit: "Editar",
-      search: "Buscar",
-      profile: "Perfil",
-      filterColumn: "Filtro",
-      searchValue: "Buscar",
-      logout: "Cerrar sesión",
-      language: "Idioma",
-      alerts: "Alertas",
-      warnings: "Advertencias",
-      notifications: "Notificaciones",
-      searchPlaceholder: "Buscar o usar clave:valor...",
-      close: "Cerrar",
-      success: "Éxito",
-      refresh: "Actualizar",
-      previous: "Anterior",
-      next: "Siguiente",
-      show: "Mostrar",
-      all: "Todos",
-      status: {
-        active: "Activo",
-        inactive: "Inactivo",
-      },
-      rename: "Renombrar",
-      root: "Raíz",
-      folder: "Carpeta",
-      loadMore: "Cargar más",
-      darkMode: "Modo oscuro",
-      lightMode: "Modo claro",
-      filter: "Filtro",
-      textFilter: "Filtro de texto",
-      selectFilter: "Seleccionar filtro",
-      clearFilter: "Limpiar filtro",
-      columns: {
-        username: "Nombre de usuario",
-        firstName: "Nombre",
-        lastName: "Apellido",
-        email: "Email",
-        status: "Estado",
-        groups: "Grupos",
-        created: "Creado",
-        modified: "Modificado",
-        actions: "Acciones",
-      },
-      noGroups: "Sin grupos",
-      select: "Seleccionar",
-      moreInfo: "Más información",
-    },
-    users: {
-      title: "Gestión de usuarios",
-      search: "Buscar usuarios",
-      description: "Gestiona los usuarios del sistema y su acceso",
-      form: {
-        fields: {
-          given_name: {
-            label: "Nombre",
-            tooltip: "Ingresa el nombre del usuario",
-            errors: {
-              required: "El nombre es requerido",
-            },
-          },
-          family_name: {
-            label: "Apellido",
-            tooltip: "Ingresa el apellido del usuario",
-            errors: {
-              required: "El apellido es requerido",
-            },
-          },
-          email: {
-            label: "Email",
-            tooltip: "Ingresa la dirección de email del usuario",
-            errors: {
-              required: "El email es requerido",
-              invalid: "Dirección de email inválida",
-            },
-          },
-          enabled: {
-            label: "Habilitado",
-            tooltip: "Habilita o deshabilita el usuario",
-            errors: {
-              required: "Habilitado es requerido",
-            },
-          },
-          roles: {
-            label: "Roles",
-            tooltip: "Selecciona los roles para el usuario",
-            errors: {
-              required: "Los roles son requeridos",
-            },
-          },
-          email_verified: {
-            label: "Email verificado",
-            tooltip: "Indica si el email del usuario ha sido verificado",
-            errors: {
-              required: "La verificación de email es requerida",
-            },
-          },
-        },
-      },
-    },
-    roles: {
-      title: "Gestión de roles",
-      description: "Gestiona los roles del sistema y sus permisos",
-      admin: "Administrador",
-      editor: "Editor",
-      viewer: "Visualizador",
-      actions: {
-        addRole: "Agregar rol",
-      },
-    },
-    columns: {
-      username: "Nombre de usuario",
-      firstName: "Nombre",
-      lastName: "Apellido",
-      email: "Email",
-      status: "Estado",
-      groups: "Grupos",
-      created: "Creado",
-      modified: "Modificado",
-      actions: "Acciones",
-    },
-    actions: {
-      addUser: "Agregar usuario",
-      edit: "Editar usuario",
-      delete: "Eliminar usuario",
-      activate: "Activar usuario",
-      deactivate: "Desactivar usuario",
-    },
-    status: {
-      active: "Activo",
-      inactive: "Inactivo",
-    },
-    errors: {
-      loadFailed: "Error al cargar usuarios",
-      saveFailed: "Error al guardar usuario",
-      deleteFailed: "Error al eliminar usuario",
-    },
-    navigation: {
-      home: "Inicio",
-      collections: "Colecciones",
-      settings: "Configuración",
-    },
-    home: {
-      welcome: "Bienvenido a Media Lake",
-      description:
-        "Gestiona y organiza tus archivos multimedia de manera eficiente",
-      statistics: "Estadísticas",
-      collections: "Colecciones",
-      sharedCollections: "Colecciones compartidas",
-      favorites: "Favoritos",
-      smartFolders: "Carpetas inteligentes",
-      connectedStorage: "Almacenamiento conectado",
-      sharing: "Compartir",
-      comingSoon: "Próximamente",
-    },
-    notifications: {
-      "Pipeline Complete": "Pipeline completado",
-      "Asset processing pipeline completed successfully":
-        "El pipeline de procesamiento de activos se completó exitosamente",
-      "Storage Warning": "Advertencia de almacenamiento",
-      "Storage capacity reaching 80%":
-        "La capacidad de almacenamiento está llegando al 80%",
-      "Pipeline Failed": "Pipeline falló",
-      "Video processing pipeline failed":
-        "El pipeline de procesamiento de video falló",
-    },
-    modal: {
-      confirmDelete: "¿Estás seguro de que quieres eliminar este elemento?",
-      confirmAction: "¿Estás seguro de que quieres realizar esta acción?",
-      error: "Ocurrió un error",
-      success: "Operación completada exitosamente",
-    },
-    executions: {
-      title: "Ejecuciones de pipeline",
-      description: "Monitorea y gestiona tus ejecuciones de pipeline",
-      searchPlaceholder: "Buscar ejecuciones de pipeline...",
-      columns: {
-        pipelineName: "Nombre del pipeline",
-        status: "Estado",
-        startTime: "Hora de inicio",
-        endTime: "Hora de fin",
-        duration: "Duración",
-        actions: "Acciones",
-      },
-      status: {
-        succeeded: "Exitoso",
-        failed: "Falló",
-        running: "Ejecutándose",
-        timedOut: "Tiempo agotado",
-        aborted: "Abortado",
-      },
-      actions: {
-        retryFromCurrent: "Reintentar desde la posición actual",
-        retryFromStart: "Reintentar desde el inicio",
-        viewDetails: "Ver detalles",
-      },
-      pagination: {
-        page: "Página {{page}} de {{total}}",
-        showEntries: "Mostrar {{count}}",
-      },
-    },
-    s3Explorer: {
-      filter: {
-        label: "Filtrar por nombre",
-        clear: "Limpiar filtro",
-        resultsCount: "Mostrando {{count}} de {{total}} elementos",
-      },
-      error: {
-        loading: "Error al cargar objetos S3: {{message}}",
-        network:
-          "Error de red. Por favor, verifica tu conexión y vuelve a intentarlo.",
-        permission:
-          "Acceso denegado. No tienes permiso para acceder a esta ruta.",
-        permissionWithPrefixes:
-          "Acceso denegado. Solo puedes acceder a las siguientes rutas: {{prefixes}}",
-        notFound: "La ruta solicitada no existe.",
-        timeout: "Tiempo de espera agotado. Por favor, inténtalo de nuevo.",
-        retry: "Reintentar",
-      },
-      loading: {
-        initializing: "Cargando...",
-        fetchingContents: "Obteniendo contenidos...",
-      },
-      empty: {
-        folder: "Esta carpeta está vacía",
-        noResults: "No hay elementos que coincidan con tu filtro",
-      },
-      keyboard: {
-        navigation:
-          "Usa las teclas de flecha para navegar, Enter para abrir, Backspace para volver",
-      },
-      menu: {
-        rename: "Renombrar",
-        delete: "Eliminar",
-      },
-    },
-    assets: {
-      title: "Activos",
-      connectedStorage: "Almacenamiento conectado",
-    },
-    metadata: {
-      title: "Próximamente",
-      description:
-        "Estamos trabajando para traerte capacidades de gestión de metadatos. ¡Mantente atento!",
-    },
-    pipelines: {
-      title: "Pipelines",
-      description: "Gestiona tus pipelines de medios y metadatos",
-      searchPlaceholder: "Buscar pipelines...",
-      actions: {
-        create: "Agregar nuevo pipeline",
-        deploy: "Desplegar pipeline de imágenes",
-        addNew: "Agregar nuevo pipeline",
-        viewAll: "Ver todos los pipelines",
-      },
-      search: "Buscar pipelines",
-      deploy: "Desplegar pipeline de imágenes",
-      addNew: "Agregar nuevo pipeline",
-      columns: {
-        name: "Nombre",
-        creationDate: "Fecha de creación",
-        system: "Sistema",
-        type: "Tipo",
-        actions: "Acciones",
-      },
-      editor: {
-        title: "Editor de pipeline",
-        save: "Guardar pipeline",
-        validate: "Validar pipeline",
-        sidebar: {
-          title: "Nodos",
-          dragNodes: "Arrastra nodos al lienzo",
-          loading: "Cargando nodos...",
-          error: "Error al cargar nodos",
-        },
-        node: {
-          configure: "Configurar {{type}}",
-          delete: "Eliminar nodo",
-          edit: "Editar nodo",
-        },
-        edge: {
-          title: "Editar etiqueta de conexión",
-          label: "Etiqueta de conexión",
-          delete: "Eliminar conexión",
-        },
-        modals: {
-          error: {
-            title: "Error",
-            incompatibleNodes:
-              "La salida del nodo anterior no es compatible con la entrada del nodo de destino.",
-            validation: "La validación del pipeline falló",
-          },
-          delete: {
-            title: "Eliminar pipeline",
-            message:
-              "¿Estás seguro de que quieres eliminar este pipeline? Esta acción no se puede deshacer.",
-            confirm:
-              "Escribe el nombre del pipeline para confirmar la eliminación:",
-          },
-        },
-        controls: {
-          undo: "Deshacer",
-          redo: "Rehacer",
-          zoomIn: "Acercar",
-          zoomOut: "Alejar",
-          fitView: "Ajustar vista",
-          lockView: "Bloquear vista",
-        },
-        notifications: {
-          saved: "Pipeline guardado exitosamente",
-          validated: "Validación del pipeline exitosa",
-          error: {
-            save: "Error al guardar el pipeline",
-            validation: "La validación del pipeline falló",
-            incompatibleNodes: "Conexión de nodo incompatible",
-          },
-        },
-      },
-    },
-    integrations: {
-      title: "Integraciones",
-      description: "Gestiona tus integraciones y conexiones",
-      addIntegration: "Agregar integración",
-      selectIntegration: "Seleccionar integración",
-      selectProvider: "Seleccionar proveedor",
-      configureIntegration: "Configurar integración",
-      deleteConfirmation: {
-        title: "Eliminar integración",
-        message: "¿Estás seguro de que quieres eliminar esta integración?",
-        warning:
-          "Advertencia: Eliminar esta integración puede romper pipelines que la están usando.",
-      },
-      form: {
-        title: "Agregar integración",
-        fields: {
-          nodeId: {
-            label: "Integración",
-            tooltip: "Selecciona un proveedor de integración",
-            errors: {
-              required: "La selección de integración es requerida",
-            },
-          },
-          description: {
-            label: "Descripción",
-            tooltip: "Proporciona una descripción para esta integración",
-            helper: "Breve descripción de esta integración",
-            errors: {
-              required: "La descripción es requerida",
-            },
-          },
-          environmentId: {
-            label: "Entorno",
-            tooltip: "Selecciona el entorno para esta integración",
-            errors: {
-              required: "La selección de entorno es requerida",
-            },
-          },
-          enabled: {
-            label: "Habilitado",
-            tooltip: "Habilita o deshabilita esta integración",
-            errors: {
-              required: "Habilitado es requerido",
-            },
-          },
-          auth: {
-            type: {
-              label: "Tipo de autenticación",
-              tooltip: "Selecciona el método de autenticación",
-              options: {
-                awsIam: "AWS IAM",
-                apiKey: "Clave API",
-              },
-              errors: {
-                required: "El tipo de autenticación es requerido",
-              },
-            },
-            credentials: {
-              apiKey: {
-                label: "Clave API",
-                tooltip: "Ingresa tu clave API",
-                helper: "Clave API para autenticación con el servicio",
-                errors: {
-                  required: "La clave API es requerida",
-                },
-              },
-              iamRole: {
-                label: "Rol IAM",
-                tooltip: "Ingresa el ARN del rol IAM",
-                errors: {
-                  required: "El rol IAM es requerido",
-                },
-              },
-            },
-          },
-        },
-        search: {
-          placeholder: "Buscar integraciones",
-        },
-
-        errors: {
-          required: "Este campo es requerido",
-          nodeId: {
-            unrecognized_keys: "Selección de integración inválida",
-          },
-        },
-      },
-      columns: {
-        nodeName: "Nombre del nodo",
-        environment: "Entorno",
-        createdDate: "Fecha de creación",
-        modifiedDate: "Fecha de modificación",
-        actions: "Acciones",
-      },
-
-      settings: {
-        environments: {
-          title: "Entornos",
-        },
-      },
+    error: {
+      loading: "Error loading contents",
+      permissionWithPrefixes:
+        "You don't have permission to access this path. Please select from the allowed prefixes.",
+      permission: "You don't have permission to access this path.",
+      notFound: "The requested path was not found.",
+      timeout: "Request timed out. Please try again.",
+      network: "Network error. Please check your connection.",
+      retry: "Retry",
     },
   },
   groups: {
     actions: {
-      addGroup: "Agregar grupo",
       editGroup: "Editar grupo",
-      deleteGroup: "Eliminar grupo",
       createGroup: "Crear grupo",
       manageGroups: "Gestionar grupos",
+      assignPermissionSet: "Asignar conjunto de permisos",
+    },
+    permissionSets: "Conjuntos de permisos",
+    noPermissionSets: "Sin conjuntos de permisos asignados",
+    noGroups: "No groups found",
+    noDescription: "No description",
+    noAvailableGroups: "No available groups",
+    noAvailablePermissionSets: "No available permission sets",
+    fields: {
+      name: "Name",
+      id: "Group ID",
+      idHelp: "A unique identifier for the group (lowercase, no spaces)",
+      description: "Description",
+      department: "Department",
+    },
+    messages: {
+      createSuccess: "Group created successfully",
+      createError: "Failed to create group",
+      updateSuccess: "Group updated successfully",
+      updateError: "Failed to update group",
+      deleteSuccess: "Group deleted successfully",
+      deleteError: "Failed to delete group",
+      confirmDelete: "Are you sure you want to delete this group?",
+      deleteWarning: "This action cannot be undone. All users will be removed from this group.",
+      assignPermissionSetSuccess: "Permission set assigned successfully",
+      assignPermissionSetError: "Failed to assign permission set",
+      removePermissionSetSuccess: "Permission set removed successfully",
+      removePermissionSetError: "Failed to remove permission set",
     },
   },
-  permissionSets: {
-    noAssignments: "Sin conjuntos de permisos",
-    actions: {
-      addPermissionSet: "Agregar conjunto de permisos",
-      editPermissionSet: "Editar conjunto de permisos",
-      deletePermissionSet: "Eliminar conjunto de permisos",
+  assetSidebar: {
+    thumbnailGeneration: "Thumbnail Generation",
+    aiAnalysis: "AI Analysis",
+    tabs: {
+      markers: "Marcadores",
     },
+  },
+  fileUpload: {
+    errorMessages: {
+      errorDeletingPipeline: "Error deleting pipeline",
+    },
+  },
+  notifications: {
+    label: "Notification",
+    tooltip: {
+      new: "{{count}} Nuevo",
+      running: "{{count}} En ejecución",
+      none: "Sin notificaciones",
+    },
+    clearJobs: "Limpiar trabajos",
+    clearJobsTooltip:
+      "Limpiar descargas completadas y fallidas (las descargas activas permanecerán)",
+    empty: "Sin notificaciones",
+    dismiss: "Descartar",
+    fileSize: {
+      unknown: "Tamaño desconocido",
+    },
+    date: {
+      unknown: "Desconocido",
+    },
+    jobDetails: {
+      assets: "{{count}} activos",
+      created: "Creado: {{date}}",
+      lastUpdated: "Última actualización: {{date}}",
+      filesBreakdown: "Archivos comprimidos: {{zipped}}, Archivos grandes: {{large}}",
+    },
+  },
+  downloads: {
+    expired: "EXPIRED",
+    expires: "Expires",
+  },
+  actions: {
+    addUser: "Agregar User",
+    delete: "Eliminar",
+    edit: "Editar",
+  },
+  columns: {
+    actions: "Acciones",
+    email: "Correo electrónico",
+    firstName: "Nombre",
+    status: "Estado",
+  },
+  nodes: {
+    noConfiguration: "No configuration required for this node",
+  },
+  config: {
+    loadingAwsConfiguration: "Cargando AWS configuration...",
+  },
+  permissions: {
+    accessDenied: "Access Denied - You don't have permission to view this page",
+  },
+  validation: {
+    required: "This field is required",
   },
 };

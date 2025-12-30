@@ -52,15 +52,10 @@ export class CognitoServiceAdapter implements ServiceAdapter {
    * TODO: Implement with actual AWS SDK when packages are installed
    */
   async discoverResources(filters: TagFilter[]): Promise<CognitoUserPool[]> {
-    console.log(
-      `[CognitoAdapter] Discovering user pools with filters:`,
-      filters,
-    );
+    console.log(`[CognitoAdapter] Discovering user pools with filters:`, filters);
 
     // Since AWS SDK packages are not installed, use fallback discovery immediately
-    console.log(
-      `[CognitoAdapter] Using fallback discovery - AWS SDK packages not installed`,
-    );
+    console.log(`[CognitoAdapter] Using fallback discovery - AWS SDK packages not installed`);
 
     return await this.fallbackDiscovery(filters);
   }
@@ -76,10 +71,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
     console.log(`[CognitoAdapter] Validating user pool: ${resource.id}`);
 
     // Placeholder validation - will be replaced with actual AWS SDK calls
-    return (
-      resource.id.startsWith("us-east-1_") ||
-      resource.id.startsWith("us-west-2_")
-    );
+    return resource.id.startsWith("us-east-1_") || resource.id.startsWith("us-west-2_");
   }
 
   /**
@@ -89,11 +81,9 @@ export class CognitoServiceAdapter implements ServiceAdapter {
     userPoolId: string,
     username: string,
     password: string,
-    email: string,
+    email: string
   ): Promise<void> {
-    console.log(
-      `[CognitoAdapter] Creating test user: ${username} in pool ${userPoolId}`,
-    );
+    console.log(`[CognitoAdapter] Creating test user: ${username} in pool ${userPoolId}`);
 
     try {
       // Use AWS CLI to create user
@@ -101,13 +91,11 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command for user creation - only add profile if it's not 'default'
       let createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        createUserCommand = `aws cognito-idp admin-create-user --user-pool-id ${userPoolId} --username '${username}' --user-attributes Name=email,Value='${email}' Name=email_verified,Value=true --message-action SUPPRESS --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
-      console.log(
-        `[CognitoAdapter] Creating user with command: ${createUserCommand}`,
-      );
+      console.log(`[CognitoAdapter] Creating user with command: ${createUserCommand}`);
       execSync(createUserCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
@@ -120,14 +108,20 @@ export class CognitoServiceAdapter implements ServiceAdapter {
         return `'${arg.replace(/'/g, "'\"'\"'")}'`;
       };
 
-      let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --region ${this.config.region}`; // pragma: allowlist secret
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(userPoolId)} --username ${escapeShellArg(username)} --password ${escapeShellArg(password)} --permanent --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`; // pragma: allowlist secret
+      let setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(
+        userPoolId
+      )} --username ${escapeShellArg(username)} --password ${escapeShellArg(
+        password
+      )} --permanent --region ${this.config.region}`; // pragma: allowlist secret
+      if (this.config.profile && this.config.profile !== "default") {
+        setPasswordCommand = `aws cognito-idp admin-set-user-password --user-pool-id ${escapeShellArg(
+          userPoolId
+        )} --username ${escapeShellArg(username)} --password ${escapeShellArg(
+          password
+        )} --permanent --profile ${this.config.profile} --region ${this.config.region}`; // pragma: allowlist secret
       }
 
-      console.log(
-        `[CognitoAdapter] Setting permanent password for user: ${username}`,
-      );
+      console.log(`[CognitoAdapter] Setting permanent password for user: ${username}`);
       execSync(setPasswordCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
@@ -138,13 +132,10 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       await this.addUserToGroup(userPoolId, username, "superAdministrators");
 
       console.log(
-        `[CognitoAdapter] Successfully created user ${username} and added to superAdministrators group`,
+        `[CognitoAdapter] Successfully created user ${username} and added to superAdministrators group`
       );
     } catch (error: any) {
-      console.error(
-        `[CognitoAdapter] Failed to create user ${username}:`,
-        error.message,
-      );
+      console.error(`[CognitoAdapter] Failed to create user ${username}:`, error.message);
       throw error;
     }
   }
@@ -152,13 +143,9 @@ export class CognitoServiceAdapter implements ServiceAdapter {
   /**
    * Add a user to a Cognito group
    */
-  async addUserToGroup(
-    userPoolId: string,
-    username: string,
-    groupName: string,
-  ): Promise<void> {
+  async addUserToGroup(userPoolId: string, username: string, groupName: string): Promise<void> {
     console.log(
-      `[CognitoAdapter] Adding user ${username} to group ${groupName} in pool ${userPoolId}`,
+      `[CognitoAdapter] Adding user ${username} to group ${groupName} in pool ${userPoolId}`
     );
 
     try {
@@ -166,26 +153,22 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command for adding user to group - only add profile if it's not 'default'
       let addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        addToGroupCommand = `aws cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username '${username}' --group-name ${groupName} --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
-      console.log(
-        `[CognitoAdapter] Adding user to group with command: ${addToGroupCommand}`,
-      );
+      console.log(`[CognitoAdapter] Adding user to group with command: ${addToGroupCommand}`);
       execSync(addToGroupCommand, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 60000, // 60 second timeout
       });
 
-      console.log(
-        `[CognitoAdapter] Successfully added user ${username} to group ${groupName}`,
-      );
+      console.log(`[CognitoAdapter] Successfully added user ${username} to group ${groupName}`);
     } catch (error: any) {
       console.error(
         `[CognitoAdapter] Failed to add user ${username} to group ${groupName}:`,
-        error.message,
+        error.message
       );
       throw error;
     }
@@ -196,12 +179,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
    * TODO: Implement with actual AWS SDK when packages are installed
    */
   async deleteTestUser(userPoolId: string, username: string): Promise<void> {
-    console.log(
-      `[CognitoAdapter] Deleting test user: ${username} from pool ${userPoolId}`,
-    );
-    console.warn(
-      `[CognitoAdapter] Placeholder implementation - would delete user with AWS SDK`,
-    );
+    console.log(`[CognitoAdapter] Deleting test user: ${username} from pool ${userPoolId}`);
+    console.warn(`[CognitoAdapter] Placeholder implementation - would delete user with AWS SDK`);
 
     // Placeholder - actual implementation would use AdminDeleteUserCommand
   }
@@ -211,12 +190,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
    * TODO: Implement with actual AWS SDK when packages are installed
    */
   async getUserPoolPasswordPolicy(userPoolId: string): Promise<any> {
-    console.log(
-      `[CognitoAdapter] Getting password policy for pool: ${userPoolId}`,
-    );
-    console.warn(
-      `[CognitoAdapter] Placeholder implementation - would fetch policy with AWS SDK`,
-    );
+    console.log(`[CognitoAdapter] Getting password policy for pool: ${userPoolId}`);
+    console.warn(`[CognitoAdapter] Placeholder implementation - would fetch policy with AWS SDK`);
 
     // Return mock password policy
     return {
@@ -241,9 +216,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
     const applicationFilter = filters.find((f) => f.key === "Application");
     const searchPattern = applicationFilter?.values[0] || "medialake";
 
-    console.log(
-      `[CognitoAdapter] Searching for user pools containing: ${searchPattern}`,
-    );
+    console.log(`[CognitoAdapter] Searching for user pools containing: ${searchPattern}`);
 
     try {
       // Use AWS CLI to discover real user pools
@@ -251,8 +224,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       // Build AWS CLI command - only add profile if it's not 'default'
       let awsCommand = `aws cognito-idp list-user-pools --max-results 50 --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        awsCommand = `aws cognito-idp list-user-pools --max-results 50 --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        awsCommand = `aws cognito-idp list-user-pools --max-results 50 --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       const result = execSync(awsCommand, {
@@ -262,25 +235,21 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       });
 
       const userPools = JSON.parse(result);
-      const mediaLakePool = userPools.UserPools?.find((pool: any) =>
-        pool.Name?.toLowerCase().includes(searchPattern.toLowerCase()),
+      const mediaLakePool = userPools.UserPools?.find(
+        (pool: any) => pool.Name?.toLowerCase().includes(searchPattern.toLowerCase())
       );
 
       if (!mediaLakePool) {
-        console.warn(
-          `[CognitoAdapter] No user pool found containing: ${searchPattern}`,
-        );
+        console.warn(`[CognitoAdapter] No user pool found containing: ${searchPattern}`);
         return [];
       }
 
-      console.log(
-        `[CognitoAdapter] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`,
-      );
+      console.log(`[CognitoAdapter] Found user pool: ${mediaLakePool.Name} (${mediaLakePool.Id})`);
 
       // Get user pool clients
       let clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --region ${this.config.region}`;
-      if (process.env.AWS_PROFILE && process.env.AWS_PROFILE !== "default") {
-        clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --profile ${process.env.AWS_PROFILE} --region ${this.config.region}`;
+      if (this.config.profile && this.config.profile !== "default") {
+        clientsCommand = `aws cognito-idp list-user-pool-clients --user-pool-id ${mediaLakePool.Id} --profile ${this.config.profile} --region ${this.config.region}`;
       }
 
       const clientsResult = execSync(clientsCommand, {
@@ -293,9 +262,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       const client = clients.UserPoolClients?.[0];
 
       if (!client) {
-        console.warn(
-          `[CognitoAdapter] No client found for user pool: ${mediaLakePool.Id}`,
-        );
+        console.warn(`[CognitoAdapter] No client found for user pool: ${mediaLakePool.Id}`);
         return [];
       }
 
@@ -324,10 +291,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
 
       return [discoveredPool];
     } catch (error: any) {
-      console.error(
-        `[CognitoAdapter] Fallback discovery failed:`,
-        error.message,
-      );
+      console.error(`[CognitoAdapter] Fallback discovery failed:`, error.message);
       return [];
     }
   }
@@ -345,7 +309,7 @@ export class CognitoServiceAdapter implements ServiceAdapter {
  * Factory function to create CognitoServiceAdapter
  */
 export function createCognitoServiceAdapter(
-  config: ResourceDiscoveryConfig,
+  config: ResourceDiscoveryConfig
 ): CognitoServiceAdapter {
   return new CognitoServiceAdapter(config);
 }

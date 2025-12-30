@@ -60,11 +60,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
   onFilterChange,
   onSectionToggle,
 }) => {
-  const renderFilterSection = (
-    title: string,
-    section: string,
-    items: Record<string, boolean>,
-  ) => (
+  const renderFilterSection = (title: string, section: string, items: Record<string, boolean>) => (
     <>
       <ListItemButton
         onClick={() => onSectionToggle(section)}
@@ -90,10 +86,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
           <ExpandMore />
         )}
       </ListItemButton>
-      <Collapse
-        in={expandedSections[section as keyof typeof expandedSections]}
-        timeout="auto"
-      >
+      <Collapse in={expandedSections[section as keyof typeof expandedSections]} timeout="auto">
         <List component="div" disablePadding>
           {Object.entries(items).map(([key, value]) => (
             <ListItemButton

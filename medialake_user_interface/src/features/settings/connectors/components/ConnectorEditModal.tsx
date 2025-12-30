@@ -10,6 +10,7 @@ import {
   useTheme,
   alpha,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { ConnectorResponse } from "@/api/types/api.types";
 
 interface ConnectorEditModalProps {
@@ -25,9 +26,9 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
-  const [editedConnector, setEditedConnector] =
-    useState<ConnectorResponse>(connector);
+  const [editedConnector, setEditedConnector] = useState<ConnectorResponse>(connector);
 
   useEffect(() => {
     setEditedConnector(connector);
@@ -40,11 +41,11 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 600 }}>Edit Connector</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 600 }}>{t("connectors.editConnector")}</DialogTitle>
       <DialogContent>
         <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
           <TextField
-            label="Name"
+            label={t("common.labels.name")}
             value={editedConnector.name}
             onChange={(e) =>
               setEditedConnector({
@@ -55,7 +56,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
             fullWidth
           />
           <TextField
-            label="Description"
+            label={t("common.labels.description")}
             value={editedConnector.description || ""}
             onChange={(e) =>
               setEditedConnector({
@@ -68,14 +69,14 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
             rows={4}
           />
           <TextField
-            label="Bucket"
+            label={t("connectors.form.bucket")}
             value={editedConnector.storageIdentifier || ""}
             disabled
             fullWidth
           />
           {editedConnector.settings?.region && (
             <TextField
-              label="Region"
+              label={t("connectors.form.region")}
               value={editedConnector.region}
               disabled
               fullWidth
@@ -83,7 +84,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
           )}
           {editedConnector.settings?.path && (
             <TextField
-              label="Path"
+              label={t("connectors.form.path")}
               value={editedConnector.settings.path}
               onChange={(e) =>
                 setEditedConnector({
@@ -109,7 +110,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
             },
           }}
         >
-          Cancel
+          {t("common.dialogs.cancel")}
         </Button>
         <Button
           onClick={handleSave}
@@ -121,7 +122,7 @@ const ConnectorEditModal: React.FC<ConnectorEditModalProps> = ({
             },
           }}
         >
-          Save Changes
+          {t("common.dialogs.save")}
         </Button>
       </DialogActions>
     </Dialog>

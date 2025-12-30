@@ -20,6 +20,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import { useTranslation } from "react-i18next";
 
 export interface Role {
   id: string;
@@ -41,6 +42,7 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
   onEditRole,
   onDeleteRole,
 }) => {
+  const { t } = useTranslation();
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [formData, setFormData] = useState<Omit<Role, "id">>({
@@ -114,14 +116,14 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
           mb: 2,
         }}
       >
-        <Typography variant="h6">Role Management</Typography>
+        <Typography variant="h6">{t("userManagement.roleManagement.title")}</Typography>
         <Button
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
         >
-          Add Role
+          {t("userManagement.roleManagement.addRole")}
         </Button>
       </Box>
 
@@ -143,37 +145,22 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                   <Typography variant="body2" color="text.secondary">
                     {role.description}
                   </Typography>
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}
-                  >
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
                     {role.permissions.map((permission) => (
-                      <Chip
-                        key={permission}
-                        label={permission}
-                        size="small"
-                        variant="outlined"
-                      />
+                      <Chip key={permission} label={permission} size="small" variant="outlined" />
                     ))}
                   </Box>
                 </Box>
               }
             />
             <ListItemSecondaryAction>
-              <Tooltip title="Edit Role">
-                <IconButton
-                  edge="end"
-                  onClick={() => handleOpenDialog(role)}
-                  sx={{ mr: 1 }}
-                >
+              <Tooltip title={t("roles.tooltips.editRole")}>
+                <IconButton edge="end" onClick={() => handleOpenDialog(role)} sx={{ mr: 1 }}>
                   <EditIcon />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Delete Role">
-                <IconButton
-                  edge="end"
-                  onClick={() => onDeleteRole(role.id)}
-                  color="error"
-                >
+              <Tooltip title={t("roles.tooltips.deleteRole")}>
+                <IconButton edge="end" onClick={() => onDeleteRole(role.id)} color="error">
                   <DeleteIcon />
                 </IconButton>
               </Tooltip>
@@ -182,42 +169,33 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
         ))}
       </List>
 
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        maxWidth="sm"
-        fullWidth
-      >
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <form onSubmit={handleSubmit}>
           <DialogTitle>
-            {editingRole ? "Edit Role" : "Add New Role"}
+            {editingRole
+              ? t("userManagement.roleManagement.editRole")
+              : t("userManagement.roleManagement.addRole")}
           </DialogTitle>
           <DialogContent>
-            <Box
-              sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}
-            >
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
               <TextField
-                label="Role Name"
+                label={t("userManagement.roleManagement.roleName")}
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 fullWidth
               />
               <TextField
-                label="Description"
+                label={t("userManagement.roleManagement.description")}
                 value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 multiline
                 rows={2}
                 fullWidth
               />
               <Box>
                 <Typography variant="subtitle2" gutterBottom>
-                  Permissions
+                  {t("userManagement.form.permissions")}
                 </Typography>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                   {formData.permissions.map((permission) => (
@@ -230,7 +208,7 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
                   ))}
                 </Box>
                 <TextField
-                  label="Add Permission"
+                  label={t("userManagement.roleManagement.addPermission")}
                   size="small"
                   fullWidth
                   sx={{ mt: 1 }}
@@ -246,9 +224,9 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={handleCloseDialog}>{t("common.cancel")}</Button>
             <Button type="submit" variant="contained" color="primary">
-              {editingRole ? "Save Changes" : "Add Role"}
+              {editingRole ? t("common.save") : t("roles.actions.addRole")}
             </Button>
           </DialogActions>
         </form>

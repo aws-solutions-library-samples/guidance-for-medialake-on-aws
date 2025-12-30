@@ -26,10 +26,7 @@ export interface Pipeline {
   stateMachineArn: string;
   sfnRoleArn: string;
   triggerLambdaArn: string;
-  dependentResources: [
-    string,
-    string | { rule_name: string; eventbus_name: string },
-  ][];
+  dependentResources: [string, string | { rule_name: string; eventbus_name: string }][];
   deploymentStatus?: "CREATING" | "DEPLOYED" | "FAILED" | string;
   executionArn?: string;
   active?: boolean; // New field to track if the pipeline is active
@@ -121,12 +118,7 @@ export interface PipelineSettings {
   timeout: number;
 }
 
-export type PipelineStatus =
-  | "active"
-  | "inactive"
-  | "running"
-  | "failed"
-  | "completed";
+export type PipelineStatus = "active" | "inactive" | "running" | "failed" | "completed";
 
 export interface PipelineRun {
   id: string;

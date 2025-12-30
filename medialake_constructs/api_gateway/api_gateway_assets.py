@@ -30,6 +30,7 @@ from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
+    CommonLibrariesLayer,
     SearchLayer,
     ZipmergeLayer,
 )
@@ -1161,6 +1162,10 @@ class AssetsConstruct(Construct):
         # Create API Gateway endpoints
         self._create_bulk_download_api_endpoints(props)
 
+        # Create batch delete Lambda function and endpoint
+        self._create_batch_delete_lambda_function(props)
+        self._create_batch_delete_api_endpoint(props)
+
     def _create_bulk_download_lambda_functions(self, props: AssetsProps):
         """Create Lambda functions for bulk download processing."""
         # Create the ZipmergeLayer for fast ZIP merging
@@ -1398,13 +1403,13 @@ class AssetsConstruct(Construct):
             ),
         )
 
-        # Get SubClips Paths Lambda
-        self._subclips_get_paths_lambda = Lambda(
+        # Get SubClips Settings Lambda
+        self._subclips_get_settings_lambda = Lambda(
             self,
-            "AssetsBulkDownloadSubclipsGetPathsLambda",
+            "AssetsBulkDownloadSubclipsGetSettingsLambda",
             config=LambdaConfig(
-                name="assets_bulk_download_subclips_get_paths",
-                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_get_paths",
+                name="assets_bulk_download_subclips_get_settings",
+                entry="lambdas/api/assets/download/bulk/post_bulk/subclips_get_settings",
                 environment_variables={
                     **common_env_vars,
                     "ASSET_TABLE": props.asset_table.table_name,
@@ -1450,7 +1455,7 @@ class AssetsConstruct(Construct):
             self._get_parts_manifest_lambda,
             self._handle_large_individual_lambda,
             self._delete_bulk_download_lambda,
-            self._subclips_get_paths_lambda,
+            self._subclips_get_settings_lambda,
             self._subclips_size_sort_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
@@ -1474,7 +1479,7 @@ class AssetsConstruct(Construct):
             self._assess_scale_lambda,
             self._append_to_zip_lambda,
             self._handle_large_individual_lambda,
-            self._subclips_get_paths_lambda,
+            self._subclips_get_settings_lambda,
         ]:
             lambda_function.function.add_to_role_policy(
                 iam.PolicyStatement(
@@ -2141,11 +2146,11 @@ class AssetsConstruct(Construct):
         complete_multipart_task.next(success_state)
 
         ## Sub-Clipping Workflow Components ##
-        # Get sub-clips source file locations / output paths
-        get_subclip_paths_task = tasks.LambdaInvoke(
+        # Get sub-clips settings
+        get_subclip_settings_task = tasks.LambdaInvoke(
             self,
-            "AssetsGetSubClipPaths",
-            lambda_function=self._subclips_get_paths_lambda.function,
+            "AssetsGetSubClipSettings",
+            lambda_function=self._subclips_get_settings_lambda.function,
             output_path="$.Payload",
         )
 
@@ -2178,69 +2183,11 @@ class AssetsConstruct(Construct):
                 create_job_request={
                     "Queue": self.subclip_mediaconvert_queue.queue_arn,
                     "Role": self.subclip_mediaconvert_role.role_arn,
-                    "Settings": {
-                        "TimecodeConfig": {"Source": "ZEROBASED"},
-                        "OutputGroups": [
-                            {
-                                "Name": "File Group",
-                                "Outputs": [
-                                    {
-                                        "ContainerSettings": {
-                                            "Container": "MP4",
-                                            "Mp4Settings": {},
-                                        },
-                                        "VideoDescription": {
-                                            "CodecSettings": {
-                                                "Codec": "H_264",
-                                                "H264Settings": {
-                                                    "MaxBitrate.$": "States.StringToJson($.mapItem.video.MaxBitrate)",
-                                                    "Bitrate.$": "States.StringToJson($.mapItem.video.Bitrate)",
-                                                    "RateControlMode.$": "$.mapItem.video.RateControlMode",
-                                                },
-                                            }
-                                        },
-                                        "AudioDescriptions": [
-                                            {
-                                                "AudioSourceName": "Dynamic Audio Selector 1",
-                                                "CodecSettings": {
-                                                    "Codec": "AAC",
-                                                    "AacSettings": {
-                                                        "Bitrate.$": "States.StringToJson($.mapItem.audio.Bitrate)",
-                                                        "CodingMode": "CODING_MODE_2_0",
-                                                        "SampleRate.$": "States.StringToJson($.mapItem.audio.SampleRate)",
-                                                        "RateControlMode.$": "$.mapItem.audio.RateControlMode",
-                                                        "CodecProfile": "LC",
-                                                    },
-                                                },
-                                            }
-                                        ],
-                                    }
-                                ],
-                                "OutputGroupSettings": {
-                                    "Type": "FILE_GROUP_SETTINGS",
-                                    "FileGroupSettings": {
-                                        "Destination.$": "$.mapItem.outputLocationNoExt"
-                                    },
-                                },
-                            }
-                        ],
-                        "FollowSource": 1,
-                        "Inputs": [
-                            {
-                                "InputClippings": [
-                                    {
-                                        "EndTimecode.$": "$.mapItem.clipBoundary.endTime",
-                                        "StartTimecode.$": "$.mapItem.clipBoundary.startTime",
-                                    }
-                                ],
-                                "DynamicAudioSelectors": {
-                                    "Dynamic Audio Selector 1": {}
-                                },
-                                "VideoSelector": {},
-                                "TimecodeSource": "ZEROBASED",
-                                "FileInput.$": "$.mapItem.sourceLocation",
-                            }
-                        ],
+                    "Settings": {  # This block is built with individual interpolations because CDK fails if this field name changed to "Settings.$" for Step Func interpolation
+                        "TimecodeConfig.$": "$.mapItem.mediaConvertJobSettings.TimecodeConfig",
+                        "OutputGroups.$": "$.mapItem.mediaConvertJobSettings.OutputGroups",
+                        "FollowSource.$": "$.mapItem.mediaConvertJobSettings.FollowSource",
+                        "Inputs.$": "$.mapItem.mediaConvertJobSettings.Inputs",
                     },
                 },
                 integration_pattern=sfn.IntegrationPattern.RUN_JOB,
@@ -2255,7 +2202,7 @@ class AssetsConstruct(Construct):
             )
             .when(
                 sfn.Condition.is_present("$.subClips[0]"),
-                get_subclip_paths_task.next(sub_clips_map)
+                get_subclip_settings_task.next(sub_clips_map)
                 .next(sort_subclips_by_size)
                 .next(multipart_workflow),
             )
@@ -2393,8 +2340,483 @@ class AssetsConstruct(Construct):
         # Add CORS support to bulk download API resources
         add_cors_options_method(download_resource)
         add_cors_options_method(bulk_resource)
-        add_cors_options_method(job_resource)
+
+    def _create_batch_delete_lambda_function(self, props: AssetsProps):
+        """Create Lambda function for batch delete operations (consolidated)."""
+        # Get the layers for Lambda dependencies
+        search_layer = SearchLayer(self, "BatchDeleteSearchLayer")
+        common_libs_layer = CommonLibrariesLayer(self, "BatchDeleteCommonLibsLayer")
+
+        # Common environment variables
+        common_env_vars = {
+            "JOBS_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
+            "ASSET_TABLE": props.asset_table.table_name,
+            "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+            "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
+            "OPEN_SEARCH_ENDPOINT": props.open_search_endpoint,
+            "OPENSEARCH_INDEX": props.opensearch_index,
+            "S3_VECTOR_BUCKET": props.s3_vector_bucket_name,
+            "S3_VECTOR_INDEX": props.s3_vector_index_name,
+            "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+        }
+
+        # Create the batch delete processor Lambda (worker)
+        self._batch_delete_processor_lambda = Lambda(
+            self,
+            "AssetsBatchDeleteProcessorLambda",
+            config=LambdaConfig(
+                name="assets_batch_delete_processor",
+                entry="lambdas/api/assets/batch_delete/processor",
+                layers=[search_layer.layer, common_libs_layer.layer],
+                environment_variables=common_env_vars,
+                timeout_minutes=5,
+                memory_size=1024,
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+            ),
+        )
+
+        # Create the batch delete aggregator Lambda
+        self._batch_delete_aggregator_lambda = Lambda(
+            self,
+            "AssetsBatchDeleteAggregatorLambda",
+            config=LambdaConfig(
+                name="assets_batch_delete_aggregator",
+                entry="lambdas/api/assets/batch_delete/aggregator",
+                layers=[search_layer.layer],
+                environment_variables=common_env_vars,
+                timeout_minutes=2,
+                memory_size=512,
+            ),
+        )
+
+        # Create the consolidated batch delete Lambda (handles both DELETE and GET)
+        self._batch_delete_lambda = Lambda(
+            self,
+            "AssetsBatchDeleteLambda",
+            config=LambdaConfig(
+                name="assets_batch_delete",
+                entry="lambdas/api/assets/batch_delete/api",
+                layers=[search_layer.layer],
+                environment_variables=common_env_vars,
+                timeout_minutes=1,
+                memory_size=512,
+            ),
+        )
+
+        # Create Step Functions state machine for batch delete
+        self._create_batch_delete_state_machine(props)
+
+        # Grant DynamoDB permissions for jobs table (user table) to all Lambdas
+        for lambda_function in [
+            self._batch_delete_lambda,
+            self._batch_delete_processor_lambda,
+            self._batch_delete_aggregator_lambda,
+        ]:
+            lambda_function.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem",
+                        "dynamodb:UpdateItem",
+                        "dynamodb:DeleteItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[
+                        self._users_table.table_arn,
+                        f"{self._users_table.table_arn}/index/*",
+                    ],
+                )
+            )
+
+        # Grant asset table read permissions to consolidated Lambda (for validation)
+        props.asset_table.grant_read_data(self._batch_delete_lambda.function)
+
+        # Grant asset table permissions to processor Lambda
+        props.asset_table.grant_read_write_data(
+            self._batch_delete_processor_lambda.function
+        )
+
+        # Grant S3 permissions for processor Lambda (match single delete permissions)
+        # Assets can exist in ANY S3 bucket, not just media_assets_bucket
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:CopyObject",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*",  # Access to all objects in all buckets
+                    "arn:aws:s3:::*",  # Access to all buckets
+                ],
+            )
+        )
+
+        # Grant OpenSearch permissions to processor Lambda
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpDelete",
+                    "es:ESHttpGet",
+                    "es:ESHttpPost",
+                    "es:ESHttpPut",
+                    "es:ESHttpHead",
+                ],
+                resources=[f"{props.open_search_arn}/*"],
+            )
+        )
+
+        # Grant Secrets Manager permissions to processor Lambda (for search provider API keys)
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:medialake/search/provider/*",
+                ],
+            )
+        )
+
+        # Grant System Settings table permissions to processor Lambda
+        system_settings_table_arn = f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:table/{props.system_settings_table}"
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[system_settings_table_arn],
+            )
+        )
+
+        # Grant S3 vector store permissions to processor Lambda
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:DeleteObject", "s3:GetObject"],
+                resources=[f"arn:aws:s3:::{props.s3_vector_bucket_name}/*"],
+            )
+        )
+
+        # Grant EC2 permissions for VPC access (processor Lambda)
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant S3 Vector Store permissions for processor Lambda
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3vectors:ListVectors",
+                    "s3vectors:GetVectors",
+                    "s3vectors:DeleteVectors",
+                    "s3vectors:QueryVectors",
+                ],
+                resources=[
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
+                ],
+            )
+        )
+
+        # Grant KMS permissions for processor Lambda (for encrypted S3 objects)
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+    def _create_batch_delete_state_machine(self, props: AssetsProps):
+        """Create Step Functions state machine for batch delete orchestration."""
+        # Create processor task
+        process_deletion_task = tasks.LambdaInvoke(
+            self,
+            "ProcessAssetDeletion",
+            lambda_function=self._batch_delete_processor_lambda.function,
+            payload=sfn.TaskInput.from_object(
+                {
+                    "jobId.$": "$.jobId",
+                    "assetId.$": "$.assetId",
+                    "userId.$": "$.userId",
+                }
+            ),
+            output_path="$.Payload",
+        )
+
+        # Create aggregator task
+        aggregate_results_task = tasks.LambdaInvoke(
+            self,
+            "AggregateResults",
+            lambda_function=self._batch_delete_aggregator_lambda.function,
+            output_path="$.Payload",
+        )
+
+        # Define Distributed Map for parallel processing
+        # Use DISCARD to prevent hitting 256KB output limit with large batches
+        distributed_map = sfn.DistributedMap(
+            self,
+            "ProcessAssetsInParallel",
+            max_concurrency=100,
+            items_path="$.assetIds",
+            result_path=sfn.JsonPath.DISCARD,
+            item_selector={
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "assetId.$": "$$.Map.Item.Value",
+                "totalAssets.$": "$.totalAssets",
+            },
+        )
+        distributed_map.item_processor(process_deletion_task)
+
+        # Create workflow - aggregator reads final state from DynamoDB
+        workflow = distributed_map.next(aggregate_results_task)
+
+        # Create CloudWatch Log Group
+        batch_delete_log_group = logs.LogGroup(
+            self,
+            "AssetsBatchDeleteLogGroup",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Batch-Delete",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        # Create state machine
+        self._batch_delete_state_machine = sfn.StateMachine(
+            self,
+            "AssetsBatchDeleteStateMachine",
+            state_machine_name=f"{config.resource_prefix}_Asset-Batch-Delete",
+            definition_body=sfn.DefinitionBody.from_chainable(workflow),
+            timeout=Duration.hours(2),
+            logs=sfn.LogOptions(
+                destination=batch_delete_log_group,
+                level=sfn.LogLevel.ALL,
+                include_execution_data=True,
+            ),
+        )
+
+        # Update kickoff Lambda with state machine ARN
+        self._batch_delete_lambda.function.add_environment(
+            "BATCH_DELETE_STATE_MACHINE_ARN",
+            self._batch_delete_state_machine.state_machine_arn,
+        )
+
+        # Grant Step Functions permissions to kickoff Lambda
+        self._batch_delete_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:StartExecution"],
+                resources=[self._batch_delete_state_machine.state_machine_arn],
+            )
+        )
+
+        # Grant state machine permissions to invoke Lambdas
+        self._batch_delete_state_machine.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    self._batch_delete_processor_lambda.function.function_arn,
+                    self._batch_delete_aggregator_lambda.function.function_arn,
+                ],
+            )
+        )
+
+        # Grant state machine permissions for distributed map
+        self._batch_delete_state_machine.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution",
+                ],
+                resources=["*"],
+            )
+        )
+
+    def _create_batch_delete_api_endpoint(self, props: AssetsProps):
+        """Create API Gateway endpoint for batch delete operations."""
+        # Create batch resource under assets
+        batch_resource = self._assets_resource.add_resource("batch")
+
+        # DELETE /assets/batch - Batch delete assets
+        batch_delete_method = batch_resource.add_method(
+            "DELETE",
+            api_gateway.LambdaIntegration(self._batch_delete_lambda.function),
+        )
+        apply_custom_authorization(batch_delete_method, props.authorizer)
+
+        # GET /assets/batch/user - List user's batch delete jobs
+        user_resource = batch_resource.add_resource("user")
+        user_get = user_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(self._batch_delete_lambda.function),
+        )
+        apply_custom_authorization(user_get, props.authorizer)
+
+        # PUT /assets/batch/{jobId}/cancel - Cancel a batch delete job
+        job_id_resource = batch_resource.add_resource("{jobId}")
+        cancel_resource = job_id_resource.add_resource("cancel")
+        cancel_put = cancel_resource.add_method(
+            "PUT",
+            api_gateway.LambdaIntegration(self._batch_delete_lambda.function),
+        )
+        apply_custom_authorization(cancel_put, props.authorizer)
+
+        # Add CORS support
+        add_cors_options_method(batch_resource)
         add_cors_options_method(user_resource)
+        add_cors_options_method(job_id_resource)
+        add_cors_options_method(cancel_resource)
+
+        # Grant Step Functions permissions to the API Lambda for cancellation
+        # Permission must include execution ARNs, not just state machine ARN
+        self._batch_delete_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:StopExecution"],
+                resources=[
+                    f"arn:aws:states:{Stack.of(self).region}:{Stack.of(self).account}:execution:{config.resource_prefix}_Asset-Batch-Delete:*"
+                ],
+            )
+        )
+
+    def _create_bulk_download_mediaconvert_resources(self):
+        """Resources required to run MediaConvert for Bulk Download operations.
+
+        Includes tasks like sub-clipping. These are being created separate from the
+        MediaConvert resources related to pipeline operations to separate permissions and
+        keep queue operations distinct between bulk download sub-clipping jobs
+        and pipeline processing.
+        """
+        self.subclip_mediaconvert_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeSubClipQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for creating Sub-Clips of source assets",
+                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+        self.subclip_mediaconvert_role = iam.Role(
+            self,
+            "SubClipMediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            description="IAM role for MediaConvert SubClip Operations",
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
+
+    def _create_bulk_download_mediaconvert_resources(self):
+        """Resources required to run MediaConvert for Bulk Download operations.
+
+        Includes tasks like sub-clipping. These are being created separate from the
+        MediaConvert resources related to pipeline operations to separate permissions and
+        keep queue operations distinct between bulk download sub-clipping jobs
+        and pipeline processing.
+        """
+        self.subclip_mediaconvert_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeSubClipQueue",
+            props=MediaConvertProps(
+                description="A MediaLake queue for creating Sub-Clips of source assets",
+                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
+                status="ACTIVE",  # Could also be "PAUSED"
+                tags=[
+                    {"Environment": config.environment},
+                    {"Owner": config.resource_prefix},
+                ],
+            ),
+        )
+
+        self.subclip_mediaconvert_role = iam.Role(
+            self,
+            "SubClipMediaConvertRole",
+            assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            description="IAM role for MediaConvert SubClip Operations",
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:PutObject",
+                ],
+                resources=["arn:aws:s3:::*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        self.subclip_mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                ],
+                resources=["arn:aws:logs:*:*:*"],
+            )
+        )
 
     def _create_bulk_download_mediaconvert_resources(self):
         """Resources required to run MediaConvert for Bulk Download operations.

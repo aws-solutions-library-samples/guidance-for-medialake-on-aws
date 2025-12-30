@@ -21,9 +21,7 @@ interface ThemeToggleProps {
   isCollapsed?: boolean;
 }
 
-export const ThemeToggle: React.FC<ThemeToggleProps> = ({
-  isCollapsed = false,
-}) => {
+export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false }) => {
   const { t } = useTranslation();
   const muiTheme = useMuiTheme();
   const { theme, mode, setMode } = useTheme();
@@ -44,11 +42,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
               mx: 1,
             }}
           >
-            {theme === "light" ? (
-              <DarkIcon fontSize="small" />
-            ) : (
-              <LightIcon fontSize="small" />
-            )}
+            {theme === "light" ? <DarkIcon fontSize="small" /> : <LightIcon fontSize="small" />}
           </ListItemButton>
         </Tooltip>
       </ListItem>
@@ -89,14 +83,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor:
-                mode === "light"
-                  ? `${muiTheme.palette.primary.main}15`
-                  : "transparent",
+              bgcolor: mode === "light" ? `${muiTheme.palette.primary.main}15` : "transparent",
               color:
-                mode === "light"
-                  ? muiTheme.palette.primary.main
-                  : muiTheme.palette.text.secondary,
+                mode === "light" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}
           >
             <LightIcon fontSize="small" />
@@ -106,14 +95,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor:
-                mode === "dark"
-                  ? `${muiTheme.palette.primary.main}15`
-                  : "transparent",
+              bgcolor: mode === "dark" ? `${muiTheme.palette.primary.main}15` : "transparent",
               color:
-                mode === "dark"
-                  ? muiTheme.palette.primary.main
-                  : muiTheme.palette.text.secondary,
+                mode === "dark" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}
           >
             <DarkIcon fontSize="small" />
@@ -123,14 +107,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor:
-                mode === "system"
-                  ? `${muiTheme.palette.primary.main}15`
-                  : "transparent",
+              bgcolor: mode === "system" ? `${muiTheme.palette.primary.main}15` : "transparent",
               color:
-                mode === "system"
-                  ? muiTheme.palette.primary.main
-                  : muiTheme.palette.text.secondary,
+                mode === "system" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}
           >
             <SystemIcon fontSize="small" />

@@ -2,14 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
-import { useErrorModal } from "@/hooks/useErrorModal";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 
 type AssetItem = ImageItem | VideoItem | AudioItem;
 
@@ -54,17 +49,13 @@ export const useConnectorAssets = ({
   sortDirection = "desc",
   assetType,
 }: ConnectorAssetsParams) => {
-  const { showError } = useErrorModal();
-
   // Construct the query string for bucket search
   const query = bucketName
     ? `storageIdentifier:${bucketName}${assetType ? ` type:${assetType}` : ""}`
     : "";
 
   // Construct the sort parameter
-  const sort = sortBy
-    ? `${sortDirection === "desc" ? "-" : ""}${sortBy}`
-    : undefined;
+  const sort = sortBy ? `${sortDirection === "desc" ? "-" : ""}${sortBy}` : undefined;
 
   // For debugging
   console.log("useConnectorAssets called with:", { bucketName, query });
@@ -86,18 +77,15 @@ export const useConnectorAssets = ({
           params.sort = sort;
         }
 
-        const response = await apiClient.get<ConnectorAssetsResponse>(
-          API_ENDPOINTS.SEARCH,
-          {
-            params,
-            signal,
-          },
-        );
+        const response = await apiClient.get<ConnectorAssetsResponse>(API_ENDPOINTS.SEARCH, {
+          params,
+          signal,
+        });
 
         // Check if the response status is not a success (2xx)
         if (response.data?.status && !response.data.status.startsWith("2")) {
           const error = new Error(
-            response.data.message || "Search request failed",
+            response.data.message || "Search request failed"
           ) as ConnectorAssetsError;
           error.apiResponse = response.data;
           throw error;
@@ -114,7 +102,7 @@ export const useConnectorAssets = ({
         // Handle axios errors
         if (axios.isAxiosError(error) && error.response?.data) {
           const apiError = new Error(
-            error.response.data.message || "Search request failed",
+            error.response.data.message || "Search request failed"
           ) as ConnectorAssetsError;
           apiError.apiResponse = error.response.data;
           throw apiError;

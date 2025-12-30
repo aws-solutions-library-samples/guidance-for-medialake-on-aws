@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-  useEffect,
-} from "react";
+import React, { createContext, useCallback, useContext, useState, useEffect } from "react";
 import { StorageHelper } from "../helpers/storage-helper";
 import { authService } from "../../api/authService";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
@@ -19,9 +13,7 @@ interface AuthContextType {
   isInitialized: boolean;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined,
-);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -36,13 +28,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Check if this is a SAML redirect first
       const hasSamlProvider = awsConfig?.Auth?.identity_providers.some(
-        (provider) => provider.identity_provider_method === "saml",
+        (provider) => provider.identity_provider_method === "saml"
       );
 
       if (
         hasSamlProvider &&
-        (window.location.hash.includes("id_token") ||
-          window.location.search.includes("code="))
+        (window.location.hash.includes("id_token") || window.location.search.includes("code="))
       ) {
         // Don't try to get current user yet, just wait for session
         try {
@@ -69,8 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(true);
             // Only try to get user after we have a valid token
             try {
-              const user = await getCurrentUser();
-            } catch (userError) {
+              await getCurrentUser();
+            } catch (_userError) {
               // Silent fail
             }
           } else {

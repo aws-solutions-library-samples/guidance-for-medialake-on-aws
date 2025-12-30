@@ -6,10 +6,7 @@ export const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-export const handleImageDownload = (
-  imageSrc: string,
-  filename: string = "image_download.png",
-) => {
+export const handleImageDownload = (imageSrc: string, filename: string = "image_download.png") => {
   const img = new Image();
   img.crossOrigin = "anonymous"; // This may help with CORS issues
   img.src = imageSrc;

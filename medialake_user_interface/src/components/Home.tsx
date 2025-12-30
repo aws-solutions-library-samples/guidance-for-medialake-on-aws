@@ -1,19 +1,11 @@
 import React from "react";
-import {
-  Box,
-  Container,
-  Stack,
-  Typography,
-  Paper,
-  useTheme,
-  useMediaQuery,
-} from "@mui/material";
+import { Box, Container, Stack, Typography, Paper, useTheme } from "@mui/material";
 import { SmartFolders } from "@/features/home/SmartFolders";
 import { ConnectedStorage } from "@/features/home/ConnectedStorage";
 
 const Home: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  // const _isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
     <Box
@@ -45,11 +37,7 @@ const Home: React.FC = () => {
           >
             Welcome to MediaLake
           </Typography>
-          <Typography
-            variant="subtitle1"
-            color="text.secondary"
-            sx={{ maxWidth: "800px" }}
-          >
+          <Typography variant="subtitle1" color="text.secondary" sx={{ maxWidth: "800px" }}>
             Manage and organize your media files efficiently
           </Typography>
         </Box>
@@ -69,8 +57,7 @@ const Home: React.FC = () => {
               backdropFilter: "blur(10px)",
               border: "1px solid",
               borderColor: "divider",
-              transition:
-                "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
               "&:hover": {
                 transform: "translateY(-2px)",
                 boxShadow: theme.shadows[4],
@@ -89,8 +76,7 @@ const Home: React.FC = () => {
               backdropFilter: "blur(10px)",
               border: "1px solid",
               borderColor: "divider",
-              transition:
-                "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
               "&:hover": {
                 transform: "translateY(-2px)",
                 boxShadow: theme.shadows[4],

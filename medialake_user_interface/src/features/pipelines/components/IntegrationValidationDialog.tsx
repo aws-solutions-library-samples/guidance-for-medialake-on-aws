@@ -20,6 +20,7 @@ import {
   Box,
   Alert,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import type { Integration } from "@/features/settings/integrations/types/integrations.types";
 import type {
   InvalidNodeInfo,
@@ -34,9 +35,14 @@ interface IntegrationValidationDialogProps {
   onConfirm: (mappings: IntegrationMapping[]) => void;
 }
 
-export const IntegrationValidationDialog: React.FC<
-  IntegrationValidationDialogProps
-> = ({ open, invalidNodes, availableIntegrations, onClose, onConfirm }) => {
+export const IntegrationValidationDialog: React.FC<IntegrationValidationDialogProps> = ({
+  open,
+  invalidNodes,
+  availableIntegrations,
+  onClose,
+  onConfirm,
+}) => {
+  const { t } = useTranslation();
   const [mappings, setMappings] = useState<IntegrationMapping[]>([]);
   const [isValid, setIsValid] = useState(false);
 
@@ -45,30 +51,22 @@ export const IntegrationValidationDialog: React.FC<
     const initialMappings = invalidNodes.map((node) => ({
       nodeIndex: node.nodeIndex,
       oldIntegrationId: node.invalidIntegrationId,
-      newIntegrationId:
-        availableIntegrations.length > 0 ? availableIntegrations[0].id : "",
+      newIntegrationId: availableIntegrations.length > 0 ? availableIntegrations[0].id : "",
     }));
 
     setMappings(initialMappings);
     setIsValid(availableIntegrations.length > 0);
   }, [invalidNodes, availableIntegrations]);
 
-  const handleIntegrationChange = (
-    nodeIndex: number,
-    integrationId: string,
-  ) => {
+  const handleIntegrationChange = (nodeIndex: number, integrationId: string) => {
     const updatedMappings = mappings.map((mapping) =>
-      mapping.nodeIndex === nodeIndex
-        ? { ...mapping, newIntegrationId: integrationId }
-        : mapping,
+      mapping.nodeIndex === nodeIndex ? { ...mapping, newIntegrationId: integrationId } : mapping
     );
 
     setMappings(updatedMappings);
 
     // Check if all mappings have a selected integration
-    const allMappingsValid = updatedMappings.every(
-      (mapping) => !!mapping.newIntegrationId,
-    );
+    const allMappingsValid = updatedMappings.every((mapping) => !!mapping.newIntegrationId);
     setIsValid(allMappingsValid);
   };
 
@@ -78,19 +76,17 @@ export const IntegrationValidationDialog: React.FC<
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Integration Validation Required</DialogTitle>
+      <DialogTitle>{t("pipelines.integrationValidation.title")}</DialogTitle>
       <DialogContent>
         <Box sx={{ mb: 3 }}>
           <Typography variant="body1" paragraph>
-            Some nodes in the imported pipeline reference integrations that
-            don't exist in this environment. Please select replacement
-            integrations for each node:
+            Some nodes in the imported pipeline reference integrations that don't exist in this
+            environment. Please select replacement integrations for each node:
           </Typography>
 
           {availableIntegrations.length === 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              No integrations are available in this environment. You'll need to
-              create integrations before you can use these nodes.
+              {t("integrations.integrationValidation.noIntegrationsAvailable")}
             </Alert>
           )}
         </Box>
@@ -99,9 +95,9 @@ export const IntegrationValidationDialog: React.FC<
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Node</TableCell>
-                <TableCell>Invalid Integration ID</TableCell>
-                <TableCell>Replacement Integration</TableCell>
+                <TableCell>{t("common.node")}</TableCell>
+                <TableCell>{t("pipelines.integrationValidation.invalidIntegrationId")}</TableCell>
+                <TableCell>{t("pipelines.integrationValidation.replacementIntegration")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -111,19 +107,18 @@ export const IntegrationValidationDialog: React.FC<
                   <TableCell>{node.invalidIntegrationId}</TableCell>
                   <TableCell>
                     <FormControl fullWidth>
-                      <InputLabel>Select Integration</InputLabel>
+                      <InputLabel>
+                        {t("pipelines.integrationValidation.selectIntegration")}
+                      </InputLabel>
                       <Select
                         value={
-                          mappings.find((m) => m.nodeIndex === node.nodeIndex)
-                            ?.newIntegrationId || ""
+                          mappings.find((m) => m.nodeIndex === node.nodeIndex)?.newIntegrationId ||
+                          ""
                         }
                         onChange={(e) =>
-                          handleIntegrationChange(
-                            node.nodeIndex,
-                            e.target.value as string,
-                          )
+                          handleIntegrationChange(node.nodeIndex, e.target.value as string)
                         }
-                        label="Select Integration"
+                        label={t("pipelines.integrationValidation.selectIntegration")}
                         disabled={availableIntegrations.length === 0}
                       >
                         {availableIntegrations.map((integration) => (
@@ -142,15 +137,10 @@ export const IntegrationValidationDialog: React.FC<
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} color="inherit">
-          Cancel
+          {t("common.cancel")}
         </Button>
-        <Button
-          onClick={handleConfirm}
-          color="primary"
-          variant="contained"
-          disabled={!isValid}
-        >
-          Apply Changes
+        <Button onClick={handleConfirm} color="primary" variant="contained" disabled={!isValid}>
+          {t("common.apply")}
         </Button>
       </DialogActions>
     </Dialog>

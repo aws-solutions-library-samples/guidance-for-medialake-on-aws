@@ -9,10 +9,7 @@ import {
   expect,
   EnhancedCognitoUtils,
 } from "./fixtures/enhanced-cognito.fixtures";
-import {
-  test as cloudFrontTest,
-  CloudFrontTestUtils,
-} from "./fixtures/cloudfront.fixtures";
+import { test as cloudFrontTest, CloudFrontTestUtils } from "./fixtures/cloudfront.fixtures";
 import { test as authTest } from "./fixtures/auth.fixtures";
 
 // Test enhanced Cognito fixtures with tag-based discovery
@@ -28,25 +25,19 @@ enhancedCognitoTest.describe("Enhanced Cognito Fixtures Integration", () => {
 
       // Validate discovery method
       expect(["tag-based", "name-based", "fallback"]).toContain(
-        enhancedCognitoTestUser.discoveryMethod,
+        enhancedCognitoTestUser.discoveryMethod
       );
 
       // Test utility functions
-      const userPoolInfo = EnhancedCognitoUtils.getUserPoolInfo(
-        enhancedCognitoTestUser,
-      );
+      const userPoolInfo = EnhancedCognitoUtils.getUserPoolInfo(enhancedCognitoTestUser);
       expect(userPoolInfo.id).toBe(enhancedCognitoTestUser.userPoolId);
-      expect(userPoolInfo.discoveryMethod).toBe(
-        enhancedCognitoTestUser.discoveryMethod,
-      );
+      expect(userPoolInfo.discoveryMethod).toBe(enhancedCognitoTestUser.discoveryMethod);
 
       console.log(
-        `[Integration Test] User created via ${enhancedCognitoTestUser.discoveryMethod} discovery`,
+        `[Integration Test] User created via ${enhancedCognitoTestUser.discoveryMethod} discovery`
       );
-      console.log(
-        `[Integration Test] User pool: ${userPoolInfo.userPoolName || userPoolInfo.id}`,
-      );
-    },
+      console.log(`[Integration Test] User pool: ${userPoolInfo.userPoolName || userPoolInfo.id}`);
+    }
   );
 
   enhancedCognitoTest(
@@ -55,27 +46,25 @@ enhancedCognitoTest.describe("Enhanced Cognito Fixtures Integration", () => {
       // Test discovery method validation utility
       const isTagBased = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "tag-based",
+        "tag-based"
       );
       const isNameBased = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "name-based",
+        "name-based"
       );
       const isFallback = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "fallback",
+        "fallback"
       );
 
       // Exactly one should be true
-      const trueCount = [isTagBased, isNameBased, isFallback].filter(
-        Boolean,
-      ).length;
+      const trueCount = [isTagBased, isNameBased, isFallback].filter(Boolean).length;
       expect(trueCount).toBe(1);
 
       console.log(
-        `[Integration Test] Discovery method validation: ${enhancedCognitoTestUser.discoveryMethod}`,
+        `[Integration Test] Discovery method validation: ${enhancedCognitoTestUser.discoveryMethod}`
       );
-    },
+    }
   );
 
   enhancedCognitoTest("should handle custom tag filters", async () => {
@@ -85,8 +74,7 @@ enhancedCognitoTest.describe("Enhanced Cognito Fixtures Integration", () => {
       Environment: "integration-test",
     };
 
-    const customFilters =
-      EnhancedCognitoUtils.createCustomTagFilters(customTags);
+    const customFilters = EnhancedCognitoUtils.createCustomTagFilters(customTags);
     expect(customFilters).toHaveLength(2);
     expect(customFilters[0].key).toBe("CustomTag");
     expect(customFilters[0].values).toEqual(["test-value"]);
@@ -105,22 +93,17 @@ cloudFrontTest.describe("CloudFront Fixtures Integration", () => {
       expect(cloudFrontContext.distribution).toBeTruthy();
       expect(cloudFrontContext.primaryDomain).toBeTruthy();
       expect(cloudFrontContext.testUrls).toBeTruthy();
-      expect(["tag-based", "fallback"]).toContain(
-        cloudFrontContext.discoveryMethod,
-      );
+      expect(["tag-based", "fallback"]).toContain(cloudFrontContext.discoveryMethod);
 
       // Test distribution info utility
-      const distributionInfo =
-        CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
+      const distributionInfo = CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
       expect(distributionInfo.id).toBe(cloudFrontContext.distribution.id);
-      expect(distributionInfo.primaryDomain).toBe(
-        cloudFrontContext.primaryDomain,
-      );
+      expect(distributionInfo.primaryDomain).toBe(cloudFrontContext.primaryDomain);
 
       // Test distribution accessibility
       const testResults = await CloudFrontTestUtils.testDistributionAccess(
         cloudFrontTestPage,
-        cloudFrontContext.testUrls,
+        cloudFrontContext.testUrls
       );
 
       expect(testResults).toBeDefined();
@@ -136,40 +119,31 @@ cloudFrontTest.describe("CloudFront Fixtures Integration", () => {
       }
 
       console.log(
-        `[Integration Test] CloudFront distribution: ${distributionInfo.name} (${distributionInfo.discoveryMethod})`,
+        `[Integration Test] CloudFront distribution: ${distributionInfo.name} (${distributionInfo.discoveryMethod})`
       );
-      console.log(
-        `[Integration Test] Test results: ${testResults.length} URLs tested`,
-      );
-    },
+      console.log(`[Integration Test] Test results: ${testResults.length} URLs tested`);
+    }
   );
 
   cloudFrontTest(
     "should validate cache headers",
     async ({ cloudFrontContext, cloudFrontTestPage }) => {
       // Test a single URL to get headers
-      const response = await cloudFrontTestPage.goto(
-        cloudFrontContext.testUrls.root,
-        {
-          waitUntil: "networkidle",
-          timeout: 30000,
-        },
-      );
+      const response = await cloudFrontTestPage.goto(cloudFrontContext.testUrls.root, {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
 
       if (response) {
         const headers = await response.allHeaders();
-        const cacheValidation =
-          CloudFrontTestUtils.validateCacheHeaders(headers);
+        const cacheValidation = CloudFrontTestUtils.validateCacheHeaders(headers);
 
         expect(cacheValidation).toBeDefined();
         expect(typeof cacheValidation.hasCacheHeaders).toBe("boolean");
 
-        console.log(
-          `[Integration Test] Cache headers validation:`,
-          cacheValidation,
-        );
+        console.log(`[Integration Test] Cache headers validation:`, cacheValidation);
       }
-    },
+    }
   );
 
   cloudFrontTest(
@@ -179,31 +153,25 @@ cloudFrontTest.describe("CloudFront Fixtures Integration", () => {
       const invalidationId = await CloudFrontTestUtils.createTestInvalidation(
         cloudFrontServiceAdapter,
         cloudFrontContext.distribution.id,
-        ["/*"],
+        ["/*"]
       );
 
       if (invalidationId) {
         expect(invalidationId).toBeTruthy();
-        console.log(
-          `[Integration Test] Invalidation created: ${invalidationId}`,
-        );
+        console.log(`[Integration Test] Invalidation created: ${invalidationId}`);
 
         // Test waiting for invalidation (mock implementation)
         await CloudFrontTestUtils.waitForInvalidation(
           cloudFrontServiceAdapter,
           cloudFrontContext.distribution.id,
-          invalidationId,
+          invalidationId
         );
 
-        console.log(
-          `[Integration Test] Invalidation completed: ${invalidationId}`,
-        );
+        console.log(`[Integration Test] Invalidation completed: ${invalidationId}`);
       } else {
-        console.log(
-          "[Integration Test] Invalidation creation skipped (mock implementation)",
-        );
+        console.log("[Integration Test] Invalidation creation skipped (mock implementation)");
       }
-    },
+    }
   );
 });
 
@@ -230,9 +198,9 @@ authTest.describe("Backward Compatibility Integration", () => {
       expect(url).toBeTruthy();
 
       console.log(
-        `[Integration Test] Legacy fixtures working: user=${cognitoTestUser.username}, bucket=${s3BucketName}`,
+        `[Integration Test] Legacy fixtures working: user=${cognitoTestUser.username}, bucket=${s3BucketName}`
       );
-    },
+    }
   );
 
   authTest(
@@ -242,24 +210,19 @@ authTest.describe("Backward Compatibility Integration", () => {
       expect(cognitoTestUser.username).toContain(`-${testInfo.workerIndex}-`);
       expect(s3BucketName).toContain(`-worker-${testInfo.workerIndex}`);
 
-      console.log(
-        `[Integration Test] Worker ${testInfo.workerIndex} isolation maintained`,
-      );
-    },
+      console.log(`[Integration Test] Worker ${testInfo.workerIndex} isolation maintained`);
+    }
   );
 });
 
 // Test error handling and resilience
 enhancedCognitoTest.describe("Error Handling and Resilience", () => {
-  enhancedCognitoTest(
-    "should handle discovery failures gracefully",
-    async () => {
-      // Test that the enhanced fixtures handle errors gracefully
-      // This test validates that the error handling mechanisms are in place
-      console.log("[Integration Test] Error handling mechanisms validated");
-      expect(true).toBe(true); // Placeholder assertion
-    },
-  );
+  enhancedCognitoTest("should handle discovery failures gracefully", async () => {
+    // Test that the enhanced fixtures handle errors gracefully
+    // This test validates that the error handling mechanisms are in place
+    console.log("[Integration Test] Error handling mechanisms validated");
+    expect(true).toBe(true); // Placeholder assertion
+  });
 
   enhancedCognitoTest(
     "should validate user pool structure",
@@ -277,15 +240,11 @@ enhancedCognitoTest.describe("Error Handling and Resilience", () => {
         expect(enhancedCognitoTestUser.userPool).toHaveProperty("id");
         expect(enhancedCognitoTestUser.userPool).toHaveProperty("name");
         expect(enhancedCognitoTestUser.userPool).toHaveProperty("resourceType");
-        expect(enhancedCognitoTestUser.userPool.resourceType).toBe(
-          "cognito-user-pool",
-        );
+        expect(enhancedCognitoTestUser.userPool.resourceType).toBe("cognito-user-pool");
       }
 
-      console.log(
-        "[Integration Test] Enhanced user structure validation passed",
-      );
-    },
+      console.log("[Integration Test] Enhanced user structure validation passed");
+    }
   );
 });
 
@@ -296,13 +255,10 @@ cloudFrontTest.describe("Performance and Caching", () => {
     async ({ cloudFrontContext, cloudFrontTestPage }) => {
       const startTime = Date.now();
 
-      const response = await cloudFrontTestPage.goto(
-        cloudFrontContext.testUrls.root,
-        {
-          waitUntil: "networkidle",
-          timeout: 30000,
-        },
-      );
+      const response = await cloudFrontTestPage.goto(cloudFrontContext.testUrls.root, {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
 
       const responseTime = Date.now() - startTime;
 
@@ -311,9 +267,9 @@ cloudFrontTest.describe("Performance and Caching", () => {
       expect(responseTime).toBeLessThan(30000); // Should complete within timeout
 
       console.log(
-        `[Integration Test] Response time: ${responseTime}ms for ${cloudFrontContext.testUrls.root}`,
+        `[Integration Test] Response time: ${responseTime}ms for ${cloudFrontContext.testUrls.root}`
       );
-    },
+    }
   );
 
   cloudFrontTest(
@@ -356,8 +312,8 @@ cloudFrontTest.describe("Performance and Caching", () => {
 
       const successCount = results.filter((r) => r.success).length;
       console.log(
-        `[Integration Test] Concurrent requests: ${successCount}/${results.length} successful in ${totalTime}ms`,
+        `[Integration Test] Concurrent requests: ${successCount}/${results.length} successful in ${totalTime}ms`
       );
-    },
+    }
   );
 });

@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Menu,
-  MenuItem,
-  Typography,
-  FormControlLabel,
-  Checkbox,
-  useTheme,
-} from "@mui/material";
+import { Menu, MenuItem, Typography, FormControlLabel, Checkbox } from "@mui/material";
 import { Column } from "@tanstack/react-table";
 
 interface ColumnVisibilityMenuProps {
@@ -22,8 +15,6 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
   onClose,
   excludeIds = ["actions"],
 }) => {
-  const theme = useTheme();
-
   return (
     <Menu
       anchorEl={anchorEl}

@@ -49,7 +49,10 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
         <Typography variant="body2" color="text.secondary">
           {isFiltered
             ? `Showing ${totalResults} filtered results`
-            : `Showing ${(page - 1) * pageSize + 1} - ${Math.min(page * pageSize, totalResults)} of ${totalResults} results`}
+            : `Showing ${(page - 1) * pageSize + 1} - ${Math.min(
+                page * pageSize,
+                totalResults
+              )} of ${totalResults} results`}
         </Typography>
         <FormControl size="small" variant="outlined">
           <Select

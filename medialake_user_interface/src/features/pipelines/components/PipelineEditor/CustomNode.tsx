@@ -1,11 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
-import {
-  Handle,
-  Position,
-  NodeProps,
-  useReactFlow,
-  useOnSelectionChange,
-} from "reactflow";
+import { useTranslation } from "react-i18next";
+import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from "reactflow";
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
 import { RotateRight } from "@mui/icons-material";
@@ -14,6 +9,7 @@ const HANDLE_CONNECT_RADIUS = 50;
 
 // Component for expandable description with see more/less functionality
 const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
+  const { t } = useTranslation();
   const textRef = useRef<HTMLParagraphElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -23,8 +19,7 @@ const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
     const checkOverflow = () => {
       if (textRef.current) {
         // For multi-line text with line clamp, check if scrollHeight > clientHeight
-        const isTextOverflowing =
-          textRef.current.scrollHeight > textRef.current.clientHeight;
+        const isTextOverflowing = textRef.current.scrollHeight > textRef.current.clientHeight;
         setIsOverflowing(isTextOverflowing);
       }
     };
@@ -73,7 +68,9 @@ const ExpandableDescription: React.FC<{ text: string }> = ({ text }) => {
             },
           }}
         >
-          {isExpanded ? "See less" : "See more"}
+          {isExpanded
+            ? t("integrations.pipelines.editor.seeLess")
+            : t("integrations.pipelines.editor.seeMore")}
         </Typography>
       )}
     </Box>
@@ -88,8 +85,7 @@ const LabelWithTooltip: React.FC<{ text: string }> = ({ text }) => {
   React.useEffect(() => {
     const checkOverflow = () => {
       if (textRef.current) {
-        const isTextOverflowing =
-          textRef.current.scrollWidth > textRef.current.clientWidth;
+        const isTextOverflowing = textRef.current.scrollWidth > textRef.current.clientWidth;
         setIsOverflowing(isTextOverflowing);
       }
     };
@@ -145,11 +141,9 @@ export interface CustomNodeData {
   rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
 }
 
-const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
-  id,
-  data,
-  isConnectable,
-}) => {
+const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
+  const { t } = useTranslation();
+
   // In File 1: track selection state
   const [selected, setSelected] = useState(false);
   const { project } = useReactFlow();
@@ -160,7 +154,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       const isSelected = nodes.find((node: any) => node.id === id);
       setSelected(!!isSelected);
     },
-    [id],
+    [id]
   );
 
   useOnSelectionChange({ onChange });
@@ -176,10 +170,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   };
 
   // Helper function to get handle position based on rotation
-  const getHandlePosition = (
-    originalPosition: Position,
-    rotation: number,
-  ): Position => {
+  const getHandlePosition = (originalPosition: Position, rotation: number): Position => {
     const rotationMap = {
       0: {
         [Position.Left]: Position.Left,
@@ -207,15 +198,8 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
       },
     };
     return (
-      rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] ||
-      originalPosition
+      rotationMap[rotation as keyof typeof rotationMap]?.[originalPosition] || originalPosition
     );
-  };
-
-  const getEdgeOffsetStyle = (position: Position) => {
-    if (position === Position.Top) return { top: -6 }; // use -7 if your border is 2px
-    if (position === Position.Bottom) return { bottom: -6 }; // use -7 if your border is 2px
-    return {};
   };
 
   // Helper function to get handle container styles based on rotation
@@ -356,7 +340,6 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
 
   const handleNodeClick = useCallback(
     (event: React.MouseEvent) => {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
       const clickX = event.clientX;
       const clickY = event.clientY;
 
@@ -367,18 +350,14 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         const handleX = handleRect.left + handleRect.width / 2;
         const handleY = handleRect.top + handleRect.height / 2;
 
-        const distance = Math.sqrt(
-          Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2),
-        );
+        const distance = Math.sqrt(Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2));
 
         return distance <= HANDLE_CONNECT_RADIUS;
       };
 
       // Find the closest handle
       const handles = Array.from(
-        document.querySelectorAll(
-          `[data-nodeid="${id}"] .react-flow__handle-source`,
-        ),
+        document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`)
       );
       for (const handle of handles) {
         if (isNearHandle(handle)) {
@@ -392,7 +371,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         }
       }
     },
-    [id, project],
+    [id, project]
   );
 
   const isTriggerNode = data.type?.includes("TRIGGER");
@@ -413,11 +392,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
   const outputPos = getHandlePosition(Position.Right, currentRotation);
 
   const edgeNudge = (pos: Position) =>
-    pos === Position.Top
-      ? { top: -2 }
-      : pos === Position.Bottom
-        ? { bottom: -2 }
-        : {};
+    pos === Position.Top ? { top: -2 } : pos === Position.Bottom ? { bottom: -2 } : {};
 
   return (
     <Box
@@ -430,7 +405,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         transition: "all 0.3s linear",
         zIndex: currentRotation === 90 || currentRotation === 270 ? 1 : 5, // Lower z-index when handles are on top/bottom
       }}
-      onFocus={(e) => setSelected(true)}
+      onFocus={() => setSelected(true)}
     >
       <Box
         onClick={handleNodeClick}
@@ -464,24 +439,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         {!isTriggerNode && (
           <Box sx={getHandleContainerStyles(true, currentRotation)}>
             {inputTypes.map((inputType, index) => (
-              <Box
-                key={`input-${index}`}
-                sx={getHandleItemStyles(currentRotation)}
-              >
+              <Box key={`input-${index}`} sx={getHandleItemStyles(currentRotation)}>
                 <Tooltip
-                  title={
-                    typeof inputType === "string"
-                      ? inputType
-                      : (inputType as InputType).name
-                  }
+                  title={typeof inputType === "string" ? inputType : (inputType as InputType).name}
                 >
                   <Handle
                     type="target"
                     position={inputPos}
                     id={`input-${
-                      typeof inputType === "string"
-                        ? inputType
-                        : (inputType as InputType).name
+                      typeof inputType === "string" ? inputType : (inputType as InputType).name
                     }`}
                     isConnectable={isConnectable}
                     style={{
@@ -543,15 +509,15 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
             }}
           >
             {hasConfigurableParameters() && (
-              <IconButton
-                size="small"
-                onClick={handleConfigure}
-                sx={{ p: 0.5 }}
-              >
+              <IconButton size="small" onClick={handleConfigure} sx={{ p: 0.5 }}>
                 <FaCog size={14} />
               </IconButton>
             )}
-            <Tooltip title={`Rotate (${currentRotation}°)`}>
+            <Tooltip
+              title={t("pipelines.editor.rotateNode", {
+                rotation: currentRotation,
+              })}
+            >
               <IconButton size="small" onClick={handleRotate} sx={{ p: 0.5 }}>
                 <RotateRight sx={{ fontSize: 14 }} />
               </IconButton>
@@ -570,7 +536,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({
         "name" in (outputTypes[0] as any) ? (
           // Multiple output types as objects with name/description
           <Box sx={getHandleContainerStyles(false, currentRotation)}>
-            {(outputTypes as OutputType[]).map((output, index) => (
+            {(outputTypes as OutputType[]).map((output) => (
               <Box key={output.name} sx={getHandleItemStyles(currentRotation)}>
                 <Tooltip title={output.name}>
                   <Handle

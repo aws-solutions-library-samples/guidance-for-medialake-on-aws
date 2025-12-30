@@ -8,7 +8,7 @@
         "id": "dndnode_1",
         "type": "custom",
         "position": {
-          "x": 656,
+          "x": 704,
           "y": 272
         },
         "data": {
@@ -32,19 +32,27 @@
           ],
           "type": "UTILITY",
           "configuration": {
-            "path": "",
-            "operationId": "",
             "method": "process_content",
             "parameters": {
               "content_source": "proxy",
+              "model_id_text": "amazon.nova-lite-v1:0",
+              "model_id_media": "twelvelabs.pegasus-1-2-v1:0",
+              "prompt_source": "saved",
+              "saved_prompt_name": "summary_100",
               "model_region": "us-west-2",
-              "model_id": "twelvelabs.pegasus-1-2-v1:0",
+              "model_id": "twelvelabs.pegasus-v1-2",
               "prompt_name": "structured_recap"
-            }
-          }
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "rotation": 0,
+          "id": "bedrock_content_processor"
         },
-        "width": 200,
-        "height": 113
+        "width": 204,
+        "height": 115,
+        "selected": true,
+        "dragging": false
       },
       {
         "id": "dndnode_4",
@@ -74,30 +82,98 @@
           ],
           "type": "TRIGGER",
           "configuration": {
+            "path": "",
+            "operationId": "",
             "method": "trigger",
             "parameters": {
               "Prefix": ""
             },
-            "path": "",
-            "operationId": "",
             "requestMapping": null,
             "responseMapping": null
-          }
+          },
+          "rotation": 0,
+          "id": "trigger_video_processing_completed"
         },
-        "width": 200,
-        "height": 113,
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 960,
+          "y": 272
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "id": "success"
+        },
+        "width": 204,
+        "height": 119,
         "selected": false,
         "dragging": false
       }
     ],
     "edges": [
       {
-        "source": "dndnode_4",
-        "sourceHandle": "video",
-        "target": "dndnode_1",
-        "targetHandle": "input-any",
         "id": "dndnode_4-dndnode_1",
+        "source": "dndnode_4",
+        "target": "dndnode_1",
         "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-any"
+      },
+      {
+        "source": "dndnode_1",
+        "sourceHandle": "any",
+        "target": "dndnode_5",
+        "targetHandle": "input-any",
+        "id": "dndnode_1-dndnode_5",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
         "data": {
           "text": "Connected"
         }

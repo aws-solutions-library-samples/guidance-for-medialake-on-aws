@@ -20,7 +20,7 @@ export const useSystemSettings = () => {
       try {
         const response = await apiClient.get<SystemSettingsResponse>(
           SYSTEM_API.endpoints.GET_SYSTEM_SETTINGS,
-          { signal },
+          { signal }
         );
 
         if (!response.data) {
@@ -46,7 +46,7 @@ export const useSearchProvider = () => {
       try {
         const response = await apiClient.get<SystemSettingsResponse>(
           SYSTEM_API.endpoints.GET_SEARCH_PROVIDER,
-          { signal },
+          { signal }
         );
 
         if (!response.data) {
@@ -67,16 +67,12 @@ export const useCreateSearchProvider = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<
-    SystemSettingsResponse,
-    SystemSettingsError,
-    SearchProviderCreate
-  >({
+  return useMutation<SystemSettingsResponse, SystemSettingsError, SearchProviderCreate>({
     mutationFn: async (provider) => {
       try {
         const response = await apiClient.post<SystemSettingsResponse>(
           SYSTEM_API.endpoints.CREATE_SEARCH_PROVIDER,
-          provider,
+          provider
         );
 
         return response.data;
@@ -105,7 +101,7 @@ export const useDeleteSearchProvider = () => {
     mutationFn: async () => {
       try {
         const response = await apiClient.delete<SystemSettingsResponse>(
-          SYSTEM_API.endpoints.DELETE_SEARCH_PROVIDER,
+          SYSTEM_API.endpoints.DELETE_SEARCH_PROVIDER
         );
 
         return response.data;
@@ -130,16 +126,12 @@ export const useUpdateSearchProvider = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<
-    SystemSettingsResponse,
-    SystemSettingsError,
-    SearchProviderUpdate
-  >({
+  return useMutation<SystemSettingsResponse, SystemSettingsError, SearchProviderUpdate>({
     mutationFn: async (provider) => {
       try {
         const response = await apiClient.put<SystemSettingsResponse>(
           SYSTEM_API.endpoints.UPDATE_SEARCH_PROVIDER,
-          provider,
+          provider
         );
 
         return response.data;

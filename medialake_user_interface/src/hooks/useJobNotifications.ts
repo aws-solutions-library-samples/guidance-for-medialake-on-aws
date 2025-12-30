@@ -1,19 +1,10 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useUserBulkDownloadJobs } from "@/api/hooks/useAssets";
-import {
-  useNotifications,
-  Notification,
-} from "@/components/NotificationCenter";
+import { useUserBulkDownloadJobs, useUserBatchDeleteJobs } from "@/api/hooks/useAssets";
+import { useNotifications, Notification } from "@/components/NotificationCenter";
 
-interface JobData {
+interface DownloadJobData {
   jobId: string;
-  status:
-    | "INITIATED"
-    | "ASSESSED"
-    | "STAGING"
-    | "PROCESSING"
-    | "COMPLETED"
-    | "FAILED";
+  status: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
   progress?: number;
   createdAt: string;
   updatedAt: string;
@@ -27,7 +18,7 @@ interface JobData {
   expiresAt?: string;
   expiresIn?: string;
   error?: string;
-  totalSize?: number; // Keep as number to match API response
+  totalSize?: number;
   foundAssetsCount?: number;
   smallFilesCount?: number;
   largeFilesCount?: number;
@@ -35,9 +26,25 @@ interface JobData {
   description?: string;
 }
 
+interface DeleteJobData {
+  jobId: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  totalAssets: number;
+  processedAssets: number;
+  failedAssets: number;
+  progress?: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  error?: string;
+}
+
+type JobData = DownloadJobData | DeleteJobData;
+
 export const useJobNotifications = () => {
   const { notifications, add, dismiss, update } = useNotifications();
-  const { data: userJobsResponse } = useUserBulkDownloadJobs();
+  const { data: downloadJobsResponse } = useUserBulkDownloadJobs();
+  const { data: deleteJobsResponse } = useUserBatchDeleteJobs();
   const syncedJobsRef = useRef<Set<string>>(new Set());
 
   // Get dismissed jobs from localStorage
@@ -55,12 +62,9 @@ export const useJobNotifications = () => {
     (jobId: string) => {
       const dismissedJobs = getDismissedJobs();
       dismissedJobs.add(jobId);
-      localStorage.setItem(
-        "medialake_dismissed_jobs",
-        JSON.stringify([...dismissedJobs]),
-      );
+      localStorage.setItem("medialake_dismissed_jobs", JSON.stringify([...dismissedJobs]));
     },
-    [getDismissedJobs],
+    [getDismissedJobs]
   );
 
   // Clear dismissible job notifications only (respects non-dismissible notifications)
@@ -79,26 +83,28 @@ export const useJobNotifications = () => {
       .filter((n) => n.jobId && n.type !== "sticky")
       .map((n) => n.jobId);
 
-    dismissibleJobIds.forEach((jobId) => {
-      const jobKeysToRemove = [...seenJobs].filter((key) =>
-        key.startsWith(`${jobId}:`),
-      );
+    dismissibleJobIds.forEach((_jobId) => {
+      const jobKeysToRemove = [...seenJobs].filter((key) => key.startsWith(`${_jobId}:`));
       jobKeysToRemove.forEach((key) => seenJobs.delete(key));
     });
 
     if (dismissibleJobIds.length > 0) {
-      localStorage.setItem(
-        "medialake_seen_job_notifications",
-        JSON.stringify([...seenJobs]),
-      );
+      localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
     }
 
     // Only clear synced jobs for dismissed notifications
     // Keep sticky notifications in sync
   }, [notifications, dismiss, markJobAsDismissed]);
 
-  // Get user jobs from the response
-  const userJobs = userJobsResponse?.data?.jobs || [];
+  // Get user jobs from both download and delete responses
+  const downloadJobs = downloadJobsResponse?.data?.jobs || [];
+  const deleteJobs = deleteJobsResponse?.data?.jobs || [];
+
+  // Combine all jobs with a type marker
+  const allJobs: Array<JobData & { jobType: "download" | "delete" }> = [
+    ...downloadJobs.map((job) => ({ ...job, jobType: "download" as const })),
+    ...deleteJobs.map((job) => ({ ...job, jobType: "delete" as const })),
+  ];
 
   const getUnseenNotifications = useCallback((): Set<string> => {
     try {
@@ -119,26 +125,13 @@ export const useJobNotifications = () => {
     }
   }, []);
 
-  const markJobAsSeen = useCallback(
-    (jobId: string, status: string) => {
-      const seenJobs = getSeenJobNotifications();
-      const jobKey = `${jobId}:${status}`;
-      seenJobs.add(jobKey);
-      localStorage.setItem(
-        "medialake_seen_job_notifications",
-        JSON.stringify([...seenJobs]),
-      );
-    },
-    [getSeenJobNotifications],
-  );
-
   const isJobNotificationSeen = useCallback(
     (jobId: string, status: string): boolean => {
       const seenJobs = getSeenJobNotifications();
       const jobKey = `${jobId}:${status}`;
       return seenJobs.has(jobKey);
     },
-    [getSeenJobNotifications],
+    [getSeenJobNotifications]
   );
 
   const markAsUnseen = useCallback(
@@ -147,30 +140,91 @@ export const useJobNotifications = () => {
       unseenNotifications.add(notificationId);
       localStorage.setItem(
         "medialake_unseen_notifications",
-        JSON.stringify([...unseenNotifications]),
+        JSON.stringify([...unseenNotifications])
       );
     },
-    [getUnseenNotifications],
+    [getUnseenNotifications]
   );
 
   const jobToNotification = useCallback(
-    (job: JobData): Omit<Notification, "id" | "seen"> => {
+    (job: JobData & { jobType: "download" | "delete" }): Omit<Notification, "id" | "seen"> => {
+      // Handle batch delete jobs
+      if (job.jobType === "delete") {
+        const deleteJob = job as DeleteJobData & { jobType: "delete" };
+        const baseNotification = {
+          jobId: deleteJob.jobId,
+          jobStatus: deleteJob.status as any,
+          createdAt: deleteJob.createdAt,
+          updatedAt: deleteJob.updatedAt,
+          progress: deleteJob.progress,
+          foundAssetsCount: deleteJob.totalAssets,
+        };
+
+        switch (deleteJob.status) {
+          case "PENDING":
+            return {
+              ...baseNotification,
+              message: `Deleting ${deleteJob.totalAssets} assets...`,
+              type: "sticky" as const,
+            };
+          case "PROCESSING":
+            return {
+              ...baseNotification,
+              message: `Deleting assets: ${deleteJob.progress || 0}% complete (${
+                deleteJob.processedAssets
+              }/${deleteJob.totalAssets})`,
+              type: "sticky" as const,
+            };
+          case "COMPLETED": {
+            const successCount = deleteJob.totalAssets - (deleteJob.failedAssets || 0);
+            return {
+              ...baseNotification,
+              message: `Deleted ${successCount} of ${deleteJob.totalAssets} assets successfully`,
+              type: "sticky-dismissible" as const,
+            };
+          }
+          case "FAILED":
+            return {
+              ...baseNotification,
+              message: `Batch delete failed: ${deleteJob.error || "Unknown error"}`,
+              type: "dismissible" as const,
+              autoCloseMs: 10000,
+            };
+          case "CANCELLED": {
+            const processedBeforeCancellation = deleteJob.processedAssets || 0;
+            return {
+              ...baseNotification,
+              message: `Delete cancelled: ${processedBeforeCancellation} of ${deleteJob.totalAssets} assets were processed`,
+              type: "sticky-dismissible" as const,
+            };
+          }
+          default:
+            return {
+              ...baseNotification,
+              message: `Delete status: ${deleteJob.status}`,
+              type: "dismissible" as const,
+            };
+        }
+      }
+
+      // Handle bulk download jobs
+      const downloadJob = job as DownloadJobData;
       const baseNotification = {
-        jobId: job.jobId,
-        jobStatus: job.status,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        downloadUrls: job.downloadUrls,
-        expiresAt: job.expiresAt,
-        expiresIn: job.expiresIn,
-        progress: job.progress,
-        totalSize: job.totalSize,
-        foundAssetsCount: job.foundAssetsCount,
-        smallFilesCount: job.smallFilesCount,
-        largeFilesCount: job.largeFilesCount,
+        jobId: downloadJob.jobId,
+        jobStatus: downloadJob.status as any,
+        createdAt: downloadJob.createdAt,
+        updatedAt: downloadJob.updatedAt,
+        downloadUrls: downloadJob.downloadUrls,
+        expiresAt: downloadJob.expiresAt,
+        expiresIn: downloadJob.expiresIn,
+        progress: downloadJob.progress,
+        totalSize: downloadJob.totalSize,
+        foundAssetsCount: downloadJob.foundAssetsCount,
+        smallFilesCount: downloadJob.smallFilesCount,
+        largeFilesCount: downloadJob.largeFilesCount,
       };
 
-      switch (job.status) {
+      switch (downloadJob.status) {
         case "INITIATED":
           return {
             ...baseNotification,
@@ -185,18 +239,14 @@ export const useJobNotifications = () => {
             type: "sticky" as const,
           };
 
-        case "STAGING":
-          const stagingProgress = job.progress || 0;
+        case "STAGING": {
+          const stagingProgress = downloadJob.progress || 0;
           let stagingMessage = "Preparing download archive...";
 
           if (stagingProgress > 50) {
-            // If progress > 50%, we're in upload phase
-            const uploadProgress = Math.round(
-              ((stagingProgress - 50) / 50) * 100,
-            );
+            const uploadProgress = Math.round(((stagingProgress - 50) / 50) * 100);
             stagingMessage = `Staging archive: ${uploadProgress}% complete`;
           } else if (stagingProgress > 0) {
-            // If progress > 0 but <= 50%, we might be in zip creation phase
             const zipProgress = Math.round((stagingProgress / 50) * 100);
             stagingMessage = `Creating archive: ${zipProgress}% complete`;
           }
@@ -206,17 +256,16 @@ export const useJobNotifications = () => {
             message: stagingMessage,
             type: "sticky" as const,
           };
+        }
 
-        case "PROCESSING":
-          const progress = job.progress || 0;
+        case "PROCESSING": {
+          const progress = downloadJob.progress || 0;
           let progressMessage = "";
 
           if (progress <= 50) {
-            // Zip creation phase (0-50%)
             const zipProgress = Math.round((progress / 50) * 100);
             progressMessage = `Creating archive: ${zipProgress}% complete`;
           } else {
-            // Multipart upload phase (50-100%)
             const uploadProgress = Math.round(((progress - 50) / 50) * 100);
             progressMessage = `Staging archive: ${uploadProgress}% complete`;
           }
@@ -226,18 +275,19 @@ export const useJobNotifications = () => {
             message: progressMessage,
             type: "sticky" as const,
           };
+        }
 
         case "COMPLETED":
           return {
             ...baseNotification,
-            message: job.description || "Your download is ready!",
+            message: downloadJob.description || "Your download is ready!",
             type: "sticky-dismissible" as const,
           };
 
         case "FAILED":
           return {
             ...baseNotification,
-            message: `Download failed: ${job.error || "Unknown error"}`,
+            message: `Download failed: ${downloadJob.error || "Unknown error"}`,
             type: "dismissible" as const,
             autoCloseMs: 10000,
           };
@@ -245,16 +295,16 @@ export const useJobNotifications = () => {
         default:
           return {
             ...baseNotification,
-            message: `Download status: ${job.status}`,
+            message: `Download status: ${downloadJob.status}`,
             type: "dismissible" as const,
           };
       }
     },
-    [],
+    []
   );
 
   const createNotificationForJob = useCallback(
-    (job: JobData) => {
+    (job: JobData & { jobType: "download" | "delete" }) => {
       const notification = jobToNotification(job);
       const notificationId = add(notification);
 
@@ -265,11 +315,11 @@ export const useJobNotifications = () => {
 
       return notificationId;
     },
-    [add, jobToNotification, markAsUnseen, isJobNotificationSeen],
+    [add, jobToNotification, markAsUnseen, isJobNotificationSeen]
   );
 
   const updateNotificationForJob = useCallback(
-    (existingNotification: Notification, job: JobData) => {
+    (existingNotification: Notification, job: JobData & { jobType: "download" | "delete" }) => {
       const updatedNotification = jobToNotification(job);
 
       // Only update if there's a meaningful change
@@ -282,17 +332,14 @@ export const useJobNotifications = () => {
         update(existingNotification.id, updatedNotification);
 
         // Mark as unseen if status changed to completed and this completion hasn't been seen before
-        if (
-          job.status === "COMPLETED" &&
-          existingNotification.jobStatus !== "COMPLETED"
-        ) {
+        if (job.status === "COMPLETED" && existingNotification.jobStatus !== "COMPLETED") {
           if (!isJobNotificationSeen(job.jobId, "COMPLETED")) {
             markAsUnseen(existingNotification.id);
           }
         }
       }
     },
-    [update, jobToNotification, markAsUnseen, isJobNotificationSeen],
+    [update, jobToNotification, markAsUnseen, isJobNotificationSeen]
   );
 
   // Custom dismiss function that tracks dismissed jobs
@@ -304,12 +351,12 @@ export const useJobNotifications = () => {
       }
       dismiss(notificationId);
     },
-    [notifications, dismiss, markJobAsDismissed],
+    [notifications, dismiss, markJobAsDismissed]
   );
 
   // Sync backend jobs with notifications
   useEffect(() => {
-    if (userJobs.length === 0) return;
+    if (allJobs.length === 0) return;
 
     const dismissedJobs = getDismissedJobs();
 
@@ -325,7 +372,7 @@ export const useJobNotifications = () => {
     });
 
     // Remove duplicate notifications (keep the most recent one)
-    jobNotificationMap.forEach((notificationsForJob, jobId) => {
+    jobNotificationMap.forEach((notificationsForJob) => {
       if (notificationsForJob.length > 1) {
         // Sort by updatedAt or createdAt, keep the most recent
         const sortedNotifications = notificationsForJob.sort((a, b) => {
@@ -341,15 +388,13 @@ export const useJobNotifications = () => {
       }
     });
 
-    userJobs.forEach((job: JobData) => {
+    allJobs.forEach((job) => {
       // Skip creating notifications for jobs that have been manually dismissed
       if (dismissedJobs.has(job.jobId)) {
         return;
       }
 
-      const existingNotifications = notifications.filter(
-        (n) => n.jobId === job.jobId,
-      );
+      const existingNotifications = notifications.filter((n) => n.jobId === job.jobId);
 
       if (existingNotifications.length === 0) {
         // Create new notification for new job
@@ -363,32 +408,26 @@ export const useJobNotifications = () => {
     });
 
     // Remove notifications for jobs that no longer exist in backend
-    const currentJobIds = new Set(userJobs.map((job) => job.jobId));
+    const currentJobIds = new Set(allJobs.map((job) => job.jobId));
     notifications.forEach((notification) => {
       if (notification.jobId && !currentJobIds.has(notification.jobId)) {
         dismiss(notification.id);
         // Also remove from dismissed jobs since the job no longer exists
         const updatedDismissedJobs = getDismissedJobs();
         updatedDismissedJobs.delete(notification.jobId);
-        localStorage.setItem(
-          "medialake_dismissed_jobs",
-          JSON.stringify([...updatedDismissedJobs]),
-        );
+        localStorage.setItem("medialake_dismissed_jobs", JSON.stringify([...updatedDismissedJobs]));
 
         // Clean up seen job notifications for this job
         const seenJobs = getSeenJobNotifications();
         const jobKeysToRemove = [...seenJobs].filter((key) =>
-          key.startsWith(`${notification.jobId}:`),
+          key.startsWith(`${notification.jobId}:`)
         );
         jobKeysToRemove.forEach((key) => seenJobs.delete(key));
-        localStorage.setItem(
-          "medialake_seen_job_notifications",
-          JSON.stringify([...seenJobs]),
-        );
+        localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
       }
     });
   }, [
-    userJobs,
+    allJobs,
     notifications,
     createNotificationForJob,
     updateNotificationForJob,
@@ -407,7 +446,7 @@ export const useJobNotifications = () => {
   return {
     unseenCount: getUnseenCount(),
     markAllAsSeen,
-    isJobSyncing: userJobs.length > 0,
+    isJobSyncing: allJobs.length > 0,
     dismissJobNotification,
     clearAllJobNotifications,
   };

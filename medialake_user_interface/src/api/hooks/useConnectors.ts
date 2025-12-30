@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import queryClient from "@/api/queryClient";
 import { apiClient } from "@/api/apiClient";
@@ -35,12 +34,9 @@ export const useGetS3Buckets = () => {
     queryKey: [QUERY_KEYS.CONNECTORS, "s3"],
     queryFn: async ({ signal }) => {
       try {
-        const response = await apiClient.get<S3BucketResponse>(
-          `${API_ENDPOINTS.CONNECTORS}/s3`,
-          {
-            signal,
-          },
-        );
+        const response = await apiClient.get<S3BucketResponse>(`${API_ENDPOINTS.CONNECTORS}/s3`, {
+          signal,
+        });
         return response.data;
       } catch (error) {
         logger.error("Fetch S3 buckets error:", error);
@@ -58,12 +54,9 @@ export const useGetConnectors = () => {
     queryKey: [QUERY_KEYS.CONNECTORS],
     queryFn: async ({ signal }) => {
       try {
-        const response = await apiClient.get<ConnectorListResponse>(
-          API_ENDPOINTS.CONNECTORS,
-          {
-            signal,
-          },
-        );
+        const response = await apiClient.get<ConnectorListResponse>(API_ENDPOINTS.CONNECTORS, {
+          signal,
+        });
         return response.data;
       } catch (error) {
         logger.error("Fetch connectors error:", error);
@@ -80,10 +73,7 @@ export const useCreateConnector = () => {
   return useMutation<ConnectorResponse, Error, CreateConnectorRequest>({
     mutationFn: async (data) => {
       validateConnectorRequest(data);
-      const response = await apiClient.post<ConnectorResponse>(
-        API_ENDPOINTS.CONNECTORS,
-        data,
-      );
+      const response = await apiClient.post<ConnectorResponse>(API_ENDPOINTS.CONNECTORS, data);
       return response.data;
     },
     onError: (error) => {
@@ -95,25 +85,22 @@ export const useCreateConnector = () => {
       }
     },
     onSuccess: (newConnector) => {
-      queryClient.setQueryData<ConnectorListResponse>(
-        [QUERY_KEYS.CONNECTORS],
-        (old) => {
-          if (!old)
-            return {
-              status: "success",
-              message: "Connectors retrieved successfully",
-              data: { connectors: [newConnector] },
-            };
+      queryClient.setQueryData<ConnectorListResponse>([QUERY_KEYS.CONNECTORS], (old) => {
+        if (!old)
           return {
-            status: old.status,
-            message: old.message,
-            data: {
-              ...old.data,
-              connectors: [...old.data.connectors, newConnector],
-            },
+            status: "success",
+            message: "Connectors retrieved successfully",
+            data: { connectors: [newConnector] },
           };
-        },
-      );
+        return {
+          status: old.status,
+          message: old.message,
+          data: {
+            ...old.data,
+            connectors: [...old.data.connectors, newConnector],
+          },
+        };
+      });
     },
   });
 };
@@ -121,56 +108,41 @@ export const useCreateConnector = () => {
 export const useUpdateConnector = () => {
   const { showError } = useErrorModal();
 
-  return useMutation<
-    ConnectorResponse,
-    Error,
-    { id: string; data: UpdateConnectorRequest }
-  >({
+  return useMutation<ConnectorResponse, Error, { id: string; data: UpdateConnectorRequest }>({
     mutationFn: async ({ id, data }) => {
       validateConnectorRequest(data);
       const response = await apiClient.put<ConnectorResponse>(
         `${API_ENDPOINTS.CONNECTORS}/${id}`,
-        data,
+        data
       );
       return response.data;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
 
-      const previousConnectors =
-        queryClient.getQueryData<ConnectorListResponse>([
-          QUERY_KEYS.CONNECTORS,
-        ]);
+      const previousConnectors = queryClient.getQueryData<ConnectorListResponse>([
+        QUERY_KEYS.CONNECTORS,
+      ]);
 
-      queryClient.setQueryData<ConnectorListResponse>(
-        [QUERY_KEYS.CONNECTORS],
-        (old) => {
-          if (!old) return previousConnectors;
-          return {
-            status: old.status,
-            message: old.message,
-            data: {
-              ...old.data,
-              connectors: old.data.connectors.map((connector) =>
-                connector.id === id ? { ...connector, ...data } : connector,
-              ),
-            },
-          };
-        },
-      );
+      queryClient.setQueryData<ConnectorListResponse>([QUERY_KEYS.CONNECTORS], (old) => {
+        if (!old) return previousConnectors;
+        return {
+          status: old.status,
+          message: old.message,
+          data: {
+            ...old.data,
+            connectors: old.data.connectors.map((connector) =>
+              connector.id === id ? { ...connector, ...data } : connector
+            ),
+          },
+        };
+      });
 
       return { previousConnectors };
     },
-    onError: (
-      error,
-      variables,
-      context: { previousConnectors?: ConnectorListResponse },
-    ) => {
+    onError: (error, variables, context: { previousConnectors?: ConnectorListResponse }) => {
       if (context?.previousConnectors) {
-        queryClient.setQueryData(
-          [QUERY_KEYS.CONNECTORS],
-          context.previousConnectors,
-        );
+        queryClient.setQueryData([QUERY_KEYS.CONNECTORS], context.previousConnectors);
       }
       logger.error("Update connector error:", error);
       if (error.message === "Network Error") {
@@ -185,62 +157,45 @@ export const useUpdateConnector = () => {
 export const useToggleConnector = () => {
   const { showError } = useErrorModal();
 
-  return useMutation<
-    ConnectorResponse,
-    Error,
-    { id: string; enabled: boolean }
-  >({
+  return useMutation<ConnectorResponse, Error, { id: string; enabled: boolean }>({
     mutationFn: async ({ id, enabled }) => {
       const response = await apiClient.put<ConnectorResponse>(
         `${API_ENDPOINTS.CONNECTORS}/${id}/status`,
-        { status: enabled ? "active" : "disabled" },
+        { status: enabled ? "active" : "disabled" }
       );
       return response.data;
     },
     onMutate: async ({ id, enabled }) => {
       await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONNECTORS] });
 
-      const previousConnectors =
-        queryClient.getQueryData<ConnectorListResponse>([
-          QUERY_KEYS.CONNECTORS,
-        ]);
+      const previousConnectors = queryClient.getQueryData<ConnectorListResponse>([
+        QUERY_KEYS.CONNECTORS,
+      ]);
 
-      queryClient.setQueryData<ConnectorListResponse>(
-        [QUERY_KEYS.CONNECTORS],
-        (old) => {
-          if (!old) return previousConnectors;
-          return {
-            status: old.status,
-            message: old.message,
-            data: {
-              ...old.data,
-              connectors: old.data.connectors.map((connector) =>
-                connector.id === id
-                  ? { ...connector, status: enabled ? "active" : "disabled" }
-                  : connector,
-              ),
-            },
-          };
-        },
-      );
+      queryClient.setQueryData<ConnectorListResponse>([QUERY_KEYS.CONNECTORS], (old) => {
+        if (!old) return previousConnectors;
+        return {
+          status: old.status,
+          message: old.message,
+          data: {
+            ...old.data,
+            connectors: old.data.connectors.map((connector) =>
+              connector.id === id
+                ? { ...connector, status: enabled ? "active" : "disabled" }
+                : connector
+            ),
+          },
+        };
+      });
 
       return { previousConnectors };
     },
-    onError: (
-      error,
-      variables,
-      context: { previousConnectors?: ConnectorListResponse },
-    ) => {
+    onError: (error, variables, context: { previousConnectors?: ConnectorListResponse }) => {
       if (context?.previousConnectors) {
-        queryClient.setQueryData(
-          [QUERY_KEYS.CONNECTORS],
-          context.previousConnectors,
-        );
+        queryClient.setQueryData([QUERY_KEYS.CONNECTORS], context.previousConnectors);
       }
       logger.error("Toggle connector error:", error);
-      showError(
-        `Failed to ${variables.enabled ? "enable" : "disable"} connector`,
-      );
+      showError(`Failed to ${variables.enabled ? "enable" : "disable"} connector`);
     },
   });
 };
@@ -252,7 +207,7 @@ export const useDeleteConnector = () => {
     mutationFn: async (id: string) => {
       try {
         const response = await apiClient.delete<ApiResponse<void>>(
-          `${API_ENDPOINTS.CONNECTORS}/${id}`,
+          `${API_ENDPOINTS.CONNECTORS}/${id}`
         );
         return response.data;
       } catch (error) {
@@ -275,16 +230,14 @@ export const useCreateS3Connector = () => {
       validateS3ConnectorRequest(data);
       const response = await apiClient.post<SingleConnectorResponse>(
         `${API_ENDPOINTS.CONNECTORS}/s3`,
-        data,
+        data
       );
       // Check if the response status is in the success range (200-299)
       if (response.status >= 200 && response.status < 300) {
         return response.data;
       } else {
         // If not successful, throw an error to trigger onError
-        throw new Error(
-          response.data.message || "Failed to create S3 connector",
-        );
+        throw new Error(response.data.message || "Failed to create S3 connector");
       }
     },
     onError: (error: any) => {
@@ -300,25 +253,22 @@ export const useCreateS3Connector = () => {
         const newConnector = response.data;
 
         // Merges the new connector into our existing connectors
-        queryClient.setQueryData<ConnectorListResponse>(
-          [QUERY_KEYS.CONNECTORS],
-          (old) => {
-            if (!old) {
-              return {
-                status: "success",
-                message: "Connectors retrieved successfully",
-                data: { connectors: [newConnector] },
-              };
-            }
+        queryClient.setQueryData<ConnectorListResponse>([QUERY_KEYS.CONNECTORS], (old) => {
+          if (!old) {
             return {
-              ...old,
-              data: {
-                ...old.data,
-                connectors: [...old.data.connectors, newConnector],
-              },
+              status: "success",
+              message: "Connectors retrieved successfully",
+              data: { connectors: [newConnector] },
             };
-          },
-        );
+          }
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              connectors: [...old.data.connectors, newConnector],
+            },
+          };
+        });
       }
     },
   });
@@ -331,7 +281,7 @@ export const useCreateGCSConnector = () => {
     mutationFn: async (data) => {
       const response = await apiClient.post<ConnectorResponse>(
         `${API_ENDPOINTS.CONNECTORS}/gcs`,
-        data,
+        data
       );
       return response.data;
     },
@@ -353,7 +303,7 @@ export const useSyncConnector = () => {
     mutationFn: async (connectorId) => {
       try {
         const response = await apiClient.post<ApiResponse<any>>(
-          `${API_ENDPOINTS.CONNECTORS}/${connectorId}/sync`,
+          `${API_ENDPOINTS.CONNECTORS}/${connectorId}/sync`
         );
         return response.data;
       } catch (error) {

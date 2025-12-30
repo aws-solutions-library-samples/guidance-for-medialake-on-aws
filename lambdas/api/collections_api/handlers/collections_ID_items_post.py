@@ -115,10 +115,10 @@ def register_route(app):
                         "itemType": item.itemType,
                         "assetId": item.assetId,
                         "clipBoundary": (
-                            dict(item.clipBoundary) if item.clipBoundary else {}
+                            item.clipBoundary.as_dict() if item.clipBoundary else {}
                         ),
                         "sortOrder": item.sortOrder if item.sortOrder else 0,
-                        "metadata": dict(item.metadata) if item.metadata else {},
+                        "metadata": item.metadata.as_dict() if item.metadata else {},
                         "addedAt": item.addedAt,
                         "addedBy": item.addedBy,
                     }
@@ -127,19 +127,19 @@ def register_route(app):
                 except PutError as e:
                     logger.error(f"[ADD_ITEM] Error adding item: {e}")
 
-            # Update collection item count
+            # Update collection updatedAt timestamp
+            # Note: itemCount is now computed dynamically
             try:
                 collection = CollectionModel.get(
                     f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
                 )
                 collection.update(
                     actions=[
-                        CollectionModel.itemCount.add(len(added_items)),
                         CollectionModel.updatedAt.set(current_timestamp),
                     ]
                 )
             except Exception as e:
-                logger.warning(f"[ADD_ITEM] Failed to update item count: {e}")
+                logger.warning(f"[ADD_ITEM] Failed to update collection timestamp: {e}")
 
             logger.info(
                 f"[ADD_ITEM] Added {len(added_items)} item(s) to collection {collection_id}"

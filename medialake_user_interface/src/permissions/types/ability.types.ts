@@ -2,7 +2,7 @@
 import {
   Ability,
   AbilityBuilder,
-  AbilityClass,
+  // AbilityClass,
   MongoQuery,
   RawRuleOf,
 } from "@casl/ability";

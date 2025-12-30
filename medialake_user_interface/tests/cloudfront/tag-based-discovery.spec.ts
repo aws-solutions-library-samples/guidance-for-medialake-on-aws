@@ -9,10 +9,7 @@ import {
   expect,
   EnhancedCognitoUtils,
 } from "../fixtures/enhanced-cognito.fixtures";
-import {
-  test as cloudFrontTest,
-  CloudFrontTestUtils,
-} from "../fixtures/cloudfront.fixtures";
+import { test as cloudFrontTest, CloudFrontTestUtils } from "../fixtures/cloudfront.fixtures";
 import { test as awsDiscoveryTest } from "../fixtures/aws-discovery.fixtures";
 import {
   ResourceDiscoveryEngine,
@@ -27,12 +24,7 @@ import {
   CloudFrontServiceAdapter,
   createCloudFrontServiceAdapter,
 } from "../utils/cloudfront-service-adapter.js";
-import {
-  TagFilter,
-  STANDARD_TAG_PATTERNS,
-  TagMatcher,
-  AWSTag,
-} from "../utils/tag-matcher.js";
+import { TagFilter, STANDARD_TAG_PATTERNS, TagMatcher, AWSTag } from "../utils/tag-matcher.js";
 
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 const AWS_PROFILE = process.env.AWS_PROFILE || "default";
@@ -98,19 +90,17 @@ function validateTagFilter(filter: TagFilter): boolean {
  */
 async function testTagMatching(
   resourceTags: Record<string, string>,
-  filters: TagFilter[],
+  filters: TagFilter[]
 ): Promise<{
   matches: boolean;
   matchedFilters: string[];
   unmatchedFilters: string[];
 }> {
   // Convert record to AWS tag format
-  const awsTags: AWSTag[] = Object.entries(resourceTags).map(
-    ([key, value]) => ({
-      Key: key,
-      Value: value,
-    }),
-  );
+  const awsTags: AWSTag[] = Object.entries(resourceTags).map(([key, value]) => ({
+    Key: key,
+    Value: value,
+  }));
 
   const matchedFilters: string[] = [];
   const unmatchedFilters: string[] = [];
@@ -136,13 +126,11 @@ const tagDiscoveryTest = awsDiscoveryTest.extend<TagDiscoveryFixtures>({
   /**
    * Tag discovery engine fixture
    */
-  tagDiscoveryEngine: async ({}, use, testInfo) => {
+  tagDiscoveryEngine: async (_fixtures, use, testInfo) => {
     const config = createTagDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
-    console.log(
-      `[TagDiscovery Worker ${testInfo.workerIndex}] Initializing tag discovery engine`,
-    );
+    console.log(`[TagDiscovery Worker ${testInfo.workerIndex}] Initializing tag discovery engine`);
 
     await use(engine);
 
@@ -190,31 +178,22 @@ const tagDiscoveryTest = awsDiscoveryTest.extend<TagDiscoveryFixtures>({
 
 // Tag filter validation tests
 tagDiscoveryTest.describe("Tag Filter Validation", () => {
-  tagDiscoveryTest(
-    "should validate standard tag patterns",
-    async ({ standardTagFilters }) => {
-      // Validate all standard tag filters
-      for (const filter of standardTagFilters) {
-        expect(validateTagFilter(filter)).toBe(true);
-        expect(filter.key).toBeTruthy();
-        expect(filter.values.length).toBeGreaterThan(0);
-        expect(["equals", "contains", "starts-with"]).toContain(
-          filter.operator,
-        );
-      }
+  tagDiscoveryTest("should validate standard tag patterns", async ({ standardTagFilters }) => {
+    // Validate all standard tag filters
+    for (const filter of standardTagFilters) {
+      expect(validateTagFilter(filter)).toBe(true);
+      expect(filter.key).toBeTruthy();
+      expect(filter.values.length).toBeGreaterThan(0);
+      expect(["equals", "contains", "starts-with"]).toContain(filter.operator);
+    }
 
-      // Validate specific standard patterns
-      const applicationFilter = standardTagFilters.find(
-        (f) => f.key === "Application",
-      );
-      expect(applicationFilter).toBeTruthy();
-      expect(applicationFilter!.values).toContain("medialake");
+    // Validate specific standard patterns
+    const applicationFilter = standardTagFilters.find((f) => f.key === "Application");
+    expect(applicationFilter).toBeTruthy();
+    expect(applicationFilter!.values).toContain("medialake");
 
-      console.log(
-        `[Test] Validated ${standardTagFilters.length} standard tag filters`,
-      );
-    },
-  );
+    console.log(`[Test] Validated ${standardTagFilters.length} standard tag filters`);
+  });
 
   tagDiscoveryTest("should create custom tag filters correctly", async () => {
     // Test enhanced Cognito utils
@@ -224,8 +203,7 @@ tagDiscoveryTest.describe("Tag Filter Validation", () => {
       Owner: "test-team",
     };
 
-    const customFilters =
-      EnhancedCognitoUtils.createCustomTagFilters(customTags);
+    const customFilters = EnhancedCognitoUtils.createCustomTagFilters(customTags);
 
     expect(customFilters).toHaveLength(3);
 
@@ -234,8 +212,7 @@ tagDiscoveryTest.describe("Tag Filter Validation", () => {
     }
 
     // Test CloudFront utils
-    const cloudFrontCustomFilters =
-      CloudFrontTestUtils.createCustomTagFilters(customTags);
+    const cloudFrontCustomFilters = CloudFrontTestUtils.createCustomTagFilters(customTags);
 
     expect(cloudFrontCustomFilters).toHaveLength(3);
     expect(cloudFrontCustomFilters).toEqual(customFilters);
@@ -267,7 +244,7 @@ tagDiscoveryTest.describe("Tag Filter Validation", () => {
     expect(matchResult.unmatchedFilters).toContain("NonExistent");
 
     console.log(
-      `[Test] Tag matching: ${matchResult.matchedFilters.length} matched, ${matchResult.unmatchedFilters.length} unmatched`,
+      `[Test] Tag matching: ${matchResult.matchedFilters.length} matched, ${matchResult.unmatchedFilters.length} unmatched`
     );
   });
 });
@@ -283,9 +260,7 @@ enhancedCognitoTest.describe("Cognito Tag-Based Discovery Validation", () => {
 
       // Test discovery method preference
       const preferredMethods = ["tag-based", "name-based", "fallback"];
-      expect(preferredMethods).toContain(
-        enhancedCognitoTestUser.discoveryMethod,
-      );
+      expect(preferredMethods).toContain(enhancedCognitoTestUser.discoveryMethod);
 
       // If tag-based discovery was used, validate tags
       if (
@@ -293,28 +268,26 @@ enhancedCognitoTest.describe("Cognito Tag-Based Discovery Validation", () => {
         enhancedCognitoTestUser.userPool
       ) {
         expect(enhancedCognitoTestUser.userPool.tags).toBeTruthy();
-        expect(enhancedCognitoTestUser.userPool.tags!["Application"]).toBe(
-          "medialake",
-        );
+        expect(enhancedCognitoTestUser.userPool.tags!["Application"]).toBe("medialake");
       }
 
       // Test discovery engine cache
       const tagFilters = [STANDARD_TAG_PATTERNS.APPLICATION_TAG];
       const cachedResults = await cognitoDiscoveryEngine.discoverByTags(
         "cognito-user-pool",
-        tagFilters,
+        tagFilters
       );
 
       expect(cachedResults).toBeDefined();
       expect(Array.isArray(cachedResults)).toBe(true);
 
+      console.log(`[Test] Cognito discovery method: ${enhancedCognitoTestUser.discoveryMethod}`);
       console.log(
-        `[Test] Cognito discovery method: ${enhancedCognitoTestUser.discoveryMethod}`,
+        `[Test] User pool: ${
+          enhancedCognitoTestUser.userPool?.name || enhancedCognitoTestUser.userPoolId
+        }`
       );
-      console.log(
-        `[Test] User pool: ${enhancedCognitoTestUser.userPool?.name || enhancedCognitoTestUser.userPoolId}`,
-      );
-    },
+    }
   );
 
   enhancedCognitoTest(
@@ -323,21 +296,19 @@ enhancedCognitoTest.describe("Cognito Tag-Based Discovery Validation", () => {
       // Test utility function for discovery method validation
       const isTagBased = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "tag-based",
+        "tag-based"
       );
       const isNameBased = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "name-based",
+        "name-based"
       );
       const isFallback = EnhancedCognitoUtils.validateDiscoveryMethod(
         enhancedCognitoTestUser,
-        "fallback",
+        "fallback"
       );
 
       // Exactly one should be true
-      const trueCount = [isTagBased, isNameBased, isFallback].filter(
-        Boolean,
-      ).length;
+      const trueCount = [isTagBased, isNameBased, isFallback].filter(Boolean).length;
       expect(trueCount).toBe(1);
 
       // Validate that the correct method is identified
@@ -360,9 +331,9 @@ enhancedCognitoTest.describe("Cognito Tag-Based Discovery Validation", () => {
       }
 
       console.log(
-        `[Test] Discovery method validation passed: ${enhancedCognitoTestUser.discoveryMethod}`,
+        `[Test] Discovery method validation passed: ${enhancedCognitoTestUser.discoveryMethod}`
       );
-    },
+    }
   );
 
   enhancedCognitoTest(
@@ -378,23 +349,18 @@ enhancedCognitoTest.describe("Cognito Tag-Based Discovery Validation", () => {
       ];
 
       try {
-        const fallbackResults =
-          await cognitoServiceAdapter.fallbackDiscovery(testTagFilters);
+        const fallbackResults = await cognitoServiceAdapter.fallbackDiscovery(testTagFilters);
 
         // Fallback should either return results or empty array, not throw
         expect(Array.isArray(fallbackResults)).toBe(true);
 
-        console.log(
-          `[Test] Fallback discovery returned ${fallbackResults.length} results`,
-        );
+        console.log(`[Test] Fallback discovery returned ${fallbackResults.length} results`);
       } catch (error) {
         // If fallback throws, it should be a meaningful error
         expect(error).toBeInstanceOf(Error);
-        console.log(
-          `[Test] Fallback discovery failed as expected: ${(error as Error).message}`,
-        );
+        console.log(`[Test] Fallback discovery failed as expected: ${(error as Error).message}`);
       }
-    },
+    }
   );
 });
 
@@ -408,43 +374,35 @@ cloudFrontTest.describe("CloudFront Tag-Based Discovery Validation", () => {
       expect(cloudFrontContext.discoveryMethod).toBeTruthy();
 
       // Test discovery method
-      expect(["tag-based", "fallback"]).toContain(
-        cloudFrontContext.discoveryMethod,
-      );
+      expect(["tag-based", "fallback"]).toContain(cloudFrontContext.discoveryMethod);
 
       // If tag-based discovery was used, validate tags
       if (cloudFrontContext.discoveryMethod === "tag-based") {
         expect(cloudFrontContext.distribution.tags).toBeTruthy();
-        expect(cloudFrontContext.distribution.tags!["Application"]).toBe(
-          "medialake",
-        );
+        expect(cloudFrontContext.distribution.tags!["Application"]).toBe("medialake");
       }
 
       // Test discovery engine functionality
       const tagFilters = [STANDARD_TAG_PATTERNS.APPLICATION_TAG];
-      const discoveredDistributions =
-        await cloudFrontDiscoveryEngine.discoverByTags(
-          "cloudfront-distribution",
-          tagFilters,
-        );
+      const discoveredDistributions = await cloudFrontDiscoveryEngine.discoverByTags(
+        "cloudfront-distribution",
+        tagFilters
+      );
 
       expect(discoveredDistributions).toBeDefined();
       expect(Array.isArray(discoveredDistributions)).toBe(true);
 
+      console.log(`[Test] CloudFront discovery method: ${cloudFrontContext.discoveryMethod}`);
       console.log(
-        `[Test] CloudFront discovery method: ${cloudFrontContext.discoveryMethod}`,
+        `[Test] Distribution: ${cloudFrontContext.distribution.name} (${cloudFrontContext.distribution.id})`
       );
-      console.log(
-        `[Test] Distribution: ${cloudFrontContext.distribution.name} (${cloudFrontContext.distribution.id})`,
-      );
-    },
+    }
   );
 
   cloudFrontTest(
     "should validate distribution information structure",
     async ({ cloudFrontContext }) => {
-      const distributionInfo =
-        CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
+      const distributionInfo = CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
 
       // Validate required fields
       expect(distributionInfo.id).toBeTruthy();
@@ -457,9 +415,7 @@ cloudFrontTest.describe("CloudFront Tag-Based Discovery Validation", () => {
       expect(typeof distributionInfo.id).toBe("string");
       expect(typeof distributionInfo.name).toBe("string");
       expect(typeof distributionInfo.primaryDomain).toBe("string");
-      expect(["tag-based", "fallback"]).toContain(
-        distributionInfo.discoveryMethod,
-      );
+      expect(["tag-based", "fallback"]).toContain(distributionInfo.discoveryMethod);
       expect(Array.isArray(distributionInfo.aliases)).toBe(true);
 
       // Validate test URLs structure
@@ -467,10 +423,8 @@ cloudFrontTest.describe("CloudFront Tag-Based Discovery Validation", () => {
       expect(distributionInfo.testUrls.healthCheck).toBeTruthy();
       expect(distributionInfo.testUrls.staticAsset).toBeTruthy();
 
-      console.log(
-        `[Test] Distribution info validation passed for: ${distributionInfo.name}`,
-      );
-    },
+      console.log(`[Test] Distribution info validation passed for: ${distributionInfo.name}`);
+    }
   );
 
   cloudFrontTest(
@@ -486,23 +440,22 @@ cloudFrontTest.describe("CloudFront Tag-Based Discovery Validation", () => {
       ];
 
       try {
-        const fallbackResults =
-          await cloudFrontServiceAdapter.fallbackDiscovery(testTagFilters);
+        const fallbackResults = await cloudFrontServiceAdapter.fallbackDiscovery(testTagFilters);
 
         // Fallback should return array (empty or with results)
         expect(Array.isArray(fallbackResults)).toBe(true);
 
         console.log(
-          `[Test] CloudFront fallback discovery returned ${fallbackResults.length} results`,
+          `[Test] CloudFront fallback discovery returned ${fallbackResults.length} results`
         );
       } catch (error) {
         // If fallback throws, validate error handling
         expect(error).toBeInstanceOf(Error);
         console.log(
-          `[Test] CloudFront fallback discovery failed as expected: ${(error as Error).message}`,
+          `[Test] CloudFront fallback discovery failed as expected: ${(error as Error).message}`
         );
       }
-    },
+    }
   );
 });
 
@@ -510,12 +463,7 @@ cloudFrontTest.describe("CloudFront Tag-Based Discovery Validation", () => {
 tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
   tagDiscoveryTest(
     "should coordinate discovery across multiple services",
-    async ({
-      tagDiscoveryEngine,
-      cognitoTagAdapter,
-      cloudFrontTagAdapter,
-      standardTagFilters,
-    }) => {
+    async ({ tagDiscoveryEngine, cognitoTagAdapter, cloudFrontTagAdapter, standardTagFilters }) => {
       // Test that both adapters are registered
       expect(cognitoTagAdapter).toBeTruthy();
       expect(cloudFrontTagAdapter).toBeTruthy();
@@ -523,20 +471,20 @@ tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
       // Test discovery across both services
       const cognitoResults = await tagDiscoveryEngine.discoverByTags(
         "cognito-user-pool",
-        standardTagFilters,
+        standardTagFilters
       );
       const cloudFrontResults = await tagDiscoveryEngine.discoverByTags(
         "cloudfront-distribution",
-        standardTagFilters,
+        standardTagFilters
       );
 
       expect(Array.isArray(cognitoResults)).toBe(true);
       expect(Array.isArray(cloudFrontResults)).toBe(true);
 
       console.log(
-        `[Test] Integrated discovery - Cognito: ${cognitoResults.length}, CloudFront: ${cloudFrontResults.length}`,
+        `[Test] Integrated discovery - Cognito: ${cognitoResults.length}, CloudFront: ${cloudFrontResults.length}`
       );
-    },
+    }
   );
 
   tagDiscoveryTest(
@@ -546,7 +494,7 @@ tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
       const startTime1 = Date.now();
       const results1 = await tagDiscoveryEngine.discoverByTags(
         "cognito-user-pool",
-        standardTagFilters,
+        standardTagFilters
       );
       const time1 = Date.now() - startTime1;
 
@@ -554,7 +502,7 @@ tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
       const startTime2 = Date.now();
       const results2 = await tagDiscoveryEngine.discoverByTags(
         "cognito-user-pool",
-        standardTagFilters,
+        standardTagFilters
       );
       const time2 = Date.now() - startTime2;
 
@@ -564,10 +512,8 @@ tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
       // Second call should be faster (cached)
       expect(time2).toBeLessThanOrEqual(time1);
 
-      console.log(
-        `[Test] Discovery caching - First: ${time1}ms, Second: ${time2}ms`,
-      );
-    },
+      console.log(`[Test] Discovery caching - First: ${time1}ms, Second: ${time2}ms`);
+    }
   );
 
   tagDiscoveryTest(
@@ -580,21 +526,19 @@ tagDiscoveryTest.describe("Integrated Tag Discovery System", () => {
       } catch (error) {
         // Prefetching might fail in test environment, which is acceptable
         console.log(
-          `[Test] Resource prefetching failed (expected in test): ${(error as Error).message}`,
+          `[Test] Resource prefetching failed (expected in test): ${(error as Error).message}`
         );
       }
 
       // Test that discovery still works after prefetch attempt
       const results = await tagDiscoveryEngine.discoverByTags(
         "cognito-user-pool",
-        standardTagFilters,
+        standardTagFilters
       );
       expect(Array.isArray(results)).toBe(true);
 
-      console.log(
-        `[Test] Post-prefetch discovery returned ${results.length} results`,
-      );
-    },
+      console.log(`[Test] Post-prefetch discovery returned ${results.length} results`);
+    }
   );
 });
 
@@ -615,22 +559,16 @@ tagDiscoveryTest.describe("Tag Discovery Error Handling", () => {
 
       for (const invalidFilter of invalidFilters) {
         try {
-          await tagDiscoveryEngine.discoverByTags("cognito-user-pool", [
-            invalidFilter,
-          ]);
+          await tagDiscoveryEngine.discoverByTags("cognito-user-pool", [invalidFilter]);
           // If it doesn't throw, that's also acceptable (graceful handling)
-          console.log(
-            `[Test] Invalid filter handled gracefully: ${invalidFilter.key}`,
-          );
+          console.log(`[Test] Invalid filter handled gracefully: ${invalidFilter.key}`);
         } catch (error) {
           // Expected to throw for invalid filters
           expect(error).toBeInstanceOf(Error);
-          console.log(
-            `[Test] Invalid filter rejected as expected: ${(error as Error).message}`,
-          );
+          console.log(`[Test] Invalid filter rejected as expected: ${(error as Error).message}`);
         }
       }
-    },
+    }
   );
 
   tagDiscoveryTest(
@@ -642,20 +580,16 @@ tagDiscoveryTest.describe("Tag Discovery Error Handling", () => {
       try {
         const results = await tagDiscoveryEngine.discoverByTags(
           "cognito-user-pool",
-          standardTagFilters,
+          standardTagFilters
         );
         expect(Array.isArray(results)).toBe(true);
-        console.log(
-          `[Test] AWS API calls successful, returned ${results.length} results`,
-        );
+        console.log(`[Test] AWS API calls successful, returned ${results.length} results`);
       } catch (error) {
         // If AWS API calls fail, validate error handling
         expect(error).toBeInstanceOf(Error);
-        console.log(
-          `[Test] AWS API error handled: ${(error as Error).message}`,
-        );
+        console.log(`[Test] AWS API error handled: ${(error as Error).message}`);
       }
-    },
+    }
   );
 
   tagDiscoveryTest(
@@ -671,7 +605,7 @@ tagDiscoveryTest.describe("Tag Discovery Error Handling", () => {
       await expect(cloudFrontTagAdapter.cleanup()).resolves.not.toThrow();
 
       console.log("[Test] Resource cleanup validation passed");
-    },
+    }
   );
 });
 

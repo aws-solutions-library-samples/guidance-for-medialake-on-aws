@@ -23,10 +23,7 @@
 import { expect } from "@playwright/test";
 import { Page } from "@playwright/test";
 import { test as enhancedCognitoBase } from "../fixtures/enhanced-cognito.fixtures";
-import {
-  CloudFrontTestContext,
-  CloudFrontTestUtils,
-} from "../fixtures/cloudfront.fixtures";
+import { CloudFrontTestContext, CloudFrontTestUtils } from "../fixtures/cloudfront.fixtures";
 import {
   EnhancedCognitoTestUser,
   EnhancedCognitoUtils,
@@ -73,9 +70,7 @@ const test = enhancedCognitoBase.extend<{
       const { createCloudFrontServiceAdapter } = await import(
         "../utils/cloudfront-service-adapter"
       );
-      const { createResourceDiscoveryEngine } = await import(
-        "../utils/aws-resource-finder"
-      );
+      const { createResourceDiscoveryEngine } = await import("../utils/aws-resource-finder");
       const { STANDARD_TAG_PATTERNS } = await import("../utils/tag-matcher");
       console.log(`[E2E Test] CloudFront utilities imported successfully`);
 
@@ -88,22 +83,14 @@ const test = enhancedCognitoBase.extend<{
         maxCacheSize: 50,
         enableFallback: true,
       };
-      console.log(
-        `[E2E Test] Configuration created:`,
-        JSON.stringify(config, null, 2),
-      );
+      console.log(`[E2E Test] Configuration created:`, JSON.stringify(config, null, 2));
 
       // Create discovery engine and adapter
       console.log(`[E2E Test] Creating discovery engine and adapter...`);
-      const discoveryEngine = createResourceDiscoveryEngine(
-        config,
-        testInfo.workerIndex,
-      );
+      const discoveryEngine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
       const cloudFrontAdapter = createCloudFrontServiceAdapter(config);
       discoveryEngine.registerAdapter(cloudFrontAdapter);
-      console.log(
-        `[E2E Test] Discovery engine and adapter created successfully`,
-      );
+      console.log(`[E2E Test] Discovery engine and adapter created successfully`);
 
       // Discover CloudFront distribution
       console.log(`[E2E Test] Starting CloudFront distribution discovery...`);
@@ -116,28 +103,20 @@ const test = enhancedCognitoBase.extend<{
         },
         STANDARD_TAG_PATTERNS.TESTING_TAG,
       ];
-      console.log(
-        `[E2E Test] Tag filters:`,
-        JSON.stringify(tagFilters, null, 2),
-      );
+      console.log(`[E2E Test] Tag filters:`, JSON.stringify(tagFilters, null, 2));
 
       console.log(`[E2E Test] Calling discoveryEngine.discoverByTags...`);
       const distributions = (await Promise.race([
         discoveryEngine.discoverByTags("cloudfront-distribution", tagFilters),
         new Promise((_, reject) =>
           setTimeout(
-            () =>
-              reject(
-                new Error("CloudFront discovery timeout after 60 seconds"),
-              ),
-            60000,
-          ),
+            () => reject(new Error("CloudFront discovery timeout after 60 seconds")),
+            60000
+          )
         ),
       ])) as any[];
 
-      console.log(
-        `[E2E Test] Discovery completed. Found ${distributions.length} distributions`,
-      );
+      console.log(`[E2E Test] Discovery completed. Found ${distributions.length} distributions`);
 
       if (distributions.length === 0) {
         throw new Error("No CloudFront distribution found");
@@ -147,9 +126,7 @@ const test = enhancedCognitoBase.extend<{
       console.log(`[E2E Test] Using distribution:`, distribution.id);
 
       const primaryDomain =
-        distribution.aliases.length > 0
-          ? distribution.aliases[0]
-          : distribution.domainName;
+        distribution.aliases.length > 0 ? distribution.aliases[0] : distribution.domainName;
       console.log(`[E2E Test] Primary domain:`, primaryDomain);
 
       const testUrls = {
@@ -185,9 +162,7 @@ const test = enhancedCognitoBase.extend<{
    */
   userLifecycleContext: [
     async ({ enhancedCognitoTestUser, cloudFrontContext }, use, testInfo) => {
-      console.log(
-        `[E2E Test ${testInfo.title}] Setting up user lifecycle context`,
-      );
+      console.log(`[E2E Test ${testInfo.title}] Setting up user lifecycle context`);
       console.log(`[E2E Test] Enhanced Cognito user received:`, {
         username: enhancedCognitoTestUser.username,
         userPoolId: enhancedCognitoTestUser.userPoolId,
@@ -221,19 +196,13 @@ const test = enhancedCognitoBase.extend<{
       };
 
       console.log(`[E2E Test ${testInfo.title}] User lifecycle context ready`);
-      console.log(
-        `[E2E Test] Primary user: ${enhancedCognitoTestUser.username}`,
-      );
-      console.log(
-        `[E2E Test] CloudFront domain: ${cloudFrontContext.primaryDomain}`,
-      );
+      console.log(`[E2E Test] Primary user: ${enhancedCognitoTestUser.username}`);
+      console.log(`[E2E Test] CloudFront domain: ${cloudFrontContext.primaryDomain}`);
       console.log(`[E2E Test] Test users to create: ${testUsers.length}`);
 
       await use(context);
 
-      console.log(
-        `[E2E Test ${testInfo.title}] User lifecycle context cleanup completed`,
-      );
+      console.log(`[E2E Test ${testInfo.title}] User lifecycle context cleanup completed`);
     },
     { scope: "test" },
   ],
@@ -260,9 +229,7 @@ class UserManagementHelper {
     await this.page.waitForLoadState("networkidle");
 
     // Verify we're on the user management page
-    await expect(
-      this.page.getByRole("button", { name: "Add User" }),
-    ).toBeVisible({
+    await expect(this.page.getByRole("button", { name: "Add User" })).toBeVisible({
       timeout: 10000,
     });
 
@@ -281,27 +248,17 @@ class UserManagementHelper {
 
     // Fill in First Name - following exact recorded steps
     await this.page.getByRole("textbox", { name: "First Name" }).click();
-    await this.page
-      .getByRole("textbox", { name: "First Name" })
-      .fill(userData.firstName);
+    await this.page.getByRole("textbox", { name: "First Name" }).fill(userData.firstName);
     await this.page.getByRole("textbox", { name: "First Name" }).press("Tab");
-    await this.page
-      .getByRole("button", { name: "Enter the user's first name" })
-      .press("Tab");
+    await this.page.getByRole("button", { name: "Enter the user's first name" }).press("Tab");
 
     // Fill in Last Name
-    await this.page
-      .getByRole("textbox", { name: "Last Name" })
-      .fill(userData.lastName);
+    await this.page.getByRole("textbox", { name: "Last Name" }).fill(userData.lastName);
     await this.page.getByRole("textbox", { name: "Last Name" }).press("Tab");
-    await this.page
-      .getByRole("button", { name: "Enter the user's last name" })
-      .press("Tab");
+    await this.page.getByRole("button", { name: "Enter the user's last name" }).press("Tab");
 
     // Fill in Email
-    await this.page
-      .getByRole("textbox", { name: "Email" })
-      .fill(userData.email);
+    await this.page.getByRole("textbox", { name: "Email" }).fill(userData.email);
     await this.page.getByRole("textbox", { name: "Email" }).press("Tab");
 
     // Select role - for this test, always select "Editor" as requested
@@ -316,9 +273,7 @@ class UserManagementHelper {
     // Instead of clicking a generic button, wait for the form to close or success message
     await this.page.waitForTimeout(3000); // Wait for user creation to complete and form to close
 
-    console.log(
-      `[UserManagement] Successfully created user: ${userData.email}`,
-    );
+    console.log(`[UserManagement] Successfully created user: ${userData.email}`);
   }
 
   /**
@@ -333,9 +288,7 @@ class UserManagementHelper {
 
     // For this implementation, we'll verify the user exists and can be found
     // In a real implementation, you would click an edit button and update fields
-    console.log(
-      `[UserManagement] User ${originalEmail} found and ready for updates`,
-    );
+    console.log(`[UserManagement] User ${originalEmail} found and ready for updates`);
 
     // Note: Actual edit functionality would depend on the UI implementation
     // This is a placeholder for the update operation
@@ -414,7 +367,7 @@ class UserManagementHelper {
 async function withErrorHandling<T>(
   operation: () => Promise<T>,
   context: string,
-  retries: number = 2,
+  retries: number = 2
 ): Promise<T> {
   let lastError: Error;
 
@@ -434,7 +387,7 @@ async function withErrorHandling<T>(
   }
 
   throw new Error(
-    `[${context}] Operation failed after ${retries + 1} attempts: ${lastError!.message}`,
+    `[${context}] Operation failed after ${retries + 1} attempts: ${lastError!.message}`
   );
 }
 
@@ -445,10 +398,10 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
   test.beforeEach(async ({ userLifecycleContext }) => {
     console.log("[E2E Suite] Starting comprehensive user lifecycle test");
     console.log(
-      `[E2E Suite] CloudFront discovery method: ${userLifecycleContext.cloudFrontContext.discoveryMethod}`,
+      `[E2E Suite] CloudFront discovery method: ${userLifecycleContext.cloudFrontContext.discoveryMethod}`
     );
     console.log(
-      `[E2E Suite] Cognito discovery method: ${userLifecycleContext.enhancedCognitoUser.discoveryMethod}`,
+      `[E2E Suite] Cognito discovery method: ${userLifecycleContext.enhancedCognitoUser.discoveryMethod}`
     );
   });
 
@@ -457,38 +410,31 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
     userLifecycleContext,
   }) => {
     test.setTimeout(120000); // Set test timeout to 2 minutes
-    const { cloudFrontContext, enhancedCognitoUser, testUsers } =
-      userLifecycleContext;
+    const { cloudFrontContext, enhancedCognitoUser, testUsers } = userLifecycleContext;
     const userManager = new UserManagementHelper(page);
 
     console.log("[E2E Test] Starting comprehensive user lifecycle test");
 
     // Step 1: Test CloudFront distribution accessibility
-    console.log(
-      "[E2E Test] Step 1: Testing CloudFront distribution accessibility",
-    );
+    console.log("[E2E Test] Step 1: Testing CloudFront distribution accessibility");
 
     await withErrorHandling(async () => {
       const testResults = await CloudFrontTestUtils.testDistributionAccess(
         page,
-        cloudFrontContext.testUrls,
+        cloudFrontContext.testUrls
       );
 
       // Verify at least the root URL is accessible
-      const rootResult = testResults.find(
-        (r) => r.url === cloudFrontContext.testUrls.root,
-      );
+      const rootResult = testResults.find((r) => r.url === cloudFrontContext.testUrls.root);
       expect(rootResult?.success).toBe(true);
 
       console.log(
-        `[E2E Test] CloudFront accessibility verified: ${cloudFrontContext.primaryDomain}`,
+        `[E2E Test] CloudFront accessibility verified: ${cloudFrontContext.primaryDomain}`
       );
     }, "CloudFront Accessibility Test");
 
     // Step 2: Navigate to the discovered CloudFront URL and login
-    console.log(
-      "[E2E Test] Step 2: Navigating to CloudFront URL and logging in",
-    );
+    console.log("[E2E Test] Step 2: Navigating to CloudFront URL and logging in");
 
     await withErrorHandling(async () => {
       const loginUrl = `${cloudFrontContext.testUrls.root}/sign-in`;
@@ -502,9 +448,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
           timeout: 60000,
         });
 
-        console.log(
-          `[E2E Test] Page loaded with status: ${response?.status()}`,
-        );
+        console.log(`[E2E Test] Page loaded with status: ${response?.status()}`);
         console.log(`[E2E Test] Final URL: ${page.url()}`);
 
         // Check page title
@@ -539,9 +483,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
         await page.waitForTimeout(2000);
 
         console.log(`[E2E Test] Post-login URL: ${page.url()}`);
-        console.log(
-          `[E2E Test] Successfully logged in as: ${enhancedCognitoUser.username}`,
-        );
+        console.log(`[E2E Test] Successfully logged in as: ${enhancedCognitoUser.username}`);
       } catch (error) {
         // Enhanced error reporting
         console.error(`[E2E Test] Login failed at URL: ${page.url()}`);
@@ -549,9 +491,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
         // Capture page content for debugging
         const content = await page.content();
-        console.error(
-          `[E2E Test] Page HTML length: ${content.length} characters`,
-        );
+        console.error(`[E2E Test] Page HTML length: ${content.length} characters`);
 
         // Take screenshot for debugging
         await page.screenshot({ path: "login-failure.png", fullPage: true });
@@ -595,9 +535,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
     await withErrorHandling(async () => {
       const firstUser = testUsers[0];
       await userManager.updateUser(firstUser.email);
-      console.log(
-        `[E2E Test] User update demonstrated for: ${firstUser.email}`,
-      );
+      console.log(`[E2E Test] User update demonstrated for: ${firstUser.email}`);
     }, "User Update");
 
     // Step 7: Get all visible users for verification
@@ -607,9 +545,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
       return await userManager.getAllVisibleUsers();
     }, "Get All Users");
 
-    console.log(
-      `[E2E Test] Found ${allUsers.length} total users in the system`,
-    );
+    console.log(`[E2E Test] Found ${allUsers.length} total users in the system`);
 
     // Step 8: Delete test users (cleanup through UI)
     console.log("[E2E Test] Step 8: Deleting test users through UI");
@@ -618,12 +554,10 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
       await withErrorHandling(
         async () => {
           await userManager.deleteUser(userData.email);
-          console.log(
-            `[E2E Test] Successfully deleted user: ${userData.email}`,
-          );
+          console.log(`[E2E Test] Successfully deleted user: ${userData.email}`);
         },
         `Delete User ${userData.email}`,
-        1,
+        1
       ); // Only 1 retry for deletion
     }
 
@@ -638,9 +572,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
       }
     }, "User Deletion Verification");
 
-    console.log(
-      "[E2E Test] Comprehensive user lifecycle test completed successfully!",
-    );
+    console.log("[E2E Test] Comprehensive user lifecycle test completed successfully!");
   });
 
   test("should handle AWS resource discovery failures gracefully", async ({
@@ -649,17 +581,11 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
   }) => {
     const { cloudFrontContext, enhancedCognitoUser } = userLifecycleContext;
 
-    console.log(
-      "[E2E Test] Testing graceful handling of AWS resource discovery",
-    );
+    console.log("[E2E Test] Testing graceful handling of AWS resource discovery");
 
     // Test that we can still function even if some AWS resources are not optimal
-    console.log(
-      `[E2E Test] CloudFront discovery method: ${cloudFrontContext.discoveryMethod}`,
-    );
-    console.log(
-      `[E2E Test] Cognito discovery method: ${enhancedCognitoUser.discoveryMethod}`,
-    );
+    console.log(`[E2E Test] CloudFront discovery method: ${cloudFrontContext.discoveryMethod}`);
+    console.log(`[E2E Test] Cognito discovery method: ${enhancedCognitoUser.discoveryMethod}`);
 
     // Verify that regardless of discovery method, we have working resources
     expect(cloudFrontContext.distribution).toBeDefined();
@@ -689,9 +615,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
     // Give the page a moment to fully render after login
     await page.waitForTimeout(2000);
 
-    console.log(
-      "[E2E Test] Successfully handled AWS resource discovery and login",
-    );
+    console.log("[E2E Test] Successfully handled AWS resource discovery and login");
   });
 
   test("should demonstrate parallel execution safety", async ({
@@ -699,9 +623,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
   }, testInfo) => {
     const { enhancedCognitoUser } = userLifecycleContext;
 
-    console.log(
-      `[E2E Test Worker ${testInfo.workerIndex}] Testing parallel execution safety`,
-    );
+    console.log(`[E2E Test Worker ${testInfo.workerIndex}] Testing parallel execution safety`);
 
     // Verify that each worker has unique resources
     expect(enhancedCognitoUser.username).toContain(`-${testInfo.workerIndex}-`);
@@ -711,11 +633,9 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
       expect(userData.email).toContain(`-${testInfo.workerIndex}-`);
     }
 
+    console.log(`[E2E Test Worker ${testInfo.workerIndex}] Parallel execution safety verified`);
     console.log(
-      `[E2E Test Worker ${testInfo.workerIndex}] Parallel execution safety verified`,
-    );
-    console.log(
-      `[E2E Test Worker ${testInfo.workerIndex}] Unique user: ${enhancedCognitoUser.username}`,
+      `[E2E Test Worker ${testInfo.workerIndex}] Unique user: ${enhancedCognitoUser.username}`
     );
   });
 
@@ -724,9 +644,7 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
 
     // Log test results
     console.log(`[E2E Test] Test status: ${testInfo.status}`);
-    console.log(
-      `[E2E Test] Created users: ${userLifecycleContext.createdUserEmails.length}`,
-    );
+    console.log(`[E2E Test] Created users: ${userLifecycleContext.createdUserEmails.length}`);
 
     if (testInfo.status !== "passed") {
       console.error(`[E2E Test] Test failed: ${testInfo.error?.message}`);
@@ -741,28 +659,18 @@ test.describe("Comprehensive User Lifecycle E2E with AWS Discovery", () => {
  * Utility test for debugging AWS resource discovery
  */
 test.describe("AWS Resource Discovery Debug", () => {
-  test("should provide detailed AWS resource information", async ({
-    userLifecycleContext,
-  }) => {
+  test("should provide detailed AWS resource information", async ({ userLifecycleContext }) => {
     const { cloudFrontContext, enhancedCognitoUser } = userLifecycleContext;
 
     console.log("=== AWS Resource Discovery Debug Information ===");
 
     // CloudFront information
-    const cloudFrontInfo =
-      CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
-    console.log(
-      "CloudFront Distribution Info:",
-      JSON.stringify(cloudFrontInfo, null, 2),
-    );
+    const cloudFrontInfo = CloudFrontTestUtils.getDistributionInfo(cloudFrontContext);
+    console.log("CloudFront Distribution Info:", JSON.stringify(cloudFrontInfo, null, 2));
 
     // Cognito information
-    const cognitoInfo =
-      EnhancedCognitoUtils.getUserPoolInfo(enhancedCognitoUser);
-    console.log(
-      "Cognito User Pool Info:",
-      JSON.stringify(cognitoInfo, null, 2),
-    );
+    const cognitoInfo = EnhancedCognitoUtils.getUserPoolInfo(enhancedCognitoUser);
+    console.log("Cognito User Pool Info:", JSON.stringify(cognitoInfo, null, 2));
 
     // Environment information
     console.log("Environment Configuration:", {

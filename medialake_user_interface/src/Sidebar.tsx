@@ -37,7 +37,6 @@ import {
   Security as SecurityIcon,
   Home as HomeIcon,
   Extension as IntegrationIcon,
-  Cloud as EnvironmentIcon,
   Terrain as LogoIcon,
   Folder as FolderIcon,
 } from "@mui/icons-material";
@@ -76,11 +75,8 @@ function Sidebar() {
         }
       } catch (error) {
         console.error(
-          t(
-            "app.errors.loadingUserAttributes",
-            "Error loading user attributes:",
-          ),
-          error,
+          t("app.errors.loadingUserAttributes", "Error loading user attributes:"),
+          error
         );
       }
     };
@@ -116,13 +112,10 @@ function Sidebar() {
     return customTheme === "dark" ? "white" : theme.palette.text.secondary;
   };
 
-  const { ability, loading: permissionsLoading } = usePermission();
+  const { ability } = usePermission();
 
   // Feature flags
-  const advancedPermissionsEnabled = useFeatureFlag(
-    "advanced-permissions-enabled",
-    false,
-  );
+  const advancedPermissionsEnabled = useFeatureFlag("advanced-permissions-enabled", false);
 
   const canViewPipeline = useMemo(() => {
     try {
@@ -139,15 +132,12 @@ function Sidebar() {
       try {
         return ability?.can(action as any, resource as any) ?? false;
       } catch (error) {
-        console.error(
-          `Error checking ${action} permission on ${resource}:`,
-          error,
-        );
+        console.error(`Error checking ${action} permission on ${resource}:`, error);
         // During errors, default to false but log the error
         return false;
       }
     },
-    [ability],
+    [ability]
   );
 
   // Memoize permission checks with error handling
@@ -235,9 +225,7 @@ function Sidebar() {
           text: t("sidebar.submenu.permissionSets", "Permissions"),
           icon: <SecurityIcon />,
           path: "/settings/permission-sets",
-          visible:
-            advancedPermissionsEnabled &&
-            safePermissionCheck("view", "permission-set"),
+          visible: advancedPermissionsEnabled && safePermissionCheck("view", "permission-set"),
         },
         {
           text: t("sidebar.submenu.integrations"),
@@ -264,19 +252,16 @@ function Sidebar() {
     // Don't navigate if:
     // 1. We're already on this exact path, or
     // 2. We're on a sub-route of this path (except for root path '/')
-    if (
-      location.pathname === path ||
-      (path !== "/" && location.pathname.startsWith(path))
-    ) {
+    if (location.pathname === path || (path !== "/" && location.pathname.startsWith(path))) {
       console.log(
-        `${t("app.navigation.preventedDuplicate", "Prevented duplicate navigation to")} ${path}`,
+        `${t("app.navigation.preventedDuplicate", "Prevented duplicate navigation to")} ${path}`
       );
       return;
     }
 
     // Log navigation for debugging
     console.log(
-      `${t("app.navigation.navigating", "Navigating from")} ${location.pathname} to ${path}`,
+      `${t("app.navigation.navigating", "Navigating from")} ${location.pathname} to ${path}`
     );
     navigate(path);
   };
@@ -425,8 +410,7 @@ function Sidebar() {
                               justifyContent: "center",
                               px: 2.5,
                               backgroundColor:
-                                isActive(item.path || "") ||
-                                (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                                   ? `${theme.palette.primary.main}08`
                                   : "transparent",
                               "&:hover": {
@@ -441,7 +425,7 @@ function Sidebar() {
                                 justifyContent: "center",
                                 color: getIconColor(
                                   isActive(item.path || "") ||
-                                    (item.isExpandable && item.isExpanded),
+                                    (item.isExpandable && item.isExpanded)
                                 ),
                               }}
                             >
@@ -458,8 +442,7 @@ function Sidebar() {
                           }
                           sx={{
                             backgroundColor:
-                              isActive(item.path || "") ||
-                              (item.isExpandable && item.isExpanded)
+                              isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                                 ? `${theme.palette.primary.main}08`
                                 : "transparent",
                             "&:hover": {
@@ -482,8 +465,7 @@ function Sidebar() {
                           <ListItemIcon
                             sx={{
                               color: getIconColor(
-                                isActive(item.path || "") ||
-                                  (item.isExpandable && item.isExpanded),
+                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                               ),
                               minWidth: "40px",
                             }}
@@ -518,26 +500,17 @@ function Sidebar() {
                           {item.isExpandable && (
                             <Box
                               sx={{
-                                color:
-                                  customTheme === "dark" ? "white" : "inherit",
+                                color: customTheme === "dark" ? "white" : "inherit",
                               }}
                             >
-                              {item.isExpanded ? (
-                                <ExpandLess />
-                              ) : (
-                                <ExpandMore />
-                              )}
+                              {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
                             </Box>
                           )}
                         </ListItemButton>
                       )}
                     </ListItem>
                     {!isCollapsed && item.isExpandable && item.subItems && (
-                      <Collapse
-                        in={item.isExpanded}
-                        timeout="auto"
-                        unmountOnExit
-                      >
+                      <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
                           {item.subItems.map((subItem) => (
                             <ListItem key={subItem.text} disablePadding>
@@ -545,9 +518,7 @@ function Sidebar() {
                                 onClick={() => handleNavigation(subItem.path)}
                                 sx={{
                                   [isRTL ? "pr" : "pl"]: 6,
-                                  backgroundColor: isSettingsActive(
-                                    subItem.path,
-                                  )
+                                  backgroundColor: isSettingsActive(subItem.path)
                                     ? `${theme.palette.primary.main}08`
                                     : "transparent",
                                   "&:hover": {
@@ -564,16 +535,12 @@ function Sidebar() {
                                   mx: 1,
                                   borderRadius: "8px",
                                   flexDirection: "row",
-                                  justifyContent: isRTL
-                                    ? "flex-start"
-                                    : "flex-start",
+                                  justifyContent: isRTL ? "flex-start" : "flex-start",
                                 }}
                               >
                                 <ListItemIcon
                                   sx={{
-                                    color: getIconColor(
-                                      isSettingsActive(subItem.path),
-                                    ),
+                                    color: getIconColor(isSettingsActive(subItem.path)),
                                     minWidth: "40px",
                                   }}
                                 >
@@ -584,11 +551,7 @@ function Sidebar() {
                                     <Typography
                                       variant="body2"
                                       sx={{
-                                        fontWeight: isSettingsActive(
-                                          subItem.path,
-                                        )
-                                          ? 600
-                                          : 400,
+                                        fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
                                         color: isSettingsActive(subItem.path)
                                           ? theme.palette.primary.main
                                           : customTheme === "dark"
@@ -630,8 +593,7 @@ function Sidebar() {
                           justifyContent: "center",
                           px: 2.5,
                           backgroundColor:
-                            isActive(item.path || "") ||
-                            (item.isExpandable && item.isExpanded)
+                            isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                               ? `${theme.palette.primary.main}08`
                               : "transparent",
                           "&:hover": {
@@ -645,8 +607,7 @@ function Sidebar() {
                             mr: "auto",
                             justifyContent: "center",
                             color: getIconColor(
-                              isActive(item.path || "") ||
-                                (item.isExpandable && item.isExpanded),
+                              isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                             ),
                           }}
                         >
@@ -657,14 +618,11 @@ function Sidebar() {
                   ) : (
                     <ListItemButton
                       onClick={
-                        item.isExpandable
-                          ? item.onClick
-                          : () => handleNavigation(item.path || "/")
+                        item.isExpandable ? item.onClick : () => handleNavigation(item.path || "/")
                       }
                       sx={{
                         backgroundColor:
-                          isActive(item.path || "") ||
-                          (item.isExpandable && item.isExpanded)
+                          isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                             ? `${theme.palette.primary.main}08`
                             : "transparent",
                         "&:hover": {
@@ -687,8 +645,7 @@ function Sidebar() {
                       <ListItemIcon
                         sx={{
                           color: getIconColor(
-                            isActive(item.path || "") ||
-                              (item.isExpandable && item.isExpanded),
+                            isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                           ),
                           minWidth: "40px",
                         }}
@@ -701,13 +658,11 @@ function Sidebar() {
                             variant="body2"
                             sx={{
                               fontWeight:
-                                isActive(item.path || "") ||
-                                (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                                   ? 600
                                   : 400,
                               color:
-                                isActive(item.path || "") ||
-                                (item.isExpandable && item.isExpanded)
+                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
                                   ? theme.palette.primary.main
                                   : customTheme === "dark"
                                     ? "white"
@@ -766,16 +721,12 @@ function Sidebar() {
                                 mx: 1,
                                 borderRadius: "8px",
                                 flexDirection: "row",
-                                justifyContent: isRTL
-                                  ? "flex-start"
-                                  : "flex-start",
+                                justifyContent: isRTL ? "flex-start" : "flex-start",
                               }}
                             >
                               <ListItemIcon
                                 sx={{
-                                  color: getIconColor(
-                                    isSettingsActive(subItem.path),
-                                  ),
+                                  color: getIconColor(isSettingsActive(subItem.path)),
                                   minWidth: "40px",
                                 }}
                               >
@@ -786,9 +737,7 @@ function Sidebar() {
                                   <Typography
                                     variant="body2"
                                     sx={{
-                                      fontWeight: isSettingsActive(subItem.path)
-                                        ? 600
-                                        : 400,
+                                      fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
                                       color: isSettingsActive(subItem.path)
                                         ? theme.palette.primary.main
                                         : customTheme === "dark"
@@ -841,10 +790,7 @@ function Sidebar() {
             }}
           >
             {isCollapsed ? (
-              <Tooltip
-                title={userName || t("common.profile")}
-                placement="right"
-              >
+              <Tooltip title={userName || t("common.profile")} placement="right">
                 <IconButton
                   onClick={handleProfileClick}
                   sx={{
@@ -898,10 +844,7 @@ function Sidebar() {
                 <Typography
                   variant="body2"
                   sx={{
-                    color:
-                      customTheme === "dark"
-                        ? "white"
-                        : theme.palette.text.primary,
+                    color: customTheme === "dark" ? "white" : theme.palette.text.primary,
                     fontWeight: 500,
                   }}
                 >

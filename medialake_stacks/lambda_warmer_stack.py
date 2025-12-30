@@ -28,7 +28,7 @@ class LambdaWarmerStack(Stack):
             "WarmerLayer",
             code=lambda_.Code.from_asset("lambdas/layers/warmer"),
             # compatible_runtimes=[
-            #     lambda_.Runtime.PYTHON_3_9,
+            #     lambda_.Runtime.PYTHON_3_13,
             #     lambda_.Runtime.NODEJS_18_X,
             # ],
             description="Lambda Warmer Extension Layer",

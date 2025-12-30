@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -38,10 +38,7 @@ interface UseTableReturn<T> {
   setGlobalFilter: (value: string) => void;
   handleColumnMenuOpen: (event: React.MouseEvent<HTMLElement>) => void;
   handleColumnMenuClose: () => void;
-  handleFilterMenuOpen: (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => void;
+  handleFilterMenuOpen: (event: React.MouseEvent<HTMLElement>, columnId: string) => void;
   handleFilterMenuClose: () => void;
 }
 
@@ -58,19 +55,11 @@ export function useTable<T>({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnVisibility, setColumnVisibility] = useState(
-    initialColumnVisibility,
-  );
+  const [columnVisibility, setColumnVisibility] = useState(initialColumnVisibility);
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<HTMLElement | null>(
-    null,
-  );
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<HTMLElement | null>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
 
   // Sync external state with internal state
   useEffect(() => {
@@ -79,7 +68,7 @@ export function useTable<T>({
         activeSorting.map((sort) => ({
           id: sort.columnId,
           desc: sort.desc,
-        })),
+        }))
       );
     }
   }, [activeSorting]);
@@ -90,7 +79,7 @@ export function useTable<T>({
         activeFilters.map((filter) => ({
           id: filter.columnId,
           value: filter.value,
-        })),
+        }))
       );
     }
   }, [activeFilters]);
@@ -124,10 +113,7 @@ export function useTable<T>({
     setColumnMenuAnchor(null);
   };
 
-  const handleFilterMenuOpen = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterMenuOpen = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
     setFilterMenuAnchor(event.currentTarget);
     setActiveFilterColumn(columnId);
   };

@@ -1,13 +1,8 @@
 import React from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
-import {
-  type ImageItem,
-  type VideoItem,
-  type AudioItem,
-} from "@/types/search/searchResults";
+import { useTranslation } from "react-i18next";
+import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
-import { useNavigate, useLocation } from "react-router-dom";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
 import AssetResultsView from "../shared/AssetResultsView";
@@ -27,7 +22,7 @@ interface ModularUnifiedResultsViewProps {
   viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => void;
   cardSize: "small" | "medium" | "large";
   onCardSizeChange: (size: "small" | "medium" | "large") => void;
@@ -45,10 +40,7 @@ interface ModularUnifiedResultsViewProps {
   onColumnToggle: (columnId: string) => void;
   // Asset action handlers
   onAssetClick: (asset: AssetItem) => void;
-  onDeleteClick: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onDeleteClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onMenuClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditClick: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -57,16 +49,10 @@ interface ModularUnifiedResultsViewProps {
   editedName?: string;
   // Favorite functionality
   isAssetFavorited?: (assetId: string) => boolean;
-  onFavoriteToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onFavoriteToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   // Selection functionality
   selectedAssets?: string[];
-  onSelectToggle?: (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -116,44 +102,36 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   isRenaming = false,
   renamingAssetId,
 }) => {
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
+  const { t } = useTranslation();
 
-  const renderCardField = (
-    fieldId: string,
-    asset: AssetItem,
-  ): React.ReactNode => {
+  const renderCardField = (fieldId: string, asset: AssetItem): React.ReactNode => {
     switch (fieldId) {
       case "name":
-        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-          .PrimaryLocation.ObjectKey.Name;
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .Name;
       case "type":
         return asset.DigitalSourceAsset.Type;
       case "format":
         return asset.DigitalSourceAsset.MainRepresentation.Format;
-      case "size":
+      case "size": {
         const sizeInBytes =
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size;
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size;
         return formatFileSize(sizeInBytes);
+      }
       case "createdAt":
         return formatDate(asset.DigitalSourceAsset.CreateDate);
       case "modifiedAt":
         return formatDate(
-          asset.DigitalSourceAsset.ModifiedDate ||
-            asset.DigitalSourceAsset.CreateDate,
+          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
         );
       default:
         return "";
     }
   };
 
-  // Function to check if an asset is selected - only if multi-select feature is enabled
+  // Function to check if an asset is selected
   const isAssetSelected =
-    multiSelectFeature.value && selectedAssets && selectedAssets.length > 0
+    selectedAssets && selectedAssets.length > 0
       ? (assetId: string) => selectedAssets.includes(assetId)
       : undefined;
 
@@ -164,7 +142,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       searchTerm={searchTerm}
-      title="Results"
+      title={t("search.results.title")}
       groupByType={groupByType}
       onGroupByTypeChange={onGroupByTypeChange}
       viewMode={viewMode}
@@ -201,8 +179,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       renamingAssetId={renamingAssetId}
       getAssetId={(asset) => asset.InventoryID}
       getAssetName={(asset) =>
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name
+        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
       }
       getAssetType={(asset) => asset.DigitalSourceAsset.Type}
       getAssetThumbnail={(asset) => asset.thumbnailUrl || ""}

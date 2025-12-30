@@ -1,13 +1,13 @@
 import React, { useRef, useState } from "react";
 import { Box, IconButton, TextField, Button } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
-import DownloadIcon from "@mui/icons-material/Download";
+// import DownloadIcon from "@mui/icons-material/Download";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-  ColumnDef,
+  // ColumnDef,
   SortingState,
   ColumnFiltersState,
   ColumnSizingState,
@@ -18,7 +18,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ResizableTable } from "./ResizableTable";
 import { BaseTableToolbar } from "./BaseTableToolbar";
 import { TableCellContent } from "./TableCellContent";
-import { type AssetBase } from "@/types/search/searchResults";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 
 interface AssetTableProps<T> {
@@ -50,9 +49,6 @@ export function AssetTable<T>({
   const [columnVisibility, setColumnVisibility] = useState({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState("");
 
@@ -72,21 +68,15 @@ export function AssetTable<T>({
     // Legacy nested fields (for backward compatibility)
     "DigitalSourceAsset.Type": "type",
     "DigitalSourceAsset.MainRepresentation.Format": "format",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate":
-      "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate":
-      "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
     "DigitalSourceAsset.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name":
-      "name",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size":
-      "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize":
-      "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
       "fullPath",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket":
-      "bucket",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
     "Metadata.Consolidated": "metadata",
     InventoryID: "id",
   };
@@ -111,24 +101,21 @@ export function AssetTable<T>({
         // Special case for name field
         if (colId === "name") {
           const hasNameField = selectedSearchFields.some(
-            (field) => field.includes("Name") || field === "objectName",
+            (field) => field.includes("Name") || field === "objectName"
           );
           newColumnVisibility[colId] = hasNameField;
         }
         // Special case for date field
         else if (colId === "date") {
           const hasDateField = selectedSearchFields.some(
-            (field) => field.includes("CreateDate") || field === "createdAt",
+            (field) => field.includes("CreateDate") || field === "createdAt"
           );
           newColumnVisibility[colId] = hasDateField;
         }
         // Special case for size field
         else if (colId === "size") {
           const hasSizeField = selectedSearchFields.some(
-            (field) =>
-              field.includes("FileSize") ||
-              field.includes("Size") ||
-              field === "fileSize",
+            (field) => field.includes("FileSize") || field.includes("Size") || field === "fileSize"
           );
           newColumnVisibility[colId] = hasSizeField;
         }
@@ -136,7 +123,7 @@ export function AssetTable<T>({
         else {
           const apiFieldIds = reverseFieldMapping[colId] || [];
           const isFieldSelected = apiFieldIds.some((apiFieldId) =>
-            selectedSearchFields.includes(apiFieldId),
+            selectedSearchFields.includes(apiFieldId)
           );
           newColumnVisibility[colId] = isFieldSelected;
         }
@@ -165,9 +152,7 @@ export function AssetTable<T>({
 
             if (isEditing) {
               return (
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
                   <TextField
                     value={editedName}
                     onChange={(e) => setEditedName(e.target.value)}
@@ -212,9 +197,7 @@ export function AssetTable<T>({
 
             return (
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1 }}>
-                <TableCellContent variant="primary">
-                  {currentName}
-                </TableCellContent>
+                <TableCellContent variant="primary">{currentName}</TableCellContent>
                 {onEditName && (
                   <IconButton
                     size="small"
@@ -291,16 +274,14 @@ export function AssetTable<T>({
       <BaseTableToolbar
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
-        onColumnMenuOpen={(event) => setColumnMenuAnchor(event.currentTarget)}
+        onColumnMenuOpen={() => {}}
         activeFilters={columnFilters.map((f) => ({
           columnId: f.id,
           value: f.value as string,
         }))}
         activeSorting={sorting.map((s) => ({ columnId: s.id, desc: s.desc }))}
         onRemoveFilter={(columnId) => {
-          onColumnFiltersChange?.(
-            columnFilters.filter((f) => f.id !== columnId),
-          );
+          onColumnFiltersChange?.(columnFilters.filter((f) => f.id !== columnId));
         }}
         onRemoveSort={(columnId) => {
           onSortingChange?.(sorting.filter((s) => s.id !== columnId));

@@ -2,6 +2,7 @@ import React from "react";
 import { ConfirmationModal } from "@/components/common/ConfirmationModal";
 import { useDeleteApiKey } from "@/api/hooks/useApiKeys";
 import { ApiKey } from "@/api/types/apiKey.types";
+import { useTranslation } from "react-i18next";
 
 interface DeleteApiKeyDialogProps {
   open: boolean;
@@ -16,6 +17,7 @@ const DeleteApiKeyDialog: React.FC<DeleteApiKeyDialogProps> = ({
   onSuccess,
   apiKey,
 }) => {
+  const { t } = useTranslation();
   const deleteMutation = useDeleteApiKey();
 
   const handleConfirm = async () => {
@@ -34,16 +36,16 @@ const DeleteApiKeyDialog: React.FC<DeleteApiKeyDialogProps> = ({
   return (
     <ConfirmationModal
       open={open}
-      title="Delete API Key"
+      title={t("common.deleteApiKey")}
       message={
         apiKey
-          ? `Are you sure you want to delete the API key "${apiKey.name}"? This action cannot be undone and will immediately invalidate any applications using this key.`
-          : "Are you sure you want to delete this API key?"
+          ? t("common.deleteApiKeyConfirmation", { name: apiKey.name })
+          : t("common.deleteApiKeyConfirmationGeneric")
       }
       onConfirm={handleConfirm}
       onCancel={onClose}
-      confirmText="Delete"
-      cancelText="Cancel"
+      confirmText={t("common.delete")}
+      cancelText={t("common.dialogs.cancel")}
       isLoading={deleteMutation.isPending}
     />
   );

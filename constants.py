@@ -348,26 +348,3 @@ class SNS:
     def asset_sync_status_topic_name() -> str:
         """Get the full asset sync status topic name with prefix"""
         return f"{config.resource_prefix}-{SNS.ASSET_SYNC_STATUS_TOPIC}-topic"
-
-
-# Media formats and MIME types
-# NOTE: For supported file extensions, see lambdas/common_libraries/file_extensions.py
-class MediaFormats:
-    """Supported media formats and their MIME types"""
-
-    IMAGE_FORMATS = ["jpg", "jpeg", "png", "gif", "tiff", "bmp", "webp"]
-    VIDEO_FORMATS = ["mp4", "mov", "avi", "wmv", "flv", "mkv", "webm"]
-    AUDIO_FORMATS = ["mp3", "wav", "aac", "ogg", "flac", "m4a"]
-    DOCUMENT_FORMATS = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"]
-
-    # MIME types mapping
-    MIME_TYPES = {
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-        "gif": "image/gif",
-        "mp4": "video/mp4",
-        "mov": "video/quicktime",
-        "mp3": "audio/mpeg",
-        "pdf": "application/pdf",
-    }

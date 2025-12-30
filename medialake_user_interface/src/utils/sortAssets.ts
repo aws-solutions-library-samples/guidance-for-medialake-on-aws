@@ -1,12 +1,11 @@
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetBase } from "../types/search/searchResults";
 import { type AssetTableColumn } from "../types/shared/assetComponents";
-import { formatFileSize } from "./fileSize";
 
 export function sortAssets<T extends AssetBase>(
   assets: T[],
   sorting: SortingState,
-  columns?: AssetTableColumn<T>[],
+  columns?: AssetTableColumn<T>[]
 ): T[] {
   if (!sorting.length) return assets;
 

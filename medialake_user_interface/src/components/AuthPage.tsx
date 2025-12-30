@@ -1,24 +1,9 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Box,
-  CircularProgress,
-  Button,
-  Typography,
-  Stack,
-  Divider,
-} from "@mui/material";
+import { Box, CircularProgress, Button, Typography, Stack, Divider } from "@mui/material";
 import { Terrain as LogoIcon } from "@mui/icons-material";
-import {
-  Authenticator,
-  ThemeProvider as AmplifyThemeProvider,
-} from "@aws-amplify/ui-react";
-import {
-  fetchAuthSession,
-  signIn,
-  confirmSignIn,
-  signInWithRedirect,
-} from "aws-amplify/auth";
+import { Authenticator, ThemeProvider as AmplifyThemeProvider } from "@aws-amplify/ui-react";
+import { fetchAuthSession, signIn, confirmSignIn, signInWithRedirect } from "aws-amplify/auth";
 import { useAuth } from "../common/hooks/auth-context";
 import { useAwsConfig } from "../common/hooks/aws-config-context";
 import { StorageHelper } from "../common/helpers/storage-helper";
@@ -40,10 +25,10 @@ const AuthPage = () => {
   }
 
   const hasSamlProvider = awsConfig.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "saml",
+    (provider) => provider.identity_provider_method === "saml"
   );
   const hasCognitoProvider = awsConfig.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "cognito",
+    (provider) => provider.identity_provider_method === "cognito"
   );
 
   return (
@@ -110,7 +95,7 @@ const AuthPage = () => {
                     onClick={() => {
                       console.log(
                         "Initiating SAML login with provider:",
-                        provider.identity_provider_name,
+                        provider.identity_provider_name
                       );
                       signInWithRedirect({
                         provider: { custom: provider.identity_provider_name },
@@ -140,9 +125,7 @@ const AuthPage = () => {
 
           {hasSamlProvider && hasCognitoProvider && (
             <Divider sx={{ my: 2, borderColor: "rgba(255, 255, 255, 0.2)" }}>
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.7)" }}>
-                OR
-              </Typography>
+              <Typography sx={{ color: "rgba(255, 255, 255, 0.7)" }}>OR</Typography>
             </Divider>
           )}
 
@@ -195,8 +178,7 @@ const AuthPage = () => {
                   },
                 },
                 "& .amplify-field": {
-                  "--amplify-components-field-label-color":
-                    "rgba(255, 255, 255, 0.9)",
+                  "--amplify-components-field-label-color": "rgba(255, 255, 255, 0.9)",
                   width: "100%",
                   "& .amplify-flex": {
                     width: "100%",
@@ -251,6 +233,24 @@ const AuthPage = () => {
                   signUpAttributes={["email"]}
                   hideSignUp={true}
                   components={components}
+                  formFields={{
+                    forceNewPassword: {
+                      password: {
+                        placeholder: "Enter your Password",
+                      },
+                      confirm_password: {
+                        placeholder: "Confirm Password",
+                      },
+                    },
+                    signIn: {
+                      username: {
+                        placeholder: "Enter your email",
+                      },
+                      password: {
+                        placeholder: "Enter your Password",
+                      },
+                    },
+                  }}
                   services={{
                     async handleSignIn(input) {
                       try {
@@ -263,8 +263,7 @@ const AuthPage = () => {
                           return {
                             isSignedIn: false,
                             nextStep: {
-                              signInStep:
-                                "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED",
+                              signInStep: "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED",
                             },
                           };
                         }
@@ -291,7 +290,7 @@ const AuthPage = () => {
                     },
                     async handleConfirmSignIn(input) {
                       try {
-                        const confirmResult = await confirmSignIn(input);
+                        await confirmSignIn(input);
 
                         const session = await fetchAuthSession();
                         const token = session.tokens?.idToken?.toString();

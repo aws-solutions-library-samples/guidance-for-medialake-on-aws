@@ -1,4 +1,5 @@
 // src/permissions/types/permission.types.ts
+import React from "react";
 import { Actions, Subjects, Conditions } from "./ability.types";
 
 // Define the Permission interface

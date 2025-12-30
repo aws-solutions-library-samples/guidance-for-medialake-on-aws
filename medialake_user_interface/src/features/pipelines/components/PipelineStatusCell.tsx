@@ -1,14 +1,6 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  FormControlLabel,
-  CircularProgress,
-} from "@mui/material";
-import {
-  PowerSettingsNew as PowerOnIcon,
-  PowerOff as PowerOffIcon,
-} from "@mui/icons-material";
+import { Box, Typography, FormControlLabel, CircularProgress } from "@mui/material";
+import { PowerSettingsNew as PowerOnIcon, PowerOff as PowerOffIcon } from "@mui/icons-material";
 import { IconSwitch } from "@/components/common";
 import { TableCellContent } from "@/components/common/table/TableCellContent";
 import type { Pipeline } from "../types/pipelines.types";
@@ -25,8 +17,7 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
   togglingPipelines,
 }) => {
   const status = pipeline.deploymentStatus;
-  let color: "text.secondary" | "success.main" | "info.main" | "error.main" =
-    "text.secondary";
+  let color: "text.secondary" | "success.main" | "info.main" | "error.main" = "text.secondary";
 
   if (status === "DEPLOYED") {
     color = "success.main";
@@ -67,9 +58,7 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
                   sx={{ m: 1 }}
                   size="small"
                   checked={pipeline.active !== false}
-                  onChange={(e) =>
-                    onToggleActive(pipeline.id, e.target.checked)
-                  }
+                  onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
                   disabled={pipeline.system || isToggling}
                   onIcon={<PowerOnIcon />}
                   offIcon={<PowerOffIcon />}

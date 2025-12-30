@@ -10,10 +10,7 @@ import { Permission, User } from "../types/permission.types";
  * @param permissions Array of permissions from the API
  * @returns CASL ability instance
  */
-export function defineAbilityFor(
-  user: User,
-  permissions: Permission[],
-): AppAbility {
+export function defineAbilityFor(user: User, permissions: Permission[]): AppAbility {
   const { can, cannot, build } = new AbilityBuilder<AppAbility>(Ability as any);
 
   if (!user) {
@@ -22,10 +19,7 @@ export function defineAbilityFor(
   }
 
   // Check for custom permissions from JWT token first
-  if (
-    (user as any).customPermissions &&
-    Array.isArray((user as any).customPermissions)
-  ) {
+  if ((user as any).customPermissions && Array.isArray((user as any).customPermissions)) {
     const customPermissions = (user as any).customPermissions as string[];
     console.log("Using custom permissions from JWT:", customPermissions);
 
@@ -124,7 +118,7 @@ export function defineAbilityFor(
         // Skip 'full' as it's handled in the admin section
         // Handle settings.* format (e.g., settings.users:edit) FIRST
         if (resource.startsWith("settings.")) {
-          const [_, settingsResource] = resource.split(".");
+          const [, settingsResource] = resource.split(".");
 
           // Map settings resources to CASL subjects
           const settingsMapping: { [key: string]: string } = {
@@ -138,8 +132,7 @@ export function defineAbilityFor(
             regions: "region",
           };
 
-          const caslResource =
-            settingsMapping[settingsResource] || settingsResource;
+          const caslResource = settingsMapping[settingsResource] || settingsResource;
 
           // Enable view on the parent settings menu
           can("view", "settings");
@@ -152,9 +145,7 @@ export function defineAbilityFor(
 
           // For users specifically, ensure the menu is visible and route access works
           if (settingsResource === "users") {
-            console.log(
-              "Explicitly granting permissions on user and group for settings.users",
-            );
+            console.log("Explicitly granting permissions on user and group for settings.users");
             can("view", "user" as Subjects);
             can("view", "group" as Subjects);
             // Grant manage on group for the users route
@@ -165,38 +156,34 @@ export function defineAbilityFor(
 
           // For groups specifically, ensure the menu is visible
           if (settingsResource === "groups") {
-            console.log(
-              "Explicitly granting view permission on group for settings.groups",
-            );
+            console.log("Explicitly granting view permission on group for settings.groups");
             can("view", "group" as Subjects);
           }
 
           // For connectors specifically, ensure the menu is visible
           if (settingsResource === "connectors") {
-            console.log(
-              "Explicitly granting view permission on connector for settings.connectors",
-            );
+            console.log("Explicitly granting view permission on connector for settings.connectors");
             can("view", "connector" as Subjects);
           }
 
           // For integrations specifically, ensure the menu is visible
           if (settingsResource === "integrations") {
             console.log(
-              "Explicitly granting view permission on integration for settings.integrations",
+              "Explicitly granting view permission on integration for settings.integrations"
             );
             can("view", "integration" as Subjects);
           }
 
           // Enable the specific action on the settings resource
           console.log(
-            `Granting ${action} permission on ${caslResource} (from settings.${settingsResource})`,
+            `Granting ${action} permission on ${caslResource} (from settings.${settingsResource})`
           );
           can(action as Actions, caslResource as Subjects);
 
           // For edit permissions, also grant view and manage permissions to ensure route access
           if (action === "edit") {
             console.log(
-              `Also granting view and manage permissions on ${caslResource} for menu visibility and route access`,
+              `Also granting view and manage permissions on ${caslResource} for menu visibility and route access`
             );
             can("view", caslResource as Subjects);
             can("manage", caslResource as Subjects);
@@ -205,9 +192,7 @@ export function defineAbilityFor(
 
           // For manage permissions, also grant view permission
           if (action === "manage") {
-            console.log(
-              `Also granting view permission on ${caslResource} for menu visibility`,
-            );
+            console.log(`Also granting view permission on ${caslResource} for menu visibility`);
             can("view", caslResource as Subjects);
             can("view", `settings.${settingsResource}` as any);
           }
@@ -308,15 +293,12 @@ export function defineAbilityFor(
 
   // Process permissions based on principal type
   const userPermissions = permissions.filter(
-    (p) => p.principalType === "USER" && p.principalId === user.id,
+    (p) => p.principalType === "USER" && p.principalId === user.id
   );
 
   // Get group permissions for groups the user belongs to
   const groupPermissions = permissions.filter(
-    (p) =>
-      p.principalType === "GROUP" &&
-      user.groups &&
-      user.groups.includes(p.principalId),
+    (p) => p.principalType === "GROUP" && user.groups && user.groups.includes(p.principalId)
   );
 
   // Apply permissions in the correct order to implement "most explicit deny wins" rule
@@ -326,11 +308,7 @@ export function defineAbilityFor(
     .filter((p) => p.effect === "Allow")
     .forEach((permission) => {
       if (permission.conditions) {
-        can(
-          permission.action as Actions,
-          permission.resource as Subjects,
-          permission.conditions,
-        );
+        can(permission.action as Actions, permission.resource as Subjects, permission.conditions);
       } else {
         can(permission.action as Actions, permission.resource as Subjects);
       }
@@ -344,7 +322,7 @@ export function defineAbilityFor(
         cannot(
           permission.action as Actions,
           permission.resource as Subjects,
-          permission.conditions,
+          permission.conditions
         );
       } else {
         cannot(permission.action as Actions, permission.resource as Subjects);

@@ -37,9 +37,7 @@ export interface NodeConfiguration {
 }
 
 // Helper function to ensure numeric values remain as numbers
-export const ensureCorrectTypes = (
-  config: NodeConfiguration,
-): NodeConfiguration => {
+export const ensureCorrectTypes = (config: NodeConfiguration): NodeConfiguration => {
   if (!config || !config.parameters) return config;
 
   const processedParams: Record<string, any> = {};
@@ -50,7 +48,7 @@ export const ensureCorrectTypes = (
     if (typeof value === "string" && !isNaN(Number(value))) {
       // Check if this is a numeric parameter by looking at its schema
       const paramDef = Object.values(config.parameters).find(
-        (p: any) => p?.name === key && p?.schema?.type === "number",
+        (p: any) => p?.name === key && p?.schema?.type === "number"
       );
 
       if (paramDef || key === "ConcurrencyLimit") {
@@ -89,11 +87,7 @@ export const normalizeNumericValues = (obj: any): any => {
   const normalized: Record<string, any> = {};
 
   Object.entries(obj).forEach(([key, value]) => {
-    if (
-      typeof value === "string" &&
-      !isNaN(Number(value)) &&
-      value.trim() !== ""
-    ) {
+    if (typeof value === "string" && !isNaN(Number(value)) && value.trim() !== "") {
       normalized[key] = Number(value);
     } else {
       normalized[key] = value;

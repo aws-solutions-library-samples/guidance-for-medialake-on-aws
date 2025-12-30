@@ -11,11 +11,7 @@ export interface JobStatusNodeData extends CustomNodeData {
   // Additional props specific to job status node can be added here
 }
 
-const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({
-  id,
-  data,
-  isConnectable,
-}) => {
+const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isConnectable }) => {
   const { project } = useReactFlow();
 
   const handleDelete = (event: React.MouseEvent) => {
@@ -30,7 +26,6 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({
 
   const handleNodeClick = useCallback(
     (event: React.MouseEvent) => {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
       const clickX = event.clientX;
       const clickY = event.clientY;
 
@@ -41,18 +36,14 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({
         const handleX = handleRect.left + handleRect.width / 2;
         const handleY = handleRect.top + handleRect.height / 2;
 
-        const distance = Math.sqrt(
-          Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2),
-        );
+        const distance = Math.sqrt(Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2));
 
         return distance <= HANDLE_CONNECT_RADIUS;
       };
 
       // Find the closest handle
       const handles = Array.from(
-        document.querySelectorAll(
-          `[data-nodeid="${id}"] .react-flow__handle-source`,
-        ),
+        document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle-source`)
       );
       for (const handle of handles) {
         if (isNearHandle(handle)) {
@@ -66,7 +57,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({
         }
       }
     },
-    [id, project],
+    [id, project]
   );
 
   return (

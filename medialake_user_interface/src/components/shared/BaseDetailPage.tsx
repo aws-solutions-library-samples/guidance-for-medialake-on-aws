@@ -1,25 +1,7 @@
-import React, {
-  useState,
-  useMemo,
-  useCallback,
-  useEffect,
-  ReactNode,
-} from "react";
+import React, { useState, useMemo, useCallback, useEffect, ReactNode } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  Paper,
-  Tabs,
-  Tab,
-  alpha,
-} from "@mui/material";
-import {
-  useAsset,
-  useRelatedVersions,
-  useTranscription,
-} from "../../api/hooks/useAssets";
+import { Box, CircularProgress, Paper, Tabs, Tab, alpha } from "@mui/material";
+import { useAsset, useRelatedVersions, useTranscription } from "../../api/hooks/useAssets";
 import { useRightSidebar } from "../common/RightSidebar";
 import { useTrackRecentlyViewed } from "../../contexts/RecentlyViewedContext";
 import AssetSidebar from "../asset/AssetSidebar";
@@ -31,7 +13,7 @@ import type { RelatedVersionsResponse } from "../../api/hooks/useAssets";
 import { formatFileSize } from "../../utils/imageUtils";
 import TechnicalMetadataTab from "../TechnicalMetadataTab";
 import TranscriptionTab from "./TranscriptionTab";
-import TabContentContainer from "../common/TabContentContainer";
+// import TabContentContainer from "../common/TabContentContainer";
 
 interface TabConfig {
   value: string;
@@ -60,7 +42,7 @@ const RelatedItemsTab: React.FC<{
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   const items = useMemo(() => {
     if (!relatedVersionsData?.data?.results) {
       return [];
@@ -69,16 +51,14 @@ const RelatedItemsTab: React.FC<{
     return relatedVersionsData.data.results.map((result) => ({
       id: result.InventoryID,
       title:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
       type: result.DigitalSourceAsset.Type,
       thumbnail: result.thumbnailUrl,
       proxyUrl: result.proxyUrl,
       score: result.score,
       format: result.DigitalSourceAsset.MainRepresentation.Format,
       fileSize:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
   }, [relatedVersionsData]);
@@ -88,8 +68,7 @@ const RelatedItemsTab: React.FC<{
       return false;
     }
 
-    const { totalResults, page, pageSize } =
-      relatedVersionsData.data.searchMetadata;
+    const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     return totalResults > page * pageSize;
   }, [relatedVersionsData]);
 
@@ -127,16 +106,15 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
     isLoading: boolean;
     error: any;
   };
-  const [activeTab, setActiveTab] = useState<string>(
-    tabs[0]?.value || "summary",
-  );
+  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.value || "summary");
   const [relatedPage, setRelatedPage] = useState(1);
-  const { data: relatedVersionsData, isLoading: isLoadingRelated } =
-    useRelatedVersions(id || "", relatedPage);
-  const { data: transcriptionData, isLoading: isLoadingTranscription } =
-    hasTranscription
-      ? useTranscription(id || "")
-      : { data: undefined, isLoading: false };
+  const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(
+    id || "",
+    relatedPage
+  );
+  const { data: transcriptionData, isLoading: isLoadingTranscription } = hasTranscription
+    ? useTranscription(id || "")
+    : { data: undefined, isLoading: false };
   const [showHeader, setShowHeader] = useState(true);
 
   const [comments, setComments] = useState([
@@ -161,9 +139,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
   ]);
 
   useEffect(() => {
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.scrollTo(0, 0);
     } else {
@@ -176,8 +152,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
 
     const handleScroll = () => {
       const currentScrollTop =
-        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')
-          ?.scrollTop || 0;
+        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
 
       if (currentScrollTop <= 10) {
         setShowHeader(true);
@@ -190,9 +165,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
       lastScrollTop = currentScrollTop;
     };
 
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
     }
@@ -205,19 +178,17 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
   }, []);
 
   const searchParams = new URLSearchParams(location.search);
-  const searchTerm =
-    searchParams.get("q") || searchParams.get("searchTerm") || "";
+  const searchTerm = searchParams.get("q") || searchParams.get("searchTerm") || "";
 
   const versions = useMemo(() => {
     if (!assetData?.data?.asset) return [];
     return [
       {
         id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation
-          .StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.FullPath,
         type: "Original",
-        format:
-          assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+        format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
         fileSize:
           assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
         description: "Original high resolution version",
@@ -238,18 +209,16 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
 
     return Object.entries(metadata).map(([parentCategory, parentData]) => ({
       category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(
-        ([subCategory, data]) => ({
-          category: subCategory,
-          data: data,
-          count:
-            typeof data === "object"
-              ? Array.isArray(data)
-                ? data.length
-                : Object.keys(data).length
-              : 1,
-        }),
-      ),
+      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
+        category: subCategory,
+        data: data,
+        count:
+          typeof data === "object"
+            ? Array.isArray(data)
+              ? data.length
+              : Object.keys(data).length
+            : 1,
+      })),
       count: Object.keys(parentData as object).length,
     }));
   };
@@ -264,19 +233,13 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
     const asset = assetData.data.asset;
     return {
       id,
-      title:
-        asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
-      type: asset.DigitalSourceAsset.Type.toLowerCase() as
-        | "video"
-        | "image"
-        | "audio",
+      title: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+      type: asset.DigitalSourceAsset.Type.toLowerCase() as "video" | "image" | "audio",
       path: `/${mediaType}/${id}`,
       searchTerm: searchTerm,
       metadata: {
         fileSize: formatFileSize(
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-            .PrimaryLocation.FileInfo.Size,
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
         ),
       },
     };
@@ -293,24 +256,18 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
         const nextIndex = (currentIndex + 1) % tabValues.length;
         setActiveTab(tabValues[nextIndex]);
       } else if (event.key === "ArrowLeft") {
-        const prevIndex =
-          (currentIndex - 1 + tabValues.length) % tabValues.length;
+        const prevIndex = (currentIndex - 1 + tabValues.length) % tabValues.length;
         setActiveTab(tabValues[prevIndex]);
       }
     },
-    [activeTab, tabs],
+    [activeTab, tabs]
   );
 
   const handleBack = useCallback(() => {
-    if (
-      location.state &&
-      (location.state.searchTerm || location.state.preserveSearch)
-    ) {
+    if (location.state && (location.state.searchTerm || location.state.preserveSearch)) {
       navigate(-1);
     } else {
-      navigate(
-        `/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ""}`,
-      );
+      navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ""}`);
     }
   }, [navigate, location.state, searchTerm]);
 
@@ -359,12 +316,12 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
 
   const proxyUrl = (() => {
     const proxyRep = assetData.data.asset.DerivedRepresentations.find(
-      (rep) => rep.Purpose === "proxy",
+      (rep) => rep.Purpose === "proxy"
     );
     return (
       proxyRep?.URL ||
-      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-        .PrimaryLocation.ObjectKey.FullPath
+      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+        .ObjectKey.FullPath
     );
   })();
 
@@ -402,8 +359,8 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
             onPrevious={() => navigate(-1)}
             onNext={() => navigate(1)}
             assetName={
-              assetData.data.asset.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name
+              assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+                .ObjectKey.Name
             }
             assetId={assetData.data.asset.InventoryID}
             assetType={assetTypeName}
@@ -462,8 +419,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
                   fontWeight: 500,
                   transition: "all 0.2s",
                   "&:hover": {
-                    backgroundColor: (theme) =>
-                      alpha(theme.palette.secondary.main, 0.05),
+                    backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                   },
                 },
               }}
@@ -486,8 +442,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
                 pt: 2,
                 outline: "none",
                 borderRadius: 1,
-                backgroundColor: (theme) =>
-                  alpha(theme.palette.background.paper, 0.5),
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.5),
                 maxHeight: "none",
                 overflow: "visible",
               }}
@@ -498,25 +453,18 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
             >
               {tabs.map((tab) => {
                 if (tab.value === activeTab) {
-                  if (
-                    (tab.value === "summary" || tab.value === "descriptive") &&
-                    tab.component
-                  ) {
-                    return React.cloneElement(
-                      tab.component as React.ReactElement,
-                      {
-                        key: tab.value,
-                        assetData,
-                      },
-                    );
+                  if ((tab.value === "summary" || tab.value === "descriptive") && tab.component) {
+                    return React.cloneElement(tab.component as React.ReactElement, {
+                      key: tab.value,
+                      assetData,
+                    });
                   } else if (tab.value === "technical") {
                     return (
                       <TechnicalMetadataTab
                         key={tab.value}
                         metadataAccordions={metadataAccordions}
                         availableCategories={Object.keys(
-                          assetData?.data?.asset?.Metadata?.EmbeddedMetadata ||
-                            {},
+                          assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {}
                         )}
                         mediaType={mediaType}
                       />

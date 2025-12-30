@@ -1,11 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
-import { useFeatureFlag } from "@/utils/featureFlags";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
 // Default width values
 export const DEFAULT_WIDTH = 375;
@@ -22,25 +15,15 @@ interface RightSidebarContextType {
   setHasSelectedItems: (hasItems: boolean) => void;
 }
 
-const RightSidebarContext = createContext<RightSidebarContextType | undefined>(
-  undefined,
-);
+const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
 
 interface RightSidebarProviderProps {
   children: ReactNode;
 }
 
-export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
-  children,
-}) => {
+export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ children }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasSelectedItems, setHasSelectedItems] = useState(false);
-
-  // Check if multi-select feature is enabled
-  const multiSelectFeature = useFeatureFlag(
-    "search-multi-select-enabled",
-    false,
-  );
 
   const openSidebar = () => setIsExpanded(true);
   const closeSidebar = () => setIsExpanded(false);
@@ -82,9 +65,7 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
 export const useRightSidebar = () => {
   const context = useContext(RightSidebarContext);
   if (context === undefined) {
-    throw new Error(
-      "useRightSidebar must be used within a RightSidebarProvider",
-    );
+    throw new Error("useRightSidebar must be used within a RightSidebarProvider");
   }
   return context;
 };

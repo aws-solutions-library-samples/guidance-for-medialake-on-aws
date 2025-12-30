@@ -2,6 +2,7 @@
 Graph analysis utilities for pipeline definitions.
 """
 
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from aws_lambda_powertools import Logger
@@ -276,6 +277,17 @@ class GraphAnalyzer:
         """
         Find the first and last non-trigger, non-flow nodes in the execution path.
 
+        The algorithm:
+        1. Finds the first Lambda node via BFS from the root
+        2. Finds all terminal Lambda nodes (nodes with no Lambda children)
+        3. Calculates the longest path from root to each terminal node
+        4. Selects the terminal node with the longest path as the "last" node
+
+        This handles cases where:
+        - Nodes have no children but aren't in the main execution path
+        - Multiple parallel branches exist
+        - The graph has complex branching structures
+
         Returns:
             Tuple of (first_node_id, last_node_id)
         """
@@ -314,10 +326,8 @@ class GraphAnalyzer:
             if current_id in self.graph:
                 queue.extend(self.graph[current_id])
 
-        # Find the last lambda node by traversing the entire graph
-        last_node_id = None
+        # Find all lambda nodes
         all_lambda_nodes = []
-
         for node_id, node in self.node_id_to_node.items():
             if node.data.type.lower() != "trigger" and node.data.type.lower() != "flow":
                 all_lambda_nodes.append(node_id)
@@ -330,8 +340,8 @@ class GraphAnalyzer:
         if len(all_lambda_nodes) == 1:
             return all_lambda_nodes[0], all_lambda_nodes[0]
 
-        # Find the last lambda node (one with no outgoing edges to other lambdas)
-        set(all_lambda_nodes)
+        # Find all terminal lambda nodes (nodes with no Lambda children)
+        terminal_lambda_nodes = []
         for node_id in all_lambda_nodes:
             has_lambda_children = False
             if node_id in self.graph:
@@ -346,12 +356,105 @@ class GraphAnalyzer:
                         break
 
             if not has_lambda_children:
-                last_node_id = node_id
-                break
+                terminal_lambda_nodes.append(node_id)
+                logger.debug(f"Found terminal lambda node: {node_id}")
 
-        # If we couldn't find a last node, use the last one in the list
-        if not last_node_id and all_lambda_nodes:
+        # If no terminal nodes found, something is wrong (circular graph?)
+        if not terminal_lambda_nodes:
+            logger.warning("No terminal lambda nodes found, using last node in list")
             last_node_id = all_lambda_nodes[-1]
+            logger.info(f"Identified first lambda node: {first_node_id}")
+            logger.info(f"Identified last lambda node: {last_node_id}")
+            return first_node_id, last_node_id
+
+        # If only one terminal node, that's our last node
+        if len(terminal_lambda_nodes) == 1:
+            last_node_id = terminal_lambda_nodes[0]
+            logger.info(f"Identified first lambda node: {first_node_id}")
+            logger.info(f"Identified last lambda node: {last_node_id}")
+            return first_node_id, last_node_id
+
+        # Multiple terminal nodes - find the one with the longest path from root
+        # This handles cases where disconnected nodes exist
+        def calculate_longest_path_from_root(target_node_id: str) -> int:
+            """
+            Calculate the longest path from root to target node.
+            Returns -1 if the node is not reachable from root.
+            Uses DFS with memoization to handle cycles properly.
+            """
+            # Use DFS with memoization and cycle detection
+            memo = {}  # node_id -> longest path to target from this node
+
+            def dfs(current_id: str, visited_in_path: set, depth: int) -> int:
+                """
+                DFS to find longest path from current node to target.
+                Returns the depth at which target is found, or -1 if not reachable.
+                """
+                # If we reached the target, return current depth
+                if current_id == target_node_id:
+                    return depth
+
+                # Cycle detection - if we've seen this node in current path, skip
+                if current_id in visited_in_path:
+                    return -1
+
+                # Check memo
+                cache_key = (current_id, depth)
+                if cache_key in memo:
+                    return memo[cache_key]
+
+                # Mark as visited in current path
+                visited_in_path.add(current_id)
+
+                max_depth = -1
+                if current_id in self.graph:
+                    for child_id in self.graph[current_id]:
+                        result = dfs(child_id, visited_in_path, depth + 1)
+                        if result > max_depth:
+                            max_depth = result
+
+                # Unmark from current path
+                visited_in_path.remove(current_id)
+
+                memo[cache_key] = max_depth
+                return max_depth
+
+            # Limit recursion depth to prevent stack overflow
+            old_limit = sys.getrecursionlimit()
+            sys.setrecursionlimit(max(old_limit, 1000))
+
+            try:
+                result = dfs(root_node_id, set(), 0)
+            finally:
+                sys.setrecursionlimit(old_limit)
+
+            return result
+
+        # Calculate path lengths for all terminal nodes
+        terminal_nodes_with_paths = []
+        for node_id in terminal_lambda_nodes:
+            path_length = calculate_longest_path_from_root(node_id)
+            terminal_nodes_with_paths.append((node_id, path_length))
+            logger.debug(
+                f"Terminal node {node_id} has path length {path_length} from root"
+            )
+
+        # Filter out unreachable nodes (path_length == -1)
+        reachable_terminals = [
+            (nid, length) for nid, length in terminal_nodes_with_paths if length >= 0
+        ]
+
+        if not reachable_terminals:
+            logger.warning(
+                "No terminal nodes are reachable from root, using first terminal node"
+            )
+            last_node_id = terminal_lambda_nodes[0]
+        else:
+            # Select the terminal node with the longest path
+            last_node_id = max(reachable_terminals, key=lambda x: x[1])[0]
+            logger.info(
+                f"Selected terminal node {last_node_id} with longest path from root"
+            )
 
         logger.info(f"Identified first lambda node: {first_node_id}")
         logger.info(f"Identified last lambda node: {last_node_id}")

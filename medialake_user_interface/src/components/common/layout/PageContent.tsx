@@ -28,21 +28,14 @@ const ErrorState = ({ error }: { error: Error }) => {
 
   return (
     <Box sx={{ p: 2, textAlign: isRTL ? "right" : "left" }}>
-      <Alert
-        severity="error"
-        sx={{ mb: 2, textAlign: isRTL ? "right" : "left" }}
-      >
+      <Alert severity="error" sx={{ mb: 2, textAlign: isRTL ? "right" : "left" }}>
         {error.message}
       </Alert>
     </Box>
   );
 };
 
-const PageContent: React.FC<PageContentProps> = ({
-  isLoading = false,
-  error = null,
-  children,
-}) => {
+const PageContent: React.FC<PageContentProps> = ({ isLoading = false, error = null, children }) => {
   const { direction } = useDirection();
   const isRTL = direction === "rtl";
   return (
@@ -57,13 +50,7 @@ const PageContent: React.FC<PageContentProps> = ({
         direction: isRTL ? "rtl" : "ltr",
       }}
     >
-      {isLoading ? (
-        <LoadingState />
-      ) : error ? (
-        <ErrorState error={error} />
-      ) : (
-        children
-      )}
+      {isLoading ? <LoadingState /> : error ? <ErrorState error={error} /> : children}
     </Box>
   );
 };

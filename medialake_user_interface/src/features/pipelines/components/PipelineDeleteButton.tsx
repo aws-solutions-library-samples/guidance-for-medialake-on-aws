@@ -3,6 +3,7 @@ import { IconButton, Tooltip } from "@mui/material";
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
+import { useTranslation } from "react-i18next";
 
 interface PipelineDeleteButtonProps {
   id: string;
@@ -15,6 +16,7 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
   name,
   isSystem,
 }) => {
+  const { t } = useTranslation();
   const handleDelete = async () => {
     // Skip if system pipeline
     if (isSystem) {
@@ -24,7 +26,7 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
     // Use the browser's native confirm dialog directly
     if (
       window.confirm(
-        `Are you sure you want to delete pipeline "${name}"? This action cannot be undone.`,
+        `Are you sure you want to delete pipeline "${name}"? This action cannot be undone.`
       )
     ) {
       try {
@@ -39,14 +41,14 @@ export const PipelineDeleteButton: React.FC<PipelineDeleteButtonProps> = ({
         console.error("Error deleting pipeline:", error);
         // Show error message
         alert(
-          `Error deleting pipeline: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error deleting pipeline: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
     }
   };
 
   return (
-    <Tooltip title="Delete Pipeline">
+    <Tooltip title={t("common.deletePipeline")}>
       <span>
         <IconButton size="small" onClick={handleDelete} disabled={isSystem}>
           <DeleteIcon fontSize="small" />

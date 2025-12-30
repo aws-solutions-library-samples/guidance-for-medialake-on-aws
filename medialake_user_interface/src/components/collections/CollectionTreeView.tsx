@@ -24,20 +24,18 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   // Get all collections (not just root)
-  const { data: allCollectionsResponse, isLoading: isLoadingRoot } =
-    useGetCollections();
+  const { data: allCollectionsResponse, isLoading: isLoadingRoot } = useGetCollections();
 
   // Build tree structure recursively
-  const buildTree = (
-    collection: Collection,
-    allCollections: Collection[],
-  ): TreeNode => {
+  const buildTree = (collection: Collection, allCollections: Collection[]): TreeNode => {
     // Find children of this collection
     const children = allCollections.filter((c) => c.parentId === collection.id);
 
     const node: TreeNode = {
       id: collection.id,
-      label: `${collection.name}${collection.childCollectionCount > 0 ? ` (${collection.childCollectionCount})` : ""}`,
+      label: `${collection.name}${
+        collection.childCollectionCount > 0 ? ` (${collection.childCollectionCount})` : ""
+      }`,
     };
 
     // Recursively build children
@@ -54,18 +52,13 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
     const allCollections = allCollectionsResponse.data;
 
     // Filter to only root collections (no parentId)
-    const rootCollections = allCollections.filter(
-      (c: Collection) => !c.parentId,
-    );
+    const rootCollections = allCollections.filter((c: Collection) => !c.parentId);
 
     return rootCollections.map((root) => buildTree(root, allCollections));
   }, [allCollectionsResponse]);
 
   // Function to get all ancestor IDs for a given collection
-  const getAncestorIds = (
-    collectionId: string,
-    allCollections: Collection[],
-  ): string[] => {
+  const getAncestorIds = (collectionId: string, allCollections: Collection[]): string[] => {
     const ancestors: string[] = [];
     let currentId = collectionId;
 
@@ -102,10 +95,7 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
     }
   };
 
-  const handleExpandedItemsChange = (
-    event: React.SyntheticEvent,
-    itemIds: string[],
-  ) => {
+  const handleExpandedItemsChange = (event: React.SyntheticEvent, itemIds: string[]) => {
     setExpandedItems(itemIds);
   };
 
@@ -140,10 +130,7 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
       }}
     >
       <Box sx={{ p: 2 }}>
-        <Typography
-          variant="subtitle2"
-          sx={{ mb: 2, fontWeight: 600, color: "text.secondary" }}
-        >
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: "text.secondary" }}>
           Collection Hierarchy
         </Typography>
         <RichTreeView

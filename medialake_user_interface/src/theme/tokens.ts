@@ -106,8 +106,7 @@ export const componentTokens = {
       borderColor: "rgba(255, 255, 255, 0.1)",
     },
     head: (mode: "light" | "dark") => ({
-      backgroundColor:
-        mode === "dark" ? "rgba(22, 29, 38, 0.3)" : "rgba(240, 242, 245, 0.6)",
+      backgroundColor: mode === "dark" ? "rgba(22, 29, 38, 0.3)" : "rgba(240, 242, 245, 0.6)",
     }),
   },
 };

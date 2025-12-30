@@ -14,7 +14,7 @@ class EdgeLambdaConstruct(Construct):
         self.lambda_function = _lambda.Function(
             self,
             "CSPHeaderLambda",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_13,
             handler="index.lambda_handler",
             code=_lambda.Code.from_inline(
                 """

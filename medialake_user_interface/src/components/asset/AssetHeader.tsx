@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Box, IconButton, Tooltip } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import HomeIcon from "@mui/icons-material/Home";
@@ -18,6 +19,8 @@ const AssetHeader: React.FC<AssetHeaderProps> = ({
   onLock,
   onRestore,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <Box
       sx={{
@@ -32,25 +35,25 @@ const AssetHeader: React.FC<AssetHeaderProps> = ({
         zIndex: 1000,
       }}
     >
-      <Tooltip title="Download">
+      <Tooltip title={t("common.actions.download")}>
         <IconButton onClick={onDownload}>
           <DownloadIcon />
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Add to Collection">
+      <Tooltip title={t("common.actions.addToCollection")}>
         <IconButton onClick={onAddToCollection}>
           <HomeIcon />
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Lock">
+      <Tooltip title={t("common.actions.lock")}>
         <IconButton onClick={onLock}>
           <LockIcon />
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Restore">
+      <Tooltip title={t("common.actions.restore")}>
         <IconButton onClick={onRestore}>
           <RestoreIcon />
         </IconButton>

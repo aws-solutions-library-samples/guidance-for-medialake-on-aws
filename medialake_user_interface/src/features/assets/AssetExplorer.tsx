@@ -19,6 +19,7 @@ import {
   Alert,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import ApiStatusModal from "@/components/ApiStatusModal";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
@@ -30,11 +31,7 @@ import {
   type ConnectorAssetsResponse,
 } from "@/api/hooks/useConnectorAssets";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
-import {
-  useGetFavorites,
-  useAddFavorite,
-  useRemoveFavorite,
-} from "@/api/hooks/useFavorites";
+import { useGetFavorites, useAddFavorite, useRemoveFavorite } from "@/api/hooks/useFavorites";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
@@ -43,10 +40,7 @@ interface AssetExplorerProps {
   bucketName?: string;
 }
 
-const AssetExplorer: React.FC<AssetExplorerProps> = ({
-  connectorId,
-  bucketName,
-}) => {
+const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }) => {
   const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
@@ -54,16 +48,12 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   const [pageSize, setPageSize] = useState(50);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [assetType, setAssetType] = useState<string | undefined>(undefined);
+  const [assetType] = useState<string | undefined>(undefined);
 
   // UI state
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
-  const [cardSize, setCardSize] = useState<"small" | "medium" | "large">(
-    "medium",
-  );
-  const [aspectRatio, setAspectRatio] = useState<
-    "vertical" | "square" | "horizontal"
-  >("square");
+  const [cardSize, setCardSize] = useState<"small" | "medium" | "large">("medium");
+  const [aspectRatio, setAspectRatio] = useState<"vertical" | "square" | "horizontal">("square");
   const [thumbnailScale, setThumbnailScale] = useState<"fit" | "fill">("fit");
   const [showMetadata, setShowMetadata] = useState(true);
   const [groupByType, setGroupByType] = useState(false);
@@ -88,8 +78,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   };
 
   // Favorites functionality
-  const { data: favorites, isLoading: isFavoritesLoading } =
-    useGetFavorites("ASSET");
+  const { data: favorites, isLoading: isFavoritesLoading } = useGetFavorites("ASSET");
   const { mutate: addFavorite } = useAddFavorite();
   const { mutate: removeFavorite } = useRemoveFavorite();
 
@@ -100,10 +89,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   };
 
   // Handle favorite toggle
-  const handleFavoriteToggle = (
-    asset: AssetItem,
-    event: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleFavoriteToggle = (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     console.log("handleFavoriteToggle called with asset:", asset.InventoryID);
 
@@ -121,8 +107,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
           itemId: assetId,
           itemType: "ASSET",
           metadata: {
-            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-              .PrimaryLocation.ObjectKey.Name,
+            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+              .Name,
             assetType: asset.DigitalSourceAsset.Type,
             thumbnailUrl: asset.thumbnailUrl || "",
             format: asset.DigitalSourceAsset.MainRepresentation.Format,
@@ -154,6 +140,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
     handleAlertClose,
     isLoading: assetOperationsLoading,
     renamingAssetId,
+    deleteModalState,
+    handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
 
   // Card fields configuration
@@ -173,8 +161,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
       visible: true,
       minWidth: 200,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
       cell: (info) => info.getValue() as string,
       sortable: true,
     },
@@ -191,8 +178,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
       label: "Format",
       visible: true,
       minWidth: 100,
-      accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.Format,
+      accessorFn: (row: AssetItem) => row.DigitalSourceAsset.MainRepresentation.Format,
       sortable: true,
     },
     {
@@ -201,8 +187,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
       visible: true,
       minWidth: 100,
       accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       cell: (info) => formatFileSize(info.getValue() as number),
       sortable: true,
     },
@@ -233,13 +218,13 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
         },
       });
     },
-    [navigate, connectorId, bucketName],
+    [navigate, connectorId, bucketName]
   );
 
   // Handle view mode change
   const handleViewModeChange = (
     _: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => {
     if (newMode) setViewMode(newMode);
   };
@@ -247,9 +232,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   // Handle card field toggle
   const handleCardFieldToggle = (fieldId: string) => {
     setCardFields((prev) =>
-      prev.map((field) =>
-        field.id === fieldId ? { ...field, visible: !field.visible } : field,
-      ),
+      prev.map((field) => (field.id === fieldId ? { ...field, visible: !field.visible } : field))
     );
   };
 
@@ -257,10 +240,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   const handleColumnToggle = (columnId: string) => {
     setColumns((prev) =>
       prev.map((column) =>
-        column.id === columnId
-          ? { ...column, visible: !column.visible }
-          : column,
-      ),
+        column.id === columnId ? { ...column, visible: !column.visible } : column
+      )
     );
   };
 
@@ -299,18 +280,14 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
           color: "text.secondary",
         }}
       >
-        <Typography variant="h6">
-          {t("assetExplorer.noConnectorSelected")}
-        </Typography>
+        <Typography variant="h6">{t("assetExplorer.noConnectorSelected")}</Typography>
       </Box>
     );
   }
 
   // If there are no assets in the bucket, show a message
   const hasNoAssets =
-    !isLoading &&
-    searchResponse?.data?.results &&
-    searchResponse.data.results.length === 0;
+    !isLoading && searchResponse?.data?.results && searchResponse.data.results.length === 0;
 
   if (hasNoAssets) {
     return (
@@ -343,9 +320,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
   // Don't show content while loading initial data
   if (
     isLoading &&
-    (!searchResponse ||
-      searchResponse?.data == null ||
-      !searchResponse?.data?.results)
+    (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results)
   ) {
     return (
       <Box
@@ -382,9 +357,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
 
       {/* Only show the results view when we have data or after initial loading */}
       {(!isLoading ||
-        (searchResponse &&
-          searchResponse?.data != null &&
-          searchResponse?.data?.results)) && (
+        (searchResponse && searchResponse?.data != null && searchResponse?.data?.results)) && (
         <Box
           sx={{
             "& h1": {
@@ -398,8 +371,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
           <ModularUnifiedResultsView
             results={searchResponse?.data?.results || []}
             searchMetadata={{
-              totalResults:
-                searchResponse?.data?.searchMetadata?.totalResults || 0,
+              totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
               page,
               pageSize,
             }}
@@ -438,7 +410,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
               error
                 ? {
                     status: error.name || "Error",
-                    message: error.message || "Failed to load assets",
+                    message: error.message || t("assetExplorer.failedToLoadAssets"),
                   }
                 : undefined
             }
@@ -451,9 +423,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
 
       {/* Show loading indicator during initial load */}
       {isLoading &&
-        (!searchResponse ||
-          searchResponse?.data == null ||
-          !searchResponse?.data?.results) && (
+        (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results) && (
           <Box
             sx={{
               height: "100%",
@@ -511,12 +481,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
           },
         }}
       >
-        <MenuItem onClick={() => handleAction("rename")}>
-          {t("assetExplorer.menu.rename")}
-        </MenuItem>
-        <MenuItem onClick={() => handleAction("share")}>
-          {t("assetExplorer.menu.share")}
-        </MenuItem>
+        <MenuItem onClick={() => handleAction("rename")}>{t("assetExplorer.menu.rename")}</MenuItem>
+        <MenuItem onClick={() => handleAction("share")}>{t("assetExplorer.menu.share")}</MenuItem>
         <MenuItem onClick={() => handleAction("download")}>
           {t("assetExplorer.menu.download")}
         </MenuItem>
@@ -529,19 +495,14 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
         aria-labelledby="delete-dialog-title"
         aria-describedby="delete-dialog-description"
       >
-        <DialogTitle id="delete-dialog-title">
-          {t("assetExplorer.deleteDialog.title")}
-        </DialogTitle>
+        <DialogTitle id="delete-dialog-title">{t("assetExplorer.deleteDialog.title")}</DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
             {t("assetExplorer.deleteDialog.description")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={handleDeleteCancel}
-            disabled={assetOperationsLoading.delete}
-          >
+          <Button onClick={handleDeleteCancel} disabled={assetOperationsLoading.delete}>
             {t("assetExplorer.deleteDialog.cancel")}
           </Button>
           <Button
@@ -549,11 +510,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
             color="error"
             autoFocus
             disabled={assetOperationsLoading.delete}
-            startIcon={
-              assetOperationsLoading.delete ? (
-                <CircularProgress size={16} />
-              ) : undefined
-            }
+            startIcon={assetOperationsLoading.delete ? <CircularProgress size={16} /> : undefined}
           >
             {assetOperationsLoading.delete
               ? t("assetExplorer.deleteDialog.deleting")
@@ -568,14 +525,19 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
         onClose={handleAlertClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert
-          onClose={handleAlertClose}
-          severity={alert?.severity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: "100%" }}>
           {alert?.message}
         </Alert>
       </Snackbar>
+
+      {/* API Status Modal for delete operation */}
+      <ApiStatusModal
+        open={deleteModalState.open}
+        onClose={handleDeleteModalClose}
+        status={deleteModalState.status}
+        action={deleteModalState.action}
+        message={deleteModalState.message}
+      />
     </Box>
   );
 };

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
+import { useTranslation } from "react-i18next";
 import { Environment } from "@/types/environment";
 import { Box, Tooltip } from "@mui/material";
 import { TableCellContent } from "@/components/common/table";
@@ -8,18 +9,18 @@ import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 const columnHelper = createColumnHelper<Environment>();
 
 export const useEnvironmentColumns = () => {
+  const { t } = useTranslation();
+
   return useMemo(
     () => [
       columnHelper.accessor("name", {
-        header: "Name",
+        header: t("common.columns.name"),
         size: 200,
         enableSorting: true,
-        cell: ({ getValue }) => (
-          <TableCellContent variant="primary">{getValue()}</TableCellContent>
-        ),
+        cell: ({ getValue }) => <TableCellContent variant="primary">{getValue()}</TableCellContent>,
       }),
       columnHelper.accessor("region", {
-        header: "Region",
+        header: t("common.labels.region"),
         size: 150,
         enableSorting: true,
         cell: ({ getValue }) => (
@@ -27,7 +28,7 @@ export const useEnvironmentColumns = () => {
         ),
       }),
       columnHelper.accessor("status", {
-        header: "Status",
+        header: t("common.columns.status"),
         size: 150,
         enableSorting: true,
         cell: ({ getValue }) => (
@@ -35,16 +36,13 @@ export const useEnvironmentColumns = () => {
         ),
       }),
       columnHelper.accessor("created_at", {
-        header: "Created At",
+        header: t("common.columns.created"),
         size: 200,
         enableSorting: true,
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={formatLocalDateTime(dateValue, { showSeconds: true })}
-              placement="top"
-            >
+            <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {formatLocalDateTime(dateValue, { showSeconds: false })}
@@ -55,16 +53,13 @@ export const useEnvironmentColumns = () => {
         },
       }),
       columnHelper.accessor("updated_at", {
-        header: "Updated At",
+        header: t("common.columns.modified"),
         size: 200,
         enableSorting: true,
         cell: ({ getValue }) => {
           const dateValue = getValue();
           return (
-            <Tooltip
-              title={formatLocalDateTime(dateValue, { showSeconds: true })}
-              placement="top"
-            >
+            <Tooltip title={formatLocalDateTime(dateValue, { showSeconds: true })} placement="top">
               <Box>
                 <TableCellContent variant="secondary">
                   {formatLocalDateTime(dateValue, { showSeconds: false })}
@@ -75,6 +70,6 @@ export const useEnvironmentColumns = () => {
         },
       }),
     ],
-    [],
+    []
   );
 };

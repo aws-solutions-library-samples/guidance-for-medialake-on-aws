@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTitle,
@@ -13,11 +14,7 @@ import {
   InputAdornment,
   Tooltip,
 } from "@mui/material";
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  ContentCopy as CopyIcon,
-} from "@mui/icons-material";
+import { Close as CloseIcon, Edit as EditIcon, ContentCopy as CopyIcon } from "@mui/icons-material";
 import { format } from "date-fns";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { Can } from "@/permissions/components/Can";
@@ -37,6 +34,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
   onEdit,
   apiKey,
 }) => {
+  const { t } = useTranslation();
   const [copySuccess, setCopySuccess] = useState(false);
 
   // Fetch detailed API key information when dialog opens
@@ -95,7 +93,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
     >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">API Key Details</Typography>
+          <Typography variant="h6">{t("apiKeys.dialogs.detailsTitle")}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -105,32 +103,27 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
       <DialogContent>
         {isLoading && (
           <Box display="flex" justifyContent="center" py={4}>
-            <Typography>Loading API key details...</Typography>
+            <Typography>{t("apiKeys.loading")}</Typography>
           </Box>
         )}
 
         {error && (
           <Box py={2}>
-            <Typography color="error">
-              Failed to load API key details. Please try again.
-            </Typography>
+            <Typography color="error">{t("apiKeys.errors.loadFailed")}</Typography>
           </Box>
         )}
 
         {displayApiKey && !isLoading && (
           <Box>
             {/* Name and Status */}
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              mb={2}
-            >
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" component="h2">
                 {displayApiKey.name}
               </Typography>
               <Chip
-                label={displayApiKey.isEnabled ? "Enabled" : "Disabled"}
+                label={
+                  displayApiKey.isEnabled ? t("common.status.enabled") : t("common.status.disabled")
+                }
                 color={displayApiKey.isEnabled ? "success" : "default"}
                 size="small"
               />
@@ -140,7 +133,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
             {displayApiKey.description && (
               <>
                 <Typography variant="subtitle2" gutterBottom>
-                  Description
+                  {t("apiKeys.details.description")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
                   {displayApiKey.description}
@@ -152,7 +145,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
 
             {/* API Key ID */}
             <Typography variant="subtitle2" gutterBottom>
-              API Key ID
+              {t("apiKeys.details.apiKeyId")}
             </Typography>
             <TextField
               fullWidth
@@ -162,7 +155,11 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
                 endAdornment: (
                   <InputAdornment position="end">
                     <Tooltip
-                      title={copySuccess ? "Copied!" : "Copy API Key ID"}
+                      title={
+                        copySuccess
+                          ? t("common.actions.copied")
+                          : t("apiKeys.tooltips.copyApiKeyId")
+                      }
                     >
                       <IconButton
                         onClick={handleCopyId}
@@ -187,14 +184,14 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
             {/* Metadata */}
             <Box>
               <Typography variant="subtitle2" gutterBottom>
-                Created
+                {t("apiKeys.details.created")}
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
                 {formatDate(displayApiKey.createdAt)}
               </Typography>
 
               <Typography variant="subtitle2" gutterBottom>
-                Last Updated
+                {t("apiKeys.details.lastUpdated")}
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
                 {formatDate(displayApiKey.updatedAt)}
@@ -203,7 +200,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
               {displayApiKey.lastUsed && (
                 <>
                   <Typography variant="subtitle2" gutterBottom>
-                    Last Used
+                    {t("apiKeys.details.lastUsed")}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" paragraph>
                     {formatDate(displayApiKey.lastUsed)}
@@ -217,7 +214,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
 
       <DialogActions>
         <ActionButton variant="text" onClick={onClose}>
-          Close
+          {t("common.dialogs.close")}
         </ActionButton>
         <Can I="edit" a="api-key">
           <ActionButton
@@ -226,7 +223,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
             onClick={handleEdit}
             disabled={isLoading || !displayApiKey}
           >
-            Edit
+            {t("common.actions.edit")}
           </ActionButton>
         </Can>
       </DialogActions>

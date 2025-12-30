@@ -1,21 +1,20 @@
 import React from "react";
 import { TextField } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 interface PipelineNameInputProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-const PipelineNameInput: React.FC<PipelineNameInputProps> = ({
-  value,
-  onChange,
-}) => {
+const PipelineNameInput: React.FC<PipelineNameInputProps> = ({ value, onChange }) => {
+  const { t } = useTranslation();
   return (
     <TextField
       fullWidth
       variant="outlined"
       size="small"
-      placeholder="Pipeline Name"
+      placeholder={t("pipelines.namePlaceholder")}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       sx={{

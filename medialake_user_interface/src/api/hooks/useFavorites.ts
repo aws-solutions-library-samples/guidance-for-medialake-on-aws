@@ -1,4 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "../apiClient";
 import { API_ENDPOINTS } from "../endpoints";
 import { QUERY_KEYS } from "../queryKeys";
@@ -48,38 +50,100 @@ export const useGetFavorites = (itemType?: string) => {
       const { data } = await apiClient.get<FavoritesResponse>(url);
       return data.data.favorites;
     },
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 };
+
+// Context type for optimistic updates
+interface MutationContext {
+  previousFavorites: Favorite[] | undefined;
+}
 
 /**
  * Hook to add a favorite
  */
 export const useAddFavorite = () => {
   const queryClient = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const { t } = useTranslation();
 
-  return useMutation<Favorite, Error, AddFavoriteRequest>({
+  return useMutation<Favorite, Error, AddFavoriteRequest, MutationContext>({
     mutationFn: async (favoriteData) => {
-      const { data } = await apiClient.post<AddFavoriteResponse>(
+      const response = await apiClient.post<AddFavoriteResponse>(
         API_ENDPOINTS.FAVORITES.BASE,
-        favoriteData,
+        favoriteData
       );
-      return data.data.favorite;
+
+      // Handle different response structures
+      const data = response.data;
+      if (data.data?.favorite) {
+        return data.data.favorite;
+      } else if ((data as any).favorite) {
+        return (data as any).favorite;
+      } else if (data.data && !data.data.favorite) {
+        return data.data as unknown as Favorite;
+      }
+
+      // Fallback: construct from request data
+      return {
+        itemId: favoriteData.itemId,
+        itemType: favoriteData.itemType,
+        metadata: favoriteData.metadata,
+        addedAt: new Date().toISOString(),
+      };
     },
-    onSuccess: (data, variables) => {
-      console.log("Adding favorite succeeded:", data);
-      console.log("Invalidating queries with key:", QUERY_KEYS.FAVORITES.all);
+    onMutate: async (newFavorite) => {
+      const queryKey = QUERY_KEYS.FAVORITES.list(newFavorite.itemType);
 
-      // Invalidate all favorites queries to refresh data
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
+      await queryClient.cancelQueries({ queryKey });
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
 
-      // Also explicitly invalidate the specific query for the item type
-      // This ensures that filtered queries like useGetFavorites('ASSET') are also refreshed
-      console.log(
-        "Invalidating specific query with itemType:",
-        variables.itemType,
-      );
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
+      const previousFavorites = queryClient.getQueryData<Favorite[]>(queryKey);
+
+      queryClient.setQueryData<Favorite[]>(queryKey, (old) => {
+        if (old?.some((fav) => fav.itemId === newFavorite.itemId)) {
+          return old;
+        }
+        const optimisticFavorite: Favorite = {
+          itemId: newFavorite.itemId,
+          itemType: newFavorite.itemType,
+          metadata: newFavorite.metadata,
+          addedAt: new Date().toISOString(),
+        };
+        return old ? [...old, optimisticFavorite] : [optimisticFavorite];
+      });
+
+      return { previousFavorites };
+    },
+    onSuccess: (newFavorite, variables) => {
+      const queryKey = QUERY_KEYS.FAVORITES.list(variables.itemType);
+      const currentCache = queryClient.getQueryData<Favorite[]>(queryKey);
+
+      if (!currentCache?.some((fav) => fav.itemId === newFavorite.itemId)) {
+        queryClient.setQueryData<Favorite[]>(queryKey, (old) => {
+          return old ? [...old, newFavorite] : [newFavorite];
+        });
+      } else {
+        queryClient.setQueryData<Favorite[]>(queryKey, (old) => {
+          if (!old) return [newFavorite];
+          return old.map((fav) => (fav.itemId === newFavorite.itemId ? newFavorite : fav));
+        });
+      }
+    },
+    onError: (_, variables, context) => {
+      if (context?.previousFavorites) {
+        queryClient.setQueryData(
+          QUERY_KEYS.FAVORITES.list(variables.itemType),
+          context.previousFavorites
+        );
+      }
+      enqueueSnackbar(t("favorites.errorAdding"), {
+        variant: "error",
+        autoHideDuration: 5000,
       });
     },
   });
@@ -90,25 +154,48 @@ export const useAddFavorite = () => {
  */
 export const useRemoveFavorite = () => {
   const queryClient = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const { t } = useTranslation();
 
-  return useMutation<void, Error, { itemType: string; itemId: string }>({
+  return useMutation<void, Error, { itemType: string; itemId: string }, MutationContext>({
     mutationFn: async ({ itemType, itemId }) => {
       await apiClient.delete(API_ENDPOINTS.FAVORITES.DELETE(itemType, itemId));
     },
+    onMutate: async ({ itemType, itemId }) => {
+      const queryKey = QUERY_KEYS.FAVORITES.list(itemType);
+
+      await queryClient.cancelQueries({ queryKey });
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
+
+      const previousFavorites = queryClient.getQueryData<Favorite[]>(queryKey);
+
+      queryClient.setQueryData<Favorite[]>(queryKey, (old) => {
+        return old?.filter((fav) => fav.itemId !== itemId) ?? [];
+      });
+
+      return { previousFavorites };
+    },
     onSuccess: (_, variables) => {
-      console.log("Removing favorite succeeded for:", variables);
-      console.log("Invalidating queries with key:", QUERY_KEYS.FAVORITES.all);
+      const queryKey = QUERY_KEYS.FAVORITES.list(variables.itemType);
+      const currentCache = queryClient.getQueryData<Favorite[]>(queryKey);
 
-      // Invalidate all favorites queries to refresh data
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FAVORITES.all });
-
-      // Also explicitly invalidate the specific query for the item type
-      console.log(
-        "Invalidating specific query with itemType:",
-        variables.itemType,
-      );
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.FAVORITES.list(variables.itemType),
+      if (currentCache?.some((fav) => fav.itemId === variables.itemId)) {
+        queryClient.setQueryData<Favorite[]>(
+          queryKey,
+          (old) => old?.filter((fav) => fav.itemId !== variables.itemId) ?? []
+        );
+      }
+    },
+    onError: (_, variables, context) => {
+      if (context?.previousFavorites) {
+        queryClient.setQueryData(
+          QUERY_KEYS.FAVORITES.list(variables.itemType),
+          context.previousFavorites
+        );
+      }
+      enqueueSnackbar(t("favorites.errorRemoving"), {
+        variant: "error",
+        autoHideDuration: 5000,
       });
     },
   });
@@ -121,8 +208,7 @@ export const useRemoveFavorite = () => {
 export const useIsFavorited = (itemId: string, itemType: string) => {
   const { data: favorites, isLoading } = useGetFavorites(itemType);
 
-  const isFavorited =
-    favorites?.some((favorite) => favorite.itemId === itemId) || false;
+  const isFavorited = favorites?.some((fav) => fav.itemId === itemId) || false;
 
   return {
     isFavorited,

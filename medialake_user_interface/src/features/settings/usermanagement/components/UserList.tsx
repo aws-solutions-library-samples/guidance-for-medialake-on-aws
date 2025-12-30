@@ -36,11 +36,7 @@ import { useListUserAssignments } from "@/api/hooks/useAssignments";
 import { useUpdateUser } from "@/api/hooks/useUsers";
 import { useTranslation } from "react-i18next";
 import { UserFilterPopover } from "./UserFilterPopover";
-import {
-  ResizableTable,
-  ColumnVisibilityMenu,
-  TableCellContent,
-} from "@/components/common/table";
+import { ResizableTable, ColumnVisibilityMenu, TableCellContent } from "@/components/common/table";
 import { UserTableToolbar } from "./UserTableToolbar";
 import {
   TableFiltersProvider,
@@ -119,19 +115,16 @@ const GroupChips: React.FC<{
           username: user.username,
           groups: [groupId], // Use group.id (actual Cognito group name)
         },
-      },
+      }
     );
   };
 
   // Get the current group (first one if multiple exist)
   // user.groups contains the actual Cognito group name (group.id)
-  const currentGroupId =
-    user.groups && user.groups.length > 0 ? user.groups[0] : null;
+  const currentGroupId = user.groups && user.groups.length > 0 ? user.groups[0] : null;
 
   // Find the matching group object to get the display name
-  const currentGroupObj = currentGroupId
-    ? groups?.find((g) => g.id === currentGroupId)
-    : null;
+  const currentGroupObj = currentGroupId ? groups?.find((g) => g.id === currentGroupId) : null;
 
   const currentGroupDisplayName = currentGroupObj
     ? currentGroupObj.name
@@ -157,9 +150,7 @@ const GroupChips: React.FC<{
           backgroundColor: currentGroupId
             ? alpha(theme.palette.primary.main, 0.1)
             : alpha(theme.palette.grey[500], 0.1),
-          color: currentGroupId
-            ? theme.palette.primary.main
-            : theme.palette.text.secondary,
+          color: currentGroupId ? theme.palette.primary.main : theme.palette.text.secondary,
           fontWeight: currentGroupId ? 600 : 400,
           fontSize: "0.875rem",
           transition: "background-color 0.2s",
@@ -201,7 +192,7 @@ const PermissionSetChips: React.FC<{
   theme: any;
   permissionSets: any[] | undefined;
   userAssignments: any | undefined;
-}> = ({ user, theme, permissionSets, userAssignments }) => {
+}> = ({ theme, userAssignments }) => {
   const { t } = useTranslation();
 
   return (
@@ -213,8 +204,7 @@ const PermissionSetChips: React.FC<{
         alignItems: "center",
       }}
     >
-      {userAssignments?.assignments &&
-      userAssignments.assignments.length > 0 ? (
+      {userAssignments?.assignments && userAssignments.assignments.length > 0 ? (
         userAssignments.assignments.map((assignment) => (
           <Chip
             key={assignment.permissionSetId}
@@ -252,9 +242,7 @@ const containsFilter: FilterFn<any> = (row, columnId, filterValue) => {
     return dateStr === filterValue.value;
   }
 
-  return String(cellValue)
-    .toLowerCase()
-    .includes(String(filterValue).toLowerCase());
+  return String(cellValue).toLowerCase().includes(String(filterValue).toLowerCase());
 };
 
 const UserList: React.FC<UserListProps> = ({
@@ -286,7 +274,7 @@ const UserList: React.FC<UserListProps> = ({
         activeSorting.map((sort) => ({
           id: sort.columnId,
           desc: sort.desc,
-        })),
+        }))
       );
     }
   }, [activeSorting]);
@@ -297,7 +285,7 @@ const UserList: React.FC<UserListProps> = ({
         activeFilters.map((filter) => ({
           id: filter.columnId,
           value: filter.value,
-        })),
+        }))
       );
     }
   }, [activeFilters]);
@@ -329,15 +317,9 @@ const UserList: React.FC<UserListProps> = ({
     permissionSets: false, // Hide permission sets column by default
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
 
   const formatDate = (dateString: string, includeTime: boolean = false) => {
     const date = new Date(dateString);
@@ -370,11 +352,7 @@ const UserList: React.FC<UserListProps> = ({
         enableFiltering: true,
         cell: ({ getValue }) => {
           console.log("Cell theme:", theme);
-          return (
-            <TableCellContent variant="primary">
-              {getValue() as string}
-            </TableCellContent>
-          );
+          return <TableCellContent variant="primary">{getValue() as string}</TableCellContent>;
         },
       },
       {
@@ -386,9 +364,7 @@ const UserList: React.FC<UserListProps> = ({
         enableSorting: true,
         enableFiltering: true,
         cell: ({ getValue }) => (
-          <TableCellContent variant="secondary">
-            {(getValue() as string) || "-"}
-          </TableCellContent>
+          <TableCellContent variant="secondary">{(getValue() as string) || "-"}</TableCellContent>
         ),
       },
       {
@@ -400,9 +376,7 @@ const UserList: React.FC<UserListProps> = ({
         enableSorting: true,
         enableFiltering: true,
         cell: ({ getValue }) => (
-          <TableCellContent variant="secondary">
-            {(getValue() as string) || "-"}
-          </TableCellContent>
+          <TableCellContent variant="secondary">{(getValue() as string) || "-"}</TableCellContent>
         ),
       },
       {
@@ -431,19 +405,13 @@ const UserList: React.FC<UserListProps> = ({
           const enabled = getValue() as boolean;
           return (
             <Chip
-              label={
-                enabled
-                  ? t("common.status.active")
-                  : t("common.status.inactive")
-              }
+              label={enabled ? t("common.status.active") : t("common.status.inactive")}
               size="small"
               sx={{
                 backgroundColor: enabled
                   ? alpha(theme.palette.success.main, 0.1)
                   : alpha(theme.palette.grey[500], 0.1),
-                color: enabled
-                  ? theme.palette.success.main
-                  : theme.palette.grey[500],
+                color: enabled ? theme.palette.success.main : theme.palette.grey[500],
                 fontWeight: 600,
                 borderRadius: "6px",
                 height: "24px",
@@ -484,11 +452,7 @@ const UserList: React.FC<UserListProps> = ({
         enableFiltering: false,
         cell: ({ row }) => {
           return (
-            <PermissionSetCell
-              user={row.original}
-              theme={theme}
-              permissionSets={permissionSets}
-            />
+            <PermissionSetCell user={row.original} theme={theme} permissionSets={permissionSets} />
           );
         },
       },
@@ -505,9 +469,7 @@ const UserList: React.FC<UserListProps> = ({
           return (
             <Tooltip title={formatDate(dateValue, true)} placement="top">
               <Box>
-                <TableCellContent variant="secondary">
-                  {formatDate(dateValue)}
-                </TableCellContent>
+                <TableCellContent variant="secondary">{formatDate(dateValue)}</TableCellContent>
               </Box>
             </Tooltip>
           );
@@ -526,9 +488,7 @@ const UserList: React.FC<UserListProps> = ({
           return (
             <Tooltip title={formatDate(dateValue, true)} placement="top">
               <Box>
-                <TableCellContent variant="secondary">
-                  {formatDate(dateValue)}
-                </TableCellContent>
+                <TableCellContent variant="secondary">{formatDate(dateValue)}</TableCellContent>
               </Box>
             </Tooltip>
           );
@@ -537,9 +497,7 @@ const UserList: React.FC<UserListProps> = ({
       {
         id: "actions",
         header: () => (
-          <Box sx={{ width: "100%", textAlign: "center" }}>
-            {t("common.columns.actions")}
-          </Box>
+          <Box sx={{ width: "100%", textAlign: "center" }}>{t("common.columns.actions")}</Box>
         ),
         minSize: 100,
         size: 120,
@@ -566,19 +524,14 @@ const UserList: React.FC<UserListProps> = ({
             </Tooltip>
             <Tooltip
               title={
-                row.original.enabled
-                  ? t("common.actions.deactivate")
-                  : t("common.actions.activate")
+                row.original.enabled ? t("common.actions.deactivate") : t("common.actions.activate")
               }
             >
               <IconButton
                 size="small"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onToggleUserStatus(
-                    row.original.username,
-                    !row.original.enabled,
-                  );
+                  onToggleUserStatus(row.original.username, !row.original.enabled);
                 }}
                 sx={{
                   backgroundColor: row.original.enabled
@@ -672,10 +625,7 @@ const UserList: React.FC<UserListProps> = ({
     setColumnMenuAnchor(null);
   };
 
-  const handleFilterMenuOpen = (
-    event: React.MouseEvent<HTMLElement>,
-    columnId: string,
-  ) => {
+  const handleFilterMenuOpen = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
     setFilterMenuAnchor(event.currentTarget);
     setActiveFilterColumn(columnId);
   };
@@ -698,26 +648,15 @@ const UserList: React.FC<UserListProps> = ({
       onRemoveFilter,
       onRemoveSort,
       onFilterChange: (columnId: string, value: string) => {
-        const newFilters = columnFilters.map((f) =>
-          f.id === columnId ? { ...f, value } : f,
-        );
+        const newFilters = columnFilters.map((f) => (f.id === columnId ? { ...f, value } : f));
         handleFilterChange(newFilters);
       },
       onSortChange: (columnId: string, desc: boolean) => {
-        const newSorting = sorting.map((s) =>
-          s.id === columnId ? { ...s, desc } : s,
-        );
+        const newSorting = sorting.map((s) => (s.id === columnId ? { ...s, desc } : s));
         handleSortingChange(newSorting);
       },
     }),
-    [
-      columnFilters,
-      sorting,
-      onRemoveFilter,
-      onRemoveSort,
-      handleFilterChange,
-      handleSortingChange,
-    ],
+    [columnFilters, sorting, onRemoveFilter, onRemoveSort, handleFilterChange, handleSortingChange]
   );
 
   return (
@@ -752,7 +691,7 @@ const UserList: React.FC<UserListProps> = ({
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={onRemoveSort}
           emptyState={{
-            message: "No users found",
+            message: t("common.noUsersFound"),
             icon: <GroupIcon sx={{ fontSize: 40 }} />,
           }}
         />
@@ -766,9 +705,7 @@ const UserList: React.FC<UserListProps> = ({
 
         <UserFilterPopover
           anchorEl={filterMenuAnchor}
-          column={
-            activeFilterColumn ? table.getColumn(activeFilterColumn) : null
-          }
+          column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
           onClose={handleFilterMenuClose}
           users={users}
         />

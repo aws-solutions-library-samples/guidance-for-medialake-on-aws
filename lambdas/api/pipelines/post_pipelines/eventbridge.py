@@ -21,6 +21,51 @@ from config import (
 # Initialize logger
 logger = Logger()
 
+# Initialize DynamoDB client
+dynamodb = boto3.resource("dynamodb")
+# Get table name from environment variable (set by CDK)
+PIPELINES_TABLE_NAME = os.environ.get("PIPELINES_TABLE")
+if PIPELINES_TABLE_NAME:
+    # Extract table name from ARN if needed
+    if PIPELINES_TABLE_NAME.startswith("arn:"):
+        PIPELINES_TABLE_NAME = PIPELINES_TABLE_NAME.split("/")[-1]
+    pipelines_table = dynamodb.Table(PIPELINES_TABLE_NAME)
+else:
+    pipelines_table = None
+    logger.warning("PIPELINES_TABLE environment variable not set")
+
+
+def resolve_pipeline_id_to_name(pipeline_id: str) -> str:
+    """
+    Resolve a pipeline ID (UUID) to its name by querying DynamoDB.
+
+    Args:
+        pipeline_id: The pipeline UUID
+
+    Returns:
+        The pipeline name, or the original ID if not found
+    """
+    if not pipelines_table:
+        logger.warning(
+            "Pipelines table not available, cannot resolve pipeline ID to name"
+        )
+        return pipeline_id
+
+    try:
+        response = pipelines_table.get_item(Key={"id": pipeline_id})
+        if "Item" in response:
+            pipeline_name = response["Item"].get("name", pipeline_id)
+            logger.info(
+                f"[DEBUG] Resolved pipeline ID {pipeline_id} to name: {pipeline_name}"
+            )
+            return pipeline_name
+        else:
+            logger.warning(f"Pipeline ID {pipeline_id} not found in DynamoDB")
+            return pipeline_id
+    except Exception as e:
+        logger.error(f"Error resolving pipeline ID {pipeline_id}: {e}")
+        return pipeline_id
+
 
 def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, Any]:
     """
@@ -35,7 +80,46 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
         Processed event pattern with parameter substitutions
     """
     # Get parameters from node configuration
+    # Check both locations: parameters dict and direct configuration
     parameters = node.data.configuration.get("parameters", {})
+
+    # Also check for parameters directly in configuration (for backward compatibility)
+    # This allows ${pipeline_name} to work whether pipeline_name is in parameters or configuration
+    for key, value in node.data.configuration.items():
+        if key != "parameters" and isinstance(value, (str, int, float, bool)):
+            if key not in parameters:
+                parameters[key] = value
+
+    # Resolve pipeline_name if it looks like a UUID (from UI dropdown)
+    logger.info(
+        f"[DEBUG] Checking pipeline_name in parameters: {parameters.get('pipeline_name', 'NOT FOUND')}"
+    )
+    if "pipeline_name" in parameters:
+        pipeline_value = parameters["pipeline_name"]
+        logger.info(
+            f"[DEBUG] pipeline_value type: {type(pipeline_value)}, value: {pipeline_value}"
+        )
+        # Check if it's a UUID pattern (8-4-4-4-12 hex digits)
+        if isinstance(pipeline_value, str) and re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            pipeline_value,
+            re.IGNORECASE,
+        ):
+            logger.info(
+                f"[DEBUG] Detected pipeline_name as UUID: {pipeline_value}, resolving to name"
+            )
+            resolved_name = resolve_pipeline_id_to_name(pipeline_value)
+            logger.info(f"[DEBUG] Resolved to: {resolved_name}")
+            parameters["pipeline_name"] = resolved_name
+        else:
+            logger.info(
+                f"[DEBUG] pipeline_name does not match UUID pattern or is not a string"
+            )
+
+    logger.info(f"[DEBUG] process_pattern_parameters - All parameters: {parameters}")
+    logger.info(
+        f"[DEBUG] process_pattern_parameters - node.data.configuration: {node.data.configuration}"
+    )
 
     # Find format parameters
     format_value = None
@@ -140,16 +224,32 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
                             if param_name in parameters and parameters[param_name]:
                                 param_value = parameters[param_name]
                                 logger.info(
-                                    f"Replacing {param_name} with {param_value}"
+                                    f"[DEBUG] Replacing placeholder ${{{param_name}}} with value: {param_value}"
                                 )
+                                # Only uppercase Format-related parameters
+                                should_uppercase = param_name in [
+                                    "Format",
+                                    "Image Type",
+                                    "Video Type",
+                                    "Audio Type",
+                                ]
+
                                 if "," in param_value:
                                     obj[key][i] = [
-                                        v.strip().upper()
+                                        (
+                                            v.strip().upper()
+                                            if should_uppercase
+                                            else v.strip()
+                                        )
                                         for v in param_value.split(",")
                                         if v.strip()
                                     ]
                                 else:
-                                    obj[key][i] = param_value.upper()
+                                    obj[key][i] = (
+                                        param_value.upper()
+                                        if should_uppercase
+                                        else param_value
+                                    )
                 elif (
                     isinstance(value, str)
                     and value.startswith("${")
@@ -158,15 +258,27 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
                     param_name = value[2:-1]
                     if param_name in parameters and parameters[param_name]:
                         param_value = parameters[param_name]
-                        logger.info(f"Replacing {param_name} with {param_value}")
+                        logger.info(
+                            f"[DEBUG] Replacing placeholder ${{{param_name}}} with value: {param_value}"
+                        )
+                        # Only uppercase Format-related parameters
+                        should_uppercase = param_name in [
+                            "Format",
+                            "Image Type",
+                            "Video Type",
+                            "Audio Type",
+                        ]
+
                         if "," in param_value:
                             obj[key] = [
-                                v.strip().upper()
+                                v.strip().upper() if should_uppercase else v.strip()
                                 for v in param_value.split(",")
                                 if v.strip()
                             ]
                         else:
-                            obj[key] = param_value.upper()
+                            obj[key] = (
+                                param_value.upper() if should_uppercase else param_value
+                            )
 
     # Special handling for Format in MainRepresentation
     if (
@@ -202,9 +314,8 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
     # Process any remaining placeholders
     replace_placeholders(result)
 
-    # Only add source if it's not already in the pattern and not a pipeline_execution rule
-    if "source" not in result and not is_pipeline_execution:
-        result["source"] = ["custom.asset.processor"]
+    # Note: source is no longer added automatically - it should be defined in the YAML
+    # if needed for the specific trigger type
 
     logger.info(f"Processed event pattern: {json.dumps(result)}")
     return result
@@ -225,6 +336,24 @@ def get_event_pattern_for_rule(
     Returns:
         Event pattern dictionary for the rule
     """
+    # First check if event_pattern is in node configuration parameters (from UI)
+    parameters = node.data.configuration.get("parameters", {})
+    if "event_pattern" in parameters and parameters["event_pattern"]:
+        try:
+            # Parse the event pattern from parameters (it's stored as a JSON string or dict)
+            if isinstance(parameters["event_pattern"], str):
+                pattern = json.loads(parameters["event_pattern"])
+            else:
+                pattern = parameters["event_pattern"]
+
+            logger.info(f"Using event pattern from node parameters: {pattern}")
+
+            # Don't add default source for custom patterns
+            return pattern
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse event_pattern from parameters: {e}")
+            # Fall through to check YAML
+
     # Check if YAML data contains an event pattern
     if (
         yaml_data
@@ -337,9 +466,8 @@ def get_event_pattern_for_rule(
             # For other rules, use the pattern from YAML
             pattern = copy.deepcopy(yaml_pattern)
 
-            # Don't add source if not present
-
             # Process parameter substitutions
+            # YAML is the source of truth for the pattern structure
             pattern = process_pattern_parameters(pattern, node)
 
             return pattern
@@ -468,23 +596,6 @@ def get_event_pattern_for_rule(
 
         # Skip the rest of the function to avoid adding parameters at the top level
         return pattern
-    elif rule_name == "workflow_completed":
-        # Get pipeline name from node configuration if available
-        target_pipeline = node.data.configuration.get("pipeline_name", "")
-        pattern.update({"detail-type": ["WorkflowCompleted"]})
-
-        # Add pipeline name filter if specified and not empty
-        if target_pipeline and target_pipeline.strip():
-            # Handle comma-delimited pipeline names
-            if "," in target_pipeline:
-                # Split by comma, trim whitespace, and filter out empty items
-                pipeline_array = [
-                    name.strip() for name in target_pipeline.split(",") if name.strip()
-                ]
-                if pipeline_array:  # Only add if there are non-empty items
-                    pattern["detail"] = {"pipeline_name": pipeline_array}
-            else:
-                pattern["detail"] = {"pipeline_name": [target_pipeline]}
 
     # Add any additional filters from node configuration
     for param in node.data.configuration:
@@ -863,8 +974,23 @@ def create_eventbridge_rule(
         # Create the EventBridge rule
         events_client = boto3.client("events")
 
-        # Get the event bus name from environment variable
-        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        # Get the event bus ARN/name from node parameters if specified, otherwise use environment variable
+        parameters = node.data.configuration.get("parameters", {})
+        event_bus_identifier = parameters.get("event_bus_arn", PIPELINES_EVENT_BUS_NAME)
+
+        # Extract the event bus name from ARN if it's an ARN
+        # ARN format: arn:aws:events:region:account-id:event-bus/bus-name
+        # or just "default" or a simple bus name
+        if event_bus_identifier.startswith("arn:aws:events:"):
+            # Extract bus name from ARN
+            event_bus_name = event_bus_identifier.split("/")[-1]
+        else:
+            # It's already a bus name (e.g., "default" or "custom-bus-name")
+            event_bus_name = event_bus_identifier
+
+        logger.info(
+            f"Using event bus: {event_bus_identifier} (extracted name: {event_bus_name})"
+        )
 
         # Create the rule
         rule_response = events_client.put_rule(
@@ -1016,7 +1142,12 @@ def create_eventbridge_rule(
                         f"Adding common libraries layer to EventBridge trigger Lambda: {common_libraries_layer_arn}"
                     )
 
-                # Create the Lambda function
+                # Create the Lambda function with retry logic for role propagation issues
+                # Extract Max Concurrent Executions from node parameters for environment variable
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+
                 create_function_params = {
                     "FunctionName": trigger_lambda_name,
                     "Runtime": "python3.12",
@@ -1027,7 +1158,7 @@ def create_eventbridge_rule(
                     "MemorySize": 1024,
                     "Environment": {
                         "Variables": {
-                            "MAX_CONCURRENT_EXECUTIONS": "1000",
+                            "MAX_CONCURRENT_EXECUTIONS": str(max_concurrent_executions),
                             "PIPELINE_NAME": pipeline_name,
                             "SERVICE": "Trigger",  # node Title
                             "STEP_NAME": "Pipeline Trigger",  # friendly name of the node
@@ -1109,8 +1240,9 @@ def create_eventbridge_rule(
                     response = sqs_client.create_queue(
                         QueueName=queue_name,
                         Attributes={
-                            "VisibilityTimeout": "300",  # 5 minutes
+                            "VisibilityTimeout": "900",  # 15 minutes (allows for retries)
                             "MessageRetentionPeriod": "86400",  # 1 day
+                            "ReceiveMessageWaitTimeSeconds": "20",  # Long polling to reduce empty receives
                         },
                     )
                     queue_url = response["QueueUrl"]
@@ -1151,20 +1283,59 @@ def create_eventbridge_rule(
                 event_source_mapping_uuid = existing_mappings["EventSourceMappings"][0][
                     "UUID"
                 ]
+
+                # Update the mapping to add concurrency control if not present
+                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+                logger.info(
+                    f"Updating event source mapping with MaximumConcurrency={max_concurrent_executions} from node parameters"
+                )
+
+                try:
+                    lambda_client.update_event_source_mapping(
+                        UUID=event_source_mapping_uuid,
+                        ScalingConfig={"MaximumConcurrency": max_concurrent_executions},
+                        FunctionResponseTypes=[
+                            "ReportBatchItemFailures"
+                        ],  # Enable partial batch responses
+                    )
+                    logger.info(
+                        f"Updated event source mapping {event_source_mapping_uuid} with MaximumConcurrency={max_concurrent_executions} and ReportBatchItemFailures"
+                    )
+                except Exception as update_error:
+                    logger.warning(
+                        f"Could not update event source mapping concurrency: {update_error}"
+                    )
+
                 logger.info(
                     f"Using existing event source mapping: {event_source_mapping_uuid}"
                 )
             else:
-                # Set up Lambda trigger from SQS queue
+                # Set up Lambda trigger from SQS queue with concurrency control
+                # MaximumConcurrency limits how many Lambda instances process messages simultaneously
+                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+                logger.info(
+                    f"Using MaximumConcurrency={max_concurrent_executions} from node parameters"
+                )
+
                 response = lambda_client.create_event_source_mapping(
                     EventSourceArn=queue_arn,
                     FunctionName=trigger_lambda_name,
                     Enabled=True,
                     BatchSize=1,
+                    ScalingConfig={"MaximumConcurrency": max_concurrent_executions},
+                    FunctionResponseTypes=[
+                        "ReportBatchItemFailures"
+                    ],  # Enable partial batch responses
                 )
                 event_source_mapping_uuid = response.get("UUID")
                 logger.info(
-                    f"Created new event source mapping {event_source_mapping_uuid} from SQS queue to Lambda function"
+                    f"Created new event source mapping {event_source_mapping_uuid} from SQS queue to Lambda function with MaximumConcurrency={max_concurrent_executions}"
                 )
         except Exception as e:
             logger.error(f"Error creating/finding SQS queue: {e}")
@@ -1229,39 +1400,82 @@ def create_eventbridge_rule(
         return None
 
 
-def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
+def update_eventbridge_rule_state(
+    rule_name: str, enabled: bool, event_bus_name: Optional[str] = None
+) -> None:
     """
     Enable or disable an EventBridge rule.
 
     Args:
         rule_name: Name of the rule
         enabled: True to enable, False to disable
+        event_bus_name: Optional event bus name. If not provided, will try to find the rule across event buses.
     """
     events_client = boto3.client("events")
-    event_bus_name = PIPELINES_EVENT_BUS_NAME
+
+    # If event_bus_name is not provided, try to find the rule by checking multiple event buses
+    if not event_bus_name:
+        # First try the default pipelines event bus
+        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        try:
+            events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+            logger.info(f"Found rule {rule_name} on event bus {event_bus_name}")
+        except events_client.exceptions.ResourceNotFoundException:
+            # Try the default event bus
+            event_bus_name = "default"
+            try:
+                events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+                logger.info(f"Found rule {rule_name} on default event bus")
+            except events_client.exceptions.ResourceNotFoundException:
+                logger.error(f"Could not find rule {rule_name} on any known event bus")
+                raise
 
     try:
         if enabled:
             events_client.enable_rule(Name=rule_name, EventBusName=event_bus_name)
-            logger.info(f"Enabled EventBridge rule: {rule_name}")
+            logger.info(
+                f"Enabled EventBridge rule: {rule_name} on bus {event_bus_name}"
+            )
         else:
             events_client.disable_rule(Name=rule_name, EventBusName=event_bus_name)
-            logger.info(f"Disabled EventBridge rule: {rule_name}")
+            logger.info(
+                f"Disabled EventBridge rule: {rule_name} on bus {event_bus_name}"
+            )
     except Exception as e:
         logger.error(f"Error updating EventBridge rule state for {rule_name}: {e}")
 
 
-def delete_eventbridge_rule(rule_name: str) -> None:
+def delete_eventbridge_rule(
+    rule_name: str, event_bus_name: Optional[str] = None
+) -> None:
     """
     Delete an EventBridge rule, its targets, and associated resources (SQS queue, event source mapping).
 
     Args:
         rule_name: Name of the rule
+        event_bus_name: Optional event bus name. If not provided, will try to find the rule across event buses.
     """
     events_client = boto3.client("events")
     sqs_client = boto3.client("sqs")
     lambda_client = boto3.client("lambda")
-    event_bus_name = PIPELINES_EVENT_BUS_NAME
+
+    # If event_bus_name is not provided, try to find the rule by checking multiple event buses
+    if not event_bus_name:
+        # First try the default pipelines event bus
+        event_bus_name = PIPELINES_EVENT_BUS_NAME
+        try:
+            events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+            logger.info(f"Found rule {rule_name} on event bus {event_bus_name}")
+        except events_client.exceptions.ResourceNotFoundException:
+            # Try the default event bus
+            event_bus_name = "default"
+            try:
+                events_client.describe_rule(Name=rule_name, EventBusName=event_bus_name)
+                logger.info(f"Found rule {rule_name} on default event bus")
+            except events_client.exceptions.ResourceNotFoundException:
+                logger.error(f"Could not find rule {rule_name} on any known event bus")
+                # Continue anyway to try to clean up resources
+                event_bus_name = PIPELINES_EVENT_BUS_NAME
 
     try:
         # Extract the pipeline name from the rule name (it's usually the first part)

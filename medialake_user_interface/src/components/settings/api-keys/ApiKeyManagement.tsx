@@ -11,7 +11,6 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
-  IconButton,
   InputAdornment,
   Snackbar,
 } from "@mui/material";
@@ -40,9 +39,7 @@ const ApiKeyManagement: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
-    "success",
-  );
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success");
 
   const { showError } = useErrorModal();
 
@@ -58,7 +55,7 @@ const ApiKeyManagement: React.FC = () => {
       filtered = filtered.filter(
         (apiKey) =>
           apiKey.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          apiKey.description.toLowerCase().includes(searchTerm.toLowerCase()),
+          apiKey.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -146,16 +143,12 @@ const ApiKeyManagement: React.FC = () => {
   return (
     <Box>
       <PageHeader
-        title="API Key Management"
-        description="Manage API keys for programmatic access to the system"
+        title={t("apiKeys.title")}
+        description={t("apiKeys.description")}
         action={
           <Can I="create" a="api-key">
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddApiKey}
-            >
-              Add API Key
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>
+              {t("apiKeys.addApiKey")}
             </Button>
           </Can>
         }
@@ -168,7 +161,7 @@ const ApiKeyManagement: React.FC = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                placeholder="Search API keys..."
+                placeholder={t("apiKeys.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -182,15 +175,12 @@ const ApiKeyManagement: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={3}>
               <FormControl fullWidth sx={{ overflow: "visible" }}>
-                <InputLabel
-                  shrink
-                  sx={{ backgroundColor: "background.paper", px: 0.5 }}
-                >
+                <InputLabel shrink sx={{ backgroundColor: "background.paper", px: 0.5 }}>
                   Category
                 </InputLabel>
                 <Select
                   value={filterCategory}
-                  label="Category"
+                  label={t("common.category")}
                   onChange={(e) => setFilterCategory(e.target.value)}
                   startAdornment={
                     <InputAdornment position="start">
@@ -199,9 +189,9 @@ const ApiKeyManagement: React.FC = () => {
                   }
                   notched
                 >
-                  <MenuItem value="all">All API Keys</MenuItem>
-                  <MenuItem value="enabled">Enabled</MenuItem>
-                  <MenuItem value="disabled">Disabled</MenuItem>
+                  <MenuItem value="all">{t("apiKeys.categoryAll")}</MenuItem>
+                  <MenuItem value="enabled">{t("common.enabled")}</MenuItem>
+                  <MenuItem value="disabled">{t("common.disabled")}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -233,20 +223,16 @@ const ApiKeyManagement: React.FC = () => {
           >
             <Typography variant="h6" color="textSecondary" gutterBottom>
               {searchTerm || filterCategory !== "all"
-                ? "No API keys match your search"
-                : "No API keys found"}
+                ? t("apiKeys.emptyState.noMatchingApiKeys")
+                : t("apiKeys.emptyState.noApiKeys")}
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
               {searchTerm || filterCategory !== "all"
-                ? "Try adjusting your search or filter criteria"
-                : "Create your first API key to get started"}
+                ? t("common.messages.tryAdjustingSearchOrFilter")
+                : t("apiKeys.emptyState.createFirstApiKey")}
             </Typography>
             <Can I="create" a="api-key">
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddApiKey}
-              >
+              <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddApiKey}>
                 Add API Key
               </Button>
             </Can>
@@ -300,11 +286,7 @@ const ApiKeyManagement: React.FC = () => {
         onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbarSeverity}
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: "100%" }}>
           {snackbarMessage}
         </Alert>
       </Snackbar>

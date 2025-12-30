@@ -51,65 +51,201 @@ actions:
     description: Process any content using Amazon Bedrock models with customizable prompts
     operationId: bedrockContentProcessor
     parameters:
+      # Content Source - FIRST parameter to determine which models to show
       - in: body
-        name: model_id
+        name: content_source
+        label: Content Source
+        description: Select the type of content to process
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "Text (Transcript)"
+              value: "transcript"
+            - label: "Media (Image/Audio/Video)"
+              value: "proxy"
+          default: transcript
+      # ALL models for text/transcript processing (text-only + multimodal)
+      - in: body
+        name: model_id_text
         label: Bedrock Model
         required: true
         schema:
           type: select
           options:
-            [
-              "amazon.nova-canvas-v1:0",
-              "amazon.nova-lite-v1:0",
-              "amazon.nova-premier-v1:0",
-              "amazon.nova-pro-v1:0",
-              "amazon.nova-reel-v1:0",
-              "amazon.nova-reel-v1:1",
-              "amazon.titan-image-generator-v2:0",
-              "amazon.titan-image-generator-v1",
-              "amazon.titan-embed-image-v1",
-              "anthropic.claude-3-haiku-20240307-v1:0",
-              "anthropic.claude-3-opus-20240229-v1:0",
-              "anthropic.claude-3-sonnet-20240229-v1:0",
-              "anthropic.claude-3-5-sonnet-20241022-v2:0",
-              "anthropic.claude-3-5-sonnet-20240620-v1:0",
-              "anthropic.claude-3-7-sonnet-20250219-v1:0",
-              "meta.llama3-2-1b-instruct-v1:0",
-              "meta.llama3-2-11b-instruct-v1:0",
-              "meta.llama3-2-90b-instruct-v1:0",
-              "meta.llama4-maverick-17b-instruct-v1:0",
-              "meta.llama4-scout-17b-instruct-v1:0",
-              "mistral.pixtral-large-2502-v1:0",
-              "stability.sd3-5-large-v1:0",
-              "stability.stable-image-core-v1:1",
-              "stability.stable-image-ultra-v1:1",
-            ]
+            # Amazon Nova Text Models
+            - label: "Amazon Nova Lite v1 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "amazon.nova-lite-v1:0"
+            - label: "Amazon Nova Micro (us-east-1, us-west-2, ap-southeast-2)"
+              value: "amazon.nova-micro-v1:0"
+            - label: "Amazon Nova Premier v1 (us-east-1, us-west-2)"
+              value: "amazon.nova-premier-v1:0"
+            - label: "Amazon Nova Pro v1 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "amazon.nova-pro-v1:0"
+            # Anthropic Claude 3 Family (Multimodal - can process text OR images/video)
+            - label: "Anthropic Claude 3 Haiku (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-haiku-20240307-v1:0"
+            - label: "Anthropic Claude 3 Opus (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-opus-20240229-v1:0"
+            - label: "Anthropic Claude 3 Sonnet (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-sonnet-20240229-v1:0"
+            # Anthropic Claude 3.5 Family (Multimodal)
+            - label: "Anthropic Claude 3.5 Haiku (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-5-haiku-20241022-v1:0"
+            - label: "Anthropic Claude 3.5 Sonnet v1 (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-5-sonnet-20240620-v1:0"
+            - label: "Anthropic Claude 3.5 Sonnet v2 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+            # Anthropic Claude 3.7 Sonnet (Multimodal)
+            - label: "Anthropic Claude 3.7 Sonnet (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-7-sonnet-20250219-v1:0"
+            # Anthropic Claude 4 Family (Multimodal)
+            - label: "Anthropic Claude Haiku 4.5 (us-east-1, us-west-2)"
+              value: "anthropic.claude-haiku-4-5-20250514-v1:0"
+            - label: "Anthropic Claude Opus 4 (us-east-1, us-west-2)"
+              value: "anthropic.claude-opus-4-20250514-v1:0"
+            - label: "Anthropic Claude Opus 4.1 (us-east-1, us-west-2)"
+              value: "anthropic.claude-opus-4-1-20250514-v1:0"
+            - label: "Anthropic Claude Sonnet 4 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-sonnet-4-20250514-v1:0"
+            - label: "Anthropic Claude Sonnet 4.5 (us-east-1, us-west-2)"
+              value: "anthropic.claude-sonnet-4-5-20250514-v1:0"
+            # DeepSeek Models
+            - label: "DeepSeek R1 (us-east-1, us-west-2)"
+              value: "deepseek.deepseek-r1-v1:0"
+            # Meta Llama 3.1 Family
+            - label: "Meta Llama 3.1 8B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-1-8b-instruct-v1:0"
+            - label: "Meta Llama 3.1 70B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-1-70b-instruct-v1:0"
+            - label: "Meta Llama 3.1 405B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-1-405b-instruct-v1:0"
+            # Meta Llama 3.2 Family
+            - label: "Meta Llama 3.2 1B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-2-1b-instruct-v1:0"
+            - label: "Meta Llama 3.2 11B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-2-11b-instruct-v1:0"
+            - label: "Meta Llama 3.2 90B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-2-90b-instruct-v1:0"
+            # Meta Llama 3.3 Family
+            - label: "Meta Llama 3.3 70B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama3-3-70b-instruct-v1:0"
+            # Meta Llama 4 Family
+            - label: "Meta Llama 4 Maverick 17B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama4-maverick-17b-instruct-v1:0"
+            - label: "Meta Llama 4 Scout 17B Instruct (us-east-1, us-west-2)"
+              value: "meta.llama4-scout-17b-instruct-v1:0"
+            # Mistral Models (Multimodal)
+            - label: "Mistral Pixtral Large 25.02 (us-east-1, us-west-2)"
+              value: "mistral.pixtral-large-2502-v1:0"
+            # TwelveLabs Models (Video understanding - can also process text)
+            - label: "TwelveLabs Pegasus v1.2 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "twelvelabs.pegasus-1-2-v1:0"
+            # Writer Models
+            - label: "Palmyra X5 (us-east-1, us-west-2)"
+              value: "writer.palmyra-x5-v1:0"
+        showWhen:
+          field: parameters.content_source
+          value: transcript
+      # Multimodal models (for image/audio/video input)
       - in: body
-        name: prompt_name
-        label: Default Prompt
+        name: model_id_media
+        label: Bedrock Model (Multimodal)
+        required: true
+        schema:
+          type: select
+          options:
+            # Anthropic Claude 3 Family (Vision-enabled)
+            - label: "Anthropic Claude 3 Haiku (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-haiku-20240307-v1:0"
+            - label: "Anthropic Claude 3 Opus (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-opus-20240229-v1:0"
+            - label: "Anthropic Claude 3 Sonnet (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-sonnet-20240229-v1:0"
+            # Anthropic Claude 3.5 Family (Vision-enabled)
+            - label: "Anthropic Claude 3.5 Haiku (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-5-haiku-20241022-v1:0"
+            - label: "Anthropic Claude 3.5 Sonnet v1 (us-east-1, us-west-2)"
+              value: "anthropic.claude-3-5-sonnet-20240620-v1:0"
+            - label: "Anthropic Claude 3.5 Sonnet v2 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+            # Anthropic Claude 3.7 Sonnet (Vision-enabled)
+            - label: "Anthropic Claude 3.7 Sonnet (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-3-7-sonnet-20250219-v1:0"
+            # Anthropic Claude 4 Family (Vision-enabled)
+            - label: "Anthropic Claude Haiku 4.5 (us-east-1, us-west-2)"
+              value: "anthropic.claude-haiku-4-5-20250514-v1:0"
+            - label: "Anthropic Claude Opus 4 (us-east-1, us-west-2)"
+              value: "anthropic.claude-opus-4-20250514-v1:0"
+            - label: "Anthropic Claude Opus 4.1 (us-east-1, us-west-2)"
+              value: "anthropic.claude-opus-4-1-20250514-v1:0"
+            - label: "Anthropic Claude Sonnet 4 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "anthropic.claude-sonnet-4-20250514-v1:0"
+            - label: "Anthropic Claude Sonnet 4.5 (us-east-1, us-west-2)"
+              value: "anthropic.claude-sonnet-4-5-20250514-v1:0"
+            # Mistral Models (Vision-enabled)
+            - label: "Mistral Pixtral Large 25.02 (us-east-1, us-west-2)"
+              value: "mistral.pixtral-large-2502-v1:0"
+            # TwelveLabs Models (Video understanding)
+            - label: "TwelveLabs Pegasus v1.2 (us-east-1, us-west-2, ap-southeast-2)"
+              value: "twelvelabs.pegasus-1-2-v1:0"
+        showWhen:
+          field: parameters.content_source
+          value: proxy
+      - in: body
+        name: prompt_source
+        label: Prompt Source
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "Choose from saved prompts (Use a prompt your team has already defined)"
+              value: "saved"
+            - label: "Write a custom prompt (Create new instructions for this node)"
+              value: "custom"
+          default: saved
+      - in: body
+        name: saved_prompt_name
+        label: Select Saved Prompt
         required: false
         schema:
           type: select
           options:
-            [
-              "summary_100",
-              "describe_image",
-              "extract_key_points",
-              "analyze_sentiment",
-            ]
-      # - in: body
-      #   name: custom_prompt
-      #   label: Override Prompt
-      #   required: false
-      #   schema:
-      #     type: string
+            - label: "Summary (100 words)"
+              value: "summary_100"
+            - label: "Describe Image"
+              value: "describe_image"
+            - label: "Extract Key Points"
+              value: "extract_key_points"
+            - label: "Analyze Sentiment"
+              value: "analyze_sentiment"
+        showWhen:
+          field: parameters.prompt_source
+          value: saved
       - in: body
-        name: content_source
-        label: Content Source
-        required: true
+        name: custom_prompt_label
+        label: Prompt Label
+        placeholder: Name this prompt (e.g., 'Technical Documentation Summary')
+        description: A friendly name to identify this custom prompt result
+        required: false
         schema:
-          type: select
-          options: ["transcript", "proxy"]
+          type: string
+        showWhen:
+          field: parameters.prompt_source
+          value: custom
+      - in: body
+        name: custom_prompt_text
+        label: Prompt Text
+        placeholder: Enter instructions for the model...
+        description: Provide detailed instructions for how the model should process the content
+        required: false
+        schema:
+          type: string
+          multiline: true
+          rows: 8
+        showWhen:
+          field: parameters.prompt_source
+          value: custom
     connections:
       incoming:
         type: [any]

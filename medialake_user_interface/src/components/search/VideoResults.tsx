@@ -41,8 +41,7 @@ const defaultColumns: AssetTableColumn<VideoItem>[] = [
     visible: true,
     minWidth: 300,
     accessorFn: (video) =>
-      video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.Name,
+      video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
     cell: (info) => info.getValue() as string,
   },
   {
@@ -67,8 +66,7 @@ const defaultColumns: AssetTableColumn<VideoItem>[] = [
     visible: false,
     minWidth: 100,
     accessorFn: (video) =>
-      video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .FileInfo.Size,
+      video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
     cell: (info) => formatFileSize(info.getValue() as number),
   },
 ];
@@ -83,16 +81,14 @@ const sortOptions = [
 const renderCardField = (fieldId: string, video: VideoItem): string => {
   switch (fieldId) {
     case "name":
-      return video.DigitalSourceAsset.MainRepresentation.StorageInfo
-        .PrimaryLocation.ObjectKey.Name;
+      return video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
     case "format":
       return video.DigitalSourceAsset.MainRepresentation.Format;
     case "createDate":
       return formatDate(video.DigitalSourceAsset.CreateDate);
     case "fileSize":
       return formatFileSize(
-        video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        video.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
       );
     default:
       return "";

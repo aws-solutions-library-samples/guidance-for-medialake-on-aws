@@ -1,7 +1,7 @@
 // src/shared/utils/dateUtils.ts
 
 import {
-  format,
+  // format,
   formatDistanceToNow,
   parseISO,
   isValid as isValidDate,
@@ -55,7 +55,7 @@ const isStatusLabel = (input: string | number): input is string =>
  */
 export const formatLocalDateTime = (
   input?: string | number | null,
-  options: DateTimeFormatOptions = {},
+  options: DateTimeFormatOptions = {}
 ): string => {
   if (input == null) {
     return "";
@@ -119,8 +119,7 @@ export const isValidISOString = (input?: string | number | null): boolean => {
 
 /** E.g. “PDT” or fallback “America/Los_Angeles” */
 export const getTimezoneAbbreviation = (timezone?: string): string => {
-  const targetTimezone =
-    timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const targetTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   try {
     const parts = new Date()
       .toLocaleTimeString("en-US", {

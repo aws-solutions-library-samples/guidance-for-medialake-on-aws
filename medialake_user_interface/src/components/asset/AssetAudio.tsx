@@ -1,15 +1,6 @@
 // AssetAudio.tsx
 import React, { useState, useRef, useEffect } from "react";
-import {
-  Box,
-  Typography,
-  IconButton,
-  Slider,
-  Stack,
-  Paper,
-  useTheme,
-  alpha,
-} from "@mui/material";
+import { Box, Typography, IconButton, Slider, Stack, Paper, useTheme, alpha } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
@@ -288,13 +279,11 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
           >
             {Array.from({ length: sizeStyles.barCount }).map((_, index) => {
               const baseHeight = 20;
-              const middleBoost =
-                Math.sin((index / sizeStyles.barCount) * Math.PI) * 80;
+              const middleBoost = Math.sin((index / sizeStyles.barCount) * Math.PI) * 80;
               const randomVariation = Math.random() * 15;
               const height = baseHeight + middleBoost + randomVariation;
 
-              const isBeforePlayhead =
-                (index / sizeStyles.barCount) * 100 <= progressPercentage;
+              const isBeforePlayhead = (index / sizeStyles.barCount) * 100 <= progressPercentage;
 
               return (
                 <Box
@@ -395,10 +384,7 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
               justifyContent: "center",
             }}
           >
-            <IconButton
-              aria-label="previous"
-              sx={{ color: theme.palette.text.secondary }}
-            >
+            <IconButton aria-label="previous" sx={{ color: theme.palette.text.secondary }}>
               <SkipPreviousIcon fontSize="large" />
             </IconButton>
             <IconButton
@@ -413,16 +399,9 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
                 },
               }}
             >
-              {isPlaying ? (
-                <PauseIcon fontSize="large" />
-              ) : (
-                <PlayArrowIcon fontSize="large" />
-              )}
+              {isPlaying ? <PauseIcon fontSize="large" /> : <PlayArrowIcon fontSize="large" />}
             </IconButton>
-            <IconButton
-              aria-label="next"
-              sx={{ color: theme.palette.text.secondary }}
-            >
+            <IconButton aria-label="next" sx={{ color: theme.palette.text.secondary }}>
               <SkipNextIcon fontSize="large" />
             </IconButton>
           </Box>
@@ -461,12 +440,8 @@ const AssetAudio: React.FC<AssetAudioProps> = ({
         </Stack>
       </Paper>
 
-      <Typography
-        variant="caption"
-        sx={{ mt: 2, color: theme.palette.text.secondary }}
-      >
-        Format: MP3 • Sample Rate: 44.1 kHz • Bit Rate: 320 kbps • Channels:
-        Stereo
+      <Typography variant="caption" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+        Format: MP3 • Sample Rate: 44.1 kHz • Bit Rate: 320 kbps • Channels: Stereo
       </Typography>
     </Box>
   );

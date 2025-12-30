@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -70,6 +71,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
   availableCategories,
   mediaType = "image",
 }) => {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   /* ---------------------------------------------------------------------- */
@@ -91,8 +93,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
       result = result
         .map((parent) => {
           const subCategories = parent.subCategories.filter(
-            (sub: any) =>
-              sub.category.toLowerCase() === categoryFilter.toLowerCase(),
+            (sub: any) => sub.category.toLowerCase() === categoryFilter.toLowerCase()
           );
           return subCategories.length
             ? { ...parent, subCategories, count: subCategories.length }
@@ -107,7 +108,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
       result = result
         .map((parent) => {
           const subCategories = parent.subCategories.filter((sub: any) =>
-            JSON.stringify(sub.data).toLowerCase().includes(term),
+            JSON.stringify(sub.data).toLowerCase().includes(term)
           );
           return subCategories.length
             ? { ...parent, subCategories, count: subCategories.length }
@@ -127,9 +128,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
     const all: string[] = [];
     filteredAccordions.forEach((parent, pIdx) => {
       all.push(`parent-${pIdx}`);
-      parent.subCategories.forEach((_: any, sIdx: number) =>
-        all.push(`${pIdx}-${sIdx}`),
-      );
+      parent.subCategories.forEach((_: any, sIdx: number) => all.push(`${pIdx}-${sIdx}`));
     });
     return all;
   }, [filteredAccordions]);
@@ -157,7 +156,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
         {/* --------------------------------------------------  Filter bar  --- */}
         <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
           <TextField
-            placeholder="Filter metadata…"
+            placeholder={t("common.placeholders.filterMetadata")}
             size="small"
             value={textFilter}
             onChange={(e) => setTextFilter(e.target.value)}
@@ -177,11 +176,10 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
               onChange={(e) => setCategoryFilter(e.target.value as string)}
               displayEmpty
             >
-              <MenuItem value="all">All Categories</MenuItem>
+              <MenuItem value="all">{t("detailPages.metadata.allCategories")}</MenuItem>
               {availableCategories.map((key) => (
                 <MenuItem key={key} value={key}>
-                  {categoryMapping[key] ||
-                    key.charAt(0).toUpperCase() + key.slice(1)}
+                  {categoryMapping[key] || key.charAt(0).toUpperCase() + key.slice(1)}
                 </MenuItem>
               ))}
             </Select>
@@ -216,9 +214,8 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                     {parent.category === "EmbeddedMetadata"
                       ? "Embedded Metadata"
-                      : categoryMapping[
-                          parent.category as keyof typeof categoryMapping
-                        ] || parent.category}
+                      : categoryMapping[parent.category as keyof typeof categoryMapping] ||
+                        parent.category}
                   </Typography>
                   <Chip
                     size="small"
@@ -241,9 +238,8 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                   label={
                     <Box sx={{ display: "flex", alignItems: "center" }}>
                       <Typography variant="body2">
-                        {categoryMapping[
-                          sub.category as keyof typeof categoryMapping
-                        ] || sub.category}
+                        {categoryMapping[sub.category as keyof typeof categoryMapping] ||
+                          sub.category}
                       </Typography>
                       <Chip
                         size="small"
@@ -252,10 +248,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                           ml: 1,
                           height: 18,
                           fontSize: "0.65rem",
-                          backgroundColor: alpha(
-                            theme.palette.secondary.main,
-                            0.1,
-                          ),
+                          backgroundColor: alpha(theme.palette.secondary.main, 0.1),
                           color: theme.palette.secondary.main,
                         }}
                       />
@@ -266,10 +259,7 @@ const TechnicalMetadataTab: React.FC<TechnicalMetadataTabProps> = ({
                     sx={{
                       p: 2,
                       mt: 1,
-                      backgroundColor: alpha(
-                        theme.palette.background.paper,
-                        0.5,
-                      ),
+                      backgroundColor: alpha(theme.palette.background.paper, 0.5),
                       borderRadius: 1,
                     }}
                   >

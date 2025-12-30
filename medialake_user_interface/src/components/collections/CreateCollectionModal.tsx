@@ -52,24 +52,20 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   const collections = collectionsResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
 
-  const handleInputChange =
-    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value =
-        event.target.type === "checkbox"
-          ? event.target.checked
-          : event.target.value;
-      setFormData((prev) => ({
+  const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors((prev) => ({
         ...prev,
-        [field]: value,
+        [field]: "",
       }));
-      // Clear error when user starts typing
-      if (errors[field]) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
-      }
-    };
+    }
+  };
 
   const handleSelectChange = (field: string) => (event: any) => {
     setFormData((prev) => ({
@@ -99,9 +95,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
 
     // Description validation
     if (formData.description && formData.description.length > 500) {
-      newErrors.description = t(
-        "collectionsPage.form.validation.descriptionMaxLength",
-      );
+      newErrors.description = t("collectionsPage.form.validation.descriptionMaxLength");
     }
 
     setErrors(newErrors);
@@ -165,9 +159,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
         },
       }}
     >
-      <DialogTitle sx={{ fontWeight: 600 }}>
-        {t("collectionsPage.createCollection")}
-      </DialogTitle>
+      <DialogTitle sx={{ fontWeight: 600 }}>{t("collectionsPage.createCollection")}</DialogTitle>
 
       <DialogContent sx={{ pb: 2 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 1 }}>
@@ -200,10 +192,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
 
           {/* Collection Type */}
           {collectionTypes.length > 0 && (
-            <FormControl
-              fullWidth
-              disabled={createCollectionMutation.isPending}
-            >
+            <FormControl fullWidth disabled={createCollectionMutation.isPending}>
               <InputLabel>{t("collectionsPage.form.type")}</InputLabel>
               <Select
                 value={formData.collectionTypeId}
@@ -211,7 +200,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                 onChange={handleSelectChange("collectionTypeId")}
               >
                 <MenuItem value="">
-                  <em>None</em>
+                  <em>{t("common.none")}</em>
                 </MenuItem>
                 {collectionTypes
                   .filter((type) => type.isActive)
@@ -242,13 +231,8 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
 
           {/* Parent Collection - Only show if no default parent is set */}
           {!defaultParentId && collections.length > 0 && (
-            <FormControl
-              fullWidth
-              disabled={createCollectionMutation.isPending}
-            >
-              <InputLabel>
-                {t("collectionsPage.form.parentCollection")}
-              </InputLabel>
+            <FormControl fullWidth disabled={createCollectionMutation.isPending}>
+              <InputLabel>{t("collectionsPage.form.parentCollection")}</InputLabel>
               <Select
                 value={formData.parentId}
                 label={t("collectionsPage.form.parentCollection")}
@@ -279,32 +263,21 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
           />
 
           {/* Error Alert */}
-          {createCollectionMutation.isError && (
-            <Alert severity="error">{t("common.error")}</Alert>
-          )}
+          {createCollectionMutation.isError && <Alert severity="error">{t("common.error")}</Alert>}
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button
-          onClick={handleClose}
-          disabled={createCollectionMutation.isPending}
-        >
+        <Button onClick={handleClose} disabled={createCollectionMutation.isPending}>
           {t("common.cancel")}
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={createCollectionMutation.isPending || !formData.name.trim()}
-          startIcon={
-            createCollectionMutation.isPending ? (
-              <CircularProgress size={20} />
-            ) : null
-          }
+          startIcon={createCollectionMutation.isPending ? <CircularProgress size={20} /> : null}
         >
-          {createCollectionMutation.isPending
-            ? t("common.saving")
-            : t("common.save")}
+          {createCollectionMutation.isPending ? t("common.saving") : t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

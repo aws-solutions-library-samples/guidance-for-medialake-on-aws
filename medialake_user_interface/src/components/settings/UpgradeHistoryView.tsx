@@ -26,7 +26,6 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon,
   NavigateNext as NavigateNextIcon,
-  NavigateBefore as NavigateBeforeIcon,
   History as HistoryIcon,
 } from "@mui/icons-material";
 import { EmptyTableState } from "@/components/common/table";
@@ -94,10 +93,7 @@ export const UpgradeHistoryView: React.FC = () => {
     return (
       <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography variant="body2" color="text.secondary">
-          {t(
-            "settings.systemSettings.upgrade.noHistory",
-            "No upgrade history available",
-          )}
+          {t("settings.systemSettings.upgrade.noHistory", "No upgrade history available")}
         </Typography>
       </Box>
     );
@@ -110,37 +106,23 @@ export const UpgradeHistoryView: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>
-                {t(
-                  "settings.systemSettings.upgrade.historyTable.status",
-                  "Status",
-                )}
+                {t("settings.systemSettings.upgrade.historyTable.status", "Status")}
               </TableCell>
               <TableCell>
                 {t("settings.systemSettings.upgrade.historyTable.from", "From")}
               </TableCell>
+              <TableCell>{t("settings.systemSettings.upgrade.historyTable.to", "To")}</TableCell>
               <TableCell>
-                {t("settings.systemSettings.upgrade.historyTable.to", "To")}
+                {t("settings.systemSettings.upgrade.historyTable.duration", "Duration")}
               </TableCell>
               <TableCell>
-                {t(
-                  "settings.systemSettings.upgrade.historyTable.duration",
-                  "Duration",
-                )}
-              </TableCell>
-              <TableCell>
-                {t(
-                  "settings.systemSettings.upgrade.historyTable.triggeredBy",
-                  "Triggered By",
-                )}
+                {t("settings.systemSettings.upgrade.historyTable.triggeredBy", "Triggered By")}
               </TableCell>
               <TableCell>
                 {t("settings.systemSettings.upgrade.historyTable.date", "Date")}
               </TableCell>
               <TableCell align="center">
-                {t(
-                  "settings.systemSettings.upgrade.historyTable.details",
-                  "Details",
-                )}
+                {t("settings.systemSettings.upgrade.historyTable.details", "Details")}
               </TableCell>
             </TableRow>
           </TableHead>
@@ -149,7 +131,7 @@ export const UpgradeHistoryView: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
                   <EmptyTableState
-                    message="No upgrade history available"
+                    message={t("common.noUpgradeHistory")}
                     icon={<HistoryIcon sx={{ fontSize: 40 }} />}
                   />
                 </TableCell>
@@ -159,17 +141,9 @@ export const UpgradeHistoryView: React.FC = () => {
                 <TableRow key={record.upgrade_id} hover>
                   <TableCell>
                     <Chip
-                      icon={
-                        record.status === "completed" ? (
-                          <CheckCircleIcon />
-                        ) : (
-                          <ErrorIcon />
-                        )
-                      }
+                      icon={record.status === "completed" ? <CheckCircleIcon /> : <ErrorIcon />}
                       label={record.status}
-                      color={
-                        record.status === "completed" ? "success" : "error"
-                      }
+                      color={record.status === "completed" ? "success" : "error"}
                       size="small"
                     />
                   </TableCell>
@@ -190,9 +164,7 @@ export const UpgradeHistoryView: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
-                      {formatDuration(record.duration)}
-                    </Typography>
+                    <Typography variant="body2">{formatDuration(record.duration)}</Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
@@ -212,10 +184,7 @@ export const UpgradeHistoryView: React.FC = () => {
                         </IconButton>
                       </Tooltip>
                     ) : (
-                      <Tooltip
-                        title={`Pipeline: ${record.pipeline_execution_id}`}
-                        arrow
-                      >
+                      <Tooltip title={`Pipeline: ${record.pipeline_execution_id}`} arrow>
                         <IconButton size="small">
                           <InfoIcon fontSize="small" />
                         </IconButton>
@@ -234,9 +203,7 @@ export const UpgradeHistoryView: React.FC = () => {
           <Button
             onClick={handleNextPage}
             disabled={loading}
-            endIcon={
-              loading ? <CircularProgress size={16} /> : <NavigateNextIcon />
-            }
+            endIcon={loading ? <CircularProgress size={16} /> : <NavigateNextIcon />}
           >
             {t("common.loadMore", "Load More")}
           </Button>

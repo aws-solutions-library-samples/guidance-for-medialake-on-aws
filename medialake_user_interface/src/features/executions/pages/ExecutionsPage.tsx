@@ -1,22 +1,7 @@
-import React, {
-  useMemo,
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Box,
-  Button,
-  useTheme,
-  alpha,
-  Chip,
-  Popover,
-  IconButton,
-} from "@mui/material";
+import { Box, Button, useTheme, alpha, Chip, IconButton } from "@mui/material";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -43,10 +28,7 @@ import { ExecutionsTable } from "../components/ExecutionsTable";
 import { TableCellContent } from "@/components/common/table";
 import { BaseFilterPopover } from "@/components/common/table/BaseFilterPopover";
 import { usePipelineExecutions } from "../api/hooks/usePipelineExecutions";
-import {
-  useRetryFromCurrent,
-  useRetryFromStart,
-} from "../api/hooks/useRetryExecution";
+import { useRetryFromCurrent, useRetryFromStart } from "../api/hooks/useRetryExecution";
 import type {
   PipelineExecution,
   PipelineExecutionFilters,
@@ -59,26 +41,18 @@ const PAGE_SIZE = 20;
 const ExecutionsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // State declarations
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "start_time", desc: true },
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "start_time", desc: true }]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(
-    null,
-  );
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
-    null,
-  );
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
-  const [selectedExecution, setSelectedExecution] =
-    useState<PipelineExecution | null>(null);
+  const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Retry mutations
@@ -93,30 +67,21 @@ const ExecutionsPage: React.FC = () => {
       sortBy: sorting[0]?.id || "start_time",
       sortOrder: sorting[0]?.desc ? ("desc" as const) : ("asc" as const),
       // If globalFilter is empty, clear search immediately; otherwise use debounced value
-      ...(globalFilter === ""
-        ? {}
-        : debouncedGlobalFilter && { search: debouncedGlobalFilter }),
+      ...(globalFilter === "" ? {} : debouncedGlobalFilter && { search: debouncedGlobalFilter }),
       ...columnFilters.reduce(
         (acc, filter) => ({
           ...acc,
           [filter.id]: filter.value,
         }),
-        {},
+        {}
       ),
     }),
-    [sorting, columnFilters, globalFilter, debouncedGlobalFilter],
+    [sorting, columnFilters, globalFilter, debouncedGlobalFilter]
   );
 
   // Data fetching and memoization
-  const {
-    data,
-    isLoading,
-    error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    refetch,
-  } = usePipelineExecutions(PAGE_SIZE, filters);
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
+    usePipelineExecutions(PAGE_SIZE, filters);
 
   const executions = useMemo(() => {
     if (!data?.pages) return [];
@@ -138,10 +103,7 @@ const ExecutionsPage: React.FC = () => {
     const prevSort = prevSortRef.current;
 
     // Only reset if sorting actually changed
-    if (
-      currentSort.sortBy !== prevSort.sortBy ||
-      currentSort.sortOrder !== prevSort.sortOrder
-    ) {
+    if (currentSort.sortBy !== prevSort.sortBy || currentSort.sortOrder !== prevSort.sortOrder) {
       queryClient.resetQueries({
         queryKey: QUERY_KEYS.PIPELINE_EXECUTIONS.all,
       });
@@ -158,23 +120,12 @@ const ExecutionsPage: React.FC = () => {
       setActiveFilterColumn(columnId);
       setColumnMenuAnchor(event.currentTarget);
     },
-    [],
+    []
   );
 
   const handleFilterMenuClose = useCallback(() => {
     setColumnMenuAnchor(null);
     setActiveFilterColumn(null);
-  }, []);
-
-  const handleFilterChange = useCallback((columnId: string, value: string) => {
-    setColumnFilters((prev) => {
-      const existing = prev.find((f) => f.id === columnId);
-      if (existing) {
-        return prev.map((f) => (f.id === columnId ? { ...f, value } : f));
-      }
-      return [...prev, { id: columnId, value }];
-    });
-    setColumnMenuAnchor(null);
   }, []);
 
   const getStatusColor = useCallback(
@@ -193,7 +144,7 @@ const ExecutionsPage: React.FC = () => {
           return theme.palette.grey[500];
       }
     },
-    [theme],
+    [theme]
   );
 
   const formatDate = useCallback((dateString: string) => {
@@ -216,14 +167,14 @@ const ExecutionsPage: React.FC = () => {
     (executionId: string) => {
       retryFromCurrentMutation.mutate(executionId);
     },
-    [retryFromCurrentMutation],
+    [retryFromCurrentMutation]
   );
 
   const handleRetryFromStart = useCallback(
     (executionId: string) => {
       retryFromStartMutation.mutate(executionId);
     },
-    [retryFromStartMutation],
+    [retryFromStartMutation]
   );
 
   // const handleViewDetails = useCallback((executionId: string) => {
@@ -267,9 +218,7 @@ const ExecutionsPage: React.FC = () => {
         filterFn: "includesString",
         filter: "includesString",
         cell: ({ getValue }) => (
-          <TableCellContent variant="primary">
-            {getValue() as string}
-          </TableCellContent>
+          <TableCellContent variant="primary">{getValue() as string}</TableCellContent>
         ),
       },
       {
@@ -356,7 +305,7 @@ const ExecutionsPage: React.FC = () => {
               <IconButton
                 size="small"
                 color="primary"
-                title="View Details"
+                title={t("common.actions.viewDetails")}
                 onClick={() => handleViewDetails(row.original)}
                 sx={{
                   backgroundColor: alpha(theme.palette.primary.main, 0.1),
@@ -373,12 +322,9 @@ const ExecutionsPage: React.FC = () => {
                     size="small"
                     color="primary"
                     title={t("executions.actions.retryFromCurrent")}
-                    onClick={() =>
-                      handleRetryFromCurrent(row.original.execution_id)
-                    }
+                    onClick={() => handleRetryFromCurrent(row.original.execution_id)}
                     disabled={
-                      retryFromCurrentMutation.isPending ||
-                      retryFromStartMutation.isPending
+                      retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
                     }
                     sx={{
                       backgroundColor: alpha(theme.palette.primary.main, 0.1),
@@ -397,12 +343,9 @@ const ExecutionsPage: React.FC = () => {
                     size="small"
                     color="primary"
                     title={t("executions.actions.retryFromStart")}
-                    onClick={() =>
-                      handleRetryFromStart(row.original.execution_id)
-                    }
+                    onClick={() => handleRetryFromStart(row.original.execution_id)}
                     disabled={
-                      retryFromCurrentMutation.isPending ||
-                      retryFromStartMutation.isPending
+                      retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
                     }
                     sx={{
                       backgroundColor: alpha(theme.palette.primary.main, 0.1),
@@ -434,7 +377,7 @@ const ExecutionsPage: React.FC = () => {
       handleRetryFromStart,
       retryFromCurrentMutation.isPending,
       retryFromStartMutation.isPending,
-    ],
+    ]
   );
 
   const table = useReactTable({
@@ -468,14 +411,8 @@ const ExecutionsPage: React.FC = () => {
     },
   });
 
-  const activeColumn = activeFilterColumn
-    ? table.getColumn(activeFilterColumn)
-    : null;
-
   return (
-    <Box
-      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
-    >
+    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Main content */}
 
       <PageHeader
@@ -551,9 +488,7 @@ const ExecutionsPage: React.FC = () => {
                 desc: s.desc,
               }))}
               onRemoveFilter={(columnId) => {
-                setColumnFilters((prev) =>
-                  prev.filter((f) => f.id !== columnId),
-                );
+                setColumnFilters((prev) => prev.filter((f) => f.id !== columnId));
               }}
               onRemoveSort={(columnId) => {
                 setSorting((prev) => prev.filter((s) => s.id !== columnId));
@@ -608,8 +543,8 @@ const ExecutionsPage: React.FC = () => {
               data.map((item) => {
                 const value = item[columnId as keyof PipelineExecution];
                 return value ? String(value) : "";
-              }),
-            ),
+              })
+            )
           ).filter(Boolean);
         }}
         formatValue={(columnId, value) => {

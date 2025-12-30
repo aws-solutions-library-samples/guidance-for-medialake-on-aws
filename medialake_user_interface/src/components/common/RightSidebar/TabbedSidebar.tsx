@@ -3,6 +3,7 @@ import { Box, Tabs, Tab } from "@mui/material";
 import FilterOperations from "./FilterOperations";
 import BatchOperationsWrapper from "./BatchOperationsWrapper";
 import { useRightSidebar } from "./SidebarContext";
+import { useTranslation } from "react-i18next";
 
 interface TabbedSidebarProps {
   selectedAssets: Array<{
@@ -14,6 +15,7 @@ interface TabbedSidebarProps {
   onBatchDownload?: () => void;
   onBatchShare?: () => void;
   isDownloadLoading?: boolean;
+  isDeleteLoading?: boolean;
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
   filterComponent?: React.ReactNode;
@@ -25,13 +27,15 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   onBatchDownload,
   onBatchShare,
   isDownloadLoading,
+  isDeleteLoading,
   onClearSelection,
   onRemoveItem,
   filterComponent,
 }) => {
+  const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
   const [activeTab, setActiveTab] = React.useState<"filter" | "batch">(
-    selectedAssets.length > 0 ? "batch" : "filter",
+    selectedAssets.length > 0 ? "batch" : "filter"
   );
 
   // Auto-switch to batch tab when items are first selected,
@@ -52,10 +56,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
     }
   }, [selectedAssets.length, setHasSelectedItems]);
 
-  const handleTabChange = (
-    event: React.SyntheticEvent,
-    newValue: "filter" | "batch",
-  ) => {
+  const handleTabChange = (event: React.SyntheticEvent, newValue: "filter" | "batch") => {
     setActiveTab(newValue);
   };
 
@@ -87,7 +88,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
             }}
           >
             <Tab
-              label="FILTER OPTIONS"
+              label={t("rightSidebar.filterOptions")}
               value="filter"
               id="filter-tab"
               aria-controls="filter-panel"
@@ -135,6 +136,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
                 onBatchDownload={onBatchDownload}
                 onBatchShare={onBatchShare}
                 isDownloadLoading={isDownloadLoading}
+                isDeleteLoading={isDeleteLoading}
                 onClearSelection={onClearSelection}
                 onRemoveItem={onRemoveItem}
               />

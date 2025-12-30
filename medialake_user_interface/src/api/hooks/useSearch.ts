@@ -2,7 +2,6 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
-import { useErrorModal } from "@/hooks/useErrorModal";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
 
@@ -51,7 +50,6 @@ export const useSearch = (query: string, params?: SearchParams) => {
   const pageSize = params?.pageSize || 20;
   const isSemantic = params?.isSemantic ?? false;
   const fields = params?.fields || [];
-  const { showError } = useErrorModal();
 
   // Extract facet parameters from params
   const facetParams = params
@@ -68,14 +66,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     : undefined;
 
   return useQuery<SearchResponseType, SearchError>({
-    queryKey: QUERY_KEYS.SEARCH.list(
-      query,
-      page,
-      pageSize,
-      isSemantic,
-      fields,
-      facetParams,
-    ),
+    queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
     queryFn: async ({ signal }) => {
       try {
         // Build query parameters
@@ -87,20 +78,12 @@ export const useSearch = (query: string, params?: SearchParams) => {
 
         // Add facet parameters if they exist
         if (params?.type) queryParams.append("type", params.type);
-        if (params?.extension)
-          queryParams.append("extension", params.extension);
-        if (params?.LargerThan)
-          queryParams.append("LargerThan", params.LargerThan.toString());
+        if (params?.extension) queryParams.append("extension", params.extension);
+        if (params?.LargerThan) queryParams.append("LargerThan", params.LargerThan.toString());
         if (params?.asset_size_lte)
-          queryParams.append(
-            "asset_size_lte",
-            params.asset_size_lte.toString(),
-          );
+          queryParams.append("asset_size_lte", params.asset_size_lte.toString());
         if (params?.asset_size_gte)
-          queryParams.append(
-            "asset_size_gte",
-            params.asset_size_gte.toString(),
-          );
+          queryParams.append("asset_size_gte", params.asset_size_gte.toString());
         if (params?.ingested_date_lte)
           queryParams.append("ingested_date_lte", params.ingested_date_lte);
         if (params?.ingested_date_gte)
@@ -117,14 +100,12 @@ export const useSearch = (query: string, params?: SearchParams) => {
 
         const response = await apiClient.get<SearchResponseType>(
           `${API_ENDPOINTS.SEARCH}?${queryParams.toString()}`,
-          { signal },
+          { signal }
         );
 
         // Check if the response status is not a success (2xx)
         if (response.data?.status && !response.data.status.startsWith("2")) {
-          const error = new Error(
-            response.data.message || "Search request failed",
-          ) as SearchError;
+          const error = new Error(response.data.message || "Search request failed") as SearchError;
           error.apiResponse = response.data;
           throw error;
         }
@@ -140,7 +121,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
         // Handle axios errors
         if (axios.isAxiosError(error) && error.response?.data) {
           const apiError = new Error(
-            error.response.data.message || "Search request failed",
+            error.response.data.message || "Search request failed"
           ) as SearchError;
           apiError.apiResponse = error.response.data;
           throw apiError;

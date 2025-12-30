@@ -1,3 +1,4 @@
+import React from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Row } from "@tanstack/react-table";
 import { Integration } from "../components/IntegrationList/types";
@@ -10,7 +11,7 @@ interface UseTableVirtualizerOptions {
 export const useTableVirtualizer = (
   rows: Row<Integration>[],
   containerRef: React.RefObject<HTMLDivElement>,
-  options: UseTableVirtualizerOptions = {},
+  options: UseTableVirtualizerOptions = {}
 ) => {
   const { rowHeight = 52, overscan = 10 } = options;
 

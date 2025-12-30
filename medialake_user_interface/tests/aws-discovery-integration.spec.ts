@@ -25,12 +25,8 @@ test.describe("AWS Resource Discovery Integration", () => {
 
     // Verify resource context structure
     expect(awsResourceContext).toBeDefined();
-    expect(awsResourceContext.environment).toBe(
-      process.env.MEDIALAKE_ENV || "dev",
-    );
-    expect(awsResourceContext.region).toBe(
-      process.env.AWS_REGION || "us-east-1",
-    );
+    expect(awsResourceContext.environment).toBe(process.env.MEDIALAKE_ENV || "dev");
+    expect(awsResourceContext.region).toBe(process.env.AWS_REGION || "us-east-1");
     expect(awsResourceContext.discoveryEngine).toBe(discoveryEngine);
 
     // Log discovered resources for debugging
@@ -43,19 +39,11 @@ test.describe("AWS Resource Discovery Integration", () => {
       });
 
       // Verify Cognito user pool structure
-      expect(awsResourceContext.cognitoUserPool.resourceType).toBe(
-        "cognito-user-pool",
-      );
-      expect(awsResourceContext.cognitoUserPool.id).toMatch(
-        /^us-[a-z]+-\d+_[A-Za-z0-9]+$/,
-      );
-      expect(awsResourceContext.cognitoUserPool.tags.Application).toBe(
-        "medialake",
-      );
+      expect(awsResourceContext.cognitoUserPool.resourceType).toBe("cognito-user-pool");
+      expect(awsResourceContext.cognitoUserPool.id).toMatch(/^us-[a-z]+-\d+_[A-Za-z0-9]+$/);
+      expect(awsResourceContext.cognitoUserPool.tags.Application).toBe("medialake");
     } else {
-      console.warn(
-        "No Cognito user pool discovered - this is expected in placeholder mode",
-      );
+      console.warn("No Cognito user pool discovered - this is expected in placeholder mode");
     }
 
     if (awsResourceContext.cloudFrontDistribution) {
@@ -69,18 +57,12 @@ test.describe("AWS Resource Discovery Integration", () => {
 
       // Verify CloudFront distribution structure
       expect(awsResourceContext.cloudFrontDistribution.resourceType).toBe(
-        "cloudfront-distribution",
+        "cloudfront-distribution"
       );
-      expect(awsResourceContext.cloudFrontDistribution.id).toMatch(
-        /^E[A-Z0-9]{13}$/,
-      );
-      expect(awsResourceContext.cloudFrontDistribution.tags.Application).toBe(
-        "medialake",
-      );
+      expect(awsResourceContext.cloudFrontDistribution.id).toMatch(/^E[A-Z0-9]{13}$/);
+      expect(awsResourceContext.cloudFrontDistribution.tags.Application).toBe("medialake");
     } else {
-      console.warn(
-        "No CloudFront distribution discovered - this is expected in placeholder mode",
-      );
+      console.warn("No CloudFront distribution discovered - this is expected in placeholder mode");
     }
   });
 
@@ -100,13 +82,10 @@ test.describe("AWS Resource Discovery Integration", () => {
     });
 
     // Test discovery with custom filters
-    const cognitoPools = await discoveryEngine.discoverByTags(
-      "cognito-user-pool",
-      customTags,
-    );
+    const cognitoPools = await discoveryEngine.discoverByTags("cognito-user-pool", customTags);
     const distributions = await discoveryEngine.discoverByTags(
       "cloudfront-distribution",
-      customTags,
+      customTags
     );
 
     // In placeholder mode, we expect mock data or empty arrays
@@ -114,21 +93,16 @@ test.describe("AWS Resource Discovery Integration", () => {
     expect(Array.isArray(distributions)).toBe(true);
 
     console.log(
-      `Discovered ${cognitoPools.length} Cognito pools and ${distributions.length} CloudFront distributions`,
+      `Discovered ${cognitoPools.length} Cognito pools and ${distributions.length} CloudFront distributions`
     );
   });
 
-  test("should handle cache operations correctly", async ({
-    discoveryEngine,
-  }) => {
+  test("should handle cache operations correctly", async ({ discoveryEngine }) => {
     // Test cache invalidation
     await AWSDiscoveryUtils.invalidateCache(discoveryEngine);
 
     // Test cache invalidation for specific resource type
-    await AWSDiscoveryUtils.invalidateCache(
-      discoveryEngine,
-      "cognito-user-pool",
-    );
+    await AWSDiscoveryUtils.invalidateCache(discoveryEngine, "cognito-user-pool");
 
     // Verify cache stats
     const stats = await AWSDiscoveryUtils.getDiscoveryStats(discoveryEngine);
@@ -146,9 +120,7 @@ test.describe("AWS Resource Discovery Integration", () => {
 
     // Test CloudFront service adapter
     expect(cloudFrontDiscovery).toBeDefined();
-    expect(cloudFrontDiscovery.getResourceType()).toBe(
-      "cloudfront-distribution",
-    );
+    expect(cloudFrontDiscovery.getResourceType()).toBe("cloudfront-distribution");
 
     // Test resource discovery through individual adapters
     const standardFilters = [
@@ -160,10 +132,8 @@ test.describe("AWS Resource Discovery Integration", () => {
       { key: "Testing", values: ["enabled"], operator: "equals" as const },
     ];
 
-    const cognitoPools =
-      await cognitoDiscovery.discoverResources(standardFilters);
-    const distributions =
-      await cloudFrontDiscovery.discoverResources(standardFilters);
+    const cognitoPools = await cognitoDiscovery.discoverResources(standardFilters);
+    const distributions = await cloudFrontDiscovery.discoverResources(standardFilters);
 
     expect(Array.isArray(cognitoPools)).toBe(true);
     expect(Array.isArray(distributions)).toBe(true);
@@ -175,9 +145,7 @@ test.describe("AWS Resource Discovery Integration", () => {
     }
 
     if (distributions.length > 0) {
-      const isValid = await cloudFrontDiscovery.validateResource(
-        distributions[0],
-      );
+      const isValid = await cloudFrontDiscovery.validateResource(distributions[0]);
       expect(typeof isValid).toBe("boolean");
     }
   });
@@ -191,15 +159,10 @@ test.describe("Enhanced Cognito Integration", () => {
     // when AWS SDK packages are installed and resources are properly tagged
 
     if (awsResourceContext.cognitoUserPool) {
-      console.log(
-        "Enhanced Cognito test would use pool:",
-        awsResourceContext.cognitoUserPool.name,
-      );
+      console.log("Enhanced Cognito test would use pool:", awsResourceContext.cognitoUserPool.name);
 
       // Verify user pool has required properties for enhanced testing
-      expect(awsResourceContext.cognitoUserPool.clients.length).toBeGreaterThan(
-        0,
-      );
+      expect(awsResourceContext.cognitoUserPool.clients.length).toBeGreaterThan(0);
       expect(awsResourceContext.cognitoUserPool.status).toBeDefined();
 
       // Test password policy retrieval (placeholder)
@@ -217,12 +180,8 @@ test.describe("Backward Compatibility", () => {
     // Verify that the new discovery system provides the same interface
     // that existing tests would expect
 
-    expect(awsResourceContext.region).toBe(
-      process.env.AWS_REGION || "us-east-1",
-    );
-    expect(awsResourceContext.environment).toBe(
-      process.env.MEDIALAKE_ENV || "dev",
-    );
+    expect(awsResourceContext.region).toBe(process.env.AWS_REGION || "us-east-1");
+    expect(awsResourceContext.environment).toBe(process.env.MEDIALAKE_ENV || "dev");
 
     // The discovery engine should be available for advanced use cases
     expect(awsResourceContext.discoveryEngine).toBeDefined();
@@ -237,13 +196,9 @@ test.describe("Backward Compatibility", () => {
 
     if (awsResourceContext.cloudFrontDistribution) {
       expect(awsResourceContext.cloudFrontDistribution).toHaveProperty("id");
-      expect(awsResourceContext.cloudFrontDistribution).toHaveProperty(
-        "domainName",
-      );
+      expect(awsResourceContext.cloudFrontDistribution).toHaveProperty("domainName");
       expect(awsResourceContext.cloudFrontDistribution).toHaveProperty("tags");
-      expect(awsResourceContext.cloudFrontDistribution).toHaveProperty(
-        "status",
-      );
+      expect(awsResourceContext.cloudFrontDistribution).toHaveProperty("status");
     }
   });
 });

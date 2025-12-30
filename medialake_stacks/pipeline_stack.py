@@ -128,13 +128,12 @@ class PipelineStack(cdk.NestedStack):
         )
 
         ## pipelines deploy
-        # Get all JSON files from the pipeline library directory
+        # Get all JSON files from the pipeline library -> defualt pipelines directory
         pipeline_library_dir = os.path.join(
             os.path.dirname(__file__),
             "..",
-            "s3_bucket_assets",
             "pipeline_library",
-            "default",
+            "Default Pipelines",
         )
 
         pipeline_files = glob.glob(os.path.join(pipeline_library_dir, "*.json"))

@@ -12,44 +12,38 @@ import PermissionTokenCache from "../permissions/utils/permission-token-cache";
 class AuthService {
   constructor() {
     // Listen for auth events
-    Hub.listen(
-      "auth",
-      async (capsule: HubCapsule<"auth", { event: string }>) => {
-        const { payload } = capsule;
+    Hub.listen("auth", async (capsule: HubCapsule<"auth", { event: string }>) => {
+      const { payload } = capsule;
 
-        // Handle auth events
-        switch (payload.event) {
-          case "signInWithRedirect":
-            break;
-          case "signInWithRedirect_failure":
-            this.clearTokens();
-            break;
-          case "customOAuthState":
-            await this.handleAuthenticationCheck();
-            break;
-          case "signedIn":
-            await this.handleAuthenticationCheck();
-            window.location.replace("/");
-            break;
-          case "signedOut":
-            this.clearTokens();
-            PermissionTokenCache.clear();
-            break;
-          case "tokenRefresh":
-            await this.handleAuthenticationCheck();
-            break;
-          case "tokenRefresh_failure":
-            this.clearTokens();
-            break;
-        }
-      },
-    );
+      // Handle auth events
+      switch (payload.event) {
+        case "signInWithRedirect":
+          break;
+        case "signInWithRedirect_failure":
+          this.clearTokens();
+          break;
+        case "customOAuthState":
+          await this.handleAuthenticationCheck();
+          break;
+        case "signedIn":
+          await this.handleAuthenticationCheck();
+          window.location.replace("/");
+          break;
+        case "signedOut":
+          this.clearTokens();
+          PermissionTokenCache.clear();
+          break;
+        case "tokenRefresh":
+          await this.handleAuthenticationCheck();
+          break;
+        case "tokenRefresh_failure":
+          this.clearTokens();
+          break;
+      }
+    });
   }
 
-  async signInWithUsernamePassword(
-    username: string,
-    password: string,
-  ): Promise<boolean> {
+  async signInWithUsernamePassword(username: string, password: string): Promise<boolean> {
     try {
       const signInResult = await signIn({ username, password });
 
@@ -64,11 +58,7 @@ class AuthService {
   }
 
   async signInWithSAML(): Promise<void> {
-    try {
-      await signInWithRedirect();
-    } catch (error) {
-      throw error;
-    }
+    await signInWithRedirect();
   }
 
   async refreshToken(): Promise<string | null> {
@@ -168,8 +158,7 @@ class AuthService {
   async getUserInitial(): Promise<string> {
     try {
       const attributes = await fetchUserAttributes();
-      const firstName =
-        attributes.given_name || attributes.name?.split(" ")[0] || "";
+      const firstName = attributes.given_name || attributes.name?.split(" ")[0] || "";
       return firstName.charAt(0).toUpperCase() || "A";
     } catch (error) {
       return "A";

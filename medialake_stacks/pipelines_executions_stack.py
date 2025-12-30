@@ -52,6 +52,7 @@ class PipelinesExecutionsStack(Stack):
                     "Step Functions Execution Status Change",
                     "Step Functions State Machine Status Change",
                 ],
+                detail={"stateMachineArn": [{"suffix": "_pipeline"}]},
             ),
             event_bus=events.EventBus.from_event_bus_name(
                 self, "DefaultEventBus", event_bus_name="default"

@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   IconButton,
   Badge,
@@ -17,6 +11,7 @@ import {
   Tooltip,
   LinearProgress,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   Notifications as NotificationsIcon,
   Close as CloseIcon,
@@ -28,9 +23,9 @@ import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
 
 // Helper function to format file sizes
-const formatFileSize = (bytes: string | number): string => {
+const formatFileSize = (bytes: string | number, t: (key: string) => string): string => {
   const numBytes = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
-  if (isNaN(numBytes)) return "Unknown size";
+  if (isNaN(numBytes)) return t("notifications.fileSize.unknown");
 
   const units = ["B", "KB", "MB", "GB", "TB"];
   let size = numBytes;
@@ -45,10 +40,10 @@ const formatFileSize = (bytes: string | number): string => {
 };
 
 // Helper function to format dates
-const formatDate = (dateString: string): string => {
-  if (!dateString) return "Unknown";
+const formatDate = (dateString: string, t: (key: string) => string): string => {
+  if (!dateString) return t("notifications.date.unknown");
   const date = new Date(dateString);
-  if (isNaN(date.getTime())) return "Unknown";
+  if (isNaN(date.getTime())) return t("notifications.date.unknown");
   return date.toLocaleString("en-US", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -108,13 +103,7 @@ export interface Notification {
   /** Job ID for tracking backend jobs */
   jobId?: string;
   /** Current job status */
-  jobStatus?:
-    | "INITIATED"
-    | "ASSESSED"
-    | "STAGING"
-    | "PROCESSING"
-    | "COMPLETED"
-    | "FAILED";
+  jobStatus?: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
   /** Download URLs for completed jobs */
   downloadUrls?:
     | {
@@ -154,22 +143,17 @@ interface NotificationContextValue {
   update: (id: string, updates: Partial<Omit<Notification, "id">>) => void;
 }
 
-const NotificationContext = createContext<NotificationContextValue | null>(
-  null,
-);
+const NotificationContext = createContext<NotificationContextValue | null>(null);
 
 export const useNotifications = (): NotificationContextValue => {
   const ctx = useContext(NotificationContext);
-  if (!ctx)
-    throw new Error("useNotifications must be inside <NotificationProvider>");
+  if (!ctx) throw new Error("useNotifications must be inside <NotificationProvider>");
   return ctx;
 };
 
 const STORAGE_KEY = "medialake_notifications";
 
-export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
-  children,
-}) => {
+export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Load notifications from localStorage on mount
@@ -209,23 +193,16 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
   }, []);
 
   const markAsSeen = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, seen: true } : n)),
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, seen: true } : n)));
   }, []);
 
   const dismiss = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
-  const update = useCallback(
-    (id: string, updates: Partial<Omit<Notification, "id">>) => {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...updates } : n)),
-      );
-    },
-    [],
-  );
+  const update = useCallback((id: string, updates: Partial<Omit<Notification, "id">>) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, ...updates } : n)));
+  }, []);
 
   // Auto‑close for dismissible notifications
   useEffect(() => {
@@ -239,9 +216,7 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
   }, [notifications, dismiss]);
 
   return (
-    <NotificationContext.Provider
-      value={{ notifications, add, markAsSeen, dismiss, update }}
-    >
+    <NotificationContext.Provider value={{ notifications, add, markAsSeen, dismiss, update }}>
       {children}
     </NotificationContext.Provider>
   );
@@ -251,9 +226,9 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({
 //  Bell icon + dropdown UI
 // ──────────────────────────/
 export const NotificationCenter: React.FC = () => {
+  const { t } = useTranslation();
   const { notifications, markAsSeen, dismiss } = useNotifications();
-  const { dismissJobNotification, clearAllJobNotifications } =
-    useJobNotifications();
+  const { dismissJobNotification } = useJobNotifications();
   const deleteBulkDownloadJob = useDeleteBulkDownloadJob();
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -279,8 +254,7 @@ export const NotificationCenter: React.FC = () => {
   // Calculate active jobs count (not COMPLETED or FAILED)
   const getActiveJobsCount = (): number => {
     return notifications.filter(
-      (n) =>
-        n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED",
+      (n) => n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED"
     ).length;
   };
 
@@ -315,10 +289,7 @@ export const NotificationCenter: React.FC = () => {
         const seenJobs = getSeenJobNotifications();
         const jobKey = `${n.jobId}:${n.jobStatus}`;
         seenJobs.add(jobKey);
-        localStorage.setItem(
-          "medialake_seen_job_notifications",
-          JSON.stringify([...seenJobs]),
-        );
+        localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
       }
       if (!n.seen) markAsSeen(n.id);
     });
@@ -347,10 +318,7 @@ export const NotificationCenter: React.FC = () => {
   };
 
   const handleDismissClick = (notification: Notification) => {
-    if (
-      notification.type === "sticky-dismissible" &&
-      notification.jobStatus === "COMPLETED"
-    ) {
+    if (notification.type === "sticky-dismissible" && notification.jobStatus === "COMPLETED") {
       // Show confirmation dialog for completed downloads
       setDismissDialog({
         open: true,
@@ -365,9 +333,7 @@ export const NotificationCenter: React.FC = () => {
 
   const handleConfirmDismiss = async () => {
     // Find the notification to get the jobId
-    const notification = notifications.find(
-      (n) => n.id === dismissDialog.notificationId,
-    );
+    const notification = notifications.find((n) => n.id === dismissDialog.notificationId);
 
     // Dismiss the notification from UI first
     dismissNotification(dismissDialog.notificationId);
@@ -394,25 +360,17 @@ export const NotificationCenter: React.FC = () => {
       <Tooltip
         title={
           unseenCount > 0
-            ? `${unseenCount} New`
+            ? t("notifications.tooltip.new", { count: unseenCount })
             : activeJobsCount > 0
-              ? `${activeJobsCount} Running`
-              : "No notifications"
+              ? t("notifications.tooltip.running", { count: activeJobsCount })
+              : t("notifications.tooltip.none")
         }
         arrow
       >
-        <IconButton
-          aria-label="notifications"
-          onClick={handleClick}
-          sx={{ position: "relative" }}
-        >
+        <IconButton aria-label="notifications" onClick={handleClick} sx={{ position: "relative" }}>
           <Badge
             badgeContent={
-              unseenCount > 0
-                ? unseenCount
-                : activeJobsCount > 0
-                  ? activeJobsCount
-                  : undefined
+              unseenCount > 0 ? unseenCount : activeJobsCount > 0 ? activeJobsCount : undefined
             }
             color={unseenCount > 0 ? "error" : "success"}
             sx={{
@@ -470,9 +428,9 @@ export const NotificationCenter: React.FC = () => {
                 alignItems: "center",
               }}
             >
-              <Typography variant="h6">Notifications</Typography>
+              <Typography variant="h6">{t("common.notifications")}</Typography>
               {/* Clear dismissible job notifications */}
-              {/* <Tooltip title="Clear completed and failed downloads (active downloads will remain)">
+              {/* <Tooltip title={t("notifications.clearJobsTooltip")}>
                 <Button
                   size="small"
                   variant="outlined"
@@ -480,7 +438,7 @@ export const NotificationCenter: React.FC = () => {
                   onClick={clearAllJobNotifications}
                   sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}
                 >
-                  Clear Jobs
+                  {t("notifications.clearJobs")}
                 </Button>
               </Tooltip> */}
             </Box>
@@ -498,7 +456,7 @@ export const NotificationCenter: React.FC = () => {
             <Stack spacing={1}>
               {notifications.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
-                  No notifications
+                  {t("notifications.empty")}
                 </Typography>
               )}
               {notifications.map((n) => {
@@ -516,9 +474,7 @@ export const NotificationCenter: React.FC = () => {
                       gap: 1,
                     }}
                   >
-                    <Box
-                      sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}
-                    >
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
                       {/* Download Icon with status color and flashing animation for unseen */}
                       <Box
                         sx={{
@@ -546,11 +502,7 @@ export const NotificationCenter: React.FC = () => {
 
                       <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
                         {n.actionText && n.onAction && (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={n.onAction}
-                          >
+                          <Button size="small" variant="contained" onClick={n.onAction}>
                             {n.actionText}
                           </Button>
                         )}
@@ -561,7 +513,7 @@ export const NotificationCenter: React.FC = () => {
                             variant="outlined"
                             onClick={() => handleDismissClick(n)}
                           >
-                            Dismiss
+                            {t("notifications.dismiss")}
                           </Button>
                         )}
 
@@ -602,15 +554,13 @@ export const NotificationCenter: React.FC = () => {
                             <Box sx={{ flex: 1 }}>
                               <LinearProgress
                                 variant={
-                                  (n.jobStatus === "STAGING" ||
-                                    n.jobStatus === "PROCESSING") &&
+                                  (n.jobStatus === "STAGING" || n.jobStatus === "PROCESSING") &&
                                   n.progress !== undefined
                                     ? "determinate"
                                     : "indeterminate"
                                 }
                                 value={
-                                  (n.jobStatus === "STAGING" ||
-                                    n.jobStatus === "PROCESSING") &&
+                                  (n.jobStatus === "STAGING" || n.jobStatus === "PROCESSING") &&
                                   n.progress !== undefined
                                     ? n.progress
                                     : undefined
@@ -627,10 +577,7 @@ export const NotificationCenter: React.FC = () => {
                               />
                             </Box>
                             {n.progress !== undefined && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
+                              <Typography variant="caption" color="text.secondary">
                                 {Math.round(n.progress)}%
                               </Typography>
                             )}
@@ -649,45 +596,41 @@ export const NotificationCenter: React.FC = () => {
                           {n.foundAssetsCount !== undefined && (
                             <Tooltip
                               title={
-                                n.smallFilesCount !== undefined &&
-                                n.largeFilesCount !== undefined
-                                  ? `Zipped files: ${n.smallFilesCount}, Large files: ${n.largeFilesCount}`
+                                n.smallFilesCount !== undefined && n.largeFilesCount !== undefined
+                                  ? t("notifications.jobDetails.filesBreakdown", {
+                                      zipped: n.smallFilesCount,
+                                      large: n.largeFilesCount,
+                                    })
                                   : undefined
                               }
                             >
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {n.foundAssetsCount} assets
+                              <Typography variant="caption" color="text.secondary">
+                                {t("notifications.jobDetails.assets", {
+                                  count: n.foundAssetsCount,
+                                })}
                               </Typography>
                             </Tooltip>
                           )}
 
                           {n.totalSize !== undefined && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {formatFileSize(n.totalSize)}
+                            <Typography variant="caption" color="text.secondary">
+                              {formatFileSize(n.totalSize, t)}
                             </Typography>
                           )}
 
                           {n.createdAt && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Created: {formatDate(n.createdAt)}
+                            <Typography variant="caption" color="text.secondary">
+                              {t("notifications.jobDetails.created", {
+                                date: formatDate(n.createdAt, t),
+                              })}
                             </Typography>
                           )}
 
                           {n.updatedAt && n.updatedAt !== n.createdAt && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Last updated: {formatDate(n.updatedAt)}
+                            <Typography variant="caption" color="text.secondary">
+                              {t("notifications.jobDetails.lastUpdated", {
+                                date: formatDate(n.updatedAt, t),
+                              })}
                             </Typography>
                           )}
                         </Box>
@@ -699,9 +642,7 @@ export const NotificationCenter: React.FC = () => {
                       <DownloadLinksDisplay
                         downloadUrls={n.downloadUrls}
                         expiresAt={n.expiresAt}
-                        description={
-                          n.jobStatus === "COMPLETED" ? undefined : n.message
-                        }
+                        description={n.jobStatus === "COMPLETED" ? undefined : n.message}
                       />
                     )}
                   </Paper>

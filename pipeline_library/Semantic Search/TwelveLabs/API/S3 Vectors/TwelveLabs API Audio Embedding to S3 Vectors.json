@@ -41,7 +41,7 @@
             "method": "map",
             "parameters": {
               "ConcurrencyLimit": 100,
-              "ItemsPath": "$.payload.externalTaskStatus"
+              "ItemsPath": "$.payload.data"
             }
           }
         },

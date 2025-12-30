@@ -311,11 +311,28 @@ def handler(event, context):
         },
     )
 
-    # Initialize S3 Vector client using the custom boto3 SDK
+    # Initialize S3 Vector client using the custom boto3 SDK with retry configuration
     try:
+        from botocore.config import Config
+
+        # Configure retry strategy with exponential backoff for transient errors
+        retry_config = Config(
+            retries={
+                "max_attempts": 10,  # Increased from default to handle service unavailability
+                "mode": "adaptive",  # Adaptive mode adjusts retry behavior based on service responses
+            },
+            connect_timeout=5,
+            read_timeout=60,
+        )
+
         session = boto3.Session()
-        s3_vector_client = session.client("s3vectors", region_name=region)
-        logger.info("S3 Vector client initialized successfully")
+        s3_vector_client = session.client(
+            "s3vectors", region_name=region, config=retry_config
+        )
+        logger.info(
+            "S3 Vector client initialized successfully with retry configuration",
+            extra={"region": region, "max_attempts": 10, "retry_mode": "adaptive"},
+        )
     except Exception as e:
         logger.error(
             "Failed to initialize S3 Vector client",

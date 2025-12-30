@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Typography, LinearProgress, Slider } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import AssetViewControls from "./AssetViewControls";
@@ -48,7 +49,7 @@ export interface AssetResultsViewProps<T> {
   viewMode: "card" | "table";
   onViewModeChange: (
     event: React.MouseEvent<HTMLElement>,
-    newMode: "card" | "table" | null,
+    newMode: "card" | "table" | null
   ) => void;
   cardSize: "small" | "medium" | "large";
   onCardSizeChange: (size: "small" | "medium" | "large") => void;
@@ -68,10 +69,7 @@ export interface AssetResultsViewProps<T> {
   onAssetClick: (asset: T) => void;
   onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (
-    asset: T,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
+  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean; // Show - icon instead of + for collection view
   onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -166,11 +164,13 @@ function AssetResultsView<T>({
   getAssetProxy,
   renderCardField,
 }: AssetResultsViewProps<T>) {
+  const { t } = useTranslation();
+
   // Debug: Check if we're receiving the onAddToCollectionClick prop
   console.log(
     "AssetResultsView: onAddToCollectionClick prop is:",
     typeof onAddToCollectionClick,
-    onAddToCollectionClick,
+    onAddToCollectionClick
   );
 
   // Local state for slider value during dragging (to prevent constant re-filtering)
@@ -219,8 +219,7 @@ function AssetResultsView<T>({
             }))}
           onSortChange={(columnId) => {
             const currentSort = sorting[0];
-            const desc =
-              currentSort?.id === columnId ? !currentSort.desc : false;
+            const desc = currentSort?.id === columnId ? !currentSort.desc : false;
             onSortChange([{ id: columnId, desc }]);
           }}
           fields={
@@ -232,9 +231,7 @@ function AssetResultsView<T>({
                   visible: col.visible,
                 }))
           }
-          onFieldToggle={
-            viewMode === "card" ? onCardFieldToggle : onColumnToggle
-          }
+          onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
           selectedFields={selectedFields}
           availableFields={availableFields}
           onFieldsChange={onFieldsChange}
@@ -254,8 +251,8 @@ function AssetResultsView<T>({
         />
 
         <ErrorDisplay
-          title="Error"
-          message="There was a problem retrieving content."
+          title={t("search.results.error")}
+          message={t("search.results.errorMessage")}
           detailedMessage={error.message}
         />
       </Box>
@@ -454,18 +451,19 @@ function AssetResultsView<T>({
                 valueA = getAssetType(a);
                 valueB = getAssetType(b);
                 break;
-              case "size":
+              case "size": {
                 // Assuming there's a way to get size from the asset
                 const sizeFieldA = a as any;
                 const sizeFieldB = b as any;
                 valueA =
-                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation
-                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
                 valueB =
-                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation
-                    ?.StorageInfo?.PrimaryLocation?.FileInfo?.Size || 0;
+                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                    ?.FileInfo?.Size || 0;
                 break;
-              case "date":
+              }
+              case "date": {
                 // Assuming there's a way to get date from the asset
                 const dateFieldA = a as any;
                 const dateFieldB = b as any;
@@ -476,6 +474,7 @@ function AssetResultsView<T>({
                   ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime()
                   : 0;
                 break;
+              }
               default:
                 valueA = (a as any)[sortField];
                 valueB = (b as any)[sortField];
@@ -486,9 +485,7 @@ function AssetResultsView<T>({
 
             // Handle string comparison
             if (typeof valueA === "string" && typeof valueB === "string") {
-              return desc
-                ? valueB.localeCompare(valueA)
-                : valueA.localeCompare(valueB);
+              return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
             }
 
             // Handle number comparison
@@ -553,16 +550,10 @@ function AssetResultsView<T>({
             getAssetName={getAssetName}
             getAssetType={getAssetType}
             getAssetThumbnail={getAssetThumbnail}
-            isSelected={
-              isAssetSelected
-                ? (asset) => isAssetSelected(getAssetId(asset))
-                : undefined
-            }
+            isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
             onSelectToggle={onSelectToggle}
             isFavorite={
-              isAssetFavorited
-                ? (asset) => isAssetFavorited(getAssetId(asset))
-                : undefined
+              isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined
             }
             onFavoriteToggle={onFavoriteToggle}
             selectedSearchFields={selectedFields}

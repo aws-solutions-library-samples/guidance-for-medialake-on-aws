@@ -1,13 +1,6 @@
 import React from "react";
 import { Controller, Control, FieldValues, Path } from "react-hook-form";
-import {
-  TextField,
-  TextFieldProps,
-  Tooltip,
-  IconButton,
-  Box,
-  InputAdornment,
-} from "@mui/material";
+import { TextField, TextFieldProps, Tooltip, IconButton, InputAdornment } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { useTranslation } from "react-i18next";
 
@@ -34,7 +27,6 @@ export const FormField = <T extends FieldValues>({
   tooltip,
   translationPrefix,
   useDirectLabels = false,
-  showHelper = false,
   ...rest
 }: FormFieldProps<T>) => {
   const { t } = useTranslation();
@@ -69,10 +61,7 @@ export const FormField = <T extends FieldValues>({
             error
               ? useDirectLabels
                 ? error.message
-                : t(
-                    `${translationPrefix}.errors.${error.type}`,
-                    error.message || "",
-                  )
+                : t(`${translationPrefix}.errors.${error.type}`, error.message || "")
               : helperText
           }
           InputProps={{

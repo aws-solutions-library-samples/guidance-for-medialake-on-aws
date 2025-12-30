@@ -1,37 +1,33 @@
-import {
-  formatLocalDateTime,
-  formatRelativeTime,
-} from "@/shared/utils/dateUtils";
+import React from "react";
+import { formatLocalDateTime, formatRelativeTime } from "@/shared/utils/dateUtils";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
+import { useTranslation } from "react-i18next";
 
 interface ExecutionsListProps {
   executions: PipelineExecution[];
 }
 
 const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       {executions.map((execution) => (
         <div key={execution.execution_id} className="p-4 border rounded-lg">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-2">
-              <span className="font-semibold">Started:</span>
+              <span className="font-semibold">{t("executions.fields.started")}:</span>
               <span>{formatLocalDateTime(execution.start_time)}</span>
-              <span className="text-gray-500">
-                ({formatRelativeTime(execution.start_time)})
-              </span>
+              <span className="text-gray-500">({formatRelativeTime(execution.start_time)})</span>
             </div>
             {execution.end_time && (
               <div className="flex items-center space-x-2">
-                <span className="font-semibold">Ended:</span>
+                <span className="font-semibold">{t("executions.fields.ended")}:</span>
                 <span>{formatLocalDateTime(execution.end_time)}</span>
-                <span className="text-gray-500">
-                  ({formatRelativeTime(execution.end_time)})
-                </span>
+                <span className="text-gray-500">({formatRelativeTime(execution.end_time)})</span>
               </div>
             )}
             <div className="flex items-center space-x-2">
-              <span className="font-semibold">Status:</span>
+              <span className="font-semibold">{t("executions.fields.status")}:</span>
               <span
                 className={`px-2 py-1 rounded ${
                   execution.status === "SUCCEEDED"
@@ -46,9 +42,7 @@ const ExecutionsList: React.FC<ExecutionsListProps> = ({ executions }) => {
                 {execution.status}
               </span>
             </div>
-            <div className="text-sm text-gray-600">
-              Pipeline: {execution.pipeline_name}
-            </div>
+            <div className="text-sm text-gray-600">Pipeline: {execution.pipeline_name}</div>
           </div>
         </div>
       ))}

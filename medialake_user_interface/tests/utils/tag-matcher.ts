@@ -66,10 +66,7 @@ export class TagMatcher {
    * @param filter - Single tag filter to match
    * @returns true if the filter matches, false otherwise
    */
-  private static matchesFilter(
-    resourceTags: AWSTag[],
-    filter: TagFilter,
-  ): boolean {
+  private static matchesFilter(resourceTags: AWSTag[], filter: TagFilter): boolean {
     const matchingTag = resourceTags.find((tag) => tag.Key === filter.key);
 
     if (!matchingTag) {
@@ -81,13 +78,9 @@ export class TagMatcher {
         case "equals":
           return matchingTag.Value === filterValue;
         case "contains":
-          return matchingTag.Value.toLowerCase().includes(
-            filterValue.toLowerCase(),
-          );
+          return matchingTag.Value.toLowerCase().includes(filterValue.toLowerCase());
         case "startsWith":
-          return matchingTag.Value.toLowerCase().startsWith(
-            filterValue.toLowerCase(),
-          );
+          return matchingTag.Value.toLowerCase().startsWith(filterValue.toLowerCase());
         default:
           return false;
       }
@@ -99,9 +92,7 @@ export class TagMatcher {
    * @param filters - Array of TagFilter objects
    * @returns Array in AWS SDK TagFilter format
    */
-  static convertToAWSTagFilters(
-    filters: TagFilter[],
-  ): Array<{ Key: string; Values: string[] }> {
+  static convertToAWSTagFilters(filters: TagFilter[]): Array<{ Key: string; Values: string[] }> {
     return filters.map((filter) => ({
       Key: filter.key,
       Values: filter.values,
@@ -119,7 +110,7 @@ export class TagMatcher {
         acc[tag.Key] = tag.Value;
         return acc;
       },
-      {} as Record<string, string>,
+      {} as Record<string, string>
     );
   }
 
@@ -163,12 +154,10 @@ export class TagMatcher {
    */
   static validateRequiredTags(
     resourceTags: AWSTag[],
-    requiredTags: string[],
+    requiredTags: string[]
   ): { isValid: boolean; missingTags: string[] } {
     const presentTagKeys = resourceTags.map((tag) => tag.Key);
-    const missingTags = requiredTags.filter(
-      (required) => !presentTagKeys.includes(required),
-    );
+    const missingTags = requiredTags.filter((required) => !presentTagKeys.includes(required));
 
     return {
       isValid: missingTags.length === 0,

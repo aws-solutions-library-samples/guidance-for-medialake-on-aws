@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { TextField, Button, Box, Tooltip, IconButton } from "@mui/material";
 import { Search as SearchIcon, Help as HelpIcon } from "@mui/icons-material";
 
@@ -22,40 +23,36 @@ Examples:
 • "metadata:resolution:1080p type:video"
 `;
 
-const SearchBar: React.FC<SearchBarProps> = ({
-  searchQuery,
-  onSearchChange,
-  onSearchSubmit,
-}) => (
-  <Box sx={{ display: "flex", flexGrow: 1, mr: 2, alignItems: "center" }}>
-    <TextField
-      label="Search"
-      variant="outlined"
-      size="small"
-      value={searchQuery}
-      onChange={onSearchChange}
-      onKeyDown={(e) => e.key === "Enter" && onSearchSubmit()}
-      placeholder="Search (e.g., sunset type:image)"
-      sx={{ flexGrow: 1, mr: 2, bgcolor: "background.paper" }}
-      helperText="Use keywords like type:, format:, size:, date:, metadata: to filter results"
-    />
-    <Tooltip
-      title={<pre style={{ whiteSpace: "pre-wrap" }}>{searchHelpText}</pre>}
-      placement="bottom-start"
-      sx={{ maxWidth: "none" }}
-    >
-      <IconButton size="small" sx={{ mr: 1 }}>
-        <HelpIcon />
-      </IconButton>
-    </Tooltip>
-    <Button
-      variant="contained"
-      startIcon={<SearchIcon />}
-      onClick={onSearchSubmit}
-    >
-      Search
-    </Button>
-  </Box>
-);
+const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, onSearchChange, onSearchSubmit }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Box sx={{ display: "flex", flexGrow: 1, mr: 2, alignItems: "center" }}>
+      <TextField
+        label={t("search.bar.label")}
+        variant="outlined"
+        size="small"
+        value={searchQuery}
+        onChange={onSearchChange}
+        onKeyDown={(e) => e.key === "Enter" && onSearchSubmit()}
+        placeholder={t("search.bar.placeholder")}
+        sx={{ flexGrow: 1, mr: 2, bgcolor: "background.paper" }}
+        helperText={t("search.bar.helperText")}
+      />
+      <Tooltip
+        title={<pre style={{ whiteSpace: "pre-wrap" }}>{searchHelpText}</pre>}
+        placement="bottom-start"
+        sx={{ maxWidth: "none" }}
+      >
+        <IconButton size="small" sx={{ mr: 1 }}>
+          <HelpIcon />
+        </IconButton>
+      </Tooltip>
+      <Button variant="contained" startIcon={<SearchIcon />} onClick={onSearchSubmit}>
+        {t("common.search")}
+      </Button>
+    </Box>
+  );
+};
 
 export default React.memo(SearchBar);

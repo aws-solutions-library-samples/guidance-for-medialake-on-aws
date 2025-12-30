@@ -15,18 +15,14 @@ interface PresignedUrlResponse {
 
 export const useGeneratePresignedUrl = () => {
   return useMutation({
-    mutationFn: async ({
-      inventoryId,
-      expirationTime,
-      purpose,
-    }: GeneratePresignedUrlParams) => {
+    mutationFn: async ({ inventoryId, expirationTime, purpose }: GeneratePresignedUrlParams) => {
       const response = await apiClient.post<{ data: PresignedUrlResponse }>(
         "/assets/generate-presigned-url",
         {
           inventory_id: inventoryId,
           expiration_time: expirationTime,
           purpose: purpose, // Include purpose in the request
-        },
+        }
       );
       return response.data.data;
     },

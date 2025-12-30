@@ -79,9 +79,7 @@ export const test = base.extend<AWSDiscoveryFixtures>({
     const config = createDiscoveryConfig();
     const engine = createResourceDiscoveryEngine(config, testInfo.workerIndex);
 
-    console.log(
-      `[AWSDiscovery Worker ${testInfo.workerIndex}] Initializing discovery engine`,
-    );
+    console.log(`[AWSDiscovery Worker ${testInfo.workerIndex}] Initializing discovery engine`);
 
     // Register service adapters
     const cognitoAdapter = createCognitoServiceAdapter(config);
@@ -95,10 +93,7 @@ export const test = base.extend<AWSDiscoveryFixtures>({
       const commonFilters = getEnvironmentTagFilters();
       await engine.prefetchResources(commonFilters);
     } catch (error) {
-      console.warn(
-        `[AWSDiscovery Worker ${testInfo.workerIndex}] Prefetch failed:`,
-        error,
-      );
+      console.warn(`[AWSDiscovery Worker ${testInfo.workerIndex}] Prefetch failed:`, error);
     }
 
     await use(engine);
@@ -136,9 +131,7 @@ export const test = base.extend<AWSDiscoveryFixtures>({
    */
   awsResourceContext: [
     async ({ discoveryEngine }, use, testInfo) => {
-      console.log(
-        `[AWSDiscovery Test ${testInfo.title}] Setting up resource context`,
-      );
+      console.log(`[AWSDiscovery Test ${testInfo.title}] Setting up resource context`);
 
       const tagFilters = getEnvironmentTagFilters();
       let cognitoUserPool: CognitoUserPool | undefined;
@@ -146,37 +139,28 @@ export const test = base.extend<AWSDiscoveryFixtures>({
 
       try {
         // Discover Cognito user pool
-        const cognitoPools = await discoveryEngine.discoverByTags(
-          "cognito-user-pool",
-          tagFilters,
-        );
+        const cognitoPools = await discoveryEngine.discoverByTags("cognito-user-pool", tagFilters);
         if (cognitoPools.length > 0) {
           cognitoUserPool = cognitoPools[0] as CognitoUserPool;
           console.log(
-            `[AWSDiscovery] Found Cognito user pool: ${cognitoUserPool.name} (${cognitoUserPool.id})`,
+            `[AWSDiscovery] Found Cognito user pool: ${cognitoUserPool.name} (${cognitoUserPool.id})`
           );
         } else {
-          console.warn(
-            `[AWSDiscovery] No Cognito user pools found with tags:`,
-            tagFilters,
-          );
+          console.warn(`[AWSDiscovery] No Cognito user pools found with tags:`, tagFilters);
         }
 
         // Discover CloudFront distribution
         const distributions = await discoveryEngine.discoverByTags(
           "cloudfront-distribution",
-          tagFilters,
+          tagFilters
         );
         if (distributions.length > 0) {
           cloudFrontDistribution = distributions[0] as CloudFrontDistribution;
           console.log(
-            `[AWSDiscovery] Found CloudFront distribution: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`,
+            `[AWSDiscovery] Found CloudFront distribution: ${cloudFrontDistribution.name} (${cloudFrontDistribution.id})`
           );
         } else {
-          console.warn(
-            `[AWSDiscovery] No CloudFront distributions found with tags:`,
-            tagFilters,
-          );
+          console.warn(`[AWSDiscovery] No CloudFront distributions found with tags:`, tagFilters);
         }
       } catch (error) {
         console.error(`[AWSDiscovery] Error during resource discovery:`, error);
@@ -192,9 +176,7 @@ export const test = base.extend<AWSDiscoveryFixtures>({
 
       await use(context);
 
-      console.log(
-        `[AWSDiscovery Test ${testInfo.title}] Resource context cleanup completed`,
-      );
+      console.log(`[AWSDiscovery Test ${testInfo.title}] Resource context cleanup completed`);
     },
     { scope: "test" },
   ],
@@ -221,32 +203,21 @@ export const testWithEnhancedCognito = test.extend<{
   enhancedCognitoTestUser: [
     async ({ awsResourceContext, cognitoDiscovery }, use, testInfo) => {
       if (!awsResourceContext.cognitoUserPool) {
-        throw new Error(
-          "No Cognito user pool found for enhanced test user creation",
-        );
+        throw new Error("No Cognito user pool found for enhanced test user creation");
       }
 
       const userPool = awsResourceContext.cognitoUserPool;
       const randomId = Math.random().toString(36).substring(2, 8);
       const uniqueEmail = `mne-medialake+e2etest-${testInfo.workerIndex}-${randomId}@amazon.com`;
 
-      console.log(
-        `[EnhancedCognito] Creating test user in pool: ${userPool.name}`,
-      );
+      console.log(`[EnhancedCognito] Creating test user in pool: ${userPool.name}`);
 
       // Get password policy and generate appropriate password
-      const passwordPolicy = await cognitoDiscovery.getUserPoolPasswordPolicy(
-        userPool.id,
-      );
+      const passwordPolicy = await cognitoDiscovery.getUserPoolPasswordPolicy(userPool.id);
       const password = generateSecurePassword(passwordPolicy?.PasswordPolicy);
 
       // Create the test user
-      await cognitoDiscovery.createTestUser(
-        userPool.id,
-        uniqueEmail,
-        password,
-        uniqueEmail,
-      );
+      await cognitoDiscovery.createTestUser(userPool.id, uniqueEmail, password, uniqueEmail);
 
       const testUser: EnhancedCognitoTestUser = {
         username: uniqueEmail,
@@ -263,10 +234,7 @@ export const testWithEnhancedCognito = test.extend<{
       try {
         await cognitoDiscovery.deleteTestUser(userPool.id, uniqueEmail);
       } catch (cleanupError) {
-        console.error(
-          "[EnhancedCognito] Error during user cleanup:",
-          cleanupError,
-        );
+        console.error("[EnhancedCognito] Error during user cleanup:", cleanupError);
       }
     },
     { scope: "test" },
@@ -327,9 +295,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
 
   // Fill to minimum length
   while (password.length < minLength) {
-    password += availableChars.charAt(
-      Math.floor(Math.random() * availableChars.length),
-    );
+    password += availableChars.charAt(Math.floor(Math.random() * availableChars.length));
   }
 
   // Shuffle the password to randomize character positions
@@ -343,9 +309,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
   const alphanumeric = uppercase + lowercase + numbers;
   if (!/^[a-zA-Z0-9]/.test(shuffled)) {
     // Replace first character with random alphanumeric
-    const safeStart = alphanumeric.charAt(
-      Math.floor(Math.random() * alphanumeric.length),
-    );
+    const safeStart = alphanumeric.charAt(Math.floor(Math.random() * alphanumeric.length));
     return safeStart + shuffled.slice(1);
   }
 
@@ -377,10 +341,7 @@ export const AWSDiscoveryUtils = {
   /**
    * Invalidate discovery cache for fresh resource lookup
    */
-  async invalidateCache(
-    engine: ResourceDiscoveryEngine,
-    resourceType?: string,
-  ): Promise<void> {
+  async invalidateCache(engine: ResourceDiscoveryEngine, resourceType?: string): Promise<void> {
     engine.invalidateCache(resourceType as any);
   },
 };

@@ -1,21 +1,15 @@
 import React from "react";
-import { Box, Typography, Stack, CircularProgress } from "@mui/material";
+import { Box, Typography, Stack, CircularProgress, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import {
-  useGetFavorites,
-  useRemoveFavorite,
-} from "../../api/hooks/useFavorites";
+import { useTranslation } from "react-i18next";
+import { useGetFavorites, useRemoveFavorite } from "../../api/hooks/useFavorites";
 import AssetCard from "../../components/shared/AssetCard";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 
 export const Favorites: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const {
-    data: unsortedFavorites,
-    isLoading,
-    error,
-    refetch,
-  } = useGetFavorites("ASSET");
+  const { data: unsortedFavorites, isLoading, error, refetch } = useGetFavorites("ASSET");
   const { mutate: removeFavorite } = useRemoveFavorite();
 
   // Sort favorites by addedAt timestamp in descending order (newest first)
@@ -43,21 +37,10 @@ export const Favorites: React.FC = () => {
     });
   }, [unsortedFavorites]);
 
-  // Log when the component renders and when data changes
-  console.log("Favorites component rendering with sorted data:", favorites);
-
-  // Add effect to log when favorites data changes
-  React.useEffect(() => {
-    console.log("Favorites data changed:", unsortedFavorites);
-    console.log("Sorted favorites:", favorites);
-  }, [unsortedFavorites, favorites]);
-
   // Handle clicking on an asset to navigate to its detail page
   const handleAssetClick = (assetId: string, assetType: string) => {
     const pathPrefix =
-      assetType.toLowerCase() === "audio"
-        ? "/audio/"
-        : `/${assetType.toLowerCase()}s/`;
+      assetType.toLowerCase() === "audio" ? "/audio/" : `/${assetType.toLowerCase()}s/`;
     // Always use the original asset ID, not the clip ID
     const originalAssetId = getOriginalAssetId({ InventoryID: assetId });
     navigate(`${pathPrefix}${originalAssetId}`);
@@ -67,7 +50,7 @@ export const Favorites: React.FC = () => {
   const handleFavoriteToggle = (
     assetId: string,
     itemType: string,
-    event: React.MouseEvent<HTMLElement>,
+    event: React.MouseEvent<HTMLElement>
   ) => {
     event.stopPropagation();
     removeFavorite({ itemId: assetId, itemType });
@@ -94,11 +77,14 @@ export const Favorites: React.FC = () => {
     return (
       <Box>
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-          Favorites
+          {t("home.favorites")}
         </Typography>
-        <Typography color="error">
-          Error loading favorites: {error.message}
+        <Typography color="error" sx={{ mb: 2 }}>
+          {t("favorites.errorLoading")}
         </Typography>
+        <Button variant="outlined" onClick={() => refetch()}>
+          {t("favorites.retry")}
+        </Button>
       </Box>
     );
   }
@@ -108,9 +94,9 @@ export const Favorites: React.FC = () => {
     return (
       <Box>
         <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-          Favorites
+          {t("home.favorites")}
         </Typography>
-        <Typography color="text.secondary">No favorite assets yet</Typography>
+        <Typography color="text.secondary">{t("favorites.noFavorites")}</Typography>
       </Box>
     );
   }
@@ -118,7 +104,7 @@ export const Favorites: React.FC = () => {
   return (
     <Box>
       <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-        Favorites
+        {t("home.favorites")}
       </Typography>
 
       <Stack
@@ -158,24 +144,17 @@ export const Favorites: React.FC = () => {
                 { id: "type", label: "Type", visible: true },
               ]}
               renderField={(fieldId) => {
-                if (fieldId === "name")
-                  return favorite.metadata?.name || favorite.itemId;
-                if (fieldId === "type")
-                  return favorite.metadata?.assetType || "Unknown";
+                if (fieldId === "name") return favorite.metadata?.name || favorite.itemId;
+                if (fieldId === "type") return favorite.metadata?.assetType || "Unknown";
                 return "";
               }}
               onAssetClick={() =>
-                handleAssetClick(
-                  favorite.itemId,
-                  favorite.metadata?.assetType || "Unknown",
-                )
+                handleAssetClick(favorite.itemId, favorite.metadata?.assetType || "Unknown")
               }
               onDeleteClick={() => {}} // Not used in this context
               onDownloadClick={() => {}} // Not used in this context
               isFavorite={true}
-              onFavoriteToggle={(e) =>
-                handleFavoriteToggle(favorite.itemId, favorite.itemType, e)
-              }
+              onFavoriteToggle={(e) => handleFavoriteToggle(favorite.itemId, favorite.itemType, e)}
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fill"

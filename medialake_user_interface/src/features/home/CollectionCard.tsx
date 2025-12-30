@@ -1,12 +1,5 @@
 import React, { useMemo } from "react";
-import {
-  Card,
-  CardContent,
-  CardMedia,
-  Typography,
-  Box,
-  IconButton,
-} from "@mui/material";
+import { Card, CardContent, CardMedia, Typography, Box, IconButton } from "@mui/material";
 import {
   MoreVert,
   FolderOpen,
@@ -54,22 +47,15 @@ interface CollectionCardProps {
   onOpen?: (id: string) => void;
 }
 
-export const CollectionCard: React.FC<CollectionCardProps> = ({
-  collection,
-  onOpen,
-}) => {
+export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) => {
   // Fetch collection types to get icon and color
-  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
-    useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
   const collectionTypes = collectionTypesResponse?.data || [];
 
   // Find the collection type for this collection
   const collectionType = useMemo(() => {
     if (!collection.collectionTypeId || isLoadingTypes) return null;
-    return (
-      collectionTypes.find((type) => type.id === collection.collectionTypeId) ||
-      null
-    );
+    return collectionTypes.find((type) => type.id === collection.collectionTypeId) || null;
   }, [collection.collectionTypeId, collectionTypes, isLoadingTypes]);
 
   // Get the icon to display
@@ -96,9 +82,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
         display: "flex",
         flexDirection: "column",
         borderRadius: 3,
-        border: collectionType?.color
-          ? `2px solid ${collectionType.color}`
-          : "2px solid",
+        border: collectionType?.color ? `2px solid ${collectionType.color}` : "2px solid",
         borderColor: collectionType?.color || "divider",
         overflow: "visible", // Prevent clipping on hover
         transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",

@@ -2,14 +2,14 @@ export const SYSTEM_SETTINGS_CONFIG = {
   PROVIDERS: {
     TWELVE_LABS_API: {
       id: "twelvelabs-api",
-      name: "TwelveLabs API",
+      name: "TwelveLabs Marengo Embed 2.7 API",
       type: "twelvelabs",
       defaultEndpoint: "https://api.twelvelabs.io/v1",
       requiresApiKey: true,
     },
     TWELVE_LABS_BEDROCK: {
       id: "twelvelabs-bedrock",
-      name: "TwelveLabs Bedrock",
+      name: "TwelveLabs Marengo Embed 2.7 on Bedrock",
       type: "twelvelabs-bedrock",
       requiresApiKey: false,
     },

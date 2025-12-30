@@ -96,7 +96,7 @@ def sanitize_for_sqs(text: str, max_length: int = 128) -> str:
     # Truncate if too long, but if we need to truncate, use a hash instead to maintain uniqueness
     if len(sanitized) > max_length:
         # Use MD5 hash to ensure uniqueness while staying within length limits
-        hash_suffix = hashlib.md5(text.encode()).hexdigest()[:8]  # nosec B324
+        hash_suffix = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()[:8]
         # Take as much of the sanitized string as possible, leaving room for hash
         prefix_length = max_length - len(hash_suffix) - 1  # -1 for separator
         if prefix_length > 0:

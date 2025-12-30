@@ -1,10 +1,6 @@
 import React from "react";
 import { Box, Typography, Button, Paper, Divider } from "@mui/material";
-import {
-  useRouteError,
-  useNavigate,
-  isRouteErrorResponse,
-} from "react-router-dom";
+import { useRouteError, useNavigate, isRouteErrorResponse } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
@@ -31,7 +27,7 @@ const RouteErrorBoundary: React.FC = () => {
     errorMessage = error;
   } else {
     // Unknown error type
-    errorMessage = "An unexpected error occurred";
+    errorMessage = t("common.messages.unexpectedErrorOccurred");
   }
 
   return (
@@ -73,19 +69,13 @@ const RouteErrorBoundary: React.FC = () => {
           ) : null}
 
           <Typography variant="h5" fontWeight="medium" textAlign="center">
-            {statusText ||
-              t("errors.somethingWentWrong", "Something went wrong")}
+            {statusText || t("errors.somethingWentWrong", "Something went wrong")}
           </Typography>
         </Box>
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ mb: 3 }}
-          textAlign="center"
-        >
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }} textAlign="center">
           {errorMessage}
         </Typography>
 
@@ -93,11 +83,7 @@ const RouteErrorBoundary: React.FC = () => {
           <Button variant="outlined" onClick={() => window.location.reload()}>
             {t("errors.refreshPage", "Refresh Page")}
           </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => navigate("/")}
-          >
+          <Button variant="contained" color="primary" onClick={() => navigate("/")}>
             {t("errors.goToHomepage", "Go to Homepage")}
           </Button>
         </Box>

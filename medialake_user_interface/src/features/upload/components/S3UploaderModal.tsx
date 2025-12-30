@@ -31,14 +31,14 @@ interface S3UploaderModalProps {
 const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
   open,
   onClose,
-  title = "Upload Files",
-  description = "Select an S3 connector and upload your files",
+  title,
+  description,
   path = "",
   onUploadComplete,
   onUploadError,
 }) => {
   const { t } = useTranslation();
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [, setUploadedFiles] = useState<any[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState<string>(path || "");
 
@@ -72,7 +72,7 @@ const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle>{title || t("upload.title")}</DialogTitle>
       <DialogContent>
         <DialogContentText>{description}</DialogContentText>
         {currentPath && (

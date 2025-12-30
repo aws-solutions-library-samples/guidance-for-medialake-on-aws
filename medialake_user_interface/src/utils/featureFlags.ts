@@ -12,14 +12,12 @@ import React from "react";
  */
 export const getFeatureFlag = async (
   flagName: string,
-  defaultValue: boolean = false,
+  defaultValue: boolean = false
 ): Promise<boolean> => {
   try {
     const response = await fetch("/feature-flags.json");
     if (!response.ok) {
-      console.warn(
-        `Failed to fetch feature flags: ${response.status} ${response.statusText}`,
-      );
+      console.warn(`Failed to fetch feature flags: ${response.status} ${response.statusText}`);
       return defaultValue;
     }
 
@@ -41,10 +39,7 @@ export const getFeatureFlag = async (
  * @param defaultValue The default value to return if the flag doesn't exist
  * @returns An object containing the flag value and loading state
  */
-export const useFeatureFlag = (
-  flagName: string,
-  defaultValue: boolean = false,
-) => {
+export const useFeatureFlag = (flagName: string, defaultValue: boolean = false) => {
   const [flagValue, setFlagValue] = React.useState<boolean>(defaultValue);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
 

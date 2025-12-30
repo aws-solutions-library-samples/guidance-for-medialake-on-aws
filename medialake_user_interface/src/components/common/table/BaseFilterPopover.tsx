@@ -115,11 +115,7 @@ export function BaseFilterPopover<T>({
       </IconButton>
       <Stack spacing={2}>
         <Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mb: 1, display: "block" }}
-          >
+          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
             {t("common.textFilter")}
           </Typography>
           <TextField
@@ -138,11 +134,7 @@ export function BaseFilterPopover<T>({
         </Box>
 
         <Box>
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mb: 1, display: "block" }}
-          >
+          <Typography variant="caption" color="textSecondary" sx={{ mb: 1, display: "block" }}>
             {t("common.selectFilter")}
           </Typography>
           <Select
@@ -167,11 +159,7 @@ export function BaseFilterPopover<T>({
         </Box>
 
         {currentValue && (
-          <Button
-            size="small"
-            onClick={handleClearFilter}
-            sx={{ alignSelf: "flex-start" }}
-          >
+          <Button size="small" onClick={handleClearFilter} sx={{ alignSelf: "flex-start" }}>
             {t("common.clearFilter")}
           </Button>
         )}

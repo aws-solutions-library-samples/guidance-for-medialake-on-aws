@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Box, Paper, Typography, Alert, AlertTitle } from "@mui/material";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
@@ -8,11 +9,9 @@ interface ErrorDisplayProps {
   detailedMessage?: string;
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
-  title,
-  message,
-  detailedMessage,
-}) => {
+const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ title, message, detailedMessage }) => {
+  const { t } = useTranslation();
+
   return (
     <Box sx={{ mt: 4 }}>
       <Paper
@@ -44,7 +43,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 
         {detailedMessage && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            <AlertTitle>Error Details</AlertTitle>
+            <AlertTitle>{t("errors.errorDetails")}</AlertTitle>
             {detailedMessage}
           </Alert>
         )}

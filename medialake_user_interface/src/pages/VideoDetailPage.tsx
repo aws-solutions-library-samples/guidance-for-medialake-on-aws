@@ -1,35 +1,16 @@
-import React, {
-  useState,
-  useMemo,
-  useCallback,
-  useRef,
-  useEffect,
-} from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useMediaController } from "../hooks/useMediaController";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  Paper,
-  Tabs,
-  Tab,
-  alpha,
-} from "@mui/material";
+import { Box, CircularProgress, Typography, Paper, Tabs, Tab, alpha } from "@mui/material";
 import {
   useAsset,
   useRelatedVersions,
   useTranscription,
   RelatedVersionsResponse,
 } from "../api/hooks/useAssets";
-import {
-  RightSidebarProvider,
-  useRightSidebar,
-} from "../components/common/RightSidebar";
-import {
-  RecentlyViewedProvider,
-  useTrackRecentlyViewed,
-} from "../contexts/RecentlyViewedContext";
+import { RightSidebarProvider, useRightSidebar } from "../components/common/RightSidebar";
+import { RecentlyViewedProvider, useTrackRecentlyViewed } from "../contexts/RecentlyViewedContext";
 import AssetSidebar from "../components/asset/AssetSidebar";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
 import AssetVideo from "../components/asset/AssetVideo";
@@ -48,16 +29,15 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
   const techDetailsColor = "#68D391";
 
   const s3Bucket =
-    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo
-      ?.PrimaryLocation?.Bucket;
+    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+      ?.Bucket;
   const objectName =
-    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo
-      ?.PrimaryLocation?.ObjectKey?.Name;
+    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+      ?.ObjectKey?.Name;
   const fullPath =
-    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo
-      ?.PrimaryLocation?.ObjectKey?.FullPath;
-  const s3Uri =
-    s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : "Unknown";
+    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+      ?.ObjectKey?.FullPath;
+  const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : "Unknown";
 
   // Extract metadata from API response
   const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
@@ -65,30 +45,24 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
   const videoMetadata = Array.isArray(metadata.video) ? metadata.video[0] : {};
 
   const fileSize =
-    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo
-      ?.PrimaryLocation?.FileInfo?.Size || 0;
+    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+      ?.FileInfo?.Size || 0;
   const format =
-    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format ||
-    "Unknown";
+    assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || "Unknown";
   const duration = generalMetadata.Duration
     ? `${parseFloat(generalMetadata.Duration).toFixed(2)} s`
     : "Unknown";
   const width = videoMetadata.Width ?? "Unknown";
   const height = videoMetadata.Height ?? "Unknown";
-  const frameRate = videoMetadata.FrameRate
-    ? `${videoMetadata.FrameRate} FPS`
-    : "Unknown";
+  const frameRate = videoMetadata.FrameRate ? `${videoMetadata.FrameRate} FPS` : "Unknown";
   const bitRate =
     videoMetadata.OverallBitRate || videoMetadata.BitRate
       ? `${Math.round((videoMetadata.OverallBitRate || videoMetadata.BitRate) / 1000)} kbps`
       : "Unknown";
-  const codec =
-    videoMetadata.codec_name || metadata.general.Format || "Unknown";
+  const codec = videoMetadata.codec_name || metadata.general.Format || "Unknown";
 
   const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
-    ? new Date(
-        assetData.data.asset.DigitalSourceAsset.CreateDate,
-      ).toLocaleDateString()
+    ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
     : "Unknown";
 
   return (
@@ -139,9 +113,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Size:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {formatFileSize(fileSize)}
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{formatFileSize(fileSize)}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -154,9 +126,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Format:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {format}
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{format}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -169,9 +139,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             S3 Bucket:
           </Typography>
-          <Typography
-            sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}
-          >
+          <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
             {s3Bucket || "Unknown"}
           </Typography>
         </Box>
@@ -186,9 +154,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Object Name:
           </Typography>
-          <Typography
-            sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}
-          >
+          <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
             {objectName || "Unknown"}
           </Typography>
         </Box>
@@ -203,9 +169,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             S3 URI:
           </Typography>
-          <Typography
-            sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}
-          >
+          <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
             {s3Uri}
           </Typography>
         </Box>
@@ -242,9 +206,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Duration:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {duration} seconds
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{duration} seconds</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -272,9 +234,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Frame Rate:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {frameRate} FPS
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{frameRate} FPS</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -287,9 +247,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Bit Rate:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {bitRate}
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{bitRate}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -302,9 +260,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Codec:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {codec}
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{codec}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
@@ -317,9 +273,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
           >
             Created Date:
           </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {createdDate}
-          </Typography>
+          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{createdDate}</Typography>
         </Box>
       </Box>
     </TabContentContainer>
@@ -331,7 +285,7 @@ const RelatedItemsTab: React.FC<{
   relatedVersionsData: RelatedVersionsResponse | undefined;
   isLoading: boolean;
   onLoadMore: () => void;
-}> = ({ assetId, relatedVersionsData, isLoading, onLoadMore }) => {
+}> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
   console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
 
   const items = useMemo(() => {
@@ -343,16 +297,14 @@ const RelatedItemsTab: React.FC<{
     const mappedItems = relatedVersionsData.data.results.map((result) => ({
       id: result.InventoryID,
       title:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .ObjectKey.Name,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
       type: result.DigitalSourceAsset.Type,
       thumbnail: result.thumbnailUrl,
       proxyUrl: result.proxyUrl,
       score: result.score,
       format: result.DigitalSourceAsset.MainRepresentation.Format,
       fileSize:
-        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-          .FileInfo.Size,
+        result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
     console.log("Mapped items:", mappedItems);
@@ -365,8 +317,7 @@ const RelatedItemsTab: React.FC<{
       return false;
     }
 
-    const { totalResults, page, pageSize } =
-      relatedVersionsData.data.searchMetadata;
+    const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     const hasMoreItems = totalResults > page * pageSize;
     console.log("Has more items:", hasMoreItems);
     return hasMoreItems;
@@ -388,13 +339,14 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   assetType,
   searchTerm,
 }) => {
+  const { t } = useTranslation();
   const videoViewerRef = useRef<VideoViewerRef>(null);
   const seekAttemptsRef = useRef<number>(0);
-  const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isExpanded, closeSidebar } = useRightSidebar();
+  const { isExpanded } = useRightSidebar();
   const {
     data: assetData,
     isLoading,
@@ -406,10 +358,11 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   };
   const [activeTab, setActiveTab] = useState<string>("summary");
   const [relatedPage, setRelatedPage] = useState(1);
-  const { data: relatedVersionsData, isLoading: isLoadingRelated } =
-    useRelatedVersions(id || "", relatedPage);
-  const { data: transcriptionData, isLoading: isLoadingTranscription } =
-    useTranscription(id || "");
+  const { data: relatedVersionsData, isLoading: isLoadingRelated } = useRelatedVersions(
+    id || "",
+    relatedPage
+  );
+  const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || "");
   const [showHeader, setShowHeader] = useState(true);
 
   // Video media controller for transcript synchronization
@@ -473,9 +426,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
       }
 
       try {
-        // Try to get current time to verify video is ready
-        const currentTime = videoViewerRef.current.getCurrentTime();
-        // If we can get current time, video is ready
+        // Video is ready, seek to clip start time
         videoViewerRef.current.seek(startTime!);
         console.log(`Seeked to clip start time: ${startTime}s for asset ${id}`);
         // Success - clear any pending timeouts
@@ -490,7 +441,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         } else {
           console.warn(
             `Failed to seek to clip start time ${startTime}s after ${maxAttempts} attempts:`,
-            error,
+            error
           );
         }
       }
@@ -532,9 +483,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
   // Scroll to top when component mounts
   useEffect(() => {
     // Find the scrollable container in the AppLayout
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.scrollTo(0, 0);
     } else {
@@ -545,8 +494,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
 
   // Use the searchTerm prop or fallback to URL parameters
   const searchParams = new URLSearchParams(location.search);
-  const urlSearchTerm =
-    searchParams.get("q") || searchParams.get("searchTerm") || "";
+  const urlSearchTerm = searchParams.get("q") || searchParams.get("searchTerm") || "";
   // Use the prop value if available, otherwise use the URL value
   const effectiveSearchTerm = searchTerm || urlSearchTerm;
 
@@ -555,11 +503,10 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     return [
       {
         id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
-        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation
-          .StorageInfo.PrimaryLocation.ObjectKey.FullPath,
+        src: assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+          .ObjectKey.FullPath,
         type: "Original",
-        format:
-          assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
+        format: assetData.data.asset.DigitalSourceAsset.MainRepresentation.Format,
         fileSize:
           assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
         description: "Original high resolution version",
@@ -580,18 +527,16 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
 
     return Object.entries(metadata).map(([parentCategory, parentData]) => ({
       category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(
-        ([subCategory, data]) => ({
-          category: subCategory,
-          data: data,
-          count:
-            typeof data === "object"
-              ? Array.isArray(data)
-                ? data.length
-                : Object.keys(data).length
-              : 1,
-        }),
-      ),
+      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
+        category: subCategory,
+        data: data,
+        count:
+          typeof data === "object"
+            ? Array.isArray(data)
+              ? data.length
+              : Object.keys(data).length
+            : 1,
+      })),
       count: Object.keys(parentData as object).length,
     }));
   };
@@ -626,8 +571,8 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
       ? {
           id: assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID,
           title:
-            assetData.data.asset.DigitalSourceAsset.MainRepresentation
-              .StorageInfo.PrimaryLocation.ObjectKey.Name,
+            assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+              .ObjectKey.Name,
           type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video",
           path: `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${
             assetData.data.asset.InventoryID
@@ -640,19 +585,13 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
             creator: "John Doe",
           },
         }
-      : null,
+      : null
   );
 
   // Handle keyboard navigation for tabs
   const handleTabKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      const tabs = [
-        "summary",
-        "technical",
-        "descriptive",
-        "transcription",
-        "related",
-      ];
+      const tabs = ["summary", "technical", "descriptive", "transcription", "related"];
       const currentIndex = tabs.indexOf(activeTab);
 
       if (event.key === "ArrowRight") {
@@ -663,20 +602,17 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
         setActiveTab(tabs[prevIndex]);
       }
     },
-    [activeTab],
+    [activeTab]
   );
 
   const handleBack = useCallback(() => {
     // If we came from a specific location with state, go back to that location
-    if (
-      location.state &&
-      (location.state.searchTerm || location.state.preserveSearch)
-    ) {
+    if (location.state && (location.state.searchTerm || location.state.preserveSearch)) {
       navigate(-1);
     } else {
       // Fallback to search page with search term if available
       navigate(
-        `/search${effectiveSearchTerm ? `?q=${encodeURIComponent(effectiveSearchTerm)}` : ""}`,
+        `/search${effectiveSearchTerm ? `?q=${encodeURIComponent(effectiveSearchTerm)}` : ""}`
       );
     }
   }, [navigate, location.state, effectiveSearchTerm]);
@@ -688,8 +624,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     const handleScroll = () => {
       // Get scrollTop from the parent scrollable container instead
       const currentScrollTop =
-        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')
-          ?.scrollTop || 0;
+        document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
 
       if (currentScrollTop <= 10) {
         setShowHeader(true);
@@ -703,9 +638,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
     };
 
     // Listen to scroll on the parent container
-    const container = document.querySelector(
-      '[class*="AppLayout"] [style*="overflow: auto"]',
-    );
+    const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
     }
@@ -749,12 +682,12 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
 
   const proxyUrl = (() => {
     const proxyRep = assetData.data.asset.DerivedRepresentations.find(
-      (rep) => rep.Purpose === "proxy",
+      (rep) => rep.Purpose === "proxy"
     );
     return (
       proxyRep?.URL ||
-      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo
-        .PrimaryLocation.ObjectKey.FullPath
+      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+        .ObjectKey.FullPath
     );
   })();
 
@@ -793,8 +726,8 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
             onPrevious={() => navigate(-1)}
             onNext={() => navigate(1)}
             assetName={
-              assetData.data.asset.DigitalSourceAsset.MainRepresentation
-                .StorageInfo.PrimaryLocation.ObjectKey.Name
+              assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+                .ObjectKey.Name
             }
             assetId={assetData.data.asset.InventoryID}
             assetType="Video"
@@ -874,39 +807,38 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                   fontWeight: 500,
                   transition: "all 0.2s",
                   "&:hover": {
-                    backgroundColor: (theme) =>
-                      alpha(theme.palette.secondary.main, 0.05),
+                    backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                   },
                 },
               }}
             >
               <Tab
                 value="summary"
-                label="Summary"
+                label={t("detailPages.tabs.summary")}
                 id="tab-summary"
                 aria-controls="tabpanel-summary"
               />
               <Tab
                 value="technical"
-                label="Technical Metadata"
+                label={t("detailPages.tabs.technical")}
                 id="tab-technical"
                 aria-controls="tabpanel-technical"
               />
               <Tab
                 value="descriptive"
-                label="Descriptive"
+                label={t("detailPages.tabs.descriptive")}
                 id="tab-descriptive"
                 aria-controls="tabpanel-descriptive"
               />
               <Tab
                 value="transcription"
-                label="Transcription"
+                label={t("detailPages.tabs.transcription")}
                 id="tab-transcription"
                 aria-controls="tabpanel-transcription"
               />
               <Tab
                 value="related"
-                label="Related Items"
+                label={t("detailPages.tabs.relatedItems")}
                 id="tab-related"
                 aria-controls="tabpanel-related"
               />
@@ -919,8 +851,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                 pt: 2,
                 outline: "none", // Remove outline when focused but keep it accessible
                 borderRadius: 1,
-                backgroundColor: (theme) =>
-                  alpha(theme.palette.background.paper, 0.5),
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.5),
                 maxHeight: "none",
                 overflow: "visible",
               }}
@@ -937,9 +868,7 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
                   mediaType="video"
                 />
               )}
-              {activeTab === "descriptive" && (
-                <DescriptiveTab assetData={assetData} />
-              )}
+              {activeTab === "descriptive" && <DescriptiveTab assetData={assetData} />}
               {activeTab === "transcription" && (
                 <TranscriptionTab
                   assetId={id || ""}
@@ -989,11 +918,7 @@ const VideoDetailPage: React.FC = () => {
   return (
     <RecentlyViewedProvider>
       <RightSidebarProvider>
-        <VideoDetailContent
-          asset={asset}
-          assetType={assetType}
-          searchTerm={searchTerm}
-        />
+        <VideoDetailContent asset={asset} assetType={assetType} searchTerm={searchTerm} />
       </RightSidebarProvider>
     </RecentlyViewedProvider>
   );

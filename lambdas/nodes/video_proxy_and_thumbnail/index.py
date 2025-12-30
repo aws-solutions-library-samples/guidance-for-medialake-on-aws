@@ -1,9 +1,11 @@
 """
-Video-proxy + thumbnail trigger Lambda (no DynamoDB cache)
+Video-proxy + thumbnail trigger Lambda with MediaConvert endpoint caching
 
 • Accepts modern {"payload": {"assets": […]} events
 • Renders a MediaConvert job (proxy MP4 + FRAME_CAPTURE JPEG) from Jinja in S3
-• Retries describe_endpoints with exponential back-off
+• Uses cached MediaConvert endpoints from DynamoDB to minimize API calls
+• Implements intelligent retry logic with timeout awareness
+• Emits CloudWatch metrics for monitoring
 • Cleans up any existing proxy or thumbnail before submitting a new job
 """
 
@@ -12,8 +14,6 @@ import importlib.util
 import json
 import os
 import os.path
-import random
-import time
 from typing import Any, Dict, List
 
 import boto3
@@ -22,6 +22,13 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from jinja2 import Environment, FileSystemLoader
 from lambda_middleware import lambda_middleware
+from mediaconvert_utils import (
+    MediaConvertEndpointError,
+    MediaConvertThrottlingError,
+    MediaConvertTimeoutError,
+    emit_mediaconvert_metrics,
+    get_mediaconvert_client_with_cache,
+)
 
 # ── Powertools & clients ─────────────────────────────────────────────────────
 logger = Logger()
@@ -98,22 +105,7 @@ def _extract_video_duration(event: dict) -> float:
         return 0.0
 
 
-def get_mediaconvert_endpoint() -> str:
-    override = os.getenv("MEDIACONVERT_ENDPOINT_URL")
-    if override:
-        return override
-
-    mc = boto3.client("mediaconvert")
-    for attempt in range(60):
-        try:
-            return mc.describe_endpoints()["Endpoints"][0]["Url"]
-        except ClientError as e:
-            if e.response["Error"]["Code"] != "TooManyRequestsException":
-                raise
-            delay = (2**attempt) + random.random()
-            logger.warning("describe_endpoints throttled, retrying in %.2fs", delay)
-            time.sleep(delay)
-    _raise("Unable to obtain MediaConvert endpoint after retries")
+# Removed: get_mediaconvert_endpoint() - now using get_mediaconvert_client_with_cache() from mediaconvert_utils
 
 
 def create_job_with_retry(
@@ -121,16 +113,45 @@ def create_job_with_retry(
 ) -> Dict[str, Any]:
     """
     Wrap mc.create_job() in exponential-backoff on TooManyRequestsException.
+    Emits CloudWatch metrics for monitoring.
     """
+    import random
+    import time
+
     attempt = 0
     while True:
         try:
-            return mc_client.create_job(**job_settings)
+            start_time = time.time()
+            response = mc_client.create_job(**job_settings)
+            latency_ms = (time.time() - start_time) * 1000
+
+            # Emit success metrics
+            emit_mediaconvert_metrics(
+                "JobCreationLatency",
+                latency_ms,
+                unit="Milliseconds",
+                dimensions={"Operation": "CreateJob"},
+            )
+
+            if attempt > 0:
+                logger.info(
+                    f"create_job succeeded after {attempt} retries",
+                    extra={"attempt": attempt, "latency_ms": latency_ms},
+                )
+
+            return response
+
         except ClientError as e:
             code = e.response["Error"]["Code"]
             if code == "TooManyRequestsException" and attempt < max_retries:
                 attempt += 1
                 backoff = (2**attempt) + random.random()
+
+                # Emit throttling metric
+                emit_mediaconvert_metrics(
+                    "JobCreationThrottled", 1, dimensions={"Operation": "CreateJob"}
+                )
+
                 logger.warning(
                     "create_job throttled (attempt %d/%d), retrying in %.2fs",
                     attempt,
@@ -211,8 +232,20 @@ def _normalize_event(evt: dict) -> dict:
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
-def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     try:
+        # Calculate timeout buffer based on remaining Lambda execution time
+        remaining_time_ms = context.get_remaining_time_in_millis()
+        timeout_buffer_seconds = 30  # Reserve 30 seconds before timeout
+
+        logger.info(
+            "Lambda execution started",
+            extra={
+                "remaining_time_ms": remaining_time_ms,
+                "timeout_buffer_seconds": timeout_buffer_seconds,
+            },
+        )
+
         asset = _normalize_event(event)
         primary = asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
             "PrimaryLocation"
@@ -303,7 +336,43 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
         if not dest.startswith("s3://") or "None" in dest:
             _raise(f"Invalid destination rendered: {dest}")
 
-        mc = boto3.client("mediaconvert", endpoint_url=get_mediaconvert_endpoint())
+        # Get MediaConvert client with cached endpoint lookup
+        # This uses DynamoDB cache to minimize describe_endpoints API calls
+        try:
+            region = os.environ.get("AWS_REGION", "us-east-1")
+            mc = get_mediaconvert_client_with_cache(
+                region=region, timeout_buffer_seconds=timeout_buffer_seconds
+            )
+            logger.info(
+                "Successfully obtained MediaConvert client",
+                extra={"region": region, "cache_enabled": True},
+            )
+        except MediaConvertEndpointError as e:
+            logger.error(
+                "Failed to get MediaConvert endpoint",
+                extra={"error": str(e), "region": region},
+            )
+            emit_mediaconvert_metrics(
+                "EndpointLookupFailure", 1, dimensions={"Region": region}
+            )
+            raise RuntimeError(f"Failed to obtain MediaConvert endpoint: {e}") from e
+        except MediaConvertTimeoutError as e:
+            logger.error(
+                "Approaching Lambda timeout while getting MediaConvert client",
+                extra={"remaining_time_ms": e.remaining_time_ms},
+            )
+            raise RuntimeError(f"Lambda timeout approaching: {e}") from e
+        except MediaConvertThrottlingError as e:
+            logger.error(
+                "MediaConvert API throttled",
+                extra={"error": str(e), "retry_after": e.retry_after},
+            )
+            emit_mediaconvert_metrics(
+                "ThrottlingError", 1, dimensions={"Region": region}
+            )
+            # Re-raise the original exception so Step Functions can retry
+            raise
+
         job_response = create_job_with_retry(mc, job_settings)
 
         # render the API response
@@ -324,10 +393,37 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext) -> Dict[str, Any]:
         result["updatedAsset"] = _strip_decimals(updated_item)
         return result
 
+    except MediaConvertTimeoutError as e:
+        logger.error(
+            "Lambda timeout approaching during video processing",
+            extra={"remaining_time_ms": e.remaining_time_ms, "error": str(e)},
+        )
+        emit_mediaconvert_metrics(
+            "LambdaTimeout", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"Lambda timeout approaching: {e}") from e
+    except MediaConvertThrottlingError as e:
+        logger.error(
+            "MediaConvert API throttled during video processing",
+            extra={"retry_after": e.retry_after, "error": str(e)},
+        )
+        emit_mediaconvert_metrics(
+            "ThrottlingFailure", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"MediaConvert API throttled: {e}") from e
+    except MediaConvertEndpointError as e:
+        logger.error("Failed to obtain MediaConvert endpoint", extra={"error": str(e)})
+        emit_mediaconvert_metrics(
+            "EndpointError", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"MediaConvert endpoint error: {e}") from e
     except Exception as e:
         logger.exception("Video proxy + thumbnail failed", extra={"error": str(e)})
-        return {
-            "externalJobResult": "Failed",
-            "externalJobStatus": "Started",
-            "error": f"Error processing video: {e}",
-        }
+        emit_mediaconvert_metrics(
+            "UnexpectedError", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"Error processing video: {e}") from e
