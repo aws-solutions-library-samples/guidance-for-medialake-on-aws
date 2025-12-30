@@ -69,5 +69,6 @@
       "use_existing_groups": false
     },
     "use_existing_vpc": false
-  }
+  },
+  "video_download_enabled": true
 }

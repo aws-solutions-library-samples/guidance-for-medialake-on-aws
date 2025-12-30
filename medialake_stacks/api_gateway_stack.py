@@ -14,6 +14,7 @@ from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
+from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
@@ -274,6 +275,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table=props.system_settings_table,
                 media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                video_download_enabled=config.video_download_enabled,
             ),
         )
 

@@ -26,6 +26,7 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
+from cdk_logger import get_logger
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -80,6 +81,9 @@ class AssetsProps:
     security_group: Optional[ec2.SecurityGroup] = None
     media_assets_bucket: Optional[s3.Bucket] = None
     s3_vector_index_name: str = "media-vectors"
+    video_download_enabled: bool = (
+        True  # Feature flag for video/clip download functionality
+    )
 
     # Bulk download parameters
     small_file_threshold_mb: int = 512  # Max size for a file to be considered "small"
@@ -108,6 +112,9 @@ class AssetsConstruct(Construct):
         props: AssetsProps,
     ) -> None:
         super().__init__(scope, construct_id)
+
+        # Initialize logger for this construct
+        self.logger = get_logger("AssetsConstruct")
 
         Stack.of(self).region
         # Create assets resource and add {id} parameter
@@ -412,86 +419,97 @@ class AssetsConstruct(Construct):
         )
         apply_custom_authorization(asset_delete, props.authorizer)
 
-        # Add POST /assets/generate-presigned-url endpoint
-        presigned_url_resource = self._assets_resource.add_resource(
-            "generate-presigned-url"
-        )
-        generate_presigned_url_lambda = Lambda(
-            self,
-            "GeneratePresignedUrlLambda",
-            config=LambdaConfig(
-                name="generate_presigned_url",
-                layers=[search_layer.layer],
-                entry="lambdas/api/assets/generate_presigned_url",
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
-                },
-            ),
-        )
-
-        # Add DynamoDB and S3 permissions for presigned URL Lambda
-        generate_presigned_url_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"],
-                resources=[props.asset_table.table_arn],
+        # Add POST /assets/generate-presigned-url endpoint (conditional based on video_download_enabled)
+        presigned_url_resource = None  # Initialize to None
+        if props.video_download_enabled:
+            self.logger.info(
+                "Creating presigned URL endpoint - video download feature enabled"
             )
-        )
-        generate_presigned_url_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "kms:Decrypt",
-                    "kms:DescribeKey",
-                ],
-                resources=["*"],
+            presigned_url_resource = self._assets_resource.add_resource(
+                "generate-presigned-url"
             )
-        )
-
-        generate_presigned_url_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "s3:GetObjectVersion",
-                ],
-                resources=["arn:aws:s3:::*/*"],  # Access to all objects in all buckets
+            generate_presigned_url_lambda = Lambda(
+                self,
+                "GeneratePresignedUrlLambda",
+                config=LambdaConfig(
+                    name="generate_presigned_url",
+                    layers=[search_layer.layer],
+                    entry="lambdas/api/assets/generate_presigned_url",
+                    environment_variables={
+                        "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                        "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    },
+                ),
             )
-        )
 
-        # Add S3 bucket-level permissions for GetBucketLocation (required for region discovery)
-        generate_presigned_url_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:GetBucketLocation"],
-                resources=[
-                    "arn:aws:s3:::*"
-                ],  # Access to all buckets for location queries
+            # Add DynamoDB and S3 permissions for presigned URL Lambda
+            generate_presigned_url_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=["dynamodb:GetItem"],
+                    resources=[props.asset_table.table_arn],
+                )
             )
-        )
+            generate_presigned_url_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "kms:Decrypt",
+                        "kms:DescribeKey",
+                    ],
+                    resources=["*"],
+                )
+            )
 
-        # Add POST method to /assets/generate-presigned-url
-        presigned_url_post = presigned_url_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(
-                generate_presigned_url_lambda.function,
-                proxy=True,
-                integration_responses=[
-                    api_gateway.IntegrationResponse(
+            generate_presigned_url_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "s3:GetObject",
+                        "s3:GetObjectVersion",
+                    ],
+                    resources=[
+                        "arn:aws:s3:::*/*"
+                    ],  # Access to all objects in all buckets
+                )
+            )
+
+            # Add S3 bucket-level permissions for GetBucketLocation (required for region discovery)
+            generate_presigned_url_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=["s3:GetBucketLocation"],
+                    resources=[
+                        "arn:aws:s3:::*"
+                    ],  # Access to all buckets for location queries
+                )
+            )
+
+            # Add POST method to /assets/generate-presigned-url
+            presigned_url_post = presigned_url_resource.add_method(
+                "POST",
+                api_gateway.LambdaIntegration(
+                    generate_presigned_url_lambda.function,
+                    proxy=True,
+                    integration_responses=[
+                        api_gateway.IntegrationResponse(
+                            status_code="200",
+                            response_parameters={
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                            },
+                        )
+                    ],
+                ),
+                method_responses=[
+                    api_gateway.MethodResponse(
                         status_code="200",
                         response_parameters={
-                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                            "method.response.header.Access-Control-Allow-Origin": True,
                         },
                     )
                 ],
-            ),
-            method_responses=[
-                api_gateway.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True,
-                    },
-                )
-            ],
-        )
-        apply_custom_authorization(presigned_url_post, props.authorizer)
+            )
+            apply_custom_authorization(presigned_url_post, props.authorizer)
+        else:
+            self.logger.info(
+                "Skipping presigned URL endpoint creation - video download feature disabled"
+            )
 
         # Add POST /assets/generate-presigned-url endpoint
         upload_resource = self._assets_resource.add_resource("upload")
@@ -1085,7 +1103,9 @@ class AssetsConstruct(Construct):
         # Add CORS support to all API resources
         add_cors_options_method(self._assets_resource)
         add_cors_options_method(asset_resource)
-        add_cors_options_method(presigned_url_resource)
+        # Only add CORS for presigned URL resource if it was created
+        if presigned_url_resource is not None:
+            add_cors_options_method(presigned_url_resource)
         add_cors_options_method(rename_resource)
         add_cors_options_method(related_versions_resource)
         add_cors_options_method(transcript_resource)
@@ -1095,9 +1115,25 @@ class AssetsConstruct(Construct):
         add_cors_options_method(abort_resource)
         add_cors_options_method(sign_resource)
 
-        # Add bulk download functionality if required props are provided
-        if props.media_assets_bucket and props.vpc and props.security_group:
+        # Add bulk download functionality if feature is enabled and required props are provided
+        if (
+            props.video_download_enabled
+            and props.media_assets_bucket
+            and props.vpc
+            and props.security_group
+        ):
+            self.logger.info(
+                "Creating bulk download resources - feature enabled and dependencies available"
+            )
             self._create_bulk_download_resources(props)
+        elif props.video_download_enabled:
+            self.logger.warning(
+                "Video download feature is enabled but missing required dependencies (media_assets_bucket, vpc, or security_group)"
+            )
+        else:
+            self.logger.info(
+                "Video download feature is disabled - skipping bulk download resources"
+            )
 
     def _create_bulk_download_resources(self, props: AssetsProps):
         """
@@ -1111,7 +1147,12 @@ class AssetsConstruct(Construct):
 
         Note: Bulk download jobs are now stored in the user table using the pattern:
         itemKey: "BULK_DOWNLOAD#{job_id}#{reverse_timestamp}"
+
+        Prerequisites: This method should only be called when video_download_enabled is True
+        and all required dependencies (VPC, security group, media assets bucket) are available.
         """
+        self.logger.info("Creating bulk download resources")
+
         # Use the existing user table for bulk download jobs
         self._users_table = dynamodb.TableV2.from_table_name(
             self, "ImportedTable", f"{config.resource_prefix}-user-{config.environment}"
@@ -1439,7 +1480,10 @@ class AssetsConstruct(Construct):
         self._add_bulk_download_lambda_permissions(props)
 
     def _add_bulk_download_lambda_permissions(self, props: AssetsProps):
-        """Add necessary permissions to Lambda functions."""
+        """Add necessary permissions to Lambda functions.
+
+        Prerequisites: This method should only be called when video_download_enabled is True.
+        """
 
         # DynamoDB permissions
         for lambda_function in [
@@ -2295,7 +2339,12 @@ class AssetsConstruct(Construct):
         )
 
     def _create_bulk_download_api_endpoints(self, props: AssetsProps):
-        """Create API Gateway endpoints for bulk download operations."""
+        """Create API Gateway endpoints for bulk download operations.
+
+        Prerequisites: This method should only be called when video_download_enabled is True.
+        """
+        self.logger.info("Creating bulk download API endpoints")
+
         # Create download resource under assets
         download_resource = self._assets_resource.add_resource("download")
         bulk_resource = download_resource.add_resource("bulk")
@@ -2885,30 +2934,65 @@ class AssetsConstruct(Construct):
 
     @property
     def bulk_download_table(self) -> dynamodb.TableV2:
-        return (
-            self._bulk_download_table if hasattr(self, "_bulk_download_table") else None
-        )
+        """Return the bulk download table if it exists, None otherwise."""
+        if hasattr(self, "_bulk_download_table"):
+            return self._bulk_download_table
+        self.logger.debug("Bulk download table not available - feature may be disabled")
+        return None
 
     @property
     def efs_filesystem(self) -> efs.FileSystem:
-        return self._efs_filesystem if hasattr(self, "_efs_filesystem") else None
+        """Return the EFS filesystem if it exists, None otherwise."""
+        if hasattr(self, "_efs_filesystem"):
+            return self._efs_filesystem
+        self.logger.debug(
+            "EFS filesystem not available - video download feature may be disabled"
+        )
+        return None
 
     @property
     def state_machine(self) -> sfn.StateMachine:
-        return self._state_machine if hasattr(self, "_state_machine") else None
+        """Return the Step Functions state machine if it exists, None otherwise."""
+        if hasattr(self, "_state_machine"):
+            return self._state_machine
+        self.logger.debug(
+            "Step Functions state machine not available - video download feature may be disabled"
+        )
+        return None
 
     @property
     def subclip_mediaconvert_role_arn(self) -> str:
-        return (
-            self.subclip_mediaconvert_role.role_arn
-            if hasattr(self, "subclip_mediaconvert_role")
-            else None
+        """Return the MediaConvert role ARN if it exists, None otherwise."""
+        if hasattr(self, "subclip_mediaconvert_role"):
+            return self.subclip_mediaconvert_role.role_arn
+        self.logger.debug(
+            "MediaConvert role not available - video download feature may be disabled"
         )
+        return None
 
     @property
     def subclip_mediaconvert_queue_arn(self) -> str:
-        return (
-            self.subclip_mediaconvert_queue.queue_arn
-            if hasattr(self, "proxy_queue")
-            else None
+        """Return the MediaConvert queue ARN if it exists, None otherwise."""
+        if hasattr(self, "subclip_mediaconvert_queue"):
+            return self.subclip_mediaconvert_queue.queue_arn
+        self.logger.debug(
+            "MediaConvert queue not available - video download feature may be disabled"
         )
+        return None
+
+    def _ensure_download_feature_enabled(self, operation_name: str):
+        """
+        Ensure that the download feature is enabled before performing operations.
+
+        Args:
+            operation_name: Name of the operation being attempted
+
+        Raises:
+            RuntimeError: If download feature is disabled
+        """
+        if not hasattr(self, "_state_machine") or self._state_machine is None:
+            error_msg = (
+                f"Cannot perform {operation_name}: video download feature is disabled"
+            )
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
