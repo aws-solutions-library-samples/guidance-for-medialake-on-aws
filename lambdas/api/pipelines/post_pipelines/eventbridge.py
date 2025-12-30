@@ -1142,7 +1142,12 @@ def create_eventbridge_rule(
                         f"Adding common libraries layer to EventBridge trigger Lambda: {common_libraries_layer_arn}"
                     )
 
-                # Create the Lambda function
+                # Create the Lambda function with retry logic for role propagation issues
+                # Extract Max Concurrent Executions from node parameters for environment variable
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+
                 create_function_params = {
                     "FunctionName": trigger_lambda_name,
                     "Runtime": "python3.12",
@@ -1153,7 +1158,7 @@ def create_eventbridge_rule(
                     "MemorySize": 1024,
                     "Environment": {
                         "Variables": {
-                            "MAX_CONCURRENT_EXECUTIONS": "10",
+                            "MAX_CONCURRENT_EXECUTIONS": str(max_concurrent_executions),
                             "PIPELINE_NAME": pipeline_name,
                             "SERVICE": "Trigger",  # node Title
                             "STEP_NAME": "Pipeline Trigger",  # friendly name of the node
@@ -1280,18 +1285,24 @@ def create_eventbridge_rule(
                 ]
 
                 # Update the mapping to add concurrency control if not present
+                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+                logger.info(
+                    f"Updating event source mapping with MaximumConcurrency={max_concurrent_executions} from node parameters"
+                )
+
                 try:
                     lambda_client.update_event_source_mapping(
                         UUID=event_source_mapping_uuid,
-                        ScalingConfig={
-                            "MaximumConcurrency": 10  # Limit concurrent executions
-                        },
+                        ScalingConfig={"MaximumConcurrency": max_concurrent_executions},
                         FunctionResponseTypes=[
                             "ReportBatchItemFailures"
                         ],  # Enable partial batch responses
                     )
                     logger.info(
-                        f"Updated event source mapping {event_source_mapping_uuid} with MaximumConcurrency=10 and ReportBatchItemFailures"
+                        f"Updated event source mapping {event_source_mapping_uuid} with MaximumConcurrency={max_concurrent_executions} and ReportBatchItemFailures"
                     )
                 except Exception as update_error:
                     logger.warning(
@@ -1304,22 +1315,27 @@ def create_eventbridge_rule(
             else:
                 # Set up Lambda trigger from SQS queue with concurrency control
                 # MaximumConcurrency limits how many Lambda instances process messages simultaneously
-                # This prevents overwhelming MediaConvert API with concurrent requests
+                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
+                max_concurrent_executions = parameters.get(
+                    "Max Concurrent Executions", 10
+                )
+                logger.info(
+                    f"Using MaximumConcurrency={max_concurrent_executions} from node parameters"
+                )
+
                 response = lambda_client.create_event_source_mapping(
                     EventSourceArn=queue_arn,
                     FunctionName=trigger_lambda_name,
                     Enabled=True,
                     BatchSize=1,
-                    ScalingConfig={
-                        "MaximumConcurrency": 10  # Limit concurrent executions to prevent MediaConvert throttling
-                    },
+                    ScalingConfig={"MaximumConcurrency": max_concurrent_executions},
                     FunctionResponseTypes=[
                         "ReportBatchItemFailures"
                     ],  # Enable partial batch responses
                 )
                 event_source_mapping_uuid = response.get("UUID")
                 logger.info(
-                    f"Created new event source mapping {event_source_mapping_uuid} from SQS queue to Lambda function with MaximumConcurrency=10"
+                    f"Created new event source mapping {event_source_mapping_uuid} from SQS queue to Lambda function with MaximumConcurrency={max_concurrent_executions}"
                 )
         except Exception as e:
             logger.error(f"Error creating/finding SQS queue: {e}")

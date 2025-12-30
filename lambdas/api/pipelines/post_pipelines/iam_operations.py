@@ -62,6 +62,7 @@ def wait_for_role_propagation(role_name: str, max_attempts: int = 20) -> None:
     This function uses a combination of checks and delays to ensure the role has
     propagated through AWS's systems before it's used to create a Lambda function.
     """
+    logger.info(f"[DEBUG] wait_for_role_propagation START for role: {role_name}")
     iam_client = boto3.client("iam")
     attempt = 0
     delay_seconds = 5  # Start with 5 seconds delay
@@ -111,6 +112,7 @@ def wait_for_role_propagation(role_name: str, max_attempts: int = 20) -> None:
     logger.warning(
         f"Role propagation check timed out after {max_attempts} attempts, proceeding anyway"
     )
+    logger.info(f"[DEBUG] wait_for_role_propagation END for role: {role_name}")
 
 
 def delete_role(role_name: str) -> None:
@@ -504,6 +506,7 @@ def create_lambda_execution_policy(
     role_name: str, yaml_data: Dict[str, Any], node: Any = None
 ) -> None:
     """Create and attach the execution policy to the Lambda role based on YAML configuration."""
+    logger.info(f"[DEBUG] create_lambda_execution_policy START for role: {role_name}")
     iam = boto3.client("iam")
 
     # Default policy if no IAM policy is defined in YAML
@@ -760,6 +763,8 @@ def create_lambda_execution_policy(
             logger.error(f"Error attaching policy to role: {attach_err}")
             raise
 
+        logger.info(f"[DEBUG] create_lambda_execution_policy END for role: {role_name}")
+
     except Exception as e:
         logger.error(f"Error creating/attaching policy to role {role_name}: {str(e)}")
         logger.error(f"Exception type: {type(e).__name__}")
@@ -776,6 +781,9 @@ def create_lambda_role(
     node: Any = None,
 ) -> str:
     """Create a Lambda execution role."""
+    logger.info(
+        f"[DEBUG] create_lambda_role START for node: {node_id}, pipeline: {pipeline_name}"
+    )
     iam = boto3.client("iam")
 
     # Use the lambda function name as the role name if provided
@@ -826,10 +834,14 @@ def create_lambda_role(
     try:
         # Check if role exists
         try:
+            logger.info(f"[DEBUG] Checking if role {role_name} exists...")
             iam.get_role(RoleName=role_name)
             logger.info(f"Found existing role {role_name}, deleting it")
+            logger.info(f"[DEBUG] About to delete existing role: {role_name}")
             delete_role(role_name)
+            logger.info(f"[DEBUG] delete_role completed, waiting for deletion...")
             wait_for_role_deletion(role_name)
+            logger.info(f"[DEBUG] wait_for_role_deletion completed for: {role_name}")
         except iam.exceptions.NoSuchEntityException:
             logger.info(f"Role {role_name} does not exist, creating new role")
 
@@ -894,7 +906,13 @@ def create_lambda_role(
                     f"Creating and attaching custom execution policy for {role_name}"
                 )
                 try:
+                    logger.info(
+                        f"[DEBUG] About to call create_lambda_execution_policy for role: {role_name}"
+                    )
                     create_lambda_execution_policy(role_name, yaml_data, node)
+                    logger.info(
+                        f"[DEBUG] create_lambda_execution_policy completed for role: {role_name}"
+                    )
                     logger.info(
                         f"Custom execution policy created and attached successfully for {role_name}"
                     )
@@ -909,12 +927,17 @@ def create_lambda_role(
                 )
 
                 # Add a small delay after role creation to allow for propagation
+                logger.info(f"[DEBUG] Sleeping 2 seconds for role propagation...")
                 time.sleep(2)
+                logger.info(f"[DEBUG] Sleep completed, verifying attached policies...")
 
                 # Verify attached policies
                 attached_policies = iam.list_attached_role_policies(RoleName=role_name)
                 logger.info(f"Attached policies for {role_name}: {attached_policies}")
 
+                logger.info(
+                    f"[DEBUG] create_lambda_role END for role: {role_name}, returning ARN: {role_arn}"
+                )
                 return role_arn
 
             except iam.exceptions.EntityAlreadyExistsException:
