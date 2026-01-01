@@ -70,7 +70,7 @@ mr-title-check:
 .echo_versions: &echo_versions
   before_script:
     - yum update -y
-    - yum install -y python3 python3-pip nodejs npm git jq unzip which findutils
+    - yum install -y python3 python3-pip python3-devel nodejs npm git jq unzip which findutils gcc
     - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib
     - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
     - unzip awscliv2.zip

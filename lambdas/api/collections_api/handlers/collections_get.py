@@ -127,6 +127,13 @@ def register_route(app):
             else:
                 items = _query_all_collections(query_params.limit, start_key)
 
+            # Filter collections based on privacy and ownership
+            # This ensures:
+            # - Public collections are visible to authenticated users only
+            # - Private collections are only visible to their owners
+            # - Unauthenticated users see no collections
+            items = _filter_collections_by_access(items, user_id)
+
             has_more = len(items) > query_params.limit
             if has_more:
                 items = items[: query_params.limit]
@@ -301,6 +308,62 @@ def _query_child_collections(parent_id, limit, start_key):
 
     logger.info(f"Found {len(child_items)} child collections")
     return child_items
+
+
+@tracer.capture_method
+def _filter_collections_by_access(items, user_id):
+    """
+    Filter collections based on privacy and ownership.
+
+    Returns:
+        - Public collections (isPublic = True) - only visible to authenticated users
+        - Private collections only if user_id matches ownerId
+        - Unauthenticated users (user_id = None) see no collections
+
+    Args:
+        items: List of collection dictionaries
+        user_id: User ID from JWT token, or None if unauthenticated
+
+    Returns:
+        Filtered list of collections
+    """
+    filtered_items = []
+
+    # Unauthenticated users cannot see any collections
+    if not user_id:
+        logger.debug(
+            {
+                "message": "Unauthenticated user - no collections visible",
+                "original_count": len(items),
+                "filtered_count": 0,
+                "operation": "_filter_collections_by_access",
+            }
+        )
+        return filtered_items
+
+    for item in items:
+        is_public = item.get("isPublic", False)
+        owner_id = item.get("ownerId")
+
+        # Public collections are accessible to authenticated users
+        if is_public:
+            filtered_items.append(item)
+        # Private collections: only accessible to owner
+        elif owner_id == user_id:
+            filtered_items.append(item)
+        # Private collections owned by others are excluded
+
+    logger.debug(
+        {
+            "message": "Filtered collections by access",
+            "original_count": len(items),
+            "filtered_count": len(filtered_items),
+            "user_id": user_id,
+            "operation": "_filter_collections_by_access",
+        }
+    )
+
+    return filtered_items
 
 
 @tracer.capture_method
