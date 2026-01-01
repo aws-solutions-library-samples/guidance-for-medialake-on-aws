@@ -475,9 +475,45 @@ export const useVideoKeyboardShortcuts = ({
     const handledKeys = new Set([" ", "k", "K"]); // Space + K keys that we handle
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore when typing in fields
-      const tag = (event.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Ignore when typing in fields - check both event target and active element
+      // This is important because we're using capture phase, so event.target might not be the input yet
+      const activeElement = document.activeElement as HTMLElement;
+      const target = event.target as HTMLElement;
+
+      // Check if active element is an input field
+      if (activeElement) {
+        const activeTag = activeElement.tagName;
+        if (activeTag === "INPUT" || activeTag === "TEXTAREA") {
+          return;
+        }
+        // Check for contentEditable elements
+        if (activeElement.isContentEditable) {
+          return;
+        }
+        // Check if active element is inside an input (for Material-UI wrappers)
+        let element: HTMLElement | null = activeElement;
+        while (element) {
+          if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+            return;
+          }
+          // Check for Material-UI input classes
+          if (element.classList.contains("MuiInputBase-input")) {
+            return;
+          }
+          element = element.parentElement;
+        }
+      }
+
+      // Also check event target as fallback
+      if (target) {
+        const targetTag = target.tagName;
+        if (targetTag === "INPUT" || targetTag === "TEXTAREA") {
+          return;
+        }
+        if (target.isContentEditable) {
+          return;
+        }
+      }
 
       // If we handle this key, stop anyone else from seeing it
       if (handledKeys.has(event.key)) {
@@ -619,6 +655,27 @@ export const useVideoKeyboardShortcuts = ({
 
     // Block native/key-up fallbacks some players use
     const blockNative = (e: KeyboardEvent) => {
+      // Don't block if user is typing in an input field
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement) {
+        const activeTag = activeElement.tagName;
+        if (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeElement.isContentEditable) {
+          return;
+        }
+        // Check if active element is inside an input (for Material-UI wrappers)
+        let element: HTMLElement | null = activeElement;
+        while (element) {
+          if (
+            element.tagName === "INPUT" ||
+            element.tagName === "TEXTAREA" ||
+            element.classList.contains("MuiInputBase-input")
+          ) {
+            return;
+          }
+          element = element.parentElement;
+        }
+      }
+
       if (handledKeys.has(e.key)) {
         (e as any).stopImmediatePropagation?.();
         e.stopPropagation();
