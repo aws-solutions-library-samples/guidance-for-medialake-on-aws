@@ -86,7 +86,8 @@ class UsersGroupsStack(cdk.NestedStack):
                     ),
                     projection_type=dynamodb.ProjectionType.ALL,
                 ),
-                # GSI3 (BulkDownloadJobLookup)
+                # GSI3 (BulkDownloadJobLookup) - Always present for backward compatibility
+                # Even when video_download_enabled=false, this GSI remains to avoid breaking existing deployments
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI3",
                     partition_key=dynamodb.Attribute(
