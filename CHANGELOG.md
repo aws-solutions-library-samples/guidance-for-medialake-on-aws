@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0] - 2026-01-05
+
+### Features
+
+- feat: adds backend feature flag to enable/disable downloads
+
+### Bug Fixes
+
+- fix: pin FFmpeg/FFprobe to version autobuild-2025-12-30-12-55
+- fix(ui): Resolve problem when searching while in VideoDetailPage because of the player shortcuts
+- fix: remove glow when there is more than two lines on asset card in dark theme
+- fix: Private collections only shows your own collections now
+
 ## [1.3.0] - 2025-12-30
 
 ### Features

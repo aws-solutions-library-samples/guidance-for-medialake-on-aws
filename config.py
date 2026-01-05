@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import warnings
 from datetime import datetime
 from enum import Enum
@@ -9,6 +10,7 @@ from aws_cdk import aws_logs as logs
 from pydantic import (
     BaseModel,
     Field,
+    ValidationError,
     field_validator,
     model_validator,
     root_validator,
@@ -541,6 +543,118 @@ class CDKConfig(BaseModel):
     authZ: AuthConfig = AuthConfig()
     vpc: VpcConfig = Field(default_factory=VpcConfig)
     cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
+    video_download_enabled: bool = True
+
+    def __init__(self, **data):
+        """Initialize CDKConfig and log configuration values for audit trail.
+
+        Raises:
+            SystemExit: When configuration validation fails, causing CDK deployment to fail
+        """
+        try:
+            super().__init__(**data)
+            self._log_configuration_audit_trail()
+        except ValidationError as e:
+            # Handle Pydantic validation errors during direct instantiation
+            # Initialize logger for error reporting
+            try:
+                from cdk_logger import CDKLogger
+
+                logger = CDKLogger.get_logger("CDKConfig")
+            except ImportError:
+                import logging
+
+                logger = logging.getLogger("CDKConfig")
+                if not logger.handlers:
+                    handler = logging.StreamHandler()
+                    formatter = logging.Formatter(
+                        '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                    )
+                    handler.setFormatter(formatter)
+                    logger.addHandler(handler)
+                    logger.setLevel(logging.INFO)
+
+            # Format validation errors with detailed messages
+            error_details = []
+            for error in e.errors():
+                field_path = " -> ".join(str(loc) for loc in error["loc"])
+                error_details.append(f"  • Field '{field_path}': {error['msg']}")
+                if "input" in error:
+                    error_details.append(f"    Received value: {error['input']}")
+
+            error_msg = (
+                f"CDK Configuration Validation Error: Invalid configuration provided. "
+                f"Please fix the following validation errors:\n"
+                + "\n".join(error_details)
+                + f"\n\nFor more information about configuration options, please refer to the documentation."
+            )
+
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+
+            # Exit with error code to fail CDK deployment
+            # This ensures that configuration validation errors propagate to deployment failures
+            sys.exit(1)
+
+    def _log_configuration_audit_trail(self):
+        """Log configuration values for audit trail during CDK synthesis."""
+        # Import here to avoid circular imports during module loading
+        try:
+            from cdk_logger import CDKLogger
+
+            logger = CDKLogger.get_logger("CDKConfig")
+        except ImportError:
+            # Fallback to standard logging if CDKLogger is not available
+            import logging
+
+            logger = logging.getLogger("CDKConfig")
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter(
+                    '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                )
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+                logger.setLevel(logging.INFO)
+
+        # Get current timestamp for audit trail
+        timestamp = datetime.utcnow().isoformat() + "Z"
+
+        # Log the resolved video_download_enabled value with deployment context
+        logger.info(
+            f"CDK Configuration Audit: video_download_enabled={self.video_download_enabled}, "
+            f"environment={self.environment}, "
+            f"resource_prefix={self.resource_prefix}, "
+            f"account_id={self.account_id}, "
+            f"primary_region={self.primary_region}, "
+            f"synthesis_timestamp={timestamp}"
+        )
+
+    @field_validator("video_download_enabled")
+    @classmethod
+    def validate_video_download_enabled(cls, v):
+        """Validate that video_download_enabled is a boolean value.
+
+        Args:
+            v: The value to validate
+
+        Returns:
+            bool: The validated boolean value
+
+        Raises:
+            ValueError: If the value is not a boolean type with detailed error message
+        """
+        if not isinstance(v, bool):
+            # Provide detailed error message with examples and type information
+            error_msg = (
+                f"video_download_enabled must be a boolean value (true or false). "
+                f"Received: {repr(v)} (type: {type(v).__name__}). "
+                f"Valid examples: true, false. "
+                f"Common mistakes: using strings like 'true'/'false' instead of boolean values, "
+                f"or using numbers like 1/0 instead of true/false."
+            )
+            raise ValueError(error_msg)
+        return v
 
     @property
     def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:
@@ -586,16 +700,138 @@ class CDKConfig(BaseModel):
 
     @classmethod
     def load_from_file(cls, filename="config.json"):
+        """Load configuration from file and log audit trail.
+
+        Args:
+            filename: Path to the configuration file
+
+        Returns:
+            CDKConfig: Loaded and validated configuration instance
+
+        Raises:
+            SystemExit: When configuration validation fails, causing CDK deployment to fail
+        """
+        # Initialize logger first for error reporting
+        try:
+            from cdk_logger import CDKLogger
+
+            logger = CDKLogger.get_logger("CDKConfig")
+        except ImportError:
+            import logging
+
+            logger = logging.getLogger("CDKConfig")
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter(
+                    '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                )
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+                logger.setLevel(logging.INFO)
+
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
-            return cls(**config_data)
-        except FileNotFoundError:
+
+            # Create instance which will automatically trigger audit logging
+            # This is where Pydantic validation occurs
+            instance = cls(**config_data)
+
+            logger.info(f"Configuration loaded successfully from file: {filename}")
+            return instance
+
+        except FileNotFoundError as e:
+            error_msg = (
+                f"CDK Configuration Error: Configuration file '{filename}' not found. "
+                f"Please ensure the configuration file exists and is accessible. "
+                f"Error details: {str(e)}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Create default instance which will also trigger audit logging
             return cls()
 
+        except json.JSONDecodeError as e:
+            error_msg = (
+                f"CDK Configuration Error: Invalid JSON format in configuration file '{filename}'. "
+                f"Please check the JSON syntax. "
+                f"Error at line {e.lineno}, column {e.colno}: {e.msg}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Exit with error code to fail CDK deployment
+            sys.exit(1)
 
-# Load configuration from config.json
-config = CDKConfig.load_from_file()
+        except ValidationError as e:
+            # Handle Pydantic validation errors with detailed messages
+            error_details = []
+            for error in e.errors():
+                field_path = " -> ".join(str(loc) for loc in error["loc"])
+                error_details.append(f"  • Field '{field_path}': {error['msg']}")
+                if "input" in error:
+                    error_details.append(f"    Received value: {error['input']}")
+
+            error_msg = (
+                f"CDK Configuration Validation Error: Invalid configuration in '{filename}'. "
+                f"Please fix the following validation errors:\n"
+                + "\n".join(error_details)
+                + f"\n\nFor more information about configuration options, please refer to the documentation."
+            )
+
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+
+            # Exit with error code to fail CDK deployment
+            # This ensures that configuration validation errors propagate to deployment failures
+            sys.exit(1)
+
+        except Exception as e:
+            # Handle any other unexpected errors during configuration loading
+            error_msg = (
+                f"CDK Configuration Error: Unexpected error while loading configuration from '{filename}'. "
+                f"Error type: {type(e).__name__}, Details: {str(e)}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Exit with error code to fail CDK deployment
+            sys.exit(1)
+
+
+# Load configuration from config.json with comprehensive error handling
+try:
+    config = CDKConfig.load_from_file()
+except SystemExit:
+    # Re-raise SystemExit to ensure CDK deployment fails
+    raise
+except Exception as e:
+    # Handle any unexpected errors during module-level configuration loading
+    import sys
+
+    try:
+        from cdk_logger import CDKLogger
+
+        logger = CDKLogger.get_logger("CDKConfig")
+    except ImportError:
+        import logging
+
+        logger = logging.getLogger("CDKConfig")
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+
+    error_msg = (
+        f"CDK Configuration Error: Critical error during module initialization. "
+        f"Error type: {type(e).__name__}, Details: {str(e)}. "
+        f"This error prevents CDK deployment from proceeding."
+    )
+    logger.error(error_msg)
+    print(f"ERROR: {error_msg}", file=sys.stderr)
+    sys.exit(1)
 
 # Define constants based on config values
 WORKFLOW_PAYLOAD_TEMP_BUCKET = "mne-mscdemo-workflow-payload-temp-data"
