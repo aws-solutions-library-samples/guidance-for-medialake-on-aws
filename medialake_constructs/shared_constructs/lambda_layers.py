@@ -216,6 +216,14 @@ class ResvgCliLayer(Construct):
 
 
 class FFProbeLayer(Construct):
+    # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
+    # The combined size of FFProbe + PyMediaInfo + Powertools + CommonLibraries layers
+    # must stay under 250MB. Using 'latest' can cause builds to exceed this limit.
+    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
+    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
+    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
+    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
+
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
@@ -250,13 +258,12 @@ class FFProbeLayer(Construct):
                             yum update -y && yum install -y wget xz zip tar
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
-                            grep ffmpeg-master-latest-linux64-gpl.tar.xz checksums.sha256 | sha256sum -c
-                            mkdir ffmpeg-master-latest-linux64-gpl
-                            tar xvf ffmpeg-master-latest-linux64-gpl.tar.xz -C ffmpeg-master-latest-linux64-gpl
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
+                            echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
+                            mkdir ffmpeg-extracted
+                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
                             mkdir -p ffprobe/bin
-                            cp ffmpeg-master-latest-linux64-gpl/*/bin/ffprobe ffprobe/bin/
+                            cp ffmpeg-extracted/*/bin/ffprobe ffprobe/bin/
                             cd ffprobe
                             zip -9 -r $TEMP_DIR/ffprobe.zip .
                             cp $TEMP_DIR/ffprobe.zip /asset-output/
@@ -274,9 +281,17 @@ class FFProbeLayer(Construct):
 
 
 class FFmpegLayer(Construct):
+    # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
+    # The combined size of FFmpeg + other layers must stay under 250MB.
+    # Using 'latest' can cause builds to exceed this limit as FFmpeg grows.
+    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
+    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
+    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
+    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
+
     def __init__(self, scope: Construct, id: str, **kwargs):
         """
-        This layer bundles a static build of FFmpeg. It downloads the FFmpeg release,
+        This layer bundles a static build of FFmpeg. It downloads a pinned FFmpeg release,
         verifies it with its SHA256 checksum, extracts the binary, and packages it into a Lambda layer.
         """
         super().__init__(scope, id, **kwargs)
@@ -304,18 +319,17 @@ class FFmpegLayer(Construct):
                         command=[
                             "/bin/bash",
                             "-c",
-                            """
+                            f"""
                             set -e
                             yum update -y && yum install -y wget xz zip tar
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
-                            grep ffmpeg-master-latest-linux64-gpl.tar.xz checksums.sha256 | sha256sum -c
-                            mkdir ffmpeg-master-latest-linux64-gpl
-                            tar xvf ffmpeg-master-latest-linux64-gpl.tar.xz -C ffmpeg-master-latest-linux64-gpl
+                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
+                            echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
+                            mkdir ffmpeg-extracted
+                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
                             mkdir -p ffmpeg/bin
-                            cp ffmpeg-master-latest-linux64-gpl/*/bin/ffmpeg ffmpeg/bin/
+                            cp ffmpeg-extracted/*/bin/ffmpeg ffmpeg/bin/
                             cd ffmpeg
                             zip -9 -r $TEMP_DIR/ffmpeg.zip .
                             cp $TEMP_DIR/ffmpeg.zip /asset-output/

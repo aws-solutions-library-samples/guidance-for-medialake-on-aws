@@ -1462,29 +1462,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                               display: "-webkit-box",
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
-                              position: "relative",
-                              "&:after": {
-                                content: '"..."',
-                                position: "absolute",
-                                bottom: 0,
-                                right: 0,
-                                paddingLeft: "4px",
-                                backgroundColor: "inherit",
-                                boxShadow: "-8px 0 8px rgba(255,255,255,0.8)",
-                                display: "none",
-                              },
-                              "&.truncated:after": {
-                                display: "inline",
-                              },
                               "&:hover": {
                                 maxHeight: "none", // Remove height limit on hover
                                 WebkitLineClamp: "unset",
-                                "&:after": {
-                                  display: "none",
-                                },
                               },
                             }}
-                            className={String(renderField(field.id)).length > 60 ? "truncated" : ""}
                             display="inline"
                             variant="body2"
                             title={String(renderField(field.id))}
