@@ -4,6 +4,7 @@ import os
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.event_handler.exceptions import InternalServerError
 
 logger = Logger(child=True)
 tracer = Tracer()
@@ -112,8 +113,4 @@ def register_route(app):
             }
         except Exception as e:
             logger.exception("Error retrieving search provider")
-            return {
-                "status": "error",
-                "message": f"Error retrieving search provider: {str(e)}",
-                "data": {},
-            }
+            raise InternalServerError(f"Error retrieving search provider: {str(e)}")
