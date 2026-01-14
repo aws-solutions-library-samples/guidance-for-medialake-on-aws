@@ -216,13 +216,11 @@ class ResvgCliLayer(Construct):
 
 
 class FFProbeLayer(Construct):
-    # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
-    # The combined size of FFProbe + PyMediaInfo + Powertools + CommonLibraries layers
-    # must stay under 250MB. Using 'latest' can cause builds to exceed this limit.
-    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
-    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
-    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
-    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
+    # FFmpeg 8.0.1 source build from official FFmpeg releases
+    FFMPEG_VERSION = "8.0.1"
+    FFMPEG_FILENAME = "ffmpeg-8.0.1.tar.xz"
+    FFMPEG_URL = "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz"
+    # FFMPEG_SHA256 = ""  # TODO: Add SHA256 checksum
 
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -255,16 +253,20 @@ class FFProbeLayer(Construct):
                             "-c",
                             f"""
                             set -e
-                            yum update -y && yum install -y wget xz zip tar
+                            yum update -y && yum install -y wget xz zip tar gcc make nasm yasm
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
-                            echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
-                            mkdir ffmpeg-extracted
-                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
-                            mkdir -p ffprobe/bin
-                            cp ffmpeg-extracted/*/bin/ffprobe ffprobe/bin/
-                            cd ffprobe
+                            wget {self.FFMPEG_URL} -O {self.FFMPEG_FILENAME}
+                            # TODO: Add SHA256 check when available
+                            # echo "$FFMPEG_SHA256  {self.FFMPEG_FILENAME}" | sha256sum -c
+                            mkdir ffmpeg-src
+                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-src --strip-components=1
+                            cd ffmpeg-src
+                            ./configure --disable-doc --disable-ffmpeg --disable-ffplay --enable-static --disable-shared
+                            make -j$(nproc) ffprobe
+                            mkdir -p $TEMP_DIR/ffprobe/bin
+                            cp ffprobe $TEMP_DIR/ffprobe/bin/
+                            cd $TEMP_DIR/ffprobe
                             zip -9 -r $TEMP_DIR/ffprobe.zip .
                             cp $TEMP_DIR/ffprobe.zip /asset-output/
                             cd /
@@ -281,18 +283,16 @@ class FFProbeLayer(Construct):
 
 
 class FFmpegLayer(Construct):
-    # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
-    # The combined size of FFmpeg + other layers must stay under 250MB.
-    # Using 'latest' can cause builds to exceed this limit as FFmpeg grows.
-    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
-    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
-    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
-    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
+    # FFmpeg 8.0.1 source build from official FFmpeg releases
+    FFMPEG_VERSION = "8.0.1"
+    FFMPEG_FILENAME = "ffmpeg-8.0.1.tar.xz"
+    FFMPEG_URL = "https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz"
+    # FFMPEG_SHA256 = ""  # TODO: Add SHA256 checksum
 
     def __init__(self, scope: Construct, id: str, **kwargs):
         """
-        This layer bundles a static build of FFmpeg. It downloads a pinned FFmpeg release,
-        verifies it with its SHA256 checksum, extracts the binary, and packages it into a Lambda layer.
+        This layer builds FFmpeg from source. It downloads the FFmpeg 8.0.1 source tarball,
+        compiles it, and packages the binary into a Lambda layer.
         """
         super().__init__(scope, id, **kwargs)
 
@@ -321,16 +321,20 @@ class FFmpegLayer(Construct):
                             "-c",
                             f"""
                             set -e
-                            yum update -y && yum install -y wget xz zip tar
+                            yum update -y && yum install -y wget xz zip tar gcc make nasm yasm
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
-                            echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
-                            mkdir ffmpeg-extracted
-                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
-                            mkdir -p ffmpeg/bin
-                            cp ffmpeg-extracted/*/bin/ffmpeg ffmpeg/bin/
-                            cd ffmpeg
+                            wget {self.FFMPEG_URL} -O {self.FFMPEG_FILENAME}
+                            # TODO: Add SHA256 check when available
+                            # echo "$FFMPEG_SHA256  {self.FFMPEG_FILENAME}" | sha256sum -c
+                            mkdir ffmpeg-src
+                            tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-src --strip-components=1
+                            cd ffmpeg-src
+                            ./configure --disable-doc --disable-ffprobe --disable-ffplay --enable-static --disable-shared
+                            make -j$(nproc) ffmpeg
+                            mkdir -p $TEMP_DIR/ffmpeg/bin
+                            cp ffmpeg $TEMP_DIR/ffmpeg/bin/
+                            cd $TEMP_DIR/ffmpeg
                             zip -9 -r $TEMP_DIR/ffmpeg.zip .
                             cp $TEMP_DIR/ffmpeg.zip /asset-output/
                             cd /
