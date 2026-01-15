@@ -35,7 +35,7 @@ workflow:
 # This job should ONLY run on MRs targeting 'stable'
 test-mr-to-stable:
   stage: build
-  image: alpine:latest
+  image: public.ecr.aws/docker/library/alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
@@ -49,7 +49,7 @@ test-mr-to-stable:
 # Validate MR title for main and stable branches
 mr-title-check:
   stage: .pre
-  image: alpine:latest
+  image: public.ecr.aws/docker/library/alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
@@ -113,7 +113,7 @@ pre_commit_checks:
 # Simple version check for MRs to stable
 version-check:
   stage: build
-  image: alpine:latest
+  image: public.ecr.aws/docker/library/alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
   script:
@@ -125,7 +125,7 @@ version-check:
 
 # STEP 1: Add back semantic-version job
 semantic-version:
-  image: alpine:latest
+  image: public.ecr.aws/docker/library/alpine:latest
   stage: .pre
   variables:
     GIT_DEPTH: 0
@@ -423,7 +423,7 @@ semantic-version:
 
 # STEP 3: Add back sync-to-github job
 sync-to-github:
-  image: alpine:latest
+  image: public.ecr.aws/docker/library/alpine:latest
   stage: deploy
   rules:
     - if: $CI_COMMIT_REF_NAME == "release"
