@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.1] - 2026-01-15
+
+### Bug Fixes
+
+- fix: update FFmpeg version to autobuild-2025-11-30-12-53
+- fix: updated location of ffmpeg/probe
+
+### Other Changes
+
+- release: main to stable
+
 ## [1.4.0] - 2026-01-05
 
 ### Features
