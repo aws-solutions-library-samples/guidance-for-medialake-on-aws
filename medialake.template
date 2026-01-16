@@ -579,6 +579,14 @@ Resources:
                 - bash .cicd/build_ffmpeg.sh
                 - echo "Building RSSVG"
                 - bash .cicd/build_resvg.sh
+                - echo "Building NumPy layer"
+                - bash .cicd/build_numpy.sh || (echo "NumPy build failed" && exit 1)
+                - test -d dist/lambdas/layers/numpy || (echo "NumPy layer directory not found after build" && exit 1)
+                - echo "NumPy layer verified"
+                - echo "Building OpenEXR layer"
+                - bash .cicd/build_openexr.sh || (echo "OpenEXR build failed" && exit 1)
+                - test -d dist/lambdas/layers/openexr || (echo "OpenEXR layer directory not found after build" && exit 1)
+                - echo "OpenEXR layer verified"
                 # - cdk synth || (echo "CDK synth failed" && find . -name "cdk.json" -o -name "app.py" | grep -v "node_modules")
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
@@ -631,6 +639,11 @@ Resources:
               commands:
                 - echo Deploying CDK stacks
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - echo "=== DEBUG - Checking workspace structure ==="
+                - pwd
+                - ls -la
+                - echo "=== DEBUG - Checking dist folder ==="
+                - 'ls -la dist/lambdas/layers/ || echo "dist/lambdas/layers/ NOT FOUND"'
                 # Bootstrap current region
                 - cdk bootstrap
                 # Also bootstrap us-east-1 if we're not already in that region

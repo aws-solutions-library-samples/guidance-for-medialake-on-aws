@@ -627,6 +627,10 @@ Resources:
                 - bash .cicd/build_ffmpeg.sh
                 - echo "Building RSSVG"
                 - bash .cicd/build_resvg.sh
+                - echo "Building NumPy layer"
+                - bash .cicd/build_numpy.sh
+                - echo "Building OpenEXR layer"
+                - bash .cicd/build_openexr.sh
                 - echo "CDK synthesis"
                 - cdk synth || (echo "CDK synth failed" && exit 1)
             post_build:

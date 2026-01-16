@@ -9,9 +9,12 @@ node:
     config:
       lambda:
         handler: utility/ImageMetadataExtractorLambdaDeployment
-        runtime: nodejs18.x
+        runtime: python3.12
         memory_size: 10240
         timeout: 900
+        layers:
+          - OpenEXR
+          - Numpy
         iam_policy:
           statements:
             - effect: Allow
