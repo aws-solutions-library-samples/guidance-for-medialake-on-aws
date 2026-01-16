@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.0] - 2026-01-16
+
+### Features
+
+- feat: add EXR support with OpenEXR 3.4.4
+
 ## [1.5.0] - 2026-01-16
 
 ### Features
