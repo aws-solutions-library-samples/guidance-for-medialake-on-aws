@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.0] - 2026-01-16
+
+### Features
+
+- feat: enable S3 server access logging for IAC assets bucket
+
+### Bug Fixes
+
+- fix: use cp -rL instead of cp -au for Docker bundling compatibility
+
 ## [1.4.1] - 2026-01-15
 
 ### Bug Fixes
