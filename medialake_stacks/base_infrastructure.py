@@ -23,6 +23,7 @@ from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
 )
 from medialake_constructs.shared_constructs.s3_logging import (
     add_s3_access_logging_policy,
+    enable_s3_server_access_logging,
 )
 from medialake_constructs.shared_constructs.s3_vectors import (
     S3VectorCluster,
@@ -346,6 +347,13 @@ class BaseInfrastructureStack(Stack):
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
             ),
+        )
+
+        # Enable server access logging for IAC assets bucket
+        enable_s3_server_access_logging(
+            self,
+            access_logs_bucket=self.access_logs_bucket,
+            source_bucket=self.iac_assets_bucket.bucket,
         )
 
         self._pipelines_event_bus = EventBus(
