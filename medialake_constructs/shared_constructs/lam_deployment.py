@@ -133,12 +133,22 @@ class LambdaDeployment(Construct):
                 check=True,
             )
 
-        # Copy source files to package directory
+        # Copy source files and directories to package directory
         for item in os.listdir(source_path):
             s = os.path.join(source_path, item)
             d = os.path.join(package_path, item)
             if os.path.isfile(s):
                 shutil.copy2(s, d)
+            elif os.path.isdir(s):
+                # Skip common non-code directories
+                if item not in [
+                    "__pycache__",
+                    ".pytest_cache",
+                    ".hypothesis",
+                    "node_modules",
+                    ".git",
+                ]:
+                    shutil.copytree(s, d, dirs_exist_ok=True)
 
         shutil.make_archive(zip_path.replace(".zip", ""), "zip", package_path)
 

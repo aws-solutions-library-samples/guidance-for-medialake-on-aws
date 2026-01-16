@@ -256,9 +256,8 @@ class LambdaMiddleware:
             and isinstance(ev.get("metadata"), dict)
             and isinstance(ev.get("payload"), dict)
             and "data" in ev["payload"]
-            and "assets" in ev["payload"]
         ):
-            # Check if payload was offloaded to S3
+            # Check if payload was offloaded to S3 (must check BEFORE checking assets)
             meta = ev.get("metadata", {})
             if meta.get("stepExternalPayload") == "True":
                 ext_loc = meta.get("stepExternalPayloadLocation", {})
