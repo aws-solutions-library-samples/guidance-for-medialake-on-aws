@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.0] - 2026-01-20
+
+### Features
+
+- feat: migrate S3 Vector to native CDK constructs and leverage GA improvements
+
 ## [1.6.1] - 2026-01-20
 
 ### Bug Fixes
