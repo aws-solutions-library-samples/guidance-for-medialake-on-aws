@@ -1,5 +1,17 @@
 """
 S3 Vector embedding store implementation for semantic search.
+
+S3 Vectors GA Capabilities (January 2025):
+- Up to 2 billion vectors per index (40x increase from preview)
+- Up to 100 search results per query (increased from 30)
+- ~100ms query latency for frequent queries
+- 50 metadata keys per vector (10 non-filterable)
+- Native metadata filtering support
+
+Current Implementation:
+- Uses topK=100 for comprehensive search coverage
+- Combines S3 Vectors for similarity with OpenSearch for metadata filtering
+- Supports diverse asset discovery with multiple query rounds
 """
 
 import os
@@ -132,10 +144,10 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             self.logger.info("Executing S3 Vector semantic query")
             s3_vector_start = time.time()
 
-            # S3 Vector has a max topK of 30
-            # Strategy: Do multiple queries (each topK=30) with exclusion filters
+            # S3 Vector GA supports up to 100 results per query (increased from 30 in preview)
+            # Strategy: Do multiple queries (each topK=100) with exclusion filters
             # to discover diverse assets (videos with many clips can dominate results)
-            vector_topK = 30
+            vector_topK = 100
             max_discovery_rounds = 3
             min_unique_assets = 5
 
@@ -167,7 +179,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                     exclusion_filter = None
                     self.logger.info(f"Round {round_num + 1}: Initial broad query")
 
-                # Query S3 Vector Store (always topK=30, never exceeds limit)
+                # Query S3 Vector Store (topK=100 for comprehensive results)
                 try:
                     round_response = s3_vector_client.query_vectors(
                         vectorBucketName=bucket_name,
@@ -176,6 +188,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                         topK=vector_topK,
                         filter=exclusion_filter,
                         returnMetadata=True,
+                        returnDistance=True,  # GA feature: accurate similarity scoring
                     )
 
                     round_results = round_response.get("vectors", [])
@@ -294,7 +307,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                     topK=vector_topK,
                     filter=vector_filter,
                     returnMetadata=True,
-                    returnDistance=True,
+                    returnDistance=True,  # GA feature: accurate similarity scoring
                 )
 
                 filtered_results = filtered_response.get("vectors", [])
