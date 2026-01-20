@@ -1034,6 +1034,25 @@ def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
             s3_client, payload["data"], logger
         )
 
+        # Check if downloaded data is itself another S3 reference (lightweight reference pattern)
+        # This happens when TwelveLabs Bedrock Results returns a reference file that points to embeddings file
+        if (
+            embedding_data
+            and isinstance(embedding_data, dict)
+            and is_s3_reference(embedding_data)
+        ):
+            logger.info(
+                "Downloaded data is a lightweight reference, downloading actual embeddings",
+                extra={
+                    "reference_bucket": embedding_data.get("s3_bucket"),
+                    "reference_key": embedding_data.get("s3_key"),
+                },
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, embedding_data, logger
+            )
+            logger.info(f"Downloaded actual embeddings, type: {type(embedding_data)}")
+
     # Try new structure: data.item
     if not embedding_data and isinstance(payload.get("data"), dict):
         item = payload["data"].get("item")
