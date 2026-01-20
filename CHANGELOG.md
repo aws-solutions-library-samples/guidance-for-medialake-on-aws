@@ -13,7 +13,6 @@
 
 ### Refactors
 
-- refactor: enable S3 server access logging for IAC assets bucket
 - refactor: migrate S3 Vector to native CDK constructs and leverage GA improvements
 
 ## [1.4.1] - 2026-01-20
