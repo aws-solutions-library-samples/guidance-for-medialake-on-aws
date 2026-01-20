@@ -1,43 +1,24 @@
 # Changelog
 
-## [1.7.0] - 2026-01-20
-
-### Features
-
-- feat: migrate S3 Vector to native CDK constructs and leverage GA improvements
-
-## [1.6.1] - 2026-01-20
-
-### Bug Fixes
-
-- fix: preserve assets when downloading external payloads in middleware
-
-## [1.6.0] - 2026-01-16
+## [1.5.0] - 2026-01-16
 
 ### Features
 
 - feat: add EXR support with OpenEXR 3.4.4
 
-## [1.5.0] - 2026-01-16
-
-### Features
-
-- feat: enable S3 server access logging for IAC assets bucket
-
 ### Bug Fixes
 
 - fix: use cp -rL instead of cp -au for Docker bundling compatibility
+- fix: preserve assets when downloading external payloads in middleware
 
-## [1.4.1] - 2026-01-15
+### Refactors
 
-### Bug Fixes
+- refactor: enable S3 server access logging for IAC assets bucket
+- refactor: migrate S3 Vector to native CDK constructs and leverage GA improvements
+
+## [1.4.1] - 2026-01-20
 
 - fix: update FFmpeg version to autobuild-2025-11-30-12-53
-- fix: updated location of ffmpeg/probe
-
-### Other Changes
-
-- release: main to stable
 
 ## [1.4.0] - 2026-01-05
 
