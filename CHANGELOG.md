@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-01-20
+
+### Bug Fixes
+
+- fix: preserve assets when downloading external payloads in middleware
+
 ## [1.6.0] - 2026-01-16
 
 ### Features
