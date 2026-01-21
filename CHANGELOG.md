@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.0] - 2026-01-21
+
+### Features
+
+- feat: Initial implementation of collection sharing
+
 ## [1.5.0] - 2026-01-16
 
 ### Features
