@@ -48,6 +48,8 @@ def register_route(app):
             target_id = request_data.targetUserId
             role = request_data.accessLevel.value
 
+            granter_id = user_context.get("user_id")
+
             # Create permission model instance
             permission = ShareModel()
             permission.PK = f"{COLLECTION_PK_PREFIX}{collection_id}"
@@ -55,8 +57,12 @@ def register_route(app):
             permission.targetType = "user"
             permission.targetId = target_id
             permission.role = role
-            permission.grantedBy = user_context.get("user_id")
+            permission.grantedBy = granter_id
             permission.grantedAt = current_timestamp
+
+            # GSI6 - For "shared by me" queries
+            permission.GSI6_PK = f"GRANTOR#{granter_id}"
+            permission.GSI6_SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
 
             if request_data.message:
                 permission.message = request_data.message

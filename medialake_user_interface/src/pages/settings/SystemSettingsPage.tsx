@@ -612,23 +612,9 @@ const SystemSettingsPage: React.FC = () => {
                               {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
                             </MenuItem>
                             <MenuItem value="s3-vector">
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Typography>
-                                  {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
-                                </Typography>
-                                <Chip
-                                  label={t("settings.systemSettings.search.preview", "Preview")}
-                                  size="small"
-                                  color="warning"
-                                  sx={{ height: 20, fontSize: "0.7rem" }}
-                                />
-                              </Box>
+                              <Typography>
+                                {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                              </Typography>
                             </MenuItem>
                           </Select>
                         </FormControl>

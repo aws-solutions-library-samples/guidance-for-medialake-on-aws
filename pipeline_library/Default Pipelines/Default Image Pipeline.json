@@ -36,7 +36,7 @@
             "parameters": {
               "Max Concurrent Executions": 1000,
               "Prefix": "",
-              "Format": "APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG, JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF, TIFF, WEBP, WMF, XBM, XPM, CR2, ERF, NEF"
+              "Format": "APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG, JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF, TIFF, WEBP, WMF, XBM, XPM, CR2, ERF, NEF, EXR"
             },
             "path": "",
             "operationId": "",

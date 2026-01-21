@@ -37,6 +37,8 @@ SUPPORTED_EXTENSIONS = {
         "wmf",  # Windows Metafile - verified
         "xbm",  # X11 Bitmap - verified
         "xpm",  # X11 Pixmap - verified
+        # HDR/High bit-depth formats
+        "exr",  # OpenEXR - High Dynamic Range image format
         # RAW formats (verified working)
         "cr2",  # Canon RAW 2 - verified (57/58 files, 1 CHDK-modified file failed)
         "erf",  # Epson RAW - verified
@@ -147,7 +149,7 @@ def get_extensions_as_uppercase_string(asset_type, separator=", "):
 
     Example:
         >>> get_extensions_as_uppercase_string("Image")
-        'APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG, JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF, TIFF, WEBP, WMF, XBM, XPM, CR2, ERF, NEF'
+        'APNG, AVIF, BMP, GIF, ICO, J2K, JP2, JPEG, JPG, PBM, PCX, PGM, PNG, PPM, PSD, SVG, TIF, TIFF, WEBP, WMF, XBM, XPM, CR2, ERF, NEF, EXR'
     """
     extensions = get_extensions_by_type(asset_type)
     return separator.join(ext.upper() for ext in extensions)

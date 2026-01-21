@@ -186,6 +186,10 @@ class ShareModel(Model):
     grantedAt = UnicodeAttribute()
     message = UnicodeAttribute(null=True)
 
+    # GSI6 - Shares granted by user (for "shared by me" queries)
+    GSI6_PK = UnicodeAttribute(null=True)  # GRANTOR#{user_id}
+    GSI6_SK = UnicodeAttribute(null=True)  # COLL#{collection_id}
+
 
 class RuleModel(Model):
     """

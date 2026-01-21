@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 
 import boto3
+import numpy as np
+import OpenEXR
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
@@ -63,6 +65,75 @@ def convert_svg_to_png(svg_data: bytes) -> bytes:
             return f.read()
     finally:
         for p in (svg_path, png_path):
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
+
+
+def convert_exr_to_png(exr_data: bytes) -> bytes:
+    """Convert EXR → PNG using OpenEXR library (new API)."""
+    with tempfile.NamedTemporaryFile(suffix=".exr", delete=False) as exr_file:
+        exr_file.write(exr_data)
+        exr_path = exr_file.name
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as png_file:
+        png_path = png_file.name
+
+    try:
+        # Use new OpenEXR.File API (recommended, not deprecated InputFile)
+        with OpenEXR.File(exr_path) as exr:
+            header = exr.header()
+
+            # Get dimensions from dataWindow (returns tuple of numpy arrays)
+            min_coord, max_coord = header["dataWindow"]
+            int(max_coord[0] - min_coord[0] + 1)
+            int(max_coord[1] - min_coord[1] + 1)
+
+            # Get channels - new API groups RGB automatically
+            channels_dict = exr.channels()
+
+            # Check if RGB/RGBA channel exists (new API groups them)
+            if "RGB" in channels_dict:
+                rgb_channel = channels_dict["RGB"]
+                rgb = rgb_channel.pixels  # numpy array (height, width, 3)
+                rgb = np.clip(rgb * 255.0, 0, 255).astype(np.uint8)
+                img = Image.fromarray(rgb, mode="RGB")
+            elif "RGBA" in channels_dict:
+                rgba_channel = channels_dict["RGBA"]
+                rgba = rgba_channel.pixels  # numpy array (height, width, 4)
+                rgba = np.clip(rgba * 255.0, 0, 255).astype(np.uint8)
+                img = Image.fromarray(rgba, mode="RGBA")
+            elif "Y" in channels_dict:
+                # Grayscale
+                y_channel = channels_dict["Y"]
+                y = y_channel.pixels  # numpy array (height, width)
+                y = np.clip(y * 255.0, 0, 255).astype(np.uint8)
+                img = Image.fromarray(y, mode="L")
+            else:
+                # Fallback: try to get R, G, B channels separately
+                if (
+                    "R" in channels_dict
+                    and "G" in channels_dict
+                    and "B" in channels_dict
+                ):
+                    r = channels_dict["R"].pixels
+                    g = channels_dict["G"].pixels
+                    b = channels_dict["B"].pixels
+                    rgb = np.dstack((r, g, b))
+                    rgb = np.clip(rgb * 255.0, 0, 255).astype(np.uint8)
+                    img = Image.fromarray(rgb, mode="RGB")
+                else:
+                    raise ValueError(
+                        f"Unsupported channel configuration: {list(channels_dict.keys())}"
+                    )
+
+        img.save(png_path, format="PNG")
+
+        with open(png_path, "rb") as f:
+            return f.read()
+    finally:
+        for p in (exr_path, png_path):
             try:
                 os.unlink(p)
             except Exception:
@@ -129,13 +200,26 @@ def _resolve_dims(w, h, iw, ih):
 
 
 def _extract_from_event(event: dict):
-    payload = event.get("payload", {})
-    assets = payload.get("assets") or _raise("Missing payload.assets")
-    asset = assets[0]
-    mode = payload.get("mode", "proxy")
-    width = payload.get("width")
-    height = payload.get("height")
-    crop = bool(payload.get("crop", False))
+    # Handle both event structures:
+    # 1. New structure: event.assets (from Step Functions)
+    # 2. Old structure: event.payload.assets (from direct invocation)
+    if "assets" in event:
+        # New structure - assets at root level
+        assets = event.get("assets") or _raise("Missing assets")
+        asset = assets[0]
+        mode = event.get("mode", "proxy")
+        width = event.get("width")
+        height = event.get("height")
+        crop = bool(event.get("crop", False))
+    else:
+        # Old structure - assets in payload
+        payload = event.get("payload", {})
+        assets = payload.get("assets") or _raise("Missing payload.assets")
+        asset = assets[0]
+        mode = payload.get("mode", "proxy")
+        width = payload.get("width")
+        height = payload.get("height")
+        crop = bool(payload.get("crop", False))
     return asset, mode, width, height, crop
 
 
@@ -179,6 +263,8 @@ def lambda_handler(event, context: LambdaContext):
     body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     if key.lower().endswith(".svg"):
         body = convert_svg_to_png(body)
+    elif key.lower().endswith(".exr"):
+        body = convert_exr_to_png(body)
 
     img = Image.open(io.BytesIO(body))
 
