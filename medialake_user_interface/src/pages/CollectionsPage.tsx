@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -19,6 +19,10 @@ import {
   Snackbar,
   Alert,
   TextField,
+  Tabs,
+  Tab,
+  Tooltip,
+  Badge,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -44,18 +48,26 @@ import {
   Category,
   BookmarkBorder,
   LocalOffer,
+  Share as ShareIcon,
+  People as PeopleIcon,
+  PersonOutline as PersonIcon,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { RefreshButton } from "@/components/common";
 import {
   useGetCollections,
+  useGetCollectionsSharedWithMe,
+  useGetCollectionsSharedByMe,
   useDeleteCollection,
   useUpdateCollection,
   useGetCollectionTypes,
   type Collection,
 } from "../api/hooks/useCollections";
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
+import { ShareManagementModal } from "../components/collections/ShareManagementModal";
 import { formatDate } from "@/utils/dateFormat";
+
+type FilterTab = "all" | "myCollections" | "sharedWithMe" | "sharedByMe";
 
 // Map of icon names to Material-UI icon components
 const ICON_MAP: Record<string, React.ReactElement> = {
@@ -81,9 +93,11 @@ const CollectionsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [editedDescription, setEditedDescription] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -92,14 +106,45 @@ const CollectionsPage: React.FC = () => {
     severity: "success" | "error";
   } | null>(null);
 
+  // Get filter from URL params
+  const filterParam = searchParams.get("filter") as FilterTab | null;
+  const activeTab: FilterTab = filterParam || "all";
+
   // API hooks
   const { data: collectionsResponse, isLoading, error, refetch } = useGetCollections();
+  const { data: sharedWithMeResponse, isLoading: isLoadingSharedWithMe } =
+    useGetCollectionsSharedWithMe();
+  const { data: sharedByMeResponse, isLoading: isLoadingSharedByMe } =
+    useGetCollectionsSharedByMe();
   const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
   const deleteCollectionMutation = useDeleteCollection();
   const updateCollectionMutation = useUpdateCollection();
 
   const allCollections = collectionsResponse?.data || [];
+  const sharedWithMeCollections = sharedWithMeResponse?.data || [];
+  const sharedByMeCollections = sharedByMeResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Handle tab change
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: FilterTab) => {
+    if (newValue === "all") {
+      searchParams.delete("filter");
+    } else {
+      searchParams.set("filter", newValue);
+    }
+    setSearchParams(searchParams);
+  };
+
+  // Handle share button click
+  const handleShareClick = (collection: Collection) => {
+    setSelectedCollection(collection);
+    setShareModalOpen(true);
+  };
+
+  const handleShareModalClose = () => {
+    setShareModalOpen(false);
+    setSelectedCollection(null);
+  };
 
   // Helper to get icon and color for a collection
   const getCollectionStyle = (collection: Collection) => {
@@ -147,15 +192,48 @@ const CollectionsPage: React.FC = () => {
     return count;
   };
 
-  // Only show root collections (no parentId) and hide shared collections for now
-  const rootCollections = useMemo(() => {
-    return allCollections
-      .filter((c) => !c.parentId)
-      .map((c) => ({
-        ...c,
-        totalDescendants: calculateTotalDescendants(c.id, allCollections),
-      }));
-  }, [allCollections]);
+  // Get filtered collections based on active tab
+  const filteredCollections = useMemo(() => {
+    let collections: Collection[] = [];
+
+    switch (activeTab) {
+      case "myCollections":
+        // Only collections owned by the user (not shared with them)
+        collections = allCollections.filter((c) => !c.parentId && !c.sharedWithMe);
+        break;
+      case "sharedWithMe":
+        collections = sharedWithMeCollections;
+        break;
+      case "sharedByMe":
+        collections = sharedByMeCollections;
+        break;
+      case "all":
+      default:
+        // All root collections the user has access to
+        collections = allCollections.filter((c) => !c.parentId);
+        break;
+    }
+
+    return collections.map((c) => ({
+      ...c,
+      totalDescendants: calculateTotalDescendants(c.id, allCollections),
+    }));
+  }, [activeTab, allCollections, sharedWithMeCollections, sharedByMeCollections]);
+
+  // For backwards compatibility
+  const rootCollections = filteredCollections;
+
+  // Determine loading state based on active tab
+  const isLoadingCollections = useMemo(() => {
+    switch (activeTab) {
+      case "sharedWithMe":
+        return isLoadingSharedWithMe;
+      case "sharedByMe":
+        return isLoadingSharedByMe;
+      default:
+        return isLoading;
+    }
+  }, [activeTab, isLoading, isLoadingSharedWithMe, isLoadingSharedByMe]);
 
   // Handle refresh
   const handleRefresh = () => {
@@ -274,7 +352,65 @@ const CollectionsPage: React.FC = () => {
         }
       />
 
-      <PageContent isLoading={isLoading} error={error as Error}>
+      {/* Filter Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          aria-label="collection filter tabs"
+          sx={{
+            "& .MuiTab-root": {
+              textTransform: "none",
+              minHeight: 48,
+            },
+          }}
+        >
+          <Tab
+            value="all"
+            label={t("collectionsPage.filters.all", "All Collections")}
+            icon={<FolderIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            value="myCollections"
+            label={t("collectionsPage.filters.myCollections", "My Collections")}
+            icon={<PersonIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            value="sharedWithMe"
+            label={
+              <Badge
+                badgeContent={sharedWithMeCollections.length}
+                color="primary"
+                max={99}
+                sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}
+              >
+                {t("collectionsPage.filters.sharedWithMe", "Shared With Me")}
+              </Badge>
+            }
+            icon={<PeopleIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+          />
+          <Tab
+            value="sharedByMe"
+            label={
+              <Badge
+                badgeContent={sharedByMeCollections.length}
+                color="secondary"
+                max={99}
+                sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}
+              >
+                {t("collectionsPage.filters.sharedByMe", "Shared By Me")}
+              </Badge>
+            }
+            icon={<ShareIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+          />
+        </Tabs>
+      </Box>
+
+      <PageContent isLoading={isLoadingCollections} error={error as Error}>
         {rootCollections.length === 0 ? (
           <Box
             sx={{
@@ -377,7 +513,7 @@ const CollectionsPage: React.FC = () => {
                         >
                           {collection.name}
                         </Typography>
-                        {/* Badges: Public/Private and Collection Type */}
+                        {/* Badges: Public/Private, Sharing Status, and Collection Type */}
                         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                           <Chip
                             label={
@@ -402,6 +538,52 @@ const CollectionsPage: React.FC = () => {
                               },
                             }}
                           />
+                          {/* Shared with me indicator */}
+                          {collection.sharedWithMe && (
+                            <Chip
+                              label={t("collectionsPage.sharedWithYou", "Shared with you")}
+                              size="small"
+                              icon={<PeopleIcon />}
+                              sx={{
+                                height: 22,
+                                color: theme.palette.info.main,
+                                bgcolor: alpha(theme.palette.info.main, 0.1),
+                                border: `1px solid ${theme.palette.info.main}`,
+                                "& .MuiChip-icon": {
+                                  color: theme.palette.info.main,
+                                  fontSize: 14,
+                                },
+                              }}
+                            />
+                          )}
+                          {/* Shared by me indicator */}
+                          {collection.isShared && !collection.sharedWithMe && (
+                            <Tooltip
+                              title={t(
+                                "collectionsPage.sharedWithCount",
+                                "Shared with {{count}} people",
+                                {
+                                  count: collection.shareCount || 0,
+                                }
+                              )}
+                            >
+                              <Chip
+                                label={
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <ShareIcon sx={{ fontSize: 14 }} />
+                                    {collection.shareCount || 0}
+                                  </Box>
+                                }
+                                size="small"
+                                sx={{
+                                  height: 22,
+                                  color: theme.palette.secondary.main,
+                                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                  border: `1px solid ${theme.palette.secondary.main}`,
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                           {collection.collectionTypeId &&
                             !isLoadingTypes &&
                             (() => {
@@ -532,29 +714,49 @@ const CollectionsPage: React.FC = () => {
                       gap: 1,
                     }}
                   >
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(collection);
-                      }}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(collection);
-                      }}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Delete
-                    </Button>
+                    {/* Only show Share button for collections user owns */}
+                    {!collection.sharedWithMe && (
+                      <Button
+                        size="small"
+                        startIcon={<ShareIcon />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareClick(collection);
+                        }}
+                        sx={{ textTransform: "none" }}
+                        color="secondary"
+                      >
+                        {t("common.share", "Share")}
+                      </Button>
+                    )}
+                    {/* Only show Edit/Delete for collections user owns */}
+                    {!collection.sharedWithMe && (
+                      <>
+                        <Button
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(collection);
+                          }}
+                          sx={{ textTransform: "none" }}
+                        >
+                          {t("common.edit", "Edit")}
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(collection);
+                          }}
+                          sx={{ textTransform: "none" }}
+                        >
+                          {t("common.delete", "Delete")}
+                        </Button>
+                      </>
+                    )}
                   </CardActions>
                 </Card>
               );
@@ -625,6 +827,13 @@ const CollectionsPage: React.FC = () => {
 
       {/* Create Collection Modal */}
       <CreateCollectionModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
+
+      {/* Share Management Modal */}
+      <ShareManagementModal
+        open={shareModalOpen}
+        onClose={handleShareModalClose}
+        collection={selectedCollection}
+      />
 
       {/* Alert Snackbar */}
       <Snackbar
