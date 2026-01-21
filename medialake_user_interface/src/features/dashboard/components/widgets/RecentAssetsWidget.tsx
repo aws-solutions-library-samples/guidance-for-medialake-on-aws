@@ -1,8 +1,5 @@
-import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-  Box,
-  Stack,
-  Skeleton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -18,6 +15,7 @@ import AssetCard from "@/components/shared/AssetCard";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
+import { AssetCarousel } from "../AssetCarousel";
 import { useDashboardActions } from "../../store/dashboardStore";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { useAddFavorite, useRemoveFavorite, useGetFavorites } from "@/api/hooks/useFavorites";
@@ -28,9 +26,6 @@ import type { BaseWidgetProps } from "../../types";
 import type { ImageItem, VideoItem, AudioItem } from "@/types/search/searchResults";
 
 type AssetItem = ImageItem | VideoItem | AudioItem;
-
-const CARD_WIDTH = 240;
-const CARD_GAP = 16;
 
 // Helper to safely extract asset properties from the nested structure
 const getAssetName = (asset: any): string => {
@@ -63,12 +58,10 @@ const getAssetFormat = (asset: any): string => {
   return asset?.DigitalSourceAsset?.MainRepresentation?.Format || "";
 };
 
-export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
+export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpanded = false }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { removeWidget, setExpandedWidget } = useDashboardActions();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [visibleCards, setVisibleCards] = useState(5);
 
   // Add to Collection state
   const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
@@ -105,26 +98,6 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
       return getAssetCreateDate(b) - getAssetCreateDate(a);
     });
   }, [searchResponse]);
-
-  // Calculate visible cards based on container width
-  useEffect(() => {
-    const calculateVisibleCards = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth;
-        const cardsCount = Math.floor((containerWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP));
-        setVisibleCards(Math.max(1, cardsCount));
-      }
-    };
-
-    calculateVisibleCards();
-
-    const resizeObserver = new ResizeObserver(calculateVisibleCards);
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    return () => resizeObserver.disconnect();
-  }, []);
 
   // Check if asset is favorited
   const isAssetFavorited = useCallback(
@@ -214,22 +187,6 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
   }, [removeWidget, widgetId]);
 
   const renderContent = () => {
-    if (isLoading) {
-      return (
-        <Stack direction="row" spacing={2} sx={{ overflowX: "auto", pb: 1 }}>
-          {Array.from({ length: visibleCards }).map((_, i) => (
-            <Skeleton
-              key={i}
-              variant="rectangular"
-              width={CARD_WIDTH}
-              height={200}
-              sx={{ borderRadius: 2, flexShrink: 0 }}
-            />
-          ))}
-        </Stack>
-      );
-    }
-
     if (!assets || assets.length === 0) {
       return (
         <EmptyState
@@ -241,76 +198,55 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
     }
 
     return (
-      <Box ref={containerRef} sx={{ width: "100%" }}>
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{
-            overflowX: "auto",
-            pb: 1,
-            "&::-webkit-scrollbar": {
-              height: "6px",
-            },
-            "&::-webkit-scrollbar-track": {
-              backgroundColor: "rgba(0,0,0,0.05)",
-              borderRadius: "3px",
-            },
-            "&::-webkit-scrollbar-thumb": {
-              backgroundColor: "rgba(0,0,0,0.2)",
-              borderRadius: "3px",
-            },
-          }}
-        >
-          {assets.slice(0, Math.max(visibleCards * 2, 10)).map((asset) => {
-            const assetId = getAssetId(asset);
-            const assetName = getAssetName(asset);
-            const assetType = getAssetType(asset);
-            const thumbnailUrl = getAssetThumbnail(asset);
-            const format = getAssetFormat(asset);
-            const isFavorited = isAssetFavorited(assetId);
+      <AssetCarousel
+        items={assets.slice(0, 20)}
+        isLoading={isLoading}
+        getItemKey={(asset: AssetItem) => getAssetId(asset)}
+        emptyState={
+          <EmptyState
+            icon={<RecentIcon sx={{ fontSize: 48 }} />}
+            title={t("dashboard.widgets.recentAssets.emptyTitle")}
+            description={t("dashboard.widgets.recentAssets.emptyDescription")}
+          />
+        }
+        renderCard={(asset: AssetItem) => {
+          const assetId = getAssetId(asset);
+          const assetName = getAssetName(asset);
+          const assetType = getAssetType(asset);
+          const thumbnailUrl = getAssetThumbnail(asset);
+          const format = getAssetFormat(asset);
+          const isFavorited = isAssetFavorited(assetId);
 
-            return (
-              <Box
-                key={assetId}
-                sx={{
-                  minWidth: CARD_WIDTH,
-                  maxWidth: CARD_WIDTH,
-                  flexShrink: 0,
-                }}
-              >
-                <AssetCard
-                  id={assetId}
-                  name={assetName}
-                  thumbnailUrl={thumbnailUrl}
-                  assetType={assetType}
-                  fields={[
-                    { id: "name", label: "Name", visible: true },
-                    { id: "type", label: "Type", visible: true },
-                  ]}
-                  renderField={(fieldId) => {
-                    if (fieldId === "name") return assetName;
-                    if (fieldId === "type") return assetType;
-                    if (fieldId === "format") return format;
-                    return "";
-                  }}
-                  onAssetClick={() => handleAssetClick(assetId, assetType)}
-                  onDeleteClick={(e) => assetOperations.handleDeleteClick(asset as AssetItem, e)}
-                  onDownloadClick={(e) =>
-                    assetOperations.handleDownloadClick(asset as AssetItem, e)
-                  }
-                  onAddToCollectionClick={(e) => handleAddToCollectionClick(asset as AssetItem, e)}
-                  isFavorite={isFavorited}
-                  onFavoriteToggle={(e) => handleFavoriteToggle(asset as AssetItem, e)}
-                  cardSize="medium"
-                  aspectRatio="square"
-                  thumbnailScale="fill"
-                  showMetadata={true}
-                />
-              </Box>
-            );
-          })}
-        </Stack>
-      </Box>
+          return (
+            <AssetCard
+              id={assetId}
+              name={assetName}
+              thumbnailUrl={thumbnailUrl}
+              assetType={assetType}
+              fields={[
+                { id: "name", label: "Name", visible: true },
+                { id: "type", label: "Type", visible: true },
+              ]}
+              renderField={(fieldId) => {
+                if (fieldId === "name") return assetName;
+                if (fieldId === "type") return assetType;
+                if (fieldId === "format") return format;
+                return "";
+              }}
+              onAssetClick={() => handleAssetClick(assetId, assetType)}
+              onDeleteClick={(e) => assetOperations.handleDeleteClick(asset, e)}
+              onDownloadClick={(e) => assetOperations.handleDownloadClick(asset, e)}
+              onAddToCollectionClick={(e) => handleAddToCollectionClick(asset, e)}
+              isFavorite={isFavorited}
+              onFavoriteToggle={(e) => handleFavoriteToggle(asset, e)}
+              cardSize="medium"
+              aspectRatio="square"
+              thumbnailScale="fit"
+              showMetadata={true}
+            />
+          );
+        }}
+      />
     );
   };
 
@@ -324,6 +260,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
         onRefresh={handleRefresh}
         onRemove={handleRemove}
         isLoading={isLoading}
+        isExpanded={isExpanded}
         error={error}
         onRetry={handleRefresh}
       >

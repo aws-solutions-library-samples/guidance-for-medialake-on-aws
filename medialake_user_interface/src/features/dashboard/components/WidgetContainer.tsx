@@ -17,10 +17,52 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
   onRefresh,
   onRemove,
   isLoading = false,
+  isExpanded = false,
   error,
   onRetry,
 }) => {
   const theme = useTheme();
+
+  // When expanded, render without the Paper wrapper and header (modal provides those)
+  if (isExpanded) {
+    return (
+      <Box
+        sx={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            flex: 1,
+            overflow: "auto",
+            p: 2,
+            minHeight: 0,
+          }}
+        >
+          {error ? (
+            <Alert
+              severity="error"
+              action={
+                onRetry && (
+                  <Button color="inherit" size="small" onClick={onRetry}>
+                    Retry
+                  </Button>
+                )
+              }
+              sx={{ mb: 2 }}
+            >
+              {error.message || "Failed to load widget data"}
+            </Alert>
+          ) : (
+            children
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Paper
@@ -31,7 +73,7 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
         display: "flex",
         flexDirection: "column",
         borderRadius: 2,
-        backgroundColor: alpha(theme.palette.background.paper, 0.9),
+        backgroundColor: alpha(theme.palette.background.default, 0.95),
         backdropFilter: "blur(10px)",
         border: "1px solid",
         borderColor: "divider",

@@ -1,6 +1,13 @@
 // src/api/endpoints.ts
 
 export const API_ENDPOINTS = {
+  DASHBOARD: {
+    LAYOUT: "/dashboard/layout",
+    LAYOUT_RESET: "/dashboard/layout/reset",
+    PRESETS: "/dashboard/presets",
+    PRESET: (presetId: string) => `/dashboard/presets/${presetId}`,
+    PRESET_APPLY: (presetId: string) => `/dashboard/presets/${presetId}/apply`,
+  },
   CONNECTORS: "/connectors",
   PIPELINES: "/pipelines",
   PIPELINE_EXECUTIONS: "/pipelines/executions",

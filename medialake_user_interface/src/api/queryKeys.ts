@@ -1,4 +1,10 @@
 export const QUERY_KEYS = {
+  DASHBOARD: {
+    all: ["dashboard"] as const,
+    layout: () => [...QUERY_KEYS.DASHBOARD.all, "layout"] as const,
+    presets: () => [...QUERY_KEYS.DASHBOARD.all, "presets"] as const,
+    preset: (presetId: string) => [...QUERY_KEYS.DASHBOARD.presets(), presetId] as const,
+  },
   CONNECTORS: {
     all: ["connectors"] as const,
     lists: () => [...QUERY_KEYS.CONNECTORS.all, "list"] as const,

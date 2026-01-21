@@ -9,6 +9,7 @@ export default {
     arabic: "Arabisch",
     hebrew: "Hebräisch",
   },
+  collections: {},
   assetsPage: {
     title: "Assets",
     connectors: "Konnektoren",
@@ -803,6 +804,7 @@ export default {
       restore: "Wiederherstellen",
       viewDetails: "Details anzeigen",
       addToCollection: "Zur Sammlung hinzufügen",
+      removeFromCollection: "Aus Sammlung entfernen",
       assetDetail: "Asset-Detail",
       renameAsset: "Asset umbenennen",
       viewAlternativeTranscriptions: "Alternative Transkriptionen anzeigen",
@@ -1299,6 +1301,68 @@ export default {
         "Dadurch werden alle Widgets auf ihre Standardpositionen und -größen zurückgesetzt. Ihre aktuellen Layout-Anpassungen gehen verloren.",
       cancel: "Abbrechen",
       confirm: "Zurücksetzen",
+    },
+    status: {
+      syncing: "Layout wird synchronisiert...",
+      pendingChanges: "Änderungen warten auf Synchronisierung",
+    },
+    errors: {
+      saveFailed: "Layout konnte nicht gespeichert werden",
+      resetFailed: "Layout konnte nicht zurückgesetzt werden",
+      presetCreateFailed: "Vorlage konnte nicht erstellt werden",
+      presetUpdateFailed: "Vorlage konnte nicht aktualisiert werden",
+      presetDeleteFailed: "Vorlage konnte nicht gelöscht werden",
+      presetApplyFailed: "Vorlage konnte nicht angewendet werden",
+      maxPresetsExceeded: "Maximal 5 Vorlagen erlaubt",
+    },
+    messages: {
+      resetSuccess: "Layout auf Standard zurückgesetzt",
+      presetCreated: "Vorlage erfolgreich gespeichert",
+      presetUpdated: "Vorlage aktualisiert",
+      presetDeleted: "Vorlage gelöscht",
+      presetApplied: "Vorlage angewendet",
+    },
+    selector: {
+      defaultDashboard: "Dashboard",
+      defaultDescription: "Standardlayout",
+      savedDashboards: "Gespeicherte Dashboards",
+      widgets: "Widgets",
+      saveCurrentLayout: "Aktuelles Layout speichern",
+      manageDashboards: "Dashboards verwalten",
+      dashboardsSaved: "Dashboards gespeichert",
+    },
+    saveDialog: {
+      title: "Dashboard-Layout speichern",
+      nameLabel: "Dashboard-Name",
+      namePlaceholder: "z.B. Mein Analytics-Dashboard",
+      descriptionLabel: "Beschreibung (optional)",
+      descriptionPlaceholder:
+        "Fügen Sie eine Beschreibung hinzu, um sich an dieses Layout zu erinnern...",
+      save: "Dashboard speichern",
+      nameRequired: "Name ist erforderlich",
+      nameTooLong: "Name darf {{max}} Zeichen nicht überschreiten",
+      limitReached:
+        "Sie haben die maximale Anzahl von {{max}} gespeicherten Dashboards erreicht. Löschen Sie ein vorhandenes, um ein neues Layout zu speichern.",
+      nearLimit:
+        "Sie haben {{current}} von {{max}} Dashboards gespeichert. Dies wird Ihr letzter verfügbarer Platz sein.",
+      hint: "Ihre aktuelle Widget-Anordnung und -Größen werden als neue Dashboard-Vorlage gespeichert.",
+    },
+    manageDialog: {
+      title: "Dashboards verwalten",
+      noPresets: "Keine gespeicherten Dashboards",
+      noPresetsHint:
+        "Speichern Sie Ihr aktuelles Layout, um Ihre erste Dashboard-Vorlage zu erstellen.",
+      active: "Aktiv",
+      widgets: "Widgets",
+      updated: "Aktualisiert",
+      apply: "Anwenden",
+      edit: "Bearbeiten",
+      delete: "Löschen",
+    },
+    deleteDialog: {
+      title: "Dashboard löschen?",
+      message:
+        'Sind Sie sicher, dass Sie "{{name}}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     },
   },
 };

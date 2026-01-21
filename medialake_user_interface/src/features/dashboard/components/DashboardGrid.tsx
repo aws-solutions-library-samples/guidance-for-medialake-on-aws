@@ -25,6 +25,7 @@ import {
   WIDGET_DEFINITIONS,
 } from "../store/dashboardStore";
 import { WidgetSelector } from "./WidgetSelector";
+import { DashboardSelector } from "./DashboardSelector";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
 import { MyCollectionsWidget } from "./widgets/MyCollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
@@ -35,8 +36,8 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 // Grid configuration
-const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
-const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
+const BREAKPOINTS = { xl: 1600, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
+const COLS = { xl: 12, lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
 const ROW_HEIGHT = 80;
 const MARGIN: [number, number] = [16, 16];
 
@@ -102,10 +103,13 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
           maxH: item.maxH,
         }));
 
+      // Use xl layout for lg if available, otherwise fall back
+      const lgLayout = allLayouts.xl || allLayouts.lg || currentLayout;
+
       setLayout({
         ...layout,
         layouts: {
-          lg: convertLayout(allLayouts.lg || currentLayout),
+          lg: convertLayout(lgLayout),
           md: convertLayout(allLayouts.md || currentLayout),
           sm: convertLayout(allLayouts.sm || currentLayout),
         },
@@ -161,6 +165,7 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
     });
 
   const responsiveLayouts: ResponsiveLayouts<string> = {
+    xl: convertToRGLLayout(layout.layouts.lg), // Use lg layout for xl screens
     lg: convertToRGLLayout(layout.layouts.lg),
     md: convertToRGLLayout(layout.layouts.md),
     sm: convertToRGLLayout(layout.layouts.sm),
@@ -173,35 +178,42 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
         <Box
           sx={{
             display: "flex",
-            justifyContent: "flex-end",
-            gap: 1,
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 2,
             mb: 2,
           }}
         >
-          <Tooltip title={t("dashboard.actions.resetLayout")}>
-            <IconButton
-              onClick={handleResetClick}
-              size="small"
-              sx={{
-                color: "text.secondary",
-                "&:hover": {
-                  color: "warning.main",
-                },
-              }}
-            >
-              <ResetIcon />
-            </IconButton>
-          </Tooltip>
+          {/* Dashboard Selector on the left */}
+          <DashboardSelector />
 
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={handleOpenWidgetSelector}
-            disabled={availableWidgets.length === 0}
-          >
-            {t("dashboard.actions.addWidget")}
-          </Button>
+          {/* Actions on the right */}
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Tooltip title={t("dashboard.actions.resetLayout")}>
+              <IconButton
+                onClick={handleResetClick}
+                size="small"
+                sx={{
+                  color: "text.secondary",
+                  "&:hover": {
+                    color: "warning.main",
+                  },
+                }}
+              >
+                <ResetIcon />
+              </IconButton>
+            </Tooltip>
+
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleOpenWidgetSelector}
+              disabled={availableWidgets.length === 0}
+            >
+              {t("dashboard.actions.addWidget")}
+            </Button>
+          </Box>
         </Box>
       )}
 

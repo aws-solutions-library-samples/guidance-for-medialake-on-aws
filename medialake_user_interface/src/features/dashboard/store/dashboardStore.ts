@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 import type {
   DashboardLayout,
   DashboardState,
@@ -16,18 +17,18 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Favorites",
     description: "Quick access to your favorited assets and collections",
     icon: "favorite",
-    defaultSize: { w: 6, h: 4 },
-    minSize: { w: 3, h: 2 },
-    maxSize: { w: 12, h: 8 },
+    defaultSize: { w: 6, h: 5 },
+    minSize: { w: 3, h: 4 },
+    maxSize: { w: 12, h: 12 },
   },
   "my-collections": {
     type: "my-collections",
     title: "My Collections",
     description: "View and manage your personal collections",
     icon: "folder",
-    defaultSize: { w: 6, h: 4 },
-    minSize: { w: 3, h: 2 },
-    maxSize: { w: 12, h: 8 },
+    defaultSize: { w: 6, h: 5 },
+    minSize: { w: 3, h: 4 },
+    maxSize: { w: 12, h: 12 },
   },
   "recent-assets": {
     type: "recent-assets",
@@ -36,7 +37,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     icon: "schedule",
     defaultSize: { w: 12, h: 5 },
     minSize: { w: 4, h: 4 },
-    maxSize: { w: 12, h: 6 },
+    maxSize: { w: 12, h: 12 },
   },
 };
 
@@ -50,25 +51,25 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
   ],
   layouts: {
     lg: [
-      { i: "favorites-1", x: 0, y: 0, w: 6, h: 4, minW: 3, minH: 2, maxW: 12, maxH: 8 },
-      { i: "my-collections-1", x: 6, y: 0, w: 6, h: 4, minW: 3, minH: 2, maxW: 12, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 4, w: 12, h: 5, minW: 4, minH: 4, maxW: 12, maxH: 6 },
+      { i: "favorites-1", x: 0, y: 0, w: 6, h: 5, minW: 3, minH: 4, maxW: 12, maxH: 12 },
+      { i: "my-collections-1", x: 6, y: 0, w: 6, h: 5, minW: 3, minH: 4, maxW: 12, maxH: 12 },
+      { i: "recent-assets-1", x: 0, y: 5, w: 12, h: 5, minW: 4, minH: 4, maxW: 12, maxH: 12 },
     ],
     md: [
-      { i: "favorites-1", x: 0, y: 0, w: 5, h: 4, minW: 3, minH: 2, maxW: 10, maxH: 8 },
-      { i: "my-collections-1", x: 5, y: 0, w: 5, h: 4, minW: 3, minH: 2, maxW: 10, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 4, w: 10, h: 5, minW: 4, minH: 4, maxW: 10, maxH: 6 },
+      { i: "favorites-1", x: 0, y: 0, w: 5, h: 5, minW: 3, minH: 4, maxW: 10, maxH: 12 },
+      { i: "my-collections-1", x: 5, y: 0, w: 5, h: 5, minW: 3, minH: 4, maxW: 10, maxH: 12 },
+      { i: "recent-assets-1", x: 0, y: 5, w: 10, h: 5, minW: 4, minH: 4, maxW: 10, maxH: 12 },
     ],
     sm: [
-      { i: "favorites-1", x: 0, y: 0, w: 1, h: 4, minW: 1, minH: 2, maxW: 1, maxH: 8 },
-      { i: "my-collections-1", x: 0, y: 4, w: 1, h: 4, minW: 1, minH: 2, maxW: 1, maxH: 8 },
-      { i: "recent-assets-1", x: 0, y: 8, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 6 },
+      { i: "favorites-1", x: 0, y: 0, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
+      { i: "my-collections-1", x: 0, y: 5, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
+      { i: "recent-assets-1", x: 0, y: 10, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
     ],
   },
 };
 
 const STORAGE_KEY = "dashboard-layout";
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 6; // Bumped version for preset tracking
 
 // Helper to generate unique widget ID
 const generateWidgetId = (type: WidgetType): string => {
@@ -120,7 +121,52 @@ const findAvailablePosition = (
   return { x: 0, y: maxY };
 };
 
-interface DashboardStore extends DashboardState, DashboardActions {}
+// Convert API layout to frontend layout format
+export const convertApiLayoutToFrontend = (apiLayout: {
+  layoutVersion: number;
+  widgets: Array<{ id: string; type: string; config?: Record<string, unknown> }>;
+  layouts: { lg: LayoutItem[]; md: LayoutItem[]; sm: LayoutItem[] };
+  updatedAt?: string;
+}): DashboardLayout => {
+  return {
+    version: apiLayout.layoutVersion,
+    layoutVersion: apiLayout.layoutVersion,
+    widgets: apiLayout.widgets.map((w) => ({
+      id: w.id,
+      type: w.type as WidgetType,
+      config: w.config,
+    })),
+    layouts: apiLayout.layouts,
+    updatedAt: apiLayout.updatedAt,
+  };
+};
+
+// Convert frontend layout to API format
+export const convertFrontendLayoutToApi = (layout: DashboardLayout) => {
+  return {
+    widgets: layout.widgets.map((w) => ({
+      id: w.id,
+      type: w.type,
+      config: w.config || {},
+    })),
+    layouts: layout.layouts,
+  };
+};
+
+interface DashboardStore extends DashboardState, DashboardActions {
+  // API sync state
+  isSyncing: boolean;
+  lastSyncError: string | null;
+  setIsSyncing: (syncing: boolean) => void;
+  setLastSyncError: (error: string | null) => void;
+  // Pending changes for debounced save
+  hasPendingChanges: boolean;
+  setHasPendingChanges: (pending: boolean) => void;
+  // Active preset tracking
+  activePresetId: string | null;
+  activePresetName: string | null;
+  setActivePreset: (presetId: string | null, presetName: string | null) => void;
+}
 
 export const useDashboardStore = create<DashboardStore>()(
   persist(
@@ -130,9 +176,18 @@ export const useDashboardStore = create<DashboardStore>()(
       isEditMode: false,
       expandedWidgetId: null,
       isWidgetSelectorOpen: false,
+      // API sync state
+      isSyncing: false,
+      lastSyncError: null,
+      hasPendingChanges: false,
+      // Active preset tracking
+      activePresetId: null,
+      activePresetName: null,
 
       // Actions
-      setLayout: (layout) => set({ layout }),
+      setLayout: (layout) => {
+        set({ layout, hasPendingChanges: true });
+      },
 
       updateLayoutItem: (itemId, updates) => {
         const { layout } = get();
@@ -149,6 +204,7 @@ export const useDashboardStore = create<DashboardStore>()(
             ...layout,
             layouts: newLayouts,
           },
+          hasPendingChanges: true,
         });
       },
 
@@ -191,6 +247,7 @@ export const useDashboardStore = create<DashboardStore>()(
             layouts: newLayouts,
           },
           isWidgetSelectorOpen: false,
+          hasPendingChanges: true,
         });
       },
 
@@ -207,11 +264,12 @@ export const useDashboardStore = create<DashboardStore>()(
               sm: layout.layouts.sm.filter((item) => item.i !== widgetId),
             },
           },
+          hasPendingChanges: true,
         });
       },
 
       resetToDefault: () => {
-        set({ layout: DEFAULT_LAYOUT });
+        set({ layout: DEFAULT_LAYOUT, hasPendingChanges: true });
       },
 
       setExpandedWidget: (widgetId) => {
@@ -227,14 +285,23 @@ export const useDashboardStore = create<DashboardStore>()(
       },
 
       saveLayout: () => {
-        // Layout is automatically saved by persist middleware
-        // This method exists for explicit save calls if needed
+        // Layout is automatically saved by persist middleware for localStorage
+        // API sync is handled by the useDashboardSync hook
+        set({ hasPendingChanges: false });
       },
 
       loadLayout: () => {
         // Layout is automatically loaded by persist middleware
-        // This method exists for explicit load calls if needed
+        // API sync is handled by the useDashboardSync hook
       },
+
+      // API sync actions
+      setIsSyncing: (syncing) => set({ isSyncing: syncing }),
+      setLastSyncError: (error) => set({ lastSyncError: error }),
+      setHasPendingChanges: (pending) => set({ hasPendingChanges: pending }),
+      // Active preset action
+      setActivePreset: (presetId, presetName) =>
+        set({ activePresetId: presetId, activePresetName: presetName }),
     }),
     {
       name: STORAGE_KEY,
@@ -249,12 +316,19 @@ export const useDashboardStore = create<DashboardStore>()(
             isEditMode: false,
             expandedWidgetId: null,
             isWidgetSelectorOpen: false,
+            isSyncing: false,
+            lastSyncError: null,
+            hasPendingChanges: false,
+            activePresetId: null,
+            activePresetName: null,
           };
         }
         return persistedState as DashboardStore;
       },
       partialize: (state) => ({
         layout: state.layout,
+        activePresetId: state.activePresetId,
+        activePresetName: state.activePresetName,
       }),
     }
   )
@@ -264,19 +338,52 @@ export const useDashboardStore = create<DashboardStore>()(
 export const useDashboardLayout = () => useDashboardStore((state) => state.layout);
 export const useExpandedWidget = () => useDashboardStore((state) => state.expandedWidgetId);
 export const useWidgetSelectorOpen = () => useDashboardStore((state) => state.isWidgetSelectorOpen);
+export const useActivePresetId = () => useDashboardStore((state) => state.activePresetId);
+export const useActivePresetName = () => useDashboardStore((state) => state.activePresetName);
+
+// Use useShallow to prevent infinite loops when returning objects from selectors
+export const useDashboardSyncState = () =>
+  useDashboardStore(
+    useShallow((state) => ({
+      isSyncing: state.isSyncing,
+      lastSyncError: state.lastSyncError,
+      hasPendingChanges: state.hasPendingChanges,
+    }))
+  );
+
 export const useDashboardActions = () => {
-  const store = useDashboardStore();
+  // Use individual selectors to get stable function references
+  // This prevents creating a new object on every render
+  const setLayout = useDashboardStore((state) => state.setLayout);
+  const updateLayoutItem = useDashboardStore((state) => state.updateLayoutItem);
+  const addWidget = useDashboardStore((state) => state.addWidget);
+  const removeWidget = useDashboardStore((state) => state.removeWidget);
+  const resetToDefault = useDashboardStore((state) => state.resetToDefault);
+  const setExpandedWidget = useDashboardStore((state) => state.setExpandedWidget);
+  const toggleWidgetSelector = useDashboardStore((state) => state.toggleWidgetSelector);
+  const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
+  const saveLayout = useDashboardStore((state) => state.saveLayout);
+  const loadLayout = useDashboardStore((state) => state.loadLayout);
+  const setIsSyncing = useDashboardStore((state) => state.setIsSyncing);
+  const setLastSyncError = useDashboardStore((state) => state.setLastSyncError);
+  const setHasPendingChanges = useDashboardStore((state) => state.setHasPendingChanges);
+  const setActivePreset = useDashboardStore((state) => state.setActivePreset);
+
   return {
-    setLayout: store.setLayout,
-    updateLayoutItem: store.updateLayoutItem,
-    addWidget: store.addWidget,
-    removeWidget: store.removeWidget,
-    resetToDefault: store.resetToDefault,
-    setExpandedWidget: store.setExpandedWidget,
-    toggleWidgetSelector: store.toggleWidgetSelector,
-    setWidgetSelectorOpen: store.setWidgetSelectorOpen,
-    saveLayout: store.saveLayout,
-    loadLayout: store.loadLayout,
+    setLayout,
+    updateLayoutItem,
+    addWidget,
+    removeWidget,
+    resetToDefault,
+    setExpandedWidget,
+    toggleWidgetSelector,
+    setWidgetSelectorOpen,
+    saveLayout,
+    loadLayout,
+    setIsSyncing,
+    setLastSyncError,
+    setHasPendingChanges,
+    setActivePreset,
   };
 };
 

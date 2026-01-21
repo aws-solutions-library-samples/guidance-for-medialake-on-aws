@@ -47,9 +47,21 @@ export const useGetFavorites = (itemType?: string) => {
         ? `${API_ENDPOINTS.FAVORITES.BASE}?itemType=${itemType}`
         : API_ENDPOINTS.FAVORITES.BASE;
 
-      const { data } = await apiClient.get<FavoritesResponse>(url);
-      // Handle various response structures gracefully
-      return data?.data?.favorites ?? [];
+      const { data } = await apiClient.get<FavoritesResponse | { body: string }>(url);
+
+      // Handle API Gateway response where body is a JSON string
+      if ("body" in data && typeof data.body === "string") {
+        try {
+          const parsed = JSON.parse(data.body);
+          return parsed?.data?.favorites ?? [];
+        } catch {
+          return [];
+        }
+      }
+
+      // Handle direct response structure
+      const response = data as FavoritesResponse;
+      return response?.data?.favorites ?? [];
     },
     staleTime: Infinity,
     gcTime: 1000 * 60 * 30,

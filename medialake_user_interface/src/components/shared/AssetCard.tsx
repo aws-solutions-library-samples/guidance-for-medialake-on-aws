@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useSemanticSearch } from "@/stores/searchStore";
 import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -124,9 +123,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
     // Get semantic mode to conditionally hide buttons
     // Only hide buttons when semantic search is active AND in clip mode
+    // Use the isSemantic prop instead of global store to allow parent components to control this
+    // This prevents dashboard cards from being affected by search page state
     const semanticMode = useSemanticMode();
-    const isSemanticSearchActive = useSemanticSearch();
-    const isClipMode = isSemanticSearchActive && semanticMode === "clip";
+    const isClipMode = isSemantic && semanticMode === "clip";
 
     // Update when menuOpen prop changes
     useEffect(() => {
@@ -1112,7 +1112,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       color: "primary.contrastText",
                     },
                   }}
-                  title={showRemoveButton ? "Remove from Collection" : "Add to Collection"}
+                  title={
+                    showRemoveButton
+                      ? t("common.actions.removeFromCollection")
+                      : t("common.actions.addToCollection")
+                  }
                 >
                   {showRemoveButton ? (
                     <RemoveIcon fontSize="small" />

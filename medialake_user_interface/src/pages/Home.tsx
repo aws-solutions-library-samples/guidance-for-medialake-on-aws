@@ -4,20 +4,28 @@ import {
   Typography,
   useTheme,
   useMediaQuery,
-  Container,
   Fade,
   Button,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
-import { Add as AddIcon, RestartAlt as ResetIcon } from "@mui/icons-material";
+import { Add as AddIcon, RestartAlt as ResetIcon, Sync as SyncIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useDirection } from "../contexts/DirectionContext";
 import { useSidebar } from "../contexts/SidebarContext";
 import { drawerWidth, collapsedDrawerWidth } from "../constants";
-import { alpha } from "@mui/material/styles";
-import { DashboardGrid, ExpandedWidgetModal } from "@/features/dashboard";
-import { useDashboardStore, useAvailableWidgets } from "@/features/dashboard/store/dashboardStore";
+import {
+  DashboardGrid,
+  ExpandedWidgetModal,
+  DashboardSelector,
+  useDashboardSync,
+} from "@/features/dashboard";
+import {
+  useDashboardStore,
+  useAvailableWidgets,
+  useDashboardSyncState,
+} from "@/features/dashboard/store/dashboardStore";
 
 const Home: React.FC = () => {
   const theme = useTheme();
@@ -28,15 +36,18 @@ const Home: React.FC = () => {
   const { isCollapsed } = useSidebar();
 
   const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
-  const resetToDefault = useDashboardStore((state) => state.resetToDefault);
   const availableWidgets = useAvailableWidgets();
+  const { isSyncing, hasPendingChanges } = useDashboardSyncState();
+
+  // Initialize dashboard sync with API
+  const { isLoading, resetLayout } = useDashboardSync();
 
   const handleOpenWidgetSelector = () => {
     setWidgetSelectorOpen(true);
   };
 
   const handleReset = () => {
-    resetToDefault();
+    resetLayout();
   };
 
   return (
@@ -61,7 +72,7 @@ const Home: React.FC = () => {
         }),
       }}
     >
-      <Container maxWidth="xl" sx={{ py: 3, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 }, width: "100%" }}>
         <Fade in={true} timeout={800}>
           <Box sx={{ mb: 4 }}>
             {/* Header Section */}
@@ -73,8 +84,10 @@ const Home: React.FC = () => {
                 mb: 3,
               }}
             >
-              {/* Left spacer for centering */}
-              <Box sx={{ flex: 1 }} />
+              {/* Left side - Dashboard Selector */}
+              <Box sx={{ flex: 1 }}>
+                <DashboardSelector />
+              </Box>
 
               {/* Centered Title */}
               <Box sx={{ textAlign: "center" }}>
@@ -94,11 +107,39 @@ const Home: React.FC = () => {
               </Box>
 
               {/* Right side controls */}
-              <Box sx={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: 1 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 1,
+                  alignItems: "center",
+                }}
+              >
+                {/* Sync indicator */}
+                {(isSyncing || hasPendingChanges) && (
+                  <Tooltip
+                    title={
+                      isSyncing
+                        ? t("dashboard.status.syncing")
+                        : t("dashboard.status.pendingChanges")
+                    }
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+                      {isSyncing ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <SyncIcon fontSize="small" sx={{ color: "warning.main" }} />
+                      )}
+                    </Box>
+                  </Tooltip>
+                )}
+
                 <Tooltip title={t("dashboard.actions.resetLayout")}>
                   <IconButton
                     onClick={handleReset}
                     size="small"
+                    disabled={isLoading || isSyncing}
                     sx={{
                       color: "text.secondary",
                       "&:hover": {
@@ -115,7 +156,7 @@ const Home: React.FC = () => {
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={handleOpenWidgetSelector}
-                  disabled={availableWidgets.length === 0}
+                  disabled={availableWidgets.length === 0 || isLoading}
                 >
                   {t("dashboard.actions.addWidget")}
                 </Button>
@@ -126,7 +167,7 @@ const Home: React.FC = () => {
             <DashboardGrid showHeader={false} />
           </Box>
         </Fade>
-      </Container>
+      </Box>
 
       {/* Expanded Widget Modal */}
       <ExpandedWidgetModal />

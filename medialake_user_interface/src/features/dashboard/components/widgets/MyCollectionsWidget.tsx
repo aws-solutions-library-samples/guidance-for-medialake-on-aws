@@ -1,15 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import {
-  Box,
-  Grid,
-  Skeleton,
-  Card,
-  CardContent,
-  Typography,
-  Chip,
-  alpha,
-  useTheme,
-} from "@mui/material";
+import { Box, Card, CardContent, Typography, Chip, alpha, useTheme } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
   FolderOpen as CollectionIcon,
@@ -36,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { useGetCollections, useGetCollectionTypes } from "@/api/hooks/useCollections";
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
+import { CollectionCarousel } from "../CollectionCarousel";
 import { useDashboardActions } from "../../store/dashboardStore";
 import type { BaseWidgetProps } from "../../types";
 
@@ -58,6 +49,20 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   BookmarkBorder: <BookmarkBorder />,
   LocalOffer: <LocalOffer />,
 };
+
+const CARD_WIDTH = 240;
+const CARD_HEIGHT = 200;
+
+// Collection type for the carousel
+interface CollectionItem {
+  id: string;
+  name: string;
+  description?: string;
+  itemCount: number;
+  childCollectionCount?: number;
+  isPublic: boolean;
+  collectionTypeId?: string;
+}
 
 // Simple collection card for the widget
 interface CollectionCardProps {
@@ -192,7 +197,10 @@ const CollectionCardSimple: React.FC<CollectionCardProps> = ({
   );
 };
 
-export const MyCollectionsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => {
+export const MyCollectionsWidget: React.FC<BaseWidgetProps> = ({
+  widgetId,
+  isExpanded = false,
+}) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const theme = useTheme();
@@ -249,18 +257,6 @@ export const MyCollectionsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => 
   }, [removeWidget, widgetId]);
 
   const renderContent = () => {
-    if (isLoading) {
-      return (
-        <Grid container spacing={2}>
-          {[1, 2, 3, 4].map((i) => (
-            <Grid item xs={6} sm={4} md={3} key={i}>
-              <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 2 }} />
-            </Grid>
-          ))}
-        </Grid>
-      );
-    }
-
     if (!collections || collections.length === 0) {
       return (
         <EmptyState
@@ -274,26 +270,38 @@ export const MyCollectionsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => 
     }
 
     return (
-      <Grid container spacing={2}>
-        {collections.slice(0, 8).map((collection) => {
+      <CollectionCarousel
+        items={collections.slice(0, 20) as CollectionItem[]}
+        isLoading={isLoading || isLoadingTypes}
+        cardWidth={CARD_WIDTH}
+        cardHeight={CARD_HEIGHT}
+        getItemKey={(collection: CollectionItem) => collection.id}
+        emptyState={
+          <EmptyState
+            icon={<CollectionIcon sx={{ fontSize: 48 }} />}
+            title={t("dashboard.widgets.myCollections.emptyTitle")}
+            description={t("dashboard.widgets.myCollections.emptyDescription")}
+            actionLabel={t("dashboard.widgets.myCollections.createCollection")}
+            onAction={handleCreateCollection}
+          />
+        }
+        renderCard={(collection: CollectionItem) => {
           const typeInfo = getCollectionTypeInfo(collection.collectionTypeId);
           return (
-            <Grid item xs={6} sm={4} md={3} key={collection.id}>
-              <CollectionCardSimple
-                id={collection.id}
-                name={collection.name}
-                description={collection.description}
-                itemCount={collection.itemCount}
-                childCollectionCount={collection.childCollectionCount}
-                isPublic={collection.isPublic}
-                iconName={typeInfo.iconName}
-                color={typeInfo.color}
-                onClick={() => handleCollectionClick(collection.id)}
-              />
-            </Grid>
+            <CollectionCardSimple
+              id={collection.id}
+              name={collection.name}
+              description={collection.description}
+              itemCount={collection.itemCount}
+              childCollectionCount={collection.childCollectionCount}
+              isPublic={collection.isPublic}
+              iconName={typeInfo.iconName}
+              color={typeInfo.color}
+              onClick={() => handleCollectionClick(collection.id)}
+            />
           );
-        })}
-      </Grid>
+        }}
+      />
     );
   };
 
@@ -306,6 +314,7 @@ export const MyCollectionsWidget: React.FC<BaseWidgetProps> = ({ widgetId }) => 
       onRefresh={handleRefresh}
       onRemove={handleRemove}
       isLoading={isLoading || isLoadingTypes}
+      isExpanded={isExpanded}
       error={error}
       onRetry={handleRefresh}
     >

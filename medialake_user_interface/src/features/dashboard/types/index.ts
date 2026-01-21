@@ -27,12 +27,14 @@ export interface LayoutItem {
 
 export interface DashboardLayout {
   version: number;
+  layoutVersion?: number; // API uses layoutVersion, frontend uses version
   widgets: WidgetInstance[];
   layouts: {
     lg: LayoutItem[];
     md: LayoutItem[];
     sm: LayoutItem[];
   };
+  updatedAt?: string;
 }
 
 export interface WidgetInstance {
@@ -63,6 +65,7 @@ export interface DashboardActions {
 
 export interface BaseWidgetProps {
   widgetId: string;
+  isExpanded?: boolean;
   onDataLoad?: () => void;
   onError?: (error: Error) => void;
 }
