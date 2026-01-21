@@ -311,13 +311,70 @@ def _query_child_collections(parent_id, limit, start_key):
 
 
 @tracer.capture_method
-def _filter_collections_by_access(items, user_id):
+def _get_shared_collection_ids(user_id):
     """
-    Filter collections based on privacy and ownership.
+    Get IDs of collections shared with the user.
+
+    Args:
+        user_id: User ID to check
 
     Returns:
-        - Public collections (isPublic = True) - only visible to authenticated users
-        - Private collections only if user_id matches ownerId
+        Dictionary mapping collection_id to relationship info
+    """
+    shared_collections = {}
+
+    try:
+        # Query UserCollectionsGSI for user's relationships
+        response = collections_table.query(
+            IndexName="UserCollectionsGSI",
+            KeyConditionExpression="GSI1_PK = :user_pk",
+            FilterExpression="relationship <> :owner",
+            ExpressionAttributeValues={
+                ":user_pk": f"{USER_PK_PREFIX}{user_id}",
+                ":owner": "OWNER",
+            },
+        )
+
+        for item in response.get("Items", []):
+            # Extract collection ID from SK (format: COLL#{collection_id})
+            collection_id = item.get("SK", "").replace(COLLECTION_PK_PREFIX, "")
+            if collection_id:
+                shared_collections[collection_id] = {
+                    "role": item.get("relationship", "VIEWER"),
+                    "sharedAt": item.get("addedAt"),
+                }
+
+        logger.debug(
+            {
+                "message": "Found shared collections for user",
+                "user_id": user_id,
+                "shared_count": len(shared_collections),
+                "operation": "_get_shared_collection_ids",
+            }
+        )
+
+    except Exception as e:
+        logger.warning(
+            {
+                "message": "Error querying shared collections",
+                "user_id": user_id,
+                "error": str(e),
+                "operation": "_get_shared_collection_ids",
+            }
+        )
+
+    return shared_collections
+
+
+@tracer.capture_method
+def _filter_collections_by_access(items, user_id):
+    """
+    Filter collections based on privacy, ownership, and sharing.
+
+    Returns:
+        - Public collections (isPublic = True) - visible to authenticated users
+        - Private collections if user_id matches ownerId
+        - Private collections shared with the user
         - Unauthenticated users (user_id = None) see no collections
 
     Args:
@@ -325,7 +382,7 @@ def _filter_collections_by_access(items, user_id):
         user_id: User ID from JWT token, or None if unauthenticated
 
     Returns:
-        Filtered list of collections
+        Filtered list of collections with sharing metadata
     """
     filtered_items = []
 
@@ -341,17 +398,33 @@ def _filter_collections_by_access(items, user_id):
         )
         return filtered_items
 
+    # Get collections shared with this user
+    shared_collection_info = _get_shared_collection_ids(user_id)
+
     for item in items:
         is_public = item.get("isPublic", False)
         owner_id = item.get("ownerId")
+        collection_id = item.get("PK", "").replace(COLLECTION_PK_PREFIX, "")
 
         # Public collections are accessible to authenticated users
         if is_public:
+            # Check if owner has shared this collection (for isShared flag)
+            if owner_id == user_id:
+                item["isShared"] = _check_collection_has_shares(collection_id)
             filtered_items.append(item)
-        # Private collections: only accessible to owner
+        # Private collections: accessible to owner
         elif owner_id == user_id:
+            # Check if this collection has any shares
+            item["isShared"] = _check_collection_has_shares(collection_id)
             filtered_items.append(item)
-        # Private collections owned by others are excluded
+        # Private collections shared with this user
+        elif collection_id in shared_collection_info:
+            share_info = shared_collection_info[collection_id]
+            item["sharedWithMe"] = True
+            item["myRole"] = share_info.get("role", "VIEWER")
+            item["sharedAt"] = share_info.get("sharedAt")
+            filtered_items.append(item)
+        # Private collections owned by others and not shared are excluded
 
     logger.debug(
         {
@@ -359,11 +432,46 @@ def _filter_collections_by_access(items, user_id):
             "original_count": len(items),
             "filtered_count": len(filtered_items),
             "user_id": user_id,
+            "shared_access_count": len(shared_collection_info),
             "operation": "_filter_collections_by_access",
         }
     )
 
     return filtered_items
+
+
+@tracer.capture_method
+def _check_collection_has_shares(collection_id):
+    """
+    Check if a collection has any shares.
+
+    Args:
+        collection_id: Collection ID to check
+
+    Returns:
+        True if collection has shares, False otherwise
+    """
+    try:
+        response = collections_table.query(
+            KeyConditionExpression="PK = :pk AND begins_with(SK, :perm_prefix)",
+            ExpressionAttributeValues={
+                ":pk": f"{COLLECTION_PK_PREFIX}{collection_id}",
+                ":perm_prefix": "PERM#",
+            },
+            Select="COUNT",
+            Limit=1,
+        )
+        return response.get("Count", 0) > 0
+    except Exception as e:
+        logger.warning(
+            {
+                "message": "Error checking collection shares",
+                "collection_id": collection_id,
+                "error": str(e),
+                "operation": "_check_collection_has_shares",
+            }
+        )
+        return False
 
 
 @tracer.capture_method

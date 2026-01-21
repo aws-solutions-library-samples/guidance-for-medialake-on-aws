@@ -23,12 +23,14 @@ from . import (
     collections_ID_share_ID_delete,
     collections_ID_share_post,
     collections_post,
+    collections_shared_by_me_get,
     collections_shared_with_me_get,
 )
 
 __all__ = [
     "collections_get",
     "collections_post",
+    "collections_shared_by_me_get",
     "collections_shared_with_me_get",
     "collections_ID_get",
     "collections_ID_patch",
@@ -58,8 +60,8 @@ def register_all_routes(app):
     # Collections endpoints
     collections_get.register_route(app)
     collections_post.register_route(app)
-    # TODO: Convert to PynamoDB - temporarily disabled
-    # collections_shared_with_me_get.register_route(app)
+    collections_shared_by_me_get.register_route(app)
+    collections_shared_with_me_get.register_route(app)
 
     # Individual collection endpoints
     collections_ID_get.register_route(app)

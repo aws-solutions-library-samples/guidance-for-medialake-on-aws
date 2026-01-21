@@ -1,11 +1,26 @@
 import React from "react";
-import { Box, Container, Stack, Typography, Paper, useTheme } from "@mui/material";
+import { Box, Container, Stack, Typography, Paper, Grid, useTheme } from "@mui/material";
 import { SmartFolders } from "@/features/home/SmartFolders";
 import { ConnectedStorage } from "@/features/home/ConnectedStorage";
+import { SharedWithMeWidget } from "@/features/home/SharedWithMeWidget";
+import { SharedByMeWidget } from "@/features/home/SharedByMeWidget";
 
 const Home: React.FC = () => {
   const theme = useTheme();
-  // const _isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const paperStyles = {
+    p: { xs: 2, sm: 3 },
+    borderRadius: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    backdropFilter: "blur(10px)",
+    border: "1px solid",
+    borderColor: "divider",
+    transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+    "&:hover": {
+      transform: "translateY(-2px)",
+      boxShadow: theme.shadows[4],
+    },
+  };
 
   return (
     <Box
@@ -48,41 +63,25 @@ const Home: React.FC = () => {
             width: "100%",
           }}
         >
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid",
-              borderColor: "divider",
-              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: theme.shadows[4],
-              },
-            }}
-          >
+          {/* Shared Collections Section */}
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={paperStyles}>
+                <SharedWithMeWidget maxItems={3} />
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={0} sx={paperStyles}>
+                <SharedByMeWidget maxItems={3} />
+              </Paper>
+            </Grid>
+          </Grid>
+
+          <Paper elevation={0} sx={paperStyles}>
             <SmartFolders />
           </Paper>
 
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid",
-              borderColor: "divider",
-              transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-              "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: theme.shadows[4],
-              },
-            }}
-          >
+          <Paper elevation={0} sx={paperStyles}>
             <ConnectedStorage />
           </Paper>
         </Stack>

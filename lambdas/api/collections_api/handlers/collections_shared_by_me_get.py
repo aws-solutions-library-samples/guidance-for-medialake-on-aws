@@ -1,4 +1,4 @@
-"""GET /collections/shared-with-me - Get collections shared with current user."""
+"""GET /collections/shared-by-me - Get collections shared by current user."""
 
 import os
 
@@ -9,7 +9,6 @@ from aws_lambda_powertools.metrics import MetricUnit
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
-    USER_PK_PREFIX,
     create_error_response,
     create_success_response,
     format_collection_item,
@@ -18,9 +17,9 @@ from db_models import CollectionModel
 from user_auth import extract_user_context
 
 logger = Logger(
-    service="collections-shared-with-me-get", level=os.environ.get("LOG_LEVEL", "INFO")
+    service="collections-shared-by-me-get", level=os.environ.get("LOG_LEVEL", "INFO")
 )
-tracer = Tracer(service="collections-shared-with-me-get")
+tracer = Tracer(service="collections-shared-by-me-get")
 metrics = Metrics(namespace="medialake", service="collections")
 
 # Initialize DynamoDB resource
@@ -28,14 +27,16 @@ dynamodb = boto3.resource("dynamodb")
 table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
 collections_table = dynamodb.Table(table_name)
 
+GRANTOR_PREFIX = "GRANTOR#"
+
 
 def register_route(app):
-    """Register GET /collections/shared-with-me route"""
+    """Register GET /collections/shared-by-me route"""
 
-    @app.get("/collections/shared-with-me")
+    @app.get("/collections/shared-by-me")
     @tracer.capture_method
-    def collections_shared_with_me_get():
-        """Get collections shared with the current user"""
+    def collections_shared_by_me_get():
+        """Get collections shared by the current user"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
             user_id = user_context.get("user_id")
@@ -43,39 +44,33 @@ def register_route(app):
             if not user_id:
                 raise BadRequestError("Authentication required")
 
-            # Query user's shared collections via UserRelationshipModel
-            # Using GSI1 (UserCollectionsGSI) to find all collections user has access to
+            # Query GSI6 to find all shares granted by this user
             response = collections_table.query(
-                IndexName="UserCollectionsGSI",
-                KeyConditionExpression="GSI1_PK = :user_pk",
-                FilterExpression="relationship <> :owner",
+                IndexName="SharesGrantedByGSI",
+                KeyConditionExpression="GSI6_PK = :grantor_pk",
                 ExpressionAttributeValues={
-                    ":user_pk": f"{USER_PK_PREFIX}{user_id}",
-                    ":owner": "OWNER",
+                    ":grantor_pk": f"{GRANTOR_PREFIX}{user_id}",
                 },
             )
 
-            user_relationships = response.get("Items", [])
+            shares = response.get("Items", [])
 
             logger.info(
-                "Found shared collections for user",
+                "Found shares granted by user",
                 extra={
                     "user_id": user_id,
-                    "shared_count": len(user_relationships),
+                    "share_count": len(shares),
                 },
             )
 
-            # Get collection details for each relationship
-            shared_collections = []
-            for relationship in user_relationships:
-                # Extract collection ID from SK (format: COLL#{collection_id})
-                collection_id = relationship.get("SK", "").replace(
-                    COLLECTION_PK_PREFIX, ""
-                )
+            # Get unique collection IDs from shares
+            collection_ids = list(
+                set(share["PK"].replace(COLLECTION_PK_PREFIX, "") for share in shares)
+            )
 
-                if not collection_id:
-                    continue
-
+            # Batch get collection details
+            collections_with_shares = []
+            for collection_id in collection_ids:
                 try:
                     # Get collection metadata
                     collection = CollectionModel.get(
@@ -83,7 +78,14 @@ def register_route(app):
                         METADATA_SK,
                     )
 
-                    # Format collection
+                    # Get all shares for this collection
+                    collection_shares = [
+                        s
+                        for s in shares
+                        if s["PK"] == f"{COLLECTION_PK_PREFIX}{collection_id}"
+                    ]
+
+                    # Format collection with share info
                     collection_dict = {
                         "PK": collection.PK,
                         "SK": collection.SK,
@@ -105,36 +107,40 @@ def register_route(app):
                         collection_dict, user_context
                     )
 
-                    # Add sharing metadata
-                    formatted_item["sharedWithMe"] = True
-                    formatted_item["myRole"] = relationship.get(
-                        "relationship", "VIEWER"
-                    )
-                    formatted_item["sharedAt"] = relationship.get("addedAt")
+                    # Add share information
+                    formatted_item["shareCount"] = len(collection_shares)
+                    formatted_item["isShared"] = True
+                    formatted_item["sharedWith"] = [
+                        {
+                            "targetId": s.get("targetId"),
+                            "targetType": s.get("targetType"),
+                            "role": s.get("role"),
+                            "grantedAt": s.get("grantedAt"),
+                        }
+                        for s in collection_shares
+                    ]
 
-                    shared_collections.append(formatted_item)
+                    collections_with_shares.append(formatted_item)
 
                 except CollectionModel.DoesNotExist:
-                    logger.warning(
-                        f"Collection {collection_id} not found for shared relationship"
-                    )
+                    logger.warning(f"Collection {collection_id} not found for share")
                     continue
 
             metrics.add_metric(
-                name="SharedWithMeCollectionsReturned",
+                name="SharedByMeCollectionsReturned",
                 unit=MetricUnit.Count,
-                value=len(shared_collections),
+                value=len(collections_with_shares),
             )
 
             return create_success_response(
-                data=shared_collections,
+                data=collections_with_shares,
                 request_id=app.current_event.request_context.request_id,
             )
 
         except BadRequestError:
             raise
         except Exception as e:
-            logger.exception("Error listing shared collections", exc_info=e)
+            logger.exception("Error listing collections shared by user", exc_info=e)
             return create_error_response(
                 error_code="InternalServerError",
                 error_message="An unexpected error occurred",
