@@ -302,8 +302,8 @@ def lambda_handler(event, context: LambdaContext):
     proc.save(buf, format=fmt, **save_kwargs)
     data = buf.getvalue()
 
-    # build a new key alongside the source asset
-    new_key = generate_derived_filename(key, mode, ext)
+    # build a new key alongside the source asset (include source bucket as prefix)
+    new_key = f"{bucket}/{generate_derived_filename(key, mode, ext)}"
 
     # ── fetch existing representations -----------------------------------
     resp = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})
