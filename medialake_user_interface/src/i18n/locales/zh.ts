@@ -700,7 +700,6 @@ export default {
         saveError: "保存设置失败",
         cancelSuccess: "已取消更改",
         errorLoading: "加载搜索提供商配置时出错",
-        preview: "预览",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -796,7 +795,6 @@ export default {
     clip: "片段",
     none: "无",
     permissions: "权限",
-    delete: "删除",
     root: "根目录",
     folder: "文件夹",
     actions: {
