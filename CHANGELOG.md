@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.3] - 2026-01-22
+
+### Bug Fixes
+
+- fix: update to localization files to remove duplicate keys
+
 ## [1.6.2] - 2026-01-22
 
 ### Bug Fixes
