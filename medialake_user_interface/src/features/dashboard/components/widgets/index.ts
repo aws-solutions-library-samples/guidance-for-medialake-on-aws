@@ -1,5 +1,5 @@
 // Widget components barrel exports
 
 export { FavoritesWidget } from "./FavoritesWidget";
-export { MyCollectionsWidget } from "./MyCollectionsWidget";
+export { CollectionsWidget } from "./CollectionsWidget";
 export { RecentAssetsWidget } from "./RecentAssetsWidget";

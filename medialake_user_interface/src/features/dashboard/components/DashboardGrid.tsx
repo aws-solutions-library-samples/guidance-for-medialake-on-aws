@@ -27,9 +27,9 @@ import {
 import { WidgetSelector } from "./WidgetSelector";
 import { DashboardSelector } from "./DashboardSelector";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
-import { MyCollectionsWidget } from "./widgets/MyCollectionsWidget";
+import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
-import type { WidgetType, LayoutItem } from "../types";
+import type { WidgetType, LayoutItem, CollectionsWidgetConfig } from "../types";
 
 // Import react-grid-layout styles
 import "react-grid-layout/css/styles.css";
@@ -42,9 +42,12 @@ const ROW_HEIGHT = 80;
 const MARGIN: [number, number] = [16, 16];
 
 // Widget component map
-const WIDGET_COMPONENTS: Record<WidgetType, React.FC<{ widgetId: string }>> = {
+const WIDGET_COMPONENTS: Record<
+  WidgetType,
+  React.FC<{ widgetId: string; config?: CollectionsWidgetConfig }>
+> = {
   favorites: FavoritesWidget,
-  "my-collections": MyCollectionsWidget,
+  collections: CollectionsWidget,
   "recent-assets": RecentAssetsWidget,
 };
 
@@ -242,7 +245,7 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
           const WidgetComponent = WIDGET_COMPONENTS[widget.type];
           return (
             <div key={widget.id} data-grid-id={widget.id} style={{ height: "100%" }}>
-              <WidgetComponent widgetId={widget.id} />
+              <WidgetComponent widgetId={widget.id} config={widget.config} />
             </div>
           );
         })}

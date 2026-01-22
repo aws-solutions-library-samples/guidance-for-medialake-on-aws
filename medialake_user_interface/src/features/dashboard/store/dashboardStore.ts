@@ -8,6 +8,8 @@ import type {
   LayoutItem,
   WidgetType,
   WidgetDefinition,
+  CollectionsWidgetConfig,
+  WidgetInstance,
 } from "../types";
 
 // Widget definitions with metadata
@@ -21,14 +23,21 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     minSize: { w: 3, h: 4 },
     maxSize: { w: 12, h: 12 },
   },
-  "my-collections": {
-    type: "my-collections",
-    title: "My Collections",
-    description: "View and manage your personal collections",
+  collections: {
+    type: "collections",
+    title: "Collections",
+    description: "Configurable view of your collections",
     icon: "folder",
     defaultSize: { w: 6, h: 5 },
-    minSize: { w: 3, h: 4 },
-    maxSize: { w: 12, h: 12 },
+    minSize: { w: 3, h: 2 },
+    maxSize: { w: 12, h: 8 },
+    defaultConfig: {
+      viewType: "all",
+      sorting: {
+        sortBy: "name",
+        sortOrder: "asc",
+      },
+    },
   },
   "recent-assets": {
     type: "recent-assets",
@@ -46,23 +55,27 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
   version: 1,
   widgets: [
     { id: "favorites-1", type: "favorites" },
-    { id: "my-collections-1", type: "my-collections" },
+    {
+      id: "collections-1",
+      type: "collections",
+      config: { viewType: "all", sorting: { sortBy: "name", sortOrder: "asc" } },
+    },
     { id: "recent-assets-1", type: "recent-assets" },
   ],
   layouts: {
     lg: [
       { i: "favorites-1", x: 0, y: 0, w: 6, h: 5, minW: 3, minH: 4, maxW: 12, maxH: 12 },
-      { i: "my-collections-1", x: 6, y: 0, w: 6, h: 5, minW: 3, minH: 4, maxW: 12, maxH: 12 },
+      { i: "collections-1", x: 6, y: 0, w: 6, h: 5, minW: 3, minH: 2, maxW: 12, maxH: 8 },
       { i: "recent-assets-1", x: 0, y: 5, w: 12, h: 5, minW: 4, minH: 4, maxW: 12, maxH: 12 },
     ],
     md: [
       { i: "favorites-1", x: 0, y: 0, w: 5, h: 5, minW: 3, minH: 4, maxW: 10, maxH: 12 },
-      { i: "my-collections-1", x: 5, y: 0, w: 5, h: 5, minW: 3, minH: 4, maxW: 10, maxH: 12 },
+      { i: "collections-1", x: 5, y: 0, w: 5, h: 5, minW: 3, minH: 2, maxW: 10, maxH: 8 },
       { i: "recent-assets-1", x: 0, y: 5, w: 10, h: 5, minW: 4, minH: 4, maxW: 10, maxH: 12 },
     ],
     sm: [
       { i: "favorites-1", x: 0, y: 0, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
-      { i: "my-collections-1", x: 0, y: 5, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
+      { i: "collections-1", x: 0, y: 5, w: 1, h: 5, minW: 1, minH: 2, maxW: 1, maxH: 8 },
       { i: "recent-assets-1", x: 0, y: 10, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
     ],
   },
@@ -134,7 +147,7 @@ export const convertApiLayoutToFrontend = (apiLayout: {
     widgets: apiLayout.widgets.map((w) => ({
       id: w.id,
       type: w.type as WidgetType,
-      config: w.config,
+      ...(w.config && { config: w.config as unknown as CollectionsWidgetConfig }),
     })),
     layouts: apiLayout.layouts,
     updatedAt: apiLayout.updatedAt,
@@ -213,8 +226,12 @@ export const useDashboardStore = create<DashboardStore>()(
         const widgetDef = WIDGET_DEFINITIONS[type];
         const widgetId = generateWidgetId(type);
 
-        // Create new widget instance
-        const newWidget = { id: widgetId, type };
+        // Create new widget instance with default config if available
+        const newWidget: WidgetInstance = {
+          id: widgetId,
+          type,
+          ...(widgetDef.defaultConfig && { config: widgetDef.defaultConfig }),
+        };
 
         // Create layout items for each breakpoint
         const newLayouts = { ...layout.layouts };
@@ -263,6 +280,18 @@ export const useDashboardStore = create<DashboardStore>()(
               md: layout.layouts.md.filter((item) => item.i !== widgetId),
               sm: layout.layouts.sm.filter((item) => item.i !== widgetId),
             },
+          },
+          hasPendingChanges: true,
+        });
+      },
+
+      updateWidgetConfig: (widgetId, config) => {
+        const { layout } = get();
+
+        set({
+          layout: {
+            ...layout,
+            widgets: layout.widgets.map((w) => (w.id === widgetId ? { ...w, config } : w)),
           },
           hasPendingChanges: true,
         });
@@ -358,6 +387,7 @@ export const useDashboardActions = () => {
   const updateLayoutItem = useDashboardStore((state) => state.updateLayoutItem);
   const addWidget = useDashboardStore((state) => state.addWidget);
   const removeWidget = useDashboardStore((state) => state.removeWidget);
+  const updateWidgetConfig = useDashboardStore((state) => state.updateWidgetConfig);
   const resetToDefault = useDashboardStore((state) => state.resetToDefault);
   const setExpandedWidget = useDashboardStore((state) => state.setExpandedWidget);
   const toggleWidgetSelector = useDashboardStore((state) => state.toggleWidgetSelector);
@@ -374,6 +404,7 @@ export const useDashboardActions = () => {
     updateLayoutItem,
     addWidget,
     removeWidget,
+    updateWidgetConfig,
     resetToDefault,
     setExpandedWidget,
     toggleWidgetSelector,

@@ -130,11 +130,24 @@ class LambdaMiddleware:
         # ── Handle external payload offload ─────────────────────────────────
         meta = ev.get("metadata", {})
         if meta.get("stepExternalPayload") == "True":
-            print("external")
+            self.logger.info(
+                "MIDDLEWARE: Handling external payload offload (top-level)"
+            )
             loc = meta.get("stepExternalPayloadLocation", {})
             bucket = loc.get("bucket")
             key = loc.get("key")
-            data = {}
+
+            # Preserve existing payload fields in case downloaded content is data-only
+            existing_payload = ev.get("payload", {})
+            existing_assets = existing_payload.get("assets", [])
+            existing_map = existing_payload.get("map")
+            existing_history = existing_payload.get("payload_history")
+
+            result_payload: Dict[str, Any] = {"data": {}, "assets": existing_assets}
+            if existing_map:
+                result_payload["map"] = existing_map
+            if existing_history:
+                result_payload["payload_history"] = existing_history
 
             if bucket and key:
                 # pull the actual payload from S3
@@ -144,20 +157,36 @@ class LambdaMiddleware:
 
                 if isinstance(parsed, list):
                     # prepare for Map: one entry per list item
-                    data = [
+                    result_payload["data"] = [
                         {"s3_bucket": bucket, "s3_key": key, "index": idx}
                         for idx in range(len(parsed))
                     ]
+                elif (
+                    isinstance(parsed, dict) and "data" in parsed and "assets" in parsed
+                ):
+                    # Full payload structure was offloaded (from _publish when EventBridge > 256KB)
+                    result_payload = parsed
+                    self.logger.info(
+                        "MIDDLEWARE: Downloaded full payload structure (top-level)",
+                        extra={
+                            "payload_type": "full_payload",
+                            "downloaded_assets_count": len(parsed.get("assets", [])),
+                        },
+                    )
                 else:
-                    # single object, pass straight through
-                    data = parsed
+                    # Just data was offloaded (from _make_output when data > 240KB)
+                    result_payload["data"] = parsed
+                    self.logger.info(
+                        "MIDDLEWARE: Downloaded data-only payload (top-level), preserved existing fields",
+                        extra={
+                            "payload_type": "data_only",
+                            "preserved_assets_count": len(existing_assets),
+                        },
+                    )
 
             return {
                 "metadata": meta,
-                "payload": {
-                    "data": data,
-                    "assets": ev.get("payload", {}).get("assets", []),
-                },
+                "payload": result_payload,
             }
         self.logger.info("Original input event", extra={"event": ev})
 
@@ -256,9 +285,8 @@ class LambdaMiddleware:
             and isinstance(ev.get("metadata"), dict)
             and isinstance(ev.get("payload"), dict)
             and "data" in ev["payload"]
-            and "assets" in ev["payload"]
         ):
-            # Check if payload was offloaded to S3
+            # Check if payload was offloaded to S3 (must check BEFORE checking assets)
             meta = ev.get("metadata", {})
             if meta.get("stepExternalPayload") == "True":
                 ext_loc = meta.get("stepExternalPayloadLocation", {})
@@ -276,23 +304,58 @@ class LambdaMiddleware:
                     try:
                         obj = self.s3.get_object(Bucket=bucket, Key=key)
                         body = obj["Body"].read().decode("utf-8")
-                        downloaded_payload = json.loads(body)
+                        downloaded = json.loads(body)
 
-                        # Replace the empty payload with downloaded data
-                        ev["payload"] = downloaded_payload
+                        # Preserve existing assets when merging downloaded payload
+                        existing_assets = ev["payload"].get("assets", [])
+
+                        # Check if downloaded content is full payload structure or just data
+                        if (
+                            isinstance(downloaded, dict)
+                            and "data" in downloaded
+                            and "assets" in downloaded
+                        ):
+                            # Full payload structure was offloaded, replace entirely
+                            ev["payload"] = downloaded
+                            self.logger.info(
+                                "MIDDLEWARE: Downloaded full payload structure",
+                                extra={
+                                    "payload_type": "full_payload",
+                                    "downloaded_assets_count": len(
+                                        downloaded.get("assets", [])
+                                    ),
+                                },
+                            )
+                        else:
+                            # Just data was offloaded (line 593 only uploads payload["data"])
+                            # Merge while preserving existing assets
+                            ev["payload"]["data"] = downloaded
+                            # Restore assets that were in the original event
+                            if existing_assets:
+                                ev["payload"]["assets"] = existing_assets
+                            self.logger.info(
+                                "MIDDLEWARE: Downloaded data-only payload, preserved existing assets",
+                                extra={
+                                    "payload_type": "data_only",
+                                    "preserved_assets_count": len(existing_assets),
+                                },
+                            )
 
                         self.logger.info(
                             "MIDDLEWARE: Successfully downloaded external payload",
                             extra={
                                 "payload_keys": (
-                                    list(downloaded_payload.keys())
-                                    if isinstance(downloaded_payload, dict)
+                                    list(ev["payload"].keys())
+                                    if isinstance(ev["payload"], dict)
                                     else "N/A"
                                 ),
                                 "data_keys": (
-                                    list(downloaded_payload.get("data", {}).keys())
-                                    if isinstance(downloaded_payload.get("data"), dict)
+                                    list(ev["payload"].get("data", {}).keys())
+                                    if isinstance(ev["payload"].get("data"), dict)
                                     else "N/A"
+                                ),
+                                "final_assets_count": len(
+                                    ev["payload"].get("assets", [])
                                 ),
                             },
                         )
@@ -335,25 +398,60 @@ class LambdaMiddleware:
                         try:
                             obj = self.s3.get_object(Bucket=bucket, Key=key)
                             body = obj["Body"].read().decode("utf-8")
-                            downloaded_payload = json.loads(body)
+                            downloaded = json.loads(body)
 
-                            # Replace the empty payload with downloaded data
-                            detail["payload"] = downloaded_payload
+                            # Preserve existing assets when merging downloaded payload
+                            existing_assets = detail["payload"].get("assets", [])
+
+                            # Check if downloaded content is full payload structure or just data
+                            if (
+                                isinstance(downloaded, dict)
+                                and "data" in downloaded
+                                and "assets" in downloaded
+                            ):
+                                # Full payload structure was offloaded, replace entirely
+                                detail["payload"] = downloaded
+                                self.logger.info(
+                                    "MIDDLEWARE: Downloaded full payload structure (EventBridge envelope)",
+                                    extra={
+                                        "payload_type": "full_payload",
+                                        "downloaded_assets_count": len(
+                                            downloaded.get("assets", [])
+                                        ),
+                                    },
+                                )
+                            else:
+                                # Just data was offloaded (line 628 only uploads payload["data"])
+                                # Merge while preserving existing assets
+                                detail["payload"]["data"] = downloaded
+                                # Restore assets that were in the original event
+                                if existing_assets:
+                                    detail["payload"]["assets"] = existing_assets
+                                self.logger.info(
+                                    "MIDDLEWARE: Downloaded data-only payload, preserved existing assets (EventBridge envelope)",
+                                    extra={
+                                        "payload_type": "data_only",
+                                        "preserved_assets_count": len(existing_assets),
+                                    },
+                                )
 
                             self.logger.info(
                                 "MIDDLEWARE: Successfully downloaded external payload (EventBridge envelope)",
                                 extra={
                                     "payload_keys": (
-                                        list(downloaded_payload.keys())
-                                        if isinstance(downloaded_payload, dict)
+                                        list(detail["payload"].keys())
+                                        if isinstance(detail["payload"], dict)
                                         else "N/A"
                                     ),
                                     "data_keys": (
-                                        list(downloaded_payload.get("data", {}).keys())
+                                        list(detail["payload"].get("data", {}).keys())
                                         if isinstance(
-                                            downloaded_payload.get("data"), dict
+                                            detail["payload"].get("data"), dict
                                         )
                                         else "N/A"
+                                    ),
+                                    "final_assets_count": len(
+                                        detail["payload"].get("assets", [])
                                     ),
                                 },
                             )

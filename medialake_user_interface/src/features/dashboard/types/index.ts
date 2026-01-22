@@ -1,6 +1,30 @@
 // Dashboard feature type definitions
 
-export type WidgetType = "favorites" | "my-collections" | "recent-assets";
+// Collection view types for the collections widget
+export type CollectionViewType =
+  | "all"
+  | "public"
+  | "private"
+  | "my-collections"
+  | "shared-with-me"
+  | "my-shared";
+
+// Sorting configuration types
+export type SortBy = "name" | "createdAt" | "updatedAt";
+export type SortOrder = "asc" | "desc";
+
+export interface SortConfig {
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+}
+
+// Collections widget configuration
+export interface CollectionsWidgetConfig {
+  viewType: CollectionViewType;
+  sorting: SortConfig;
+}
+
+export type WidgetType = "favorites" | "collections" | "recent-assets";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -10,6 +34,7 @@ export interface WidgetDefinition {
   defaultSize: { w: number; h: number };
   minSize: { w: number; h: number };
   maxSize: { w: number; h: number };
+  defaultConfig?: CollectionsWidgetConfig;
 }
 
 export interface LayoutItem {
@@ -40,7 +65,7 @@ export interface DashboardLayout {
 export interface WidgetInstance {
   id: string;
   type: WidgetType;
-  config?: Record<string, unknown>;
+  config?: CollectionsWidgetConfig;
 }
 
 export interface DashboardState {
@@ -55,6 +80,7 @@ export interface DashboardActions {
   updateLayoutItem: (itemId: string, updates: Partial<LayoutItem>) => void;
   addWidget: (type: WidgetType) => void;
   removeWidget: (widgetId: string) => void;
+  updateWidgetConfig: (widgetId: string, config: CollectionsWidgetConfig) => void;
   resetToDefault: () => void;
   setExpandedWidget: (widgetId: string | null) => void;
   toggleWidgetSelector: () => void;

@@ -119,6 +119,17 @@ class CollectionsApi(Construct):
                 ),
                 projection_type=dynamodb.ProjectionType.ALL,
             ),
+            # GSI6: SharesGrantedByGSI - Find all shares granted by a specific user
+            dynamodb.GlobalSecondaryIndexPropsV2(
+                index_name="SharesGrantedByGSI",
+                partition_key=dynamodb.Attribute(
+                    name="GSI6_PK", type=dynamodb.AttributeType.STRING
+                ),
+                sort_key=dynamodb.Attribute(
+                    name="GSI6_SK", type=dynamodb.AttributeType.STRING
+                ),
+                projection_type=dynamodb.ProjectionType.ALL,
+            ),
         ]
 
         self._collections_table = DynamoDB(
@@ -265,6 +276,16 @@ class CollectionsApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /collections/shared-by-me (static route must come before variable route)
+        shared_by_me_resource = collections_resource.add_resource("shared-by-me")
+        shared_by_me_method = shared_by_me_resource.add_method(
+            "ANY",
+            collections_integration,
+        )
+        cfn_method = shared_by_me_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # /collections/{collectionId} - Variable path for specific collections
         collection_id_resource = collections_resource.add_resource("{collectionId}")
 
@@ -292,6 +313,7 @@ class CollectionsApi(Construct):
         add_cors_options_method(collection_types_resource)
         add_cors_options_method(collections_resource)
         add_cors_options_method(shared_with_me_resource)
+        add_cors_options_method(shared_by_me_resource)
         add_cors_options_method(collection_id_resource)
         add_cors_options_method(collection_proxy_resource)
 

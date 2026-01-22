@@ -8,7 +8,7 @@ import { QUERY_KEYS } from "../queryKeys";
 // Types matching the backend API
 export interface WidgetInstance {
   id: string;
-  type: "favorites" | "my-collections" | "recent-assets";
+  type: "favorites" | "collections" | "recent-assets";
   config?: Record<string, unknown>;
 }
 

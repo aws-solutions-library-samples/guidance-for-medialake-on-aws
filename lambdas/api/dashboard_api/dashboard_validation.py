@@ -123,6 +123,90 @@ def validate_config_size(widgets: List[Dict[str, Any]]) -> ValidationResult:
     return result
 
 
+def validate_widget_configs(widgets: List[Dict[str, Any]]) -> ValidationResult:
+    """Validate widget-specific configuration values."""
+    result = ValidationResult()
+
+    VALID_VIEW_TYPES = {
+        "all",
+        "public",
+        "private",
+        "my-collections",
+        "shared-with-me",
+        "my-shared",
+    }
+    VALID_SORT_BY = {"name", "createdAt", "updatedAt"}
+    VALID_SORT_ORDER = {"asc", "desc"}
+
+    for widget in widgets:
+        widget_id = widget.get("id")
+        widget_type = widget.get("type")
+        config = widget.get("config", {})
+
+        # Validate collections widget config
+        if widget_type == "collections":
+            if not config:
+                result.add_error(
+                    f"widgets[{widget_id}].config",
+                    "Collections widget requires a config object",
+                )
+                continue
+
+            # Validate viewType
+            view_type = config.get("viewType")
+            if not view_type:
+                result.add_error(
+                    f"widgets[{widget_id}].config.viewType",
+                    "Collections widget config requires 'viewType' field",
+                )
+            elif view_type not in VALID_VIEW_TYPES:
+                result.add_error(
+                    f"widgets[{widget_id}].config.viewType",
+                    f"Invalid viewType '{view_type}'. Must be one of: {', '.join(sorted(VALID_VIEW_TYPES))}",
+                )
+
+            # Validate sorting
+            sorting = config.get("sorting")
+            if not sorting:
+                result.add_error(
+                    f"widgets[{widget_id}].config.sorting",
+                    "Collections widget config requires 'sorting' object",
+                )
+            elif not isinstance(sorting, dict):
+                result.add_error(
+                    f"widgets[{widget_id}].config.sorting",
+                    "Collections widget 'sorting' must be an object",
+                )
+            else:
+                # Validate sortBy
+                sort_by = sorting.get("sortBy")
+                if not sort_by:
+                    result.add_error(
+                        f"widgets[{widget_id}].config.sorting.sortBy",
+                        "Collections widget sorting requires 'sortBy' field",
+                    )
+                elif sort_by not in VALID_SORT_BY:
+                    result.add_error(
+                        f"widgets[{widget_id}].config.sorting.sortBy",
+                        f"Invalid sortBy '{sort_by}'. Must be one of: {', '.join(sorted(VALID_SORT_BY))}",
+                    )
+
+                # Validate sortOrder
+                sort_order = sorting.get("sortOrder")
+                if not sort_order:
+                    result.add_error(
+                        f"widgets[{widget_id}].config.sorting.sortOrder",
+                        "Collections widget sorting requires 'sortOrder' field",
+                    )
+                elif sort_order not in VALID_SORT_ORDER:
+                    result.add_error(
+                        f"widgets[{widget_id}].config.sorting.sortOrder",
+                        f"Invalid sortOrder '{sort_order}'. Must be one of: {', '.join(sorted(VALID_SORT_ORDER))}",
+                    )
+
+    return result
+
+
 def validate_layout(
     widgets: List[Dict[str, Any]], layouts: Dict[str, List[Dict[str, Any]]]
 ) -> ValidationResult:
@@ -134,6 +218,7 @@ def validate_layout(
         validate_widget_sizes(widgets, layouts),
         validate_layout_size(widgets, layouts),
         validate_config_size(widgets),
+        validate_widget_configs(widgets),
     ]:
         if not validation_result.is_valid:
             result.is_valid = False

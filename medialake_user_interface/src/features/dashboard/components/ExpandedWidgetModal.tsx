@@ -11,24 +11,24 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboardStore, WIDGET_DEFINITIONS } from "../store/dashboardStore";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
-import { MyCollectionsWidget } from "./widgets/MyCollectionsWidget";
+import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
-import type { WidgetType } from "../types";
+import type { WidgetType, CollectionsWidgetConfig } from "../types";
 
 // Widget component map
 const WIDGET_COMPONENTS: Record<
   WidgetType,
-  React.FC<{ widgetId: string; isExpanded?: boolean }>
+  React.FC<{ widgetId: string; isExpanded?: boolean; config?: CollectionsWidgetConfig }>
 > = {
   favorites: FavoritesWidget,
-  "my-collections": MyCollectionsWidget,
+  collections: CollectionsWidget,
   "recent-assets": RecentAssetsWidget,
 };
 
 // Widget icon map
 const WIDGET_ICONS: Record<WidgetType, React.ReactNode> = {
   favorites: <FavoriteIcon />,
-  "my-collections": <CollectionIcon />,
+  collections: <CollectionIcon />,
   "recent-assets": <RecentIcon />,
 };
 
@@ -50,7 +50,7 @@ export const ExpandedWidgetModal: React.FC = () => {
     if (widget) {
       if (widget.type === "favorites") {
         queryClient.invalidateQueries({ queryKey: ["favorites"] });
-      } else if (widget.type === "my-collections") {
+      } else if (widget.type === "collections") {
         queryClient.invalidateQueries({ queryKey: ["collections"] });
       } else if (widget.type === "recent-assets") {
         queryClient.invalidateQueries({ queryKey: ["search"] });
@@ -150,7 +150,7 @@ export const ExpandedWidgetModal: React.FC = () => {
 
       <DialogContent sx={{ p: 0, overflow: "hidden" }}>
         <Box sx={{ height: "100%", minHeight: 400 }}>
-          <WidgetComponent widgetId={widget.id} isExpanded={true} />
+          <WidgetComponent widgetId={widget.id} isExpanded={true} config={widget.config} />
         </Box>
       </DialogContent>
     </Dialog>

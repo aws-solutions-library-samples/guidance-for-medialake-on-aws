@@ -26,7 +26,7 @@ import type { WidgetSelectorProps, WidgetType } from "../types";
 // Map widget types to icons
 const WIDGET_ICONS: Record<WidgetType, React.ReactElement> = {
   favorites: <FavoriteIcon />,
-  "my-collections": <CollectionIcon />,
+  collections: <CollectionIcon />,
   "recent-assets": <RecentIcon />,
 };
 
