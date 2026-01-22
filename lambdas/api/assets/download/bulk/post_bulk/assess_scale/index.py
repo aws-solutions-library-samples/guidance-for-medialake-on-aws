@@ -180,37 +180,58 @@ def get_assets_metadata(asset_ids: List[str]) -> Dict[str, Any]:
                 )
                 file_info = storage_info.get("FileInfo", {})
 
+                # Get asset type to determine what metadata to extract
+                asset_type = asset.get("DigitalSourceAsset", {}).get("Type", "Unknown")
+
                 # Metadata Fields
                 metadata = asset.get("Metadata", {}).get("EmbeddedMetadata", {})
 
                 selected_video_fields = {}
                 selected_audio_fields = {}
 
-                video_metadata: Dict = metadata.get("video", [{}])[0]
-                audio_metadata: Dict = metadata.get("audio", [{}])[0]
+                # Only extract video/audio metadata for video/audio assets
+                if asset_type in ["Video", "Audio"]:
+                    # Safely get first element from video/audio metadata lists, handle empty lists
+                    video_list = metadata.get("video", [])
+                    video_metadata: Dict = video_list[0] if video_list else {}
 
-                try:
-                    selected_video_fields["Bitrate"] = video_metadata["BitRate"]
-                    selected_video_fields["MaxBitrate"] = video_metadata[
-                        "BitRate_Maximum"
-                    ]
-                    selected_video_fields["RateControlMode"] = video_metadata[
-                        "BitRate_Mode"
-                    ]
+                    audio_list = metadata.get("audio", [])
+                    audio_metadata: Dict = audio_list[0] if audio_list else {}
 
-                    selected_audio_fields["Bitrate"] = audio_metadata["BitRate"]
-                    selected_audio_fields["SampleRate"] = audio_metadata["sample_rate"]
-                    selected_audio_fields["RateControlMode"] = audio_metadata[
-                        "BitRate_Mode"
-                    ]
-                except KeyError as e:
-                    logger.error(
-                        "Error: Missing required asset metadata",
+                    logger.debug(
+                        "Extracting video/audio metadata",
                         extra={
-                            "error": str(e),
+                            "assetId": asset.get("InventoryID", "unknown"),
+                            "assetType": asset_type,
+                            "video_metadata_keys": list(video_metadata.keys()),
+                            "audio_metadata_keys": list(audio_metadata.keys()),
                         },
                     )
-                    raise  # break and exit
+
+                    # Use .get() with defaults to handle missing fields
+                    selected_video_fields["Bitrate"] = video_metadata.get("BitRate", 0)
+                    selected_video_fields["MaxBitrate"] = video_metadata.get(
+                        "BitRate_Maximum", 0
+                    )
+                    selected_video_fields["RateControlMode"] = video_metadata.get(
+                        "BitRate_Mode", "Unknown"
+                    )
+
+                    selected_audio_fields["Bitrate"] = audio_metadata.get("BitRate", 0)
+                    selected_audio_fields["SampleRate"] = audio_metadata.get(
+                        "sample_rate", 0
+                    )
+                    selected_audio_fields["RateControlMode"] = audio_metadata.get(
+                        "BitRate_Mode", "Unknown"
+                    )
+                else:
+                    logger.debug(
+                        f"Skipping video/audio metadata extraction for {asset_type} asset",
+                        extra={
+                            "assetId": asset.get("InventoryID", "unknown"),
+                            "assetType": asset_type,
+                        },
+                    )
 
                 # Create the asset metadata entry with assetId as Key
                 assets[asset["InventoryID"]] = {

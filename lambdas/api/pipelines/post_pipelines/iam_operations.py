@@ -194,40 +194,6 @@ def create_sfn_role(role_name: str) -> str:
         ],
     }
 
-    # Define inline policy for S3 access (for Distributed Map ItemReader)
-    s3_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": ["s3:GetObject", "s3:ListBucket"],
-                "Resource": "*",
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["kms:Decrypt", "kms:DescribeKey"],
-                "Resource": "*",
-            },
-        ],
-    }
-
-    # Define inline policy for Step Functions Distributed Map to start child executions
-    distributed_map_policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": ["states:StartExecution"],
-                "Resource": "*",
-            },
-            {
-                "Effect": "Allow",
-                "Action": ["states:DescribeExecution", "states:StopExecution"],
-                "Resource": "*",
-            },
-        ],
-    }
-
     try:
         # Check if role exists
         try:
@@ -264,25 +230,8 @@ def create_sfn_role(role_name: str) -> str:
         )
         logger.info(f"Added CloudWatch Logs policy to role {role_name}")
 
-        # Add inline policy for S3 access (for Distributed Map ItemReader)
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName="StepFunctionsS3AccessPolicy",
-            PolicyDocument=json.dumps(s3_policy),
-        )
-        logger.info(f"Added S3 access policy to role {role_name}")
-
-        # Add inline policy for Distributed Map to start child executions
-        iam_client.put_role_policy(
-            RoleName=role_name,
-            PolicyName="StepFunctionsDistributedMapPolicy",
-            PolicyDocument=json.dumps(distributed_map_policy),
-        )
-        logger.info(f"Added Distributed Map execution policy to role {role_name}")
-
         # Wait for role and policies to propagate
         logger.info(f"Waiting for role {role_name} to propagate...")
-        time.sleep(10)
         time.sleep(10)
 
         logger.info(f"Role {role_name} created successfully with ARN: {role_arn}")

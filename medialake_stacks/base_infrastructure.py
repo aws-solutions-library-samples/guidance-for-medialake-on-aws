@@ -304,29 +304,6 @@ class BaseInfrastructureStack(Stack):
                         max_age=3000,
                     )
                 ],
-                lifecycle_rules=[
-                    s3.LifecycleRule(
-                        id="DeleteTempZipFiles",
-                        enabled=True,
-                        prefix="temp/zip/",
-                        expiration=Duration.days(7),
-                    ),
-                    s3.LifecycleRule(
-                        id="DeleteTempSubClips",
-                        enabled=True,
-                        prefix="temp/subClips/",
-                        expiration=Duration.days(7),
-                    ),
-                    s3.LifecycleRule(
-                        enabled=True,
-                        transitions=[
-                            s3.Transition(
-                                storage_class=s3.StorageClass.INTELLIGENT_TIERING,
-                                transition_after=Duration.days(0),
-                            )
-                        ],
-                    ),
-                ],
             ),
         )
 

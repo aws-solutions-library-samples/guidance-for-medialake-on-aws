@@ -33,6 +33,11 @@ test.describe("Cognito E2E Authentication Tests", () => {
       .getByRole("textbox", { name: "Email" })
       .waitFor({ state: "visible", timeout: 10000 });
 
+    // Wait for login form to be visible before interacting
+    await page
+      .getByRole("textbox", { name: "Email" })
+      .waitFor({ state: "visible", timeout: 10000 });
+
     // Fill in the login form with the dynamically created test user
     await page.getByRole("textbox", { name: "Email" }).fill(cognitoTestUser.username);
     await page.getByRole("textbox", { name: "Password" }).fill(cognitoTestUser.password);

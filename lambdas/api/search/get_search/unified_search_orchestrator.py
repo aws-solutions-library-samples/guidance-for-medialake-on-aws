@@ -37,13 +37,11 @@ class UnifiedSearchOrchestrator:
         self.provider_factory = SearchProviderFactory(logger, metrics)
         self._providers = {}
         self._default_provider = None
-        self._providers_initialized = False
-        self._last_config_check = None
-        self._config_cache_ttl = 60  # Reload config every 60 seconds if needed
-        self._initialize_provider_classes()
+        self._initialize_providers()
 
-    def _initialize_provider_classes(self):
-        """Register all available search provider classes (without loading configs)"""
+    def _initialize_providers(self):
+        """Initialize and register all available search providers"""
+        # Register provider classes
         self.provider_factory.register_provider("coactive", CoactiveSearchProvider)
         self.provider_factory.register_provider(
             "bedrock_twelvelabs", BedrockTwelveLabsSearchProvider
@@ -51,39 +49,9 @@ class UnifiedSearchOrchestrator:
         self.provider_factory.register_provider(
             "twelvelabs_api", TwelveLabsAPISearchProvider
         )
-        self.logger.info("Registered search provider classes")
 
-    def _should_reload_providers(self) -> bool:
-        """Check if providers should be reloaded from configuration"""
-        if not self._providers_initialized:
-            self.logger.info("Providers not yet initialized, will load configurations")
-            return True
-
-        # If no providers are available, try reloading (handles config changes)
-        if not self._providers:
-            self.logger.info("No providers available, will attempt reload")
-            return True
-
-        # Reload periodically to pick up configuration changes
-        if self._last_config_check:
-            elapsed = time.time() - self._last_config_check
-            if elapsed > self._config_cache_ttl:
-                self.logger.info(
-                    f"Config cache expired ({elapsed:.1f}s > {self._config_cache_ttl}s), will reload"
-                )
-                return True
-
-        return False
-
-    def _ensure_providers_initialized(self):
-        """Lazy initialization of providers with cache invalidation"""
-        if self._should_reload_providers():
-            self.logger.info("Initializing/reloading search providers")
-            self._load_provider_configurations()
-            self._providers_initialized = True
-            self._last_config_check = time.time()
-        else:
-            self.logger.debug(f"Using cached providers: {list(self._providers.keys())}")
+        # Load provider configurations and create instances
+        self._load_provider_configurations()
 
     def _load_provider_configurations(self):
         """Load search provider configurations from system settings"""
@@ -151,10 +119,6 @@ class UnifiedSearchOrchestrator:
             if response.get("Item") and response["Item"].get("providers"):
                 return response["Item"]["providers"]
 
-            # Get the embedding store configuration
-            embedding_store = self._get_embedding_store_type(system_settings_table)
-            self.logger.info(f"Using embedding store type: {embedding_store}")
-
             # Fall back to checking for individual provider configurations
             configs = []
 
@@ -207,7 +171,7 @@ class UnifiedSearchOrchestrator:
                             "type": "bedrock",
                             "secret_arn": item.get("secretArn"),
                         },
-                        "store": embedding_store,
+                        "store": "opensearch",  # Default to opensearch for bedrock
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Bedrock TwelveLabs"),
                         "id": item.get("id"),
@@ -228,7 +192,7 @@ class UnifiedSearchOrchestrator:
                             "type": "api_key",
                             "secret_arn": item.get("secretArn"),
                         },
-                        "store": embedding_store,
+                        "store": "opensearch",  # Default to opensearch for twelvelabs api
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "TwelveLabs API"),
                         "id": item.get("id"),
@@ -267,35 +231,6 @@ class UnifiedSearchOrchestrator:
         except Exception as e:
             self.logger.error(f"Error loading search provider configs: {str(e)}")
             return []
-
-    def _get_embedding_store_type(self, system_settings_table) -> str:
-        """Get the configured embedding store type from DynamoDB"""
-        try:
-            response = system_settings_table.get_item(
-                Key={"PK": "SYSTEM_SETTINGS", "SK": "EMBEDDING_STORE"}
-            )
-
-            if response.get("Item") and response["Item"].get("isEnabled"):
-                store_type = response["Item"].get("type", "opensearch")
-                # Map DynamoDB type to internal type
-                if store_type == "s3-vector":
-                    return "s3_vectors"
-                elif store_type == "opensearch":
-                    return "opensearch"
-                else:
-                    self.logger.warning(
-                        f"Unknown embedding store type: {store_type}, defaulting to opensearch"
-                    )
-                    return "opensearch"
-            else:
-                self.logger.info(
-                    "No embedding store configuration found, defaulting to opensearch"
-                )
-                return "opensearch"
-
-        except Exception as e:
-            self.logger.error(f"Error loading embedding store config: {str(e)}")
-            return "opensearch"  # Safe default
 
     def _get_coactive_api_key(self, secret_arn: str) -> Optional[str]:
         """Get Coactive API key from AWS Secrets Manager"""
@@ -336,9 +271,6 @@ class UnifiedSearchOrchestrator:
         start_time = time.time()
 
         try:
-            # Ensure providers are initialized (lazy initialization)
-            self._ensure_providers_initialized()
-
             # Parse query parameters into unified SearchQuery
             search_query = create_search_query_from_params(query_params)
 
@@ -497,7 +429,6 @@ class UnifiedSearchOrchestrator:
         """Add presigned URLs for thumbnail and proxy representations"""
         try:
             # Import here to avoid circular imports
-            from index import get_indexed_thumbnail_url
             from url_utils import generate_cloudfront_url
 
             derived_representations = result.get("DerivedRepresentations", [])
@@ -518,8 +449,7 @@ class UnifiedSearchOrchestrator:
                     )
 
                     if purpose == "thumbnail":
-                        # Use shared function to convert to indexed thumbnail URL
-                        thumbnail_url = get_indexed_thumbnail_url(presigned_url)
+                        thumbnail_url = presigned_url
                     elif purpose == "proxy":
                         proxy_url = presigned_url
 

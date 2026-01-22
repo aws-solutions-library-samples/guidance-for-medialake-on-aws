@@ -701,7 +701,6 @@ export default {
         saveError: "구성 저장에 실패했습니다",
         cancelSuccess: "변경 사항이 취소되었습니다",
         errorLoading: "검색 제공업체 구성 로딩 오류",
-        preview: "미리보기",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -957,7 +956,6 @@ export default {
       connectToExistingS3Bucket: "Connect to an existing S3 bucket",
       createNewS3Bucket: "생성 a new S3 bucket",
     },
-    delete: "삭제",
     deleteApiKeyConfirmation:
       'Are you sure you want to delete the API key "{{name}}"? This action cannot be undone and will immediately invalidate any applications using this key.',
     deleteApiKeyConfirmationGeneric: "Are you sure you want to delete this API key?",

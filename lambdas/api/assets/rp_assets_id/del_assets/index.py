@@ -18,6 +18,10 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.exceptions import ClientError
+from external_service_manager import MediaLakeExternalServiceManager
 from pydantic import BaseModel, Field
 
 # ── Powertools ───────────────────────────────────────────────────────────────
@@ -99,7 +103,22 @@ def lambda_handler(event: APIGatewayProxyEvent, _ctx: LambdaContext) -> Dict[str
             inventory_id=inventory_id, publish_event=True
         )
 
-        # Return success response with deletion details
+        # 6. Delete from external services (e.g., Coactive)
+        external_service_manager = MediaLakeExternalServiceManager(logger, metrics)
+        try:
+            external_results = (
+                external_service_manager.delete_asset_from_external_services(
+                    asset, inventory_id
+                )
+            )
+            if external_results:
+                logger.info(
+                    f"External service deletion results for {inventory_id}: {external_results}"
+                )
+        except Exception as e:
+            logger.error(f"Failed to delete asset from external services: {str(e)}")
+            # Don't fail the entire deletion if external service deletion fails
+
         return create_response(
             HTTPStatus.OK,
             "Asset deleted successfully",

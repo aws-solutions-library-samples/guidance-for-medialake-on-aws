@@ -29,30 +29,6 @@ class TwelveLabsAPISearchProvider(ProviderPlusStoreSearchProvider):
     def __init__(self, config, logger, metrics):
         super().__init__(config, logger, metrics)
         self._opensearch_client = None
-        # Model-specific configuration for embedding types to include in clips
-        self.embedding_model = "Marengo-retrieval-2.7"
-
-    def get_allowed_clip_embedding_types(self) -> List[str]:
-        """
-        Get the list of embedding types that should be included in clips for timeline display.
-        This is model-specific as different models return different embedding types.
-
-        For TwelveLabs API Marengo 2.7:
-        - Returns: audio, visual-text
-        - We only want visual-text for clips (timeline markers)
-        - Filter out audio
-
-        For future models, this method can be updated to return different embedding types.
-        """
-        if (
-            "Marengo-retrieval-2.7" in self.embedding_model
-            or "marengo" in self.embedding_model.lower()
-        ):
-            # For Marengo 2.7 API, only include visual-text for clips
-            return ["visual-text"]
-
-        # Default: include visual-text for clips (safest option for timeline display)
-        return ["visual-text"]
 
     def _get_provider_location(self) -> ProviderLocation:
         return ProviderLocation.EXTERNAL
@@ -201,139 +177,6 @@ class TwelveLabsAPISearchProvider(ProviderPlusStoreSearchProvider):
     def execute_store_search(
         self, embeddings: List[float], query: SearchQuery
     ) -> SearchResult:
-        """Execute search against the configured vector store (OpenSearch or S3 Vectors)"""
-        # Route to appropriate store based on configuration
-        store_type = self.config.store or "opensearch"
-
-        if store_type == "s3_vectors":
-            return self._execute_s3_vector_search(embeddings, query)
-        else:
-            return self._execute_opensearch_search(embeddings, query)
-
-    def _execute_s3_vector_search(
-        self, embeddings: List[float], query: SearchQuery
-    ) -> SearchResult:
-        """Execute search against S3 Vectors"""
-        try:
-            from s3_vector_embedding_store import S3VectorEmbeddingStore
-
-            self.logger.info("Executing TwelveLabs API semantic query via S3 Vectors")
-
-            # Create S3 Vector store instance
-            s3_vector_store = S3VectorEmbeddingStore(self.logger, self.metrics)
-
-            # Create params-like object that S3VectorEmbeddingStore expects
-            class MockParams:
-                def __init__(self, query_obj):
-                    self.q = query_obj.query_text
-                    self.pageSize = query_obj.page_size
-                    self.page = (query_obj.page_offset // query_obj.page_size) + 1
-                    # Add filter parameters if present
-                    self.type = None
-                    self.extension = None
-                    self.asset_size_gte = None
-                    self.asset_size_lte = None
-                    self.ingested_date_gte = None
-                    self.ingested_date_lte = None
-
-                    # Extract filters from SearchQuery
-                    if query_obj.filters:
-                        for filter_item in query_obj.filters:
-                            key = filter_item.get("key")
-                            value = filter_item.get("value")
-                            if key == "mediaType" and isinstance(value, list):
-                                self.type = ",".join(value)
-                            elif (
-                                key == "DigitalSourceAsset.MainRepresentation.Format"
-                                and isinstance(value, list)
-                            ):
-                                self.extension = ",".join(value)
-
-            params = MockParams(query)
-
-            # Build semantic query - let S3VectorEmbeddingStore generate embeddings internally
-            # But we already have embeddings, so we need to override them
-            semantic_query = s3_vector_store.build_semantic_query(
-                params, allowed_embedding_types=self.get_allowed_clip_embedding_types()
-            )
-
-            # Override the embedding with our API-generated one
-            semantic_query["embedding"] = embeddings
-
-            # Execute search
-            search_start = time.time()
-            store_result = s3_vector_store.execute_search(semantic_query, params)
-            search_time = time.time() - search_start
-
-            self.logger.info(
-                f"[PERF] S3 Vector search execution took: {search_time:.3f}s"
-            )
-            self.logger.info(
-                f"S3 Vector search returned {len(store_result.hits)} results"
-            )
-
-            # Convert BaseEmbeddingStore SearchResult to unified SearchResult
-            from unified_search_models import MediaType, SearchHit
-
-            search_hits = []
-            for hit in store_result.hits:
-                # Determine media type from source data
-                asset_type = (
-                    hit.get("_source", {})
-                    .get("DigitalSourceAsset", {})
-                    .get("Type", "video")
-                )
-                try:
-                    media_type = MediaType(asset_type.lower())
-                except ValueError:
-                    media_type = MediaType.VIDEO
-
-                # Get source data and preserve clips if they exist
-                source_data = hit.get("_source", {}).copy()
-                if "clips" in hit:
-                    source_data["clips"] = hit["clips"]
-
-                search_hit = SearchHit(
-                    asset_id=source_data.get("InventoryID", ""),
-                    score=hit.get("_score", 0.0),
-                    source=source_data,
-                    media_type=media_type,
-                    provider_metadata={
-                        "provider": "twelvelabs_api",
-                        "store": "s3_vectors",
-                        "embedding_model": "Marengo-retrieval-2.7",
-                    },
-                )
-                search_hits.append(search_hit)
-
-            return SearchResult(
-                hits=search_hits,
-                total_results=store_result.total_results,
-                max_score=max([h.score for h in search_hits]) if search_hits else 0.0,
-                took_ms=int(search_time * 1000),
-                provider="twelvelabs_api",
-                architecture_type=SearchArchitectureType.PROVIDER_PLUS_STORE,
-                provider_location=ProviderLocation.EXTERNAL,
-            )
-        except Exception as e:
-            self.logger.error(f"S3 Vector search failed: {str(e)}")
-            import traceback
-
-            self.logger.error(traceback.format_exc())
-            # Return empty result on failure
-            return SearchResult(
-                hits=[],
-                total_results=0,
-                max_score=0.0,
-                took_ms=0,
-                provider="twelvelabs_api",
-                architecture_type=SearchArchitectureType.PROVIDER_PLUS_STORE,
-                provider_location=ProviderLocation.EXTERNAL,
-            )
-
-    def _execute_opensearch_search(
-        self, embeddings: List[float], query: SearchQuery
-    ) -> SearchResult:
         """Execute search against OpenSearch using the generated embeddings"""
         try:
             client = self._get_opensearch_client()
@@ -390,34 +233,6 @@ class TwelveLabsAPISearchProvider(ProviderPlusStoreSearchProvider):
             self.logger.info(
                 f"Processed {len(hits)} hits into {len(processed_results)} parent assets with clips"
             )
-
-            # Filter clips based on allowed embedding types (post-processing)
-            allowed_types = self.get_allowed_clip_embedding_types()
-            filtered_results = []
-            total_clips_before = 0
-            total_clips_after = 0
-
-            for result in processed_results:
-                clips = result.get("clips", [])
-                total_clips_before += len(clips)
-
-                # Filter clips to only include allowed embedding types
-                filtered_clips = [
-                    clip
-                    for clip in clips
-                    if clip.get("embedding_option") in allowed_types
-                ]
-                total_clips_after += len(filtered_clips)
-
-                result["clips"] = filtered_clips
-                filtered_results.append(result)
-
-            self.logger.info(
-                f"Filtered clips from {total_clips_before} to {total_clips_after} "
-                f"(kept only {allowed_types})"
-            )
-
-            processed_results = filtered_results
 
             # Convert processed results to SearchHit format
             search_hits = []

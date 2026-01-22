@@ -163,8 +163,8 @@ class ApiGatewayIntegrationsConstruct(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        # /integrations/{id} - Variable path for specific integrations
-        integration_id_resource = integrations_resource.add_resource("{id}")
+        # /integrations/{integration_id} - Variable path for specific integrations
+        integration_id_resource = integrations_resource.add_resource("{integration_id}")
 
         # Add ANY method to /integrations/{integration_id}
         integration_id_method = integration_id_resource.add_method(

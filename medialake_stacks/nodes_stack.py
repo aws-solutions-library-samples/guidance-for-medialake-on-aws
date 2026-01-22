@@ -545,11 +545,8 @@ class NodesStack(cdk.NestedStack):
             self,
             "MediaConvertProxyRole",
             assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
-            role_name=f"{config.resource_prefix}-MediaConvert-Proxy-Role-{config.environment}",
-            description="IAM role for MediaConvert video transcoding service with least-privilege S3 and KMS access",
-            max_session_duration=cdk.Duration.hours(
-                12
-            ),  # Allow long-running transcoding jobs
+            role_name=f"{config.resource_prefix}_MediaConvert_Proxy_Role",
+            description="IAM role for MediaConvert",
         )
 
         # S3 permissions for reading source files and writing outputs

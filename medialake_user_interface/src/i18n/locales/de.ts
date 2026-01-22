@@ -713,7 +713,6 @@ export default {
         saveError: "Fehler beim Speichern der Einstellungen",
         cancelSuccess: "Änderungen abgebrochen",
         errorLoading: "Fehler beim Laden der Suchanbieter-Konfiguration",
-        preview: "Vorschau",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -968,7 +967,6 @@ export default {
       connectToExistingS3Bucket: "Connect to an existing S3 bucket",
       createNewS3Bucket: "Erstellen a new S3 bucket",
     },
-    delete: "Löschen",
     deleteApiKeyConfirmation:
       'Are you sure you want to delete the API key "{{name}}"? This action cannot be undone and will immediately invalidate any applications using this key.',
     deleteApiKeyConfirmationGeneric: "Are you sure you want to delete this API key?",

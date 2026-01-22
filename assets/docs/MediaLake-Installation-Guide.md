@@ -135,29 +135,21 @@ After deployment, you'll need to configure storage connectors to connect media l
   - Media lake supports two architectural patterns for semantic search:
 
   **1. Provider + Store Architecture (TwelveLabs)**
-
   - Uses an AI provider to generate embeddings, which are then stored in an embedding store
   - **Embedding Store Options**:
     - **OpenSearch**: Recommended for production deployments due to enhanced reliability and performance
     - **S3 Vectors**: Cost-effective option, currently in preview mode
   - **TwelveLabs Integration Methods**:
-    - **TwelveLabs API**: Direct integration with TwelveLabs API (requires TwelveLabs API key - **integration configuration required**)
-    - **TwelveLabs via AWS Bedrock**: Uses TwelveLabs Marengo 2.7 model through AWS Bedrock with automatic regional inference profile selection. Supports US, EU, and APAC regions with optimal performance routing. For current region availability, see [AWS Bedrock Models Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html). (**No integration configuration required** - uses IAM role permissions)
+    - **TwelveLabs API**: Direct integration with TwelveLabs API (requires TwelveLabs API key)
+    - **TwelveLabs via AWS Bedrock**: Uses TwelveLabs Marengo 2.7 model through AWS Bedrock with automatic regional inference profile selection. Supports US, EU, and APAC regions with optimal performance routing. For current region availability, see [AWS Bedrock Models Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html).
 
   **2. External Semantic Service Architecture (Coactive)**
-
   - Uses an external service that manages both embedding generation and storage
   - Media assets are ingested directly into the external service's platform
   - Search queries are executed against the external service, with results enriched by MediaLake metadata
-  - **Coactive Integration**: Direct integration with Coactive API for multimodal search capabilities (requires Coactive API key - **integration configuration required**)
+  - **Coactive Integration**: Direct integration with Coactive API for multimodal search capabilities (requires Coactive API key)
 
-- **When to Configure Integrations**:
-
-  - Integrations provide secure credential storage for pipeline nodes requiring external API access
-  - **Configure integrations before importing dependent pipelines**
-  - Navigate to **Settings > Integrations** to add required integrations
-  - **Integration required for**: TwelveLabs API pipelines, Coactive pipelines
-  - **No integration required for**: TwelveLabs Bedrock pipelines, Default pipelines, Transcription pipelines, and others
+  - Add and configure your preferred semantic search provider integration method.
 
 - **Import Processing Pipelines**:
 
@@ -168,7 +160,6 @@ After deployment, you'll need to configure storage connectors to connect media l
     **Semantic Search Pipelines:**
 
     _TwelveLabs API-based Pipelines (Provider + Store Architecture):_
-
     - [`TwelveLabs API Audio Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs API
     - [`TwelveLabs API Video Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs API
     - [`TwelveLabs API Image Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/OpenSearch/TwelveLabs%20API%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs API
@@ -177,7 +168,6 @@ After deployment, you'll need to configure storage connectors to connect media l
     - [`TwelveLabs API Image Embedding to S3 Vectors.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/API/S3%20Vectors/TwelveLabs%20API%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs API
 
     _TwelveLabs Bedrock-based Pipelines (Provider + Store Architecture):_
-
     - [`TwelveLabs Bedrock Audio Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Audio%20Embedding%20to%20OpenSearch.json) - Generate audio embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
     - [`TwelveLabs Bedrock Video Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Video%20Embedding%20to%20OpenSearch.json) - Generate video embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
     - [`TwelveLabs Bedrock Image Embedding to OpenSearch.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20OpenSearch.json) - Generate image embeddings for semantic search using TwelveLabs Marengo 2.7 on Bedrock
@@ -186,12 +176,10 @@ After deployment, you'll need to configure storage connectors to connect media l
     - [`TwelveLabs Bedrock Image Embedding to S3 Vectors.json`](../../pipeline_library/Semantic%20Search/TwelveLabs/Bedrock/S3%20Vectors/TwelveLabs%20Bedrock%20Image%20Embedding%20to%20S3%20Vectors.json) - Generate image embeddings for S3 Vectors using TwelveLabs Marengo 2.7 on Bedrock
 
     _Coactive Pipelines (External Semantic Service Architecture):_
-
     - [`Coactive API Image Ingestion Pipeline.json`](../../pipeline_library/Semantic%20Search/Coactive/Coactive%20API%20Image%20Ingestion%20Pipeline.json) - Ingest and index images for multimodal search using Coactive API
     - [`Coactive API Video Ingestion Pipeline.json`](../../pipeline_library/Semantic%20Search/Coactive/Coactive%20API%20Video%20Ingestion%20Pipeline.json) - Ingest and index videos for multimodal search using Coactive API
 
     **Enrichment Pipelines:**
-
     - [`TwelveLabs Pegasus Bedrock Video Enrichment.json`](../../pipeline_library/Enrichment/TwelveLabs%20Pegasus%20Bedrock%20Video%20Enrichment.json) - Enrich video content with AI-generated metadata using TwelveLabs Pegasus on Bedrock
 
     **Transcription Pipelines:**

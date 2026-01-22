@@ -709,7 +709,6 @@ export default {
         saveError: "विन्यास सहेजने में विफल",
         cancelSuccess: "परिवर्तन रद्द किए गए",
         errorLoading: "खोज प्रदाता विन्यास लोड करने में त्रुटि",
-        preview: "पूर्वावलोकन",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -824,7 +823,6 @@ export default {
     browsePipelines: "सभी उपलब्ध पाइपलाइन ब्राउज़ करें",
     loadMoreActivities: "अधिक गतिविधियां लोड करें",
     permissions: "अनुमतियाँ",
-    delete: "हटाएँ",
     root: "रूट",
     folder: "फ़ोल्डर",
     actions: {

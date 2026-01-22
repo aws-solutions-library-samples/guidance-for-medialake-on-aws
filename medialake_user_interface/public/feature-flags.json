@@ -5,6 +5,18 @@
   "chat-enabled": {
     "value": false
   },
+  "file-upload-enabled": {
+    "value": false
+  },
+  "notification-enabled": {
+    "value": true
+  },
+  "search-multi-select-enabled": {
+    "value": true
+  },
+  "user-favorites-enabled": {
+    "value": false
+  },
   "manual-pipeline-trigger-enabled": {
     "value": false
   },

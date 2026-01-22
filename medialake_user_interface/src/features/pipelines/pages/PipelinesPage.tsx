@@ -14,7 +14,10 @@ import {
   // alpha,
   // IconButton,
 } from "@mui/material";
-import { Add as AddIcon, FileUpload as FileUploadIcon } from "@mui/icons-material";
+import {
+  Add as AddIcon,
+  FileUpload as FileUploadIcon,
+} from "@mui/icons-material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -361,13 +364,7 @@ const PipelinesPage: React.FC = () => {
         description={t("pipelines.description")}
         action={
           <>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: { xs: 1, md: 3.5 },
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 3.5 }}>
               <RefreshButton
                 onRefresh={handleRefresh}
                 isRefreshing={isRefreshing}

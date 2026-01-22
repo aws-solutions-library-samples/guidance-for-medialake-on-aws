@@ -220,7 +220,7 @@ export const useSemanticSearchSettings = () => {
 
   // Handle provider type change
   const handleProviderTypeChange = async (
-    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive"
+    providerType: "none" | "twelvelabs-api" | "twelvelabs-bedrock" | "coactive",
   ) => {
     if (providerType === "none") {
       // Reset to no provider
@@ -413,7 +413,10 @@ export const useSemanticSearchSettings = () => {
       const currentProviderType = settings.current.provider.type;
 
       let providerConfig: SearchProvider;
-      let providerTypeForState: "twelvelabs-api" | "twelvelabs-bedrock" | "coactive";
+      let providerTypeForState:
+        | "twelvelabs-api"
+        | "twelvelabs-bedrock"
+        | "coactive";
 
       if (currentProviderType === "coactive") {
         providerConfig = {
@@ -433,7 +436,8 @@ export const useSemanticSearchSettings = () => {
           name: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name,
           type: "twelvelabs-api", // API key dialog is only for API providers
           apiKey: apiKeyInput,
-          endpoint: SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
+          endpoint:
+            SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.defaultEndpoint,
           isConfigured: true,
           isEnabled: true,
         };
@@ -461,7 +465,8 @@ export const useSemanticSearchSettings = () => {
       // Save to API immediately with the new API key
       // Check if there's already a provider configured (any provider)
       const hasExistingProvider =
-        settings.original.provider.config?.isConfigured || settings.original.provider.config?.id;
+        settings.original.provider.config?.isConfigured ||
+        settings.original.provider.config?.id;
 
       if (hasExistingProvider) {
         // Update existing provider (supports type switching now)
@@ -513,7 +518,8 @@ export const useSemanticSearchSettings = () => {
 
       if (
         current.provider.config &&
-        (current.provider.type === "twelvelabs-api" || current.provider.type === "coactive")
+        (current.provider.type === "twelvelabs-api" ||
+          current.provider.type === "coactive")
       ) {
         if (providerExists) {
           // Update existing provider

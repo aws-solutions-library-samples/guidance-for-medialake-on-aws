@@ -701,7 +701,6 @@ export default {
         saveError: "שמירת התצורה נכשלה",
         cancelSuccess: "השינויים בוטלו",
         errorLoading: "שגיאה בטעינת תצורת ספק החיפוש",
-        preview: "תצוגה מקדימה",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -797,7 +796,6 @@ export default {
     clip: "קליפ",
     none: "אין",
     permissions: "הרשאות",
-    delete: "מחק",
     root: "שורש",
     folder: "תיקייה",
     actions: {

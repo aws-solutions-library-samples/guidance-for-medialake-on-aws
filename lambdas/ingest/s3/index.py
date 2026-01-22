@@ -21,6 +21,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
+from external_service_manager import MediaLakeExternalServiceManager
 
 # Import centralized file extension constants from common_libraries layer
 from file_extensions import SUPPORTED_EXTENSIONS
@@ -448,6 +449,9 @@ class AssetProcessor:
 
         _session = boto3.Session()
         self._credentials = _session.get_credentials()
+
+        # Initialize external service manager for handling Coactive and other external services
+        self.external_service_manager = MediaLakeExternalServiceManager(logger, metrics)
 
     def _signed_request(
         self, method: str, url: str, payload: dict | None = None, timeout: int = 60
@@ -1793,6 +1797,44 @@ class AssetProcessor:
                 asset_data = response["Items"][0]
                 inventory_id = asset_data["InventoryID"]
                 logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
+
+                # Delete all associated S3 files BEFORE deleting DynamoDB record
+                self._delete_associated_s3_files(asset_record, bucket, key)
+
+                # Delete from DynamoDB
+                self.dynamodb.delete_item(Key={"InventoryID": inventory_id})
+                metrics.add_metric(
+                    name="AssetDeletionProcessed", unit=MetricUnit.Count, value=1
+                )
+
+                # Delete associated OpenSearch docs
+                self.delete_opensearch_docs(inventory_id)
+
+                # Delete S3 vectors
+                vector_count = self.delete_s3_vectors(inventory_id)
+                logger.info(f"Deleted {vector_count} vectors for asset {inventory_id}")
+
+                # Delete from external services (e.g., Coactive)
+                try:
+                    external_results = self.external_service_manager.delete_asset_from_external_services(
+                        asset_record, inventory_id
+                    )
+                    if external_results:
+                        logger.info(
+                            f"External service deletion results for {inventory_id}: {external_results}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to delete asset from external services: {str(e)}"
+                    )
+                    # Don't fail the entire deletion if external service deletion fails
+
+                # Publish deletion event
+                self.publish_deletion_event(inventory_id)
+
+                logger.info(
+                    f"Successfully deleted asset {inventory_id} and all associated files"
+                )
 
             else:
                 # For deletion events, skip trying to find by tags as the object is gone

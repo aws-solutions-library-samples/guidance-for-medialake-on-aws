@@ -562,10 +562,10 @@ class FFProbeLayer(Construct):
     # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
     # The combined size of FFProbe + PyMediaInfo + Powertools + CommonLibraries layers
     # must stay under 250MB. Using 'latest' can cause builds to exceed this limit.
-    # Version: autobuild-2025-11-30-12-53 (131MB compressed)
-    FFMPEG_VERSION = "autobuild-2025-11-30-12-53"
-    FFMPEG_FILENAME = "ffmpeg-N-121938-g2456a39581-linux64-gpl.tar.xz"
-    FFMPEG_SHA256 = "fec46f7984352b988bda79be0521964a5148fecf7aa13db4e18a4383aa88e87f"  # pragma: allowlist secret
+    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
+    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
+    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
+    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
 
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
@@ -631,10 +631,10 @@ class FFmpegLayer(Construct):
     # Pin to a specific FFmpeg build version to avoid Lambda layer size limit issues.
     # The combined size of FFmpeg + other layers must stay under 250MB.
     # Using 'latest' can cause builds to exceed this limit as FFmpeg grows.
-    # Version: autobuild-2025-11-30-12-53 (131MB compressed)
-    FFMPEG_VERSION = "autobuild-2025-11-30-12-53"
-    FFMPEG_FILENAME = "ffmpeg-N-121938-g2456a39581-linux64-gpl.tar.xz"
-    FFMPEG_SHA256 = "fec46f7984352b988bda79be0521964a5148fecf7aa13db4e18a4383aa88e87f"  # pragma: allowlist secret
+    # Version: autobuild-2025-12-30-12-55 (131MB compressed)
+    FFMPEG_VERSION = "autobuild-2025-12-30-12-55"
+    FFMPEG_FILENAME = "ffmpeg-N-122292-gee2eb6ced8-linux64-gpl.tar.xz"
+    FFMPEG_SHA256 = "743350f5b5fc489c727e7fbf0654d2c787841e743fef8d012b505e02ba4fd548"  # pragma: allowlist secret
 
     def __init__(self, scope: Construct, id: str, **kwargs):
         """

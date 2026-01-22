@@ -669,7 +669,6 @@ export default {
         saveError: "Échec de l'enregistrement des paramètres",
         cancelSuccess: "Modifications annulées",
         errorLoading: "Erreur lors du chargement de la configuration du fournisseur de recherche",
-        preview: "Aperçu",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",
@@ -756,7 +755,6 @@ export default {
     textFilter: "Filtre textuel",
     all: "Tous",
     filter: "Filtrer",
-    delete: "Supprimer",
     validation: {
       apiKeyRequired: "La clé API est requise",
       integrationMustBeSelected: "Une intégration doit être sélectionnée",

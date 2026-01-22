@@ -24,10 +24,13 @@ def translate_event_to_request(event):
         # Where to write it
         output_bucket = event.get("output_bucket", "")
 
-        # mirror source bucket + path (without extension)
-        # strip extension, leave off suffix and extension
+        # mirror source bucket + path (without extension), include original extension
+        # to prevent naming collisions (e.g., audio.mp3 vs audio.wav)
         base = input_key.rsplit(".", 1)[0]
-        output_key = f"{input_bucket}/{base}"  # e.g. "my-source-bucket/path/to/file"
+        orig_ext = (
+            input_key.rsplit(".", 1)[1].lower() if "." in input_key else "unknown"
+        )
+        output_key = f"{input_bucket}/{base}-{orig_ext}"  # e.g. "my-source-bucket/path/to/file-mp3"
 
         # Role + queue ARNs
         mediaconvert_role_arn = event.get(

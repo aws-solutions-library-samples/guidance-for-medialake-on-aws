@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next";
 import { Button, Box, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import ConnectorCard from "@/features/settings/connectors/components/ConnectorCard";
@@ -145,13 +144,19 @@ const ConnectorsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box
+      sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}
+    >
       <PageHeader
-        title={t("connectors.title")}
-        description={t("connectors.description")}
+        title="Connectors"
+        description="Manage storage connectors for your media assets"
         action={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddClick}>
-            {t("connectors.addConnector")}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+          >
+            Add Connector
           </Button>
         }
       />

@@ -80,6 +80,10 @@ export const test = cognitoBase.extend<AuthFixtures>({
         .getByRole("textbox", { name: "Email" })
         .waitFor({ state: "visible", timeout: 10000 });
 
+      await page
+        .getByRole("textbox", { name: "Email" })
+        .waitFor({ state: "visible", timeout: 10000 });
+
       await page.getByRole("textbox", { name: "Email" }).fill(cognitoTestUser.username);
       await page.getByRole("textbox", { name: "Password" }).fill(cognitoTestUser.password);
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -212,6 +216,10 @@ export const test = cognitoBase.extend<AuthFixtures>({
       await page.goto(loginUrl, { waitUntil: "domcontentloaded" });
 
       // Wait for login form to be visible before interacting
+      await page
+        .getByRole("textbox", { name: "Email" })
+        .waitFor({ state: "visible", timeout: 10000 });
+
       await page
         .getByRole("textbox", { name: "Email" })
         .waitFor({ state: "visible", timeout: 10000 });
