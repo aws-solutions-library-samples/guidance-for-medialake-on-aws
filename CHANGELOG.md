@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
 ## [1.6.0] - 2026-01-21
 
 ### Features
