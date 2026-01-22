@@ -12,14 +12,12 @@ def get_secret_value(secret_arn: str) -> Dict[str, Any]:
     Retrieve secret value from AWS Secrets Manager
     """
     try:
-        print(f"Attempting to retrieve secret from ARN: {secret_arn}")
+        print(f"Attempting to retrieve secret from ARN")
         secrets_client = boto3.client("secretsmanager")
         response = secrets_client.get_secret_value(SecretId=secret_arn)
         print(f"Successfully retrieved secret from Secrets Manager")
 
         secret_string = response.get("SecretString", "")
-        print(f"Secret string length: {len(secret_string)}")
-        print(f"Secret string preview: {secret_string[:100]}...")
 
         if not secret_string.strip():
             raise ValueError("Secret string is empty")
@@ -32,11 +30,11 @@ def get_secret_value(secret_arn: str) -> Dict[str, Any]:
             print("Secret is not JSON format, treating as plain text personal token")
             return {"personal_token": secret_string.strip()}
     except json.JSONDecodeError as e:
-        error_msg = f"Failed to parse secret JSON from {secret_arn}: {str(e)}. Secret content: {secret_string[:200]}"
+        error_msg = f"Failed to parse secret JSON: {str(e)}."
         print(f"ERROR: {error_msg}")
         raise RuntimeError(error_msg)
     except Exception as e:
-        error_msg = f"Failed to retrieve secret from {secret_arn}: {str(e)}"
+        error_msg = f"Failed to retrieve secret: {str(e)}"
         print(f"ERROR: {error_msg}")
         raise RuntimeError(error_msg)
 
@@ -52,8 +50,6 @@ def get_coactive_access_token() -> str:
         error_msg = "API_KEY_SECRET_ARN environment variable not set"
         print(f"ERROR: {error_msg}")
         raise RuntimeError(error_msg)
-
-    print(f"Using secret ARN: {secret_arn}")
 
     # Retrieve credentials from Secrets Manager
     try:
@@ -88,7 +84,6 @@ def get_coactive_access_token() -> str:
     else:
         error_msg = "Secret must contain either 'personal_token' or both 'client_id' and 'client_secret'"
         print(f"ERROR: {error_msg}")
-        print(f"Available keys in secret: {list(secret_data.keys())}")
         raise RuntimeError(error_msg)
 
     try:

@@ -333,7 +333,7 @@
         },
         "data": {
           "nodeId": "conditional",
-          "label": "Conditional (conditional) (conditional) (conditional)",
+          "label": "Conditional (conditional)",
           "description": "This step will branch the workflow into two paths based on a boolean condition evaluation",
           "icon": {
             "key": null,

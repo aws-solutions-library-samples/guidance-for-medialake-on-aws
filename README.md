@@ -414,9 +414,13 @@ Use the emailed credentials and link to log in to the media lake UI.
   - **Provider + Store Architecture** (TwelveLabs): AI provider generates embeddings stored in OpenSearch or S3 Vectors
   - **External Semantic Service Architecture** (Coactive): External service manages both embedding generation and storage
 - **Embedding Store Options** (for Provider + Store Architecture): OpenSearch (recommended for production) or S3 Vectors (cost-effective, preview mode)
+  - **S3 Vectors Preview Note**: As S3 Vectors is currently in preview, queries return a maximum of 30 vectors per request (topK=30), meaning each search will return up to 30 results.
 - **Supported Providers**:
   - **TwelveLabs**: Via direct API or AWS Bedrock integration
   - **Coactive**: Direct API integration for multimodal search
+- **Integration Configuration**: Integrations provide secure credential storage for pipelines requiring external API access. Configure integrations in **Settings > Integrations** before importing dependent pipelines:
+  - **Required for**: TwelveLabs API pipelines, Coactive pipelines
+  - **Not required for**: TwelveLabs Bedrock pipelines (uses IAM role permissions) and others
 - Import pipelines for semantic search, enrichment, and transcription.
 
 ### 4. **Ingest Media**

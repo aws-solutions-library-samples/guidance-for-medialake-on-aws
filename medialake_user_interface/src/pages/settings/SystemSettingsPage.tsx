@@ -539,9 +539,6 @@ const SystemSettingsPage: React.FC = () => {
                               </Typography>
                             </Box>
                           </MenuItem>
-                          <MenuItem value="coactive">
-                            {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
-                          </MenuItem>
                         </Select>
                       </FormControl>
                       {(settings.provider.type === "twelvelabs-api" ||
@@ -574,11 +571,7 @@ const SystemSettingsPage: React.FC = () => {
                   sx={{
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
-                    opacity:
-                      settings.isEnabled &&
-                      settings.provider.type !== "coactive"
-                        ? 1
-                        : 0.5,
+                    opacity: settings.isEnabled && settings.provider.type !== "coactive" ? 1 : 0.5,
                   }}
                 >
                   <CardContent>
@@ -588,56 +581,40 @@ const SystemSettingsPage: React.FC = () => {
                         "Semantic Search Embedding Store"
                       )}
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 3 }}
-                    >
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                       {settings.provider.type === "coactive"
                         ? t(
                             "settings.systemSettings.search.embeddingStoreCoactiveDesc",
-                            "Coactive AI uses its own external search service and does not require an embedding store configuration.",
+                            "Coactive AI uses its own external search service and does not require an embedding store configuration."
                           )
                         : t(
                             "settings.systemSettings.search.embeddingStoreDesc",
-                            "Choose where to store and search vector embeddings",
+                            "Choose where to store and search vector embeddings"
                           )}
                     </Typography>
 
                     {settings.provider.type !== "coactive" ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                      >
-                        <FormControl
-                          sx={{ minWidth: 200 }}
-                          disabled={!settings.isEnabled}
-                        >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
                           <InputLabel>
-                            {t(
-                              "settings.systemSettings.search.selectStore",
-                              "Select Store",
-                            )}
+                            {t("settings.systemSettings.search.selectStore", "Select Store")}
                           </InputLabel>
                           <Select
                             value={settings.embeddingStore.type}
-                            label="Select Store"
+                            label={t("settings.systemSettings.search.selectStore", "Select Store")}
                             onChange={(e) =>
                               handleEmbeddingStoreChange(
-                                e.target.value as "opensearch" | "s3-vector",
+                                e.target.value as "opensearch" | "s3-vector"
                               )
                             }
                           >
                             <MenuItem value="opensearch">
-                              {
-                                SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
-                                  .OPENSEARCH.name
-                              }
+                              {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
                             </MenuItem>
                             <MenuItem value="s3-vector">
-                              {
-                                SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES
-                                  .S3_VECTOR.name
-                              }
+                              <Typography>
+                                {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                              </Typography>
                             </MenuItem>
                           </Select>
                         </FormControl>
@@ -647,26 +624,18 @@ const SystemSettingsPage: React.FC = () => {
                           onClick={handleSaveEmbeddingStoreSettings}
                           disabled={!settings.isEnabled || isSaving}
                           startIcon={
-                            isSaving ? (
-                              <CircularProgress size={16} />
-                            ) : (
-                              <CheckCircleIcon />
-                            )
+                            isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />
                           }
                         >
-                          {isSaving
-                            ? t("common.saving", "Saving...")
-                            : t("common.save", "Save")}
+                          {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save")}
                         </Button>
                       </Box>
                     ) : (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                      >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                         <Chip
                           label={t(
                             "settings.systemSettings.search.externalService",
-                            "External Service",
+                            "External Service"
                           )}
                           color="info"
                           variant="outlined"

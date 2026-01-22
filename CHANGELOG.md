@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.6.3] - 2026-01-22
+
+### Bug Fixes
+
+- fix: update to localization files to remove duplicate keys
+
+## [1.6.2] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
+## [1.6.1] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
+## [1.6.0] - 2026-01-21
+
+### Features
+
+- feat: Initial implementation of collection sharing
+
+## [1.5.0] - 2026-01-16
+
+### Features
+
+- feat: add EXR support with OpenEXR 3.4.4
+
+### Bug Fixes
+
+- fix: use cp -rL instead of cp -au for Docker bundling compatibility
+- fix: preserve assets when downloading external payloads in middleware
+
+### Refactors
+
+- refactor: migrate S3 Vector to native CDK constructs and leverage GA improvements
+
+## [1.4.1] - 2026-01-20
+
+- fix: update FFmpeg version to autobuild-2025-11-30-12-53
+
 ## [1.4.0] - 2026-01-05
 
 ### Features

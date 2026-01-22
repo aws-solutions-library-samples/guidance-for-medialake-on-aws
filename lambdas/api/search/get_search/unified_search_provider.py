@@ -104,6 +104,16 @@ class ProviderPlusStoreSearchProvider(BaseSearchProvider):
     ) -> SearchResult:
         """Execute search against the embedding store"""
 
+    @abstractmethod
+    def get_allowed_clip_embedding_types(self) -> List[str]:
+        """
+        Get the list of embedding types that should be included in clips for timeline display.
+        This is model-specific as different models return different embedding types.
+
+        Returns:
+            List of embedding type strings (e.g., ["visual-text"])
+        """
+
 
 class ExternalSemanticServiceProvider(BaseSearchProvider):
     """Base class for external semantic service architecture (Coactive)"""

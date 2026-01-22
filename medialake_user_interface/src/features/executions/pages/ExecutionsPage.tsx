@@ -52,8 +52,7 @@ const ExecutionsPage: React.FC = () => {
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
-  const [selectedExecution, setSelectedExecution] =
-    useState<PipelineExecution | null>(null);
+  const [selectedExecution, setSelectedExecution] = useState<PipelineExecution | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Retry mutations

@@ -80,9 +80,7 @@ function generateSecurePassword(passwordPolicy?: any): string {
 
   // Fill to target length (1.5x minimum length)
   while (password.length < targetLength) {
-    password += availableChars.charAt(
-      Math.floor(Math.random() * availableChars.length),
-    );
+    password += availableChars.charAt(Math.floor(Math.random() * availableChars.length));
   }
 
   // Shuffle the password to randomize character positions
@@ -174,32 +172,23 @@ function getUserPoolPasswordPolicy(userPoolId: string): any {
 function verifySuperAdminGroupExists(userPoolId: string): boolean {
   try {
     console.log(
-      `[Cognito Fixture] Verifying superAdministrators group exists in user pool: ${userPoolId}`,
+      `[Cognito Fixture] Verifying superAdministrators group exists in user pool: ${userPoolId}`
     );
-    const groupsOutput = executeAwsCommand(
-      `cognito-idp list-groups --user-pool-id ${userPoolId}`,
-    );
+    const groupsOutput = executeAwsCommand(`cognito-idp list-groups --user-pool-id ${userPoolId}`);
     const groupsData = JSON.parse(groupsOutput);
     const groups = groupsData.Groups || [];
 
-    const superAdminGroup = groups.find(
-      (group: any) => group.GroupName === "superAdministrators",
-    );
+    const superAdminGroup = groups.find((group: any) => group.GroupName === "superAdministrators");
 
     if (superAdminGroup) {
       console.log(`[Cognito Fixture] Found superAdministrators group`);
       return true;
     } else {
-      console.warn(
-        `[Cognito Fixture] superAdministrators group not found in user pool`,
-      );
+      console.warn(`[Cognito Fixture] superAdministrators group not found in user pool`);
       return false;
     }
   } catch (error) {
-    console.error(
-      "[Cognito Fixture] Error verifying superAdministrators group:",
-      error,
-    );
+    console.error("[Cognito Fixture] Error verifying superAdministrators group:", error);
     return false;
   }
 }
@@ -231,18 +220,14 @@ function createTestUser(
     if (verifySuperAdminGroupExists(userPoolId)) {
       const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
       executeAwsCommand(addToGroupCommand);
-      console.log(
-        `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
-      );
+      console.log(`[Cognito Fixture] Test user added to superAdministrators group: ${username}`);
     } else {
       console.warn(
-        `[Cognito Fixture] Could not add user to superAdministrators group - group not found`,
+        `[Cognito Fixture] Could not add user to superAdministrators group - group not found`
       );
     }
 
-    console.log(
-      `[Cognito Fixture] Test user created successfully: ${username}`,
-    );
+    console.log(`[Cognito Fixture] Test user created successfully: ${username}`);
   } catch (error: any) {
     if (error.message.includes("UsernameExistsException")) {
       console.log(`[Cognito Fixture] User ${username} already exists, updating password...`);
@@ -257,7 +242,7 @@ function createTestUser(
             const addToGroupCommand = `cognito-idp admin-add-user-to-group --user-pool-id ${userPoolId} --username "${username}" --group-name superAdministrators`;
             executeAwsCommand(addToGroupCommand);
             console.log(
-              `[Cognito Fixture] Test user added to superAdministrators group: ${username}`,
+              `[Cognito Fixture] Test user added to superAdministrators group: ${username}`
             );
           } catch (groupError: any) {
             // Ignore if user is already in the group
@@ -267,15 +252,13 @@ function createTestUser(
             ) {
               console.warn(
                 `[Cognito Fixture] Warning: Could not add user to group:`,
-                groupError.message,
+                groupError.message
               );
             }
           }
         }
 
-        console.log(
-          `[Cognito Fixture] Updated password for existing user: ${username}`,
-        );
+        console.log(`[Cognito Fixture] Updated password for existing user: ${username}`);
       } catch (updateError) {
         console.error("[Cognito Fixture] Error updating existing user password:", updateError);
         throw updateError;

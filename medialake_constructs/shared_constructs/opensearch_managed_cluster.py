@@ -128,6 +128,21 @@ class OpenSearchCluster(Construct):
                 allow_all_outbound=False,
             )
 
+            # Add explicit egress rules for OpenSearch
+            # Allow HTTPS egress to VPC CIDR for node-to-node communication
+            os_security_group.add_egress_rule(
+                peer=ec2.Peer.ipv4(props.vpc.vpc_cidr_block),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS egress within VPC for cluster communication",
+            )
+
+            # Allow HTTPS egress for AWS services (CloudWatch Logs, S3 snapshots)
+            os_security_group.add_egress_rule(
+                peer=ec2.Peer.any_ipv4(),
+                connection=ec2.Port.tcp(443),
+                description="Allow HTTPS egress for AWS services",
+            )
+
         os_security_group.add_ingress_rule(
             peer=ec2.Peer.security_group_id(props.security_group.security_group_id),
             connection=ec2.Port.tcp(443),

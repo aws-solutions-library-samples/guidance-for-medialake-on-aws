@@ -517,6 +517,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             "PipelineCreationStateMachineLogGroup",
             log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator",
             retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create the state machine with logging enabled
