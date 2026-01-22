@@ -14,6 +14,7 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 from lambda_middleware import lambda_middleware
+from nodes_utils import generate_derived_filename
 from PIL import ExifTags, Image
 
 logger = Logger()
@@ -285,7 +286,7 @@ def lambda_handler(event, context: LambdaContext):
     out_bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME") or _raise(
         "MEDIA_ASSETS_BUCKET_NAME env-var missing"
     )
-    out_key = f"{bucket}/{key.rsplit('.', 1)[0]}_thumbnail.{ext}"
+    out_key = f"{bucket}/{generate_derived_filename(key, 'thumbnail', ext)}"
 
     try:
         s3.delete_object(Bucket=out_bucket, Key=out_key)
