@@ -1339,6 +1339,7 @@ export default {
       expand: "展开",
       refresh: "刷新",
       remove: "移除",
+      configure: "配置",
     },
     widgetSelector: {
       title: "添加小部件",

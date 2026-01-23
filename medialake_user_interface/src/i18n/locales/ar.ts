@@ -1340,6 +1340,7 @@ export default {
       expand: "توسيع",
       refresh: "تحديث",
       remove: "إزالة",
+      configure: "تكوين",
     },
     widgetSelector: {
       title: "إضافة عنصر واجهة",

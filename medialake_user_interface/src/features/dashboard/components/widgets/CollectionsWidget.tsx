@@ -253,6 +253,7 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
   const { removeWidget, setExpandedWidget, updateWidgetConfig } = useDashboardActions();
 
   const [currentUserId, setCurrentUserId] = React.useState<string>("");
+  const [isConfigOpen, setIsConfigOpen] = React.useState<boolean>(false);
 
   // Get current user ID on mount
   React.useEffect(() => {
@@ -266,6 +267,11 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
     },
     [widgetId, updateWidgetConfig]
   );
+
+  // Handle toggle configuration panel
+  const handleToggleConfig = useCallback(() => {
+    setIsConfigOpen((prev) => !prev);
+  }, []);
 
   // Determine which API endpoint to use based on viewType
   const viewType = config.viewType;
@@ -470,12 +476,25 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
       onExpand={handleExpand}
       onRefresh={handleRefresh}
       onRemove={handleRemove}
+      onConfigure={handleToggleConfig}
       isLoading={isLoading || isLoadingTypes}
       isExpanded={isExpanded}
       error={error}
       onRetry={handleRefresh}
     >
-      <WidgetConfigPanel config={config} onChange={handleConfigChange} />
+      {isConfigOpen && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 1,
+            backgroundColor: (theme) => theme.palette.background.paper,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <WidgetConfigPanel config={config} onChange={handleConfigChange} />
+        </Box>
+      )}
       {renderContent()}
     </WidgetContainer>
   );

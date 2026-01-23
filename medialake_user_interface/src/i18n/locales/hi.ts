@@ -1349,6 +1349,7 @@ export default {
       expand: "विस्तार करें",
       refresh: "रीफ्रेश करें",
       remove: "हटाएं",
+      configure: "कॉन्फ़िगर करें",
     },
     widgetSelector: {
       title: "विजेट जोड़ें",

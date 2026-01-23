@@ -92,41 +92,66 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
             </Typography>
           </Box>
         ) : (
-          <List sx={{ pt: 0 }}>
-            {availableWidgets.map((widget) => (
-              <ListItem key={widget.type} disablePadding sx={{ mb: 1 }}>
-                <ListItemButton
-                  onClick={() => handleAddWidget(widget.type)}
-                  sx={{
-                    borderRadius: 2,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    "&:hover": {
-                      backgroundColor: "action.hover",
-                      borderColor: "primary.main",
-                    },
-                  }}
-                >
-                  <ListItemIcon
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, px: 1 }}>
+              {t(
+                "dashboard.widgetSelector.collectionsHint",
+                "Tip: You can add multiple Collections widgets with different configurations"
+              )}
+            </Typography>
+            <List sx={{ pt: 0 }}>
+              {availableWidgets.map((widget) => (
+                <ListItem key={`${widget.type}-${Date.now()}`} disablePadding sx={{ mb: 1 }}>
+                  <ListItemButton
+                    onClick={() => handleAddWidget(widget.type)}
                     sx={{
-                      minWidth: 48,
-                      color: "primary.main",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      "&:hover": {
+                        backgroundColor: "action.hover",
+                        borderColor: "primary.main",
+                      },
                     }}
                   >
-                    {WIDGET_ICONS[widget.type]}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      <Typography variant="subtitle1" fontWeight={500}>
-                        {widget.title}
-                      </Typography>
-                    }
-                    secondary={widget.description}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 48,
+                        color: "primary.main",
+                      }}
+                    >
+                      {WIDGET_ICONS[widget.type]}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography variant="subtitle1" fontWeight={500}>
+                          {widget.title}
+                        </Typography>
+                      }
+                      secondary={
+                        <>
+                          {widget.description}
+                          {widget.type === "collections" && (
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              display="block"
+                              sx={{ mt: 0.5, fontStyle: "italic", color: "primary.main" }}
+                            >
+                              {t(
+                                "dashboard.widgetSelector.multiInstance",
+                                "Can be added multiple times"
+                              )}
+                            </Typography>
+                          )}
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
         )}
       </DialogContent>
     </Dialog>

@@ -1346,6 +1346,7 @@ export default {
       expand: "展開",
       refresh: "更新",
       remove: "削除",
+      configure: "設定",
     },
     widgetSelector: {
       title: "ウィジェットを追加",

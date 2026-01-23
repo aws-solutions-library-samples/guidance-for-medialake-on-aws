@@ -1340,6 +1340,7 @@ export default {
       expand: "הרחב",
       refresh: "רענן",
       remove: "הסר",
+      configure: "הגדר",
     },
     widgetSelector: {
       title: "הוסף ווידג'ט",

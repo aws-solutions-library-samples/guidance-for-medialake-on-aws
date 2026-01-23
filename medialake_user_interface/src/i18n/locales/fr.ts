@@ -1354,6 +1354,7 @@ export default {
       expand: "Agrandir",
       refresh: "Actualiser",
       remove: "Supprimer",
+      configure: "Configurer",
     },
     widgetSelector: {
       title: "Ajouter un widget",

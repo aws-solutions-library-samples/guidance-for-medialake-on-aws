@@ -16,6 +16,7 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
   onExpand,
   onRefresh,
   onRemove,
+  onConfigure,
   isLoading = false,
   isExpanded = false,
   error,
@@ -93,6 +94,7 @@ export const WidgetContainer: React.FC<ExtendedWidgetContainerProps> = ({
         onExpand={onExpand}
         onRefresh={onRefresh}
         onRemove={onRemove}
+        onConfigure={onConfigure}
         isLoading={isLoading}
         isDraggable={true}
       />

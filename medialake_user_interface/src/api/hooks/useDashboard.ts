@@ -199,7 +199,10 @@ export const useGetDashboardPresets = () => {
       );
       return data.data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always consider data stale to ensure fresh data
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 };
 
@@ -236,7 +239,10 @@ export const useCreateDashboardPreset = () => {
       return data.data;
     },
     onSuccess: () => {
+      // Invalidate and refetch presets list
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
+      // Force refetch to ensure UI updates immediately
+      queryClient.refetchQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
       enqueueSnackbar(t("dashboard.messages.presetCreated", "Preset saved successfully"), {
         variant: "success",
         autoHideDuration: 3000,
@@ -281,6 +287,8 @@ export const useUpdateDashboardPreset = () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.DASHBOARD.preset(variables.presetId),
       });
+      // Force refetch to ensure UI updates immediately
+      queryClient.refetchQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
       enqueueSnackbar(t("dashboard.messages.presetUpdated", "Preset updated"), {
         variant: "success",
         autoHideDuration: 3000,
@@ -310,6 +318,8 @@ export const useDeleteDashboardPreset = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
+      // Force refetch to ensure UI updates immediately
+      queryClient.refetchQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
       enqueueSnackbar(t("dashboard.messages.presetDeleted", "Preset deleted"), {
         variant: "success",
         autoHideDuration: 3000,

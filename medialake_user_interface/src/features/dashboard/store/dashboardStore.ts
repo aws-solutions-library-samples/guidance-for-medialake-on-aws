@@ -419,9 +419,17 @@ export const useDashboardActions = () => {
 };
 
 // Helper to get available widgets (not currently in layout)
+// Note: Collections widgets can have multiple instances, but favorites and recent-assets are single-instance
 export const useAvailableWidgets = () => {
   const layout = useDashboardLayout();
   const currentTypes = new Set(layout.widgets.map((w) => w.type));
 
-  return Object.values(WIDGET_DEFINITIONS).filter((def) => !currentTypes.has(def.type));
+  return Object.values(WIDGET_DEFINITIONS).filter((def) => {
+    // Always allow adding collections widgets (multi-instance support)
+    if (def.type === "collections") {
+      return true;
+    }
+    // For other widget types, only allow if not already in layout
+    return !currentTypes.has(def.type);
+  });
 };

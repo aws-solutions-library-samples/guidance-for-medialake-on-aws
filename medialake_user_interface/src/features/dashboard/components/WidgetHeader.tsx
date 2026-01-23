@@ -5,6 +5,7 @@ import {
   Refresh as RefreshIcon,
   Close as RemoveIcon,
   DragIndicator as DragIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import type { WidgetHeaderProps } from "../types";
@@ -15,6 +16,7 @@ export const WidgetHeader: React.FC<WidgetHeaderProps> = ({
   onExpand,
   onRefresh,
   onRemove,
+  onConfigure,
   isLoading = false,
   isDraggable = true,
 }) => {
@@ -67,6 +69,26 @@ export const WidgetHeader: React.FC<WidgetHeaderProps> = ({
 
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         {isLoading && <CircularProgress size={18} sx={{ mr: 1 }} />}
+
+        {onConfigure && (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfigure();
+            }}
+            sx={{
+              color: "text.secondary",
+              "&:hover": {
+                color: "primary.main",
+                backgroundColor: "action.hover",
+              },
+            }}
+            aria-label={t("dashboard.actions.configure", "Configure")}
+          >
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+        )}
 
         {onRefresh && (
           <IconButton

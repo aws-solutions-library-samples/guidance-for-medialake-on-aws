@@ -104,6 +104,7 @@ export interface WidgetContainerProps {
   onExpand?: () => void;
   onRefresh?: () => void;
   onRemove?: () => void;
+  onConfigure?: () => void;
   isLoading?: boolean;
   isExpanded?: boolean;
 }
@@ -114,6 +115,7 @@ export interface WidgetHeaderProps {
   onExpand?: () => void;
   onRefresh?: () => void;
   onRemove?: () => void;
+  onConfigure?: () => void;
   isLoading?: boolean;
   isDraggable?: boolean;
 }

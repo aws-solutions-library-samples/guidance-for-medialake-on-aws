@@ -1340,6 +1340,7 @@ export default {
       expand: "확장",
       refresh: "새로고침",
       remove: "제거",
+      configure: "구성",
     },
     widgetSelector: {
       title: "위젯 추가",
