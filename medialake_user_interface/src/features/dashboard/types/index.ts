@@ -19,7 +19,7 @@ export interface SortConfig {
 }
 
 // Collections widget configuration
-export interface CollectionsWidgetConfig {
+export interface CollectionsWidgetConfig extends Record<string, unknown> {
   viewType: CollectionViewType;
   sorting: SortConfig;
 }
