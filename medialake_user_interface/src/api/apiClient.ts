@@ -87,7 +87,24 @@ class ApiClient extends ApiClientBase {
           status: response.status,
           url: response.config.url,
           method: response.config.method?.toUpperCase(),
+          rawData: response.data,
+          hasBody: "body" in (response.data || {}),
+          hasSuccess: "success" in (response.data || {}),
+          hasData: "data" in (response.data || {}),
         });
+
+        // Unwrap Lambda proxy integration response format
+        // API returns: {statusCode, body: {success, data}}
+        // We need: {success, data}
+        if (response.data && typeof response.data === "object" && "body" in response.data) {
+          console.log("🔄 Unwrapping Lambda proxy response format");
+          console.log("Before unwrap:", JSON.stringify(response.data, null, 2));
+          response.data = response.data.body;
+          console.log("After unwrap:", JSON.stringify(response.data, null, 2));
+        } else {
+          console.log("ℹ️ Response already in correct format (no body field to unwrap)");
+        }
+
         return response;
       },
       async (error) => {

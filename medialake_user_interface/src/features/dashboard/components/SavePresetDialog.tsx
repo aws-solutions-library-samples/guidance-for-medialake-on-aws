@@ -40,6 +40,7 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
 
+  const layout = useDashboardStore((state) => state.layout);
   const setActivePreset = useDashboardStore((state) => state.setActivePreset);
 
   const createPresetMutation = useCreateDashboardPreset();
@@ -94,13 +95,19 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       const result = await createPresetMutation.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
+        widgets: layout.widgets,
+        layouts: layout.layouts,
       });
+
       // Set the newly created preset as active
       setActivePreset(result.presetId, result.name);
+
+      // Close the dialog
       onClose();
     } catch (error) {
       // Error handling is done in the mutation hook
       console.error("Failed to create preset:", error);
+      // Don't close dialog on error so user can retry
     }
   };
 

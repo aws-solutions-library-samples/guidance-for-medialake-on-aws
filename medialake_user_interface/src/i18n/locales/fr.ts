@@ -1379,6 +1379,8 @@ export default {
       presetDeleteFailed: "Échec de la suppression du modèle",
       presetApplyFailed: "Échec de l'application du modèle",
       maxPresetsExceeded: "Maximum de 5 modèles autorisés",
+      noActivePreset:
+        "Aucun modèle actif à enregistrer. Veuillez sélectionner un tableau de bord ou en créer un nouveau.",
     },
     messages: {
       resetSuccess: "Disposition réinitialisée par défaut",
@@ -1386,6 +1388,7 @@ export default {
       presetUpdated: "Modèle mis à jour",
       presetDeleted: "Modèle supprimé",
       presetApplied: "Modèle appliqué",
+      layoutSaved: "Disposition enregistrée avec succès",
     },
     selector: {
       defaultDashboard: "Tableau de bord",
@@ -1393,6 +1396,8 @@ export default {
       savedDashboards: "Tableaux de bord enregistrés",
       widgets: "widgets",
       saveCurrentLayout: "Enregistrer la disposition actuelle",
+      saveNewDashboard: "Enregistrer un nouveau tableau de bord",
+      selectPresetFirst: "Sélectionnez d'abord un tableau de bord",
       manageDashboards: "Gérer les tableaux de bord",
       dashboardsSaved: "tableaux de bord enregistrés",
     },

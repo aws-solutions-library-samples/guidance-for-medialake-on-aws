@@ -1369,6 +1369,7 @@ export default {
       presetDeleteFailed: "Failed to delete preset",
       presetApplyFailed: "Failed to apply preset",
       maxPresetsExceeded: "Maximum of 5 presets allowed",
+      noActivePreset: "No active preset to save. Please select a dashboard or create a new one.",
     },
     messages: {
       resetSuccess: "Layout reset to default",
@@ -1376,6 +1377,7 @@ export default {
       presetUpdated: "Preset updated",
       presetDeleted: "Preset deleted",
       presetApplied: "Preset applied",
+      layoutSaved: "Layout saved successfully",
     },
     selector: {
       defaultDashboard: "Dashboard",
@@ -1383,6 +1385,8 @@ export default {
       savedDashboards: "Saved Dashboards",
       widgets: "widgets",
       saveCurrentLayout: "Save Current Layout",
+      saveNewDashboard: "Save New Dashboard",
+      selectPresetFirst: "Select a dashboard first",
       manageDashboards: "Manage Dashboards",
       dashboardsSaved: "dashboards saved",
     },

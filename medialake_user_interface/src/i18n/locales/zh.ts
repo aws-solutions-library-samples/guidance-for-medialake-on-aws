@@ -1363,6 +1363,7 @@ export default {
       presetDeleteFailed: "删除预设失败",
       presetApplyFailed: "应用预设失败",
       maxPresetsExceeded: "最多允许5个预设",
+      noActivePreset: "没有要保存的活动预设。请选择一个仪表板或创建一个新的。",
     },
     messages: {
       resetSuccess: "布局已重置为默认",
@@ -1370,6 +1371,7 @@ export default {
       presetUpdated: "预设已更新",
       presetDeleted: "预设已删除",
       presetApplied: "预设已应用",
+      layoutSaved: "布局保存成功",
     },
     selector: {
       defaultDashboard: "仪表板",
@@ -1377,6 +1379,8 @@ export default {
       savedDashboards: "已保存的仪表板",
       widgets: "小部件",
       saveCurrentLayout: "保存当前布局",
+      saveNewDashboard: "保存新仪表板",
+      selectPresetFirst: "请先选择一个仪表板",
       manageDashboards: "管理仪表板",
       dashboardsSaved: "仪表板已保存",
     },

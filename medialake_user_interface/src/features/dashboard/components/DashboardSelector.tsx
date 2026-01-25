@@ -17,13 +17,16 @@ import {
   KeyboardArrowDown as ArrowDownIcon,
   Dashboard as DashboardIcon,
   Save as SaveIcon,
+  AddCircleOutline as AddIcon,
   Settings as SettingsIcon,
   Check as CheckIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { useSnackbar } from "notistack";
 import {
   useGetDashboardPresets,
   useApplyDashboardPreset,
+  useUpdateDashboardPreset,
   type PresetSummary,
 } from "@/api/hooks/useDashboard";
 import { useDashboardStore, convertApiLayoutToFrontend } from "../store/dashboardStore";
@@ -39,6 +42,7 @@ interface DashboardSelectorProps {
 export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className }) => {
   const theme = useTheme();
   const { t } = useTranslation();
+  const { enqueueSnackbar } = useSnackbar();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
@@ -46,6 +50,7 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   const open = Boolean(anchorEl);
 
   // Store state
+  const layout = useDashboardStore((state) => state.layout);
   const activePresetId = useDashboardStore((state) => state.activePresetId);
   const activePresetName = useDashboardStore((state) => state.activePresetName);
   const setLayout = useDashboardStore((state) => state.setLayout);
@@ -55,6 +60,7 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   // API hooks
   const { data: presets = [], isLoading: isLoadingPresets } = useGetDashboardPresets();
   const applyPresetMutation = useApplyDashboardPreset();
+  const updatePresetMutation = useUpdateDashboardPreset();
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -67,9 +73,15 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   const handlePresetSelect = async (preset: PresetSummary) => {
     handleClose();
     try {
+      console.log("Applying preset:", preset.presetId);
       const result = await applyPresetMutation.mutateAsync(preset.presetId);
+      console.log("Apply preset result:", result);
+      console.log("Result layouts:", result.layouts);
+
       // Update local store with the applied layout
       const frontendLayout = convertApiLayoutToFrontend(result);
+      console.log("Converted frontend layout:", frontendLayout);
+
       setLayout(frontendLayout);
       setActivePreset(preset.presetId, preset.name);
       setHasPendingChanges(false);
@@ -84,7 +96,39 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
     setActivePreset(null, null);
   };
 
-  const handleSaveClick = () => {
+  const handleSaveCurrentLayout = async () => {
+    handleClose();
+
+    if (!activePresetId) {
+      enqueueSnackbar(
+        t(
+          "dashboard.errors.noActivePreset",
+          "No active preset to save. Please select a dashboard or create a new one."
+        ),
+        { variant: "warning", autoHideDuration: 5000 }
+      );
+      return;
+    }
+
+    try {
+      await updatePresetMutation.mutateAsync({
+        presetId: activePresetId,
+        data: {
+          widgets: layout.widgets,
+          layouts: layout.layouts,
+        },
+      });
+      setHasPendingChanges(false);
+      enqueueSnackbar(t("dashboard.messages.layoutSaved", "Layout saved successfully"), {
+        variant: "success",
+        autoHideDuration: 3000,
+      });
+    } catch (error) {
+      console.error("Failed to save layout:", error);
+    }
+  };
+
+  const handleSaveNewDashboard = () => {
     handleClose();
     setSaveDialogOpen(true);
   };
@@ -96,6 +140,7 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
 
   const displayName = activePresetName || t("dashboard.selector.defaultDashboard", "Dashboard");
   const isApplying = applyPresetMutation.isPending;
+  const isSaving = updatePresetMutation.isPending;
 
   return (
     <Box className={className}>
@@ -222,12 +267,30 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
         <Divider sx={{ my: 0.5 }} />
 
         {/* Actions */}
-        <MenuItem onClick={handleSaveClick} disabled={presets.length >= MAX_PRESETS}>
+        {/* Save Current Layout - only enabled if a preset is active */}
+        <MenuItem onClick={handleSaveCurrentLayout} disabled={!activePresetId || isSaving}>
           <ListItemIcon sx={{ minWidth: 28 }}>
-            <SaveIcon sx={{ fontSize: 16 }} />
+            {isSaving ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 16 }} />}
           </ListItemIcon>
           <ListItemText
             primary={t("dashboard.selector.saveCurrentLayout", "Save Current Layout")}
+            secondary={
+              !activePresetId
+                ? t("dashboard.selector.selectPresetFirst", "Select a dashboard first")
+                : undefined
+            }
+            primaryTypographyProps={{ variant: "body2" }}
+            secondaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+          />
+        </MenuItem>
+
+        {/* Save New Dashboard */}
+        <MenuItem onClick={handleSaveNewDashboard} disabled={presets.length >= MAX_PRESETS}>
+          <ListItemIcon sx={{ minWidth: 28 }}>
+            <AddIcon sx={{ fontSize: 16 }} />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("dashboard.selector.saveNewDashboard", "Save New Dashboard")}
             primaryTypographyProps={{ variant: "body2" }}
           />
         </MenuItem>

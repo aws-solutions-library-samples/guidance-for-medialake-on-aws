@@ -1365,6 +1365,7 @@ export default {
       presetDeleteFailed: "فشل في حذف القالب",
       presetApplyFailed: "فشل في تطبيق القالب",
       maxPresetsExceeded: "الحد الأقصى 5 قوالب مسموح بها",
+      noActivePreset: "لا يوجد قالب نشط للحفظ. يرجى تحديد لوحة تحكم أو إنشاء واحدة جديدة.",
     },
     messages: {
       resetSuccess: "تم إعادة تعيين التخطيط إلى الافتراضي",
@@ -1372,6 +1373,7 @@ export default {
       presetUpdated: "تم تحديث القالب",
       presetDeleted: "تم حذف القالب",
       presetApplied: "تم تطبيق القالب",
+      layoutSaved: "تم حفظ التخطيط بنجاح",
     },
     selector: {
       defaultDashboard: "لوحة التحكم",
@@ -1379,6 +1381,8 @@ export default {
       savedDashboards: "لوحات التحكم المحفوظة",
       widgets: "عناصر",
       saveCurrentLayout: "حفظ التخطيط الحالي",
+      saveNewDashboard: "حفظ لوحة تحكم جديدة",
+      selectPresetFirst: "حدد لوحة تحكم أولاً",
       manageDashboards: "إدارة لوحات التحكم",
       dashboardsSaved: "لوحات تحكم محفوظة",
     },

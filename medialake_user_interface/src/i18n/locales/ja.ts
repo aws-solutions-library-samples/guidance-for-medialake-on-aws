@@ -1371,6 +1371,8 @@ export default {
       presetDeleteFailed: "プリセットの削除に失敗しました",
       presetApplyFailed: "プリセットの適用に失敗しました",
       maxPresetsExceeded: "プリセットは最大5つまでです",
+      noActivePreset:
+        "保存するアクティブなプリセットがありません。ダッシュボードを選択するか、新しいものを作成してください。",
     },
     messages: {
       resetSuccess: "レイアウトをデフォルトにリセットしました",
@@ -1378,6 +1380,7 @@ export default {
       presetUpdated: "プリセットを更新しました",
       presetDeleted: "プリセットを削除しました",
       presetApplied: "プリセットを適用しました",
+      layoutSaved: "レイアウトを保存しました",
     },
     selector: {
       defaultDashboard: "ダッシュボード",
@@ -1385,6 +1388,8 @@ export default {
       savedDashboards: "保存済みダッシュボード",
       widgets: "ウィジェット",
       saveCurrentLayout: "現在のレイアウトを保存",
+      saveNewDashboard: "新しいダッシュボードを保存",
+      selectPresetFirst: "最初にダッシュボードを選択してください",
       manageDashboards: "ダッシュボードを管理",
       dashboardsSaved: "ダッシュボード保存済み",
     },

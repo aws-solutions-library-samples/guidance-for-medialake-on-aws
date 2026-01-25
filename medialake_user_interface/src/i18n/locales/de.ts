@@ -1379,6 +1379,8 @@ export default {
       presetDeleteFailed: "Vorlage konnte nicht gelöscht werden",
       presetApplyFailed: "Vorlage konnte nicht angewendet werden",
       maxPresetsExceeded: "Maximal 5 Vorlagen erlaubt",
+      noActivePreset:
+        "Keine aktive Vorlage zum Speichern. Bitte wählen Sie ein Dashboard aus oder erstellen Sie ein neues.",
     },
     messages: {
       resetSuccess: "Layout auf Standard zurückgesetzt",
@@ -1386,6 +1388,7 @@ export default {
       presetUpdated: "Vorlage aktualisiert",
       presetDeleted: "Vorlage gelöscht",
       presetApplied: "Vorlage angewendet",
+      layoutSaved: "Layout erfolgreich gespeichert",
     },
     selector: {
       defaultDashboard: "Dashboard",
@@ -1393,6 +1396,8 @@ export default {
       savedDashboards: "Gespeicherte Dashboards",
       widgets: "Widgets",
       saveCurrentLayout: "Aktuelles Layout speichern",
+      saveNewDashboard: "Neues Dashboard speichern",
+      selectPresetFirst: "Wählen Sie zuerst ein Dashboard aus",
       manageDashboards: "Dashboards verwalten",
       dashboardsSaved: "Dashboards gespeichert",
     },

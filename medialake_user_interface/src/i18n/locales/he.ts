@@ -1365,6 +1365,7 @@ export default {
       presetDeleteFailed: "מחיקת התבנית נכשלה",
       presetApplyFailed: "החלת התבנית נכשלה",
       maxPresetsExceeded: "מותר מקסימום 5 תבניות",
+      noActivePreset: "אין תבנית פעילה לשמירה. אנא בחר לוח בקרה או צור אחד חדש.",
     },
     messages: {
       resetSuccess: "הפריסה אופסה לברירת מחדל",
@@ -1372,6 +1373,7 @@ export default {
       presetUpdated: "התבנית עודכנה",
       presetDeleted: "התבנית נמחקה",
       presetApplied: "התבנית הוחלה",
+      layoutSaved: "הפריסה נשמרה בהצלחה",
     },
     selector: {
       defaultDashboard: "לוח בקרה",
@@ -1379,6 +1381,8 @@ export default {
       savedDashboards: "לוחות בקרה שמורים",
       widgets: "ווידג'טים",
       saveCurrentLayout: "שמור פריסה נוכחית",
+      saveNewDashboard: "שמור לוח בקרה חדש",
+      selectPresetFirst: "בחר לוח בקרה תחילה",
       manageDashboards: "נהל לוחות בקרה",
       dashboardsSaved: "לוחות בקרה שמורים",
     },

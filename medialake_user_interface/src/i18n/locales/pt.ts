@@ -1376,6 +1376,8 @@ export default {
       presetDeleteFailed: "Falha ao excluir o modelo",
       presetApplyFailed: "Falha ao aplicar o modelo",
       maxPresetsExceeded: "Máximo de 5 modelos permitidos",
+      noActivePreset:
+        "Nenhum modelo ativo para salvar. Por favor, selecione um painel ou crie um novo.",
     },
     messages: {
       resetSuccess: "Layout redefinido para o padrão",
@@ -1383,6 +1385,7 @@ export default {
       presetUpdated: "Modelo atualizado",
       presetDeleted: "Modelo excluído",
       presetApplied: "Modelo aplicado",
+      layoutSaved: "Layout salvo com sucesso",
     },
     selector: {
       defaultDashboard: "Painel",
@@ -1390,6 +1393,8 @@ export default {
       savedDashboards: "Painéis salvos",
       widgets: "widgets",
       saveCurrentLayout: "Salvar layout atual",
+      saveNewDashboard: "Salvar novo painel",
+      selectPresetFirst: "Selecione um painel primeiro",
       manageDashboards: "Gerenciar painéis",
       dashboardsSaved: "painéis salvos",
     },

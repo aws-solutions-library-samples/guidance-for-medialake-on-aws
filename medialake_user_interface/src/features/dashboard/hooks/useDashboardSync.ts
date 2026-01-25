@@ -13,20 +13,17 @@ import {
   DEFAULT_LAYOUT,
 } from "../store/dashboardStore";
 
-const DEBOUNCE_DELAY = 2000; // 2 seconds debounce for auto-save
-
 /**
  * Hook to synchronize dashboard layout between local store and API.
  *
  * This hook:
  * 1. Loads the layout from API on mount
  * 2. Falls back to localStorage if API fails
- * 3. Auto-saves changes to API with debouncing
- * 4. Provides manual save/reset functions
+ * 3. Provides manual save/reset functions
+ * 4. NO AUTO-SAVE - user must explicitly save changes
  */
 export const useDashboardSync = () => {
   const queryClient = useQueryClient();
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
 
   // Store state - use individual selectors for stable references
@@ -70,57 +67,8 @@ export const useDashboardSync = () => {
     }
   }, [loadError, setLastSyncError]);
 
-  // Debounced auto-save when layout changes
-  useEffect(() => {
-    // Skip if initial load or no pending changes
-    if (isInitialLoadRef.current || !hasPendingChanges) {
-      return;
-    }
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Set new timeout for debounced save
-    saveTimeoutRef.current = setTimeout(() => {
-      const apiPayload = convertFrontendLayoutToApi(layout);
-      setIsSyncing(true);
-
-      saveLayoutMutation.mutate(apiPayload, {
-        onSuccess: () => {
-          setHasPendingChanges(false);
-          setLastSyncError(null);
-          setIsSyncing(false);
-        },
-        onError: (error) => {
-          console.error("Auto-save failed:", error);
-          setLastSyncError("Failed to save layout");
-          setIsSyncing(false);
-        },
-      });
-    }, DEBOUNCE_DELAY);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [
-    layout,
-    hasPendingChanges,
-    saveLayoutMutation,
-    setIsSyncing,
-    setHasPendingChanges,
-    setLastSyncError,
-  ]);
-
-  // Manual save function (immediate, no debounce)
+  // Manual save function (saves current layout to active preset or default layout)
   const saveNow = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
     const apiPayload = convertFrontendLayoutToApi(layout);
     setIsSyncing(true);
 
@@ -140,10 +88,6 @@ export const useDashboardSync = () => {
 
   // Reset to default layout via API
   const resetLayout = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
     setIsSyncing(true);
 
     return resetLayoutMutation

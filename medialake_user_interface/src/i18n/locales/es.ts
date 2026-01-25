@@ -1376,6 +1376,8 @@ export default {
       presetDeleteFailed: "Error al eliminar la plantilla",
       presetApplyFailed: "Error al aplicar la plantilla",
       maxPresetsExceeded: "Máximo de 5 plantillas permitidas",
+      noActivePreset:
+        "No hay plantilla activa para guardar. Por favor, seleccione un panel o cree uno nuevo.",
     },
     messages: {
       resetSuccess: "Diseño restablecido a predeterminado",
@@ -1383,6 +1385,7 @@ export default {
       presetUpdated: "Plantilla actualizada",
       presetDeleted: "Plantilla eliminada",
       presetApplied: "Plantilla aplicada",
+      layoutSaved: "Diseño guardado exitosamente",
     },
     selector: {
       defaultDashboard: "Panel",
@@ -1390,6 +1393,8 @@ export default {
       savedDashboards: "Paneles guardados",
       widgets: "widgets",
       saveCurrentLayout: "Guardar diseño actual",
+      saveNewDashboard: "Guardar nuevo panel",
+      selectPresetFirst: "Seleccione un panel primero",
       manageDashboards: "Administrar paneles",
       dashboardsSaved: "paneles guardados",
     },

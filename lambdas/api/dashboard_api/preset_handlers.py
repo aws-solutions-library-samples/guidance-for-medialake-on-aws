@@ -110,7 +110,31 @@ def register_preset_routes(app):
                     f"Cannot create more than {MAX_PRESETS} saved presets",
                 )
 
-            layout_data = _get_user_layout(user_id)
+            # Get layout data from request body if provided, otherwise from user's current layout
+            widgets = body.get("widgets")
+            layouts = body.get("layouts")
+
+            if widgets is not None and layouts is not None:
+                # Use layout from request (current frontend state)
+                layout_data = {
+                    "widgets": widgets,
+                    "layouts": layouts,
+                }
+                logger.info(
+                    "Using layout from request body",
+                    extra={
+                        "widgets_count": len(widgets),
+                        "layouts_keys": list(layouts.keys()) if layouts else [],
+                        "lg_count": len(layouts.get("lg", [])) if layouts else 0,
+                        "md_count": len(layouts.get("md", [])) if layouts else 0,
+                        "sm_count": len(layouts.get("sm", [])) if layouts else 0,
+                    },
+                )
+            else:
+                # Fallback to user's saved layout
+                layout_data = _get_user_layout(user_id)
+                logger.info("Using layout from database")
+
             preset_id = str(ULID())
             now = datetime.now(timezone.utc).isoformat()
 
@@ -194,8 +218,8 @@ def register_preset_routes(app):
                         "presetId": preset.presetId,
                         "name": preset.name,
                         "description": preset.description,
-                        "widgets": list(preset.widgets) if preset.widgets else [],
-                        "layouts": dict(preset.layouts) if preset.layouts else {},
+                        "widgets": preset.widgets if preset.widgets else [],
+                        "layouts": preset.layouts if preset.layouts else {},
                         "createdAt": preset.createdAt,
                         "updatedAt": preset.updatedAt,
                     },
@@ -272,8 +296,8 @@ def register_preset_routes(app):
                         "presetId": preset.presetId,
                         "name": preset.name,
                         "description": preset.description,
-                        "widgets": list(preset.widgets) if preset.widgets else [],
-                        "layouts": dict(preset.layouts) if preset.layouts else {},
+                        "widgets": preset.widgets if preset.widgets else [],
+                        "layouts": preset.layouts if preset.layouts else {},
                         "createdAt": preset.createdAt,
                         "updatedAt": preset.updatedAt,
                     },
@@ -364,8 +388,8 @@ def register_preset_routes(app):
                 SK=LAYOUT_SK_ACTIVE,
                 userId=user_id,
                 layoutVersion=new_version,
-                widgets=list(preset.widgets) if preset.widgets else [],
-                layouts=dict(preset.layouts) if preset.layouts else {},
+                widgets=preset.widgets if preset.widgets else [],
+                layouts=preset.layouts if preset.layouts else {},
                 createdAt=(
                     now if current_version == 0 else _get_created_at(user_id, now)
                 ),
@@ -388,8 +412,8 @@ def register_preset_routes(app):
                     "success": True,
                     "data": {
                         "layoutVersion": new_version,
-                        "widgets": list(preset.widgets) if preset.widgets else [],
-                        "layouts": dict(preset.layouts) if preset.layouts else {},
+                        "widgets": preset.widgets if preset.widgets else [],
+                        "layouts": preset.layouts if preset.layouts else {},
                         "updatedAt": now,
                     },
                 },
@@ -423,9 +447,10 @@ def _get_user_layout(user_id: str) -> dict:
         layout = DashboardLayoutModel.get(
             f"{USER_PK_PREFIX}{user_id}", LAYOUT_SK_ACTIVE
         )
+        # JSONAttribute automatically deserializes to Python objects
         return {
-            "widgets": list(layout.widgets) if layout.widgets else [],
-            "layouts": dict(layout.layouts) if layout.layouts else {},
+            "widgets": layout.widgets if layout.widgets else [],
+            "layouts": layout.layouts if layout.layouts else {},
         }
     except DoesNotExist:
         return {

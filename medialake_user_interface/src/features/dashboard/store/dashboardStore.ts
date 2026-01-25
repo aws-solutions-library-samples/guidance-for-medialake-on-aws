@@ -138,9 +138,23 @@ const findAvailablePosition = (
 export const convertApiLayoutToFrontend = (apiLayout: {
   layoutVersion: number;
   widgets: Array<{ id: string; type: string; config?: Record<string, unknown> }>;
-  layouts: { lg: LayoutItem[]; md: LayoutItem[]; sm: LayoutItem[] };
+  layouts?: { lg: LayoutItem[]; md: LayoutItem[]; sm: LayoutItem[] };
   updatedAt?: string;
 }): DashboardLayout => {
+  // Ensure layouts exist with fallback to empty arrays
+  const layouts = apiLayout.layouts || {
+    lg: [],
+    md: [],
+    sm: [],
+  };
+
+  // Ensure each breakpoint exists
+  const safeLayouts = {
+    lg: layouts.lg || [],
+    md: layouts.md || [],
+    sm: layouts.sm || [],
+  };
+
   return {
     version: apiLayout.layoutVersion,
     layoutVersion: apiLayout.layoutVersion,
@@ -149,7 +163,7 @@ export const convertApiLayoutToFrontend = (apiLayout: {
       type: w.type as WidgetType,
       ...(w.config && { config: w.config as unknown as CollectionsWidgetConfig }),
     })),
-    layouts: apiLayout.layouts,
+    layouts: safeLayouts,
     updatedAt: apiLayout.updatedAt,
   };
 };

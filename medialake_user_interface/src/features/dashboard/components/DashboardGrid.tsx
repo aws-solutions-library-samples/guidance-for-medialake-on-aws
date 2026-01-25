@@ -150,8 +150,11 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
   }, []);
 
   // Convert our layout format to react-grid-layout format
-  const convertToRGLLayout = (items: LayoutItem[]): RGLLayoutItem[] =>
-    items.map((item) => {
+  const convertToRGLLayout = (items: LayoutItem[] | undefined): RGLLayoutItem[] => {
+    if (!items || !Array.isArray(items)) {
+      return [];
+    }
+    return items.map((item) => {
       const widgetDef =
         WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"];
       return {
@@ -166,12 +169,13 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
         maxH: item.maxH ?? widgetDef.maxSize.h,
       };
     });
+  };
 
   const responsiveLayouts: ResponsiveLayouts<string> = {
-    xl: convertToRGLLayout(layout.layouts.lg), // Use lg layout for xl screens
-    lg: convertToRGLLayout(layout.layouts.lg),
-    md: convertToRGLLayout(layout.layouts.md),
-    sm: convertToRGLLayout(layout.layouts.sm),
+    xl: convertToRGLLayout(layout.layouts?.lg), // Use lg layout for xl screens
+    lg: convertToRGLLayout(layout.layouts?.lg),
+    md: convertToRGLLayout(layout.layouts?.md),
+    sm: convertToRGLLayout(layout.layouts?.sm),
   };
 
   return (

@@ -7,11 +7,10 @@ All dashboard data uses a single DynamoDB table with the following access patter
 - System Default: PK=SYSTEM         SK=LAYOUT#default
 """
 
+import json
 import os
 
 from pynamodb.attributes import (
-    ListAttribute,
-    MapAttribute,
     NumberAttribute,
     UnicodeAttribute,
 )
@@ -23,6 +22,25 @@ SYSTEM_PK = "SYSTEM"
 LAYOUT_SK_ACTIVE = "LAYOUT#active"
 LAYOUT_SK_DEFAULT = "LAYOUT#default"
 PRESET_SK_PREFIX = "PRESET#"
+
+
+class JSONAttribute(UnicodeAttribute):
+    """
+    Custom attribute for storing JSON data as a string.
+    Automatically serializes/deserializes Python objects to/from JSON.
+    """
+
+    def serialize(self, value):
+        """Convert Python object to JSON string for storage."""
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    def deserialize(self, value):
+        """Convert JSON string back to Python object."""
+        if value is None or value == "":
+            return None
+        return json.loads(value)
 
 
 class DashboardLayoutModel(Model):
@@ -45,8 +63,8 @@ class DashboardLayoutModel(Model):
     # Layout attributes
     userId = UnicodeAttribute(null=True)  # Null for system default
     layoutVersion = NumberAttribute(default=1)
-    widgets = ListAttribute()  # List of WidgetInstance dicts
-    layouts = MapAttribute()  # {lg: [], md: [], sm: []}
+    widgets = JSONAttribute()  # List of WidgetInstance dicts (stored as JSON)
+    layouts = JSONAttribute()  # {lg: [], md: [], sm: []} (stored as JSON)
     createdAt = UnicodeAttribute()
     updatedAt = UnicodeAttribute()
 
@@ -73,7 +91,7 @@ class DashboardPresetModel(Model):
     userId = UnicodeAttribute()
     name = UnicodeAttribute()
     description = UnicodeAttribute(null=True)
-    widgets = ListAttribute()  # List of WidgetInstance dicts
-    layouts = MapAttribute()  # {lg: [], md: [], sm: []}
+    widgets = JSONAttribute()  # List of WidgetInstance dicts (stored as JSON)
+    layouts = JSONAttribute()  # {lg: [], md: [], sm: []} (stored as JSON)
     createdAt = UnicodeAttribute()
     updatedAt = UnicodeAttribute()

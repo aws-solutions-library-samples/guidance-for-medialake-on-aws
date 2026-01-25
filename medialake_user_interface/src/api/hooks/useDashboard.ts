@@ -75,6 +75,12 @@ export interface PresetResponse {
 export interface CreatePresetRequest {
   name: string;
   description?: string;
+  widgets?: WidgetInstance[];
+  layouts?: {
+    lg: LayoutItem[];
+    md: LayoutItem[];
+    sm: LayoutItem[];
+  };
 }
 
 export interface UpdatePresetRequest {
@@ -118,6 +124,7 @@ export const useGetDashboardLayout = () => {
       const { data } = await apiClient.get<ApiResponse<DashboardLayout>>(
         API_ENDPOINTS.DASHBOARD.LAYOUT
       );
+      // After axios interceptor unwrapping, data is already {success, data}
       return data.data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -249,12 +256,27 @@ export const useCreateDashboardPreset = () => {
       });
     },
     onError: (error: any) => {
+      console.error("Create preset error details:", error);
       const errorCode = error?.response?.data?.error?.code;
+      const errorMessage = error?.response?.data?.error?.message;
+
       if (errorCode === "MAX_PRESETS_EXCEEDED") {
         enqueueSnackbar(t("dashboard.errors.maxPresetsExceeded", "Maximum of 5 presets allowed"), {
           variant: "warning",
           autoHideDuration: 5000,
         });
+      } else if (error?.response?.status === 500) {
+        enqueueSnackbar(
+          errorMessage ||
+            t(
+              "dashboard.errors.presetCreateServerError",
+              "Server error creating preset. Please try again or contact support."
+            ),
+          {
+            variant: "error",
+            autoHideDuration: 7000,
+          }
+        );
       } else {
         enqueueSnackbar(t("dashboard.errors.presetCreateFailed", "Failed to create preset"), {
           variant: "error",

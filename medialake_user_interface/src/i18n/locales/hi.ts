@@ -1374,6 +1374,8 @@ export default {
       presetDeleteFailed: "प्रीसेट हटाने में विफल",
       presetApplyFailed: "प्रीसेट लागू करने में विफल",
       maxPresetsExceeded: "अधिकतम 5 प्रीसेट की अनुमति है",
+      noActivePreset:
+        "सहेजने के लिए कोई सक्रिय प्रीसेट नहीं है। कृपया एक डैशबोर्ड चुनें या नया बनाएं।",
     },
     messages: {
       resetSuccess: "लेआउट डिफ़ॉल्ट पर रीसेट हो गया",
@@ -1381,6 +1383,7 @@ export default {
       presetUpdated: "प्रीसेट अपडेट हो गया",
       presetDeleted: "प्रीसेट हटा दिया गया",
       presetApplied: "प्रीसेट लागू हो गया",
+      layoutSaved: "लेआउट सफलतापूर्वक सहेजा गया",
     },
     selector: {
       defaultDashboard: "डैशबोर्ड",
@@ -1388,6 +1391,8 @@ export default {
       savedDashboards: "सहेजे गए डैशबोर्ड",
       widgets: "विजेट्स",
       saveCurrentLayout: "वर्तमान लेआउट सहेजें",
+      saveNewDashboard: "नया डैशबोर्ड सहेजें",
+      selectPresetFirst: "पहले एक डैशबोर्ड चुनें",
       manageDashboards: "डैशबोर्ड प्रबंधित करें",
       dashboardsSaved: "डैशबोर्ड सहेजे गए",
     },

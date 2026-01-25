@@ -193,8 +193,8 @@ def _get_user_layout(user_id: str) -> dict | None:
         )
         return {
             "layoutVersion": layout.layoutVersion,
-            "widgets": list(layout.widgets) if layout.widgets else [],
-            "layouts": dict(layout.layouts) if layout.layouts else {},
+            "widgets": layout.widgets if layout.widgets else [],
+            "layouts": layout.layouts if layout.layouts else {},
             "updatedAt": layout.updatedAt,
         }
     except DoesNotExist:
@@ -208,8 +208,8 @@ def _get_system_default() -> dict | None:
         layout = DashboardLayoutModel.get(SYSTEM_PK, LAYOUT_SK_DEFAULT)
         return {
             "layoutVersion": layout.layoutVersion,
-            "widgets": list(layout.widgets) if layout.widgets else [],
-            "layouts": dict(layout.layouts) if layout.layouts else {},
+            "widgets": layout.widgets if layout.widgets else [],
+            "layouts": layout.layouts if layout.layouts else {},
             "updatedAt": layout.updatedAt,
         }
     except DoesNotExist:
@@ -230,8 +230,8 @@ def _get_default_layout() -> dict:
     try:
         layout = DashboardLayoutModel.get(SYSTEM_PK, LAYOUT_SK_DEFAULT)
         return {
-            "widgets": list(layout.widgets) if layout.widgets else [],
-            "layouts": dict(layout.layouts) if layout.layouts else {},
+            "widgets": layout.widgets if layout.widgets else [],
+            "layouts": layout.layouts if layout.layouts else {},
         }
     except DoesNotExist:
         return {
