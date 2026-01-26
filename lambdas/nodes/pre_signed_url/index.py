@@ -138,10 +138,12 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext):
         bucket, key, media_type = _extract_location(event.get("payload", {}))
 
         # ── 2. URL validity (env-driven, capped) ──────────────────────────
-        url_validity = int(os.getenv("URL_VALIDITY", URL_VALIDITY_DEFAULT))
+        url_validity = int(os.getenv("URL_VALIDITY_DURATION", URL_VALIDITY_DEFAULT))
         if not 0 < url_validity <= URL_VALIDITY_MAX:
-            raise ValueError(
-                f"URL_VALIDITY must be between 1 s and {URL_VALIDITY_MAX} s"
+            raise RuntimeError(
+                f"Invalid URL Validity Duration: {url_validity} seconds. "
+                f"Must be between 1 and {URL_VALIDITY_MAX} seconds (7 days). "
+                f"Please update the pipeline configuration."
             )
 
         # ── 3. Region-aware S3 client & pre-signed URL ────────────────────
