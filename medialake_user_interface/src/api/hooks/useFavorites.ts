@@ -47,10 +47,15 @@ export const useGetFavorites = (itemType?: string) => {
         ? `${API_ENDPOINTS.FAVORITES.BASE}?itemType=${itemType}`
         : API_ENDPOINTS.FAVORITES.BASE;
 
-      const { data } = await apiClient.get<FavoritesResponse | { body: string }>(url);
+      const { data } = await apiClient.get(url);
+
+      // Handle null or undefined response
+      if (!data) {
+        return [];
+      }
 
       // Handle API Gateway response where body is a JSON string
-      if ("body" in data && typeof data.body === "string") {
+      if (typeof data === "object" && "body" in data && typeof data.body === "string") {
         try {
           const parsed = JSON.parse(data.body);
           return parsed?.data?.favorites ?? [];
@@ -59,9 +64,19 @@ export const useGetFavorites = (itemType?: string) => {
         }
       }
 
-      // Handle direct response structure
-      const response = data as FavoritesResponse;
-      return response?.data?.favorites ?? [];
+      // Handle direct response structure with data.favorites
+      if (typeof data === "object" && "data" in data) {
+        const response = data as FavoritesResponse;
+        return response?.data?.favorites ?? [];
+      }
+
+      // Handle case where data is already the favorites array
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      // Fallback to empty array
+      return [];
     },
     staleTime: Infinity,
     gcTime: 1000 * 60 * 30,

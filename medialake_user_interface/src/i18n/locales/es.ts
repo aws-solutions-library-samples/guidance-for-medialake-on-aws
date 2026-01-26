@@ -1367,6 +1367,7 @@ export default {
     status: {
       syncing: "Sincronizando diseño...",
       pendingChanges: "Cambios pendientes de sincronización",
+      unsavedChanges: "Cambios no guardados",
     },
     errors: {
       saveFailed: "Error al guardar el diseño",

@@ -1367,6 +1367,7 @@ export default {
     status: {
       syncing: "Sincronizando layout...",
       pendingChanges: "Alterações pendentes de sincronização",
+      unsavedChanges: "Alterações não salvas",
     },
     errors: {
       saveFailed: "Falha ao salvar o layout",

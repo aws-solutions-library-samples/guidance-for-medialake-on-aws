@@ -1360,6 +1360,7 @@ export default {
     status: {
       syncing: "Syncing layout...",
       pendingChanges: "Changes pending sync",
+      unsavedChanges: "Unsaved changes",
     },
     errors: {
       saveFailed: "Failed to save layout",

@@ -1354,6 +1354,7 @@ export default {
     status: {
       syncing: "正在同步布局...",
       pendingChanges: "更改待同步",
+      unsavedChanges: "未保存的更改",
     },
     errors: {
       saveFailed: "保存布局失败",

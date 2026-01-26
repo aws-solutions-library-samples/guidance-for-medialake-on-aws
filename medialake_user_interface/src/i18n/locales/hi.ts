@@ -1365,6 +1365,7 @@ export default {
     status: {
       syncing: "लेआउट सिंक हो रहा है...",
       pendingChanges: "परिवर्तन सिंक होने की प्रतीक्षा में",
+      unsavedChanges: "असहेजे परिवर्तन",
     },
     errors: {
       saveFailed: "लेआउट सहेजने में विफल",

@@ -1356,6 +1356,7 @@ export default {
     status: {
       syncing: "레이아웃 동기화 중...",
       pendingChanges: "동기화 대기 중인 변경 사항",
+      unsavedChanges: "저장되지 않은 변경 사항",
     },
     errors: {
       saveFailed: "레이아웃 저장 실패",

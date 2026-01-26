@@ -1356,6 +1356,7 @@ export default {
     status: {
       syncing: "מסנכרן פריסה...",
       pendingChanges: "שינויים ממתינים לסנכרון",
+      unsavedChanges: "שינויים לא שמורים",
     },
     errors: {
       saveFailed: "שמירת הפריסה נכשלה",

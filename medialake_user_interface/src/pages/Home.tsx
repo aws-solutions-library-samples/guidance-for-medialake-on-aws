@@ -8,9 +8,8 @@ import {
   Button,
   IconButton,
   Tooltip,
-  CircularProgress,
 } from "@mui/material";
-import { Add as AddIcon, RestartAlt as ResetIcon, Sync as SyncIcon } from "@mui/icons-material";
+import { Add as AddIcon, RestartAlt as ResetIcon, Edit as EditIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useDirection } from "../contexts/DirectionContext";
 import { useSidebar } from "../contexts/SidebarContext";
@@ -37,7 +36,7 @@ const Home: React.FC = () => {
 
   const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
   const availableWidgets = useAvailableWidgets();
-  const { isSyncing, hasPendingChanges } = useDashboardSyncState();
+  const { hasPendingChanges } = useDashboardSyncState();
 
   // Initialize dashboard sync with API
   const { isLoading, resetLayout } = useDashboardSync();
@@ -116,21 +115,11 @@ const Home: React.FC = () => {
                   alignItems: "center",
                 }}
               >
-                {/* Sync indicator */}
-                {(isSyncing || hasPendingChanges) && (
-                  <Tooltip
-                    title={
-                      isSyncing
-                        ? t("dashboard.status.syncing")
-                        : t("dashboard.status.pendingChanges")
-                    }
-                  >
+                {/* Unsaved changes indicator */}
+                {hasPendingChanges && (
+                  <Tooltip title={t("dashboard.status.unsavedChanges")}>
                     <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
-                      {isSyncing ? (
-                        <CircularProgress size={16} />
-                      ) : (
-                        <SyncIcon fontSize="small" sx={{ color: "warning.main" }} />
-                      )}
+                      <EditIcon fontSize="small" sx={{ color: "warning.main" }} />
                     </Box>
                   </Tooltip>
                 )}
@@ -139,7 +128,7 @@ const Home: React.FC = () => {
                   <IconButton
                     onClick={handleReset}
                     size="small"
-                    disabled={isLoading || isSyncing}
+                    disabled={isLoading}
                     sx={{
                       color: "text.secondary",
                       "&:hover": {

@@ -1356,6 +1356,7 @@ export default {
     status: {
       syncing: "جارٍ مزامنة التخطيط...",
       pendingChanges: "تغييرات في انتظار المزامنة",
+      unsavedChanges: "تغييرات غير محفوظة",
     },
     errors: {
       saveFailed: "فشل في حفظ التخطيط",

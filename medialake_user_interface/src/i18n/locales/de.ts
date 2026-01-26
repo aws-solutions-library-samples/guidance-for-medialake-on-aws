@@ -1370,6 +1370,7 @@ export default {
     status: {
       syncing: "Layout wird synchronisiert...",
       pendingChanges: "Änderungen warten auf Synchronisierung",
+      unsavedChanges: "Nicht gespeicherte Änderungen",
     },
     errors: {
       saveFailed: "Layout konnte nicht gespeichert werden",

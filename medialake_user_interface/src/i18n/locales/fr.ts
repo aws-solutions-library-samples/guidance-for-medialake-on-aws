@@ -1370,6 +1370,7 @@ export default {
     status: {
       syncing: "Synchronisation de la disposition...",
       pendingChanges: "Modifications en attente de synchronisation",
+      unsavedChanges: "Modifications non enregistrées",
     },
     errors: {
       saveFailed: "Échec de l'enregistrement de la disposition",

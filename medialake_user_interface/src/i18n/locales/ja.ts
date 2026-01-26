@@ -1362,6 +1362,7 @@ export default {
     status: {
       syncing: "レイアウトを同期中...",
       pendingChanges: "同期待ちの変更があります",
+      unsavedChanges: "未保存の変更",
     },
     errors: {
       saveFailed: "レイアウトの保存に失敗しました",
