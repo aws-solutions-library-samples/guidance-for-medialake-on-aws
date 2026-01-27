@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 
 class NodeData(BaseModel):
     id: str
+    nodeId: Optional[str] = (
+        None  # Template type identifier (e.g., "choice", "fail", "success")
+    )
     type: str
     label: str
     description: str

@@ -1,0 +1,520 @@
+{
+  "name": "External Metadata Enrichment",
+  "description": "Fetch metadata from external source systems (MAM/DAM) and store it alongside asset records. This pipeline supports both automatic triggering (after a workflow completes) and manual triggering via API. IMPORTANT: Before deploying, you must configure the secret_arn, auth_endpoint, and metadata_endpoint parameters with your external system's credentials and API endpoints. NOTE: The secret name in AWS Secrets Manager must start with 'medialake/' (e.g., 'medialake/external-mam-credentials') for the pipeline to have permission to access it. END STATES: The pipeline ends with one of four states based on the enrichment result - Success (metadata retrieved), NoMatch (correlation ID not found), AuthError (authentication failed), or Error (unexpected error).",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 160,
+          "y": 160
+        },
+        "data": {
+          "nodeId": "trigger_workflow_completed",
+          "label": "Workflow Completed (trigger)",
+          "description": "This step will trigger after a specified workflow completes - for automatic enrichment after initial processing (e.g., Default Video Pipeline)",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "pipeline_name": "Default Video Pipeline",
+              "asset_representation": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "rotation": 0,
+          "id": "trigger_workflow_completed"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 160,
+          "y": 320
+        },
+        "data": {
+          "nodeId": "trigger_manual",
+          "label": "Manual Trigger",
+          "description": "This step enables manual triggering via the pipeline trigger API - for on-demand enrichment or re-enrichment of specific assets",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {},
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "rotation": 0,
+          "id": "trigger_manual"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 480,
+          "y": 240
+        },
+        "data": {
+          "nodeId": "external_metadata_fetch",
+          "label": "External Metadata Fetch (fetch_metadata)",
+          "description": "Fetch metadata from external source systems (MAM/DAM) and store it alongside asset records",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "INTEGRATION",
+          "configuration": {
+            "path": "",
+            "operationId": "fetchExternalMetadata",
+            "method": "fetch_metadata",
+            "parameters": {
+              "adapter_type": "generic_rest",
+              "auth_type": "oauth2_client_credentials",
+              "secret_arn": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:medialake/example-credentials",
+              "auth_endpoint": "https://api.example.com/oauth/token",
+              "metadata_endpoint": "https://api.example.com/v1/assets",
+              "correlation_id_param": "assetId",
+              "max_retries": 3
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "rotation": 0,
+          "id": "external_metadata_fetch"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 760,
+          "y": 240
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Enrichment Result",
+          "description": "Routes to appropriate end state based on enrichment_status: success, no_match, auth_error, or error",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Success",
+              "description": "Metadata successfully retrieved and stored"
+            },
+            {
+              "name": "NoMatch",
+              "description": "Correlation ID invalid, missing, or not found in external system"
+            },
+            {
+              "name": "AuthError",
+              "description": "Authentication failed (credential retrieval, OAuth token, or API key errors)"
+            },
+            {
+              "name": "Error",
+              "description": "Unexpected error (HTTP 500, unhandled exceptions)"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {
+              "variable": "$.payload.data.body.enrichment_status",
+              "choices": [
+                {
+                  "condition": "success",
+                  "output": "Success"
+                },
+                {
+                  "condition": "no_match",
+                  "output": "NoMatch"
+                },
+                {
+                  "condition": "auth_error",
+                  "output": "AuthError"
+                }
+              ],
+              "default": "Error"
+            }
+          },
+          "rotation": 0,
+          "id": "choice_enrichment_result"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 80
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "Enrichment completed successfully - metadata was retrieved from the external system and stored in the asset record",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "rotation": 0,
+          "id": "success"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 200
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "NoMatch",
+          "description": "Correlation ID issue - the asset's correlation ID was invalid, missing, or not found in the external system. Check the asset's filename or provide a correlation_id override via the trigger API.",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "NoMatch",
+              "Cause": "Correlation ID invalid, missing, or not found in external system. Verify the asset filename matches the external system ID, or provide a correlation_id override when triggering the pipeline."
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "rotation": 0,
+          "id": "fail_no_match"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_6",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 320
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "AuthError",
+          "description": "Authentication failed - could not authenticate with the external system. Check credentials in Secrets Manager, verify the auth_endpoint URL, and ensure the external system is accessible.",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "AuthError",
+              "Cause": "Authentication failed. Check: 1) Credentials in Secrets Manager are correct, 2) Secret name starts with 'medialake/', 3) Auth endpoint URL is correct, 4) External system is accessible."
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "rotation": 0,
+          "id": "fail_auth_error"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_7",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 440
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Error",
+          "description": "Unexpected error occurred during enrichment. Check CloudWatch logs for details. Common causes: HTTP 500 from external API, network issues, or unhandled exceptions.",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "Error",
+              "Cause": "Unexpected error during enrichment. Check CloudWatch logs for the External_Metadata_Fetch_Node Lambda function. Common causes: external API returned HTTP 500, network connectivity issues, or unhandled exceptions."
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "rotation": 0,
+          "id": "fail_error"
+        },
+        "width": 204,
+        "height": 119
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_2",
+        "source": "dndnode_0",
+        "target": "dndnode_2",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Success"
+        },
+        "sourceHandle": "Success",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_5",
+        "source": "dndnode_3",
+        "target": "dndnode_5",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "NoMatch"
+        },
+        "sourceHandle": "NoMatch",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_6",
+        "source": "dndnode_3",
+        "target": "dndnode_6",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "AuthError"
+        },
+        "sourceHandle": "AuthError",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_3-dndnode_7",
+        "source": "dndnode_3",
+        "target": "dndnode_7",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Error"
+        },
+        "sourceHandle": "Error",
+        "targetHandle": "input-any"
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

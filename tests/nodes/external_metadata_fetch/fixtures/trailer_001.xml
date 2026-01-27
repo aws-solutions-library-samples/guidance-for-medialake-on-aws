@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Anonymized test fixture: Season Trailer (Interstitial content)
+  Based on typical XML metadata structure, with all customer-specific
+  data replaced with generic test data.
+
+  Content Type: Interstitial (Season Trailer)
+  Features: Minimal metadata, episode_number=0, content_type=Interstitial
+-->
+<ProgramMetadata>
+  <acme_id>TST400001</acme_id>
+  <title>The Hidden Legacy - Season 2 Trailer</title>
+  <video_filename>L00400001.mov</video_filename>
+  <captions_filename>L00400001_cc_en-US.scc</captions_filename>
+  <primary_network>Acme Plus</primary_network>
+  <short_description>The Hidden Legacy - Season 2 Trailer</short_description>
+  <long_description>The Hidden Legacy - Season 2 Trailer</long_description>
+  <is_movie>FALSE</is_movie>
+  <show_name>The Hidden Legacy</show_name>
+  <season_number>2</season_number>
+  <episode_number>0</episode_number>
+  <rating>
+    <Rating Type="TV Rating" Descriptor="LSV">TV-MA</Rating>
+    <Rating Type="us-tv" Descriptor="LSV">TV-MA</Rating>
+    <Rating Type="ca-tv">18+</Rating>
+  </rating>
+  <cue_points />
+  <keywords>mystery, drama, family secrets, artifact, investigation, thriller, suspense, legacy, hidden truth, discovery, trailer, season 2</keywords>
+  <genre>Drama</genre>
+  <genres>
+    <genre type="default">Drama</genre>
+    <genre type="subgenre">Mystery</genre>
+    <genre type="Amazon">Drama</genre>
+    <genre type="Amazon">Mystery</genre>
+    <genre type="Apple">Drama</genre>
+    <genre type="Apple">Mystery</genre>
+  </genres>
+  <language>en-US</language>
+  <country>United States</country>
+  <country_code>US</country_code>
+  <short_series_description>A museum curator uncovers family secrets through a mysterious artifact.</short_series_description>
+  <long_series_description>The Hidden Legacy follows Alex Chen, a museum curator who discovers a mysterious artifact that reveals hidden truths about their family's past. Spanning multiple generations and continents, the series explores themes of identity, legacy, and the secrets families keep. As Alex unravels the mystery, they must confront uncomfortable truths while navigating present-day challenges.</long_series_description>
+  <original_air_date>2025-02-15</original_air_date>
+  <actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Alex Chen">Jordan Lee</actor>
+  </actors>
+  <directors />
+  <premiere_year>2025</premiere_year>
+  <video_type>Full Episode</video_type>
+  <video_dar>16:9</video_dar>
+  <tms_movie_id />
+  <tms_series_id>SH099900010000</tms_series_id>
+  <series_id>TST100000</series_id>
+  <season_id>TSS10002</season_id>
+  <tms_episode_id>EP099900010020</tms_episode_id>
+  <frame_rate>2400</frame_rate>
+  <resolution />
+  <video_definition>HD</video_definition>
+  <video_duration />
+  <refid>L00400001</refid>
+  <version_id>TST400001.1</version_id>
+  <titlebrief>Hidden 200A</titlebrief>
+  <id_sequence>20400001</id_sequence>
+  <content_type>Interstitial</content_type>
+  <ad_category>Entertainment:General</ad_category>
+  <ad_content_id>L00400001</ad_content_id>
+  <carousel></carousel>
+  <platform_rights></platform_rights>
+  <short_season_description>Alex Chen's journey continues as new secrets emerge.</short_season_description>
+  <long_season_description>In the second season of The Hidden Legacy, Alex Chen's investigation takes them across continents as they uncover deeper layers of their family's mysterious past.</long_season_description>
+  <copyright_holder />
+  <copyright_year>2025</copyright_year>
+  <writers />
+  <studio_name>Acme Plus</studio_name>
+  <season_count>2</season_count>
+  <episode_count>1</episode_count>
+  <guest_actors />
+  <producers />
+  <series_creators />
+  <executive_producers />
+  <needs_watermark>false</needs_watermark>
+  <series_premiere_date>2025-02-15</series_premiere_date>
+  <season_rating />
+  <series_rating />
+  <in_color_flag>Y</in_color_flag>
+  <season_actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Alex Chen">Jordan Lee</actor>
+  </season_actors>
+  <season_directors />
+  <season_writers />
+  <season_guest_actors />
+  <season_producers />
+  <season_executive_producers />
+  <series_actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Alex Chen">Jordan Lee</actor>
+    <actor order="2" first_name="Morgan" last_name="Taylor" role="Sam Rivera">Morgan Taylor</actor>
+  </series_actors>
+  <series_directors />
+  <series_writers />
+  <series_guest_actors />
+  <series_producers />
+  <series_executive_producers />
+  <conform_materials_list>L00400001</conform_materials_list>
+  <placement>
+    <acme_id>L00400001</acme_id>
+    <material_id>L00400001</material_id>
+    <placementplaylistevent Index="0">
+      <acme_id>L00400001</acme_id>
+      <acme_material_id>L00400001</acme_material_id>
+      <acme_material_title>The Hidden Legacy: Full Trailer: 02-001</acme_material_title>
+      <acme_material_segment_number_sub>1</acme_material_segment_number_sub>
+      <acme_material_type>VIDEO</acme_material_type>
+      <acme_material_tc_in>00:59:59.22</acme_material_tc_in>
+      <acme_material_tc_out>01:02:10.03</acme_material_tc_out>
+    </placementplaylistevent>
+  </placement>
+  <sourcematerials>
+    <material>
+      <acme_id>L00400001</acme_id>
+      <material_id>L00400001</material_id>
+      <semitextless>false</semitextless>
+      <component componenttype="Video">
+        <acme_id>L00400001</acme_id>
+        <material_id>L00400001</material_id>
+        <filename>L00400001.mov</filename>
+        <componenttypemetadata>
+          <videoattributes>
+            <framerate>2400</framerate>
+            <aspectratio>1.78</aspectratio>
+            <videocodec>Apple Pro Res</videocodec>
+            <activepicture></activepicture>
+            <AFD>10</AFD>
+          </videoattributes>
+          <format></format>
+          <forced_narrative>false</forced_narrative>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00400001.1.en-US.OA</acme_id>
+        <material_id>L00400001</material_id>
+        <fileposition>1</fileposition>
+        <filename>L00400001.mov</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber>Tracks 1&amp;2</audiopairnumber>
+                <audiodescription>Stereo</audiodescription>
+                <audiolanguage code="en-US">English US (en-US)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Subtitle">
+        <acme_id>L00400001.ClosedCaptioning.en-US</acme_id>
+        <material_id>L00400001</material_id>
+        <filename>L00400001_cc_en-US.scc</filename>
+        <componenttypemetadata>
+          <subtitleattributes>
+            <language code="en-US">English US (en-US)</language>
+          </subtitleattributes>
+        </componenttypemetadata>
+      </component>
+    </material>
+  </sourcematerials>
+  <timelines>
+    <segments>
+      <segment>
+        <segmentnumber>1</segmentnumber>
+        <start>00:59:59:22</start>
+        <end>01:02:10:03</end>
+      </segment>
+    </segments>
+    <markers />
+    <adopportunitiesmarkers />
+  </timelines>
+</ProgramMetadata>

@@ -1,0 +1,56 @@
+{
+  "Comment": "State machine for pipeline Default Video Pipeline",
+  "StartAt": "Video_Metadata_Extractor_extract__dndnode_13_",
+  "States": {
+    "Check_MediaConvert_Status_extract__dndnode_14_": {
+      "Next": "Choice__dndnode_26_",
+      "Result": {
+        "message": "No Lambda function for check_media_convert_status"
+      },
+      "Type": "Pass"
+    },
+    "Choice__dndnode_26_": {
+      "Choices": [
+        {
+          "Next": "Success__dndnode_17_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        },
+        {
+          "Next": "Fail_fail__dndnode_27_",
+          "StringEquals": "Failed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_wait__dndnode_21_",
+      "Type": "Choice"
+    },
+    "Fail_fail__dndnode_27_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Success__dndnode_17_": {
+      "Type": "Succeed"
+    },
+    "Video_Metadata_Extractor_extract__dndnode_13_": {
+      "Next": "Video_Proxy_and_Thumbnail_extract__dndnode_25_",
+      "Result": {
+        "message": "No Lambda function for video_metadata_extractor"
+      },
+      "Type": "Pass"
+    },
+    "Video_Proxy_and_Thumbnail_extract__dndnode_25_": {
+      "Next": "Check_MediaConvert_Status_extract__dndnode_14_",
+      "Result": {
+        "message": "No Lambda function for video_proxy_and_thumbnail"
+      },
+      "Type": "Pass"
+    },
+    "Wait_wait__dndnode_21_": {
+      "Next": "Check_MediaConvert_Status_extract__dndnode_14_",
+      "Seconds": 15,
+      "Type": "Wait"
+    }
+  }
+}

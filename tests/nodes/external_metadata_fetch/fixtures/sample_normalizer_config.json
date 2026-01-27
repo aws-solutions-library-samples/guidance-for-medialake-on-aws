@@ -1,0 +1,143 @@
+{
+  "$schema": "https://medialake.example.com/schemas/normalizer-config.json",
+  "_comment": "Sample normalizer configuration for testing with anonymized fixtures.",
+  "_description": "This configuration matches the field names used in the anonymized test fixtures (episode_full_*.xml, trailer_*.xml, special_content_*.xml).",
+
+  "normalizer": {
+    "source_type": "generic_xml",
+    "config": {
+      "_description": "Generic field mappings for the test fixtures",
+
+      "source_namespace_prefix": "ACME",
+      "default_language": "en-US",
+      "include_raw_source": false,
+
+      "primary_id_field": "acme_id",
+      "ref_id_field": "refid",
+      "title_field": "title",
+      "title_brief_field": "titlebrief",
+      "premiere_year_field": "premiere_year",
+      "original_air_date_field": "original_air_date",
+      "country_code_field": "country_code",
+      "language_field": "language",
+
+      "identifier_mappings": {
+        "_comment": "Maps source field names to namespace suffixes. Empty string uses source_namespace_prefix directly. Hyphen prefix appends to source_namespace_prefix. No hyphen uses as absolute namespace.",
+        "acme_id": "",
+        "refid": "-REF",
+        "version_id": "-VERSION",
+        "id_sequence": "-SEQ",
+        "tms_series_id": "TMS",
+        "tms_episode_id": "TMS",
+        "tms_movie_id": "TMS",
+        "ad_content_id": "-AD"
+      },
+
+      "title_mappings": {
+        "_comment": "Maps source field names to MEC LocalizedInfo elements",
+        "title_field": "title",
+        "title_brief_field": "titlebrief",
+        "description_field": "long_description",
+        "description_short_field": "short_description",
+        "copyright_holder_field": "copyright_holder",
+        "keywords_field": "keywords"
+      },
+
+      "hierarchy_field_mappings": {
+        "_comment": "Maps source field names for series/season/episode hierarchy",
+        "series_id_field": "series_id",
+        "season_id_field": "season_id",
+        "episode_number_field": "episode_number",
+        "season_number_field": "season_number",
+        "show_name_field": "show_name",
+        "short_series_description_field": "short_series_description",
+        "long_series_description_field": "long_series_description",
+        "short_season_description_field": "short_season_description",
+        "long_season_description_field": "long_season_description",
+        "series_premiere_date_field": "series_premiere_date",
+        "season_count_field": "season_count",
+        "episode_count_field": "episode_count"
+      },
+
+      "people_field_mappings": {
+        "_comment": "Maps source field names (container elements) to MEC JobFunction values",
+        "actors": "Actor",
+        "directors": "Director",
+        "writers": "Writer",
+        "producers": "Producer",
+        "executive_producers": "ExecutiveProducer",
+        "series_creators": "Creator",
+        "guest_actors": "Actor"
+      },
+
+      "person_first_name_attr": "@first_name",
+      "person_last_name_attr": "@last_name",
+      "person_order_attr": "@order",
+      "person_role_attr": "@role",
+      "guest_actors_field": "guest_actors",
+
+      "classification_field_mappings": {
+        "_comment": "Maps source field names for content classification",
+        "is_movie_field": "is_movie",
+        "content_type_field": "content_type",
+        "video_type_field": "video_type",
+        "genre_field": "genre",
+        "genres_container_field": "genres"
+      },
+
+      "rating_system_mappings": {
+        "_comment": "Maps rating @Type attribute values to MEC System and Region. Region is REQUIRED by MEC v2.25.",
+        "TV Rating": { "system": "us-tv", "region": "US" },
+        "us-tv": { "system": "us-tv", "region": "US" },
+        "ca-tv": { "system": "ca-tv", "region": "CA" },
+        "au-tv": { "system": "au-tv", "region": "AU" },
+        "ACMA": { "system": "ACMA", "region": "AU" },
+        "DMEC": { "system": "DMEC", "region": "MX" },
+        "in-tv": { "system": "in-tv", "region": "IN" },
+        "nz-tv": { "system": "nz-tv", "region": "NZ" },
+        "nz-am": { "system": "nz-am", "region": "NZ" }
+      },
+
+      "technical_field_mappings": {
+        "_comment": "Maps source field names for technical metadata",
+        "frame_rate_field": "frame_rate",
+        "video_dar_field": "video_dar",
+        "video_definition_field": "video_definition",
+        "resolution_field": "resolution",
+        "in_color_flag_field": "in_color_flag",
+        "video_filename_field": "video_filename",
+        "captions_filename_field": "captions_filename"
+      },
+
+      "custom_field_categories": {
+        "_comment": "Maps category names to lists of field names to extract into custom_fields",
+        "advertising": [
+          "ad_category",
+          "ad_content_id",
+          "cue_points",
+          "adopportunitiesmarkers"
+        ],
+        "timing": ["timelines", "timelines_df30", "segments", "markers"],
+        "technical": [
+          "AFD",
+          "needs_watermark",
+          "semitextless",
+          "conform_materials_list"
+        ],
+        "rights": ["platform_rights", "carousel"],
+        "other": ["placement"]
+      },
+
+      "platform_genre_types": [
+        "Amazon",
+        "Apple",
+        "Roku",
+        "SN Series",
+        "SN Genres",
+        "Shudder Prod",
+        "Bell Series",
+        "TELUS Series"
+      ]
+    }
+  }
+}

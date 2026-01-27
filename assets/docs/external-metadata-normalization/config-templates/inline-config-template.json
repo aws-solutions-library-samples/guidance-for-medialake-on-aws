@@ -1,0 +1,53 @@
+{
+  "_comment": "Inline configuration template for pipeline node settings",
+  "_usage": "Embed this in the 'normalizer.config' field of your pipeline node",
+
+  "source_namespace_prefix": "CUSTOMER",
+  "default_language": "en-US",
+  "primary_id_field": "content_id",
+  "ref_id_field": "reference_id",
+  "include_raw_source": false,
+
+  "identifier_mappings": {
+    "_comment": "Map source ID fields to namespace suffixes",
+    "_rules": "Empty string uses prefix directly, '-SUFFIX' appends to prefix, 'ABSOLUTE' uses as-is",
+
+    "content_id": "",
+    "reference_id": "-REF",
+    "version_id": "-VERSION",
+    "gracenote_series_id": "TMS",
+    "gracenote_episode_id": "TMS"
+  },
+
+  "title_mappings": {
+    "_comment": "Map source title/description fields to MEC LocalizedInfo elements",
+
+    "title_field": "title",
+    "title_brief_field": "short_title",
+    "short_description_field": "synopsis_short",
+    "long_description_field": "synopsis_full",
+    "copyright_field": "copyright_notice",
+    "keywords_field": "keywords"
+  },
+
+  "people_field_mappings": {
+    "_comment": "Map source people fields to MEC JobFunction values",
+
+    "actors": "Actor",
+    "directors": "Director",
+    "writers": "Writer",
+    "producers": "Producer",
+    "executive_producers": "ExecutiveProducer",
+    "guest_actors": "Actor"
+  },
+  "guest_actors_field": "guest_actors",
+
+  "rating_system_mappings": {
+    "_comment": "Map rating system identifiers to region (country) codes",
+
+    "us-tv": "US",
+    "TV Rating": "US",
+    "ca-tv": "CA",
+    "au-tv": "AU"
+  }
+}

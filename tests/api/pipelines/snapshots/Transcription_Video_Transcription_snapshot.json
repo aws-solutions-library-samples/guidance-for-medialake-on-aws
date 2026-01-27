@@ -1,0 +1,46 @@
+{
+  "Comment": "State machine for pipeline Video Transcription",
+  "StartAt": "Transcribe_Audio_using_Amazon_Transcribe__dndnode_1_",
+  "States": {
+    "Bedrock_Content_Processor_process_content__dndnode_6_": {
+      "Next": "Success__dndnode_4_",
+      "Result": {
+        "message": "No Lambda function for bedrock_content_processor"
+      },
+      "Type": "Pass"
+    },
+    "Choice__dndnode_3_": {
+      "Choices": [
+        {
+          "Next": "Bedrock_Content_Processor_process_content__dndnode_6_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_wait__dndnode_5_",
+      "Type": "Choice"
+    },
+    "Success__dndnode_4_": {
+      "Type": "Succeed"
+    },
+    "Transcribe_Audio_using_Amazon_Transcribe__dndnode_1_": {
+      "Next": "Transcription_Job_Status__dndnode_2_",
+      "Result": {
+        "message": "No Lambda function for audio_transcription_transcribe"
+      },
+      "Type": "Pass"
+    },
+    "Transcription_Job_Status__dndnode_2_": {
+      "Next": "Choice__dndnode_3_",
+      "Result": {
+        "message": "No Lambda function for audio_transcription_transcribe_status"
+      },
+      "Type": "Pass"
+    },
+    "Wait_wait__dndnode_5_": {
+      "Next": "Transcription_Job_Status__dndnode_2_",
+      "Seconds": 30,
+      "Type": "Wait"
+    }
+  }
+}

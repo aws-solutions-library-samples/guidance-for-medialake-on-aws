@@ -71,7 +71,12 @@ class StateMachineBuilder:
             choice_false_targets,
             choice_fail_targets,
             map_processor_chains,
+            choice_custom_branches,
         ) = self.graph_analyzer.find_special_edges()
+
+        # Log custom branches if found
+        if choice_custom_branches:
+            logger.info(f"Found custom Choice branches: {choice_custom_branches}")
 
         # Step 3.5: Find first and last Lambda nodes
         first_lambda_node_id, last_lambda_node_id = (
@@ -110,6 +115,7 @@ class StateMachineBuilder:
             choice_true_targets,
             choice_false_targets,
             choice_fail_targets,
+            choice_custom_branches,
         )
         logger.info(
             f"After connecting states, we have {len(self.states)} states: {list(self.states.keys())}"

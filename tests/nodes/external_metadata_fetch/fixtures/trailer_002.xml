@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Anonymized test fixture: Promotional Clip (Interstitial content)
+  Based on typical XML metadata structure, with all customer-specific
+  data replaced with generic test data.
+
+  Content Type: Interstitial (Promotional Clip)
+  Features: Very minimal metadata, short duration
+-->
+<ProgramMetadata>
+  <acme_id>TST500001</acme_id>
+  <title>Nightfall Chronicles - Coming Soon</title>
+  <video_filename>L00500001.mov</video_filename>
+  <captions_filename></captions_filename>
+  <primary_network>Acme Plus</primary_network>
+  <short_description>Nightfall Chronicles returns this fall.</short_description>
+  <long_description>Nightfall Chronicles returns this fall with new mysteries and supernatural thrills.</long_description>
+  <is_movie>FALSE</is_movie>
+  <show_name>Nightfall Chronicles</show_name>
+  <season_number>2</season_number>
+  <episode_number>0</episode_number>
+  <rating>
+    <Rating Type="TV Rating">TV-MA</Rating>
+    <Rating Type="us-tv">TV-MA</Rating>
+  </rating>
+  <cue_points />
+  <keywords>horror, supernatural, mystery, promo, coming soon</keywords>
+  <genre>Drama</genre>
+  <genres>
+    <genre type="default">Drama</genre>
+    <genre type="subgenre">Horror</genre>
+  </genres>
+  <language>en-US</language>
+  <country>United States</country>
+  <country_code>US</country_code>
+  <short_series_description>A supernatural thriller following investigators in a haunted small town.</short_series_description>
+  <long_series_description>Nightfall Chronicles follows Detective Maya Santos and local historian Dr. James Wright as they investigate supernatural occurrences in the small town of Millbrook.</long_series_description>
+  <original_air_date>2024-09-01</original_air_date>
+  <actors />
+  <directors />
+  <premiere_year>2024</premiere_year>
+  <video_type>Full Episode</video_type>
+  <video_dar>16:9</video_dar>
+  <tms_movie_id />
+  <tms_series_id>SH088800020000</tms_series_id>
+  <series_id>TST200000</series_id>
+  <season_id>TSS20002</season_id>
+  <tms_episode_id>EP088800020030</tms_episode_id>
+  <frame_rate>2400</frame_rate>
+  <resolution />
+  <video_definition>HD</video_definition>
+  <video_duration />
+  <refid>L00500001</refid>
+  <version_id>TST500001.1</version_id>
+  <titlebrief>Nightfall Promo</titlebrief>
+  <id_sequence>20500001</id_sequence>
+  <content_type>Interstitial</content_type>
+  <ad_category>Entertainment:General</ad_category>
+  <ad_content_id>L00500001</ad_content_id>
+  <carousel></carousel>
+  <platform_rights></platform_rights>
+  <short_season_description>The darkness returns to Millbrook.</short_season_description>
+  <long_season_description>In the second season of Nightfall Chronicles, Detective Santos and Dr. Wright face an even greater supernatural threat.</long_season_description>
+  <copyright_holder />
+  <copyright_year>2024</copyright_year>
+  <writers />
+  <studio_name>Acme Plus</studio_name>
+  <season_count>3</season_count>
+  <episode_count>0</episode_count>
+  <guest_actors />
+  <producers />
+  <series_creators />
+  <executive_producers />
+  <needs_watermark>false</needs_watermark>
+  <series_premiere_date>2023-07-22</series_premiere_date>
+  <season_rating />
+  <series_rating />
+  <in_color_flag>Y</in_color_flag>
+  <season_actors />
+  <season_directors />
+  <season_writers />
+  <season_guest_actors />
+  <season_producers />
+  <season_executive_producers />
+  <series_actors />
+  <series_directors />
+  <series_writers />
+  <series_guest_actors />
+  <series_producers />
+  <series_executive_producers />
+  <conform_materials_list>L00500001</conform_materials_list>
+  <sourcematerials>
+    <material>
+      <acme_id>L00500001</acme_id>
+      <material_id>L00500001</material_id>
+      <semitextless>false</semitextless>
+      <component componenttype="Video">
+        <acme_id>L00500001</acme_id>
+        <material_id>L00500001</material_id>
+        <filename>L00500001.mov</filename>
+        <componenttypemetadata>
+          <videoattributes>
+            <framerate>2400</framerate>
+            <aspectratio>1.78</aspectratio>
+            <videocodec>Apple Pro Res</videocodec>
+            <activepicture></activepicture>
+            <AFD>10</AFD>
+          </videoattributes>
+          <format></format>
+          <forced_narrative>false</forced_narrative>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00500001.1.en-US.OA</acme_id>
+        <material_id>L00500001</material_id>
+        <fileposition>1</fileposition>
+        <filename>L00500001.mov</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber>Tracks 1&amp;2</audiopairnumber>
+                <audiodescription>Stereo</audiodescription>
+                <audiolanguage code="en-US">English US (en-US)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+    </material>
+  </sourcematerials>
+  <timelines>
+    <segments>
+      <segment>
+        <segmentnumber>1</segmentnumber>
+        <start>00:59:59:22</start>
+        <end>01:00:29:22</end>
+      </segment>
+    </segments>
+    <markers />
+    <adopportunitiesmarkers />
+  </timelines>
+</ProgramMetadata>

@@ -442,67 +442,90 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 f"State machine successfully created for pipeline {pipeline_name}"
             )
 
-            # Create EventBridge rules for trigger nodes
+            # Create EventBridge rules for trigger nodes (excluding manual triggers)
             update_pipeline_status(pipeline_id, "CREATING EVENT RULES")
             logger.info(
-                f"Creating EventBridge rules for trigger nodes in pipeline {pipeline_name}"
+                f"Creating EventBridge rules for event trigger nodes in pipeline {pipeline_name}"
             )
             eventbridge_rule_arns = {}
             eventbridge_role_arns = {}
             trigger_lambda_arns = {}
             sqs_queue_arns = {}
             event_source_mapping_uuids = {}
-            trigger_nodes = [
+
+            # Filter out manual trigger nodes - they don't need EventBridge rules
+            event_trigger_nodes = [
                 node
                 for node in pipeline.configuration.nodes
                 if node.data.type.lower() == "trigger"
+                and node.data.id != "trigger_manual"
             ]
-            total_triggers = len(trigger_nodes)
-            processed_triggers = 0
-            for node in pipeline.configuration.nodes:
-                if node.data.type.lower() == "trigger":
-                    processed_triggers += 1
-                    update_pipeline_status(
-                        pipeline_id,
-                        f"CREATING EVENT RULE {processed_triggers}/{total_triggers}",
-                    )
-                    logger.info(
-                        f"Creating EventBridge rule for trigger node {processed_triggers}/{total_triggers}: {node.data.id}"
-                    )
-                    try:
-                        rule_result = create_eventbridge_rule(
-                            pipeline_name,
-                            node,
-                            state_machine_arn,
-                            active=pipeline.active,
-                        )
-                        if rule_result:
-                            eventbridge_rule_arns[node.data.id] = rule_result[
-                                "rule_arn"
-                            ]
-                            eventbridge_role_arns[node.data.id] = rule_result[
-                                "role_arn"
-                            ]
-                            trigger_lambda_arns[node.data.id] = rule_result[
-                                "trigger_lambda_arn"
-                            ]
-                            sqs_queue_arns[node.data.id] = rule_result["queue_arn"]
-                            if rule_result["event_source_mapping_uuid"]:
-                                event_source_mapping_uuids[node.data.id] = rule_result[
-                                    "event_source_mapping_uuid"
-                                ]
-                            logger.info(
-                                f"Added EventBridge rule {rule_result['rule_arn']} for node {node.data.id} with active={pipeline.active}"
-                            )
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to create EventBridge rule for node {node.data.id}: {e}"
-                        )
+            manual_trigger_nodes = [
+                node
+                for node in pipeline.configuration.nodes
+                if node.data.type.lower() == "trigger"
+                and node.data.id == "trigger_manual"
+            ]
 
-            if total_triggers > 0:
+            total_event_triggers = len(event_trigger_nodes)
+            total_manual_triggers = len(manual_trigger_nodes)
+            processed_triggers = 0
+
+            logger.info(
+                f"Found {total_event_triggers} event trigger nodes and {total_manual_triggers} manual trigger nodes"
+            )
+
+            # Only create EventBridge rules for event trigger nodes
+            for node in event_trigger_nodes:
+                processed_triggers += 1
+                update_pipeline_status(
+                    pipeline_id,
+                    f"CREATING EVENT RULE {processed_triggers}/{total_event_triggers}",
+                )
+                logger.info(
+                    f"Creating EventBridge rule for event trigger node {processed_triggers}/{total_event_triggers}: {node.data.id}"
+                )
+                try:
+                    rule_result = create_eventbridge_rule(
+                        pipeline_name,
+                        node,
+                        state_machine_arn,
+                        active=pipeline.active,
+                    )
+                    if rule_result:
+                        eventbridge_rule_arns[node.data.id] = rule_result["rule_arn"]
+                        eventbridge_role_arns[node.data.id] = rule_result["role_arn"]
+                        trigger_lambda_arns[node.data.id] = rule_result[
+                            "trigger_lambda_arn"
+                        ]
+                        sqs_queue_arns[node.data.id] = rule_result["queue_arn"]
+                        if rule_result["event_source_mapping_uuid"]:
+                            event_source_mapping_uuids[node.data.id] = rule_result[
+                                "event_source_mapping_uuid"
+                            ]
+                        logger.info(
+                            f"Added EventBridge rule {rule_result['rule_arn']} for event trigger node {node.data.id} with active={pipeline.active}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to create EventBridge rule for event trigger node {node.data.id}: {e}"
+                    )
+
+            # Log manual trigger nodes (no EventBridge rules needed)
+            for node in manual_trigger_nodes:
+                logger.info(
+                    f"Skipping EventBridge rule creation for manual trigger node: {node.data.id} (triggered manually)"
+                )
+
+            if total_event_triggers > 0:
                 update_pipeline_status(pipeline_id, "EVENT RULES CREATED")
                 logger.info(
-                    f"All EventBridge rules created for pipeline {pipeline_name}"
+                    f"All EventBridge rules created for {total_event_triggers} event trigger nodes in pipeline {pipeline_name}"
+                )
+            elif total_manual_triggers > 0:
+                update_pipeline_status(pipeline_id, "MANUAL TRIGGERS CONFIGURED")
+                logger.info(
+                    f"Pipeline {pipeline_name} configured with {total_manual_triggers} manual trigger nodes (no EventBridge rules needed)"
                 )
             else:
                 logger.info(

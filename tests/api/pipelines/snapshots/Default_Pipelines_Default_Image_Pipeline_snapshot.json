@@ -1,0 +1,30 @@
+{
+  "Comment": "State machine for pipeline Default Image Pipeline",
+  "StartAt": "Image_Metadata_Extractor_extract__dndnode_3_",
+  "States": {
+    "Image_Metadata_Extractor_extract__dndnode_3_": {
+      "Next": "Image_Proxy_extract__dndnode_2_",
+      "Result": {
+        "message": "No Lambda function for image_metadata_extractor"
+      },
+      "Type": "Pass"
+    },
+    "Image_Proxy_extract__dndnode_2_": {
+      "Next": "Image_Thumbnail_extract__dndnode_1_",
+      "Result": {
+        "message": "No Lambda function for image_proxy"
+      },
+      "Type": "Pass"
+    },
+    "Image_Thumbnail_extract__dndnode_1_": {
+      "Next": "Success__dndnode_4_",
+      "Result": {
+        "message": "No Lambda function for image_thumbnail"
+      },
+      "Type": "Pass"
+    },
+    "Success__dndnode_4_": {
+      "Type": "Succeed"
+    }
+  }
+}

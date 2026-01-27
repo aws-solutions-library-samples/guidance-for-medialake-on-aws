@@ -1,0 +1,16 @@
+{
+  "Comment": "State machine for pipeline TwelveLabs Pegasus Bedrock Video Enrichment",
+  "StartAt": "Bedrock_Content_Processor_process_content__dndnode_1_",
+  "States": {
+    "Bedrock_Content_Processor_process_content__dndnode_1_": {
+      "Next": "Success__dndnode_5_",
+      "Result": {
+        "message": "No Lambda function for bedrock_content_processor"
+      },
+      "Type": "Pass"
+    },
+    "Success__dndnode_5_": {
+      "Type": "Succeed"
+    }
+  }
+}

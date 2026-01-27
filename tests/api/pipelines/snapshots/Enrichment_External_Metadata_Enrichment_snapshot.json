@@ -1,0 +1,79 @@
+{
+  "Comment": "State machine for pipeline External Metadata Enrichment",
+  "StartAt": "External_Metadata_Fetch_fetch_metadata_fetchExternalMetadata__dndnode_2_",
+  "States": {
+    "AuthError__dndnode_6_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Enrichment_Result__dndnode_3_": {
+      "Choices": [
+        {
+          "Next": "Success__dndnode_4_",
+          "StringEquals": "success",
+          "Variable": "$.payload.data.body.enrichment_status"
+        },
+        {
+          "Next": "NoMatch__dndnode_5_",
+          "StringEquals": "no_match",
+          "Variable": "$.payload.data.body.enrichment_status"
+        },
+        {
+          "Next": "AuthError__dndnode_6_",
+          "StringEquals": "auth_error",
+          "Variable": "$.payload.data.body.enrichment_status"
+        }
+      ],
+      "Default": "Error__dndnode_7_",
+      "Type": "Choice"
+    },
+    "Error__dndnode_7_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "External_Metadata_Fetch_fetch_metadata_fetchExternalMetadata__dndnode_2_": {
+      "Next": "Enrichment_Result__dndnode_3_",
+      "Parameters": {
+        "executionName.$": "$$.Execution.Name",
+        "payload.$": "$",
+        "stateMachineArn.$": "$$.StateMachine.Id"
+      },
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:external_metadata_fetch",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "NoMatch__dndnode_5_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Success__dndnode_4_": {
+      "Type": "Succeed"
+    }
+  }
+}

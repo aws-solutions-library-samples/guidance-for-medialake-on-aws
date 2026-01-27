@@ -61,15 +61,64 @@ def extract_event_rule_info(pipeline: dict) -> dict:
     Returns:
         A dictionary containing event rule information
     """
-    event_rule_info = {"triggerTypes": ["Event Triggered"], "eventRules": []}
+    event_rule_info = {"triggerTypes": [], "eventRules": []}
 
-    # Check for Event Triggered (EventBridge rules)
+    # Check if this is a manual trigger pipeline by examining the pipeline definition
+    is_manual_trigger = False
+    if "definition" in pipeline and isinstance(pipeline["definition"], dict):
+        configuration = pipeline["definition"].get("configuration", {})
+        nodes = configuration.get("nodes", [])
+
+        # Look for trigger_manual node in the pipeline definition
+        for node in nodes:
+            if (
+                isinstance(node, dict)
+                and node.get("data", {}).get("id") == "trigger_manual"
+            ):
+                is_manual_trigger = True
+                break
+
+    if is_manual_trigger:
+        event_rule_info["triggerTypes"].append("Manual Trigger")
+
+        # Extract supported content types from the manual trigger node if available
+        supported_content_types = []
+        if "definition" in pipeline and isinstance(pipeline["definition"], dict):
+            configuration = pipeline["definition"].get("configuration", {})
+            nodes = configuration.get("nodes", [])
+
+            for node in nodes:
+                if (
+                    isinstance(node, dict)
+                    and node.get("data", {}).get("id") == "trigger_manual"
+                ):
+                    # Look for supported content types in the node configuration
+                    node_config = node.get("data", {}).get("configuration", {})
+                    parameters = node_config.get("parameters", {})
+
+                    # Check for "Supported Content Types" parameter
+                    content_types_param = parameters.get("Supported Content Types", "")
+                    if content_types_param:
+                        # Convert from "Video,Audio,Image" format to array
+                        supported_content_types = [
+                            ct.strip().lower() for ct in content_types_param.split(",")
+                        ]
+                    break
+
+        # Set supported content types for frontend
+        pipeline["supported_content_types"] = (
+            supported_content_types
+            if supported_content_types
+            else ["video", "audio", "image"]
+        )
+
+    # Check for Event Triggered (EventBridge rules) - this can coexist with manual triggers
     if "dependentResources" in pipeline:
         for resource_type, resource_value in pipeline.get("dependentResources", []):
             if resource_type == "eventbridge_rule":
-                # Add Event Triggered to trigger types if not already there
-                if "Event Triggered" not in event_rule_info["triggerTypes"]:
-                    event_rule_info["triggerTypes"].append("Event Triggered")
+                # Add Event Trigger to trigger types if not already there
+                if "Event Trigger" not in event_rule_info["triggerTypes"]:
+                    event_rule_info["triggerTypes"].append("Event Trigger")
 
                 # Extract rule name and eventbus name if available
                 rule_info = {}
@@ -86,9 +135,12 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                 if "ruleName" in rule_info:
                     rule_name = rule_info["ruleName"]
 
-                    # Check for default pipeline patterns
-                    # Use centralized file extension lists
-                    if "default-image-pipeline" in rule_name:
+                    # Check for manual trigger patterns
+                    if "manual_trigger" in rule_name:
+                        rule_info["description"] = "Manual trigger event rule"
+                        rule_info["eventType"] = "Manual Trigger"
+                    # Check for default pipeline patterns - use centralized file extension lists
+                    elif "default-image-pipeline" in rule_name:
                         image_exts_str = get_extensions_as_uppercase_string("Image")
                         rule_info["description"] = (
                             f"Triggers on image files ({image_exts_str})"
@@ -119,8 +171,9 @@ def extract_event_rule_info(pipeline: dict) -> dict:
 
                 event_rule_info["eventRules"].append(rule_info)
 
-    # For now, we're only supporting Event Triggered
-    # In the future, we can add logic for API Triggered and Manually Triggered
+    # Ensure we have at least one trigger type
+    if not event_rule_info["triggerTypes"]:
+        event_rule_info["triggerTypes"].append("Event Triggered")
 
     return event_rule_info
 
@@ -187,8 +240,9 @@ def get_pipelines(
             # Extract event rule information
             event_rule_info = extract_event_rule_info(pipeline)
 
-            # Update the pipeline type to use the determined trigger types
-            pipeline["type"] = ",".join(event_rule_info["triggerTypes"])
+            # Use the type from the database if set, otherwise use determined trigger types
+            if not pipeline.get("type"):
+                pipeline["type"] = ",".join(event_rule_info["triggerTypes"])
 
             # Add event rule information to the pipeline
             pipeline["eventRuleInfo"] = event_rule_info

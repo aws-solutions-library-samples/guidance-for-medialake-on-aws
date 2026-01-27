@@ -9,3 +9,4 @@ pydantic
 Jinja2>=3.1.5
 aws-lambda-powertools
 click
+xmltodict>=0.13.0
