@@ -594,7 +594,7 @@ class FFProbeLayer(Construct):
                         command=[
                             "/bin/bash",
                             "-c",
-                            """
+                            f"""
                             set -euo pipefail
 
                             # Install download tools
