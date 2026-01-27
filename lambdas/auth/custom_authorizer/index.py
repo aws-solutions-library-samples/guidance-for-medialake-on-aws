@@ -966,6 +966,12 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "get /assets/{id}/transcript": "assets:view",
         "get /assets/{id}/related_versions": "assets:view",
         "post /assets/generate_presigned_url": "assets:upload",
+
+        # Asset shares endpoints
+        "post /assets/{id}/share": "assets:externalShare",
+        "get /assets/{id}/shares": "assets:view",
+        "delete /assets/{id}/share/{shareToken}": "assets:externalShare",
+
         # Download endpoints
         "get /download/bulk": "assets:download",
         "post /download/bulk": "assets:download",

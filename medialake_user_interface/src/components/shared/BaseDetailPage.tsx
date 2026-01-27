@@ -13,6 +13,7 @@ import type { RelatedVersionsResponse } from "../../api/hooks/useAssets";
 import { formatFileSize } from "../../utils/imageUtils";
 import TechnicalMetadataTab from "../TechnicalMetadataTab";
 import TranscriptionTab from "./TranscriptionTab";
+import { transformMetadata } from "../../utils/metadataUtils";
 // import TabContentContainer from "../common/TabContentContainer";
 
 interface TabConfig {
@@ -203,25 +204,6 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
       })),
     ];
   }, [assetData]);
-
-  const transformMetadata = (metadata: any) => {
-    if (!metadata) return [];
-
-    return Object.entries(metadata).map(([parentCategory, parentData]) => ({
-      category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
-        category: subCategory,
-        data: data,
-        count:
-          typeof data === "object"
-            ? Array.isArray(data)
-              ? data.length
-              : Object.keys(data).length
-            : 1,
-      })),
-      count: Object.keys(parentData as object).length,
-    }));
-  };
 
   const metadataAccordions = useMemo(() => {
     if (!assetData?.data?.asset?.Metadata) return [];

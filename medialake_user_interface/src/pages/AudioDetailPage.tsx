@@ -19,6 +19,7 @@ import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
 import DescriptiveTab from "../components/shared/DescriptiveTab";
 import TabContentContainer from "../components/common/TabContentContainer";
+import { transformMetadata } from "@/utils/metadataUtils";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
   const fileInfoColor = "#4299E1";
@@ -576,25 +577,6 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
       })),
     ];
   }, [assetData]);
-
-  const transformMetadata = (metadata: any) => {
-    if (!metadata) return [];
-
-    return Object.entries(metadata).map(([parentCategory, parentData]) => ({
-      category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
-        category: subCategory,
-        data: data,
-        count:
-          typeof data === "object"
-            ? Array.isArray(data)
-              ? data.length
-              : Object.keys(data).length
-            : 1,
-      })),
-      count: Object.keys(parentData as object).length,
-    }));
-  };
 
   const metadataAccordions = useMemo(() => {
     if (!assetData?.data?.asset?.Metadata) return [];

@@ -88,4 +88,12 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/settings/collection-types/${id}`,
     MIGRATE: (id: string) => `/settings/collection-types/${id}/migrate`,
   },
+  SHARES: {
+    CREATE: (assetId: string) => `/assets/${assetId}/share`,
+    GET_FOR_ASSET: (assetId: string) => `/assets/${assetId}/shares`,
+    REVOKE: (assetId: string, shareToken: string) => `/assets/${assetId}/share/${shareToken}`,
+    PUBLIC_ACCESS: (shareToken: string) => `/public/share/${shareToken}`,
+    GENERATE_DOWNLOAD_URL: (shareToken: string) =>
+      `/public/share/${shareToken}/generate-download-url`,
+  },
 };

@@ -1311,6 +1311,62 @@ export default {
     accessDenied: "Access Denied - You don't have permission to view this page",
   },
   validation: {
-    required: "This field is required",
+    required: "Este campo es obligatorio",
+  },
+  shareDialog: {
+    title: "Compartir activo",
+    selectVersion: "Seleccionar versión para compartir",
+    proxy: "Proxy (optimizado para web)",
+    proxyDescription: "Carga más rápida",
+    proxyOptimized: "Optimizado para transmisión",
+    proxyBandwidth: "Ancho de banda menor",
+    recommended: "Recomendado",
+    original: "Original (calidad completa)",
+    originalQuality: "Calidad máxima",
+    originalResolution: "Resolución original",
+    originalSize: "Tamaño de archivo mayor",
+    expiration: "Expiración",
+    expirationOptions: {
+      twentyFourHours: "24 horas",
+      sevenDays: "7 días",
+      thirtyDays: "30 días",
+      never: "Nunca",
+    },
+    permissions: "Permisos",
+    showMetadata: "Mostrar metadatos",
+    existingShares: "Comparticiones existentes",
+    created: "Creado",
+    expires: "Expira",
+    expired: "Expirado",
+    accessCount: "Recuento de accesos",
+    downloadCount: "Recuento de descargas",
+    copyUrl: "Copiar URL",
+    revokeShare: "Revocar compartición",
+    noShares: "Aún no se ha creado ninguna compartición",
+    close: "Cerrar",
+    createShareLink: "Crear enlace de compartición",
+  },
+  publicShare: {
+    title: "Activo compartido",
+    assetMetadata: "Metadatos del activo",
+    poweredBy: "Powered by MediaLake",
+    downloadFile: "Descargar archivo",
+    generatingDownload: "Generando descarga...",
+    representationType: {
+      webOptimized: "Optimizado para web",
+      originalQuality: "Calidad original",
+    },
+    expiry: "Expira",
+    media: {
+      previewNotAvailable:
+        "La vista previa del contenido multimedia no está disponible en este momento.",
+      previewNotAvailableFormat:
+        "La vista previa no está disponible para este tipo de archivo. Puede descargar el archivo para verlo.",
+    },
+    error: {
+      notFound: "Recurso compartido no encontrado o ha caducado",
+      notFoundMessage:
+        "Este enlace compartido puede haber sido revocado o ha caducado. Póngase en contacto con la persona que compartió este enlace con usted.",
+    },
   },
 };

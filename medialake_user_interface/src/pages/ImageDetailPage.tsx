@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Box, CircularProgress, Typography, Paper, Button, Tabs, Tab, alpha } from "@mui/material";
@@ -14,6 +14,7 @@ import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TabContentContainer from "../components/common/TabContentContainer";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { transformMetadata } from "../utils/metadataUtils";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
   const asset = assetData?.data?.asset;
@@ -299,29 +300,10 @@ const ImageDetailContent: React.FC = () => {
     totalResults = 0,
   } = location.state || {};
 
-  const transformMetadata = useCallback((metadata: any) => {
-    if (!metadata) return [];
-
-    return Object.entries(metadata).map(([parentCategory, parentData]) => ({
-      category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
-        category: subCategory,
-        data: data,
-        count:
-          typeof data === "object"
-            ? Array.isArray(data)
-              ? data.length
-              : Object.keys(data).length
-            : 1,
-      })),
-      count: Object.keys(parentData as object).length,
-    }));
-  }, []);
-
   const metadataAccordions = useMemo(() => {
     if (!assetData?.data?.asset?.Metadata) return [];
     return transformMetadata(assetData.data.asset.Metadata);
-  }, [assetData, transformMetadata]);
+  }, [assetData]);
 
   // All sub-categories that exist in this asset’s EmbeddedMetadata
   const availableCategoryKeys = useMemo(() => {

@@ -20,6 +20,10 @@ from medialake_constructs.api_gateway.api_gateway_assets import (
     AssetsConstruct,
     AssetsProps,
 )
+from medialake_constructs.api_gateway.api_gateway_asset_shares import (
+    AssetSharesConstruct,
+    AssetSharesConstructProps,
+)
 from medialake_constructs.api_gateway.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
@@ -41,6 +45,7 @@ class ApiGatewayStackProps:
     """Configuration for API Gateway Stack."""
 
     asset_table: dynamodb.TableV2
+    asset_shares_table: dynamodb.TableV2
     auth_table_name: str
     avp_policy_store_arn: str
     avp_policy_store_id: str
@@ -264,6 +269,7 @@ class ApiGatewayStack(cdk.NestedStack):
             props=AssetsProps(
                 asset_table=props.asset_table,
                 connector_table=self._connectors_api_gateway.connector_table,
+                asset_shares_table=props.asset_shares_table,
                 api_resource=self._rest_api,
                 authorizer=self._authorizer,
                 x_origin_verify_secret=self._x_origin_verify_secret,
@@ -276,6 +282,18 @@ class ApiGatewayStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 video_download_enabled=config.video_download_enabled,
+            ),
+        )
+
+        self._asset_shares_construct = AssetSharesConstruct(
+            self,
+            "AssetSharesApiGateway",
+            props=AssetSharesConstructProps(
+                api=self._rest_api,
+                asset_table=props.asset_table,
+                asset_shares_table=props.asset_shares_table,
+                asset_resource=self._assets_construct.asset_resource,
+                authorizer=self._authorizer,
             ),
         )
 

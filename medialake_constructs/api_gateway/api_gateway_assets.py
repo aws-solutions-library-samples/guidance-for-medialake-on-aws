@@ -62,6 +62,7 @@ class AssetsProps:
 
     asset_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
+    asset_shares_table: dynamodb.TableV2
     api_resource: api_gateway.IResource
     authorizer: api_gateway.IAuthorizer
     x_origin_verify_secret: secretsmanager.Secret
@@ -120,6 +121,7 @@ class AssetsConstruct(Construct):
         # Create assets resource and add {id} parameter
         self._assets_resource = props.api_resource.root.add_resource("assets")
         asset_resource = self._assets_resource.add_resource("{id}")
+        self._asset_resource = asset_resource
 
         search_layer = SearchLayer(self, "SearchLayer")
 
@@ -215,6 +217,7 @@ class AssetsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    "ASSET_SHARES_TABLE": props.asset_shares_table.table_name,
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "INDEX_NAME": props.opensearch_index,
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
@@ -320,6 +323,17 @@ class AssetsConstruct(Construct):
                 resources=[
                     props.asset_table.table_arn,
                     system_settings_table_arn,
+                ],
+            )
+        )
+
+        # Add DynamoDB permissions for DELETE Lambda to cascade delete asset shares
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:Query", "dynamodb:BatchWriteItem", "dynamodb:DeleteItem"],
+                resources=[
+                    props.asset_shares_table.table_arn,
+                    f"{props.asset_shares_table.table_arn}/index/*",
                 ],
             )
         )
@@ -2980,6 +2994,11 @@ class AssetsConstruct(Construct):
             "MediaConvert queue not available - video download feature may be disabled"
         )
         return None
+
+    @property
+    def asset_resource(self) -> api_gateway.IResource:
+        """Return the asset resource."""
+        return self._asset_resource
 
     def _ensure_download_feature_enabled(self, operation_name: str):
         """

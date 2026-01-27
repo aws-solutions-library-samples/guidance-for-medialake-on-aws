@@ -27,6 +27,7 @@ metrics = Metrics(namespace="AssetDeletionAPI", service="asset-deletion-api")
 
 # ── Environment ──────────────────────────────────────────────────────────────
 DYNAMODB_TABLE_NAME = os.environ.get("MEDIALAKE_ASSET_TABLE", "")
+ASSET_SHARES_TABLE_NAME = os.environ.get("ASSET_SHARES_TABLE", "")
 
 
 class DeleteRequest(BaseModel):
@@ -90,6 +91,7 @@ def lambda_handler(event: APIGatewayProxyEvent, _ctx: LambdaContext) -> Dict[str
         # Use centralized deletion service
         deletion_service = AssetDeletionService(
             dynamodb_table_name=DYNAMODB_TABLE_NAME,
+            asset_shares_table_name=ASSET_SHARES_TABLE_NAME,
             logger=logger,
             metrics=metrics,
             tracer=tracer,
@@ -108,6 +110,7 @@ def lambda_handler(event: APIGatewayProxyEvent, _ctx: LambdaContext) -> Dict[str
                 "s3ObjectsDeleted": result.s3_objects_deleted,
                 "openSearchDocsDeleted": result.opensearch_docs_deleted,
                 "vectorsDeleted": result.vectors_deleted,
+                "sharesDeleted": result.shares_deleted,
                 "externalServicesDeleted": len(result.external_services_deleted),
                 "dynamodbDeleted": result.dynamodb_deleted,
                 "eventPublished": result.event_published,

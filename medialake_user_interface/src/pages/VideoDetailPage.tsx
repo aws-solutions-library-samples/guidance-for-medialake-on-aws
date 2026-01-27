@@ -18,6 +18,7 @@ import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import { AssetResponse } from "../api/types/asset.types";
 import { formatFileSize } from "../utils/imageUtils";
+import { transformMetadata } from "../utils/metadataUtils";
 import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
 import DescriptiveTab from "../components/shared/DescriptiveTab";
@@ -521,25 +522,6 @@ const VideoDetailContent: React.FC<VideoDetailContentProps> = ({
       })),
     ];
   }, [assetData]);
-
-  const transformMetadata = (metadata: any) => {
-    if (!metadata) return [];
-
-    return Object.entries(metadata).map(([parentCategory, parentData]) => ({
-      category: parentCategory,
-      subCategories: Object.entries(parentData as object).map(([subCategory, data]) => ({
-        category: subCategory,
-        data: data,
-        count:
-          typeof data === "object"
-            ? Array.isArray(data)
-              ? data.length
-              : Object.keys(data).length
-            : 1,
-      })),
-      count: Object.keys(parentData as object).length,
-    }));
-  };
 
   const metadataAccordions = useMemo(() => {
     if (!assetData?.data?.asset?.Metadata) return [];

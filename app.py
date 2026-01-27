@@ -20,6 +20,10 @@ from medialake_stacks.api_gateway_deployment_stack import (
     ApiGatewayDeploymentStackProps,
 )
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
+from medialake_stacks.asset_share_stack import (
+    AssetShareStack,
+    AssetShareStackProps,
+)
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
 from medialake_stacks.authorization_stack import (
     AuthorizationStack,
@@ -268,6 +272,13 @@ class MediaLakeStack(cdk.Stack):
         settings_stack.add_dependency(nodes_stack)
         settings_stack.add_dependency(asset_sync_stack)
 
+        # Create Asset Share Stack for direct CloudFront URL shares
+        asset_share_stack = AssetShareStack(
+            self,
+            "MediaLakeAssetShareStack",
+            props=AssetShareStackProps(),
+        )
+
         api_gateway_stack = ApiGatewayStack(
             self,
             "MediaLakeApiGatewayStack",
@@ -308,6 +319,7 @@ class MediaLakeStack(cdk.Stack):
                 # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
                 ui_origin_host=props.ui_origin_host,  # Custom UI origin host, if configured
+                asset_shares_table=asset_share_stack.asset_shares_table
             ),
         )
 

@@ -17,6 +17,7 @@ import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
 import ImageDetailPage from "@/pages/ImageDetailPage";
 import VideoDetailPage from "@/pages/VideoDetailPage";
 import AudioDetailPage from "@/pages/AudioDetailPage";
+import { PublicSharePage } from "@/pages/PublicSharePage";
 import ConnectorsPage from "@/pages/settings/ConnectorsPage";
 import ProfilePage from "@/pages/settings/ProfilePage";
 import UserManagement from "@/pages/settings/UserManagement";
@@ -40,6 +41,11 @@ export const router = createBrowserRouter([
   {
     path: "/access-denied",
     element: <AccessDeniedPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/share/:token",
+    element: <PublicSharePage />,
     errorElement: <RouteErrorBoundary />,
   },
   {

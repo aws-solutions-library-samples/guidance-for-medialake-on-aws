@@ -147,6 +147,44 @@ def generate_presigned_url(
         return None
 
 
+def generate_presigned_download_url(
+    bucket: str, key: str, expiration: int = 3600
+) -> Optional[str]:
+    """
+    Generate a presigned download URL for an S3 object with region-aware client.
+    The URL forces browser download instead of inline viewing.
+    
+    Args:
+        bucket: S3 bucket name
+        key: S3 object key
+        expiration: URL expiration time in seconds (default: 3600)
+    """
+    try:
+        # Use region-aware S3 client
+        s3_client = _get_s3_client_for_bucket(bucket)
+        url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket,
+                "Key": key,
+                "ResponseContentDisposition": f'attachment; filename="{key.split("/")[-1]}"',
+            },
+            ExpiresIn=expiration,
+        )
+
+        logger.debug(
+            "Generated presigned download URL for s3://%s/%s (region %s)",
+            bucket,
+            key,
+            s3_client.meta.region_name,
+        )
+
+        return url
+    except Exception as e:
+        logger.error(f"Error generating presigned download URL: {str(e)}")
+        return None
+
+
 def generate_cloudfront_url(bucket: str, key: str) -> Optional[str]:
     """
     Generate a CloudFront URL for an S3 object.

@@ -4,6 +4,7 @@ import { ChevronLeft, History, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
 import { formatDistanceToNow } from "date-fns";
+import { ShareButton } from "../share/ShareButton";
 
 interface BreadcrumbNavigationProps {
   searchTerm: string;
@@ -87,8 +88,9 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
         </Box>
       </Box>
 
-      {/* Right Section - Only History */}
-      <Box sx={{ display: "flex", alignItems: "center" }}>
+      {/* Right Section - History and Share */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <ShareButton assetId={assetId} assetName={assetName} />
         <IconButton onClick={handleHistoryClick} size="small" aria-label="show history">
           <History />
         </IconButton>

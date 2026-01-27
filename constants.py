@@ -186,6 +186,7 @@ class DynamoDB:
     # Table names
     SETTINGS_TABLE = "settings"
     ASSETS_TABLE = "assets"
+    SHARES_TABLE = "shares"
     METADATA_TABLE = "metadata"
     USERS_TABLE = "users"
     CONNECTOR_TABLE = "connectors"

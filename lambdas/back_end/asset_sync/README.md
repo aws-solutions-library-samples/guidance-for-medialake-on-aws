@@ -165,6 +165,7 @@ The Asset Sync System enables efficient synchronization between S3 buckets and a
 - `CHUNK_TABLE_NAME`: DynamoDB table for chunk tracking
 - `ERROR_TABLE_NAME`: DynamoDB table for error records
 - `ASSETS_TABLE_NAME`: DynamoDB table for asset management
+- `SHARES_TABLE_NAME`: DynamoDB table for asset shares
 - `RESULTS_BUCKET_NAME`: S3 bucket for manifests and reports
 - `PROCESSOR_QUEUE_URL`: SQS queue URL for chunk processing
 - `PROCESSOR_FUNCTION_ARN`: ARN of processor Lambda

@@ -6,6 +6,7 @@ Used by both API delete endpoint and S3 connector delete events.
 
 This service handles:
 - S3 object deletion (main + derived representations)
+- Asset shares deletion
 - DynamoDB record deletion
 - OpenSearch document deletion
 - S3 vector deletion
@@ -48,6 +49,7 @@ OPENSEARCH_SERVICE = os.getenv("OPENSEARCH_SERVICE", "es")
 VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "")
 VECTOR_INDEX_NAME = os.getenv("VECTOR_INDEX_NAME", "media-vectors")
 DYNAMODB_TABLE_NAME = os.getenv("MEDIALAKE_ASSET_TABLE", "")
+ASSET_SHARES_TABLE_NAME = os.getenv("ASSET_SHARES_TABLE", "")
 
 _session = boto3.Session()
 _credentials = _session.get_credentials()
@@ -62,6 +64,7 @@ class DeletionResult:
     s3_objects_deleted: int = 0
     opensearch_docs_deleted: int = 0
     vectors_deleted: int = 0
+    shares_deleted: int = 0
     external_services_deleted: list = None
     dynamodb_deleted: bool = False
     event_published: bool = False
@@ -102,12 +105,14 @@ class AssetDeletionService:
         logger: Logger = None,
         metrics: Metrics = None,
         tracer: Tracer = None,
+        asset_shares_table_name: str = None,
     ):
         self.logger = logger or globals()["logger"]
         self.metrics = metrics or globals()["metrics"]
         self.tracer = tracer or globals()["tracer"]
         self.table_name = dynamodb_table_name or DYNAMODB_TABLE_NAME
         self.table = dynamodb.Table(self.table_name)
+        self.asset_shares_table = dynamodb.Table(asset_shares_table_name or ASSET_SHARES_TABLE_NAME)
         self.external_manager = MediaLakeExternalServiceManager(
             self.logger, self.metrics
         )
@@ -142,25 +147,28 @@ class AssetDeletionService:
             if asset_data is None:
                 asset_data = self._fetch_asset(inventory_id)
 
-            # 2. Delete S3 objects (main + derived + transcripts)
+            # 2. Delete asset shares (cascade delete)
+            result.shares_deleted = self._delete_asset_shares(inventory_id)
+
+            # 3. Delete S3 objects (main + derived + transcripts)
             result.s3_objects_deleted = self._delete_s3_objects(asset_data)
 
-            # 3. Delete OpenSearch documents
+            # 4. Delete OpenSearch documents
             result.opensearch_docs_deleted = self._delete_opensearch_docs(inventory_id)
 
-            # 4. Delete S3 vectors
+            # 5. Delete S3 vectors
             result.vectors_deleted = self._delete_s3_vectors(inventory_id)
 
-            # 5. Delete from external services
+            # 6. Delete from external services
             result.external_services_deleted = self._delete_external_services(
                 asset_data, inventory_id
             )
 
-            # 6. Delete DynamoDB record
+            # 7. Delete DynamoDB record
             self._delete_dynamodb_record(inventory_id)
             result.dynamodb_deleted = True
 
-            # 7. Publish deletion event
+            # 8. Publish deletion event
             if publish_event:
                 self._publish_deletion_event(inventory_id)
                 result.event_published = True
@@ -174,6 +182,7 @@ class AssetDeletionService:
                     "s3_objects": result.s3_objects_deleted,
                     "opensearch_docs": result.opensearch_docs_deleted,
                     "vectors": result.vectors_deleted,
+                    "shares": result.shares_deleted,
                 },
             )
 
@@ -204,6 +213,60 @@ class AssetDeletionService:
         except ClientError as e:
             self.logger.error(f"DynamoDB error fetching asset: {e}")
             raise AssetDeletionError(f"Failed to fetch asset: {e}", inventory_id)
+
+    @tracer.capture_method
+    def _delete_asset_shares(self, inventory_id: str) -> int:
+        """Delete all asset shares associated with the asset"""
+        deleted_count = 0
+        try:
+            # Query shares table for all shares with this asset ID
+            # Uses the AssetID-CreatedAt-index GSI
+            response = self.asset_shares_table.query(
+                IndexName="AssetID-CreatedAt-index",
+                KeyConditionExpression="AssetID = :asset_id",
+                ExpressionAttributeValues={":asset_id": inventory_id},
+                Select="ALL_PROJECTED_ATTRIBUTES",
+            )
+
+            shares_to_delete = response.get("Items", [])
+
+            # Handle pagination if there are many shares
+            while "LastEvaluatedKey" in response:
+                response = self.asset_shares_table.query(
+                    IndexName="AssetID-CreatedAt-index",
+                    KeyConditionExpression="AssetID = :asset_id",
+                    ExpressionAttributeValues={":asset_id": inventory_id},
+                    ExclusiveStartKey=response["LastEvaluatedKey"],
+                    Select="ALL_PROJECTED_ATTRIBUTES",
+                )
+                shares_to_delete.extend(response.get("Items", []))
+
+            # Batch delete all shares
+            if shares_to_delete:
+                with self.asset_shares_table.batch_writer() as batch:
+                    for share in shares_to_delete:
+                        batch.delete_item(Key={"ShareToken": share["ShareToken"]})
+                        deleted_count += 1
+
+                self.logger.info(
+                    f"Deleted {deleted_count} asset shares for asset {inventory_id}"
+                )
+                self.metrics.add_metric(
+                    "AssetSharesDeleted", MetricUnit.Count, deleted_count
+                )
+            else:
+                self.logger.info(f"No asset shares found for asset {inventory_id}")
+
+            return deleted_count
+
+        except ClientError as e:
+            self.logger.warning(
+                f"Failed to delete asset shares: {e}",
+                extra={"asset_id": inventory_id, "error": str(e)},
+            )
+            # Don't raise - this is non-critical and shouldn't block asset deletion
+            self.metrics.add_metric("AssetSharesDeletionFailure", MetricUnit.Count, 1)
+            return 0
 
     @tracer.capture_method
     def _delete_s3_objects(self, asset: Dict[str, Any]) -> int:

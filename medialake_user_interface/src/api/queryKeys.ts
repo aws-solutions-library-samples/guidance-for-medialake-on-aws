@@ -171,4 +171,9 @@ export const QUERY_KEYS = {
     details: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.COLLECTION_TYPES.details(), id] as const,
   },
+  SHARES: {
+    all: ["shares"] as const,
+    FOR_ASSET: (assetId: string) => [...QUERY_KEYS.SHARES.all, "asset", assetId] as const,
+    PUBLIC: (shareToken: string) => [...QUERY_KEYS.SHARES.all, "public", shareToken] as const,
+  },
 } as const;

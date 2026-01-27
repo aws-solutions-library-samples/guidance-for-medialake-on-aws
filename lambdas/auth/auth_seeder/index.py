@@ -77,6 +77,7 @@ DEFAULT_PERMISSION_SETS = [
                 "view": True,
                 "edit": True,
                 "delete": True,
+                "externalShare": True,
             },
             # Search permissions
             "search": {"view": True},
@@ -210,6 +211,7 @@ DEFAULT_PERMISSION_SETS = [
                 "view": True,
                 "edit": True,
                 "delete": True,
+                "externalShare": True,
             },
             # Search permissions
             "search": {"view": True},
@@ -253,6 +255,7 @@ DEFAULT_PERMISSION_SETS = [
                 "view": True,
                 "edit": False,
                 "delete": False,
+                "externalShare": False,
             },
             # Search permissions
             "search": {"view": True},
