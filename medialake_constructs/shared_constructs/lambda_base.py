@@ -325,7 +325,7 @@ class Lambda(Construct):
             layer_objects.extend(config.layers)
 
         # Create Log Group with retention from config
-        log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
+        log_group_name = f"/aws/lambda/{lambda_function_name}"
         logger.debug(
             f"Creating log group: {log_group_name} with retention: {LOG_RETENTION}"
         )
