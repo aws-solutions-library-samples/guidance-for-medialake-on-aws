@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.4] - 2026-01-27
+
+### Bug Fixes
+
+- fix: lambda layer for FFProbe command string correction
+- fix: correct environment variable name in pre_signed_url node
+
 ## [1.6.3] - 2026-01-22
 
 ### Bug Fixes
