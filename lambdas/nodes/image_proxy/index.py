@@ -12,6 +12,7 @@ import OpenEXR
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import lambda_middleware
+from nodes_utils import generate_derived_filename
 from PIL import ExifTags, Image
 
 logger = Logger()
@@ -301,9 +302,8 @@ def lambda_handler(event, context: LambdaContext):
     proc.save(buf, format=fmt, **save_kwargs)
     data = buf.getvalue()
 
-    # build a new key alongside the source asset
-    stem = key.rsplit(".", 1)[0]
-    new_key = f"{stem}_{mode}.{ext}"
+    # build a new key alongside the source asset (include source bucket as prefix)
+    new_key = f"{bucket}/{generate_derived_filename(key, mode, ext)}"
 
     # ── fetch existing representations -----------------------------------
     resp = dynamo.get_item(Key={"InventoryID": clean_asset_id(inv_id)})

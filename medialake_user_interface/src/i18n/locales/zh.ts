@@ -1290,6 +1290,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "小部件名称",
+        placeholder: "输入自定义名称...",
+        helperText: "可选：为此小部件指定自定义名称（最多50个字符）",
+        clear: "清除自定义名称",
+      },
       favorites: {
         title: "收藏夹",
         emptyTitle: "暂无收藏",

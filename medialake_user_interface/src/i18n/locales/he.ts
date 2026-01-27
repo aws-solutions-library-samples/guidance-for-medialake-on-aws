@@ -1291,6 +1291,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "שם הווידג'ט",
+        placeholder: "הזן שם מותאם אישית...",
+        helperText: "אופציונלי: תן לווידג'ט זה שם מותאם אישית (מקסימום 50 תווים)",
+        clear: "נקה שם מותאם אישית",
+      },
       favorites: {
         title: "מועדפים",
         emptyTitle: "אין עדיין מועדפים",

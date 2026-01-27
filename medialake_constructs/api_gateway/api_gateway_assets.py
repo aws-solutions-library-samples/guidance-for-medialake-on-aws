@@ -2495,6 +2495,7 @@ class AssetsConstruct(Construct):
                     "s3:PutObject",
                     "s3:DeleteObject",
                     "s3:CopyObject",
+                    "s3:ListBucket",  # Required for listing thumbnail files during deletion
                 ],
                 resources=[
                     "arn:aws:s3:::*/*",  # Access to all objects in all buckets

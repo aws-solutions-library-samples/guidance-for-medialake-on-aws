@@ -1297,6 +1297,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "ウィジェット名",
+        placeholder: "カスタム名を入力...",
+        helperText: "オプション：このウィジェットにカスタム名を付ける（最大50文字）",
+        clear: "カスタム名をクリア",
+      },
       favorites: {
         title: "お気に入り",
         emptyTitle: "お気に入りはまだありません",

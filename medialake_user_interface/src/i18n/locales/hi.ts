@@ -1300,6 +1300,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "विजेट का नाम",
+        placeholder: "एक कस्टम नाम दर्ज करें...",
+        helperText: "वैकल्पिक: इस विजेट को एक कस्टम नाम दें (अधिकतम 50 वर्ण)",
+        clear: "कस्टम नाम साफ़ करें",
+      },
       favorites: {
         title: "पसंदीदा",
         emptyTitle: "अभी तक कोई पसंदीदा नहीं",

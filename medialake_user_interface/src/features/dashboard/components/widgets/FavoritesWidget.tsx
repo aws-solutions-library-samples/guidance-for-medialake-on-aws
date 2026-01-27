@@ -16,7 +16,7 @@ import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
 import { AssetCarousel } from "../AssetCarousel";
-import { useDashboardActions } from "../../store/dashboardStore";
+import { useDashboardActions, useDashboardStore } from "../../store/dashboardStore";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
@@ -74,6 +74,12 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { removeWidget, setExpandedWidget } = useDashboardActions();
+
+  // Get widget instance from store to access customName
+  const widgetInstance = useDashboardStore((state) =>
+    state.layout.widgets.find((w) => w.id === widgetId)
+  );
+  const customName = widgetInstance?.customName;
 
   // Add to Collection state
   const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
@@ -236,7 +242,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
     <>
       <WidgetContainer
         widgetId={widgetId}
-        title={t("dashboard.widgets.favorites.title")}
+        title={customName || t("dashboard.widgets.favorites.title")}
         icon={<FavoriteIcon />}
         onExpand={handleExpand}
         onRefresh={handleRefresh}

@@ -1291,6 +1291,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "اسم الأداة",
+        placeholder: "أدخل اسمًا مخصصًا...",
+        helperText: "اختياري: أعط هذه الأداة اسمًا مخصصًا (بحد أقصى 50 حرفًا)",
+        clear: "مسح الاسم المخصص",
+      },
       favorites: {
         title: "المفضلة",
         emptyTitle: "لا توجد مفضلات بعد",

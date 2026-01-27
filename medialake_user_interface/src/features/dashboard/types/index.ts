@@ -66,6 +66,7 @@ export interface WidgetInstance {
   id: string;
   type: WidgetType;
   config?: CollectionsWidgetConfig;
+  customName?: string; // Optional custom name for the widget instance
 }
 
 export interface DashboardState {
@@ -81,6 +82,7 @@ export interface DashboardActions {
   addWidget: (type: WidgetType) => void;
   removeWidget: (widgetId: string) => void;
   updateWidgetConfig: (widgetId: string, config: CollectionsWidgetConfig) => void;
+  updateWidgetCustomName: (widgetId: string, customName: string | undefined) => void;
   resetToDefault: () => void;
   setExpandedWidget: (widgetId: string | null) => void;
   toggleWidgetSelector: () => void;

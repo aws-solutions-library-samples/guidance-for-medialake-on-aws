@@ -257,9 +257,11 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             "MEDIA_ASSETS_BUCKET_NAME env-var missing"
         )
 
-        # mirror source bucket + path (without extension)
-        input_key_no_ext = os.path.splitext(in_key)[0]
-        output_key = f"{in_bucket}/{input_key_no_ext}"
+        # mirror source bucket + path (without extension), include original extension
+        # to prevent naming collisions (e.g., video.mp4 vs video.mov)
+        input_key_no_ext, orig_ext = os.path.splitext(in_key)
+        orig_ext = orig_ext.lstrip(".").lower() if orig_ext else "unknown"
+        output_key = f"{in_bucket}/{input_key_no_ext}-{orig_ext}"
 
         # delete existing proxy (.mp4) and thumbnails (.jpg, numbered variants)
         # Clean up proxy

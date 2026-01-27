@@ -10,6 +10,7 @@ export interface WidgetInstance {
   id: string;
   type: "favorites" | "collections" | "recent-assets";
   config?: Record<string, unknown>;
+  customName?: string; // Optional custom name for the widget instance
 }
 
 export interface LayoutItem {
@@ -201,9 +202,12 @@ export const useGetDashboardPresets = () => {
   return useQuery<PresetSummary[], Error>({
     queryKey: QUERY_KEYS.DASHBOARD.presets(),
     queryFn: async () => {
+      console.log("[useGetDashboardPresets] Fetching presets from API...");
       const { data } = await apiClient.get<ApiResponse<PresetSummary[]>>(
         API_ENDPOINTS.DASHBOARD.PRESETS
       );
+      console.log("[useGetDashboardPresets] API response:", data);
+      console.log("[useGetDashboardPresets] Presets data:", data.data);
       return data.data;
     },
     staleTime: 0, // Always consider data stale to ensure fresh data
@@ -245,11 +249,14 @@ export const useCreateDashboardPreset = () => {
       );
       return data.data;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      console.log("[useCreateDashboardPreset] Preset created successfully:", data);
       // Invalidate and refetch presets list
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
-      // Force refetch to ensure UI updates immediately
-      queryClient.refetchQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
+      console.log("[useCreateDashboardPreset] Invalidating queries...");
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
+      console.log("[useCreateDashboardPreset] Refetching queries...");
+      await queryClient.refetchQueries({ queryKey: QUERY_KEYS.DASHBOARD.presets() });
+      console.log("[useCreateDashboardPreset] Cache updated");
       enqueueSnackbar(t("dashboard.messages.presetCreated", "Preset saved successfully"), {
         variant: "success",
         autoHideDuration: 3000,

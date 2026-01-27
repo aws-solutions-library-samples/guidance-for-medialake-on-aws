@@ -59,6 +59,12 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
 
   // API hooks
   const { data: presets = [], isLoading: isLoadingPresets } = useGetDashboardPresets();
+
+  // Debug logging
+  console.log("[DashboardSelector] Presets from query:", presets);
+  console.log("[DashboardSelector] Is loading:", isLoadingPresets);
+  console.log("[DashboardSelector] Active preset ID:", activePresetId);
+  console.log("[DashboardSelector] Active preset name:", activePresetName);
   const applyPresetMutation = useApplyDashboardPreset();
   const updatePresetMutation = useUpdateDashboardPreset();
 

@@ -1291,6 +1291,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "위젯 이름",
+        placeholder: "사용자 정의 이름 입력...",
+        helperText: "선택사항: 이 위젯에 사용자 정의 이름 지정 (최대 50자)",
+        clear: "사용자 정의 이름 지우기",
+      },
       favorites: {
         title: "즐겨찾기",
         emptyTitle: "아직 즐겨찾기가 없습니다",

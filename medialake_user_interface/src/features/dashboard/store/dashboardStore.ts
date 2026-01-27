@@ -137,7 +137,12 @@ const findAvailablePosition = (
 // Convert API layout to frontend layout format
 export const convertApiLayoutToFrontend = (apiLayout: {
   layoutVersion: number;
-  widgets: Array<{ id: string; type: string; config?: Record<string, unknown> }>;
+  widgets: Array<{
+    id: string;
+    type: string;
+    config?: Record<string, unknown>;
+    customName?: string;
+  }>;
   layouts?: { lg: LayoutItem[]; md: LayoutItem[]; sm: LayoutItem[] };
   updatedAt?: string;
 }): DashboardLayout => {
@@ -162,6 +167,7 @@ export const convertApiLayoutToFrontend = (apiLayout: {
       id: w.id,
       type: w.type as WidgetType,
       ...(w.config && { config: w.config as unknown as CollectionsWidgetConfig }),
+      ...(w.customName && { customName: w.customName }),
     })),
     layouts: safeLayouts,
     updatedAt: apiLayout.updatedAt,
@@ -175,6 +181,7 @@ export const convertFrontendLayoutToApi = (layout: DashboardLayout) => {
       id: w.id,
       type: w.type,
       config: w.config || {},
+      ...(w.customName && { customName: w.customName }),
     })),
     layouts: layout.layouts,
   };
@@ -311,6 +318,20 @@ export const useDashboardStore = create<DashboardStore>()(
         });
       },
 
+      updateWidgetCustomName: (widgetId, customName) => {
+        const { layout } = get();
+
+        set({
+          layout: {
+            ...layout,
+            widgets: layout.widgets.map((w) =>
+              w.id === widgetId ? { ...w, customName: customName || undefined } : w
+            ),
+          },
+          hasPendingChanges: true,
+        });
+      },
+
       resetToDefault: () => {
         set({ layout: DEFAULT_LAYOUT, hasPendingChanges: true });
       },
@@ -402,6 +423,7 @@ export const useDashboardActions = () => {
   const addWidget = useDashboardStore((state) => state.addWidget);
   const removeWidget = useDashboardStore((state) => state.removeWidget);
   const updateWidgetConfig = useDashboardStore((state) => state.updateWidgetConfig);
+  const updateWidgetCustomName = useDashboardStore((state) => state.updateWidgetCustomName);
   const resetToDefault = useDashboardStore((state) => state.resetToDefault);
   const setExpandedWidget = useDashboardStore((state) => state.setExpandedWidget);
   const toggleWidgetSelector = useDashboardStore((state) => state.toggleWidgetSelector);
@@ -419,6 +441,7 @@ export const useDashboardActions = () => {
     addWidget,
     removeWidget,
     updateWidgetConfig,
+    updateWidgetCustomName,
     resetToDefault,
     setExpandedWidget,
     toggleWidgetSelector,

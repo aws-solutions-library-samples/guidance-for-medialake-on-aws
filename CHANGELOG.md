@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.6.4] - 2026-01-27
+
+### Bug Fixes
+
+- fix: lambda layer for FFProbe command string correction
+- fix: correct environment variable name in pre_signed_url node
+
+## [1.6.3] - 2026-01-22
+
+### Bug Fixes
+
+- fix: update to localization files to remove duplicate keys
+
+## [1.6.2] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
+## [1.6.1] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
 ## [1.6.0] - 2026-01-21
 
 ### Features

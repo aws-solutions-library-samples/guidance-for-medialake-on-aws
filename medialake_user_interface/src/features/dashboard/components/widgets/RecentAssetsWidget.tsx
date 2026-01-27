@@ -16,7 +16,7 @@ import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
 import { AssetCarousel } from "../AssetCarousel";
-import { useDashboardActions } from "../../store/dashboardStore";
+import { useDashboardActions, useDashboardStore } from "../../store/dashboardStore";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { useAddFavorite, useRemoveFavorite, useGetFavorites } from "@/api/hooks/useFavorites";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
@@ -62,6 +62,12 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { removeWidget, setExpandedWidget } = useDashboardActions();
+
+  // Get widget instance from store to access customName
+  const widgetInstance = useDashboardStore((state) =>
+    state.layout.widgets.find((w) => w.id === widgetId)
+  );
+  const customName = widgetInstance?.customName;
 
   // Add to Collection state
   const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
@@ -254,7 +260,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
     <>
       <WidgetContainer
         widgetId={widgetId}
-        title={t("dashboard.widgets.recentAssets.title")}
+        title={customName || t("dashboard.widgets.recentAssets.title")}
         icon={<RecentIcon />}
         onExpand={handleExpand}
         onRefresh={handleRefresh}

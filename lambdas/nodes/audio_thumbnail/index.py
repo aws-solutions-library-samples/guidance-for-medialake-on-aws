@@ -6,6 +6,7 @@ import tempfile
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from nodes_utils import generate_derived_filename
 
 logger = Logger()
 tracer = Tracer()
@@ -91,7 +92,7 @@ def lambda_handler(event, context: LambdaContext):
             )
 
             # Upload the thumbnail to S3
-            output_key = f"{bucket}/{key.rsplit('.', 1)[0]}_waveform.png"
+            output_key = f"{bucket}/{generate_derived_filename(key, 'waveform', 'png')}"
             logger.info(f"Uploading thumbnail to s3://{output_bucket}/{output_key}")
             s3.upload_file(
                 temp_output_file.name,

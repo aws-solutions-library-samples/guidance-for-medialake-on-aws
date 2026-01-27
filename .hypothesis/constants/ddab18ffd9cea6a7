@@ -1,0 +1,4 @@
+# file: /Users/lberezin/Dev/AWS/CDK/guidance-for-medialake-on-aws/Workspace-2/lambdas/back_end/pipeline_nodes_deployment/auth_detector.py
+# hypothesis_version: 6.148.7
+
+['allSchemes', 'apiKey', 'apikey', 'authType', 'bearer', 'bearerFormat', 'clientCredentials', 'clientcredentials', 'headerName', 'http', 'in', 'name', 'oauth2', 'primaryScheme', 'scheme', 'tokenUrl', 'type']

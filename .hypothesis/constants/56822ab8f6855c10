@@ -1,0 +1,4 @@
+# file: /Users/lberezin/Dev/AWS/CDK/guidance-for-medialake-on-aws/Workspace-2/lambdas/back_end/pipeline_nodes_deployment/openapi_models.py
+# hypothesis_version: 6.148.7
+
+['MediaType', 'Operation', 'Parameter', 'RequestBody', 'Response', 'SecurityScheme', 'Server', 'bearerFormat', 'content', 'default', 'description', 'enum', 'example', 'examples', 'flows', 'headers', 'in', 'name', 'operationId', 'parameters', 'requestBody', 'required', 'responses', 'schema', 'scheme', 'security', 'summary', 'tags', 'type', 'url', 'variables', 'x-requestMapping', 'x-responseMapping']

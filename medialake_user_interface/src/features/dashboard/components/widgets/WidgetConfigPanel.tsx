@@ -10,18 +10,46 @@ import {
   Typography,
   Paper,
   Divider,
+  TextField,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
-import { ArrowUpward as AscIcon, ArrowDownward as DescIcon } from "@mui/icons-material";
+import {
+  ArrowUpward as AscIcon,
+  ArrowDownward as DescIcon,
+  Clear as ClearIcon,
+} from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import type { CollectionsWidgetConfig, CollectionViewType, SortBy, SortOrder } from "../../types";
 
 interface WidgetConfigPanelProps {
+  widgetId: string;
+  customName?: string;
   config: CollectionsWidgetConfig;
   onChange: (config: CollectionsWidgetConfig) => void;
+  onCustomNameChange: (customName: string | undefined) => void;
 }
 
-export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({ config, onChange }) => {
+export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
+  widgetId,
+  customName,
+  config,
+  onChange,
+  onCustomNameChange,
+}) => {
   const { t } = useTranslation();
+  const [nameValue, setNameValue] = React.useState(customName || "");
+
+  const handleCustomNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setNameValue(value);
+    onCustomNameChange(value.trim() || undefined);
+  };
+
+  const handleClearCustomName = () => {
+    setNameValue("");
+    onCustomNameChange(undefined);
+  };
 
   const handleViewTypeChange = (event: any) => {
     const newViewType = event.target.value as CollectionViewType;
@@ -72,6 +100,38 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({ config, on
       <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
         {t("dashboard.widgets.collections.configTitle", "Widget Configuration")}
       </Typography>
+
+      {/* Custom Name Input */}
+      <TextField
+        fullWidth
+        size="small"
+        label={t("dashboard.widgets.customName.label", "Widget Name")}
+        placeholder={t("dashboard.widgets.customName.placeholder", "Enter a custom name...")}
+        value={nameValue}
+        onChange={handleCustomNameChange}
+        helperText={t(
+          "dashboard.widgets.customName.helperText",
+          "Optional: Give this widget a custom name (max 50 characters)"
+        )}
+        inputProps={{ maxLength: 50 }}
+        sx={{ mb: 2 }}
+        InputProps={{
+          endAdornment: nameValue ? (
+            <InputAdornment position="end">
+              <IconButton
+                size="small"
+                onClick={handleClearCustomName}
+                edge="end"
+                aria-label={t("dashboard.widgets.customName.clear", "Clear custom name")}
+              >
+                <ClearIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ) : null,
+        }}
+      />
+
+      <Divider sx={{ my: 2 }} />
 
       {/* View Type Selection */}
       <FormControl fullWidth size="small" sx={{ mb: 2 }}>

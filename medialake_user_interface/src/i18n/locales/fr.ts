@@ -1305,6 +1305,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      customName: {
+        label: "Nom du Widget",
+        placeholder: "Entrez un nom personnalisé...",
+        helperText: "Optionnel : Donnez un nom personnalisé à ce widget (max 50 caractères)",
+        clear: "Effacer le nom personnalisé",
+      },
       favorites: {
         title: "Favoris",
         emptyTitle: "Pas encore de favoris",

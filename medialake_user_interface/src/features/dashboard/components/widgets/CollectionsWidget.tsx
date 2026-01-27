@@ -32,7 +32,7 @@ import {
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
 import { CollectionCarousel } from "../CollectionCarousel";
-import { useDashboardActions } from "../../store/dashboardStore";
+import { useDashboardActions, useDashboardStore } from "../../store/dashboardStore";
 import type { BaseWidgetProps, CollectionsWidgetConfig } from "../../types";
 import { filterCollections, sortCollections } from "../../utils/collectionFilters";
 import type { Collection } from "../../utils/collectionFilters";
@@ -250,7 +250,14 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { removeWidget, setExpandedWidget, updateWidgetConfig } = useDashboardActions();
+  const { removeWidget, setExpandedWidget, updateWidgetConfig, updateWidgetCustomName } =
+    useDashboardActions();
+
+  // Get widget instance from store to access customName
+  const widgetInstance = useDashboardStore((state) =>
+    state.layout.widgets.find((w) => w.id === widgetId)
+  );
+  const customName = widgetInstance?.customName;
 
   const [currentUserId, setCurrentUserId] = React.useState<string>("");
   const [isConfigOpen, setIsConfigOpen] = React.useState<boolean>(false);
@@ -266,6 +273,14 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
       updateWidgetConfig(widgetId, newConfig);
     },
     [widgetId, updateWidgetConfig]
+  );
+
+  // Handle custom name changes
+  const handleCustomNameChange = useCallback(
+    (newCustomName: string | undefined) => {
+      updateWidgetCustomName(widgetId, newCustomName);
+    },
+    [widgetId, updateWidgetCustomName]
   );
 
   // Handle toggle configuration panel
@@ -393,8 +408,14 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
     removeWidget(widgetId);
   }, [removeWidget, widgetId]);
 
-  // Get widget title based on viewType
+  // Get widget title based on viewType or use custom name
   const getWidgetTitle = useCallback(() => {
+    // If custom name is set, use it
+    if (customName) {
+      return customName;
+    }
+
+    // Otherwise, use default title based on viewType
     switch (viewType) {
       case "all":
         return t("dashboard.widgets.collections.allTitle", "All Collections");
@@ -411,7 +432,7 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
       default:
         return t("dashboard.widgets.collections.title", "Collections");
     }
-  }, [viewType, t]);
+  }, [viewType, customName, t]);
 
   const renderContent = () => {
     if (!processedCollections || processedCollections.length === 0) {
@@ -492,7 +513,13 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
             border: (theme) => `1px solid ${theme.palette.divider}`,
           }}
         >
-          <WidgetConfigPanel config={config} onChange={handleConfigChange} />
+          <WidgetConfigPanel
+            widgetId={widgetId}
+            customName={customName}
+            config={config}
+            onChange={handleConfigChange}
+            onCustomNameChange={handleCustomNameChange}
+          />
         </Box>
       )}
       {renderContent()}
