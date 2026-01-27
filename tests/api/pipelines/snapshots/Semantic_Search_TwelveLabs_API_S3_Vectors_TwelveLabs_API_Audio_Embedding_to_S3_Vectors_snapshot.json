@@ -1,0 +1,59 @@
+{
+  "Comment": "State machine for pipeline TwelveLabs API Audio Embedding to S3 Vectors",
+  "StartAt": "Audio_Splitter_split__dndnode_4_",
+  "States": {
+    "Audio_Splitter_split__dndnode_4_": {
+      "Next": "Map_map__dndnode_0_",
+      "Result": {
+        "message": "No Lambda function for audio_splitter"
+      },
+      "Type": "Pass"
+    },
+    "Map_map__dndnode_0_": {
+      "ItemsPath": "$.payload.data",
+      "Iterator": {
+        "StartAt": "PassState",
+        "States": {
+          "PassState": {
+            "End": true,
+            "Type": "Pass"
+          }
+        }
+      },
+      "MaxConcurrency": 40,
+      "Next": "Success__dndnode_2_",
+      "Parameters": {
+        "item.$": "$$.Map.Item.Value"
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5
+        }
+      ],
+      "Type": "Map"
+    },
+    "Success__dndnode_2_": {
+      "Type": "Succeed"
+    }
+  }
+}

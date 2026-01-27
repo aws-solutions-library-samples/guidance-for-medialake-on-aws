@@ -1,0 +1,138 @@
+{
+  "Comment": "State machine for pipeline Coactive API Video Ingestion Pipeline",
+  "StartAt": "Coactive_get_listDatasets__dndnode_15_",
+  "States": {
+    "Choice__dndnode_16_": {
+      "Choices": [
+        {
+          "Next": "Success__dndnode_9_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        },
+        {
+          "Next": "Fail_fail__dndnode_10_",
+          "StringEquals": "Failed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_wait__dndnode_6_",
+      "Type": "Choice"
+    },
+    "Coactive_get_getVideoAssetStatus__dndnode_18_": {
+      "Next": "Choice__dndnode_16_",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:coactive",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "Coactive_get_listDatasets__dndnode_15_": {
+      "Next": "Conditional_conditional__dndnode_12_",
+      "Parameters": {
+        "executionName.$": "$$.Execution.Name",
+        "payload.$": "$",
+        "stateMachineArn.$": "$$.StateMachine.Id"
+      },
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:coactive",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "Coactive_post_ingestAssets__dndnode_19_": {
+      "Next": "Coactive_get_getVideoAssetStatus__dndnode_18_",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:coactive",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "Conditional_conditional__dndnode_12_": {
+      "Next": "Generate_Presigned_URL_post_generatePresignedUrl__dndnode_4_",
+      "Type": "Pass"
+    },
+    "Fail_fail__dndnode_10_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Generate_Presigned_URL_post_generatePresignedUrl__dndnode_4_": {
+      "Next": "Coactive_post_ingestAssets__dndnode_19_",
+      "Result": {
+        "message": "No Lambda function for pre_signed_url"
+      },
+      "Type": "Pass"
+    },
+    "Success__dndnode_9_": {
+      "Type": "Succeed"
+    },
+    "Wait_wait__dndnode_6_": {
+      "Next": "Coactive_get_getVideoAssetStatus__dndnode_18_",
+      "Seconds": 15,
+      "Type": "Wait"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "Comment": "State machine for pipeline TwelveLabs Bedrock Image Embedding to OpenSearch",
+  "StartAt": "TwelveLabs_Bedrock_Invoke_invoke__dndnode_21_",
+  "States": {
+    "Choice__dndnode_10_": {
+      "Choices": [
+        {
+          "Next": "TwelveLabs_Bedrock_Results__dndnode_16_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        },
+        {
+          "Next": "Fail_fail__dndnode_11_",
+          "StringEquals": "Failed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_wait__dndnode_5_",
+      "Type": "Choice"
+    },
+    "Embedding_Store_store__dndnode_9_": {
+      "End": true,
+      "Result": {
+        "message": "No Lambda function for embedding_store"
+      },
+      "Type": "Pass"
+    },
+    "Fail_fail__dndnode_11_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "TwelveLabs_Bedrock_Invoke_invoke__dndnode_21_": {
+      "Next": "TwelveLabs_Bedrock_Status__dndnode_15_",
+      "Result": {
+        "message": "No Lambda function for twelvelabs_bedrock_invoke"
+      },
+      "Type": "Pass"
+    },
+    "TwelveLabs_Bedrock_Results__dndnode_16_": {
+      "Next": "Embedding_Store_store__dndnode_9_",
+      "Result": {
+        "message": "No Lambda function for twelvelabs_bedrock_results"
+      },
+      "Type": "Pass"
+    },
+    "TwelveLabs_Bedrock_Status__dndnode_15_": {
+      "Next": "Choice__dndnode_10_",
+      "Result": {
+        "message": "No Lambda function for twelvelabs_bedrock_status"
+      },
+      "Type": "Pass"
+    },
+    "Wait_wait__dndnode_5_": {
+      "Next": "TwelveLabs_Bedrock_Status__dndnode_15_",
+      "Seconds": 15,
+      "Type": "Wait"
+    }
+  }
+}

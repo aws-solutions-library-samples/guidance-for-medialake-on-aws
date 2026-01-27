@@ -324,11 +324,16 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "twelvelabs_bedrock_results"],
         )
 
-        # ========================================
-        # DynamoDB Table for Node Definitions
-        # ========================================
-        # Stores node metadata, configurations, and relationships
-        # Uses multiple GSIs for efficient querying by different access patterns
+        # External Metadata Fetch Node - for enriching assets with metadata from external systems
+        self.external_metadata_fetch_lambda_deployment = LambdaDeployment(
+            self,
+            "ExternalMetadataFetchLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/integration",
+            code_path=["lambdas", "nodes", "external_metadata_fetch"],
+        )
+
+        # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,
             "PipelineNodesTable",

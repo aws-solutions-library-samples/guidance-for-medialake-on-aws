@@ -1,0 +1,183 @@
+spec: v1.0.0
+node:
+  id: external_metadata_fetch
+  title: External Metadata Fetch
+  description: Fetch metadata from external source systems (MAM/DAM) and store it alongside asset records
+  version: 1.0.0
+  type: integration
+  integration:
+    config:
+      lambda:
+        handler: integration/ExternalMetadataFetchLambdaDeployment
+        runtime: python3.12
+        timeout: 300 # 5 minutes to handle retries and slow external APIs
+        iam_policy:
+          statements:
+            # CloudWatch Logs permissions
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            # S3 read permission for IAC assets bucket (normalizer configs)
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${IAC_ASSETS_BUCKET}/*
+            # Secrets Manager read permission for external API credentials
+            - effect: Allow
+              actions:
+                - secretsmanager:GetSecretValue
+              resources:
+                - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:medialake/*
+            # DynamoDB read/write permission for asset table
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            # EventBridge publish permission for pipeline events
+            - effect: Allow
+              actions:
+                - events:PutEvents
+              resources:
+                - arn:aws:events:${AWS_REGION}:${ACCOUNT_ID}:event-bus/${PIPELINES_EVENT_BUS_NAME}
+            # KMS permissions for decrypting secrets
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:key/*
+actions:
+  fetch_metadata:
+    summary: Fetch External Metadata
+    description: Fetch metadata from an external source system using the asset's correlation ID
+    operationId: fetchExternalMetadata
+    parameters:
+      - in: body
+        name: adapter_type
+        label: Metadata Adapter
+        description: The type of adapter to use for fetching metadata
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "Generic REST API"
+              value: "generic_rest"
+          default: generic_rest
+      - in: body
+        name: auth_type
+        label: Authentication Type
+        description: The authentication method for the external API
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "OAuth2 Client Credentials"
+              value: "oauth2_client_credentials"
+            - label: "API Key"
+              value: "api_key"
+            - label: "Basic Authentication"
+              value: "basic_auth"
+          default: oauth2_client_credentials
+      - in: body
+        name: secret_arn
+        label: Credentials Secret ARN
+        description: AWS Secrets Manager ARN containing API credentials. IMPORTANT - The secret name must start with 'medialake/' (e.g., 'medialake/external-mam-credentials') for the pipeline to have permission to access it.
+        placeholder: "arn:aws:secretsmanager:us-east-1:123456789012:secret:medialake/external-mam-credentials" # pragma: allowlist secret
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: auth_endpoint
+        label: Authentication Endpoint
+        description: OAuth2 token endpoint URL (required for OAuth2, optional for other auth types)
+        placeholder: "https://api.example.com/oauth/token"
+        required: false
+        schema:
+          type: string
+        showWhen:
+          field: parameters.auth_type
+          value: oauth2_client_credentials
+      - in: body
+        name: scope
+        label: OAuth2 Scope
+        description: OAuth2 scope to request (required for some OAuth2 providers)
+        placeholder: "metadata"
+        required: false
+        schema:
+          type: string
+        showWhen:
+          field: parameters.auth_type
+          value: oauth2_client_credentials
+      - in: body
+        name: metadata_endpoint
+        label: Metadata API Endpoint
+        description: External API endpoint for fetching asset metadata
+        placeholder: "https://api.example.com/v1/assets"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: correlation_id_param
+        label: Correlation ID Parameter Name
+        description: Query parameter name for the asset identifier in the external API
+        placeholder: "assetId"
+        required: false
+        default: "assetId"
+        schema:
+          type: string
+      - in: body
+        name: response_metadata_path
+        label: Response Metadata Path
+        description: Dot-notation path to extract metadata from nested response (e.g., "ProgramMetadata" for XML with root wrapper, "data.metadata" for nested JSON)
+        placeholder: "ProgramMetadata"
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: max_retries
+        label: Maximum Retries
+        description: Maximum number of retry attempts for transient errors
+        required: false
+        default: 3
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5
+      - in: body
+        name: normalizer_source_type
+        label: Normalizer Type
+        description: The type of normalizer to use for transforming metadata to MEC format
+        required: false
+        schema:
+          type: select
+          options:
+            - label: "None (raw metadata)"
+              value: ""
+            - label: "Generic XML"
+              value: "generic_xml"
+          default: "generic_xml"
+      - in: body
+        name: normalizer_config_s3_path
+        label: Normalizer Config S3 Path
+        description: S3 path to the normalizer configuration file (relative to IAC assets bucket, e.g., 'normalizer-configs/customer-config.json')
+        placeholder: "normalizer-configs/customer-config.json"
+        required: false
+        schema:
+          type: string
+        showWhen:
+          field: parameters.normalizer_source_type
+          value: generic_xml
+    x-requestMapping: integration/external_metadata_fetch/fetch_metadata/
+    x-responseMapping: integration/external_metadata_fetch/fetch_metadata/
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

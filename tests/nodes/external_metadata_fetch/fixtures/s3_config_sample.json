@@ -1,0 +1,61 @@
+{
+  "_comment": "Sample S3-storable normalizer configuration for integration tests.",
+  "_s3_path": "normalizer-configs/acme-generic-xml-config.json",
+  "_description": "This file represents the configuration that would be stored in S3 and loaded at runtime. In tests, this is loaded via mocked S3 calls.",
+
+  "source_namespace_prefix": "ACME",
+  "default_language": "en-US",
+  "include_raw_source": false,
+
+  "primary_id_field": "acme_id",
+  "ref_id_field": "refid",
+  "title_field": "title",
+  "title_brief_field": "titlebrief",
+  "premiere_year_field": "premiere_year",
+  "original_air_date_field": "original_air_date",
+  "country_code_field": "country_code",
+  "language_field": "language",
+
+  "identifier_mappings": {
+    "acme_id": "",
+    "refid": "-REF",
+    "version_id": "-VERSION",
+    "id_sequence": "-SEQ",
+    "tms_series_id": "TMS",
+    "tms_episode_id": "TMS",
+    "tms_movie_id": "TMS",
+    "ad_content_id": "-AD"
+  },
+
+  "title_mappings": {
+    "title_field": "title",
+    "title_brief_field": "titlebrief",
+    "description_field": "long_description",
+    "description_short_field": "short_description",
+    "copyright_holder_field": "copyright_holder",
+    "keywords_field": "keywords"
+  },
+
+  "hierarchy_field_mappings": {
+    "series_id_field": "series_id",
+    "season_id_field": "season_id",
+    "episode_number_field": "episode_number",
+    "season_number_field": "season_number",
+    "show_name_field": "show_name"
+  },
+
+  "people_field_mappings": {
+    "actors": "Actor",
+    "directors": "Director",
+    "writers": "Writer",
+    "producers": "Producer",
+    "series_creators": "Creator",
+    "guest_actors": "Actor"
+  },
+
+  "person_first_name_attr": "@first_name",
+  "person_last_name_attr": "@last_name",
+  "person_order_attr": "@order",
+  "person_role_attr": "@role",
+  "guest_actors_field": "guest_actors"
+}

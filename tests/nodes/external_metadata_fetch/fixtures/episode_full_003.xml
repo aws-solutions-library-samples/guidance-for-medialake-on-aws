@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Anonymized test fixture: Full Episode with minimal cast
+  Based on typical XML metadata structure, with all customer-specific
+  data replaced with generic test data.
+
+  Content Type: Full Episode (Sci-Fi series)
+  Features: Minimal cast, single director, fewer ratings
+-->
+<ProgramMetadata>
+  <acme_id>TST300003</acme_id>
+  <title>Beyond the Horizon</title>
+  <video_filename>L00300003.mov</video_filename>
+  <captions_filename>L00300003_cc_en-US.scc</captions_filename>
+  <primary_network>Acme Plus</primary_network>
+  <short_description>Captain Chen makes a fateful decision.</short_description>
+  <long_description>As the starship Endeavor approaches an uncharted nebula, Captain Lin Chen must make a decision that will affect the entire crew. With communications cut off from Earth and resources running low, the crew discovers something unexpected within the cosmic cloud. Science Officer Dr. Yuki Tanaka's analysis reveals possibilities that challenge everything they thought they knew about the universe.</long_description>
+  <is_movie>FALSE</is_movie>
+  <show_name>Stellar Odyssey</show_name>
+  <season_number>02</season_number>
+  <episode_number>8</episode_number>
+  <rating>
+    <Rating Type="TV Rating" Descriptor="V">TV-14</Rating>
+    <Rating Type="us-tv" Descriptor="V">TV-14</Rating>
+    <Rating Type="ca-tv">14+</Rating>
+  </rating>
+  <cue_points />
+  <keywords>science fiction, space, exploration, starship, crew, nebula, discovery, captain, adventure</keywords>
+  <genre>Science Fiction</genre>
+  <genres>
+    <genre type="default">Science Fiction</genre>
+    <genre type="Amazon">Science Fiction</genre>
+    <genre type="Amazon">Adventure</genre>
+    <genre type="Apple">Science Fiction</genre>
+  </genres>
+  <language>en-US</language>
+  <country>United States</country>
+  <country_code>US</country_code>
+  <short_series_description>The crew of the starship Endeavor explores the unknown reaches of space.</short_series_description>
+  <long_series_description>Stellar Odyssey follows the crew of the starship Endeavor as they embark on humanity's first deep space exploration mission. Led by Captain Lin Chen, the diverse crew faces challenges both external and internal as they push the boundaries of human knowledge. Each episode explores themes of discovery, sacrifice, and what it means to be human in the vast emptiness of space.</long_series_description>
+  <original_air_date>2024-06-20</original_air_date>
+  <actors>
+    <actor order="1" first_name="Lin" last_name="Chen" role="Captain Lin Chen">Lin Chen</actor>
+    <actor order="2" first_name="Yuki" last_name="Tanaka" role="Dr. Yuki Tanaka">Yuki Tanaka</actor>
+    <actor order="3" first_name="Marcus" last_name="Webb" role="Chief Engineer Webb">Marcus Webb</actor>
+  </actors>
+  <directors>
+    <director order="4" first_name="Sandra" last_name="Kim" role="">Sandra Kim</director>
+  </directors>
+  <premiere_year>2024</premiere_year>
+  <video_type>Full Episode</video_type>
+  <video_dar>16:9</video_dar>
+  <tms_movie_id />
+  <tms_series_id>SH077700030000</tms_series_id>
+  <series_id>TST300000</series_id>
+  <season_id>TSS30002</season_id>
+  <tms_episode_id>EP077700030018</tms_episode_id>
+  <frame_rate>2400</frame_rate>
+  <resolution />
+  <video_definition>HD</video_definition>
+  <video_duration />
+  <refid>L00300003</refid>
+  <version_id>TST300003.2</version_id>
+  <titlebrief>Stellar 208</titlebrief>
+  <id_sequence>30300003</id_sequence>
+  <content_type>Series</content_type>
+  <ad_category>Entertainment:General</ad_category>
+  <ad_content_id>L00300003</ad_content_id>
+  <carousel></carousel>
+  <platform_rights></platform_rights>
+  <short_season_description>The Endeavor ventures deeper into uncharted space.</short_season_description>
+  <long_season_description>In the second season of Stellar Odyssey, the crew of the Endeavor pushes further into the unknown. With Earth now months behind them, Captain Chen and her crew must rely on each other as they encounter phenomena that defy explanation.</long_season_description>
+  <copyright_holder>2024 Stellar Productions Inc.</copyright_holder>
+  <copyright_year>2024</copyright_year>
+  <writers>
+    <writer order="5" first_name="Alex" last_name="Rivera" role="">Alex Rivera</writer>
+  </writers>
+  <studio_name>Acme Plus</studio_name>
+  <season_count>2</season_count>
+  <episode_count>12</episode_count>
+  <guest_actors />
+  <producers>
+    <producer order="6" first_name="Diana" last_name="Ross" role="">Diana Ross</producer>
+  </producers>
+  <series_creators>
+    <series_creator order="7" first_name="Alex" last_name="Rivera" role="">Alex Rivera</series_creator>
+  </series_creators>
+  <executive_producers />
+  <needs_watermark>false</needs_watermark>
+  <series_premiere_date>2023-01-15</series_premiere_date>
+  <season_rating>
+    <Rating Type="TV Rating">TV-14</Rating>
+    <Rating Type="us-tv">TV-14</Rating>
+    <Rating Type="ca-tv">14+</Rating>
+  </season_rating>
+  <series_rating>
+    <Rating Type="TV Rating">TV-14</Rating>
+    <Rating Type="us-tv">TV-14</Rating>
+    <Rating Type="ca-tv">14+</Rating>
+  </series_rating>
+  <in_color_flag>Y</in_color_flag>
+  <season_actors>
+    <actor order="1" first_name="Lin" last_name="Chen" role="Captain Lin Chen">Lin Chen</actor>
+    <actor order="2" first_name="Yuki" last_name="Tanaka" role="Dr. Yuki Tanaka">Yuki Tanaka</actor>
+    <actor order="3" first_name="Marcus" last_name="Webb" role="Chief Engineer Webb">Marcus Webb</actor>
+  </season_actors>
+  <season_directors>
+    <director order="4" first_name="Sandra" last_name="Kim" role="">Sandra Kim</director>
+  </season_directors>
+  <season_writers>
+    <writer order="5" first_name="Alex" last_name="Rivera" role="">Alex Rivera</writer>
+  </season_writers>
+  <season_guest_actors />
+  <season_producers>
+    <producer order="6" first_name="Diana" last_name="Ross" role="">Diana Ross</producer>
+  </season_producers>
+  <season_executive_producers />
+  <series_actors>
+    <actor order="1" first_name="Lin" last_name="Chen" role="Captain Lin Chen">Lin Chen</actor>
+    <actor order="2" first_name="Yuki" last_name="Tanaka" role="Dr. Yuki Tanaka">Yuki Tanaka</actor>
+    <actor order="3" first_name="Marcus" last_name="Webb" role="Chief Engineer Webb">Marcus Webb</actor>
+  </series_actors>
+  <series_directors>
+    <director order="4" first_name="Sandra" last_name="Kim" role="">Sandra Kim</director>
+  </series_directors>
+  <series_writers>
+    <writer order="5" first_name="Alex" last_name="Rivera" role="">Alex Rivera</writer>
+  </series_writers>
+  <series_guest_actors />
+  <series_producers>
+    <producer order="6" first_name="Diana" last_name="Ross" role="">Diana Ross</producer>
+  </series_producers>
+  <series_executive_producers />
+  <conform_materials_list>L00300003</conform_materials_list>
+  <sourcematerials>
+    <material>
+      <acme_id>L00300003</acme_id>
+      <material_id>L00300003</material_id>
+      <semitextless>false</semitextless>
+      <component componenttype="Video">
+        <acme_id>L00300003</acme_id>
+        <material_id>L00300003</material_id>
+        <filename>L00300003.mov</filename>
+        <componenttypemetadata>
+          <videoattributes>
+            <framerate>2400</framerate>
+            <aspectratio>1.78</aspectratio>
+            <videocodec>Apple Pro Res</videocodec>
+            <activepicture></activepicture>
+            <AFD>10</AFD>
+          </videoattributes>
+          <format></format>
+          <forced_narrative>false</forced_narrative>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00300003.1.en-US.OA</acme_id>
+        <material_id>L00300003</material_id>
+        <fileposition>1</fileposition>
+        <filename>L00300003.mov</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber>Tracks 1&amp;2</audiopairnumber>
+                <audiodescription>Stereo</audiodescription>
+                <audiolanguage code="en-US">English US (en-US)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Subtitle">
+        <acme_id>L00300003.ClosedCaptioning.en-US</acme_id>
+        <material_id>L00300003</material_id>
+        <filename>L00300003_cc_en-US.scc</filename>
+        <componenttypemetadata>
+          <subtitleattributes>
+            <language code="en-US">English US (en-US)</language>
+          </subtitleattributes>
+        </componenttypemetadata>
+      </component>
+    </material>
+  </sourcematerials>
+  <timelines>
+    <segments>
+      <segment>
+        <segmentnumber>1</segmentnumber>
+        <start>00:59:59:22</start>
+        <end>01:45:30:00</end>
+      </segment>
+    </segments>
+    <markers />
+    <adopportunitiesmarkers />
+  </timelines>
+</ProgramMetadata>

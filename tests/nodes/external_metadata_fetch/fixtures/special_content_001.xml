@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Anonymized test fixture: Special Content (Behind the Scenes)
+  Based on typical XML metadata structure, with all customer-specific
+  data replaced with generic test data.
+
+  Content Type: Special (Behind the Scenes featurette)
+  Features: Non-standard episode number, special content type
+-->
+<ProgramMetadata>
+  <acme_id>TST600001</acme_id>
+  <title>The Making of The Hidden Legacy</title>
+  <video_filename>L00600001.mov</video_filename>
+  <captions_filename>L00600001_cc_en-US.scc</captions_filename>
+  <primary_network>Acme Plus</primary_network>
+  <short_description>Go behind the scenes of The Hidden Legacy.</short_description>
+  <long_description>Join the cast and crew of The Hidden Legacy as they take you behind the scenes of the hit drama series. Discover the secrets of the production, from set design to special effects, and hear from the actors about their characters and the challenges of bringing this mysterious story to life.</long_description>
+  <is_movie>FALSE</is_movie>
+  <show_name>The Hidden Legacy</show_name>
+  <season_number>01</season_number>
+  <episode_number>99</episode_number>
+  <rating>
+    <Rating Type="TV Rating">TV-PG</Rating>
+    <Rating Type="us-tv">TV-PG</Rating>
+    <Rating Type="ca-tv">PG</Rating>
+  </rating>
+  <cue_points />
+  <keywords>behind the scenes, making of, documentary, cast, crew, production, special feature</keywords>
+  <genre>Documentary</genre>
+  <genres>
+    <genre type="default">Documentary</genre>
+    <genre type="Amazon">Documentary</genre>
+    <genre type="Apple">Documentary</genre>
+  </genres>
+  <language>en-US</language>
+  <country>United States</country>
+  <country_code>US</country_code>
+  <short_series_description>A museum curator uncovers family secrets through a mysterious artifact.</short_series_description>
+  <long_series_description>The Hidden Legacy follows Alex Chen, a museum curator who discovers a mysterious artifact that reveals hidden truths about their family's past.</long_series_description>
+  <original_air_date>2024-05-01</original_air_date>
+  <actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Themselves">Jordan Lee</actor>
+    <actor order="2" first_name="Morgan" last_name="Taylor" role="Themselves">Morgan Taylor</actor>
+    <actor order="3" first_name="Casey" last_name="Williams" role="Themselves">Casey Williams</actor>
+  </actors>
+  <directors>
+    <director order="4" first_name="Documentary" last_name="Director" role="">Documentary Director</director>
+  </directors>
+  <premiere_year>2024</premiere_year>
+  <video_type>Special</video_type>
+  <video_dar>16:9</video_dar>
+  <tms_movie_id />
+  <tms_series_id>SH099900010000</tms_series_id>
+  <series_id>TST100000</series_id>
+  <season_id>TSS10001</season_id>
+  <tms_episode_id>EP099900010099</tms_episode_id>
+  <frame_rate>2400</frame_rate>
+  <resolution />
+  <video_definition>HD</video_definition>
+  <video_duration />
+  <refid>L00600001</refid>
+  <version_id>TST600001.1</version_id>
+  <titlebrief>Hidden BTS</titlebrief>
+  <id_sequence>30600001</id_sequence>
+  <content_type>Series</content_type>
+  <ad_category>Entertainment:General</ad_category>
+  <ad_content_id>L00600001</ad_content_id>
+  <carousel></carousel>
+  <platform_rights></platform_rights>
+  <short_season_description>Alex Chen discovers a mysterious artifact and begins unraveling family secrets.</short_season_description>
+  <long_season_description>In the first season of The Hidden Legacy, museum curator Alex Chen discovers a mysterious artifact that sets them on a journey to uncover their family's hidden past.</long_season_description>
+  <copyright_holder>2024 Example Studios LLC</copyright_holder>
+  <copyright_year>2024</copyright_year>
+  <writers />
+  <studio_name>Acme Plus</studio_name>
+  <season_count>2</season_count>
+  <episode_count>10</episode_count>
+  <guest_actors />
+  <producers>
+    <producer order="5" first_name="Special" last_name="Producer" role="">Special Producer</producer>
+  </producers>
+  <series_creators>
+    <series_creator order="6" first_name="Taylor" last_name="Brooks" role="">Taylor Brooks</series_creator>
+  </series_creators>
+  <executive_producers />
+  <needs_watermark>false</needs_watermark>
+  <series_premiere_date>2024-03-15</series_premiere_date>
+  <season_rating>
+    <Rating Type="TV Rating">TV-MA</Rating>
+    <Rating Type="us-tv">TV-MA</Rating>
+  </season_rating>
+  <series_rating>
+    <Rating Type="TV Rating">TV-MA</Rating>
+    <Rating Type="us-tv">TV-MA</Rating>
+  </series_rating>
+  <in_color_flag>Y</in_color_flag>
+  <season_actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Alex Chen">Jordan Lee</actor>
+    <actor order="2" first_name="Morgan" last_name="Taylor" role="Sam Rivera">Morgan Taylor</actor>
+  </season_actors>
+  <season_directors>
+    <director order="3" first_name="Quinn" last_name="Anderson" role="">Quinn Anderson</director>
+  </season_directors>
+  <season_writers>
+    <writer order="4" first_name="Taylor" last_name="Brooks" role="">Taylor Brooks</writer>
+  </season_writers>
+  <season_guest_actors />
+  <season_producers>
+    <producer order="5" first_name="Jamie" last_name="Foster" role="">Jamie Foster</producer>
+  </season_producers>
+  <season_executive_producers />
+  <series_actors>
+    <actor order="1" first_name="Jordan" last_name="Lee" role="Alex Chen">Jordan Lee</actor>
+    <actor order="2" first_name="Morgan" last_name="Taylor" role="Sam Rivera">Morgan Taylor</actor>
+  </series_actors>
+  <series_directors>
+    <director order="3" first_name="Quinn" last_name="Anderson" role="">Quinn Anderson</director>
+  </series_directors>
+  <series_writers>
+    <writer order="4" first_name="Taylor" last_name="Brooks" role="">Taylor Brooks</writer>
+  </series_writers>
+  <series_guest_actors />
+  <series_producers>
+    <producer order="5" first_name="Jamie" last_name="Foster" role="">Jamie Foster</producer>
+  </series_producers>
+  <series_executive_producers />
+  <conform_materials_list>L00600001</conform_materials_list>
+  <sourcematerials>
+    <material>
+      <acme_id>L00600001</acme_id>
+      <material_id>L00600001</material_id>
+      <semitextless>false</semitextless>
+      <component componenttype="Video">
+        <acme_id>L00600001</acme_id>
+        <material_id>L00600001</material_id>
+        <filename>L00600001.mov</filename>
+        <componenttypemetadata>
+          <videoattributes>
+            <framerate>2400</framerate>
+            <aspectratio>1.78</aspectratio>
+            <videocodec>Apple Pro Res</videocodec>
+            <activepicture></activepicture>
+            <AFD>10</AFD>
+          </videoattributes>
+          <format></format>
+          <forced_narrative>false</forced_narrative>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00600001.1.en-US.OA</acme_id>
+        <material_id>L00600001</material_id>
+        <fileposition>1</fileposition>
+        <filename>L00600001.mov</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber>Tracks 1&amp;2</audiopairnumber>
+                <audiodescription>Stereo</audiodescription>
+                <audiolanguage code="en-US">English US (en-US)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Subtitle">
+        <acme_id>L00600001.ClosedCaptioning.en-US</acme_id>
+        <material_id>L00600001</material_id>
+        <filename>L00600001_cc_en-US.scc</filename>
+        <componenttypemetadata>
+          <subtitleattributes>
+            <language code="en-US">English US (en-US)</language>
+          </subtitleattributes>
+        </componenttypemetadata>
+      </component>
+    </material>
+  </sourcematerials>
+  <timelines>
+    <segments>
+      <segment>
+        <segmentnumber>1</segmentnumber>
+        <start>00:59:59:22</start>
+        <end>01:29:59:22</end>
+      </segment>
+    </segments>
+    <markers />
+    <adopportunitiesmarkers />
+  </timelines>
+</ProgramMetadata>

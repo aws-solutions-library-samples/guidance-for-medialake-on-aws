@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Anonymized test fixture: Full Episode with guest actors and more ratings
+  Based on typical XML metadata structure, with all customer-specific
+  data replaced with generic test data.
+
+  Content Type: Full Episode (Horror/Drama series)
+  Features: Guest actors, ACMA rating, multiple audio tracks, subtitles
+-->
+<ProgramMetadata>
+  <acme_id>TST200002</acme_id>
+  <title>Shadows in the Dark</title>
+  <video_filename>L00200002.mov</video_filename>
+  <captions_filename>L00200002_cc_en-US.scc</captions_filename>
+  <primary_network>Acme Plus</primary_network>
+  <short_description>The team faces their darkest challenge yet.</short_description>
+  <long_description>When a mysterious force threatens the small town of Millbrook, a group of unlikely heroes must band together to confront the darkness. Detective Maya Santos leads the investigation while local historian Dr. James Wright uncovers ancient secrets that may hold the key to survival. As night falls, the true nature of the threat becomes terrifyingly clear.</long_description>
+  <is_movie>FALSE</is_movie>
+  <show_name>Nightfall Chronicles</show_name>
+  <season_number>01</season_number>
+  <episode_number>5</episode_number>
+  <rating>
+    <Rating Type="ACMA" Descriptor="DUHSTSSLCVS">MA15</Rating>
+    <Rating Type="au-tv" Descriptor="DHSLV">MA15+</Rating>
+    <Rating Type="ca-tv">18+</Rating>
+    <Rating Type="us-tv" Descriptor="LV">TV-MA</Rating>
+    <Rating Type="TV Rating" Descriptor="LV">TV-MA</Rating>
+    <Rating Type="nz-am" Descriptor="DIATHSLV">16</Rating>
+  </rating>
+  <cue_points />
+  <keywords>horror, supernatural, mystery, small town, investigation, thriller, darkness, survival, ancient secrets</keywords>
+  <genre>Drama</genre>
+  <genres>
+    <genre type="default">Drama</genre>
+    <genre type="subgenre">Horror</genre>
+    <genre type="Amazon">Drama</genre>
+    <genre type="Amazon">Horror</genre>
+    <genre type="Apple">Drama</genre>
+    <genre type="Apple">Horror</genre>
+  </genres>
+  <language>en-US</language>
+  <country>United States</country>
+  <country_code>US</country_code>
+  <short_series_description>A supernatural thriller following investigators in a haunted small town.</short_series_description>
+  <long_series_description>Nightfall Chronicles follows Detective Maya Santos and local historian Dr. James Wright as they investigate supernatural occurrences in the small town of Millbrook. Each episode reveals new layers of an ancient mystery while the characters confront their own demons. The series blends horror, mystery, and drama as the team races against time to save their community from an otherworldly threat.</long_series_description>
+  <original_air_date>2023-10-08</original_air_date>
+  <actors>
+    <actor order="1" first_name="Elena" last_name="Rodriguez" role="Maya Santos">Elena Rodriguez</actor>
+    <actor order="2" first_name="Marcus" last_name="Chen" role="Dr. James Wright">Marcus Chen</actor>
+    <actor order="3" first_name="Sarah" last_name="Mitchell" role="Deputy Kim">Sarah Mitchell</actor>
+    <actor order="4" first_name="David" last_name="Park" role="Father Thomas">David Park</actor>
+    <actor order="5" first_name="Lisa" last_name="Nguyen" role="Dr. Rachel Stone">Lisa Nguyen</actor>
+    <actor order="6" first_name="Michael" last_name="Brown" role="Sheriff Cooper">Michael Brown</actor>
+    <actor order="7" first_name="Jennifer" last_name="White" role="Emma Wright">Jennifer White</actor>
+    <actor order="8" first_name="Robert" last_name="Garcia" role="Old Man Jenkins">Robert Garcia</actor>
+    <actor order="9" first_name="Amanda" last_name="Foster" role="Nurse Betty">Amanda Foster</actor>
+    <actor order="10" first_name="Chris" last_name="Taylor" role="Deputy Marcus">Chris Taylor</actor>
+    <actor order="11" first_name="Nicole" last_name="Adams" role="Librarian Helen">Nicole Adams</actor>
+  </actors>
+  <directors>
+    <director order="14" first_name="James" last_name="Morrison" role="">James Morrison</director>
+  </directors>
+  <premiere_year>2023</premiere_year>
+  <video_type>Full Episode</video_type>
+  <video_dar>16:9</video_dar>
+  <tms_movie_id />
+  <tms_series_id>SH088800020000</tms_series_id>
+  <series_id>TST200000</series_id>
+  <season_id>TSS20001</season_id>
+  <tms_episode_id>EP088800020005</tms_episode_id>
+  <frame_rate>2400</frame_rate>
+  <resolution />
+  <video_definition>HD</video_definition>
+  <video_duration />
+  <refid>L00200002</refid>
+  <version_id>TST200002.1</version_id>
+  <titlebrief>Nightfall 105</titlebrief>
+  <id_sequence>20200002</id_sequence>
+  <content_type>Series</content_type>
+  <ad_category>Entertainment:General</ad_category>
+  <ad_content_id>L00200002</ad_content_id>
+  <carousel></carousel>
+  <platform_rights></platform_rights>
+  <short_season_description>Detective Santos and Dr. Wright investigate supernatural events in Millbrook.</short_season_description>
+  <long_season_description>In the first season of Nightfall Chronicles, Detective Maya Santos arrives in Millbrook to investigate a series of unexplained deaths. Partnering with local historian Dr. James Wright, she discovers the town's dark history and the supernatural forces that have awakened.</long_season_description>
+  <copyright_holder>All rights reserved 2023 Example Productions LLC.</copyright_holder>
+  <copyright_year>2023</copyright_year>
+  <writers>
+    <writer order="15" first_name="Kevin" last_name="Smith" role="">Kevin Smith</writer>
+    <writer order="16" first_name="Laura" last_name="Johnson" role="">Laura Johnson</writer>
+  </writers>
+  <studio_name>Acme Plus</studio_name>
+  <season_count>3</season_count>
+  <episode_count>9</episode_count>
+  <guest_actors>
+    <guest_actor order="12" first_name="Thomas" last_name="Wilson" role="">Thomas Wilson</guest_actor>
+    <guest_actor order="13" first_name="Patricia" last_name="Lee" role="">Patricia Lee</guest_actor>
+  </guest_actors>
+  <producers>
+    <producer order="17" first_name="Steven" last_name="Clark" role="">Steven Clark</producer>
+    <producer order="18" first_name="Michelle" last_name="Davis" role="">Michelle Davis</producer>
+    <producer order="19" first_name="Brian" last_name="Wilson" role="">Brian Wilson</producer>
+  </producers>
+  <series_creators>
+    <series_creator order="66" first_name="Kevin" last_name="Smith" role="">Kevin Smith</series_creator>
+  </series_creators>
+  <executive_producers />
+  <needs_watermark>false</needs_watermark>
+  <series_premiere_date>2023-07-22</series_premiere_date>
+  <season_rating>
+    <Rating Type="au-tv">MA15+</Rating>
+    <Rating Type="ca-tv">18+</Rating>
+    <Rating Type="us-tv">TV-MA</Rating>
+    <Rating Type="TV Rating" Descriptor="LV">TV-MA</Rating>
+    <Rating Type="nz-am">16</Rating>
+  </season_rating>
+  <series_rating>
+    <Rating Type="au-tv">MA15+</Rating>
+    <Rating Type="ca-tv">18+</Rating>
+    <Rating Type="us-tv">TV-MA</Rating>
+    <Rating Type="TV Rating" Descriptor="LV">TV-MA</Rating>
+    <Rating Type="nz-am">16</Rating>
+  </series_rating>
+  <in_color_flag>Y</in_color_flag>
+  <season_actors>
+    <actor order="1" first_name="Elena" last_name="Rodriguez" role="Maya Santos">Elena Rodriguez</actor>
+    <actor order="2" first_name="Marcus" last_name="Chen" role="Dr. James Wright">Marcus Chen</actor>
+    <actor order="3" first_name="Sarah" last_name="Mitchell" role="Deputy Kim">Sarah Mitchell</actor>
+    <actor order="4" first_name="David" last_name="Park" role="Father Thomas">David Park</actor>
+  </season_actors>
+  <season_directors>
+    <director order="5" first_name="James" last_name="Morrison" role="">James Morrison</director>
+    <director order="6" first_name="Rachel" last_name="Green" role="">Rachel Green</director>
+  </season_directors>
+  <season_writers>
+    <writer order="7" first_name="Kevin" last_name="Smith" role="">Kevin Smith</writer>
+    <writer order="8" first_name="Laura" last_name="Johnson" role="">Laura Johnson</writer>
+  </season_writers>
+  <season_guest_actors />
+  <season_producers>
+    <producer order="9" first_name="Steven" last_name="Clark" role="">Steven Clark</producer>
+    <producer order="10" first_name="Michelle" last_name="Davis" role="">Michelle Davis</producer>
+  </season_producers>
+  <season_executive_producers />
+  <series_actors>
+    <actor order="1" first_name="Elena" last_name="Rodriguez" role="Maya Santos">Elena Rodriguez</actor>
+    <actor order="2" first_name="Marcus" last_name="Chen" role="Dr. James Wright">Marcus Chen</actor>
+  </series_actors>
+  <series_directors>
+    <director order="3" first_name="James" last_name="Morrison" role="">James Morrison</director>
+  </series_directors>
+  <series_writers>
+    <writer order="4" first_name="Kevin" last_name="Smith" role="">Kevin Smith</writer>
+  </series_writers>
+  <series_guest_actors />
+  <series_producers>
+    <producer order="5" first_name="Steven" last_name="Clark" role="">Steven Clark</producer>
+  </series_producers>
+  <series_executive_producers />
+  <conform_materials_list>L00200002</conform_materials_list>
+  <placement>
+    <acme_id>L00200002</acme_id>
+    <material_id>L00200002</material_id>
+    <placementplaylistevent Index="0">
+      <acme_id>L00200002</acme_id>
+      <acme_material_id>L00200002</acme_material_id>
+      <acme_material_title>Nightfall Chronicles: 01-005: Shadows in the Dark</acme_material_title>
+      <acme_material_segment_number_sub>1</acme_material_segment_number_sub>
+      <acme_material_type>VIDEO</acme_material_type>
+      <acme_material_tc_in>00:59:59.22</acme_material_tc_in>
+      <acme_material_tc_out>01:56:47.23</acme_material_tc_out>
+    </placementplaylistevent>
+  </placement>
+  <sourcematerials>
+    <material>
+      <acme_id>L00200002</acme_id>
+      <material_id>L00200002</material_id>
+      <semitextless>false</semitextless>
+      <component componenttype="Video">
+        <acme_id>L00200002</acme_id>
+        <material_id>L00200002</material_id>
+        <filename>L00200002.mov</filename>
+        <componenttypemetadata>
+          <videoattributes>
+            <framerate>2400</framerate>
+            <aspectratio>1.78</aspectratio>
+            <videocodec>Apple Pro Res</videocodec>
+            <activepicture></activepicture>
+            <AFD>10</AFD>
+          </videoattributes>
+          <format></format>
+          <forced_narrative>true</forced_narrative>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00200002.1.English.OA</acme_id>
+        <material_id>L00200002</material_id>
+        <fileposition>1</fileposition>
+        <filename>L00200002.mov</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber>Tracks 1&amp;2</audiopairnumber>
+                <audiodescription>Surround Front</audiodescription>
+                <audiolanguage code="en-US">English US (en-US)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Audio">
+        <acme_id>L00200002.audiodub.es-419</acme_id>
+        <material_id>L00200002</material_id>
+        <fileposition></fileposition>
+        <filename>L00200002_stereo_es-419_LR.wav</filename>
+        <componenttypemetadata>
+          <audioattributes>
+            <audios>
+              <audioset>
+                <audiopairnumber></audiopairnumber>
+                <audiodescription></audiodescription>
+                <audiolanguage code="es-419">Spanish Latin American (es-419)</audiolanguage>
+              </audioset>
+            </audios>
+            <audiocodec></audiocodec>
+            <DVS />
+          </audioattributes>
+        </componenttypemetadata>
+      </component>
+      <component componenttype="Subtitle">
+        <acme_id>L00200002.ClosedCaptioning.en-US</acme_id>
+        <material_id>L00200002</material_id>
+        <filename>L00200002_cc_en-US.scc</filename>
+        <componenttypemetadata>
+          <subtitleattributes>
+            <language code="en-US">English US (en-US)</language>
+          </subtitleattributes>
+        </componenttypemetadata>
+      </component>
+    </material>
+  </sourcematerials>
+  <timelines>
+    <segments>
+      <segment>
+        <segmentnumber>1</segmentnumber>
+        <start>00:59:59:22</start>
+        <end>01:05:51:10</end>
+      </segment>
+      <segment>
+        <segmentnumber>2</segmentnumber>
+        <start>01:05:52:05</start>
+        <end>01:15:38:16</end>
+      </segment>
+      <segment>
+        <segmentnumber>3</segmentnumber>
+        <start>01:15:39:11</start>
+        <end>01:23:26:21</end>
+      </segment>
+      <segment>
+        <segmentnumber>4</segmentnumber>
+        <start>01:23:27:20</start>
+        <end>01:28:28:13</end>
+      </segment>
+    </segments>
+    <markers>
+      <marker name="Segment">
+        <start>01:56:17:18</start>
+        <end>01:56:47:23</end>
+        <type>End Credit</type>
+      </marker>
+    </markers>
+    <adopportunitiesmarkers />
+  </timelines>
+</ProgramMetadata>

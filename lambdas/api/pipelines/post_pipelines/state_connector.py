@@ -45,6 +45,7 @@ class StateConnector:
         choice_true_targets: Dict[str, str],
         choice_false_targets: Dict[str, str],
         choice_fail_targets: Dict[str, str] = None,
+        choice_custom_branches: Dict[str, Dict[str, str]] = None,
     ) -> None:
         """
         Connect states based on edges in the pipeline.
@@ -54,12 +55,27 @@ class StateConnector:
             choice_true_targets: Dictionary mapping Choice node IDs to their "true" target node IDs
             choice_false_targets: Dictionary mapping Choice node IDs to their "false" target node IDs
             choice_fail_targets: Dictionary mapping Choice node IDs to their "fail" target node IDs
+            choice_custom_branches: Dictionary mapping Choice node IDs to dicts of {output_name: target_node_id}
         """
-        # Initialize choice_fail_targets if not provided
+        # Initialize optional parameters if not provided
         if choice_fail_targets is None:
             choice_fail_targets = {}
+        if choice_custom_branches is None:
+            choice_custom_branches = {}
+
         logger.info(f"Connecting states based on {len(edges)} edges")
         logger.info(f"Available states at connection time: {list(self.states.keys())}")
+
+        if choice_custom_branches:
+            logger.info(f"Custom Choice branches to connect: {choice_custom_branches}")
+
+        # First, connect custom Choice branches if any exist
+        for source_id, custom_branches in choice_custom_branches.items():
+            source_state_name = self.node_id_to_state_name.get(source_id)
+            if source_state_name and source_state_name in self.states:
+                self._connect_custom_choice_branches(
+                    source_id, source_state_name, custom_branches
+                )
 
         # Connect states based on edges
         for edge in edges:
@@ -383,6 +399,109 @@ class StateConnector:
             logger.info(
                 f"Connected Map state {source_state_name} to {target_state_name}"
             )
+
+    def _connect_custom_choice_branches(
+        self,
+        source_id: str,
+        source_state_name: str,
+        custom_branches: Dict[str, str],
+    ) -> None:
+        """
+        Connect custom Choice branches to their target states.
+
+        This method handles Choice nodes with custom output types (e.g., Success,
+        NoMatch, AuthError, Error) by replacing placeholders with actual target
+        state names based on the edge mappings.
+
+        Args:
+            source_id: ID of the Choice node
+            source_state_name: Name of the Choice state
+            custom_branches: Dict mapping output names to target node IDs
+        """
+        source_state = self.states.get(source_state_name)
+        if not source_state:
+            logger.warning(
+                f"Cannot connect custom Choice branches: state {source_state_name} not found"
+            )
+            return
+
+        logger.info(
+            f"Connecting custom Choice branches for {source_state_name}: {custom_branches}"
+        )
+
+        connected_branches = 0
+        unconnected_branches = []
+
+        for output_name, target_node_id in custom_branches.items():
+            target_state_name = self.node_id_to_state_name.get(target_node_id)
+
+            if not target_state_name:
+                logger.warning(
+                    f"No state name found for custom branch target node {target_node_id}"
+                )
+                unconnected_branches.append(output_name)
+                continue
+
+            if target_state_name not in self.states:
+                logger.warning(
+                    f"Target state {target_state_name} not found in states dict for custom branch '{output_name}'"
+                )
+                unconnected_branches.append(output_name)
+                continue
+
+            # Build the placeholder pattern for this output
+            placeholder = f"__PLACEHOLDER__{source_id}_{output_name}__"
+
+            # Replace in Choices array
+            if "Choices" in source_state:
+                for choice in source_state["Choices"]:
+                    if choice.get("Next") == placeholder:
+                        choice["Next"] = target_state_name
+                        logger.info(
+                            f"Connected custom Choice branch '{output_name}': "
+                            f"{source_state_name} -> {target_state_name}"
+                        )
+                        self.choice_branch_targets[target_state_name] = (
+                            source_state_name
+                        )
+                        connected_branches += 1
+                        break
+
+            # Replace Default if it matches
+            if source_state.get("Default") == placeholder:
+                source_state["Default"] = target_state_name
+                logger.info(
+                    f"Connected custom Choice default branch '{output_name}': "
+                    f"{source_state_name} -> {target_state_name}"
+                )
+                self.choice_branch_targets[target_state_name] = source_state_name
+                connected_branches += 1
+
+        # Log warnings for any unconnected branches
+        if unconnected_branches:
+            logger.warning(
+                f"Custom Choice branches not connected in state {source_state_name}: "
+                f"{unconnected_branches}. These branches will not route to any target state."
+            )
+
+        # Check for any remaining placeholders that weren't connected
+        if "Choices" in source_state:
+            for choice in source_state["Choices"]:
+                next_val = choice.get("Next", "")
+                if "__PLACEHOLDER__" in str(next_val):
+                    logger.warning(
+                        f"Unconnected placeholder in Choice state {source_state_name}: {next_val}"
+                    )
+
+        if "__PLACEHOLDER__" in str(source_state.get("Default", "")):
+            logger.warning(
+                f"Unconnected Default placeholder in Choice state {source_state_name}: "
+                f"{source_state.get('Default')}"
+            )
+
+        logger.info(
+            f"Connected {connected_branches} custom Choice branches for {source_state_name}"
+        )
 
     def ensure_terminal_states(
         self, execution_path: List[str], leaf_node_ids: Set[str]

@@ -1,0 +1,186 @@
+{
+  "Comment": "State machine for pipeline TwelveLabs API Video Embedding to S3 Vectors",
+  "StartAt": "Presigned_URL_Generator_generate__dndnode_1_",
+  "States": {
+    "Choice__dndnode_10_": {
+      "Choices": [
+        {
+          "Next": "TwelveLabs_get_getEmbeddingTaskResults__dndnode_6_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        },
+        {
+          "Next": "Fail_fail__dndnode_11_",
+          "StringEquals": "Failed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_wait__dndnode_5_",
+      "Type": "Choice"
+    },
+    "Fail_fail__dndnode_11_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Map_map__dndnode_7_": {
+      "ItemReader": {
+        "Parameters": {
+          "Bucket.$": "$.metadata.distributedMapConfig.s3_bucket",
+          "Key.$": "$.metadata.distributedMapConfig.s3_key"
+        },
+        "ReaderConfig": {
+          "InputType": "JSON"
+        },
+        "Resource": "arn:aws:states:::s3:getObject"
+      },
+      "ItemSelector": {
+        "item.$": "$$.Map.Item.Value",
+        "metadata.$": "$.metadata"
+      },
+      "Iterator": {
+        "ProcessorConfig": {
+          "ExecutionType": "STANDARD",
+          "Mode": "DISTRIBUTED"
+        },
+        "StartAt": "PassState",
+        "States": {
+          "PassState": {
+            "End": true,
+            "Type": "Pass"
+          }
+        }
+      },
+      "MaxConcurrency": 40,
+      "Next": "Success__dndnode_8_",
+      "ResultPath": null,
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5
+        }
+      ],
+      "Type": "Map"
+    },
+    "Presigned_URL_Generator_generate__dndnode_1_": {
+      "Next": "TwelveLabs_post_generateVideoEmbeddings__dndnode_2_",
+      "Result": {
+        "message": "No Lambda function for pre_signed_url"
+      },
+      "Type": "Pass"
+    },
+    "Success__dndnode_8_": {
+      "Type": "Succeed"
+    },
+    "TwelveLabs_get_getEmbeddingTaskResults__dndnode_6_": {
+      "Next": "Map_map__dndnode_7_",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:twelve_labs",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "TwelveLabs_get_getEmbeddingTaskStatus__dndnode_3_": {
+      "Next": "Choice__dndnode_10_",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:twelve_labs",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "TwelveLabs_post_generateVideoEmbeddings__dndnode_2_": {
+      "Next": "TwelveLabs_get_getEmbeddingTaskStatus__dndnode_3_",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:twelve_labs",
+      "Retry": [
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": [
+            "MediaConvert.ThrottlingException",
+            "MediaConvert.TooManyRequestsException",
+            "MediaConvertEndpointThrottlingError"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 8
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 5
+        },
+        {
+          "BackoffRate": 2.0,
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3
+        }
+      ],
+      "Type": "Task"
+    },
+    "Wait_wait__dndnode_5_": {
+      "Next": "TwelveLabs_get_getEmbeddingTaskStatus__dndnode_3_",
+      "Seconds": 15,
+      "Type": "Wait"
+    }
+  }
+}

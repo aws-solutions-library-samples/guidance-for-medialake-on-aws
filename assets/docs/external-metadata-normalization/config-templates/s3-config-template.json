@@ -1,0 +1,153 @@
+{
+  "_metadata": {
+    "_description": "Complete S3-storable configuration template",
+    "_usage": "Upload to S3 and reference via config_s3_path in node configuration",
+    "_s3_path_convention": "normalizer-configs/{customer}-{normalizer-type}-config.json",
+    "_example_path": "normalizer-configs/acme-generic-xml-config.json"
+  },
+
+  "source_namespace_prefix": "CUSTOMER",
+  "default_language": "en-US",
+  "primary_id_field": "content_id",
+  "ref_id_field": "reference_id",
+  "include_raw_source": false,
+
+  "identifier_mappings": {
+    "content_id": "",
+    "reference_id": "-REF",
+    "version_id": "-VERSION",
+    "sequence_id": "-SEQ",
+    "gracenote_series_id": "TMS",
+    "gracenote_episode_id": "TMS",
+    "gracenote_movie_id": "TMS",
+    "ad_content_id": "-AD"
+  },
+
+  "title_mappings": {
+    "title_field": "title",
+    "title_brief_field": "titlebrief",
+    "short_description_field": "short_description",
+    "medium_description_field": "medium_description",
+    "long_description_field": "long_description",
+    "copyright_field": "copyright_holder",
+    "keywords_field": "keywords"
+  },
+
+  "classification_mappings": {
+    "is_movie_field": "is_movie",
+    "content_type_field": "content_type",
+    "video_type_field": "video_type",
+    "genres_field": "genres",
+    "genre_type_attr": "@type",
+    "genre_text_key": "#text"
+  },
+  "platform_genre_types": [
+    "Amazon",
+    "Apple",
+    "Roku",
+    "SN Series",
+    "Bell Series",
+    "TELUS Series"
+  ],
+
+  "hierarchy_mappings": {
+    "episode_number_field": "episode_number",
+    "season_number_field": "season_number",
+    "series_id_field": "tms_series_id",
+    "season_id_field": "season_id"
+  },
+
+  "parent_metadata_mappings": {
+    "show_name_field": "show_name",
+    "short_series_description_field": "short_series_description",
+    "long_series_description_field": "long_series_description",
+    "series_premiere_date_field": "series_premiere_date",
+    "season_count_field": "season_count",
+    "short_season_description_field": "short_season_description",
+    "long_season_description_field": "long_season_description",
+    "episode_count_field": "episode_count"
+  },
+
+  "people_field_mappings": {
+    "actors": "Actor",
+    "directors": "Director",
+    "writers": "Writer",
+    "producers": "Producer",
+    "executive_producers": "ExecutiveProducer",
+    "series_creators": "Creator",
+    "guest_actors": "Actor",
+    "season_actors": "Actor",
+    "season_directors": "Director",
+    "season_writers": "Writer",
+    "series_actors": "Actor",
+    "series_directors": "Director",
+    "series_writers": "Writer"
+  },
+  "guest_actors_field": "guest_actors",
+  "person_first_name_attr": "@first_name",
+  "person_last_name_attr": "@last_name",
+  "person_order_attr": "@order",
+  "person_role_attr": "@role",
+
+  "rating_system_mappings": {
+    "us-tv": "US",
+    "TV Rating": "US",
+    "ca-tv": "CA",
+    "au-tv": "AU",
+    "ACMA": "AU",
+    "DMEC": "MX",
+    "in-tv": "IN",
+    "nz-tv": "NZ",
+    "nz-am": "NZ"
+  },
+  "ratings_field": "ratings",
+  "rating_type_attr": "@type",
+  "rating_value_attr": "@value",
+  "rating_descriptor_attr": "@Descriptor",
+
+  "technical_mappings": {
+    "frame_rate_field": "frame_rate",
+    "aspect_ratio_field": "video_dar",
+    "resolution_field": "resolution",
+    "active_picture_field": "activepicture",
+    "color_type_field": "in_color_flag",
+    "video_codec_field": "videocodec",
+    "audio_attributes_field": "audioattributes",
+    "audio_language_attr": "audiolanguage",
+    "audio_dvs_attr": "DVS",
+    "audio_track_ref_attr": "fileposition",
+    "subtitle_attributes_field": "closedcaptionsattributes",
+    "subtitle_language_attr": "language",
+    "subtitle_type_attr": "type"
+  },
+
+  "temporal_mappings": {
+    "premiere_year_field": "premiere_year",
+    "original_air_date_field": "original_air_date",
+    "run_length_field": "run_length"
+  },
+
+  "geographic_mappings": {
+    "country_code_field": "country_code",
+    "language_field": "language"
+  },
+
+  "custom_field_categories": {
+    "advertising": [
+      "ad_category",
+      "ad_content_id",
+      "cue_points",
+      "adopportunitiesmarkers"
+    ],
+    "timing": ["timelines", "timelines_df30", "segments", "markers"],
+    "technical": [
+      "AFD",
+      "needs_watermark",
+      "semitextless",
+      "conform_materials_list",
+      "format"
+    ],
+    "rights": ["platform_rights", "carousel"],
+    "other": ["placement"]
+  }
+}

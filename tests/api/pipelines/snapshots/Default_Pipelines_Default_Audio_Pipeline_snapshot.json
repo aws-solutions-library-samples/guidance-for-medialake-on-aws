@@ -1,0 +1,56 @@
+{
+  "Comment": "State machine for pipeline Default Audio Pipeline",
+  "StartAt": "Audio_Metadata_Extractor_extract_extractAudioMetadata__dndnode_1_",
+  "States": {
+    "Audio_Metadata_Extractor_extract_extractAudioMetadata__dndnode_1_": {
+      "Next": "Audio_Proxy_extract__dndnode_23_",
+      "Result": {
+        "message": "No Lambda function for audio_metadata_extractor"
+      },
+      "Type": "Pass"
+    },
+    "Audio_Proxy_extract__dndnode_23_": {
+      "Next": "Check_MediaConvert_Status_check_checkStatus__dndnode_3_",
+      "Result": {
+        "message": "No Lambda function for audio_proxy"
+      },
+      "Type": "Pass"
+    },
+    "Check_MediaConvert_Status_check_checkStatus__dndnode_3_": {
+      "Next": "Choice__dndnode_29_",
+      "Result": {
+        "message": "No Lambda function for check_media_convert_status"
+      },
+      "Type": "Pass"
+    },
+    "Choice__dndnode_29_": {
+      "Choices": [
+        {
+          "Next": "Success__dndnode_28_",
+          "StringEquals": "Completed",
+          "Variable": "$.metadata.externalJobStatus"
+        },
+        {
+          "Next": "Fail_fail__dndnode_30_",
+          "StringEquals": "Failed",
+          "Variable": "$.metadata.externalJobStatus"
+        }
+      ],
+      "Default": "Wait_1_Minute__dndnode_5_",
+      "Type": "Choice"
+    },
+    "Fail_fail__dndnode_30_": {
+      "Cause": "Flow step failed",
+      "Error": "FlowFailure",
+      "Type": "Fail"
+    },
+    "Success__dndnode_28_": {
+      "Type": "Succeed"
+    },
+    "Wait_1_Minute__dndnode_5_": {
+      "Next": "Check_MediaConvert_Status_check_checkStatus__dndnode_3_",
+      "Seconds": 1,
+      "Type": "Wait"
+    }
+  }
+}
