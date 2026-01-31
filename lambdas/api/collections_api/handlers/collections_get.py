@@ -80,6 +80,8 @@ def register_route(app):
                     "filter[search]"
                 ):
                     query_params_dict["filter_search"] = filter_search
+                if group_ids := app.current_event.get_query_string_value("groupIds"):
+                    query_params_dict["groupIds"] = group_ids
                 if sort_val := app.current_event.get_query_string_value("sort"):
                     query_params_dict["sort"] = sort_val
                 if fields_val := app.current_event.get_query_string_value("fields"):
@@ -133,6 +135,40 @@ def register_route(app):
             # - Private collections are only visible to their owners
             # - Unauthenticated users see no collections
             items = _filter_collections_by_access(items, user_id)
+
+            # Apply group filtering if groupIds parameter provided (OR logic)
+            if query_params.groupIds:
+                from collection_groups_utils import get_collection_ids_by_group_ids
+
+                group_id_list = [
+                    gid.strip()
+                    for gid in query_params.groupIds.split(",")
+                    if gid.strip()
+                ]
+                if group_id_list:
+                    # Get all collection IDs from specified groups
+                    collection_ids_from_groups = set(
+                        get_collection_ids_by_group_ids(
+                            collections_table, group_id_list
+                        )
+                    )
+
+                    # Filter items to only include collections in the groups (AND logic with other filters)
+                    items = [
+                        item
+                        for item in items
+                        if item.get("PK", "").replace(COLLECTION_PK_PREFIX, "")
+                        in collection_ids_from_groups
+                    ]
+
+                    logger.debug(
+                        {
+                            "message": "Applied group filtering",
+                            "group_count": len(group_id_list),
+                            "collection_count": len(items),
+                            "operation": "collections_get",
+                        }
+                    )
 
             has_more = len(items) > query_params.limit
             if has_more:

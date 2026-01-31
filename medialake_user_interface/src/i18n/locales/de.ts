@@ -757,6 +757,7 @@ export default {
     public: "Öffentlich",
     private: "Privat",
     items: "Elemente",
+    collections: "Sammlungen",
     subCollections: "Untersammlungen",
     batchOperations: {
       deleteSelected: "Ausgewählte löschen",
@@ -1348,6 +1349,8 @@ export default {
         sortOrder: "Reihenfolge",
         ascending: "Aufsteigend",
         descending: "Absteigend",
+        filterByGroups: "Nach Gruppen filtern",
+        noGroups: "Keine Gruppen verfügbar",
       },
       recentAssets: {
         title: "Neueste Assets",

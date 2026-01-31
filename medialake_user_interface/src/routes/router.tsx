@@ -11,6 +11,7 @@ import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
 import CollectionViewPage from "@/pages/CollectionViewPage";
+import { CollectionGroupsPage } from "@/features/collection-groups";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
 import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
       {
         path: "collections/:id/view",
         element: <CollectionViewPage />,
+      },
+      {
+        path: "collection-groups",
+        element: <CollectionGroupsPage />,
       },
       {
         path: "executions",

@@ -744,6 +744,7 @@ export default {
     public: "公开",
     private: "私有",
     items: "项目",
+    collections: "集合",
     subCollections: "子集合",
     batchOperations: {
       deleteSelected: "删除所选",
@@ -1332,6 +1333,8 @@ export default {
         sortOrder: "顺序",
         ascending: "升序",
         descending: "降序",
+        filterByGroups: "按组筛选",
+        noGroups: "没有可用的组",
       },
       recentAssets: {
         title: "最近资源",

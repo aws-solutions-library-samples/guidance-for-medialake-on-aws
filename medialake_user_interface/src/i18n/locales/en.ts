@@ -704,6 +704,7 @@ export default {
     public: "Public",
     private: "Private",
     items: "items",
+    collections: "Collections",
     subCollections: "sub-collections",
     batchOperations: {
       deleteSelected: "Delete selected",
@@ -1337,6 +1338,8 @@ export default {
         sortOrder: "Order",
         ascending: "Asc",
         descending: "Desc",
+        filterByGroups: "Filter by Groups",
+        noGroups: "No groups available",
       },
       recentAssets: {
         title: "Recent Assets",

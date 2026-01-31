@@ -22,6 +22,7 @@ export interface SortConfig {
 export interface CollectionsWidgetConfig extends Record<string, unknown> {
   viewType: CollectionViewType;
   sorting: SortConfig;
+  groupIds?: string[]; // Filter by collection groups (OR logic)
 }
 
 export type WidgetType = "favorites" | "collections" | "recent-assets";

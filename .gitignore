@@ -38,6 +38,7 @@ __pycache__
 .pytest_cache
 *.egg-info
 .python-version
+.hypothesis/
 
 # Python CDK
 cdk.context.json

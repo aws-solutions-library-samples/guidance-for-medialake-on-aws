@@ -713,6 +713,7 @@ export default {
     public: "Public",
     private: "Privé",
     items: "éléments",
+    collections: "Collections",
     subCollections: "sous-collections",
     batchOperations: {
       deleteSelected: "Supprimer la sélection",
@@ -1347,6 +1348,8 @@ export default {
         sortOrder: "Ordre",
         ascending: "Croissant",
         descending: "Décroissant",
+        filterByGroups: "Filtrer par groupes",
+        noGroups: "Aucun groupe disponible",
       },
       recentAssets: {
         title: "Ressources Récentes",

@@ -29,6 +29,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 # Import PynamoDB models
 from db_models import (
     ChildReferenceModel,
+    CollectionGroupModel,
     CollectionItemModel,
     CollectionModel,
     CollectionTypeModel,
@@ -76,6 +77,7 @@ for model in [
     ShareModel,
     RuleModel,
     CollectionTypeModel,
+    CollectionGroupModel,
 ]:
     model.Meta.table_name = table_name
     model.Meta.region = region

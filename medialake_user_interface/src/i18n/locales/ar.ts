@@ -745,6 +745,7 @@ export default {
     public: "عام",
     private: "خاص",
     items: "عناصر",
+    collections: "المجموعات",
     subCollections: "مجموعات فرعية",
     batchOperations: {
       deleteSelected: "حذف المحدد",
@@ -1333,6 +1334,8 @@ export default {
         sortOrder: "الترتيب",
         ascending: "تصاعدي",
         descending: "تنازلي",
+        filterByGroups: "تصفية حسب المجموعات",
+        noGroups: "لا توجد مجموعات متاحة",
       },
       recentAssets: {
         title: "الأصول الحديثة",

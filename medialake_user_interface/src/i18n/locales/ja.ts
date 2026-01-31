@@ -750,6 +750,7 @@ export default {
     public: "公開",
     private: "非公開",
     items: "アイテム",
+    collections: "コレクション",
     subCollections: "サブコレクション",
     batchOperations: {
       deleteSelected: "選択項目を削除",
@@ -1339,6 +1340,8 @@ export default {
         sortOrder: "順序",
         ascending: "昇順",
         descending: "降順",
+        filterByGroups: "グループでフィルタ",
+        noGroups: "利用可能なグループがありません",
       },
       recentAssets: {
         title: "最近のアセット",

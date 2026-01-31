@@ -293,12 +293,21 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
 
   // Fetch collections from appropriate endpoint based on viewType
   // Note: We conditionally enable queries based on viewType to avoid unnecessary API calls
+  // Include groupIds filter if specified in config
+  const collectionsParams = useMemo(() => {
+    const params: any = {};
+    if (config.groupIds && config.groupIds.length > 0) {
+      params.groupIds = config.groupIds.join(",");
+    }
+    return params;
+  }, [config.groupIds]);
+
   const {
     data: standardCollectionsResponse,
     isLoading: isLoadingStandard,
     error: errorStandard,
     refetch: refetchStandard,
-  } = useGetCollections(undefined);
+  } = useGetCollections(collectionsParams);
 
   const {
     data: sharedWithMeResponse,

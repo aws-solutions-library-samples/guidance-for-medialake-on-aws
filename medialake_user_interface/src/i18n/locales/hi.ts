@@ -753,6 +753,7 @@ export default {
     public: "सार्वजनिक",
     private: "निजी",
     items: "आइटम",
+    collections: "संग्रह",
     subCollections: "उप-संग्रह",
     batchOperations: {
       deleteSelected: "चयनित हटाएं",
@@ -1342,6 +1343,8 @@ export default {
         sortOrder: "क्रम",
         ascending: "आरोही",
         descending: "अवरोही",
+        filterByGroups: "समूहों के अनुसार फ़िल्टर करें",
+        noGroups: "कोई समूह उपलब्ध नहीं",
       },
       recentAssets: {
         title: "हाल की संपत्तियां",

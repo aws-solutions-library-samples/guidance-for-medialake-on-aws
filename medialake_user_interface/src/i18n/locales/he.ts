@@ -745,6 +745,7 @@ export default {
     public: "ציבורי",
     private: "פרטי",
     items: "פריטים",
+    collections: "אוספים",
     subCollections: "תת-אוספים",
     batchOperations: {
       deleteSelected: "מחק נבחרים",
@@ -1333,6 +1334,8 @@ export default {
         sortOrder: "סדר",
         ascending: "עולה",
         descending: "יורד",
+        filterByGroups: "סינון לפי קבוצות",
+        noGroups: "אין קבוצות זמינות",
       },
       recentAssets: {
         title: "נכסים אחרונים",

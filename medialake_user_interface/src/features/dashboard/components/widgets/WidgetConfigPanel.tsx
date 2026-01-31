@@ -13,6 +13,9 @@ import {
   TextField,
   IconButton,
   InputAdornment,
+  Chip,
+  OutlinedInput,
+  SelectChangeEvent,
 } from "@mui/material";
 import {
   ArrowUpward as AscIcon,
@@ -20,6 +23,7 @@ import {
   Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { useCollectionGroups } from "@/features/collection-groups/hooks/useCollectionGroups";
 import type { CollectionsWidgetConfig, CollectionViewType, SortBy, SortOrder } from "../../types";
 
 interface WidgetConfigPanelProps {
@@ -40,6 +44,10 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
   const { t } = useTranslation();
   const [nameValue, setNameValue] = React.useState(customName || "");
 
+  // Fetch collection groups for filtering
+  const { data: groupsData, isLoading: isLoadingGroups } = useCollectionGroups();
+  const groups = groupsData?.data || [];
+
   const handleCustomNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setNameValue(value);
@@ -56,6 +64,15 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
     onChange({
       ...config,
       viewType: newViewType,
+    });
+  };
+
+  const handleGroupIdsChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    const groupIds = typeof value === "string" ? value.split(",") : value;
+    onChange({
+      ...config,
+      groupIds: groupIds.length > 0 ? groupIds : undefined,
     });
   };
 
@@ -163,6 +180,45 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
           <MenuItem value="my-shared">
             {t("dashboard.widgets.collections.viewTypes.myShared", "My Shared Collections")}
           </MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Group Filtering */}
+      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+        <InputLabel id="group-filter-label">
+          {t("dashboard.widgets.collections.filterByGroups", "Filter by Groups")}
+        </InputLabel>
+        <Select
+          labelId="group-filter-label"
+          id="group-filter-select"
+          multiple
+          value={config.groupIds || []}
+          onChange={handleGroupIdsChange}
+          input={
+            <OutlinedInput
+              label={t("dashboard.widgets.collections.filterByGroups", "Filter by Groups")}
+            />
+          }
+          renderValue={(selected) => (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              {selected.map((groupId) => {
+                const group = groups.find((g) => g.id === groupId);
+                return <Chip key={groupId} label={group?.name || groupId} size="small" />;
+              })}
+            </Box>
+          )}
+          disabled={isLoadingGroups}
+        >
+          {groups.length === 0 && !isLoadingGroups && (
+            <MenuItem disabled>
+              <em>{t("dashboard.widgets.collections.noGroups", "No groups available")}</em>
+            </MenuItem>
+          )}
+          {groups.map((group) => (
+            <MenuItem key={group.id} value={group.id}>
+              {group.name} ({group.collectionCount} {t("common.collections", "collections")})
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 

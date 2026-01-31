@@ -745,6 +745,7 @@ export default {
     public: "공개",
     private: "비공개",
     items: "항목",
+    collections: "컬렉션",
     subCollections: "하위 컬렉션",
     batchOperations: {
       deleteSelected: "선택 항목 삭제",
@@ -1333,6 +1334,8 @@ export default {
         sortOrder: "순서",
         ascending: "오름차순",
         descending: "내림차순",
+        filterByGroups: "그룹별 필터",
+        noGroups: "사용 가능한 그룹이 없습니다",
       },
       recentAssets: {
         title: "최근 자산",
