@@ -81,8 +81,9 @@ const GroupChips: React.FC<{
   user: User;
   theme: any;
   groups: any[] | undefined;
+  isLoadingGroups: boolean;
   handleMutation: (options: any, variables: any) => Promise<any>;
-}> = ({ user, theme, groups, handleMutation }) => {
+}> = ({ user, theme, groups, isLoadingGroups, handleMutation }) => {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const updateUserMutation = useUpdateUser();
@@ -126,9 +127,11 @@ const GroupChips: React.FC<{
   // Find the matching group object to get the display name
   const currentGroupObj = currentGroupId ? groups?.find((g) => g.id === currentGroupId) : null;
 
-  const currentGroupDisplayName = currentGroupObj
-    ? currentGroupObj.name
-    : t("common.noGroup", "No Group");
+  const currentGroupDisplayName = isLoadingGroups
+    ? t("common.loadingGroups", "Getting groups...")
+    : currentGroupObj
+      ? currentGroupObj.name
+      : t("common.noGroup", "No Group");
 
   return (
     <Box
@@ -264,7 +267,7 @@ const UserList: React.FC<UserListProps> = ({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   // Fetch groups and permission sets at the parent level
-  const { data: groups } = useGetGroups(true);
+  const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
   const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
   // Sync external state with internal state
@@ -340,7 +343,6 @@ const UserList: React.FC<UserListProps> = ({
   };
 
   const columns = useMemo<ColumnDef<User>[]>(() => {
-    console.log("Theme in columns useMemo:", theme);
     return [
       {
         header: t("common.columns.username"),
@@ -351,7 +353,6 @@ const UserList: React.FC<UserListProps> = ({
         enableSorting: true,
         enableFiltering: true,
         cell: ({ getValue }) => {
-          console.log("Cell theme:", theme);
           return <TableCellContent variant="primary">{getValue() as string}</TableCellContent>;
         },
       },
@@ -437,6 +438,7 @@ const UserList: React.FC<UserListProps> = ({
               user={row.original}
               theme={theme}
               groups={groups}
+              isLoadingGroups={isLoadingGroups}
               handleMutation={handleMutation}
             />
           );
@@ -579,6 +581,7 @@ const UserList: React.FC<UserListProps> = ({
     onDeleteUser,
     onToggleUserStatus,
     groups,
+    isLoadingGroups,
     permissionSets,
     handleMutation,
   ]);

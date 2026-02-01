@@ -735,6 +735,7 @@ export default {
     error: "Error",
     language: "Language",
     noGroup: "No group",
+    loadingGroups: "Getting groups...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
     noUsersFound: "No users found",

@@ -18,37 +18,24 @@ export const useGetGroups = (enabled: boolean = true) => {
     enabled: enabled,
     queryFn: async () => {
       try {
-        console.log(`Fetching groups... [${new Date().toISOString()}]`);
         const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE);
-        console.log(`Groups API response [${new Date().toISOString()}]`);
 
-        // Handle string body format (older API format)
         if (typeof data.body === "string") {
           const parsedBody = JSON.parse(data.body) as GroupListResponse;
-          console.log("Parsed groups from string:", parsedBody.data.groups);
           return parsedBody.data.groups;
         }
 
-        // Handle nested body.data.groups format
         if (data.body && data.body.data && Array.isArray(data.body.data.groups)) {
-          console.log("Groups from data.body:", data.body.data.groups);
           return data.body.data.groups;
         }
 
-        // Handle direct response format {status, message, data: {groups: []}}
         if (data.status && data.data && Array.isArray(data.data.groups)) {
-          console.log("Groups from direct response:", data.data.groups);
           return data.data.groups;
         }
 
-        console.error("Unexpected API response structure:", data);
         return [];
       } catch (error: any) {
-        // Handle 403 errors gracefully
         if (error?.response?.status === 403) {
-          console.log("Groups API returned 403 Forbidden");
-          console.log("User likely does not have permission to access groups");
-          // Return empty array instead of throwing an error
           return [];
         }
         // Re-throw other errors
