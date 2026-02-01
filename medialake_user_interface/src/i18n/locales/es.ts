@@ -291,6 +291,7 @@ export default {
     },
   },
   search: {
+    clear: "Borrar búsqueda",
     semantic: {
       label: "Semántico",
       enable: "Habilitar búsqueda semántica",

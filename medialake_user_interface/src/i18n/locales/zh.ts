@@ -285,6 +285,7 @@ export default {
     },
   },
   search: {
+    clear: "清除搜索",
     semantic: {
       label: "语义",
       enable: "启用语义搜索",
