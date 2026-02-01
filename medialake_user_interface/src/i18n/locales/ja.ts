@@ -289,6 +289,7 @@ export default {
     },
   },
   search: {
+    clear: "検索をクリア",
     semantic: {
       label: "セマンティック",
       enable: "セマンティック検索を有効にする",

@@ -288,6 +288,7 @@ export default {
     },
   },
   search: {
+    clear: "Clear search",
     semantic: {
       label: "Semantic",
       enable: "Enable semantic search",

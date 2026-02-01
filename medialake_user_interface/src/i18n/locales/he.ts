@@ -286,6 +286,7 @@ export default {
     },
   },
   search: {
+    clear: "חיפוש ברור",
     semantic: {
       label: "סמנטי",
       enable: "הפעל חיפוש סמנטי",

@@ -293,6 +293,7 @@ export default {
     },
   },
   search: {
+    clear: "Suche löschen",
     semantic: {
       label: "Semantisch",
       enable: "Semantische Suche aktivieren",

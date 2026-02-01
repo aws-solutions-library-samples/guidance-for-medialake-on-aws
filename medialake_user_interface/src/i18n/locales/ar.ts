@@ -286,6 +286,7 @@ export default {
     },
   },
   search: {
+    clear: "مسح البحث",
     semantic: {
       label: "دلالي",
       enable: "تفعيل البحث الدلالي",

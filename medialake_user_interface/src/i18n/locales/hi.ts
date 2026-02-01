@@ -291,6 +291,7 @@ export default {
     },
   },
   search: {
+    clear: "खोज साफ़ करें",
     semantic: {
       label: "सार्थक",
       enable: "सार्थक खोज सक्षम करें",

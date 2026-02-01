@@ -286,6 +286,7 @@ export default {
     },
   },
   search: {
+    clear: "검색 지우기",
     semantic: {
       label: "시맨틱",
       enable: "시맨틱 검색 활성화",
