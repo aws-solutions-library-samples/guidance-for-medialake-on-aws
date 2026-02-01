@@ -6,6 +6,8 @@ import {
   Favorite as FavoriteIcon,
   FolderOpen as CollectionIcon,
   Schedule as RecentIcon,
+  FolderSpecial as FolderSpecialIcon,
+  Category as CategoryIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,16 +15,32 @@ import { useDashboardStore, WIDGET_DEFINITIONS } from "../store/dashboardStore";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
 import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
-import type { WidgetType, CollectionsWidgetConfig } from "../types";
+import { CollectionGroupWidget } from "./widgets/CollectionGroupWidget";
+import { CollectionTypeWidget } from "./widgets/CollectionTypeWidget";
+import type {
+  WidgetType,
+  CollectionsWidgetConfig,
+  CollectionGroupWidgetConfig,
+  CollectionTypeWidgetConfig,
+} from "../types";
 
 // Widget component map
 const WIDGET_COMPONENTS: Record<
   WidgetType,
-  React.FC<{ widgetId: string; isExpanded?: boolean; config?: CollectionsWidgetConfig }>
+  React.FC<{
+    widgetId: string;
+    isExpanded?: boolean;
+    config?:
+      | CollectionsWidgetConfig
+      | CollectionGroupWidgetConfig
+      | CollectionTypeWidgetConfig;
+  }>
 > = {
   favorites: FavoritesWidget,
   collections: CollectionsWidget,
   "recent-assets": RecentAssetsWidget,
+  "collection-group": CollectionGroupWidget,
+  "collection-type": CollectionTypeWidget,
 };
 
 // Widget icon map
@@ -30,6 +48,8 @@ const WIDGET_ICONS: Record<WidgetType, React.ReactNode> = {
   favorites: <FavoriteIcon />,
   collections: <CollectionIcon />,
   "recent-assets": <RecentIcon />,
+  "collection-group": <FolderSpecialIcon />,
+  "collection-type": <CategoryIcon />,
 };
 
 export const ExpandedWidgetModal: React.FC = () => {

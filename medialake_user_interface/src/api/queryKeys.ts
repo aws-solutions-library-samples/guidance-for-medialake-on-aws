@@ -177,4 +177,13 @@ export const QUERY_KEYS = {
     details: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.COLLECTION_TYPES.details(), id] as const,
   },
+  COLLECTION_GROUPS: {
+    all: ["collection-groups"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.lists(), filters] as const,
+    details: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.details(), id] as const,
+    collections: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.detail(id), "collections"] as const,
+  },
 } as const;

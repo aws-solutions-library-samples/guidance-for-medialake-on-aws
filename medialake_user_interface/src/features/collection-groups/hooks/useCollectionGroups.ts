@@ -89,8 +89,8 @@ export const useAddCollectionsToGroup = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ groupId, data }: { groupId: string; data: AddCollectionsRequest }) =>
-      collectionGroupsApi.addCollections(groupId, data),
+    mutationFn: ({ groupId, collectionIds }: { groupId: string; collectionIds: string[] }) =>
+      collectionGroupsApi.addCollections(groupId, { collectionIds }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collection-groups"] });
       queryClient.invalidateQueries({
@@ -109,8 +109,8 @@ export const useRemoveCollectionsFromGroup = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ groupId, data }: { groupId: string; data: RemoveCollectionsRequest }) =>
-      collectionGroupsApi.removeCollections(groupId, data),
+    mutationFn: ({ groupId, collectionIds }: { groupId: string; collectionIds: string[] }) =>
+      collectionGroupsApi.removeCollections(groupId, { collectionIds }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["collection-groups"] });
       queryClient.invalidateQueries({

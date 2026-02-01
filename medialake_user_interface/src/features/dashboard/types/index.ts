@@ -25,7 +25,19 @@ export interface CollectionsWidgetConfig extends Record<string, unknown> {
   groupIds?: string[]; // Filter by collection groups (OR logic)
 }
 
-export type WidgetType = "favorites" | "collections" | "recent-assets";
+// Collection Group widget configuration
+export interface CollectionGroupWidgetConfig extends Record<string, unknown> {
+  groupId: string; // Single collection group to display
+  sorting: SortConfig;
+}
+
+// Collection Type widget configuration
+export interface CollectionTypeWidgetConfig extends Record<string, unknown> {
+  collectionTypeId: string; // Single collection type to display
+  sorting: SortConfig;
+}
+
+export type WidgetType = "favorites" | "collections" | "recent-assets" | "collection-group" | "collection-type";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -66,7 +78,7 @@ export interface DashboardLayout {
 export interface WidgetInstance {
   id: string;
   type: WidgetType;
-  config?: CollectionsWidgetConfig;
+  config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig;
   customName?: string; // Optional custom name for the widget instance
 }
 
@@ -82,7 +94,7 @@ export interface DashboardActions {
   updateLayoutItem: (itemId: string, updates: Partial<LayoutItem>) => void;
   addWidget: (type: WidgetType) => void;
   removeWidget: (widgetId: string) => void;
-  updateWidgetConfig: (widgetId: string, config: CollectionsWidgetConfig) => void;
+  updateWidgetConfig: (widgetId: string, config: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig) => void;
   updateWidgetCustomName: (widgetId: string, customName: string | undefined) => void;
   resetToDefault: () => void;
   setExpandedWidget: (widgetId: string | null) => void;

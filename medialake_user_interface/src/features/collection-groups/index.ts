@@ -9,3 +9,4 @@ export * from "./hooks/useCollectionGroups";
 export * from "./components/CollectionGroupsList";
 export * from "./components/CollectionGroupForm";
 export * from "./pages/CollectionGroupsPage";
+export * from "./pages/CollectionGroupDetailPage";

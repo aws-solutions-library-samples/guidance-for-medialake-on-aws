@@ -99,3 +99,23 @@ export const useRecentAssetsWidgetData = (widgetId: string) => {
     queryKey: QUERY_KEYS.SEARCH.all,
   });
 };
+
+/**
+ * Pre-configured hook for Collection Group widget data
+ */
+export const useCollectionGroupWidgetData = (widgetId: string, groupId?: string) => {
+  return useWidgetData({
+    widgetId,
+    queryKey: groupId ? QUERY_KEYS.COLLECTION_GROUPS.collections(groupId) : undefined,
+  });
+};
+
+/**
+ * Pre-configured hook for Collection Type widget data
+ */
+export const useCollectionTypeWidgetData = (widgetId: string, collectionTypeId?: string) => {
+  return useWidgetData({
+    widgetId,
+    queryKey: collectionTypeId ? QUERY_KEYS.COLLECTIONS.lists() : undefined,
+  });
+};

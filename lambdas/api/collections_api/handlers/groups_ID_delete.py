@@ -8,13 +8,13 @@ from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     NotFoundError,
 )
-from custom_exceptions import ForbiddenError
 from aws_lambda_powertools.metrics import MetricUnit
 from collection_groups_utils import (
     delete_collection_group,
     get_collection_group_metadata,
 )
 from collections_utils import create_error_response
+from custom_exceptions import ForbiddenError
 from user_auth import extract_user_context
 
 dynamodb = boto3.resource("dynamodb")

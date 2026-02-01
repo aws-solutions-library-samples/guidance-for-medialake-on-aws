@@ -9,6 +9,8 @@ import type {
   WidgetType,
   WidgetDefinition,
   CollectionsWidgetConfig,
+  CollectionGroupWidgetConfig,
+  CollectionTypeWidgetConfig,
   WidgetInstance,
 } from "../types";
 
@@ -38,6 +40,24 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
         sortOrder: "asc",
       },
     },
+  },
+  "collection-group": {
+    type: "collection-group",
+    title: "Collection Group",
+    description: "Display collections from a specific group",
+    icon: "folder_special",
+    defaultSize: { w: 6, h: 5 },
+    minSize: { w: 3, h: 2 },
+    maxSize: { w: 12, h: 8 },
+  },
+  "collection-type": {
+    type: "collection-type",
+    title: "Collection Type",
+    description: "Display collections of a specific type",
+    icon: "category",
+    defaultSize: { w: 6, h: 5 },
+    minSize: { w: 3, h: 2 },
+    maxSize: { w: 12, h: 8 },
   },
   "recent-assets": {
     type: "recent-assets",

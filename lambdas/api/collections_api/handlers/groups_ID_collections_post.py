@@ -9,7 +9,6 @@ from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     NotFoundError,
 )
-from custom_exceptions import ForbiddenError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collection_groups_utils import (
@@ -19,6 +18,7 @@ from collection_groups_utils import (
     validate_collection_ids,
 )
 from collections_utils import create_error_response
+from custom_exceptions import ForbiddenError
 from models.group_models import AddCollectionsRequest
 from user_auth import extract_user_context
 

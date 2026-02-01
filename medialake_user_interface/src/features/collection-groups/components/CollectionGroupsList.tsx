@@ -109,11 +109,13 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 transition: "transform 0.2s, box-shadow 0.2s",
+                cursor: "pointer",
                 "&:hover": {
                   transform: "translateY(-4px)",
                   boxShadow: 4,
                 },
               }}
+              onClick={() => window.location.href = `/collection-groups/${group.id}`}
             >
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -127,14 +129,20 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                     <Box>
                       <IconButton
                         size="small"
-                        onClick={() => onEditClick?.(group)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditClick?.(group);
+                        }}
                         title="Edit group"
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleDelete(group.id, group.name)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(group.id, group.name);
+                        }}
                         title="Delete group"
                         disabled={deleteGroup.isPending}
                       >
