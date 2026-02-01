@@ -160,7 +160,7 @@ class CollectionsApi(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 memory_size=1024,  # VPC Lambdas need more memory for ENI setup
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for immediate response
+                # provisioned_concurrent_executions=2,  # Disabled - causing deployment issues
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
