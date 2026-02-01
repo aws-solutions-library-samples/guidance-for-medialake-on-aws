@@ -22,9 +22,10 @@ import os
 from typing import Any, Dict
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig, Response
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from custom_exceptions import ForbiddenError
 
 # Import PynamoDB models
 from db_models import (
