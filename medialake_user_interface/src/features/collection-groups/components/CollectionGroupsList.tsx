@@ -4,6 +4,8 @@
  */
 
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Card,
@@ -34,12 +36,14 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
   onCreateClick,
   onEditClick,
 }) => {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useCollectionGroups({ search, limit: 20 });
   const deleteGroup = useDeleteCollectionGroup();
 
   const handleDelete = async (groupId: string, groupName: string) => {
-    if (window.confirm(`Are you sure you want to delete "${groupName}"?`)) {
+    if (window.confirm(t("collectionGroups.list.confirmDelete", { name: groupName }))) {
       try {
         await deleteGroup.mutateAsync(groupId);
       } catch (err) {
@@ -57,28 +61,18 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
   }
 
   if (error) {
-    return <Alert severity="error">Error loading collection groups. Please try again.</Alert>;
+    return <Alert severity="error">{t("collectionGroups.list.errorLoading")}</Alert>;
   }
 
   const groups = data?.data || [];
 
   return (
     <Box>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          Collection Groups
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={onCreateClick}>
-          Create Group
-        </Button>
-      </Box>
-
       {/* Search */}
       <Box mb={3}>
         <TextField
           fullWidth
-          placeholder="Search groups..."
+          placeholder={t("collectionGroups.list.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           variant="outlined"
@@ -90,17 +84,21 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
         <Box textAlign="center" py={8}>
           <FolderIcon sx={{ fontSize: 80, color: "grey.400", mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            No collection groups yet
+            {t("collectionGroups.list.noGroupsYet")}
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={3}>
-            Create your first group to organize collections
+            {t("collectionGroups.list.createFirstGroup")}
           </Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={onCreateClick}>
-            Create Group
+            {t("collectionsPage.filters.createGroup")}
           </Button>
         </Box>
       ) : (
-        <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={2}>
+        <Box
+          display="grid"
+          sx={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
+          gap={2}
+        >
           {groups.map((group) => (
             <Card
               key={group.id}
@@ -115,7 +113,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                   boxShadow: 4,
                 },
               }}
-              onClick={() => (window.location.href = `/collection-groups/${group.id}`)}
+              onClick={() => navigate(`/collections/groups/${group.id}`)}
             >
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -133,7 +131,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                           e.stopPropagation();
                           onEditClick?.(group);
                         }}
-                        title="Edit group"
+                        title={t("collectionGroups.list.editGroup")}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -143,7 +141,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                           e.stopPropagation();
                           handleDelete(group.id, group.name);
                         }}
-                        title="Delete group"
+                        title={t("collectionGroups.list.deleteGroup")}
                         disabled={deleteGroup.isPending}
                       >
                         <DeleteIcon fontSize="small" />
@@ -171,14 +169,19 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
 
                 <Box display="flex" gap={1} flexWrap="wrap" mt="auto">
                   <Chip
-                    label={`${group.collectionCount} collection${
-                      group.collectionCount !== 1 ? "s" : ""
-                    }`}
+                    label={t("collectionGroups.list.collectionCount", {
+                      count: group.collectionCount,
+                    })}
                     size="small"
                     variant="outlined"
                   />
                   {group.isPublic && (
-                    <Chip label="Public" size="small" color="success" variant="outlined" />
+                    <Chip
+                      label={t("common.public")}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                    />
                   )}
                   {group.userRole && group.userRole !== "owner" && (
                     <Chip label={group.userRole} size="small" variant="outlined" />

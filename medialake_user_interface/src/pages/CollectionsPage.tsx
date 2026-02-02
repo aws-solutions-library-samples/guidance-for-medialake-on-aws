@@ -51,6 +51,7 @@ import {
   Share as ShareIcon,
   People as PeopleIcon,
   PersonOutline as PersonIcon,
+  FolderSpecial as FolderSpecialIcon,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { RefreshButton } from "@/components/common";
@@ -66,8 +67,10 @@ import {
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
 import { ShareManagementModal } from "../components/collections/ShareManagementModal";
 import { formatDate } from "@/utils/dateFormat";
+import { CollectionGroupsList, CollectionGroupForm } from "@/features/collection-groups";
+import type { CollectionGroup } from "@/features/collection-groups";
 
-type FilterTab = "all" | "myCollections" | "sharedWithMe" | "sharedByMe";
+type FilterTab = "all" | "myCollections" | "sharedWithMe" | "sharedByMe" | "groups";
 
 // Map of icon names to Material-UI icon components
 const ICON_MAP: Record<string, React.ReactElement> = {
@@ -105,6 +108,10 @@ const CollectionsPage: React.FC = () => {
     message: string;
     severity: "success" | "error";
   } | null>(null);
+
+  // Collection Groups state
+  const [groupFormOpen, setGroupFormOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<CollectionGroup | null>(null);
 
   // Get filter from URL params
   const filterParam = searchParams.get("filter") as FilterTab | null;
@@ -322,6 +329,25 @@ const CollectionsPage: React.FC = () => {
     setAlert(null);
   };
 
+  // Collection Groups handlers
+  const handleCreateGroupClick = () => {
+    setSelectedGroup(null);
+    setGroupFormOpen(true);
+  };
+
+  const handleEditGroupClick = (group: CollectionGroup) => {
+    setSelectedGroup(group);
+    setGroupFormOpen(true);
+  };
+
+  const handleGroupFormClose = () => {
+    setGroupFormOpen(false);
+    setSelectedGroup(null);
+  };
+
+  // Determine if we're on the groups tab
+  const isGroupsTab = activeTab === "groups";
+
   return (
     <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
@@ -335,19 +361,35 @@ const CollectionsPage: React.FC = () => {
               disabled={isLoading}
               variant="icon"
             />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setCreateModalOpen(true)}
-              sx={{
-                borderRadius: 2,
-                textTransform: "none",
-                px: 3,
-                height: 40,
-              }}
-            >
-              {t("collectionsPage.createCollection")}
-            </Button>
+            {isGroupsTab ? (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleCreateGroupClick}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: "none",
+                  px: 3,
+                  height: 40,
+                }}
+              >
+                {t("collectionsPage.filters.createGroup", "Create Group")}
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setCreateModalOpen(true)}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: "none",
+                  px: 3,
+                  height: 40,
+                }}
+              >
+                {t("collectionsPage.createCollection")}
+              </Button>
+            )}
           </Box>
         }
       />
@@ -407,11 +449,25 @@ const CollectionsPage: React.FC = () => {
             icon={<ShareIcon sx={{ fontSize: 20 }} />}
             iconPosition="start"
           />
+          <Tab
+            value="groups"
+            label={t("collectionsPage.filters.groups", "Groups")}
+            icon={<FolderSpecialIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+          />
         </Tabs>
       </Box>
 
-      <PageContent isLoading={isLoadingCollections} error={error as Error}>
-        {rootCollections.length === 0 ? (
+      <PageContent
+        isLoading={isGroupsTab ? false : isLoadingCollections}
+        error={isGroupsTab ? null : (error as Error)}
+      >
+        {isGroupsTab ? (
+          <CollectionGroupsList
+            onCreateClick={handleCreateGroupClick}
+            onEditClick={handleEditGroupClick}
+          />
+        ) : rootCollections.length === 0 ? (
           <Box
             sx={{
               display: "flex",
@@ -827,6 +883,13 @@ const CollectionsPage: React.FC = () => {
 
       {/* Create Collection Modal */}
       <CreateCollectionModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
+
+      {/* Collection Group Form Modal */}
+      <CollectionGroupForm
+        open={groupFormOpen}
+        onClose={handleGroupFormClose}
+        group={selectedGroup}
+      />
 
       {/* Share Management Modal */}
       <ShareManagementModal

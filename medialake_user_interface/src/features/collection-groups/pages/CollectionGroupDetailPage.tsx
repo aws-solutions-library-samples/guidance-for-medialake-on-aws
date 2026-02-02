@@ -71,7 +71,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
     ) {
       try {
         await deleteGroup.mutateAsync(groupId!);
-        navigate("/collection-groups");
+        navigate("/collections?filter=groups");
       } catch (err) {
         console.error("Failed to delete group:", err);
       }
@@ -137,7 +137,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
           <Alert severity="error">{t("collectionGroups.detailPage.errorLoading")}</Alert>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate("/collection-groups")}
+            onClick={() => navigate("/collections?filter=groups")}
             sx={{ mt: 2 }}
           >
             {t("collectionGroups.detailPage.backToGroups")}
@@ -157,7 +157,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
       <Box py={4}>
         {/* Header */}
         <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <IconButton onClick={() => navigate("/collection-groups")}>
+          <IconButton onClick={() => navigate("/collections?filter=groups")}>
             <ArrowBackIcon />
           </IconButton>
           <FolderIcon color="primary" sx={{ fontSize: 40 }} />

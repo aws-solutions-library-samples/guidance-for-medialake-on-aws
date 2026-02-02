@@ -201,6 +201,8 @@ export default {
       myCollections: "مجموعاتي",
       sharedWithMe: "مشتركة معي",
       sharedByMe: "شاركتها",
+      groups: "المجموعات",
+      createGroup: "إنشاء مجموعة",
     },
     sharedWithYou: "مشتركة معك",
     sharedWithCount: "مشتركة مع {{count}} أشخاص",
@@ -1237,6 +1239,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "خطأ في تحميل مجموعات المجموعات. يرجى المحاولة مرة أخرى.",
+      searchPlaceholder: "البحث في المجموعات...",
+      noGroupsYet: "لا توجد مجموعات بعد",
+      createFirstGroup: "أنشئ مجموعتك الأولى لتنظيم المجموعات",
+      editGroup: "تعديل المجموعة",
+      deleteGroup: "حذف المجموعة",
+      confirmDelete: 'هل أنت متأكد أنك تريد حذف "{{name}}"؟',
+      collectionCount: "{{count}} مجموعة",
+      collectionCount_other: "{{count}} مجموعات",
+    },
     detailPage: {
       errorLoading: "خطأ في تحميل مجموعة المجموعات. يرجى المحاولة مرة أخرى.",
       backToGroups: "العودة إلى المجموعات",

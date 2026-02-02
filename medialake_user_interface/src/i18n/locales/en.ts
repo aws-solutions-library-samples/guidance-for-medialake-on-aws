@@ -203,6 +203,8 @@ export default {
       myCollections: "My Collections",
       sharedWithMe: "Shared With Me",
       sharedByMe: "Shared By Me",
+      groups: "Groups",
+      createGroup: "Create Group",
     },
     sharedWithYou: "Shared with you",
     sharedWithCount: "Shared with {{count}} people",
@@ -1241,6 +1243,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "Error loading collection groups. Please try again.",
+      searchPlaceholder: "Search groups...",
+      noGroupsYet: "No collection groups yet",
+      createFirstGroup: "Create your first group to organize collections",
+      editGroup: "Edit group",
+      deleteGroup: "Delete group",
+      confirmDelete: 'Are you sure you want to delete "{{name}}"?',
+      collectionCount: "{{count}} collection",
+      collectionCount_other: "{{count}} collections",
+    },
     detailPage: {
       errorLoading: "Error loading collection group. Please try again.",
       backToGroups: "Back to Groups",

@@ -29,14 +29,12 @@ import { DashboardSelector } from "./DashboardSelector";
 import { FavoritesWidget } from "./widgets/FavoritesWidget";
 import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { CollectionGroupWidget } from "./widgets/CollectionGroupWidget";
-import { CollectionTypeWidget } from "./widgets/CollectionTypeWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
 import type {
   WidgetType,
   LayoutItem,
   CollectionsWidgetConfig,
   CollectionGroupWidgetConfig,
-  CollectionTypeWidgetConfig,
 } from "../types";
 
 // Import react-grid-layout styles
@@ -54,13 +52,12 @@ const WIDGET_COMPONENTS: Record<
   WidgetType,
   React.FC<{
     widgetId: string;
-    config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig;
+    config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig;
   }>
 > = {
   favorites: FavoritesWidget,
   collections: CollectionsWidget,
   "collection-group": CollectionGroupWidget,
-  "collection-type": CollectionTypeWidget,
   "recent-assets": RecentAssetsWidget,
 };
 

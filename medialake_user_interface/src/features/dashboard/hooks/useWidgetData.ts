@@ -109,13 +109,3 @@ export const useCollectionGroupWidgetData = (widgetId: string, groupId?: string)
     queryKey: groupId ? QUERY_KEYS.COLLECTION_GROUPS.collections(groupId) : undefined,
   });
 };
-
-/**
- * Pre-configured hook for Collection Type widget data
- */
-export const useCollectionTypeWidgetData = (widgetId: string, collectionTypeId?: string) => {
-  return useWidgetData({
-    widgetId,
-    queryKey: collectionTypeId ? QUERY_KEYS.COLLECTIONS.lists() : undefined,
-  });
-};

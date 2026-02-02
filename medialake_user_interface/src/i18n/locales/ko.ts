@@ -201,6 +201,8 @@ export default {
       myCollections: "내 컬렉션",
       sharedWithMe: "나에게 공유됨",
       sharedByMe: "내가 공유함",
+      groups: "그룹",
+      createGroup: "그룹 만들기",
     },
     sharedWithYou: "귀하와 공유됨",
     sharedWithCount: "{{count}}명과 공유됨",
@@ -1230,6 +1232,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "컬렉션 그룹을 로드하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
+      searchPlaceholder: "그룹 검색...",
+      noGroupsYet: "아직 컬렉션 그룹이 없습니다",
+      createFirstGroup: "컬렉션을 정리하기 위한 첫 번째 그룹을 만드세요",
+      editGroup: "그룹 편집",
+      deleteGroup: "그룹 삭제",
+      confirmDelete: '"{{name}}"을(를) 삭제하시겠습니까?',
+      collectionCount: "{{count}}개 컬렉션",
+      collectionCount_other: "{{count}}개 컬렉션",
+    },
     detailPage: {
       errorLoading: "컬렉션 그룹을 로드하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
       backToGroups: "그룹으로 돌아가기",

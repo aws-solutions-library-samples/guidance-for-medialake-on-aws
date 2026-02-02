@@ -44,7 +44,7 @@ import { CollectionCarousel } from "../CollectionCarousel";
 import { EmptyState } from "../EmptyState";
 import { CollectionGroupWidgetConfigPanel } from "./CollectionGroupWidgetConfigPanel";
 import type { BaseWidgetProps, CollectionGroupWidgetConfig } from "../../types";
-import { useDashboardStore } from "../../store/dashboardStore";
+import { useDashboardStore, useDashboardActions } from "../../store/dashboardStore";
 import { useCollectionGroup } from "@/features/collection-groups/hooks/useCollectionGroups";
 import { useGetCollections, useGetCollectionTypes } from "@/api/hooks/useCollections";
 
@@ -227,6 +227,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { removeWidget, setExpandedWidget } = useDashboardActions();
 
   const widget = useDashboardStore((state) => state.layout.widgets.find((w) => w.id === widgetId));
 
@@ -238,6 +239,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
     data: groupData,
     isLoading: isLoadingGroup,
     error: groupError,
+    refetch: refetchGroup,
   } = useCollectionGroup(config?.groupId || "");
 
   // Fetch collections filtered by this group
@@ -245,7 +247,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
     data: collectionsData,
     isLoading: isLoadingCollections,
     error: collectionsError,
-    refetch,
+    refetch: refetchCollections,
   } = useGetCollections(config?.groupId ? { groupIds: config.groupId } : undefined);
 
   // Fetch collection types for icons and colors
@@ -263,13 +265,22 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
     }
   }, [isLoading, error, onDataLoad, onError]);
 
-  const handleRefresh = () => {
-    refetch();
-  };
+  const handleRefresh = useCallback(() => {
+    refetchGroup();
+    refetchCollections();
+  }, [refetchGroup, refetchCollections]);
 
-  const handleConfigure = () => {
+  const handleConfigure = useCallback(() => {
     setConfigPanelOpen(true);
-  };
+  }, []);
+
+  const handleExpand = useCallback(() => {
+    setExpandedWidget(widgetId);
+  }, [setExpandedWidget, widgetId]);
+
+  const handleRemove = useCallback(() => {
+    removeWidget(widgetId);
+  }, [removeWidget, widgetId]);
 
   const handleCollectionClick = useCallback(
     (collectionId: string) => {
@@ -316,10 +327,14 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
         widgetId={widgetId}
         title={widgetTitle}
         icon={<FolderSpecialIcon />}
+        onExpand={handleExpand}
         onRefresh={handleRefresh}
+        onRemove={handleRemove}
         onConfigure={handleConfigure}
         isLoading={isLoading || isLoadingTypes}
         isExpanded={isExpanded}
+        error={error}
+        onRetry={handleRefresh}
       >
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
           {error ? (

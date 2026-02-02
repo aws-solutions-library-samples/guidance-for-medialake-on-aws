@@ -20,7 +20,6 @@ import {
   FolderOpen as CollectionIcon,
   Schedule as RecentIcon,
   FolderSpecial as FolderSpecialIcon,
-  Category as CategoryIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import type { WidgetSelectorProps, WidgetType } from "../types";
@@ -31,7 +30,6 @@ const WIDGET_ICONS: Record<WidgetType, React.ReactElement> = {
   collections: <CollectionIcon />,
   "recent-assets": <RecentIcon />,
   "collection-group": <FolderSpecialIcon />,
-  "collection-type": <CategoryIcon />,
 };
 
 export const WidgetSelector: React.FC<WidgetSelectorProps> = ({

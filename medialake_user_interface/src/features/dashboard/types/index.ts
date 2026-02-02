@@ -31,18 +31,7 @@ export interface CollectionGroupWidgetConfig extends Record<string, unknown> {
   sorting: SortConfig;
 }
 
-// Collection Type widget configuration
-export interface CollectionTypeWidgetConfig extends Record<string, unknown> {
-  collectionTypeId: string; // Single collection type to display
-  sorting: SortConfig;
-}
-
-export type WidgetType =
-  | "favorites"
-  | "collections"
-  | "recent-assets"
-  | "collection-group"
-  | "collection-type";
+export type WidgetType = "favorites" | "collections" | "recent-assets" | "collection-group";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -83,7 +72,7 @@ export interface DashboardLayout {
 export interface WidgetInstance {
   id: string;
   type: WidgetType;
-  config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig;
+  config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig;
   customName?: string; // Optional custom name for the widget instance
 }
 
@@ -101,7 +90,7 @@ export interface DashboardActions {
   removeWidget: (widgetId: string) => void;
   updateWidgetConfig: (
     widgetId: string,
-    config: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig
+    config: CollectionsWidgetConfig | CollectionGroupWidgetConfig
   ) => void;
   updateWidgetCustomName: (widgetId: string, customName: string | undefined) => void;
   resetToDefault: () => void;

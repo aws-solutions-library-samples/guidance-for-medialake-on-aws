@@ -201,6 +201,8 @@ export default {
       myCollections: "האוספים שלי",
       sharedWithMe: "שותף איתי",
       sharedByMe: "שיתפתי",
+      groups: "קבוצות",
+      createGroup: "צור קבוצה",
     },
     sharedWithYou: "שותף איתך",
     sharedWithCount: "שותף עם {{count}} אנשים",
@@ -1237,6 +1239,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "שגיאה בטעינת קבוצות האוספים. אנא נסה שוב.",
+      searchPlaceholder: "חיפוש קבוצות...",
+      noGroupsYet: "אין עדיין קבוצות אוספים",
+      createFirstGroup: "צור את הקבוצה הראשונה שלך לארגון אוספים",
+      editGroup: "ערוך קבוצה",
+      deleteGroup: "מחק קבוצה",
+      confirmDelete: 'האם אתה בטוח שברצונך למחוק את "{{name}}"?',
+      collectionCount: "{{count}} אוסף",
+      collectionCount_other: "{{count}} אוספים",
+    },
     detailPage: {
       errorLoading: "שגיאה בטעינת קבוצת האוספים. אנא נסה שוב.",
       backToGroups: "חזרה לקבוצות",

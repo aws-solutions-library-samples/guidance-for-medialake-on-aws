@@ -206,6 +206,8 @@ export default {
       myCollections: "मेरे कलेक्शन",
       sharedWithMe: "मेरे साथ साझा किया गया",
       sharedByMe: "मेरे द्वारा साझा किया गया",
+      groups: "समूह",
+      createGroup: "समूह बनाएं",
     },
     sharedWithYou: "आपके साथ साझा किया गया",
     sharedWithCount: "{{count}} लोगों के साथ साझा किया गया",
@@ -1239,6 +1241,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "कलेक्शन समूह लोड करने में त्रुटि। कृपया पुनः प्रयास करें।",
+      searchPlaceholder: "समूह खोजें...",
+      noGroupsYet: "अभी तक कोई कलेक्शन समूह नहीं",
+      createFirstGroup: "कलेक्शन व्यवस्थित करने के लिए अपना पहला समूह बनाएं",
+      editGroup: "समूह संपादित करें",
+      deleteGroup: "समूह हटाएं",
+      confirmDelete: 'क्या आप वाकई "{{name}}" को हटाना चाहते हैं?',
+      collectionCount: "{{count}} कलेक्शन",
+      collectionCount_other: "{{count}} कलेक्शन",
+    },
     detailPage: {
       errorLoading: "संग्रह समूह लोड करने में त्रुटि। कृपया पुनः प्रयास करें।",
       backToGroups: "समूहों पर वापस जाएं",

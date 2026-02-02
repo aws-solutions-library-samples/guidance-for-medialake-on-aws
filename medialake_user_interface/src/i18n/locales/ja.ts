@@ -204,6 +204,8 @@ export default {
       myCollections: "マイコレクション",
       sharedWithMe: "共有されたもの",
       sharedByMe: "共有したもの",
+      groups: "グループ",
+      createGroup: "グループを作成",
     },
     sharedWithYou: "あなたと共有",
     sharedWithCount: "{{count}}人と共有",
@@ -1235,6 +1237,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "コレクショングループの読み込みエラー。もう一度お試しください。",
+      searchPlaceholder: "グループを検索...",
+      noGroupsYet: "コレクショングループはまだありません",
+      createFirstGroup: "コレクションを整理するための最初のグループを作成してください",
+      editGroup: "グループを編集",
+      deleteGroup: "グループを削除",
+      confirmDelete: '"{{name}}"を削除してもよろしいですか？',
+      collectionCount: "{{count}} コレクション",
+      collectionCount_other: "{{count}} コレクション",
+    },
     detailPage: {
       errorLoading: "コレクショングループの読み込みエラー。もう一度お試しください。",
       backToGroups: "グループに戻る",

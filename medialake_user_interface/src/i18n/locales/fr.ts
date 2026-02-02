@@ -207,6 +207,8 @@ export default {
       myCollections: "Mes collections",
       sharedWithMe: "Partagé avec moi",
       sharedByMe: "Partagé par moi",
+      groups: "Groupes",
+      createGroup: "Créer un groupe",
     },
     sharedWithYou: "Partagé avec vous",
     sharedWithCount: "Partagé avec {{count}} personnes",
@@ -1206,6 +1208,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "Erreur lors du chargement des groupes de collections. Veuillez réessayer.",
+      searchPlaceholder: "Rechercher des groupes...",
+      noGroupsYet: "Pas encore de groupes de collections",
+      createFirstGroup: "Créez votre premier groupe pour organiser les collections",
+      editGroup: "Modifier le groupe",
+      deleteGroup: "Supprimer le groupe",
+      confirmDelete: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ?',
+      collectionCount: "{{count}} collection",
+      collectionCount_other: "{{count}} collections",
+    },
     detailPage: {
       errorLoading: "Erreur lors du chargement du groupe de collections. Veuillez réessayer.",
       backToGroups: "Retour aux groupes",

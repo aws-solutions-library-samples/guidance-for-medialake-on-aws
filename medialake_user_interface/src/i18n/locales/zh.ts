@@ -200,6 +200,8 @@ export default {
       myCollections: "我的收藏集",
       sharedWithMe: "与我共享",
       sharedByMe: "我共享的",
+      groups: "分组",
+      createGroup: "创建分组",
     },
     sharedWithYou: "与您共享",
     sharedWithCount: "与{{count}}人共享",
@@ -1229,6 +1231,17 @@ export default {
     },
   },
   collectionGroups: {
+    list: {
+      errorLoading: "加载收藏组时出错。请重试。",
+      searchPlaceholder: "搜索分组...",
+      noGroupsYet: "还没有收藏组",
+      createFirstGroup: "创建您的第一个分组来组织收藏",
+      editGroup: "编辑分组",
+      deleteGroup: "删除分组",
+      confirmDelete: '您确定要删除"{{name}}"吗？',
+      collectionCount: "{{count}} 个收藏",
+      collectionCount_other: "{{count}} 个收藏",
+    },
     detailPage: {
       errorLoading: "加载收藏组时出错。请重试。",
       backToGroups: "返回组",

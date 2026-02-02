@@ -11,7 +11,6 @@ import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
 import CollectionViewPage from "@/pages/CollectionViewPage";
-import { CollectionGroupsPage } from "@/features/collection-groups";
 import { CollectionGroupDetailPage } from "@/features/collection-groups";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
@@ -31,6 +30,12 @@ import PermissionSetsPage from "@/pages/settings/PermissionSetsPage";
 const S3ExplorerWrapper = () => {
   const { connectorId } = useParams<{ connectorId: string }>();
   return <S3Explorer connectorId={connectorId!} />;
+};
+
+// Redirect component for old collection-groups detail route
+const CollectionGroupDetailRedirect = () => {
+  const { groupId } = useParams<{ groupId: string }>();
+  return <Navigate to={`/collections/groups/${groupId}`} replace />;
 };
 
 export const router = createBrowserRouter([
@@ -94,12 +99,18 @@ export const router = createBrowserRouter([
         element: <CollectionViewPage />,
       },
       {
-        path: "collection-groups",
-        element: <CollectionGroupsPage />,
+        path: "collections/groups/:groupId",
+        element: <CollectionGroupDetailPage />,
       },
       {
+        // Redirect old collection-groups route to new location
+        path: "collection-groups",
+        element: <Navigate to="/collections?filter=groups" replace />,
+      },
+      {
+        // Redirect old collection-groups detail route to new location
         path: "collection-groups/:groupId",
-        element: <CollectionGroupDetailPage />,
+        element: <CollectionGroupDetailRedirect />,
       },
       {
         path: "executions",
