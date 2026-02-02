@@ -261,7 +261,10 @@ def _query_collections_by_owner(user_id, limit, start_key):
             f"{USER_PK_PREFIX}{user_id}",
             limit=limit + 1,
         ):
-            if collection.ownerId == user_id:
+            # Filter out collection groups and ensure owner matches
+            if collection.ownerId == user_id and collection.PK.startswith(
+                COLLECTION_PK_PREFIX
+            ):
                 items.append(_model_to_dict(collection))
     except QueryError as e:
         logger.warning(f"Error querying collections by owner: {e}")
@@ -270,7 +273,9 @@ def _query_collections_by_owner(user_id, limit, start_key):
         # Fallback: query all collections and filter
         items = []
         for collection in _query_all_collections(limit, start_key):
-            if collection.get("ownerId") == user_id:
+            if collection.get("ownerId") == user_id and collection.get(
+                "PK", ""
+            ).startswith(COLLECTION_PK_PREFIX):
                 items.append(collection)
                 if len(items) > limit:
                     break
@@ -285,9 +290,13 @@ def _query_all_collections(limit, start_key):
     try:
         # Query all collections - simplified without GSI for now
         # In production, define GSI5 index class in db_models.py
+        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
             limit=limit + 1,
-            filter_condition=(CollectionModel.SK == METADATA_SK),
+            filter_condition=(
+                (CollectionModel.SK == METADATA_SK)
+                & (CollectionModel.PK.startswith(COLLECTION_PK_PREFIX))
+            ),
         ):
             items.append(_model_to_dict(collection))
     except Exception as e:
@@ -302,11 +311,13 @@ def _query_collections_by_type(collection_type_id, limit, start_key):
     items = []
     try:
         # Simplified - scan and filter by type
+        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
             limit=limit + 1,
             filter_condition=(
                 (CollectionModel.SK == METADATA_SK)
                 & (CollectionModel.collectionTypeId == collection_type_id)
+                & (CollectionModel.PK.startswith(COLLECTION_PK_PREFIX))
             ),
         ):
             items.append(_model_to_dict(collection))
@@ -438,9 +449,14 @@ def _filter_collections_by_access(items, user_id):
     shared_collection_info = _get_shared_collection_ids(user_id)
 
     for item in items:
+        # Skip collection groups (PK starts with GROUP#)
+        pk = item.get("PK", "")
+        if not pk.startswith(COLLECTION_PK_PREFIX):
+            continue
+
         is_public = item.get("isPublic", False)
         owner_id = item.get("ownerId")
-        collection_id = item.get("PK", "").replace(COLLECTION_PK_PREFIX, "")
+        collection_id = pk.replace(COLLECTION_PK_PREFIX, "")
 
         # Public collections are accessible to authenticated users
         if is_public:
