@@ -747,7 +747,9 @@ export default {
     search: "חפש",
     public: "ציבורי",
     private: "פרטי",
+    item: "פריט",
     items: "פריטים",
+    created: "נוצר",
     collections: "אוספים",
     subCollections: "תת-אוספים",
     batchOperations: {

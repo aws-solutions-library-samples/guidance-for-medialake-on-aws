@@ -752,7 +752,9 @@ export default {
     search: "検索",
     public: "公開",
     private: "非公開",
+    item: "アイテム",
     items: "アイテム",
+    created: "作成日",
     collections: "コレクション",
     subCollections: "サブコレクション",
     batchOperations: {

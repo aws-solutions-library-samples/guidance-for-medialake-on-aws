@@ -747,7 +747,9 @@ export default {
     search: "검색",
     public: "공개",
     private: "비공개",
+    item: "항목",
     items: "항목",
+    created: "생성됨",
     collections: "컬렉션",
     subCollections: "하위 컬렉션",
     batchOperations: {

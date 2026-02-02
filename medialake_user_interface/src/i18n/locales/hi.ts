@@ -755,7 +755,9 @@ export default {
     search: "खोजें",
     public: "सार्वजनिक",
     private: "निजी",
+    item: "आइटम",
     items: "आइटम",
+    created: "बनाया गया",
     collections: "संग्रह",
     subCollections: "उप-संग्रह",
     batchOperations: {

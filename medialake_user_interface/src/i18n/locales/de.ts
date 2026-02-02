@@ -759,7 +759,9 @@ export default {
     search: "Suchen",
     public: "Öffentlich",
     private: "Privat",
+    item: "Element",
     items: "Elemente",
+    created: "Erstellt",
     collections: "Sammlungen",
     subCollections: "Untersammlungen",
     batchOperations: {

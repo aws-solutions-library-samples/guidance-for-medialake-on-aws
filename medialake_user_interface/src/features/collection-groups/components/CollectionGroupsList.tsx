@@ -10,21 +10,29 @@ import {
   Box,
   Card,
   CardContent,
+  CardActions,
   Typography,
   Button,
   TextField,
   CircularProgress,
   Alert,
-  IconButton,
   Chip,
+  alpha,
+  useTheme,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Folder as FolderIcon,
+  FolderSpecial as FolderSpecialIcon,
+  FolderOpen as FolderOpenIcon,
+  Public as PublicIcon,
+  Lock as PrivateIcon,
+  CalendarToday as CalendarIcon,
+  Collections as CollectionsIcon,
 } from "@mui/icons-material";
 import { useCollectionGroups, useDeleteCollectionGroup } from "../hooks/useCollectionGroups";
+import { formatDate } from "@/utils/dateFormat";
 import type { CollectionGroup } from "../types";
 
 interface CollectionGroupsListProps {
@@ -38,6 +46,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const theme = useTheme();
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useCollectionGroups({ search, limit: 20 });
   const deleteGroup = useDeleteCollectionGroup();
@@ -82,7 +91,9 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
       {/* Groups List */}
       {groups.length === 0 ? (
         <Box textAlign="center" py={8}>
-          <FolderIcon sx={{ fontSize: 80, color: "grey.400", mb: 2 }} />
+          <FolderOpenIcon
+            sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.5), mb: 2 }}
+          />
           <Typography variant="h6" color="text.secondary" gutterBottom>
             {t("collectionGroups.list.noGroupsYet")}
           </Typography>
@@ -95,99 +106,211 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
         </Box>
       ) : (
         <Box
-          display="grid"
-          sx={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
-          gap={2}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(auto-fill, minmax(300px, 1fr))",
+              md: "repeat(auto-fill, minmax(350px, 1fr))",
+            },
+            gap: 3,
+            pt: 0.5,
+          }}
         >
           {groups.map((group) => (
             <Card
               key={group.id}
               sx={{
-                height: "100%",
                 display: "flex",
                 flexDirection: "column",
-                transition: "transform 0.2s, box-shadow 0.2s",
-                cursor: "pointer",
+                borderRadius: 3,
+                border: "2px solid",
+                borderColor: theme.palette.primary.main,
+                overflow: "visible",
+                transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
                 "&:hover": {
                   transform: "translateY(-4px)",
-                  boxShadow: 4,
+                  boxShadow: theme.shadows[6],
+                  cursor: "pointer",
                 },
               }}
               onClick={() => navigate(`/collections/groups/${group.id}`)}
             >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <FolderIcon color="primary" />
-                    <Typography variant="h6" component="h2" noWrap>
+              <CardContent
+                sx={{
+                  flexGrow: 1,
+                  pb: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Header with icon and name */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    mb: 2,
+                  }}
+                >
+                  <FolderSpecialIcon
+                    sx={{ color: theme.palette.primary.main, fontSize: 32, mr: 1.5 }}
+                  />
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography
+                      variant="h6"
+                      component="h3"
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: "1.1rem",
+                        lineHeight: 1.3,
+                        mb: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {group.name}
                     </Typography>
+                    {/* Badges: Public/Private */}
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <Chip
+                        label={group.isPublic ? t("common.public") : t("common.private")}
+                        size="small"
+                        icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
+                        sx={{
+                          height: 22,
+                          color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                          bgcolor: group.isPublic
+                            ? "#e8f5e8"
+                            : alpha(theme.palette.primary.main, 0.1),
+                          border: `1px solid ${
+                            group.isPublic ? "#2e7d32" : theme.palette.primary.main
+                          }`,
+                          "& .MuiChip-icon": {
+                            color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                            fontSize: 14,
+                          },
+                        }}
+                      />
+                      {group.userRole && group.userRole !== "owner" && (
+                        <Chip
+                          label={group.userRole}
+                          size="small"
+                          sx={{
+                            height: 22,
+                            color: theme.palette.info.main,
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            border: `1px solid ${theme.palette.info.main}`,
+                          }}
+                        />
+                      )}
+                    </Box>
                   </Box>
-                  {group.isOwner && (
-                    <Box>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditClick?.(group);
-                        }}
-                        title={t("collectionGroups.list.editGroup")}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(group.id, group.name);
-                        }}
-                        title={t("collectionGroups.list.deleteGroup")}
-                        disabled={deleteGroup.isPending}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                </Box>
+
+                {/* Description */}
+                <Box
+                  sx={{
+                    minHeight: group.description ? "40px" : "0px",
+                    mb: 2,
+                  }}
+                >
+                  {group.description && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                      }}
+                    >
+                      {group.description}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Stats */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    mt: "auto",
+                  }}
+                >
+                  {/* Collection count */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <CollectionsIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {t("collectionGroups.list.collectionCount", { count: group.collectionCount })}
+                    </Typography>
+                  </Box>
+
+                  {/* Created date */}
+                  {group.createdAt && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <CalendarIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                      <Typography variant="body2" color="text.secondary">
+                        {t("common.created")}: {formatDate(group.createdAt)}
+                      </Typography>
                     </Box>
                   )}
                 </Box>
-
-                {group.description && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    mb={2}
-                    sx={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                    }}
-                  >
-                    {group.description}
-                  </Typography>
-                )}
-
-                <Box display="flex" gap={1} flexWrap="wrap" mt="auto">
-                  <Chip
-                    label={t("collectionGroups.list.collectionCount", {
-                      count: group.collectionCount,
-                    })}
-                    size="small"
-                    variant="outlined"
-                  />
-                  {group.isPublic && (
-                    <Chip
-                      label={t("common.public")}
-                      size="small"
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-                  {group.userRole && group.userRole !== "owner" && (
-                    <Chip label={group.userRole} size="small" variant="outlined" />
-                  )}
-                </Box>
               </CardContent>
+
+              {/* Actions */}
+              {group.isOwner && (
+                <CardActions
+                  sx={{
+                    pt: 0,
+                    px: 2,
+                    pb: 2,
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 1,
+                  }}
+                >
+                  <Button
+                    size="small"
+                    startIcon={<EditIcon />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditClick?.(group);
+                    }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    {t("common.edit")}
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(group.id, group.name);
+                    }}
+                    disabled={deleteGroup.isPending}
+                    sx={{ textTransform: "none" }}
+                  >
+                    {t("common.delete")}
+                  </Button>
+                </CardActions>
+              )}
             </Card>
           ))}
         </Box>

@@ -746,7 +746,9 @@ export default {
     search: "搜索",
     public: "公开",
     private: "私有",
+    item: "项目",
     items: "项目",
+    created: "创建于",
     collections: "集合",
     subCollections: "子集合",
     batchOperations: {

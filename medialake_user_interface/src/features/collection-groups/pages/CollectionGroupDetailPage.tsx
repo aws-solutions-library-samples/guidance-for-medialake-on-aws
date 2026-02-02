@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardActions,
   IconButton,
   Chip,
   CircularProgress,
@@ -22,12 +23,13 @@ import {
   DialogContent,
   DialogActions,
   List,
-  ListItem,
   ListItemButton,
   ListItemText,
   Checkbox,
   TextField,
   Grid,
+  alpha,
+  useTheme,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
@@ -35,7 +37,12 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  FolderSpecial as FolderSpecialIcon,
   Folder as FolderIcon,
+  Public as PublicIcon,
+  Lock as PrivateIcon,
+  PhotoLibrary as PhotoLibraryIcon,
+  CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import {
   useCollectionGroup,
@@ -43,14 +50,21 @@ import {
   useAddCollectionsToGroup,
   useRemoveCollectionsFromGroup,
 } from "../hooks/useCollectionGroups";
-import { useGetCollections } from "@/api/hooks/useCollections";
+import { useGetCollections, useGetCollectionTypes } from "@/api/hooks/useCollections";
 import { CollectionGroupForm } from "../components/CollectionGroupForm";
+import { formatDate } from "@/utils/dateFormat";
 import type { CollectionGroup } from "../types";
+
+// Map of icon names to Material-UI icon components
+const ICON_MAP: Record<string, React.ReactElement> = {
+  Folder: <FolderIcon />,
+};
 
 export const CollectionGroupDetailPage: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const theme = useTheme();
   const [editFormOpen, setEditFormOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
@@ -58,12 +72,41 @@ export const CollectionGroupDetailPage: React.FC = () => {
 
   const { data: groupData, isLoading, error } = useCollectionGroup(groupId!);
   const { data: collectionsData, isLoading: isLoadingCollections } = useGetCollections();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
   const deleteGroup = useDeleteCollectionGroup();
   const addCollections = useAddCollectionsToGroup();
   const removeCollections = useRemoveCollectionsFromGroup();
 
   // Get all available collections from API
   const availableCollections = collectionsData?.data || [];
+  const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Helper to get icon and color for a collection
+  const getCollectionStyle = (collection: any) => {
+    if (!collection.collectionTypeId || isLoadingTypes) {
+      return {
+        icon: <FolderIcon sx={{ color: theme.palette.primary.main, fontSize: 32, mr: 1.5 }} />,
+        color: theme.palette.primary.main,
+        borderColor: "divider",
+      };
+    }
+
+    const collectionType = collectionTypes.find((type) => type.id === collection.collectionTypeId);
+
+    if (!collectionType) {
+      return {
+        icon: <FolderIcon sx={{ color: theme.palette.primary.main, fontSize: 32, mr: 1.5 }} />,
+        color: theme.palette.primary.main,
+        borderColor: "divider",
+      };
+    }
+
+    return {
+      icon: <FolderIcon sx={{ color: collectionType.color, fontSize: 32, mr: 1.5 }} />,
+      color: collectionType.color,
+      borderColor: collectionType.color,
+    };
+  };
 
   const handleDelete = async () => {
     if (
@@ -93,7 +136,8 @@ export const CollectionGroupDetailPage: React.FC = () => {
     }
   };
 
-  const handleRemoveCollection = async (collectionId: string) => {
+  const handleRemoveCollection = async (e: React.MouseEvent, collectionId: string) => {
+    e.stopPropagation();
     if (window.confirm(t("collectionGroups.detailPage.confirmRemove"))) {
       try {
         await removeCollections.mutateAsync({
@@ -104,6 +148,10 @@ export const CollectionGroupDetailPage: React.FC = () => {
         console.error("Failed to remove collection:", err);
       }
     }
+  };
+
+  const handleViewCollection = (collectionId: string) => {
+    navigate(`/collections/${collectionId}/view`);
   };
 
   const toggleCollectionSelection = (collectionId: string) => {
@@ -160,7 +208,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
           <IconButton onClick={() => navigate("/collections?filter=groups")}>
             <ArrowBackIcon />
           </IconButton>
-          <FolderIcon color="primary" sx={{ fontSize: 40 }} />
+          <FolderSpecialIcon color="primary" sx={{ fontSize: 40 }} />
           <Box flexGrow={1}>
             <Typography variant="h4" component="h1">
               {group.name}
@@ -194,7 +242,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
         </Box>
 
         {/* Group Info */}
-        <Card sx={{ mb: 3 }}>
+        <Card sx={{ mb: 3, borderRadius: 3 }}>
           <CardContent>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
@@ -211,7 +259,19 @@ export const CollectionGroupDetailPage: React.FC = () => {
                   <Chip
                     label={group.isPublic ? t("common.public") : t("common.private")}
                     size="small"
-                    color={group.isPublic ? "success" : "default"}
+                    icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
+                    sx={{
+                      height: 22,
+                      color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                      bgcolor: group.isPublic ? "#e8f5e8" : alpha(theme.palette.primary.main, 0.1),
+                      border: `1px solid ${
+                        group.isPublic ? "#2e7d32" : theme.palette.primary.main
+                      }`,
+                      "& .MuiChip-icon": {
+                        color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                        fontSize: 14,
+                      },
+                    }}
                   />
                 </Box>
               </Grid>
@@ -219,9 +279,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                 <Typography variant="caption" color="text.secondary">
                   {t("collectionGroups.detailPage.info.created")}
                 </Typography>
-                <Typography variant="body2">
-                  {new Date(group.createdAt).toLocaleDateString()}
-                </Typography>
+                <Typography variant="body2">{formatDate(group.createdAt)}</Typography>
               </Grid>
             </Grid>
           </CardContent>
@@ -244,7 +302,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
         </Box>
 
         {groupCollections.length === 0 ? (
-          <Card>
+          <Card sx={{ borderRadius: 3 }}>
             <CardContent>
               <Box textAlign="center" py={4}>
                 <Typography variant="body1" color="text.secondary" gutterBottom>
@@ -265,41 +323,209 @@ export const CollectionGroupDetailPage: React.FC = () => {
           </Card>
         ) : (
           <Box
-            display="grid"
             sx={{
+              display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(auto-fill, minmax(300px, 1fr))",
+                md: "repeat(auto-fill, minmax(350px, 1fr))",
               },
+              gap: 3,
+              pt: 0.5,
             }}
-            gap={2}
           >
-            {groupCollections.map((collection) => (
-              <Card key={collection.id}>
-                <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                    <Box flexGrow={1}>
-                      <Typography variant="h6" gutterBottom>
-                        {collection.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {collection.itemCount} {t("common.items")}
-                      </Typography>
+            {groupCollections.map((collection) => {
+              const style = getCollectionStyle(collection);
+              return (
+                <Card
+                  key={collection.id}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    borderRadius: 3,
+                    border: "2px solid",
+                    borderColor: style.borderColor,
+                    overflow: "visible",
+                    transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                    "&:hover": {
+                      transform: "translateY(-4px)",
+                      boxShadow: theme.shadows[6],
+                      cursor: "pointer",
+                    },
+                  }}
+                  onClick={() => handleViewCollection(collection.id)}
+                >
+                  <CardContent
+                    sx={{
+                      flexGrow: 1,
+                      pb: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    {/* Header with icon and name */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        mb: 2,
+                      }}
+                    >
+                      {style.icon}
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="h6"
+                          component="h3"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "1.1rem",
+                            lineHeight: 1.3,
+                            mb: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {collection.name}
+                        </Typography>
+                        {/* Badges: Public/Private */}
+                        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                          <Chip
+                            label={collection.isPublic ? t("common.public") : t("common.private")}
+                            size="small"
+                            icon={collection.isPublic ? <PublicIcon /> : <PrivateIcon />}
+                            sx={{
+                              height: 22,
+                              color: collection.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                              bgcolor: collection.isPublic
+                                ? "#e8f5e8"
+                                : alpha(theme.palette.primary.main, 0.1),
+                              border: `1px solid ${
+                                collection.isPublic ? "#2e7d32" : theme.palette.primary.main
+                              }`,
+                              "& .MuiChip-icon": {
+                                color: collection.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                                fontSize: 14,
+                              },
+                            }}
+                          />
+                          {collection.collectionTypeId &&
+                            !isLoadingTypes &&
+                            (() => {
+                              const collectionType = collectionTypes.find(
+                                (type) => type.id === collection.collectionTypeId
+                              );
+                              return collectionType ? (
+                                <Chip
+                                  label={collectionType.name}
+                                  size="small"
+                                  sx={{
+                                    height: 22,
+                                    color: collectionType.color,
+                                    bgcolor: alpha(collectionType.color, 0.1),
+                                    border: `1px solid ${collectionType.color}`,
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              ) : null;
+                            })()}
+                        </Box>
+                      </Box>
                     </Box>
-                    {group.isOwner && (
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveCollection(collection.id)}
-                        disabled={removeCollections.isPending}
-                        title={t("collectionGroups.detailPage.removeFromGroup")}
+
+                    {/* Description */}
+                    <Box
+                      sx={{
+                        minHeight: collection.description ? "40px" : "0px",
+                        mb: 2,
+                      }}
+                    >
+                      {collection.description && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {collection.description}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Stats */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                        mt: "auto",
+                      }}
+                    >
+                      {/* Item count */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
                       >
-                        <RemoveIcon fontSize="small" />
-                      </IconButton>
-                    )}
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
+                        <PhotoLibraryIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {collection.itemCount}{" "}
+                          {collection.itemCount !== 1 ? t("common.items") : t("common.item")}
+                        </Typography>
+                      </Box>
+
+                      {/* Created date */}
+                      {collection.createdAt && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <CalendarIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                          <Typography variant="body2" color="text.secondary">
+                            {t("common.created")}: {formatDate(collection.createdAt)}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </CardContent>
+
+                  {/* Actions */}
+                  {group.isOwner && (
+                    <CardActions
+                      sx={{
+                        pt: 0,
+                        px: 2,
+                        pb: 2,
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 1,
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<RemoveIcon />}
+                        onClick={(e) => handleRemoveCollection(e, collection.id)}
+                        disabled={removeCollections.isPending}
+                        sx={{ textTransform: "none" }}
+                      >
+                        {t("collectionGroups.detailPage.removeFromGroup")}
+                      </Button>
+                    </CardActions>
+                  )}
+                </Card>
+              );
+            })}
           </Box>
         )}
 
@@ -350,7 +576,9 @@ export const CollectionGroupDetailPage: React.FC = () => {
                     />
                     <ListItemText
                       primary={collection.name}
-                      secondary={t("common.items", { count: collection.itemCount })}
+                      secondary={`${collection.itemCount} ${
+                        collection.itemCount !== 1 ? t("common.items") : t("common.item")
+                      }`}
                     />
                   </ListItemButton>
                 ))}

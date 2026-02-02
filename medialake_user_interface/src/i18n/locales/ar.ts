@@ -747,7 +747,9 @@ export default {
     search: "بحث",
     public: "عام",
     private: "خاص",
+    item: "عنصر",
     items: "عناصر",
+    created: "تم الإنشاء",
     collections: "المجموعات",
     subCollections: "مجموعات فرعية",
     batchOperations: {
