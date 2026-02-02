@@ -671,7 +671,7 @@ def validate_collection_ids(table, collection_ids: List[str]) -> Tuple[bool, Lis
     Returns:
         Tuple of (all_valid: bool, invalid_ids: List[str])
     """
-    from lambdas.common_libraries.collections_utils import (
+    from collections_utils import (
         COLLECTION_PK_PREFIX,
         METADATA_SK,
     )
