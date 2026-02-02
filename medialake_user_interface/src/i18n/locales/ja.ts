@@ -288,6 +288,7 @@ export default {
     },
   },
   search: {
+    clear: "検索をクリア",
     semantic: {
       label: "セマンティック",
       enable: "セマンティック検索を有効にする",
@@ -974,7 +975,8 @@ export default {
       fitToContainer: "Fit to container (maintain aspect ratio)",
       fillContainer: "Fill container (may crop image)",
     },
-    noGroup: "No group",
+    noGroup: "グループなし",
+    loadingGroups: "グループを読み込んでいます...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1230,6 +1232,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "コレクショングループの読み込みエラー。もう一度お試しください。",
+      backToGroups: "グループに戻る",
+      collectionsInGroup: "このグループ内のコレクション",
+      addCollections: "コレクションを追加",
+      noCollectionsYet: "このグループにはまだコレクションがありません",
+      removeFromGroup: "グループから削除",
+      addCollectionsDialog: {
+        title: "グループにコレクションを追加",
+        searchPlaceholder: "コレクションを検索...",
+        noCollectionsFound: "コレクションが見つかりません",
+        allInGroup: "すべてのコレクションは既にこのグループにあります",
+        addButton: "追加",
+      },
+      confirmDelete: "「{{name}}」を削除してもよろしいですか？",
+      confirmRemove: "このコレクションをグループから削除しますか？",
+      info: {
+        collections: "コレクション",
+        visibility: "表示設定",
+        created: "作成日",
+      },
     },
   },
   assetSidebar: {

@@ -18,6 +18,7 @@ import {
   CloudUpload as CloudUploadIcon,
   FilterList as FilterListIcon,
   Chat as ChatIcon,
+  Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useChat } from "./contexts/ChatContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -86,12 +87,13 @@ function TopBar() {
     }
   }, []); // Only run on mount
 
-  // Sync search input with store query when store changes
+  // Sync search input with store query only when on search page
   useEffect(() => {
-    if (storeQuery && storeQuery !== searchInput) {
+    // Only sync if we're on the search page and the store query differs from input
+    if (location.pathname === "/search" && storeQuery && storeQuery !== searchInput) {
       setSearchInput(storeQuery);
     }
-  }, [storeQuery]);
+  }, [location.pathname, storeQuery]);
 
   const getSearchQuery = useCallback(() => {
     const tagPart = searchTags.map((tag) => `${tag.key}: ${tag.value}`).join(" ");
@@ -304,6 +306,9 @@ function TopBar() {
       if (filters.filename) params.set("filename", filters.filename);
 
       navigate(`/search?${params.toString()}`);
+
+      // Clear the search input after navigation
+      setSearchInput("");
     }
   };
 
@@ -345,6 +350,11 @@ function TopBar() {
       navigate(`/search?${params.toString()}`);
       return newTags;
     });
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setSearchTags([]);
   };
   // Handle semantic search toggle
   const handleSemanticSearchToggle = (
@@ -480,6 +490,26 @@ function TopBar() {
                 },
               }}
             />
+
+            {/* Clear Search Button */}
+            {searchInput && (
+              <IconButton
+                size="small"
+                onClick={handleClearSearch}
+                sx={{
+                  color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)",
+                  padding: "4px",
+                  [isRTL ? "ml" : "mr"]: 0.5,
+                  "&:hover": {
+                    backgroundColor: "transparent",
+                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)",
+                  },
+                }}
+                title={t("search.clear", "Clear search")}
+              >
+                <ClearIcon fontSize="small" />
+              </IconButton>
+            )}
 
             {/* Semantic Mode Toggle */}
             <SemanticModeToggle isVisible={storeIsSemantic} />

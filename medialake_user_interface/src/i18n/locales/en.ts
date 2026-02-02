@@ -287,6 +287,7 @@ export default {
     },
   },
   search: {
+    clear: "Clear search",
     semantic: {
       label: "Semantic",
       enable: "Enable semantic search",
@@ -738,6 +739,7 @@ export default {
     error: "Error",
     language: "Language",
     noGroup: "No group",
+    loadingGroups: "Getting groups...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
     noUsersFound: "No users found",
@@ -1236,6 +1238,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "Error loading collection group. Please try again.",
+      backToGroups: "Back to Groups",
+      collectionsInGroup: "Collections in this Group",
+      addCollections: "Add Collections",
+      noCollectionsYet: "No collections in this group yet",
+      removeFromGroup: "Remove from group",
+      addCollectionsDialog: {
+        title: "Add Collections to Group",
+        searchPlaceholder: "Search collections...",
+        noCollectionsFound: "No collections found",
+        allInGroup: "All collections are already in this group",
+        addButton: "Add",
+      },
+      confirmDelete: 'Are you sure you want to delete "{{name}}"?',
+      confirmRemove: "Remove this collection from the group?",
+      info: {
+        collections: "Collections",
+        visibility: "Visibility",
+        created: "Created",
+      },
     },
   },
   fileUpload: {

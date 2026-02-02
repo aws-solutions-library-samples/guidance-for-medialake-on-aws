@@ -284,6 +284,7 @@ export default {
     },
   },
   search: {
+    clear: "清除搜索",
     semantic: {
       label: "语义",
       enable: "启用语义搜索",
@@ -968,7 +969,8 @@ export default {
       flow: "Flow",
       utilities: "Utilities",
     },
-    noGroup: "No group",
+    noGroup: "无组",
+    loadingGroups: "正在获取组...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1224,6 +1226,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "加载收藏组时出错。请重试。",
+      backToGroups: "返回组",
+      collectionsInGroup: "此组中的收藏",
+      addCollections: "添加收藏",
+      noCollectionsYet: "此组中还没有收藏",
+      removeFromGroup: "从组中移除",
+      addCollectionsDialog: {
+        title: "将收藏添加到组",
+        searchPlaceholder: "搜索收藏...",
+        noCollectionsFound: "未找到收藏",
+        allInGroup: "所有收藏已在此组中",
+        addButton: "添加",
+      },
+      confirmDelete: '确定要删除"{{name}}"吗？',
+      confirmRemove: "从组中移除此收藏？",
+      info: {
+        collections: "收藏",
+        visibility: "可见性",
+        created: "创建时间",
+      },
     },
   },
   assetSidebar: {

@@ -1,6 +1,5 @@
 """GET /collections/groups/{groupId} - Get a specific collection group."""
 
-import json
 import os
 
 import boto3
@@ -44,16 +43,9 @@ def register_route(app):
             )
 
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": formatted_group,
-                        "meta": {
-                            "request_id": app.current_event.request_context.request_id
-                        },
-                    }
-                ),
+                "success": True,
+                "data": formatted_group,
+                "meta": {"request_id": app.current_event.request_context.request_id},
             }
 
         except NotFoundError:

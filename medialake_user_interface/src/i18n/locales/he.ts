@@ -285,6 +285,7 @@ export default {
     },
   },
   search: {
+    clear: "חיפוש ברור",
     semantic: {
       label: "סמנטי",
       enable: "הפעל חיפוש סמנטי",
@@ -969,7 +970,8 @@ export default {
       fitToContainer: "Fit to container (maintain aspect ratio)",
       fillContainer: "Fill container (may crop image)",
     },
-    noGroup: "No group",
+    noGroup: "אין קבוצה",
+    loadingGroups: "טוען קבוצות...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1232,6 +1234,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "שגיאה בטעינת קבוצת האוספים. אנא נסה שוב.",
+      backToGroups: "חזרה לקבוצות",
+      collectionsInGroup: "אוספים בקבוצה זו",
+      addCollections: "הוסף אוספים",
+      noCollectionsYet: "אין עדיין אוספים בקבוצה זו",
+      removeFromGroup: "הסר מהקבוצה",
+      addCollectionsDialog: {
+        title: "הוסף אוספים לקבוצה",
+        searchPlaceholder: "חפש אוספים...",
+        noCollectionsFound: "לא נמצאו אוספים",
+        allInGroup: "כל האוספים כבר בקבוצה זו",
+        addButton: "הוסף",
+      },
+      confirmDelete: 'האם אתה בטוח שברצונך למחוק את "{{name}}"?',
+      confirmRemove: "להסיר את האוסף הזה מהקבוצה?",
+      info: {
+        collections: "אוספים",
+        visibility: "נראות",
+        created: "נוצר",
+      },
     },
   },
   fileUpload: {

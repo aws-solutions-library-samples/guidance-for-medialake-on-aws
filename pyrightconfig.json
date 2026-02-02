@@ -17,5 +17,7 @@
     "**/assets",
     "**/.aws-sam",
     "**/.DS_Store"
-  ]
+  ],
+  "extraPaths": ["lambdas"],
+  "reportExplicitAny": false
 }

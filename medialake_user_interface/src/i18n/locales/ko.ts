@@ -285,6 +285,7 @@ export default {
     },
   },
   search: {
+    clear: "검색 지우기",
     semantic: {
       label: "시맨틱",
       enable: "시맨틱 검색 활성화",
@@ -969,7 +970,8 @@ export default {
       flow: "Flow",
       utilities: "Utilities",
     },
-    noGroup: "No group",
+    noGroup: "그룹 없음",
+    loadingGroups: "그룹을 가져오는 중...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1225,6 +1227,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "컬렉션 그룹을 로드하는 중 오류가 발생했습니다. 다시 시도해 주세요.",
+      backToGroups: "그룹으로 돌아가기",
+      collectionsInGroup: "이 그룹의 컬렉션",
+      addCollections: "컬렉션 추가",
+      noCollectionsYet: "이 그룹에 아직 컬렉션이 없습니다",
+      removeFromGroup: "그룹에서 제거",
+      addCollectionsDialog: {
+        title: "그룹에 컬렉션 추가",
+        searchPlaceholder: "컬렉션 검색...",
+        noCollectionsFound: "컬렉션을 찾을 수 없습니다",
+        allInGroup: "모든 컬렉션이 이미 이 그룹에 있습니다",
+        addButton: "추가",
+      },
+      confirmDelete: '"{{name}}"을(를) 삭제하시겠습니까?',
+      confirmRemove: "그룹에서 이 컬렉션을 제거하시겠습니까?",
+      info: {
+        collections: "컬렉션",
+        visibility: "가시성",
+        created: "생성됨",
+      },
     },
   },
   assetSidebar: {

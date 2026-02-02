@@ -11,6 +11,7 @@ from aws_lambda_powertools.event_handler.api_gateway import (
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from models import PipelineDefinition
+from pipeline_utils import determine_pipeline_type
 
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
@@ -121,6 +122,10 @@ def create_pipeline_record(
     pipeline_id = str(uuid.uuid4())
     now_iso = datetime.utcnow().isoformat()
 
+    # Determine the correct pipeline type based on the pipeline definition
+    pipeline_type = determine_pipeline_type(pipeline)
+    logger.info(f"Determined pipeline type: {pipeline_type}")
+
     item = {
         "id": pipeline_id,
         "createdAt": now_iso,
@@ -129,7 +134,7 @@ def create_pipeline_record(
         "dependentResources": [],  # Will be populated later
         "name": pipeline.name,
         "stateMachineArn": "",  # Will be populated later
-        "type": "Event Triggered",
+        "type": pipeline_type,
         "system": False,
         "deploymentStatus": deployment_status,
     }

@@ -1,0 +1,13 @@
+{
+  "_description": "Minimal configuration - uses defaults for most settings",
+  "_usage": "Quick start template when source field names match defaults",
+
+  "source_namespace_prefix": "CUSTOMER",
+  "primary_id_field": "id",
+  "ref_id_field": "ref_id",
+
+  "identifier_mappings": {
+    "id": "",
+    "ref_id": "-REF"
+  }
+}

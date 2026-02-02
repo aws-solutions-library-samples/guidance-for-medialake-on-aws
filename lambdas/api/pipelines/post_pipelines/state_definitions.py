@@ -93,6 +93,80 @@ class StateDefinitionFactory:
         logger.info(f"Using $.payload.data as default ItemsPath for Map node {node.id}")
         return "$.payload.data"
 
+    def _create_custom_choice_state(
+        self,
+        node: Any,
+        choices: List[Dict[str, str]],
+        parameters: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Create a Choice state with custom branches.
+
+        This method handles Choice nodes that define custom output types with
+        arbitrary names (e.g., Success, NoMatch, AuthError, Error) instead of
+        the standard Completed/In Progress/Fail outputs.
+
+        Args:
+            node: The Choice node from the pipeline
+            choices: List of choice definitions with 'condition' and 'output' fields
+            parameters: The parameters dict containing 'variable' and 'default'
+
+        Returns:
+            Choice state definition with output-based placeholders
+        """
+        # Get the variable path for comparisons, with sensible default
+        variable = parameters.get("variable", "$.metadata.externalJobStatus")
+        default_output = parameters.get("default", None)
+
+        logger.info(
+            f"Creating custom Choice state for node {node.id}: "
+            f"variable={variable}, default={default_output}, choices={len(choices)}"
+        )
+
+        choice_branches = []
+
+        for i, choice in enumerate(choices):
+            condition = choice.get("condition")
+            output = choice.get(
+                "output", condition
+            )  # Fallback to condition if no output
+
+            if not condition:
+                logger.warning(
+                    f"Choice entry at index {i} in node {node.id} has no 'condition' field. Skipping."
+                )
+                continue
+
+            # Create placeholder using the output name for later connection
+            placeholder = f"__PLACEHOLDER__{node.id}_{output}__"
+
+            choice_branches.append(
+                {
+                    "Variable": variable,
+                    "StringEquals": condition,
+                    "Next": placeholder,
+                }
+            )
+
+            logger.info(
+                f"Added custom Choice branch: condition='{condition}', output='{output}', placeholder='{placeholder}'"
+            )
+
+        state_def = {
+            "Type": "Choice",
+            "Choices": choice_branches,
+        }
+
+        # Set the Default branch if specified
+        if default_output:
+            default_placeholder = f"__PLACEHOLDER__{node.id}_{default_output}__"
+            state_def["Default"] = default_placeholder
+            logger.info(
+                f"Set custom Choice default branch: output='{default_output}', placeholder='{default_placeholder}'"
+            )
+
+        return state_def
+
     def create_state_definitions(
         self,
         nodes: list,
@@ -336,7 +410,12 @@ class StateDefinitionFactory:
         """
         logger.info(f"Creating flow state definition for node: {node.id}")
 
-        yaml_file_path = f"node_templates/flow/{node.data.id}.yaml"
+        # Use nodeId for template lookup (the template type like "choice", "fail", "success")
+        # Fall back to id for backward compatibility with pipelines that don't have nodeId
+        # Check if nodeId is a string to handle both real objects and test mocks
+        node_id_value = getattr(node.data, "nodeId", None)
+        template_id = node_id_value if isinstance(node_id_value, str) else node.data.id
+        yaml_file_path = f"node_templates/flow/{template_id}.yaml"
         try:
             yaml_data = read_yaml_from_s3(NODE_TEMPLATES_BUCKET, yaml_file_path)
         except Exception as e:
@@ -384,45 +463,63 @@ class StateDefinitionFactory:
             state_def = {"Type": "Wait", "Seconds": seconds}
         elif step_name == "choice":
             # Choice state
-            choices = node.data.configuration.get("choices", [])
-
-            # Check if this is a conditional node with parameters instead of choices
             parameters = node.data.configuration.get("parameters", {})
-            if not choices and parameters:
-                # Handle conditional nodes that use Variable and Condition parameters
-                variable = parameters.get("Variable", "$.metadata.externalJobStatus")
-                condition = parameters.get("Condition", "Completed")
 
-                # Use the condition value as-is to preserve exact case matching
-                condition_value = condition
+            # Check for custom choices in parameters (new functionality)
+            custom_choices = parameters.get("choices", [])
 
-                choices = [{"variable": variable, "value": condition_value}]
-                logger.info(
-                    f"Created choice from conditional parameters: Variable={variable}, Condition={condition_value}"
+            if custom_choices:
+                # New path: custom Choice branches with arbitrary output names
+                state_def = self._create_custom_choice_state(
+                    node, custom_choices, parameters
                 )
+                logger.info(
+                    f"Created custom Choice state for node {node.id} with {len(custom_choices)} branches"
+                )
+            else:
+                # Existing path: standard Choice behavior
+                choices = node.data.configuration.get("choices", [])
 
-            # Ensure we have at least one choice in the Choices array
-            if not choices:
-                choices = [
-                    {"variable": "$.metadata.externalJobStatus", "value": "Completed"}
-                ]
+                if not choices and parameters:
+                    # Handle conditional nodes that use Variable and Condition parameters
+                    variable = parameters.get(
+                        "Variable", "$.metadata.externalJobStatus"
+                    )
+                    condition = parameters.get("Condition", "Completed")
 
-            # For Choice states, we'll set placeholder Next values that will be updated later
-            # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
-            state_def = {
-                "Type": "Choice",
-                "Choices": [
-                    {
-                        "Variable": choice.get(
-                            "variable", "$.metadata.externalJobStatus"
-                        ),
-                        "StringEquals": choice.get("value", "Completed"),
-                        "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
-                    }
-                    for choice in choices
-                ],
-                "Default": f"__PLACEHOLDER__{node.id}_FALSE__",  # Placeholder to be replaced later
-            }
+                    # Use the condition value as-is to preserve exact case matching
+                    condition_value = condition
+
+                    choices = [{"variable": variable, "value": condition_value}]
+                    logger.info(
+                        f"Created choice from conditional parameters: Variable={variable}, Condition={condition_value}"
+                    )
+
+                # Ensure we have at least one choice in the Choices array
+                if not choices:
+                    choices = [
+                        {
+                            "variable": "$.metadata.externalJobStatus",
+                            "value": "Completed",
+                        }
+                    ]
+
+                # For Choice states, we'll set placeholder Next values that will be updated later
+                # when we connect the edges. We use the node ID as a prefix to ensure uniqueness.
+                state_def = {
+                    "Type": "Choice",
+                    "Choices": [
+                        {
+                            "Variable": choice.get(
+                                "variable", "$.metadata.externalJobStatus"
+                            ),
+                            "StringEquals": choice.get("value", "Completed"),
+                            "Next": f"__PLACEHOLDER__{node.id}_TRUE__",  # Placeholder to be replaced later
+                        }
+                        for choice in choices
+                    ],
+                    "Default": f"__PLACEHOLDER__{node.id}_FALSE__",  # Placeholder to be replaced later
+                }
         elif step_name == "parallel":
             # Parallel state
             branches = node.data.configuration.get("branches", [])

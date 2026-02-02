@@ -910,6 +910,57 @@ class ApiGatewayPipelinesConstruct(Construct):
         )
         apply_custom_authorization(pipeline_id_delete, props.authorizer)
 
+        # POST /pipelines/{pipelineId}/trigger - Manual pipeline trigger endpoint
+        trigger_pipeline_lambda_config = LambdaConfig(
+            name="pipeline_trigger_manual",
+            entry="lambdas/api/pipelines/trigger_pipeline",
+            environment_variables={
+                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                "PIPELINES_TABLE": props.pipeline_table.table_name,
+                "EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
+            },
+        )
+
+        self._trigger_pipeline_handler = Lambda(
+            self,
+            "TriggerPipelineHandler",
+            config=trigger_pipeline_lambda_config,
+        )
+
+        # Grant permissions to read pipeline table
+        self._trigger_pipeline_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.pipeline_table.table_arn],
+            )
+        )
+
+        # Grant permissions to send events to EventBridge
+        self._trigger_pipeline_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["events:PutEvents"],
+                resources=[props.pipelines_event_bus.event_bus_arn],
+            )
+        )
+
+        # Grant permissions to execute Step Functions
+        self._trigger_pipeline_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:StartExecution"],
+                resources=[
+                    f"arn:aws:states:*:*:stateMachine:{config.resource_prefix}_*"
+                ],
+            )
+        )
+
+        # Add trigger endpoint to pipeline_id_resource
+        trigger_resource = pipeline_id_resource.add_resource("trigger")
+        trigger_post = trigger_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(self._trigger_pipeline_handler.function),
+        )
+        apply_custom_authorization(trigger_post, props.authorizer)
+
         pipelines_executions_resource = pipelines_resource.add_resource("executions")
 
         # GET /pipelines/executions/ - responds with all pipeline executions
@@ -939,6 +990,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         add_cors_options_method(pipeline_id_resource)
         add_cors_options_method(execution_id_resource)
         add_cors_options_method(retry_resource)
+        add_cors_options_method(trigger_resource)
 
     @property
     def post_pipelines_async_handler(self) -> Lambda:
@@ -967,3 +1019,7 @@ class ApiGatewayPipelinesConstruct(Construct):
     @property
     def pipeline_trigger_lambda(self) -> Lambda:
         return self._pipeline_trigger_lambda
+
+    @property
+    def trigger_pipeline_handler(self) -> Lambda:
+        return self._trigger_pipeline_handler

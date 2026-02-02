@@ -91,7 +91,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
         onClose();
       }, 1000);
     } catch (error) {
-      console.error("Error creating group:", error);
       setSnackbar({
         open: true,
         message: t("groups.messages.createError"),

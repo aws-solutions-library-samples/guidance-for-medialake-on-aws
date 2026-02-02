@@ -285,6 +285,7 @@ export default {
     },
   },
   search: {
+    clear: "مسح البحث",
     semantic: {
       label: "دلالي",
       enable: "تفعيل البحث الدلالي",
@@ -969,7 +970,8 @@ export default {
       flow: "Flow",
       utilities: "Utilities",
     },
-    noGroup: "No group",
+    noGroup: "لا توجد مجموعة",
+    loadingGroups: "جارٍ تحميل المجموعات...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1232,6 +1234,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "خطأ في تحميل مجموعة المجموعات. يرجى المحاولة مرة أخرى.",
+      backToGroups: "العودة إلى المجموعات",
+      collectionsInGroup: "المجموعات في هذه المجموعة",
+      addCollections: "إضافة مجموعات",
+      noCollectionsYet: "لا توجد مجموعات في هذه المجموعة بعد",
+      removeFromGroup: "إزالة من المجموعة",
+      addCollectionsDialog: {
+        title: "إضافة مجموعات إلى المجموعة",
+        searchPlaceholder: "البحث عن مجموعات...",
+        noCollectionsFound: "لم يتم العثور على مجموعات",
+        allInGroup: "جميع المجموعات موجودة بالفعل في هذه المجموعة",
+        addButton: "إضافة",
+      },
+      confirmDelete: 'هل أنت متأكد من حذف "{{name}}"؟',
+      confirmRemove: "إزالة هذه المجموعة من المجموعة؟",
+      info: {
+        collections: "المجموعات",
+        visibility: "الرؤية",
+        created: "تم الإنشاء",
+      },
     },
   },
   fileUpload: {

@@ -290,6 +290,7 @@ export default {
     },
   },
   search: {
+    clear: "Limpar pesquisa",
     semantic: {
       label: "Semântica",
       enable: "Ativar pesquisa semântica",
@@ -980,7 +981,8 @@ export default {
     },
     root: "Raiz",
     folder: "Folder",
-    noGroup: "No group",
+    noGroup: "Sem grupo",
+    loadingGroups: "Obtendo grupos...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1243,6 +1245,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "Erro ao carregar grupo de coleções. Por favor, tente novamente.",
+      backToGroups: "Voltar aos Grupos",
+      collectionsInGroup: "Coleções neste Grupo",
+      addCollections: "Adicionar Coleções",
+      noCollectionsYet: "Ainda não há coleções neste grupo",
+      removeFromGroup: "Remover do grupo",
+      addCollectionsDialog: {
+        title: "Adicionar Coleções ao Grupo",
+        searchPlaceholder: "Pesquisar coleções...",
+        noCollectionsFound: "Nenhuma coleção encontrada",
+        allInGroup: "Todas as coleções já estão neste grupo",
+        addButton: "Adicionar",
+      },
+      confirmDelete: 'Tem certeza de que deseja excluir "{{name}}"?',
+      confirmRemove: "Remover esta coleção do grupo?",
+      info: {
+        collections: "Coleções",
+        visibility: "Visibilidade",
+        created: "Criado",
+      },
     },
   },
   fileUpload: {

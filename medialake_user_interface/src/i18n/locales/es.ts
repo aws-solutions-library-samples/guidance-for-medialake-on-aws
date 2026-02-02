@@ -290,6 +290,7 @@ export default {
     },
   },
   search: {
+    clear: "Borrar búsqueda",
     semantic: {
       label: "Semántico",
       enable: "Habilitar búsqueda semántica",
@@ -979,7 +980,8 @@ export default {
       flow: "Flow",
       utilities: "Utilities",
     },
-    noGroup: "No group",
+    noGroup: "Sin grupo",
+    loadingGroups: "Obteniendo grupos...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1235,6 +1237,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "Error al cargar el grupo de colecciones. Por favor, inténtalo de nuevo.",
+      backToGroups: "Volver a Grupos",
+      collectionsInGroup: "Colecciones en este Grupo",
+      addCollections: "Agregar Colecciones",
+      noCollectionsYet: "Aún no hay colecciones en este grupo",
+      removeFromGroup: "Eliminar del grupo",
+      addCollectionsDialog: {
+        title: "Agregar Colecciones al Grupo",
+        searchPlaceholder: "Buscar colecciones...",
+        noCollectionsFound: "No se encontraron colecciones",
+        allInGroup: "Todas las colecciones ya están en este grupo",
+        addButton: "Agregar",
+      },
+      confirmDelete: '¿Estás seguro de que quieres eliminar "{{name}}"?',
+      confirmRemove: "¿Eliminar esta colección del grupo?",
+      info: {
+        collections: "Colecciones",
+        visibility: "Visibilidad",
+        created: "Creado",
+      },
     },
   },
   assetSidebar: {

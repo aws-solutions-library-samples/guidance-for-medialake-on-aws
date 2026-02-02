@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Container,
@@ -42,33 +43,32 @@ import {
   useAddCollectionsToGroup,
   useRemoveCollectionsFromGroup,
 } from "../hooks/useCollectionGroups";
+import { useGetCollections } from "@/api/hooks/useCollections";
 import { CollectionGroupForm } from "../components/CollectionGroupForm";
 import type { CollectionGroup } from "../types";
 
 export const CollectionGroupDetailPage: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [editFormOpen, setEditFormOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: groupData, isLoading, error } = useCollectionGroup(groupId!);
+  const { data: collectionsData, isLoading: isLoadingCollections } = useGetCollections();
   const deleteGroup = useDeleteCollectionGroup();
   const addCollections = useAddCollectionsToGroup();
   const removeCollections = useRemoveCollectionsFromGroup();
 
-  // Mock collections data - in real implementation, fetch from API
-  const [availableCollections] = useState([
-    { id: "col_1", name: "Marketing Assets 2024", itemCount: 45 },
-    { id: "col_2", name: "Product Photos", itemCount: 128 },
-    { id: "col_3", name: "Video Archive", itemCount: 67 },
-    { id: "col_4", name: "Brand Guidelines", itemCount: 23 },
-    { id: "col_5", name: "Social Media Content", itemCount: 89 },
-  ]);
+  // Get all available collections from API
+  const availableCollections = collectionsData?.data || [];
 
   const handleDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete "${groupData?.data.name}"?`)) {
+    if (
+      window.confirm(t("collectionGroups.detailPage.confirmDelete", { name: groupData?.data.name }))
+    ) {
       try {
         await deleteGroup.mutateAsync(groupId!);
         navigate("/collection-groups");
@@ -94,7 +94,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
   };
 
   const handleRemoveCollection = async (collectionId: string) => {
-    if (window.confirm("Remove this collection from the group?")) {
+    if (window.confirm(t("collectionGroups.detailPage.confirmRemove"))) {
       try {
         await removeCollections.mutateAsync({
           groupId: groupId!,
@@ -134,13 +134,13 @@ export const CollectionGroupDetailPage: React.FC = () => {
     return (
       <Container maxWidth="lg">
         <Box py={4}>
-          <Alert severity="error">Error loading collection group. Please try again.</Alert>
+          <Alert severity="error">{t("collectionGroups.detailPage.errorLoading")}</Alert>
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate("/collection-groups")}
             sx={{ mt: 2 }}
           >
-            Back to Groups
+            {t("collectionGroups.detailPage.backToGroups")}
           </Button>
         </Box>
       </Container>
@@ -178,7 +178,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                 startIcon={<EditIcon />}
                 onClick={() => setEditFormOpen(true)}
               >
-                Edit
+                {t("common.actions.edit")}
               </Button>
               <Button
                 variant="outlined"
@@ -187,7 +187,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                 onClick={handleDelete}
                 disabled={deleteGroup.isPending}
               >
-                Delete
+                {t("common.actions.delete")}
               </Button>
             </Box>
           )}
@@ -199,17 +199,17 @@ export const CollectionGroupDetailPage: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <Typography variant="caption" color="text.secondary">
-                  Collections
+                  {t("collectionGroups.detailPage.info.collections")}
                 </Typography>
                 <Typography variant="h6">{group.collectionCount || 0}</Typography>
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Typography variant="caption" color="text.secondary">
-                  Visibility
+                  {t("collectionGroups.detailPage.info.visibility")}
                 </Typography>
                 <Box mt={0.5}>
                   <Chip
-                    label={group.isPublic ? "Public" : "Private"}
+                    label={group.isPublic ? t("common.public") : t("common.private")}
                     size="small"
                     color={group.isPublic ? "success" : "default"}
                   />
@@ -217,7 +217,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Typography variant="caption" color="text.secondary">
-                  Created
+                  {t("collectionGroups.detailPage.info.created")}
                 </Typography>
                 <Typography variant="body2">
                   {new Date(group.createdAt).toLocaleDateString()}
@@ -229,14 +229,16 @@ export const CollectionGroupDetailPage: React.FC = () => {
 
         {/* Collections in Group */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h5">Collections in this Group</Typography>
+          <Typography variant="h5">
+            {t("collectionGroups.detailPage.collectionsInGroup")}
+          </Typography>
           {group.isOwner && (
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => setAddDialogOpen(true)}
             >
-              Add Collections
+              {t("collectionGroups.detailPage.addCollections")}
             </Button>
           )}
         </Box>
@@ -246,7 +248,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
             <CardContent>
               <Box textAlign="center" py={4}>
                 <Typography variant="body1" color="text.secondary" gutterBottom>
-                  No collections in this group yet
+                  {t("collectionGroups.detailPage.noCollectionsYet")}
                 </Typography>
                 {group.isOwner && (
                   <Button
@@ -255,14 +257,23 @@ export const CollectionGroupDetailPage: React.FC = () => {
                     onClick={() => setAddDialogOpen(true)}
                     sx={{ mt: 2 }}
                   >
-                    Add Collections
+                    {t("collectionGroups.detailPage.addCollections")}
                   </Button>
                 )}
               </Box>
             </CardContent>
           </Card>
         ) : (
-          <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={2}>
+          <Box
+            display="grid"
+            sx={{
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(auto-fill, minmax(300px, 1fr))",
+              },
+            }}
+            gap={2}
+          >
             {groupCollections.map((collection) => (
               <Card key={collection.id}>
                 <CardContent>
@@ -272,7 +283,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                         {collection.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {collection.itemCount} items
+                        {collection.itemCount} {t("common.items")}
                       </Typography>
                     </Box>
                     {group.isOwner && (
@@ -280,7 +291,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                         size="small"
                         onClick={() => handleRemoveCollection(collection.id)}
                         disabled={removeCollections.isPending}
-                        title="Remove from group"
+                        title={t("collectionGroups.detailPage.removeFromGroup")}
                       >
                         <RemoveIcon fontSize="small" />
                       </IconButton>
@@ -310,18 +321,20 @@ export const CollectionGroupDetailPage: React.FC = () => {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Add Collections to Group</DialogTitle>
+          <DialogTitle>{t("collectionGroups.detailPage.addCollectionsDialog.title")}</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
-              placeholder="Search collections..."
+              placeholder={t("collectionGroups.detailPage.addCollectionsDialog.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               sx={{ mb: 2, mt: 1 }}
             />
             {filteredAvailableCollections.length === 0 ? (
               <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
-                {searchQuery ? "No collections found" : "All collections are already in this group"}
+                {searchQuery
+                  ? t("collectionGroups.detailPage.addCollectionsDialog.noCollectionsFound")
+                  : t("collectionGroups.detailPage.addCollectionsDialog.allInGroup")}
               </Typography>
             ) : (
               <List>
@@ -337,7 +350,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                     />
                     <ListItemText
                       primary={collection.name}
-                      secondary={`${collection.itemCount} items`}
+                      secondary={t("common.items", { count: collection.itemCount })}
                     />
                   </ListItemButton>
                 ))}
@@ -352,14 +365,15 @@ export const CollectionGroupDetailPage: React.FC = () => {
                 setSearchQuery("");
               }}
             >
-              Cancel
+              {t("common.actions.cancel")}
             </Button>
             <Button
               onClick={handleAddCollections}
               variant="contained"
               disabled={selectedCollections.length === 0 || addCollections.isPending}
             >
-              Add {selectedCollections.length > 0 && `(${selectedCollections.length})`}
+              {t("collectionGroups.detailPage.addCollectionsDialog.addButton")}{" "}
+              {selectedCollections.length > 0 && `(${selectedCollections.length})`}
             </Button>
           </DialogActions>
         </Dialog>

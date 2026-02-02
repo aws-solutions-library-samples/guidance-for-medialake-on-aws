@@ -183,7 +183,13 @@ class GraphAnalyzer:
 
     def find_special_edges(
         self,
-    ) -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, List[str]]]:
+    ) -> Tuple[
+        Dict[str, str],
+        Dict[str, str],
+        Dict[str, str],
+        Dict[str, List[str]],
+        Dict[str, Dict[str, str]],
+    ]:
         """
         Find special edge types in the pipeline.
 
@@ -192,9 +198,12 @@ class GraphAnalyzer:
                           choice_true_targets,
                           choice_false_targets,
                           choice_fail_targets,
-                          map_processor_chains
+                          map_processor_chains,
+                          choice_custom_branches
                       )
-            where map_processor_chains maps Map node IDs to lists of node IDs in their processor chains
+            where:
+            - map_processor_chains maps Map node IDs to lists of node IDs in their processor chains
+            - choice_custom_branches maps Choice node IDs to dicts of {output_name: target_node_id}
         """
         choice_true_targets = {}  # Maps Choice node ID to its "true" target node ID
         choice_false_targets = {}  # Maps Choice node ID to its "false" target node ID
@@ -202,6 +211,23 @@ class GraphAnalyzer:
         map_processor_chains = (
             {}
         )  # Maps Map node ID to a list of node IDs in its processor chain
+        choice_custom_branches = (
+            {}
+        )  # Maps Choice node ID to {output_name: target_node_id}
+
+        # Standard output names that are handled by existing logic
+        standard_outputs = {
+            "Completed",
+            "In Progress",
+            "Fail",
+            "any",
+            "True",
+            "False",
+            "condition_true",
+            "condition_false",
+            "condition_true_output",
+            "condition_false_output",
+        }
 
         # First identify the initial processor nodes for each Map
         initial_processor_targets = (
@@ -223,11 +249,20 @@ class GraphAnalyzer:
             if not source_node:
                 continue
 
+            # Get the template type (nodeId) for proper node type detection
+            # Fall back to id for backward compatibility with pipelines that don't have nodeId
+            # Use isinstance check to handle test mocks that return MagicMock for any attribute
+            node_id_value = getattr(source_node.data, "nodeId", None)
+            template_id = (
+                node_id_value if isinstance(node_id_value, str) else source_node.data.id
+            )
+
             # Handle Choice node edges (both choice and conditional nodes)
-            if source_node.data.type.lower() == "flow" and source_node.data.id in [
+            if source_node.data.type.lower() == "flow" and template_id in [
                 "choice",
                 "conditional",
             ]:
+                # Check for standard outputs first
                 if source_handle in ["Completed", "True"]:
                     choice_true_targets[source_id] = target_id
                     logger.info(
@@ -243,9 +278,26 @@ class GraphAnalyzer:
                     logger.info(
                         f"Identified Choice fail path: {source_id} -> {target_id}"
                     )
+                elif source_handle and source_handle not in standard_outputs:
+                    # Check if this is a custom output from outputTypes
+                    output_types = getattr(source_node.data, "outputTypes", [])
+                    if output_types:
+                        custom_output_names = {
+                            ot.get("name")
+                            for ot in output_types
+                            if isinstance(ot, dict) and ot.get("name")
+                        }
+
+                        if source_handle in custom_output_names:
+                            if source_id not in choice_custom_branches:
+                                choice_custom_branches[source_id] = {}
+                            choice_custom_branches[source_id][source_handle] = target_id
+                            logger.info(
+                                f"Identified custom Choice branch '{source_handle}': {source_id} -> {target_id}"
+                            )
 
             # Handle Map node edges
-            if source_node.data.type.lower() == "flow" and source_node.data.id == "map":
+            if source_node.data.type.lower() == "flow" and template_id == "map":
                 if source_handle == "Processor":
                     initial_processor_targets[source_id] = target_id
                     logger.info(
@@ -266,11 +318,18 @@ class GraphAnalyzer:
             map_processor_chains[map_id] = chain
             logger.info(f"Built processor chain for Map {map_id}: {chain}")
 
+        # Log summary of custom branches found
+        if choice_custom_branches:
+            logger.info(
+                f"Found custom Choice branches for {len(choice_custom_branches)} Choice nodes: {choice_custom_branches}"
+            )
+
         return (
             choice_true_targets,
             choice_false_targets,
             choice_fail_targets,
             map_processor_chains,
+            choice_custom_branches,
         )
 
     def find_first_and_last_lambdas(self) -> Tuple[Optional[str], Optional[str]]:

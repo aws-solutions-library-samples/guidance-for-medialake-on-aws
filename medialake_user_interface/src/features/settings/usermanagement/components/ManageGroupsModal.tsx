@@ -77,13 +77,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
   const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
-  // Debug logs
-  console.log("ManageGroupsModal - groups data:", groups);
-
-  // Log when groups change
-  React.useEffect(() => {
-    console.log("Groups data updated in ManageGroupsModal:", groups);
-  }, [groups]);
   const updateGroupMutation = useUpdateGroup();
   const deleteGroupMutation = useDeleteGroup();
   const assignPsToGroupMutation = useAssignPsToGroup();
@@ -181,7 +174,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
 
       setEditingGroup(null);
     } catch (error) {
-      console.error("Error updating group:", error);
       setSnackbar({
         open: true,
         message: t("groups.messages.updateError"),
@@ -217,7 +209,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
         setSelectedTab(Math.max(0, groups.length - 2));
       }
     } catch (error) {
-      console.error("Error deleting group:", error);
       setSnackbar({
         open: true,
         message: t("groups.messages.deleteError"),
@@ -255,7 +246,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
 
       handleClosePermissionSetMenu();
     } catch (error) {
-      console.error("Error assigning permission set:", error);
       setSnackbar({
         open: true,
         message: t("groups.messages.assignPermissionSetError"),
@@ -277,7 +267,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
         severity: "success",
       });
     } catch (error) {
-      console.error("Error removing permission set:", error);
       setSnackbar({
         open: true,
         message: t("groups.messages.removePermissionSetError"),
@@ -317,211 +306,208 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
               <CircularProgress />
             </Box>
           ) : groups && groups.length > 0 ? (
-            (console.log("ManageGroupsModal - rendering groups:", groups),
-            (
-              <Box sx={{ width: "100%" }}>
-                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                  <Tabs
-                    value={selectedTab}
-                    onChange={handleTabChange}
-                    variant="scrollable"
-                    scrollButtons="auto"
-                  >
-                    {groups.map((group) => (
-                      <Tab key={group.id} label={group.name} />
-                    ))}
-                  </Tabs>
-                </Box>
-
-                {groups.map((group, index) => (
-                  <Box
-                    key={group.id}
-                    role="tabpanel"
-                    hidden={selectedTab !== index}
-                    id={`group-tabpanel-${index}`}
-                    aria-labelledby={`group-tab-${index}`}
-                  >
-                    {selectedTab === index && (
-                      <Box>
-                        {confirmDeleteGroup?.id === group.id ? (
-                          <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-                            <CardContent>
-                              <Typography variant="h6" color="error" gutterBottom>
-                                {t("groups.messages.confirmDelete")}
-                              </Typography>
-                              <Typography>
-                                {t("groups.messages.deleteWarning", {
-                                  name: group.name,
-                                })}
-                              </Typography>
-                            </CardContent>
-                            <CardActions>
-                              <Button onClick={handleCancelDelete} variant="outlined">
-                                {t("common.actions.cancel")}
-                              </Button>
-                              <Button
-                                onClick={handleDeleteGroup}
-                                variant="contained"
-                                color="error"
-                                disabled={deleteGroupMutation.isPending}
-                                startIcon={
-                                  deleteGroupMutation.isPending ? (
-                                    <CircularProgress size={20} />
-                                  ) : null
-                                }
-                              >
-                                {t("common.actions.delete")}
-                              </Button>
-                            </CardActions>
-                          </Card>
-                        ) : editingGroup?.id === group.id ? (
-                          <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-                            <CardContent>
-                              <Typography variant="h6" gutterBottom>
-                                {t("groups.actions.editGroup")}
-                              </Typography>
-                              <TextField
-                                name="name"
-                                label={t("groups.fields.name")}
-                                value={editFormData.name}
-                                onChange={handleEditFormChange}
-                                fullWidth
-                                margin="normal"
-                                error={!!errors.name}
-                                helperText={errors.name}
-                                required
-                              />
-                              <TextField
-                                name="description"
-                                label={t("groups.fields.description")}
-                                value={editFormData.description}
-                                onChange={handleEditFormChange}
-                                fullWidth
-                                margin="normal"
-                                multiline
-                                rows={3}
-                              />
-                              <TextField
-                                name="department"
-                                label={t("groups.fields.department")}
-                                value={editFormData.department}
-                                onChange={handleEditFormChange}
-                                fullWidth
-                                margin="normal"
-                              />
-                            </CardContent>
-                            <CardActions>
-                              <Button onClick={handleCancelEdit} variant="outlined">
-                                {t("common.actions.cancel")}
-                              </Button>
-                              <Button
-                                onClick={handleSaveGroup}
-                                variant="contained"
-                                disabled={updateGroupMutation.isPending}
-                                startIcon={
-                                  updateGroupMutation.isPending ? (
-                                    <CircularProgress size={20} />
-                                  ) : null
-                                }
-                              >
-                                {t("common.actions.save")}
-                              </Button>
-                            </CardActions>
-                          </Card>
-                        ) : (
-                          <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-                            <CardContent>
-                              <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="flex-start"
-                              >
-                                <Box>
-                                  <Typography variant="h6" gutterBottom>
-                                    {group.name}
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {group.description || t("groups.noDescription")}
-                                  </Typography>
-                                  {group.department && (
-                                    <Typography
-                                      variant="body2"
-                                      color="text.secondary"
-                                      sx={{ mt: 0.5 }}
-                                    >
-                                      <strong>{t("groups.fields.department")}:</strong>{" "}
-                                      {group.department}
-                                    </Typography>
-                                  )}
-                                </Box>
-                                <Box>
-                                  <Tooltip title={t("common.actions.edit")}>
-                                    <IconButton onClick={() => handleEditGroup(group)} size="small">
-                                      <EditIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title={t("common.actions.delete")}>
-                                    <IconButton
-                                      onClick={() => handleConfirmDeleteGroup(group)}
-                                      size="small"
-                                      color="error"
-                                    >
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        )}
-
-                        <Box sx={{ mt: 3 }}>
-                          <Box
-                            display="flex"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            mb={2}
-                          >
-                            <Typography variant="h6">{t("groups.permissionSets")}</Typography>
-                            <Button
-                              startIcon={<AddIcon />}
-                              onClick={(e) => handleOpenPermissionSetMenu(e, group.id)}
-                              variant="outlined"
-                              size="small"
-                              disabled={availablePermissionSets.length === 0}
-                            >
-                              {t("groups.actions.assignPermissionSet")}
-                            </Button>
-                          </Box>
-
-                          <Divider sx={{ mb: 2 }} />
-
-                          {groupAssignments?.assignments &&
-                          groupAssignments.assignments.length > 0 ? (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                              {groupAssignments.assignments.map((assignment) => (
-                                <Chip
-                                  key={assignment.permissionSetId}
-                                  label={assignment.permissionSetName}
-                                  onDelete={() =>
-                                    handleRemovePermissionSet(group.id, assignment.permissionSetId)
-                                  }
-                                  sx={{ mb: 1 }}
-                                />
-                              ))}
-                            </Stack>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              {t("groups.noPermissionSets")}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
+            <Box sx={{ width: "100%" }}>
+              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+                <Tabs
+                  value={selectedTab}
+                  onChange={handleTabChange}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                >
+                  {groups.map((group) => (
+                    <Tab key={group.id} label={group.name} />
+                  ))}
+                </Tabs>
               </Box>
-            ))
+
+              {groups.map((group, index) => (
+                <Box
+                  key={group.id}
+                  role="tabpanel"
+                  hidden={selectedTab !== index}
+                  id={`group-tabpanel-${index}`}
+                  aria-labelledby={`group-tab-${index}`}
+                >
+                  {selectedTab === index && (
+                    <Box>
+                      {confirmDeleteGroup?.id === group.id ? (
+                        <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                          <CardContent>
+                            <Typography variant="h6" color="error" gutterBottom>
+                              {t("groups.messages.confirmDelete")}
+                            </Typography>
+                            <Typography>
+                              {t("groups.messages.deleteWarning", {
+                                name: group.name,
+                              })}
+                            </Typography>
+                          </CardContent>
+                          <CardActions>
+                            <Button onClick={handleCancelDelete} variant="outlined">
+                              {t("common.actions.cancel")}
+                            </Button>
+                            <Button
+                              onClick={handleDeleteGroup}
+                              variant="contained"
+                              color="error"
+                              disabled={deleteGroupMutation.isPending}
+                              startIcon={
+                                deleteGroupMutation.isPending ? (
+                                  <CircularProgress size={20} />
+                                ) : null
+                              }
+                            >
+                              {t("common.actions.delete")}
+                            </Button>
+                          </CardActions>
+                        </Card>
+                      ) : editingGroup?.id === group.id ? (
+                        <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              {t("groups.actions.editGroup")}
+                            </Typography>
+                            <TextField
+                              name="name"
+                              label={t("groups.fields.name")}
+                              value={editFormData.name}
+                              onChange={handleEditFormChange}
+                              fullWidth
+                              margin="normal"
+                              error={!!errors.name}
+                              helperText={errors.name}
+                              required
+                            />
+                            <TextField
+                              name="description"
+                              label={t("groups.fields.description")}
+                              value={editFormData.description}
+                              onChange={handleEditFormChange}
+                              fullWidth
+                              margin="normal"
+                              multiline
+                              rows={3}
+                            />
+                            <TextField
+                              name="department"
+                              label={t("groups.fields.department")}
+                              value={editFormData.department}
+                              onChange={handleEditFormChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </CardContent>
+                          <CardActions>
+                            <Button onClick={handleCancelEdit} variant="outlined">
+                              {t("common.actions.cancel")}
+                            </Button>
+                            <Button
+                              onClick={handleSaveGroup}
+                              variant="contained"
+                              disabled={updateGroupMutation.isPending}
+                              startIcon={
+                                updateGroupMutation.isPending ? (
+                                  <CircularProgress size={20} />
+                                ) : null
+                              }
+                            >
+                              {t("common.actions.save")}
+                            </Button>
+                          </CardActions>
+                        </Card>
+                      ) : (
+                        <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                          <CardContent>
+                            <Box
+                              display="flex"
+                              justifyContent="space-between"
+                              alignItems="flex-start"
+                            >
+                              <Box>
+                                <Typography variant="h6" gutterBottom>
+                                  {group.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {group.description || t("groups.noDescription")}
+                                </Typography>
+                                {group.department && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mt: 0.5 }}
+                                  >
+                                    <strong>{t("groups.fields.department")}:</strong>{" "}
+                                    {group.department}
+                                  </Typography>
+                                )}
+                              </Box>
+                              <Box>
+                                <Tooltip title={t("common.actions.edit")}>
+                                  <IconButton onClick={() => handleEditGroup(group)} size="small">
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title={t("common.actions.delete")}>
+                                  <IconButton
+                                    onClick={() => handleConfirmDeleteGroup(group)}
+                                    size="small"
+                                    color="error"
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      <Box sx={{ mt: 3 }}>
+                        <Box
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mb={2}
+                        >
+                          <Typography variant="h6">{t("groups.permissionSets")}</Typography>
+                          <Button
+                            startIcon={<AddIcon />}
+                            onClick={(e) => handleOpenPermissionSetMenu(e, group.id)}
+                            variant="outlined"
+                            size="small"
+                            disabled={availablePermissionSets.length === 0}
+                          >
+                            {t("groups.actions.assignPermissionSet")}
+                          </Button>
+                        </Box>
+
+                        <Divider sx={{ mb: 2 }} />
+
+                        {groupAssignments?.assignments &&
+                        groupAssignments.assignments.length > 0 ? (
+                          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                            {groupAssignments.assignments.map((assignment) => (
+                              <Chip
+                                key={assignment.permissionSetId}
+                                label={assignment.permissionSetName}
+                                onDelete={() =>
+                                  handleRemovePermissionSet(group.id, assignment.permissionSetId)
+                                }
+                                sx={{ mb: 1 }}
+                              />
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {t("groups.noPermissionSets")}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </Box>
           ) : (
             <Box textAlign="center" py={4}>
               <Typography variant="body1" gutterBottom>

@@ -27,9 +27,6 @@ export const UserForm: React.FC<UserFormProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  // Debug logs
-  console.log("UserForm props:", { user, availableGroups });
-
   const form = useFormWithValidation<UserFormData>({
     defaultValues: user
       ? {
@@ -39,15 +36,8 @@ export const UserForm: React.FC<UserFormProps> = ({
           groups:
             user.groups && user.groups.length > 0
               ? (() => {
-                  // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
-                  // Check if the ID exists in availableGroups, otherwise default to "editors"
                   const groupId = user.groups[0];
                   const groupExists = availableGroups.find((g) => g.id === groupId);
-                  console.log("UserForm defaultValues - looking up group:", {
-                    groupId,
-                    groupExists,
-                    availableGroups,
-                  });
                   return groupExists ? groupId : "editors";
                 })()
               : "editors",
@@ -68,22 +58,14 @@ export const UserForm: React.FC<UserFormProps> = ({
             groups:
               user.groups && user.groups.length > 0
                 ? (() => {
-                    // user.groups contains group IDs (e.g., "read-only", "superAdministrators")
-                    // Check if the ID exists in availableGroups, otherwise default to "editors"
                     const groupId = user.groups[0];
                     const groupExists = availableGroups.find((g) => g.id === groupId);
-                    console.log("UserForm reset - looking up group:", {
-                      groupId,
-                      groupExists,
-                      availableGroups,
-                      userProp: user,
-                    });
                     return groupExists ? groupId : "editors";
                   })()
                 : "editors",
           }
         : createUserFormDefaults;
-      console.log("UserForm resetting with values:", defaultVals);
+
       form.reset(defaultVals);
     } else {
       // Optionally reset to blank defaults when closed, if desired
@@ -98,11 +80,10 @@ export const UserForm: React.FC<UserFormProps> = ({
       given_name: data.given_name,
       family_name: data.family_name,
       permissions: [], // Set empty array for permissions
-      groups: [data.groups], // Convert single group ID back to array
-      enabled: true, // Default to enabled
+      groups: [data.groups],
+      enabled: true,
     };
 
-    console.log("Submitting user creation request:", requestData);
     await onSave(requestData);
     onClose();
     form.reset();
@@ -154,7 +135,6 @@ export const UserForm: React.FC<UserFormProps> = ({
                   : t("users.form.fields.groups.tooltip", "Select a group for this user")
               }
               options={availableGroups.map((group) => {
-                console.log("Mapping group in FormSelect:", group);
                 return {
                   label: group.name,
                   value: group.id,

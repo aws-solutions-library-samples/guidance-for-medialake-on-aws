@@ -290,6 +290,7 @@ export default {
     },
   },
   search: {
+    clear: "खोज साफ़ करें",
     semantic: {
       label: "सार्थक",
       enable: "सार्थक खोज सक्षम करें",
@@ -977,7 +978,8 @@ export default {
       flow: "Flow",
       utilities: "Utilities",
     },
-    noGroup: "No group",
+    noGroup: "कोई समूह नहीं",
+    loadingGroups: "समूह लोड हो रहे हैं...",
     darkMode: "Dark Mode",
     toggleTheme: "Toggle theme",
   },
@@ -1234,6 +1236,30 @@ export default {
       assignPermissionSetError: "Failed to assign permission set",
       removePermissionSetSuccess: "Permission set removed successfully",
       removePermissionSetError: "Failed to remove permission set",
+    },
+  },
+  collectionGroups: {
+    detailPage: {
+      errorLoading: "संग्रह समूह लोड करने में त्रुटि। कृपया पुनः प्रयास करें।",
+      backToGroups: "समूहों पर वापस जाएं",
+      collectionsInGroup: "इस समूह में संग्रह",
+      addCollections: "संग्रह जोड़ें",
+      noCollectionsYet: "इस समूह में अभी तक कोई संग्रह नहीं है",
+      removeFromGroup: "समूह से हटाएं",
+      addCollectionsDialog: {
+        title: "समूह में संग्रह जोड़ें",
+        searchPlaceholder: "संग्रह खोजें...",
+        noCollectionsFound: "कोई संग्रह नहीं मिला",
+        allInGroup: "सभी संग्रह पहले से ही इस समूह में हैं",
+        addButton: "जोड़ें",
+      },
+      confirmDelete: 'क्या आप वाकई "{{name}}" को हटाना चाहते हैं?',
+      confirmRemove: "इस संग्रह को समूह से हटाएं?",
+      info: {
+        collections: "संग्रह",
+        visibility: "दृश्यता",
+        created: "बनाया गया",
+      },
     },
   },
   assetSidebar: {

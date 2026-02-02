@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 import boto3
 from aws_lambda_powertools import Logger
+from pipeline_utils import determine_pipeline_type
 
 from config import NODE_TABLE, PIPELINES_TABLE
 
@@ -330,6 +331,10 @@ def create_pipeline_record(
     pipeline_id = str(uuid.uuid4())
     now_iso = datetime.utcnow().isoformat()
 
+    # Determine the correct pipeline type based on the pipeline definition
+    pipeline_type = determine_pipeline_type(pipeline)
+    logger.info(f"Determined pipeline type: {pipeline_type}")
+
     item = {
         "id": pipeline_id,
         "createdAt": now_iso,
@@ -338,7 +343,7 @@ def create_pipeline_record(
         "dependentResources": [],  # Will be populated later
         "name": pipeline.name,
         "stateMachineArn": "",  # Will be populated later
-        "type": "Event Triggered",
+        "type": pipeline_type,
         "system": False,
         "deploymentStatus": deployment_status,
         "active": active,  # Add active field
@@ -349,11 +354,6 @@ def create_pipeline_record(
 
     try:
         table.put_item(Item=item)
-        logger.info(f"Successfully created pipeline record with id {pipeline_id}")
-        return pipeline_id
-    except Exception as e:
-        logger.exception(f"Failed to create pipeline record: {e}")
-        raise
         logger.info(f"Successfully created pipeline record with id {pipeline_id}")
         return pipeline_id
     except Exception as e:
@@ -571,27 +571,33 @@ def store_pipeline_info(
         # Update existing pipeline with DEPLOYED status and new definition
         logger.info(f"Updating existing pipeline with ID: {pipeline_id}")
 
+        # Determine the correct pipeline type based on the pipeline definition
+        pipeline_type = determine_pipeline_type(pipeline)
+        logger.info(f"Determined pipeline type for update: {pipeline_type}")
+
         # Update the pipeline definition
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table(PIPELINES_TABLE)
         now_iso = datetime.utcnow().isoformat()
 
         try:
-            # Update the definition and name fields
+            # Update the definition, name, and type fields
             table.update_item(
                 Key={"id": pipeline_id},
-                UpdateExpression="SET #def = :def, #name = :name, #desc = :desc, #up = :updated",
+                UpdateExpression="SET #def = :def, #name = :name, #desc = :desc, #up = :updated, #type = :type",
                 ExpressionAttributeNames={
                     "#def": "definition",
                     "#name": "name",
                     "#desc": "description",
                     "#up": "updatedAt",
+                    "#type": "type",
                 },
                 ExpressionAttributeValues={
                     ":def": pipeline.dict(),
                     ":name": pipeline.name,
                     ":desc": pipeline.description,
                     ":updated": now_iso,
+                    ":type": pipeline_type,
                 },
             )
             logger.info(f"Successfully updated definition for pipeline {pipeline_id}")

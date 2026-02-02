@@ -272,9 +272,10 @@ class ResvgCliLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        if "CI" in os.environ:
+        ci_asset_path = "dist/lambdas/layers/resvg"
+        if "CI" in os.environ and os.path.exists(ci_asset_path):
             # Use pre-built layer in CI for faster deployments
-            code = lambda_.Code.from_asset("dist/lambdas/layers/resvg")
+            code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build from source locally
             code = lambda_.Code.from_asset(
@@ -341,9 +342,10 @@ class NumpyLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        if "CI" in os.environ:
+        ci_asset_path = "dist/lambdas/layers/numpy"
+        if "CI" in os.environ and os.path.exists(ci_asset_path):
             # Use pre-built layer in CI for faster deployments
-            code = lambda_.Code.from_asset("dist/lambdas/layers/numpy")
+            code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build locally with Docker for development
             code = lambda_.Code.from_asset(
@@ -446,9 +448,10 @@ class OpenEXRLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        if "CI" in os.environ:
+        ci_asset_path = "dist/lambdas/layers/openexr"
+        if "CI" in os.environ and os.path.exists(ci_asset_path):
             # Use pre-built layer in CI
-            code = lambda_.Code.from_asset("dist/lambdas/layers/openexr")
+            code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build from source locally
             code = lambda_.Code.from_asset(
@@ -570,7 +573,8 @@ class FFProbeLayer(Construct):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
 
-        if "CI" in os.environ:
+        ci_asset_path = "dist/lambdas/layers/ffprobe"
+        if "CI" in os.environ and os.path.exists(ci_asset_path):
             # Use pre-built layer in CI
             self.layer = lambda_.LayerVersion(
                 self,
@@ -578,7 +582,7 @@ class FFProbeLayer(Construct):
                 layer_version_name="ffprobe-layer",
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
                 description="Lambda layer with ffprobe for media metadata extraction",
-                code=lambda_.Code.from_asset("dist/lambdas/layers/ffprobe"),
+                code=lambda_.Code.from_asset(ci_asset_path),
             )
         else:
             # Build locally with Docker
@@ -643,7 +647,8 @@ class FFmpegLayer(Construct):
         """
         super().__init__(scope, id, **kwargs)
 
-        if "CI" in os.environ:
+        ci_asset_path = "dist/lambdas/layers/ffmpeg"
+        if "CI" in os.environ and os.path.exists(ci_asset_path):
             # Use pre-built layer in CI
             self.layer = lambda_.LayerVersion(
                 self,
@@ -651,7 +656,7 @@ class FFmpegLayer(Construct):
                 layer_version_name="ffmpeg-layer",
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
                 description="Lambda layer with FFmpeg for video/audio processing",
-                code=lambda_.Code.from_asset("dist/lambdas/layers/ffmpeg"),
+                code=lambda_.Code.from_asset(ci_asset_path),
             )
         else:
             # Build locally with Docker
