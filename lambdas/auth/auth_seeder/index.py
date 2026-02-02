@@ -78,6 +78,10 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "system": {
+                "view": True,  # Top-level system permissions for app initialization
+                "edit": True,
+            },
             "settings": {
                 "users": {"edit": True, "view": True, "delete": True, "create": True},
                 "system": {"edit": True, "view": True},
@@ -134,6 +138,10 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "system": {
+                "view": True,  # Allow editors to read system settings (needed for app initialization)
+                "edit": False,
+            },
         },
     },
     {
@@ -163,6 +171,10 @@ DEFAULT_PERMISSION_SETS = [
                 "view": True,
                 "edit": False,
                 "delete": False,
+            },
+            "system": {
+                "view": True,  # Allow viewers to read system settings (needed for app initialization)
+                "edit": False,
             },
         },
     },

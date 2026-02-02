@@ -202,6 +202,36 @@ class ApiGatewayConstruct(Construct):
             },
         )
 
+        # Add custom response for authorization failures (403)
+        # This provides a more user-friendly message than the default AWS message
+        self.api_gateway_rest_api.add_gateway_response(
+            "UNAUTHORIZED",
+            type=apigateway.ResponseType.UNAUTHORIZED,
+            status_code="403",
+            response_headers={
+                "Access-Control-Allow-Origin": "'*'",
+                "Access-Control-Allow-Headers": "'*'",
+            },
+            templates={
+                "application/json": '{"message": "Access denied: You don\'t have permission to perform this action"}'
+            },
+        )
+
+        # Add custom response for explicit policy denials (403)
+        # This handles when the Lambda authorizer returns a policy with "Effect": "Deny"
+        self.api_gateway_rest_api.add_gateway_response(
+            "ACCESS_DENIED",
+            type=apigateway.ResponseType.ACCESS_DENIED,
+            status_code="403",
+            response_headers={
+                "Access-Control-Allow-Origin": "'*'",
+                "Access-Control-Allow-Headers": "'*'",
+            },
+            templates={
+                "application/json": '{"message": "Access denied: You don\'t have permission to perform this action"}'
+            },
+        )
+
         # Add proxy resource, but let the recursive function handle adding the OPTIONS method
         # try:
         #     # Add a proxy resource for catch-all routing
