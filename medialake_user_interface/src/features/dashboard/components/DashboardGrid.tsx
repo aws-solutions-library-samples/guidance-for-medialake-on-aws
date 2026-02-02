@@ -54,10 +54,7 @@ const WIDGET_COMPONENTS: Record<
   WidgetType,
   React.FC<{
     widgetId: string;
-    config?:
-      | CollectionsWidgetConfig
-      | CollectionGroupWidgetConfig
-      | CollectionTypeWidgetConfig;
+    config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig;
   }>
 > = {
   favorites: FavoritesWidget,

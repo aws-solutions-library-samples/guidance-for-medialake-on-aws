@@ -1365,7 +1365,7 @@ export default {
         noTypesAvailable: "没有可用的收藏类型。请先创建一个类型。",
         loadError: "加载收藏类型失败。请重试.",
       },
-},
+    },
     actions: {
       addWidget: "添加小部件",
       resetLayout: "重置为默认布局",

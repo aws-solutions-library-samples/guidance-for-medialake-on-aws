@@ -1377,7 +1377,7 @@ export default {
         noTypesAvailable: "Nenhum tipo de coleção disponível. Crie um tipo primeiro.",
         loadError: "Falha ao carregar tipo de coleção. Por favor, tente novamente.",
       },
-},
+    },
     actions: {
       addWidget: "Adicionar Widget",
       resetLayout: "Redefinir layout padrão",

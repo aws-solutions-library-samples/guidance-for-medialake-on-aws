@@ -30,10 +30,7 @@ const WIDGET_COMPONENTS: Record<
   React.FC<{
     widgetId: string;
     isExpanded?: boolean;
-    config?:
-      | CollectionsWidgetConfig
-      | CollectionGroupWidgetConfig
-      | CollectionTypeWidgetConfig;
+    config?: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig;
   }>
 > = {
   favorites: FavoritesWidget,

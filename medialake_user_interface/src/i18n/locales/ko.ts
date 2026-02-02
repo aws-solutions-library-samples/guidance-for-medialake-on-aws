@@ -1366,7 +1366,7 @@ export default {
         noTypesAvailable: "사용 가능한 컬렉션 유형이 없습니다. 먼저 유형을 만드세요.",
         loadError: "컬렉션 유형을 로드하지 못했습니다. 다시 시도하세요.",
       },
-},
+    },
     actions: {
       addWidget: "위젯 추가",
       resetLayout: "기본 레이아웃으로 재설정",

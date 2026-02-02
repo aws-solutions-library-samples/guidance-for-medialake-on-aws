@@ -1380,7 +1380,7 @@ export default {
         noTypesAvailable: "Aucun type de collection disponible. Créez d'abord un type.",
         loadError: "Échec du chargement du type de collection. Veuillez réessayer.",
       },
-},
+    },
     actions: {
       addWidget: "Ajouter un widget",
       resetLayout: "Réinitialiser la disposition par défaut",

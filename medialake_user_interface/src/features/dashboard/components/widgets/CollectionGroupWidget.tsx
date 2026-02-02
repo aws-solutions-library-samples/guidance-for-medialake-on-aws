@@ -25,10 +25,8 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
   onError,
 }) => {
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
-  
-  const widget = useDashboardStore(
-    (state) => state.layout.widgets.find((w) => w.id === widgetId)
-  );
+
+  const widget = useDashboardStore((state) => state.layout.widgets.find((w) => w.id === widgetId));
 
   const config = widget?.config as CollectionGroupWidgetConfig | undefined;
   const customName = widget?.customName;
@@ -46,9 +44,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
     isLoading: isLoadingCollections,
     error: collectionsError,
     refetch,
-  } = useGetCollections(
-    config?.groupId ? { groupIds: config.groupId } : undefined
-  );
+  } = useGetCollections(config?.groupId ? { groupIds: config.groupId } : undefined);
 
   const isLoading = isLoadingGroup || isLoadingCollections;
   const error = groupError || collectionsError;
@@ -89,9 +85,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
       >
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
           {error ? (
-            <Alert severity="error">
-              Failed to load collection group. Please try again.
-            </Alert>
+            <Alert severity="error">Failed to load collection group. Please try again.</Alert>
           ) : !config?.groupId ? (
             <EmptyState
               icon={<FolderSpecialIcon sx={{ fontSize: 60 }} />}
@@ -113,11 +107,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
           ) : (
             <Box sx={{ flex: 1, overflow: "hidden" }}>
               {group?.description && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2, px: 2 }}
-                >
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, px: 2 }}>
                   {group.description}
                 </Typography>
               )}
@@ -125,9 +115,7 @@ export const CollectionGroupWidget: React.FC<CollectionGroupWidgetProps> = ({
                 items={collections}
                 isLoading={isLoading}
                 getItemKey={(collection: any) => collection.id}
-                renderCard={(collection: any) => (
-                  <div>{collection.name}</div>
-                )}
+                renderCard={(collection: any) => <div>{collection.name}</div>}
               />
             </Box>
           )}

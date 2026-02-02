@@ -184,6 +184,7 @@ export const QUERY_KEYS = {
       [...QUERY_KEYS.COLLECTION_GROUPS.lists(), filters] as const,
     details: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.details(), id] as const,
-    collections: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.detail(id), "collections"] as const,
+    collections: (id: string) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.detail(id), "collections"] as const,
   },
 } as const;

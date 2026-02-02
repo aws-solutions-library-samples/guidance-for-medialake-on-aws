@@ -117,7 +117,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
   const filteredAvailableCollections = availableCollections.filter(
     (col) =>
       col.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !groupData?.data.collectionIds?.includes(col.id)
+      !(groupData?.data?.collectionIds || []).includes(col.id)
   );
 
   if (isLoading) {
@@ -135,7 +135,11 @@ export const CollectionGroupDetailPage: React.FC = () => {
       <Container maxWidth="lg">
         <Box py={4}>
           <Alert severity="error">Error loading collection group. Please try again.</Alert>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/collection-groups")} sx={{ mt: 2 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate("/collection-groups")}
+            sx={{ mt: 2 }}
+          >
             Back to Groups
           </Button>
         </Box>
@@ -145,7 +149,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
 
   const group = groupData.data;
   const groupCollections = availableCollections.filter((col) =>
-    group.collectionIds?.includes(col.id)
+    (group?.collectionIds || []).includes(col.id)
   );
 
   return (

@@ -115,7 +115,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                   boxShadow: 4,
                 },
               }}
-              onClick={() => window.location.href = `/collection-groups/${group.id}`}
+              onClick={() => (window.location.href = `/collection-groups/${group.id}`)}
             >
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>

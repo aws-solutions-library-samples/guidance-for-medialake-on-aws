@@ -34,9 +34,12 @@ interface CollectionGroupWidgetConfigPanelProps {
   config?: CollectionGroupWidgetConfig;
 }
 
-export const CollectionGroupWidgetConfigPanel: React.FC<
-  CollectionGroupWidgetConfigPanelProps
-> = ({ open, onClose, widgetId, config }) => {
+export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetConfigPanelProps> = ({
+  open,
+  onClose,
+  widgetId,
+  config,
+}) => {
   const updateWidgetConfig = useDashboardStore((state) => state.updateWidgetConfig);
   const updateWidgetCustomName = useDashboardStore((state) => state.updateWidgetCustomName);
 
@@ -59,7 +62,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<
     };
 
     updateWidgetConfig(widgetId, newConfig);
-    
+
     if (customName.trim()) {
       updateWidgetCustomName(widgetId, customName.trim());
     } else {
@@ -105,9 +108,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<
             ) : error ? (
               <Alert severity="error">Failed to load collection groups</Alert>
             ) : groups.length === 0 ? (
-              <Alert severity="info">
-                No collection groups available. Create a group first.
-              </Alert>
+              <Alert severity="info">No collection groups available. Create a group first.</Alert>
             ) : (
               <Select
                 value={groupId}
@@ -140,11 +141,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<
           {/* Sort By */}
           <FormControl fullWidth>
             <FormLabel>Sort By</FormLabel>
-            <RadioGroup
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              row
-            >
+            <RadioGroup value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} row>
               <FormControlLabel value="name" control={<Radio />} label="Name" />
               <FormControlLabel value="createdAt" control={<Radio />} label="Created" />
               <FormControlLabel value="updatedAt" control={<Radio />} label="Updated" />
@@ -167,11 +164,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<
       </DialogContent>
       <DialogActions>
         <Button onClick={handleCancel}>Cancel</Button>
-        <Button
-          onClick={handleSave}
-          variant="contained"
-          disabled={!groupId || isLoading}
-        >
+        <Button onClick={handleSave} variant="contained" disabled={!groupId || isLoading}>
           Save
         </Button>
       </DialogActions>

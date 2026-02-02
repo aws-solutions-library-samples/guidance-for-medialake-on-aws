@@ -37,7 +37,12 @@ export interface CollectionTypeWidgetConfig extends Record<string, unknown> {
   sorting: SortConfig;
 }
 
-export type WidgetType = "favorites" | "collections" | "recent-assets" | "collection-group" | "collection-type";
+export type WidgetType =
+  | "favorites"
+  | "collections"
+  | "recent-assets"
+  | "collection-group"
+  | "collection-type";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -94,7 +99,10 @@ export interface DashboardActions {
   updateLayoutItem: (itemId: string, updates: Partial<LayoutItem>) => void;
   addWidget: (type: WidgetType) => void;
   removeWidget: (widgetId: string) => void;
-  updateWidgetConfig: (widgetId: string, config: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig) => void;
+  updateWidgetConfig: (
+    widgetId: string,
+    config: CollectionsWidgetConfig | CollectionGroupWidgetConfig | CollectionTypeWidgetConfig
+  ) => void;
   updateWidgetCustomName: (widgetId: string, customName: string | undefined) => void;
   resetToDefault: () => void;
   setExpandedWidget: (widgetId: string | null) => void;

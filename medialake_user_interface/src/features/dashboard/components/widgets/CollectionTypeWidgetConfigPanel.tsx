@@ -36,9 +36,12 @@ interface CollectionTypeWidgetConfigPanelProps {
   config?: CollectionTypeWidgetConfig;
 }
 
-export const CollectionTypeWidgetConfigPanel: React.FC<
-  CollectionTypeWidgetConfigPanelProps
-> = ({ open, onClose, widgetId, config }) => {
+export const CollectionTypeWidgetConfigPanel: React.FC<CollectionTypeWidgetConfigPanelProps> = ({
+  open,
+  onClose,
+  widgetId,
+  config,
+}) => {
   const updateWidgetConfig = useDashboardStore((state) => state.updateWidgetConfig);
   const updateWidgetCustomName = useDashboardStore((state) => state.updateWidgetCustomName);
 
@@ -62,7 +65,7 @@ export const CollectionTypeWidgetConfigPanel: React.FC<
     };
 
     updateWidgetConfig(widgetId, newConfig);
-    
+
     if (customName.trim()) {
       updateWidgetCustomName(widgetId, customName.trim());
     } else {
@@ -108,9 +111,7 @@ export const CollectionTypeWidgetConfigPanel: React.FC<
             ) : error ? (
               <Alert severity="error">Failed to load collection types</Alert>
             ) : types.length === 0 ? (
-              <Alert severity="info">
-                No collection types available. Create a type first.
-              </Alert>
+              <Alert severity="info">No collection types available. Create a type first.</Alert>
             ) : (
               <Select
                 value={collectionTypeId}
@@ -145,9 +146,7 @@ export const CollectionTypeWidgetConfigPanel: React.FC<
                           </Typography>
                         )}
                       </Box>
-                      {type.isSystem && (
-                        <Chip label="System" size="small" variant="outlined" />
-                      )}
+                      {type.isSystem && <Chip label="System" size="small" variant="outlined" />}
                     </Box>
                   </MenuItem>
                 ))}
@@ -158,11 +157,7 @@ export const CollectionTypeWidgetConfigPanel: React.FC<
           {/* Sort By */}
           <FormControl fullWidth>
             <FormLabel>Sort By</FormLabel>
-            <RadioGroup
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              row
-            >
+            <RadioGroup value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} row>
               <FormControlLabel value="name" control={<Radio />} label="Name" />
               <FormControlLabel value="createdAt" control={<Radio />} label="Created" />
               <FormControlLabel value="updatedAt" control={<Radio />} label="Updated" />
@@ -185,11 +180,7 @@ export const CollectionTypeWidgetConfigPanel: React.FC<
       </DialogContent>
       <DialogActions>
         <Button onClick={handleCancel}>Cancel</Button>
-        <Button
-          onClick={handleSave}
-          variant="contained"
-          disabled={!collectionTypeId || isLoading}
-        >
+        <Button onClick={handleSave} variant="contained" disabled={!collectionTypeId || isLoading}>
           Save
         </Button>
       </DialogActions>

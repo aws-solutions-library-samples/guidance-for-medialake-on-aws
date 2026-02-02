@@ -19,10 +19,8 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
   onError,
 }) => {
   const [configPanelOpen, setConfigPanelOpen] = useState(false);
-  
-  const widget = useDashboardStore(
-    (state) => state.layout.widgets.find((w) => w.id === widgetId)
-  );
+
+  const widget = useDashboardStore((state) => state.layout.widgets.find((w) => w.id === widgetId));
 
   const config = widget?.config as CollectionTypeWidgetConfig | undefined;
   const customName = widget?.customName;
@@ -30,7 +28,7 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
   // Fetch collection types
   const { data: typesData } = useGetCollectionTypes();
   const collectionTypes = typesData?.data || [];
-  
+
   // Find the specific type
   const collectionType = collectionTypes.find((t: any) => t.id === config?.collectionTypeId);
 
@@ -67,7 +65,8 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
   const collections = collectionsData?.data || [];
 
   // Determine widget title
-  const widgetTitle = customName || (collectionType?.name ? `Type: ${collectionType.name}` : "Collection Type");
+  const widgetTitle =
+    customName || (collectionType?.name ? `Type: ${collectionType.name}` : "Collection Type");
 
   return (
     <>
@@ -82,9 +81,7 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
       >
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
           {error ? (
-            <Alert severity="error">
-              Failed to load collection type. Please try again.
-            </Alert>
+            <Alert severity="error">Failed to load collection type. Please try again.</Alert>
           ) : !config?.collectionTypeId ? (
             <EmptyState
               icon={<CategoryIcon sx={{ fontSize: 60 }} />}
@@ -106,7 +103,16 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
           ) : (
             <Box sx={{ flex: 1, overflow: "hidden" }}>
               {collectionType && (
-                <Box sx={{ mb: 2, px: 2, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                <Box
+                  sx={{
+                    mb: 2,
+                    px: 2,
+                    display: "flex",
+                    gap: 1,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
                   {collectionType.color && (
                     <Box
                       sx={{
@@ -133,9 +139,7 @@ export const CollectionTypeWidget: React.FC<CollectionTypeWidgetProps> = ({
                 items={collections}
                 isLoading={isLoading}
                 getItemKey={(collection: any) => collection.id}
-                renderCard={(collection: any) => (
-                  <div>{collection.name}</div>
-                )}
+                renderCard={(collection: any) => <div>{collection.name}</div>}
               />
             </Box>
           )}
