@@ -68,6 +68,8 @@ class S3VectorCluster(Construct):
 
         # Apply removal policy based on environment per FR-6
         # RETAIN for production to prevent data loss, DESTROY for dev/staging
+        # NOTE: Even with DESTROY policy, the bucket must be empty before deletion
+        # The provisioned_resource_cleanup Lambda handles emptying the bucket/indexes
         removal_policy = (
             RemovalPolicy.RETAIN
             if config.environment == "prod"

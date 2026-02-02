@@ -54,6 +54,10 @@ def get_log_retention_from_config() -> logs.RetentionDays:
     """
     Get the log retention setting from config and convert to RetentionDays enum.
 
+    Valid values: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653
+    If a non-valid value is provided, the next highest valid value is used.
+    Values higher than 3653 result in INFINITE retention.
+
     Returns:
         logs.RetentionDays: The retention period based on config
     """
@@ -61,12 +65,12 @@ def get_log_retention_from_config() -> logs.RetentionDays:
     try:
         if hasattr(env_config, "logging") and env_config.logging:
             retention_days = getattr(
-                env_config.logging, "lambda_cloudwatch_log_retention_days", 180
+                env_config.logging, "lambda_cloudwatch_log_retention_days", 90
             )
         else:
-            retention_days = 180  # Default fallback
+            retention_days = 90  # Default fallback
     except (AttributeError, TypeError):
-        retention_days = 180  # Default fallback
+        retention_days = 90  # Default fallback
 
     # Map days to RetentionDays enum values
     retention_mapping = {
@@ -324,18 +328,10 @@ class Lambda(Construct):
             logger.debug(f"Adding {len(config.layers)} additional layers")
             layer_objects.extend(config.layers)
 
-        # Create Log Group with retention from config
-        log_group_name = f"/aws/lambda/{lambda_function_name}-logs"
-        logger.debug(
-            f"Creating log group: {log_group_name} with retention: {LOG_RETENTION}"
-        )
-        lambda_log_group = logs.LogGroup(
-            self,
-            "LambdaLogGroup",
-            log_group_name=log_group_name,
-            retention=LOG_RETENTION,
-        )
-        lambda_log_group.apply_removal_policy(config.log_removal_policy)
+        # Log group is managed via log_retention property on the Lambda function.
+        # CDK handles creating/updating the log group with the specified retention.
+        log_group_name = f"/aws/lambda/{lambda_function_name}"
+        self._log_group_name = log_group_name
 
         # Create IAM role
         logger.debug("Setting up IAM role")
@@ -392,14 +388,16 @@ class Lambda(Construct):
             "handler": config.lambda_handler,
             "entry": config.entry or f"lambdas/{lambda_function_name}",
             "role": self._lambda_role,
-            "log_group": lambda_log_group,
             "runtime": config.runtime,
             "architecture": config.architecture,
             "timeout": Duration.minutes(config.timeout_minutes),
             "memory_size": config.memory_size,
             "tracing": lambda_.Tracing.ACTIVE,
             "layers": layer_objects,
+            "log_retention": LOG_RETENTION,  # Set log retention via built-in property
         }
+
+        logger.debug(f"Log retention set to {LOG_RETENTION} for {lambda_function_name}")
 
         # Add reserved concurrent executions if provided
         if config.reserved_concurrent_executions is not None:

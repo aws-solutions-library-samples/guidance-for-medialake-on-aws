@@ -39,8 +39,65 @@ def get_s3_vector_client():
         return None
 
 
+def empty_s3_vector_index(client, bucket_name: str, index_name: str):
+    """Delete all vectors from an index."""
+    try:
+        logger.info(f"Emptying vectors from index {index_name} in bucket {bucket_name}")
+
+        # List and delete vectors in batches
+        # Note: Adjust batch size and pagination based on S3 Vectors API limits
+        next_token = None
+        deleted_count = 0
+
+        while True:
+            try:
+                # List vectors in the index
+                list_params = {
+                    "vectorBucketName": bucket_name,
+                    "indexName": index_name,
+                }
+                if next_token:
+                    list_params["nextToken"] = next_token
+
+                response = client.list_vectors(**list_params)
+                vectors = response.get("vectors", [])
+
+                if not vectors:
+                    break
+
+                # Delete vectors in batch
+                vector_ids = [v.get("vectorId") for v in vectors if v.get("vectorId")]
+                if vector_ids:
+                    for vector_id in vector_ids:
+                        try:
+                            client.delete_vectors(
+                                vectorBucketName=bucket_name,
+                                indexName=index_name,
+                                vectorIds=[vector_id],
+                            )
+                            deleted_count += 1
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to delete vector {vector_id}: {str(e)}"
+                            )
+
+                # Check for more vectors
+                next_token = response.get("nextToken")
+                if not next_token:
+                    break
+
+            except Exception as e:
+                logger.error(f"Error listing vectors in index {index_name}: {str(e)}")
+                break
+
+        logger.info(f"Deleted {deleted_count} vectors from index {index_name}")
+
+    except Exception as e:
+        logger.error(f"Failed to empty S3 Vector index {index_name}: {str(e)}")
+
+
 def delete_s3_vector_indexes(client, bucket_name: str):
-    """Delete all vector indexes in a bucket."""
+    """Delete all vector indexes in a bucket after emptying them."""
     try:
         # List all indexes in the bucket
         response = client.list_indexes(vectorBucketName=bucket_name)
@@ -50,6 +107,10 @@ def delete_s3_vector_indexes(client, bucket_name: str):
             index_name = index.get("indexName")
             if index_name:
                 try:
+                    # First, empty the index
+                    empty_s3_vector_index(client, bucket_name, index_name)
+
+                    # Then delete the index
                     client.delete_index(
                         vectorBucketName=bucket_name, indexName=index_name
                     )
