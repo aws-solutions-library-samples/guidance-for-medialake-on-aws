@@ -640,6 +640,7 @@ cleanup_stack = CleanupStack(
         pipelines_event_bus=base_infrastructure.pipelines_event_bus,
         pipeline_table=base_infrastructure.pipeline_table,
         connector_table=medialake_stack.connector_table,
+        s3_vector_bucket_name=base_infrastructure.s3_vector_bucket_name,
     ),
     env=env,
 )

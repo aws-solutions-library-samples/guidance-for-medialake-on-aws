@@ -15,6 +15,7 @@ class CleanupStackProps:
     pipelines_event_bus: events.EventBus
     pipeline_table: dynamodb.TableV2
     connector_table: dynamodb.TableV2
+    s3_vector_bucket_name: str  # Add the actual bucket name
 
 
 class CleanupStack(Stack):
@@ -34,7 +35,9 @@ class CleanupStack(Stack):
                 environment_variables={
                     "CONNECTOR_TABLE": props.connector_table.table_name,
                     "PIPELINE_TABLE": props.pipeline_table.table_name,
-                    "VECTOR_BUCKET_NAME": f"medialake-vectors-{Stack.of(self).account}-{Stack.of(self).region}-{Stack.of(self).node.try_get_context('environment') or 'dev'}",
+                    "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
+                    "ENVIRONMENT": Stack.of(self).node.try_get_context("environment")
+                    or "dev",
                 },
             ),
         )
@@ -278,10 +281,12 @@ class CleanupStack(Stack):
                     "s3vectors:DeleteVectorBucket",
                     "s3vectors:GetIndex",
                     "s3vectors:DeleteIndex",
+                    "s3vectors:ListVectors",  # Added for emptying indexes
+                    "s3vectors:DeleteVectors",  # Added for emptying indexes
                 ],
                 resources=[
-                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*",
-                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/medialake-vectors-*/index/*",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}",
+                    f"arn:aws:s3vectors:{Stack.of(self).region}:{Stack.of(self).account}:bucket/{props.s3_vector_bucket_name}/*",
                 ],
             )
         )
