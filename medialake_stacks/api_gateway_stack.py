@@ -103,7 +103,7 @@ class ApiGatewayStack(cdk.NestedStack):
             "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
             "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
             "API_KEYS_TABLE_NAME": props.api_keys_table_name,
-            "DEBUG_MODE": "true",
+            "DEBUG_MODE": "False",
             "NAMESPACE": "MediaLake",
             "TOKEN_TYPE": "identityToken",
         }

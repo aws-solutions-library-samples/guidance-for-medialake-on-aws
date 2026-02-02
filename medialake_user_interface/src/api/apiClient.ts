@@ -102,6 +102,53 @@ class ApiClient extends ApiClientBase {
 
         const originalRequest = error.config;
 
+        // Handle 403 Forbidden errors from API Gateway (not S3)
+        // API Gateway returns JSON, S3 returns XML
+        // We need to check this before CloudFront converts the error
+        if (error.response?.status === 403) {
+          const contentType = error.response?.headers?.["content-type"] || "";
+          const isApiError =
+            contentType.includes("application/json") ||
+            error.response?.data?.authError ||
+            error.response?.data?.message;
+
+          // Only redirect if this is an API authorization error, not an S3 error
+          if (isApiError) {
+            console.log("🚫 403 Forbidden from API - Redirecting to access-denied page");
+
+            // Extract error details from response
+            const authError =
+              error.response?.data?.authError ||
+              error.response?.data?.message ||
+              "You don't have permission to perform this action";
+            const requiredPermission = error.response?.data?.requiredPermission;
+
+            console.log("Permission Error Details:", {
+              authError,
+              requiredPermission,
+              fullResponse: error.response?.data,
+            });
+
+            // Use dynamic import to avoid circular dependency issues
+            import("@/utils/navigation").then(({ navigateToAccessDenied }) => {
+              navigateToAccessDenied({
+                message: authError,
+                requiredPermission,
+                attemptedUrl: error.config?.url,
+                timestamp: new Date().toISOString(),
+              });
+            });
+
+            // Still reject the promise so calling code can handle it if needed
+            return Promise.reject(error);
+          } else {
+            console.log(
+              "🗂️ 403 Forbidden from S3 - Letting CloudFront handle it (will serve index.html)"
+            );
+            // Let S3 403 errors pass through - CloudFront will convert to index.html
+          }
+        }
+
         // Check if error is token expiration
         if (
           error.response?.status === 401 &&
