@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import boto3
 from bedrock_twelvelabs_search_provider import BedrockTwelveLabsSearchProvider
 from coactive_search_provider import CoactiveSearchProvider
+from search_provider_models import DEFAULT_PAGE_SIZE
 from twelvelabs_api_search_provider import TwelveLabsAPISearchProvider
 from unified_search_models import (
     SearchArchitectureType,
@@ -589,7 +590,9 @@ class UnifiedSearchOrchestrator:
 
             # Optional parameters with defaults
             search_params["page"] = int(query_params.get("page", 1))
-            search_params["pageSize"] = int(query_params.get("pageSize", 50))
+            search_params["pageSize"] = int(
+                query_params.get("pageSize", DEFAULT_PAGE_SIZE)
+            )
             search_params["min_score"] = float(query_params.get("min_score", 0.01))
             search_params["semantic"] = (
                 query_params.get("semantic", "false").lower() == "true"
@@ -618,6 +621,8 @@ class UnifiedSearchOrchestrator:
                 search_params["filename"] = query_params["filename"]
             if "storageIdentifier" in query_params:
                 search_params["storageIdentifier"] = query_params["storageIdentifier"]
+            if "sort" in query_params:
+                search_params["sort"] = query_params["sort"]
 
             # Create SearchParams object
             params = SearchParams(**search_params)
@@ -640,7 +645,9 @@ class UnifiedSearchOrchestrator:
                     "searchMetadata": {
                         "totalResults": 0,
                         "page": int(query_params.get("page", 1)),
-                        "pageSize": int(query_params.get("pageSize", 50)),
+                        "pageSize": int(
+                            query_params.get("pageSize", DEFAULT_PAGE_SIZE)
+                        ),
                         "searchTerm": query_params.get("q", ""),
                     },
                     "results": [],

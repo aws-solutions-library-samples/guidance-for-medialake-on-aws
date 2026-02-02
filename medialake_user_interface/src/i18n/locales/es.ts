@@ -134,12 +134,26 @@ export default {
       size: "Size",
     },
   },
+  facetFilter: {
+    title: "Filtros",
+    clearAll: "Borrar todo",
+    activeFilters: "{{count}} filtro activo",
+    activeFilters_other: "{{count}} filtros activos",
+    fileType: "Tipo de archivo",
+    format: "Formato",
+    noFiltersAvailable: "No hay filtros disponibles",
+  },
   assetExplorer: {
     noConnectorSelected: "Selecciona un conector para ver los activos",
     noAssetsFound: "No se encontraron activos para este conector",
     noIndexedAssets:
       'No se encontraron activos indexados para este conector con el bucket "{{bucketName}}".',
     loadingAssets: "Cargando activos...",
+    bucketNotFound: "Bucket no encontrado",
+    invalidBucketName: "Nombre de bucket inválido",
+    permissionDenied: "Permiso denegado",
+    pageOutOfRange:
+      "La página {{requestedPage}} está fuera de rango. Redirigiendo a la página {{totalPages}}.",
     menu: {
       rename: "Renombrar",
       share: "Compartir",

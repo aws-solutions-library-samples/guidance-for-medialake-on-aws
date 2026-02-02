@@ -28,6 +28,7 @@ import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import { SearchError } from "@/api/hooks/useSearch";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
 import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
@@ -79,8 +80,6 @@ interface Filters {
     lastYear: boolean;
   };
 }
-
-const DEFAULT_PAGE_SIZE = 50;
 
 const SearchPage: React.FC = () => {
   const { t } = useTranslation();

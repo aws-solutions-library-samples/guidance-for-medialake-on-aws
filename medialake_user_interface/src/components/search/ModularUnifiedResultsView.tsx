@@ -53,6 +53,10 @@ interface ModularUnifiedResultsViewProps {
   // Selection functionality
   selectedAssets?: string[];
   onSelectToggle?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
+  // Select all functionality
+  hasSelectedAssets?: boolean;
+  selectAllState?: "none" | "some" | "all";
+  onSelectAllToggle?: () => void;
   onGroupByTypeChange: (checked: boolean) => void;
   onPageSizeChange: (newPageSize: number) => void;
   error?: { status: string; message: string } | null;
@@ -95,6 +99,9 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   onFavoriteToggle,
   selectedAssets,
   onSelectToggle,
+  hasSelectedAssets,
+  selectAllState,
+  onSelectAllToggle,
   onGroupByTypeChange,
   onPageSizeChange,
   error,
@@ -173,6 +180,9 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onFavoriteToggle={onFavoriteToggle}
       isAssetSelected={isAssetSelected}
       onSelectToggle={onSelectToggle}
+      hasSelectedAssets={hasSelectedAssets}
+      selectAllState={selectAllState}
+      onSelectAllToggle={onSelectAllToggle}
       error={error}
       isLoading={isLoading}
       isRenaming={isRenaming}

@@ -1,0 +1,366 @@
+/**
+ * Property-Based Tests for Facet Filter Functionality
+ *
+ * **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6**
+ *
+ * These tests verify the correctness properties of facet filtering:
+ * - Property 15: Facet Filter Application
+ * - Property 16: Multiple Facet AND Logic
+ * - Property 17: Facet Filter Removal
+ */
+
+import { describe, it, expect } from "vitest";
+import fc from "fast-check";
+
+// Type definitions
+interface FacetFilter {
+  field: string;
+  values: string[];
+}
+
+interface SearchQuery {
+  baseQuery: string;
+  filters: Record<string, string[]>;
+}
+
+/**
+ * Construct search query with facet filters
+ * Implements the same logic as useConnectorAssets hook
+ */
+function constructQueryWithFilters(baseQuery: string, filters: Record<string, string[]>): string {
+  let query = baseQuery;
+
+  // Add facet filters (AND logic for multiple facets)
+  Object.entries(filters).forEach(([field, values]) => {
+    if (values.length > 0) {
+      // For multiple values in the same field, use OR logic
+      const filterQuery = values.map((value) => `${field}:${value}`).join(" OR ");
+      query += ` (${filterQuery})`;
+    }
+  });
+
+  return query;
+}
+
+/**
+ * Parse filters from query string
+ */
+function parseFiltersFromQuery(query: string): Record<string, string[]> {
+  const filters: Record<string, string[]> = {};
+
+  // Match patterns like (field:value1 OR field:value2)
+  const filterPattern = /\(([^)]+)\)/g;
+  const matches = query.matchAll(filterPattern);
+
+  for (const match of matches) {
+    const filterContent = match[1];
+    const orParts = filterContent.split(" OR ");
+
+    orParts.forEach((part) => {
+      const [field, value] = part.trim().split(":");
+      if (field && value) {
+        if (!filters[field]) {
+          filters[field] = [];
+        }
+        if (!filters[field].includes(value)) {
+          filters[field].push(value);
+        }
+      }
+    });
+  }
+
+  return filters;
+}
+
+describe("Facet Filter Properties", () => {
+  describe("Property 15: Facet Filter Application", () => {
+    it("should include all selected facet values in the query", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.dictionary(
+            fc.string({ minLength: 1, maxLength: 20 }), // field name
+            fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 5 }), // values
+            { minKeys: 1, maxKeys: 3 }
+          ), // filters
+          (baseQuery, filters) => {
+            const query = constructQueryWithFilters(baseQuery, filters);
+
+            // Verify base query is included
+            expect(query).toContain(baseQuery);
+
+            // Verify all filter fields and values are included
+            Object.entries(filters).forEach(([field, values]) => {
+              values.forEach((value) => {
+                expect(query).toContain(`${field}:${value}`);
+              });
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it("should use OR logic for multiple values in the same field", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.string({ minLength: 1, maxLength: 20 }), // field
+          fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 2, maxLength: 5 }), // values
+          (baseQuery, field, values) => {
+            const filters = { [field]: values };
+            const query = constructQueryWithFilters(baseQuery, filters);
+
+            // Count OR occurrences for this field
+            const fieldPattern = new RegExp(`${field}:[^\\s)]+`, "g");
+            const fieldMatches = query.match(fieldPattern);
+
+            // Should have one entry per value
+            expect(fieldMatches?.length).toBe(values.length);
+
+            // Should contain OR between values
+            const orCount = (query.match(/ OR /g) || []).length;
+            expect(orCount).toBeGreaterThanOrEqual(values.length - 1);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it("should wrap multiple values in parentheses", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.dictionary(
+            fc.string({ minLength: 1, maxLength: 20 }), // field name
+            fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 5 }), // values
+            { minKeys: 1, maxKeys: 3 }
+          ), // filters
+          (baseQuery, filters) => {
+            const query = constructQueryWithFilters(baseQuery, filters);
+
+            // Count opening and closing parentheses
+            const openCount = (query.match(/\(/g) || []).length;
+            const closeCount = (query.match(/\)/g) || []).length;
+
+            // Should be balanced
+            expect(openCount).toBe(closeCount);
+
+            // Should have at least one pair per filter field
+            expect(openCount).toBeGreaterThanOrEqual(Object.keys(filters).length);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  describe("Property 16: Multiple Facet AND Logic", () => {
+    it("should apply AND logic between different facet fields", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.array(
+            fc.record({
+              field: fc.string({ minLength: 1, maxLength: 20 }),
+              values: fc.array(fc.string({ minLength: 1, maxLength: 20 }), {
+                minLength: 1,
+                maxLength: 3,
+              }),
+            }),
+            { minLength: 2, maxLength: 4 }
+          ), // multiple facets
+          (baseQuery, facets) => {
+            // Create unique field names to avoid collisions
+            const uniqueFacets = facets.map((f, i) => ({
+              field: `${f.field}_${i}`,
+              values: f.values,
+            }));
+
+            const filters = Object.fromEntries(uniqueFacets.map((f) => [f.field, f.values]));
+
+            const query = constructQueryWithFilters(baseQuery, filters);
+
+            // All fields should be present (AND logic)
+            uniqueFacets.forEach((facet) => {
+              expect(query).toContain(facet.field);
+            });
+
+            // Each field should have its own parenthesized group
+            const groupCount = (query.match(/\([^)]+\)/g) || []).length;
+            expect(groupCount).toBe(uniqueFacets.length);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it("should preserve all filters when adding a new one", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.dictionary(
+            fc.string({ minLength: 1, maxLength: 20 }), // existing filters
+            fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }),
+            { minKeys: 1, maxKeys: 3 }
+          ),
+          fc.string({ minLength: 1, maxLength: 20 }), // new field
+          fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }), // new values
+          (baseQuery, existingFilters, newField, newValues) => {
+            // Ensure new field is unique
+            const uniqueNewField = `${newField}_new`;
+
+            // Query with existing filters
+            const query1 = constructQueryWithFilters(baseQuery, existingFilters);
+
+            // Query with existing + new filter
+            const updatedFilters = { ...existingFilters, [uniqueNewField]: newValues };
+            const query2 = constructQueryWithFilters(baseQuery, updatedFilters);
+
+            // All existing filter fields should still be present
+            Object.keys(existingFilters).forEach((field) => {
+              expect(query2).toContain(field);
+            });
+
+            // New field should be present
+            expect(query2).toContain(uniqueNewField);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  describe("Property 17: Facet Filter Removal", () => {
+    it("should remove filter field when all values are removed", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.string({ minLength: 1, maxLength: 20 }), // field to remove
+          fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }), // values
+          (baseQuery, field, values) => {
+            // Query with filter
+            const filtersWithField = { [field]: values };
+            const queryWithFilter = constructQueryWithFilters(baseQuery, filtersWithField);
+
+            // Query without filter (empty values array)
+            const filtersWithoutField = { [field]: [] };
+            const queryWithoutFilter = constructQueryWithFilters(baseQuery, filtersWithoutField);
+
+            // Field should be present in first query
+            expect(queryWithFilter).toContain(field);
+
+            // Field should not be present in second query
+            expect(queryWithoutFilter).not.toContain(field);
+
+            // Second query should just be the base query
+            expect(queryWithoutFilter.trim()).toBe(baseQuery.trim());
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it("should preserve other filters when removing one", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.dictionary(
+            fc.string({ minLength: 1, maxLength: 20 }), // filters to keep
+            fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }),
+            { minKeys: 1, maxKeys: 3 }
+          ),
+          fc.string({ minLength: 1, maxLength: 20 }), // field to remove
+          fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }), // values to remove
+          (baseQuery, filtersToKeep, fieldToRemove, valuesToRemove) => {
+            // Ensure field to remove is unique
+            const uniqueFieldToRemove = `${fieldToRemove}_remove`;
+
+            // Query with all filters
+            const allFilters = { ...filtersToKeep, [uniqueFieldToRemove]: valuesToRemove };
+            const queryWithAll = constructQueryWithFilters(baseQuery, allFilters);
+
+            // Query without the removed field
+            const queryWithoutRemoved = constructQueryWithFilters(baseQuery, filtersToKeep);
+
+            // Removed field should be in first query but not second
+            expect(queryWithAll).toContain(uniqueFieldToRemove);
+            expect(queryWithoutRemoved).not.toContain(uniqueFieldToRemove);
+
+            // All kept fields should be in both queries
+            Object.keys(filtersToKeep).forEach((field) => {
+              expect(queryWithAll).toContain(field);
+              expect(queryWithoutRemoved).toContain(field);
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it("should handle removing a single value from multi-value filter", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.string({ minLength: 1, maxLength: 20 }), // field
+          fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 2, maxLength: 5 }), // values
+          (baseQuery, field, values) => {
+            // Query with all values
+            const allFilters = { [field]: values };
+            const queryWithAll = constructQueryWithFilters(baseQuery, allFilters);
+
+            // Query with one value removed
+            const remainingValues = values.slice(1);
+            const reducedFilters = { [field]: remainingValues };
+            const queryWithReduced = constructQueryWithFilters(baseQuery, reducedFilters);
+
+            // Field should be in both queries
+            expect(queryWithAll).toContain(field);
+            expect(queryWithReduced).toContain(field);
+
+            // First value should be in first query but not second
+            expect(queryWithAll).toContain(`${field}:${values[0]}`);
+            expect(queryWithReduced).not.toContain(`${field}:${values[0]}`);
+
+            // Remaining values should be in both queries
+            remainingValues.forEach((value) => {
+              expect(queryWithAll).toContain(`${field}:${value}`);
+              expect(queryWithReduced).toContain(`${field}:${value}`);
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  describe("Facet Filter Round-Trip", () => {
+    it("should be able to parse filters from constructed query", () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 50 }), // baseQuery
+          fc.dictionary(
+            fc.constantFrom("type", "format", "size"), // known fields
+            fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }),
+            { minKeys: 1, maxKeys: 3 }
+          ), // filters
+          (baseQuery, filters) => {
+            const query = constructQueryWithFilters(baseQuery, filters);
+            const parsedFilters = parseFiltersFromQuery(query);
+
+            // All original filter fields should be parsed
+            Object.keys(filters).forEach((field) => {
+              expect(parsedFilters[field]).toBeDefined();
+
+              // All values should be present (order may differ)
+              filters[field].forEach((value) => {
+                expect(parsedFilters[field]).toContain(value);
+              });
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+});
