@@ -131,11 +131,25 @@ export default {
       size: "Size",
     },
   },
+  facetFilter: {
+    title: "필터",
+    clearAll: "모두 지우기",
+    activeFilters: "{{count}}개의 활성 필터",
+    activeFilters_other: "{{count}}개의 활성 필터",
+    fileType: "파일 유형",
+    format: "형식",
+    noFiltersAvailable: "사용 가능한 필터가 없습니다",
+  },
   assetExplorer: {
     noConnectorSelected: "자산을 보려면 커넥터를 선택하세요",
     noAssetsFound: "이 커넥터에 대한 자산을 찾을 수 없습니다",
     noIndexedAssets: '버킷 "{{bucketName}}"의 이 커넥터에 대한 인덱싱된 자산을 찾을 수 없습니다.',
     loadingAssets: "자산 로딩 중...",
+    bucketNotFound: "버킷을 찾을 수 없습니다",
+    invalidBucketName: "잘못된 버킷 이름",
+    permissionDenied: "권한이 거부되었습니다",
+    pageOutOfRange:
+      "페이지 {{requestedPage}}이(가) 범위를 벗어났습니다. 페이지 {{totalPages}}(으)로 리디렉션합니다.",
     menu: {
       rename: "이름 변경",
       share: "공유",

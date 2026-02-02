@@ -5,6 +5,7 @@ import { logger } from "@/common/helpers/logger";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 
 type AssetItem = ImageItem | VideoItem | AudioItem;
 
@@ -15,6 +16,7 @@ interface ConnectorAssetsParams {
   sortBy?: string;
   sortDirection?: "asc" | "desc";
   assetType?: string;
+  filters?: Record<string, string[]>; // Facet filters: { field: [values] }
 }
 
 interface ConnectorAssetsData {
@@ -44,21 +46,34 @@ export interface ConnectorAssetsError extends Error {
 export const useConnectorAssets = ({
   bucketName,
   page = 1,
-  pageSize = 50,
+  pageSize = DEFAULT_PAGE_SIZE,
   sortBy = "createdAt",
   sortDirection = "desc",
   assetType,
+  filters = {},
 }: ConnectorAssetsParams) => {
   // Construct the query string for bucket search
-  const query = bucketName
-    ? `storageIdentifier:${bucketName}${assetType ? ` type:${assetType}` : ""}`
-    : "";
+  let query = bucketName ? `storageIdentifier:${bucketName}` : "";
+
+  // Add asset type filter if specified
+  if (assetType) {
+    query += ` type:${assetType}`;
+  }
+
+  // Add facet filters (AND logic for multiple facets)
+  Object.entries(filters).forEach(([field, values]) => {
+    if (values.length > 0) {
+      // For multiple values in the same field, use OR logic
+      const filterQuery = values.map((value) => `${field}:${value}`).join(" OR ");
+      query += ` (${filterQuery})`;
+    }
+  });
 
   // Construct the sort parameter
   const sort = sortBy ? `${sortDirection === "desc" ? "-" : ""}${sortBy}` : undefined;
 
   // For debugging
-  console.log("useConnectorAssets called with:", { bucketName, query });
+  console.log("useConnectorAssets called with:", { bucketName, query, filters });
 
   return useQuery<ConnectorAssetsResponse, ConnectorAssetsError>({
     // Use the existing search list query key with our bucket filter

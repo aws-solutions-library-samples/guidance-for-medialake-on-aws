@@ -56,6 +56,7 @@ import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -83,7 +84,6 @@ interface Filters {
   };
 }
 
-const DEFAULT_PAGE_SIZE = 50;
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 60;
 

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+# Import pagination constants from common library
+from search_provider_models import DEFAULT_PAGE_SIZE
+
 
 class SearchType(Enum):
     """Type of search to perform"""
@@ -44,7 +47,9 @@ class SearchQuery:
 
     query_text: str
     search_type: SearchType = SearchType.KEYWORD
-    page_size: int = 50  # default=50, max=200; future: cursor-based
+    page_size: int = (
+        DEFAULT_PAGE_SIZE  # default from constant, max=200; future: cursor-based
+    )
     page_offset: int = 0
     filters: Optional[List[Dict]] = (
         None  # Unified filters (includes mediaType, facets, ranges)
@@ -201,7 +206,7 @@ def create_search_query_from_params(query_params: Dict[str, Any]) -> SearchQuery
     # Extract basic parameters
     query_text = query_params.get("q", "")
     page = int(query_params.get("page", 1))
-    page_size = int(query_params.get("pageSize", 50))
+    page_size = int(query_params.get("pageSize", DEFAULT_PAGE_SIZE))
     semantic = query_params.get("semantic", "false").lower() == "true"
     threshold = float(query_params.get("threshold", 0.7))
     include_clips = query_params.get("includeClips", "true").lower() == "true"

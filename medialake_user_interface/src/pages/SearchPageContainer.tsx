@@ -18,6 +18,7 @@ import {
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import SearchPagePresentation from "./SearchPagePresentation";
 import { type AssetItem, type LocationState } from "./types";
 
@@ -55,7 +56,7 @@ const SearchPageContainer: React.FC = () => {
   // Convert filters to legacy format for useSearch
   const legacyParams = {
     page: 1,
-    pageSize: 50,
+    pageSize: DEFAULT_PAGE_SIZE,
     isSemantic: semantic,
     fields: [], // Default empty fields
     type: filters.type,

@@ -134,12 +134,26 @@ export default {
       size: "Size",
     },
   },
+  facetFilter: {
+    title: "फ़िल्टर",
+    clearAll: "सभी साफ़ करें",
+    activeFilters: "{{count}} सक्रिय फ़िल्टर",
+    activeFilters_other: "{{count}} सक्रिय फ़िल्टर",
+    fileType: "फ़ाइल प्रकार",
+    format: "प्रारूप",
+    noFiltersAvailable: "कोई फ़िल्टर उपलब्ध नहीं",
+  },
   assetExplorer: {
     noConnectorSelected: "संपत्तियाँ देखने के लिए कनेक्टर चुनें",
     noAssetsFound: "इस कनेक्टर के लिए कोई संपत्ति नहीं मिली",
     noIndexedAssets:
       'बकेट "{{bucketName}}" के साथ इस कनेक्टर के लिए कोई इंडेक्स की गई संपत्ति नहीं मिली।',
     loadingAssets: "संपत्तियाँ लोड हो रही हैं...",
+    bucketNotFound: "बकेट नहीं मिला",
+    invalidBucketName: "अमान्य बकेट नाम",
+    permissionDenied: "अनुमति अस्वीकृत",
+    pageOutOfRange:
+      "पृष्ठ {{requestedPage}} सीमा से बाहर है। पृष्ठ {{totalPages}} पर पुनर्निर्देशित किया जा रहा है।",
     menu: {
       rename: "नाम बदलें",
       share: "साझा करें",
