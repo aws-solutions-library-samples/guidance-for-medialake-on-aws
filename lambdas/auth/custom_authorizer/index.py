@@ -976,8 +976,24 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         # Collections endpoints
         "get /collections": "collections:view",
         "post /collections": "collections:create",
-        "put /collections/{id}": "collections:edit",
-        "delete /collections/{id}": "collections:delete",
+        "get /collections/{collectionId}": "collections:view",
+        "put /collections/{collectionId}": "collections:edit",
+        "patch /collections/{collectionId}": "collections:edit",
+        "delete /collections/{collectionId}": "collections:delete",
+        "get /collections/{collectionId}/assets": "collections:view",
+        "get /collections/{collectionId}/items": "collections:view",
+        "post /collections/{collectionId}/items": "collections:edit",
+        "delete /collections/{collectionId}/items/{itemId}": "collections:edit",
+        "get /collections/{collectionId}/rules": "collections:view",
+        "post /collections/{collectionId}/rules": "collections:edit",
+        "put /collections/{collectionId}/rules/{ruleId}": "collections:edit",
+        "delete /collections/{collectionId}/rules/{ruleId}": "collections:edit",
+        "get /collections/{collectionId}/share": "collections:view",
+        "post /collections/{collectionId}/share": "collections:edit",
+        "delete /collections/{collectionId}/share/{userId}": "collections:edit",
+        "get /collections/{collectionId}/ancestors": "collections:view",
+        "get /collections/shared-with-me": "collections:view",
+        "get /collections/shared-by-me": "collections:view",
         # Connectors endpoints
         "get /connectors": "connectors:view",
         "post /connectors": "connectors:create",
@@ -993,13 +1009,13 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "post /environments": "environments:create",
         "put /environments/{id}": "environments:edit",
         "delete /environments/{id}": "environments:delete",
-        # Groups endpoints (handled by users API)
-        "get /groups": "users:view",
-        "post /groups": "users:create",
-        "put /groups/{id}": "users:edit",
-        "delete /groups/{id}": "users:delete",
-        "post /groups/add_group_members": "users:edit",
-        "post /groups/remove_group_member": "users:edit",
+        # Groups endpoints
+        "get /groups": "groups:view",
+        "post /groups": "groups:create",
+        "put /groups/{id}": "groups:edit",
+        "delete /groups/{id}": "groups:delete",
+        "post /groups/add_group_members": "groups:edit",
+        "post /groups/remove_group_member": "groups:edit",
         # Integrations endpoints
         "get /integrations": "integrations:view",
         "post /integrations": "integrations:create",
@@ -1061,6 +1077,13 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
         "put /settings/api-keys/{id}": "api-keys:edit",
         "delete /settings/api-keys/{id}": "api-keys:delete",
+        # Collection types endpoints
+        "get /settings/collection-types": "collection-types:view",
+        "post /settings/collection-types": "collection-types:create",
+        "put /settings/collection-types/{type_id}": "collection-types:edit",
+        "delete /settings/collection-types/{type_id}": "collection-types:delete",
+        "post /settings/collection-types/{type_id}/migrate": "collection-types:edit",
+        # System settings endpoints
         "get /settings/system": "system:view",
         "get /settings/system/search": "system:view",
         "post /settings/system/search": "system:edit",
@@ -1261,7 +1284,23 @@ def validate_jwt_permissions(
             )
 
         # Check if user has the required permission
+        # Also check for settings.* prefixed version for backward compatibility
+        # e.g., "connectors:view" should also match "settings.connectors:view"
         has_permission = required_permission in custom_permissions
+
+        # If not found, check for settings.* prefixed version
+        if not has_permission:
+            # Parse the required permission to get resource and action
+            if ":" in required_permission:
+                resource, action = required_permission.split(":", 1)
+                # Check if settings.{resource}:{action} exists in permissions
+                settings_permission = f"settings.{resource}:{action}"
+                has_permission = settings_permission in custom_permissions
+                if has_permission:
+                    logger.info(
+                        f"Permission granted via settings prefix: {settings_permission}",
+                        extra={"correlation_id": correlation_id},
+                    )
 
         if has_permission:
             logger.info(

@@ -34,6 +34,9 @@ PREFIX_PERMISSION_SET = "PS#"
 PREFIX_GROUP = "GROUP#"
 PREFIX_METADATA = "METADATA"
 
+# Permission set schema version - increment this to force update of system permission sets
+PERMISSION_SCHEMA_VERSION = "2.3.0"
+
 # Default groups definitions
 DEFAULT_GROUPS = [
     {
@@ -67,6 +70,7 @@ DEFAULT_PERMISSION_SETS = [
         "description": "Full access to all system features and resources",
         "isSystem": True,
         "permissions": {
+            # Asset permissions
             "assets": {
                 "upload": True,
                 "download": True,
@@ -74,16 +78,88 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True,
             },
+            # Search permissions
             "search": {"view": True},
+            # Pipeline permissions
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
+            # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            # System permissions (top-level for app initialization)
             "system": {
-                "view": True,  # Top-level system permissions for app initialization
+                "view": True,
                 "edit": True,
             },
+            # Top-level resource permissions (required by custom authorizer)
+            # These are flattened to "resource:action" format (e.g., "connectors:view")
+            "connectors": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "users": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "groups": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "integrations": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "permissions": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "regions": {
+                "view": True,
+                "edit": True,
+            },
+            "nodes": {
+                "view": True,
+            },
+            "environments": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "reviews": {
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "storage": {
+                "view": True,
+            },
+            "api-keys": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+            },
+            "collection-types": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+                "manage": True,
+            },
+            # Nested settings permissions (for frontend UI compatibility)
             "settings": {
                 "users": {"edit": True, "view": True, "delete": True, "create": True},
+                "groups": {"edit": True, "view": True, "delete": True, "create": True},
                 "system": {"edit": True, "view": True},
                 "integrations": {
                     "edit": True,
@@ -127,6 +203,7 @@ DEFAULT_PERMISSION_SETS = [
         "isSystem": True,
         "effectiveRole": "Editor",
         "permissions": {
+            # Asset permissions
             "assets": {
                 "upload": True,
                 "download": True,
@@ -134,13 +211,31 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True,
             },
+            # Search permissions
             "search": {"view": True},
+            # Pipeline permissions
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
+            # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            # Collection types (view only - needed to work with collections)
+            "collection-types": {"view": True},
+            # Users (view only - needed for user lookups in collections sharing, etc.)
+            "users": {"view": True},
+            # System permissions (read-only for app initialization)
             "system": {
-                "view": True,  # Allow editors to read system settings (needed for app initialization)
+                "view": True,
                 "edit": False,
+            },
+            # Top-level resource permissions (required by custom authorizer)
+            "nodes": {
+                "view": True,
+            },
+            "regions": {
+                "view": True,
+            },
+            "storage": {
+                "view": True,
             },
         },
     },
@@ -151,6 +246,7 @@ DEFAULT_PERMISSION_SETS = [
         "isSystem": True,
         "effectiveRole": "Viewer",
         "permissions": {
+            # Asset permissions (read-only + download)
             "assets": {
                 "upload": False,
                 "download": True,
@@ -158,23 +254,41 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
                 "delete": False,
             },
+            # Search permissions
+            "search": {"view": True},
+            # Pipeline permissions (view only)
             "pipelines": {
                 "create": False,
                 "view": True,
                 "edit": False,
                 "delete": False,
             },
-            "search": {"view": True},
             "pipelinesExecutions": {"view": True, "retry": False, "cancel": False},
+            # Collection permissions (view only)
             "collections": {
                 "create": False,
                 "view": True,
                 "edit": False,
                 "delete": False,
             },
+            # Collection types (view only - needed to view collections)
+            "collection-types": {"view": True},
+            # Users (view only - needed for user lookups)
+            "users": {"view": True},
+            # System permissions (read-only for app initialization)
             "system": {
-                "view": True,  # Allow viewers to read system settings (needed for app initialization)
+                "view": True,
                 "edit": False,
+            },
+            # Top-level resource permissions (required by custom authorizer)
+            "nodes": {
+                "view": True,
+            },
+            "regions": {
+                "view": True,
+            },
+            "storage": {
+                "view": True,
             },
         },
     },
