@@ -198,13 +198,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
           }
         }
         // Handle standard resource:action format
-        else if (
-          action === "view" ||
-          action === "edit" ||
-          action === "delete" ||
-          action === "create" ||
-          action === "full"
-        ) {
+        else {
           // Map plural resource names to singular for CASL
           const resourceMapping: { [key: string]: string } = {
             assets: "asset",
@@ -216,6 +210,16 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             connectors: "connector",
             permissions: "permission-set",
             systems: "settings",
+            "api-keys": "api-key",
+            "collection-types": "collection-types",
+            regions: "region",
+            nodes: "nodes",
+            environments: "environments",
+            reviews: "reviews",
+            storage: "storage",
+            search: "search",
+            system: "system-settings",
+            pipelinesExecutions: "pipeline",
           };
 
           const caslResource = resourceMapping[resource] || resource;
@@ -223,6 +227,23 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
 
           console.log(`Granting ${caslAction} permission on ${caslResource}`);
           can(caslAction as Actions, caslResource as Subjects);
+
+          // For view permissions on settings-related resources, also enable settings menu
+          if (
+            action === "view" &&
+            [
+              "connector",
+              "user",
+              "group",
+              "integration",
+              "permission-set",
+              "api-key",
+              "collection-types",
+              "region",
+            ].includes(caslResource)
+          ) {
+            can("view", "settings");
+          }
 
           // For view permissions, always add the ability to view the parent resource
           if (action === "view" && resource === "pipelines") {

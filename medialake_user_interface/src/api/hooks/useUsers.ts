@@ -33,9 +33,10 @@ interface UserProfileResponse {
   };
 }
 
-export const useGetUsers = () => {
+export const useGetUsers = (enabled = true) => {
   return useQuery<User[], Error>({
     queryKey: QUERY_KEYS.USERS.all,
+    enabled: enabled,
     queryFn: async () => {
       const { data } = await apiClient.get<UsersResponse>(API_ENDPOINTS.USERS);
       return data.data.users.map((user) => ({

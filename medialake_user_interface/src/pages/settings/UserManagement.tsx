@@ -23,6 +23,7 @@ import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
 import { User, CreateUserRequest, UpdateUserRequest } from "@/api/types/api.types";
+import { useAuth } from "@/common/hooks/auth-context";
 
 const UserManagement: React.FC = () => {
   const { t } = useTranslation();
@@ -36,11 +37,15 @@ const UserManagement: React.FC = () => {
   // Feature flags
   const advancedPermissionsEnabled = useFeatureFlag("advanced-permissions-enabled", false);
 
+  // Auth context - wait for auth to be initialized before making API calls
+  const { isAuthenticated, isInitialized } = useAuth();
+  const isReady = isAuthenticated && isInitialized;
+
   const { apiStatus, handleMutation, closeApiStatus } = useApiMutationHandler();
 
-  const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers();
-  const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
-  useGetPermissionSets(true);
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers(isReady);
+  const { data: groups, isLoading: isLoadingGroups } = useGetGroups(isReady);
+  useGetPermissionSets(isReady);
 
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();

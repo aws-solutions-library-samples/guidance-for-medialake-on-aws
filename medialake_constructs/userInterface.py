@@ -528,10 +528,17 @@ class UIConstruct(Construct):
             "default_root_object": props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
             "error_responses": [
-                # NOTE: Only handle 404 errors for SPA routing
-                # 403 errors from API pass through and are handled by axios interceptor
+                # Handle 404 errors for SPA routing
                 cloudfront.ErrorResponse(
                     http_status=404,
+                    response_http_status=200,
+                    response_page_path="/index.html",
+                    ttl=Duration.minutes(0),
+                ),
+                # Handle 403 errors for SPA routing (S3 returns 403 for non-existent paths)
+                # This enables deep linking - direct navigation to routes like /settings/connectors
+                cloudfront.ErrorResponse(
+                    http_status=403,
                     response_http_status=200,
                     response_page_path="/index.html",
                     ttl=Duration.minutes(0),
