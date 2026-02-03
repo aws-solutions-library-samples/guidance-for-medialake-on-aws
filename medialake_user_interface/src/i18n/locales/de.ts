@@ -1457,6 +1457,10 @@ export default {
       maxPresetsExceeded: "Maximal 5 Vorlagen erlaubt",
       noActivePreset:
         "Keine aktive Vorlage zum Speichern. Bitte wählen Sie ein Dashboard aus oder erstellen Sie ein neues.",
+      defaultSaveFailed:
+        "Standard-Dashboard konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+      noAdminPermission: "Sie haben keine Berechtigung, das Standard-Dashboard zu speichern",
+      invalidLayout: "Ungültiges Dashboard-Layout: ",
     },
     messages: {
       resetSuccess: "Layout auf Standard zurückgesetzt",
@@ -1465,6 +1469,7 @@ export default {
       presetDeleted: "Vorlage gelöscht",
       presetApplied: "Vorlage angewendet",
       layoutSaved: "Layout erfolgreich gespeichert",
+      defaultSaved: "Standard-Dashboard erfolgreich gespeichert",
     },
     selector: {
       defaultDashboard: "Dashboard",
@@ -1476,6 +1481,8 @@ export default {
       selectPresetFirst: "Wählen Sie zuerst ein Dashboard aus",
       manageDashboards: "Dashboards verwalten",
       dashboardsSaved: "Dashboards gespeichert",
+      saveAsDefault: "Als Standard-Dashboard speichern",
+      saveAsDefaultDescription: "Für alle Benutzer festlegen",
     },
     saveDialog: {
       title: "Dashboard-Layout speichern",

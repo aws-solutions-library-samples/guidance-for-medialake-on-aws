@@ -1441,6 +1441,9 @@ export default {
       presetApplyFailed: "החלת התבנית נכשלה",
       maxPresetsExceeded: "מותר מקסימום 5 תבניות",
       noActivePreset: "אין תבנית פעילה לשמירה. אנא בחר לוח בקרה או צור אחד חדש.",
+      defaultSaveFailed: "שמירת לוח הבקרה ברירת המחדל נכשלה. אנא נסה שוב.",
+      noAdminPermission: "אין לך הרשאה לשמור את לוח הבקרה ברירת המחדל",
+      invalidLayout: "פריסת לוח בקרה לא חוקית: ",
     },
     messages: {
       resetSuccess: "הפריסה אופסה לברירת מחדל",
@@ -1449,6 +1452,7 @@ export default {
       presetDeleted: "התבנית נמחקה",
       presetApplied: "התבנית הוחלה",
       layoutSaved: "הפריסה נשמרה בהצלחה",
+      defaultSaved: "לוח הבקרה ברירת המחדל נשמר בהצלחה",
     },
     selector: {
       defaultDashboard: "לוח בקרה",
@@ -1460,6 +1464,8 @@ export default {
       selectPresetFirst: "בחר לוח בקרה תחילה",
       manageDashboards: "נהל לוחות בקרה",
       dashboardsSaved: "לוחות בקרה שמורים",
+      saveAsDefault: "שמור כלוח בקרה ברירת מחדל",
+      saveAsDefaultDescription: "הגדר לכל המשתמשים",
     },
     saveDialog: {
       title: "שמור פריסת לוח בקרה",

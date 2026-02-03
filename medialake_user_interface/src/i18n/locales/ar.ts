@@ -1441,6 +1441,9 @@ export default {
       presetApplyFailed: "فشل في تطبيق القالب",
       maxPresetsExceeded: "الحد الأقصى 5 قوالب مسموح بها",
       noActivePreset: "لا يوجد قالب نشط للحفظ. يرجى تحديد لوحة تحكم أو إنشاء واحدة جديدة.",
+      defaultSaveFailed: "فشل في حفظ لوحة التحكم الافتراضية. يرجى المحاولة مرة أخرى.",
+      noAdminPermission: "ليس لديك صلاحية لحفظ لوحة التحكم الافتراضية",
+      invalidLayout: "تخطيط لوحة تحكم غير صالح: ",
     },
     messages: {
       resetSuccess: "تم إعادة تعيين التخطيط إلى الافتراضي",
@@ -1449,6 +1452,7 @@ export default {
       presetDeleted: "تم حذف القالب",
       presetApplied: "تم تطبيق القالب",
       layoutSaved: "تم حفظ التخطيط بنجاح",
+      defaultSaved: "تم حفظ لوحة التحكم الافتراضية بنجاح",
     },
     selector: {
       defaultDashboard: "لوحة التحكم",
@@ -1460,6 +1464,8 @@ export default {
       selectPresetFirst: "حدد لوحة تحكم أولاً",
       manageDashboards: "إدارة لوحات التحكم",
       dashboardsSaved: "لوحات تحكم محفوظة",
+      saveAsDefault: "حفظ كلوحة تحكم افتراضية",
+      saveAsDefaultDescription: "تعيين لجميع المستخدمين",
     },
     saveDialog: {
       title: "حفظ تخطيط لوحة التحكم",

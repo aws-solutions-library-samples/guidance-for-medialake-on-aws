@@ -1445,6 +1445,9 @@ export default {
       presetApplyFailed: "Failed to apply preset",
       maxPresetsExceeded: "Maximum of 5 presets allowed",
       noActivePreset: "No active preset to save. Please select a dashboard or create a new one.",
+      defaultSaveFailed: "Failed to save default dashboard. Please try again.",
+      noAdminPermission: "You don't have permission to save the default dashboard",
+      invalidLayout: "Invalid dashboard layout: ",
     },
     messages: {
       resetSuccess: "Layout reset to default",
@@ -1453,6 +1456,7 @@ export default {
       presetDeleted: "Preset deleted",
       presetApplied: "Preset applied",
       layoutSaved: "Layout saved successfully",
+      defaultSaved: "Default dashboard saved successfully",
     },
     selector: {
       defaultDashboard: "Dashboard",
@@ -1464,6 +1468,8 @@ export default {
       selectPresetFirst: "Select a dashboard first",
       manageDashboards: "Manage Dashboards",
       dashboardsSaved: "dashboards saved",
+      saveAsDefault: "Save as Default Dashboard",
+      saveAsDefaultDescription: "Set for all users",
     },
     saveDialog: {
       title: "Save Dashboard Layout",

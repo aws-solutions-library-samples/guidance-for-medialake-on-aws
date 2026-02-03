@@ -395,3 +395,100 @@ export const useApplyDashboardPreset = () => {
     },
   });
 };
+
+/**
+ * Hook to fetch the system default dashboard layout
+ *
+ * This returns the administrator-configured default dashboard that all users
+ * receive when they first access the dashboard or reset to default.
+ *
+ * Validates: Requirement 8.1
+ */
+export const useGetDefaultDashboard = () => {
+  return useQuery<DashboardLayout, Error>({
+    queryKey: QUERY_KEYS.DASHBOARD.defaultLayout(),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ApiResponse<DashboardLayout>>(
+        API_ENDPOINTS.DASHBOARD.LAYOUT_DEFAULT
+      );
+      return data.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes
+    refetchOnWindowFocus: false,
+  });
+};
+
+/**
+ * Hook to save the current dashboard layout as the system default
+ *
+ * This is only available to users with the dashboard:admin permission.
+ * The saved layout becomes the default for all users who don't have
+ * a personal layout saved.
+ *
+ * Validates: Requirements 3.1, 5.3
+ */
+export const useSaveDashboardAsDefault = () => {
+  const queryClient = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
+  const { t } = useTranslation();
+
+  return useMutation<SaveLayoutResponse, Error, SaveLayoutRequest>({
+    mutationFn: async (layoutData) => {
+      const { data } = await apiClient.post<ApiResponse<SaveLayoutResponse>>(
+        API_ENDPOINTS.DASHBOARD.LAYOUT_DEFAULT,
+        layoutData
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      // Invalidate both default layout and regular layout queries
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.defaultLayout() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.layout() });
+      enqueueSnackbar(
+        t("dashboard.messages.defaultSaved", "Default dashboard saved successfully"),
+        {
+          variant: "success",
+          autoHideDuration: 3000,
+        }
+      );
+    },
+    onError: (error: any) => {
+      const errorCode = error?.response?.data?.error?.code;
+      const errorMessage = error?.response?.data?.error?.message;
+
+      if (error?.response?.status === 403 || errorCode === "FORBIDDEN") {
+        enqueueSnackbar(
+          t(
+            "dashboard.errors.noAdminPermission",
+            "You don't have permission to save the default dashboard"
+          ),
+          {
+            variant: "error",
+            autoHideDuration: 5000,
+          }
+        );
+      } else if (errorCode === "VALIDATION_ERROR") {
+        enqueueSnackbar(
+          t("dashboard.errors.invalidLayout", "Invalid dashboard layout: ") + errorMessage,
+          {
+            variant: "error",
+            autoHideDuration: 5000,
+          }
+        );
+      } else {
+        enqueueSnackbar(
+          t(
+            "dashboard.errors.defaultSaveFailed",
+            "Failed to save default dashboard. Please try again."
+          ),
+          {
+            variant: "error",
+            autoHideDuration: 5000,
+          }
+        );
+      }
+      console.error("Save default dashboard error:", error);
+    },
+  });
+};

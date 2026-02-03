@@ -4,6 +4,7 @@ export const API_ENDPOINTS = {
   DASHBOARD: {
     LAYOUT: "/dashboard/layout",
     LAYOUT_RESET: "/dashboard/layout/reset",
+    LAYOUT_DEFAULT: "/dashboard/layout/default",
     PRESETS: "/dashboard/presets",
     PRESET: (presetId: string) => `/dashboard/presets/${presetId}`,
     PRESET_APPLY: (presetId: string) => `/dashboard/presets/${presetId}/apply`,

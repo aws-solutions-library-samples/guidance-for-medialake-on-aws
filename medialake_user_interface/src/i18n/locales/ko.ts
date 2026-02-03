@@ -1441,6 +1441,9 @@ export default {
       presetApplyFailed: "프리셋 적용 실패",
       maxPresetsExceeded: "최대 5개의 프리셋만 허용됩니다",
       noActivePreset: "저장할 활성 프리셋이 없습니다. 대시보드를 선택하거나 새로 만드세요.",
+      defaultSaveFailed: "기본 대시보드 저장에 실패했습니다. 다시 시도해 주세요.",
+      noAdminPermission: "기본 대시보드를 저장할 권한이 없습니다",
+      invalidLayout: "잘못된 대시보드 레이아웃: ",
     },
     messages: {
       resetSuccess: "레이아웃이 기본값으로 재설정되었습니다",
@@ -1449,6 +1452,7 @@ export default {
       presetDeleted: "프리셋이 삭제되었습니다",
       presetApplied: "프리셋이 적용되었습니다",
       layoutSaved: "레이아웃이 저장되었습니다",
+      defaultSaved: "기본 대시보드가 저장되었습니다",
     },
     selector: {
       defaultDashboard: "대시보드",
@@ -1460,6 +1464,8 @@ export default {
       selectPresetFirst: "먼저 대시보드를 선택하세요",
       manageDashboards: "대시보드 관리",
       dashboardsSaved: "대시보드 저장됨",
+      saveAsDefault: "기본 대시보드로 저장",
+      saveAsDefaultDescription: "모든 사용자에게 설정",
     },
     saveDialog: {
       title: "대시보드 레이아웃 저장",

@@ -101,6 +101,8 @@ function mapAction(action: string): any {
     ManageGroups: "manage",
     ManagePermissions: "manage",
     ManageSettings: "manage",
+    AdminDashboard: "admin",
+    admin: "admin",
     // Add more mappings as needed
   };
 
@@ -151,6 +153,8 @@ function mapResource(resource: string): any {
     PermissionSet: "permission-set",
     ApplicationConfiguration: "all",
     ApiKey: "api-key", // pragma: allowlist secret
+    Dashboard: "dashboard",
+    dashboard: "dashboard",
     // Add more mappings as needed
   };
 
@@ -165,6 +169,7 @@ function mapResource(resource: string): any {
     if (resource.includes("/permission-sets")) return "permission-set";
     if (resource.includes("/permissions")) return "permission-set";
     if (resource.includes("/api-keys")) return "api-key";
+    if (resource.includes("/dashboard")) return "dashboard";
   }
 
   return resourceMap[resource] || resource;

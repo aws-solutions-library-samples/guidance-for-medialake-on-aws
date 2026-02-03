@@ -20,6 +20,7 @@ import {
   AddCircleOutline as AddIcon,
   Settings as SettingsIcon,
   Check as CheckIcon,
+  AdminPanelSettings as AdminIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useSnackbar } from "notistack";
@@ -27,11 +28,13 @@ import {
   useGetDashboardPresets,
   useApplyDashboardPreset,
   useUpdateDashboardPreset,
+  useSaveDashboardAsDefault,
   type PresetSummary,
 } from "@/api/hooks/useDashboard";
 import { useDashboardStore, convertApiLayoutToFrontend } from "../store/dashboardStore";
 import { SavePresetDialog } from "./SavePresetDialog";
 import { PresetManagementDialog } from "./PresetManagementDialog";
+import { usePermission } from "@/permissions/hooks/usePermission";
 
 const MAX_PRESETS = 5;
 
@@ -60,13 +63,19 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   // API hooks
   const { data: presets = [], isLoading: isLoadingPresets } = useGetDashboardPresets();
 
+  // Permission check for dashboard admin
+  const { can } = usePermission();
+  const canAdminDashboard = can("admin", "dashboard");
+
   // Debug logging
   console.log("[DashboardSelector] Presets from query:", presets);
   console.log("[DashboardSelector] Is loading:", isLoadingPresets);
   console.log("[DashboardSelector] Active preset ID:", activePresetId);
   console.log("[DashboardSelector] Active preset name:", activePresetName);
+  console.log("[DashboardSelector] Can admin dashboard:", canAdminDashboard);
   const applyPresetMutation = useApplyDashboardPreset();
   const updatePresetMutation = useUpdateDashboardPreset();
+  const saveAsDefaultMutation = useSaveDashboardAsDefault();
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -144,9 +153,28 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
     setManageDialogOpen(true);
   };
 
+  /**
+   * Handle saving the current layout as the system default dashboard.
+   * Only available to users with dashboard:admin permission.
+   *
+   * Validates: Requirements 5.3, 5.4, 5.5
+   */
+  const handleSaveAsDefault = async () => {
+    handleClose();
+    try {
+      await saveAsDefaultMutation.mutateAsync({
+        widgets: layout.widgets,
+        layouts: layout.layouts,
+      });
+    } catch (error) {
+      console.error("Failed to save default dashboard:", error);
+    }
+  };
+
   const displayName = activePresetName || t("dashboard.selector.defaultDashboard", "Dashboard");
   const isApplying = applyPresetMutation.isPending;
   const isSaving = updatePresetMutation.isPending;
+  const isSavingDefault = saveAsDefaultMutation.isPending;
 
   return (
     <Box className={className}>
@@ -310,6 +338,28 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
             primaryTypographyProps={{ variant: "body2" }}
           />
         </MenuItem>
+
+        {/* Save as Default Dashboard - only visible to users with dashboard:admin permission */}
+        {canAdminDashboard && (
+          <>
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem onClick={handleSaveAsDefault} disabled={isSavingDefault}>
+              <ListItemIcon sx={{ minWidth: 28 }}>
+                {isSavingDefault ? (
+                  <CircularProgress size={14} />
+                ) : (
+                  <AdminIcon sx={{ fontSize: 16 }} color="primary" />
+                )}
+              </ListItemIcon>
+              <ListItemText
+                primary={t("dashboard.selector.saveAsDefault", "Save as Default Dashboard")}
+                secondary={t("dashboard.selector.saveAsDefaultDescription", "Set for all users")}
+                primaryTypographyProps={{ variant: "body2" }}
+                secondaryTypographyProps={{ variant: "caption", color: "primary" }}
+              />
+            </MenuItem>
+          </>
+        )}
 
         {/* Preset count indicator */}
         <Box sx={{ px: 1.5, py: 0.75, display: "flex", justifyContent: "center" }}>

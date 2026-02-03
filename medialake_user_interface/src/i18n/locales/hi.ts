@@ -1451,6 +1451,9 @@ export default {
       maxPresetsExceeded: "अधिकतम 5 प्रीसेट की अनुमति है",
       noActivePreset:
         "सहेजने के लिए कोई सक्रिय प्रीसेट नहीं है। कृपया एक डैशबोर्ड चुनें या नया बनाएं।",
+      defaultSaveFailed: "डिफ़ॉल्ट डैशबोर्ड सहेजने में विफल। कृपया पुनः प्रयास करें।",
+      noAdminPermission: "आपके पास डिफ़ॉल्ट डैशबोर्ड सहेजने की अनुमति नहीं है",
+      invalidLayout: "अमान्य डैशबोर्ड लेआउट: ",
     },
     messages: {
       resetSuccess: "लेआउट डिफ़ॉल्ट पर रीसेट हो गया",
@@ -1459,6 +1462,7 @@ export default {
       presetDeleted: "प्रीसेट हटा दिया गया",
       presetApplied: "प्रीसेट लागू हो गया",
       layoutSaved: "लेआउट सफलतापूर्वक सहेजा गया",
+      defaultSaved: "डिफ़ॉल्ट डैशबोर्ड सफलतापूर्वक सहेजा गया",
     },
     selector: {
       defaultDashboard: "डैशबोर्ड",
@@ -1470,6 +1474,8 @@ export default {
       selectPresetFirst: "पहले एक डैशबोर्ड चुनें",
       manageDashboards: "डैशबोर्ड प्रबंधित करें",
       dashboardsSaved: "डैशबोर्ड सहेजे गए",
+      saveAsDefault: "डिफ़ॉल्ट डैशबोर्ड के रूप में सहेजें",
+      saveAsDefaultDescription: "सभी उपयोगकर्ताओं के लिए सेट करें",
     },
     saveDialog: {
       title: "डैशबोर्ड लेआउट सहेजें",

@@ -1453,6 +1453,9 @@ export default {
       maxPresetsExceeded: "Máximo de 5 plantillas permitidas",
       noActivePreset:
         "No hay plantilla activa para guardar. Por favor, seleccione un panel o cree uno nuevo.",
+      defaultSaveFailed: "Error al guardar el panel predeterminado. Por favor, inténtelo de nuevo.",
+      noAdminPermission: "No tiene permiso para guardar el panel predeterminado",
+      invalidLayout: "Diseño de panel no válido: ",
     },
     messages: {
       resetSuccess: "Diseño restablecido a predeterminado",
@@ -1461,6 +1464,7 @@ export default {
       presetDeleted: "Plantilla eliminada",
       presetApplied: "Plantilla aplicada",
       layoutSaved: "Diseño guardado exitosamente",
+      defaultSaved: "Panel predeterminado guardado exitosamente",
     },
     selector: {
       defaultDashboard: "Panel",
@@ -1472,6 +1476,8 @@ export default {
       selectPresetFirst: "Seleccione un panel primero",
       manageDashboards: "Administrar paneles",
       dashboardsSaved: "paneles guardados",
+      saveAsDefault: "Guardar como panel predeterminado",
+      saveAsDefaultDescription: "Establecer para todos los usuarios",
     },
     saveDialog: {
       title: "Guardar diseño del panel",

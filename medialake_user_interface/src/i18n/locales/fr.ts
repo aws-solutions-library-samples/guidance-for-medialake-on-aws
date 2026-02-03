@@ -1456,6 +1456,11 @@ export default {
       maxPresetsExceeded: "Maximum de 5 modèles autorisés",
       noActivePreset:
         "Aucun modèle actif à enregistrer. Veuillez sélectionner un tableau de bord ou en créer un nouveau.",
+      defaultSaveFailed:
+        "Échec de l'enregistrement du tableau de bord par défaut. Veuillez réessayer.",
+      noAdminPermission:
+        "Vous n'avez pas la permission d'enregistrer le tableau de bord par défaut",
+      invalidLayout: "Disposition de tableau de bord invalide : ",
     },
     messages: {
       resetSuccess: "Disposition réinitialisée par défaut",
@@ -1464,6 +1469,7 @@ export default {
       presetDeleted: "Modèle supprimé",
       presetApplied: "Modèle appliqué",
       layoutSaved: "Disposition enregistrée avec succès",
+      defaultSaved: "Tableau de bord par défaut enregistré avec succès",
     },
     selector: {
       defaultDashboard: "Tableau de bord",
@@ -1475,6 +1481,8 @@ export default {
       selectPresetFirst: "Sélectionnez d'abord un tableau de bord",
       manageDashboards: "Gérer les tableaux de bord",
       dashboardsSaved: "tableaux de bord enregistrés",
+      saveAsDefault: "Enregistrer comme tableau de bord par défaut",
+      saveAsDefaultDescription: "Définir pour tous les utilisateurs",
     },
     saveDialog: {
       title: "Enregistrer la disposition du tableau de bord",

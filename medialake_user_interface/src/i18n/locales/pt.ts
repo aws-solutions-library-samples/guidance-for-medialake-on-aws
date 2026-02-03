@@ -1453,6 +1453,9 @@ export default {
       maxPresetsExceeded: "Máximo de 5 modelos permitidos",
       noActivePreset:
         "Nenhum modelo ativo para salvar. Por favor, selecione um painel ou crie um novo.",
+      defaultSaveFailed: "Falha ao salvar o painel padrão. Por favor, tente novamente.",
+      noAdminPermission: "Você não tem permissão para salvar o painel padrão",
+      invalidLayout: "Layout de painel inválido: ",
     },
     messages: {
       resetSuccess: "Layout redefinido para o padrão",
@@ -1461,6 +1464,7 @@ export default {
       presetDeleted: "Modelo excluído",
       presetApplied: "Modelo aplicado",
       layoutSaved: "Layout salvo com sucesso",
+      defaultSaved: "Painel padrão salvo com sucesso",
     },
     selector: {
       defaultDashboard: "Painel",
@@ -1472,6 +1476,8 @@ export default {
       selectPresetFirst: "Selecione um painel primeiro",
       manageDashboards: "Gerenciar painéis",
       dashboardsSaved: "painéis salvos",
+      saveAsDefault: "Salvar como painel padrão",
+      saveAsDefaultDescription: "Definir para todos os usuários",
     },
     saveDialog: {
       title: "Salvar layout do painel",

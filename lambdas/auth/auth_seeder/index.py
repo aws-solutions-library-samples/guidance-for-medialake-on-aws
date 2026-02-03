@@ -78,6 +78,7 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "dashboard": {"admin": True},
             "settings": {
                 "users": {"edit": True, "view": True, "delete": True, "create": True},
                 "system": {"edit": True, "view": True},
