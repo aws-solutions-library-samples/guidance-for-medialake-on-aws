@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.0] - 2026-02-03
+
+### Features
+
+- feat: Add External Metadata Enrichment with MovieLabs Normalization
+
+### Bug Fixes
+
+- fix: assets page connector view sorting, searching response, and pagination
+- fix: user page not rendering and user page state management
+- fix: add fallback to Docker bundling when CI asset path doesn't exist
+- fix: align Lambda log group naming with AWS defaults
+
+### Code Refactoring
+
+- refactor: permission mapping updates for administrator, editor, and viewer
+- refactor: add JWT permission checking in the custom authorizer with a 403 permission denied wrapper in the UI
+- refactor: Deployment modifications on how cloudwatch log groups for Lambda's are deployed and managed with CDK
+- refactor: X icon to clear search input when there's text in the search input
+
 ## [1.6.4] - 2026-01-27
 
 ### Bug Fixes
