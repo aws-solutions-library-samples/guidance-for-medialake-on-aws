@@ -126,10 +126,17 @@ class MediaLakeExternalServiceManager:
 
         try:
             # Convert single DynamoDB item to SearchProviderConfig
+            # Recognize all Bedrock TwelveLabs variants as internal providers
+            is_bedrock_twelvelabs = provider_type in [
+                "bedrock twelvelabs",
+                "twelvelabs-bedrock",
+                "twelvelabs-bedrock-3-0",
+            ]
+
             provider_data = {
                 "provider": provider_type,
                 "provider_location": (
-                    "internal" if provider_type == "bedrock twelvelabs" else "external"
+                    "internal" if is_bedrock_twelvelabs else "external"
                 ),
                 "architecture": (
                     "external_semantic_service"
@@ -191,6 +198,15 @@ class MediaLakeExternalServiceManager:
             for provider_config in search_providers:
                 service_name = provider_config.provider
 
+                # Normalize Bedrock TwelveLabs variants to "twelvelabs" for plugin lookup
+                plugin_name = service_name
+                if service_name in [
+                    "bedrock twelvelabs",
+                    "twelvelabs-bedrock",
+                    "twelvelabs-bedrock-3-0",
+                ]:
+                    plugin_name = "twelvelabs"
+
                 try:
                     # Create plugin instance
                     plugin_config = {
@@ -201,7 +217,7 @@ class MediaLakeExternalServiceManager:
                     }
 
                     plugin = self.plugin_manager.create_plugin(
-                        service_name, plugin_config
+                        plugin_name, plugin_config
                     )
 
                     # Check if plugin is available and supports this asset type

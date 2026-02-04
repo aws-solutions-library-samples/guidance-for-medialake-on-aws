@@ -1,9 +1,52 @@
 {
-  "name": "TwelveLabs Bedrock Audio Embedding to OpenSearch",
-  "description": "",
+  "name": "TwelveLabs Bedrock Marengo 3.0 Video Embedding to OpenSearch",
+  "description": "Pipeline for generating video embeddings using TwelveLabs Marengo 3.0 (512D) on Bedrock and storing them in OpenSearch",
   "active": true,
   "configuration": {
     "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 320,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Video Type": "",
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          },
+          "id": "trigger_video_processing_completed"
+        },
+        "width": 200,
+        "height": 113
+      },
       {
         "id": "dndnode_5",
         "type": "custom",
@@ -38,7 +81,8 @@
             "parameters": {
               "Duration": "15"
             }
-          }
+          },
+          "id": "wait"
         },
         "width": 200,
         "height": 113
@@ -79,11 +123,12 @@
             "operationId": "",
             "method": "map",
             "parameters": {
-              "ConcurrencyLimit": 100,
+              "ConcurrencyLimit": 5,
               "MapType": "Distributed",
-              "ItemsPath": "$.payload.externalTaskStatus"
+              "ItemsPath": "$.payload.data"
             }
-          }
+          },
+          "id": "map"
         },
         "width": 200,
         "height": 113
@@ -113,7 +158,8 @@
           "configuration": {
             "method": "success",
             "parameters": {}
-          }
+          },
+          "id": "success"
         },
         "width": 200,
         "height": 113
@@ -146,9 +192,10 @@
             "method": "store",
             "parameters": {
               "Index Name": "media",
-              "Content Type": "audio"
+              "Content Type": "video"
             }
-          }
+          },
+          "id": "embedding_store"
         },
         "width": 200,
         "height": 113
@@ -191,7 +238,8 @@
           "configuration": {
             "method": "choice",
             "parameters": {}
-          }
+          },
+          "id": "choice"
         },
         "width": 200,
         "height": 113
@@ -226,7 +274,8 @@
               "Error": "Failed",
               "Cause": "Flow step failed"
             }
-          }
+          },
+          "id": "fail"
         },
         "width": 200,
         "height": 113
@@ -261,7 +310,8 @@
           "configuration": {
             "method": "check_status",
             "parameters": {}
-          }
+          },
+          "id": "twelvelabs_bedrock_status"
         },
         "width": 200,
         "height": 113
@@ -296,63 +346,23 @@
           "configuration": {
             "method": "get_results",
             "parameters": {}
-          }
-        },
-        "width": 200,
-        "height": 113
-      },
-      {
-        "id": "dndnode_22",
-        "type": "custom",
-        "position": {
-          "x": 320,
-          "y": 208
-        },
-        "data": {
-          "nodeId": "trigger_audio_processing_completed",
-          "label": "Audio Processing Completed (trigger)",
-          "description": "This step will trigger after audio processing is completed",
-          "icon": {
-            "key": null,
-            "ref": null,
-            "props": {
-              "size": 20
-            },
-            "_owner": null
           },
-          "inputTypes": ["any"],
-          "outputTypes": [
-            {
-              "name": "audio",
-              "description": "Output type: audio"
-            }
-          ],
-          "type": "TRIGGER",
-          "configuration": {
-            "path": "",
-            "operationId": "",
-            "method": "trigger",
-            "parameters": {
-              "Prefix": ""
-            },
-            "requestMapping": null,
-            "responseMapping": null
-          }
+          "id": "twelvelabs_bedrock_results"
         },
         "width": 200,
         "height": 113
       },
       {
-        "id": "dndnode_23",
+        "id": "dndnode_17",
         "type": "custom",
         "position": {
-          "x": 592,
+          "x": 608,
           "y": 208
         },
         "data": {
           "nodeId": "twelvelabs_bedrock_invoke",
           "label": "TwelveLabs Bedrock Invoke (invoke)",
-          "description": "Start async embedding generation using TwelveLabs Marengo 2.7 on Bedrock",
+          "description": "Start async embedding generation using TwelveLabs Marengo 3.0 on Bedrock",
           "icon": {
             "key": null,
             "ref": null,
@@ -370,18 +380,21 @@
           ],
           "type": "INTEGRATION",
           "configuration": {
-            "path": "",
-            "operationId": "",
             "method": "invoke",
             "parameters": {
-              "Model ID": "twelvelabs.marengo-embed-2-7-v1:0",
+              "Model ID": "twelvelabs.marengo-embed-3-0-v1:0",
               "Region": "us-east-1",
               "S3 Output Bucket": "${EXTERNAL_PAYLOAD_BUCKET}"
-            }
-          }
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "twelvelabs_bedrock_invoke"
         },
         "width": 200,
-        "height": 113
+        "height": 113,
+        "selected": false,
+        "dragging": false
       }
     ],
     "edges": [
@@ -480,22 +493,22 @@
         "targetHandle": "input-invocation_arn"
       },
       {
-        "id": "dndnode_22-dndnode_23",
-        "source": "dndnode_22",
-        "target": "dndnode_23",
+        "source": "dndnode_0",
+        "sourceHandle": "video",
+        "target": "dndnode_17",
+        "targetHandle": "input-video",
+        "id": "dndnode_0-dndnode_17",
         "type": "custom",
         "data": {
           "text": "Connected"
-        },
-        "sourceHandle": "audio",
-        "targetHandle": "input-audio"
+        }
       },
       {
-        "source": "dndnode_23",
+        "source": "dndnode_17",
         "sourceHandle": "invocation_arn",
         "target": "dndnode_15",
         "targetHandle": "input-invocation_arn",
-        "id": "dndnode_23-dndnode_15",
+        "id": "dndnode_17-dndnode_15",
         "type": "custom",
         "data": {
           "text": "Connected"

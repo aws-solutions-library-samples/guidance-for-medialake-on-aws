@@ -251,26 +251,33 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
     const formDefinition = useMemo<FormDefinition>(() => {
       const fields: FormFieldDefinition[] = [];
 
-      // Add integration field if needed.
+      // Add integration field only for nodes that require external API integrations.
+      // Nodes with auth.authMethod require an API key/external integration.
+      // Bedrock and other AWS service nodes use IAM roles and don't need this field.
       if (isIntegrationNode) {
-        fields.push({
-          name: "integrationId",
-          type: "select",
-          label: "Select Integration",
-          tooltip: "Select an integration for this node",
-          required: true,
-          options: integrationOptions,
-          validation: {
-            type: "string",
-            rules: [
-              {
-                type: "regex",
-                value: ".+",
-                message: t("common.validation.integrationMustBeSelected"),
-              },
-            ],
-          },
-        });
+        const nodeAuth = (node as any).auth;
+        const requiresExternalIntegration = nodeAuth && nodeAuth.authMethod;
+
+        if (requiresExternalIntegration) {
+          fields.push({
+            name: "integrationId",
+            type: "select",
+            label: "Select Integration",
+            tooltip: "Select an integration for this node",
+            required: true,
+            options: integrationOptions,
+            validation: {
+              type: "string",
+              rules: [
+                {
+                  type: "regex",
+                  value: ".+",
+                  message: t("common.validation.integrationMustBeSelected"),
+                },
+              ],
+            },
+          });
+        }
       }
 
       // For TRIGGER, FLOW, and UTILITY nodes, use effectiveParameters.

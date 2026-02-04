@@ -20,9 +20,15 @@ from opensearchpy import (
 class OpenSearchEmbeddingStore(BaseEmbeddingStore):
     """OpenSearch implementation of embedding store"""
 
-    def __init__(self, logger, metrics):
+    def __init__(self, logger, metrics, target_index: str = None):
         super().__init__(logger, metrics)
         self._client = None
+        # Support configurable index (Phase 3: config-based index selection)
+        # Falls back to OPENSEARCH_INDEX for backward compatibility
+        self._target_index = target_index or os.environ.get("OPENSEARCH_INDEX", "media")
+        self.logger.info(
+            f"[INDEX ROUTING] OpenSearchEmbeddingStore target index: '{self._target_index}'"
+        )
 
     def _get_client(self) -> OpenSearch:
         """Create and return a cached OpenSearch client with optimized settings."""
@@ -224,9 +230,12 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
         """Execute the search query against OpenSearch"""
         try:
             client = self._get_client()
-            index_name = os.environ["OPENSEARCH_INDEX"]
+            # Use target index from config (Phase 3: config-based index selection)
+            index_name = self._target_index
 
-            self.logger.info("Executing OpenSearch semantic query")
+            self.logger.info(
+                f"[INDEX ROUTING] Executing OpenSearch semantic query on index: '{index_name}'"
+            )
             opensearch_start = time.time()
             response = client.search(body=query, index=index_name)
             opensearch_time = time.time() - opensearch_start

@@ -181,6 +181,29 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             if not embeddings_data or len(embeddings_data) == 0:
                 raise RuntimeError("No embedding data found in response")
 
+            # Log raw Bedrock response structure for debugging
+            logger.info(
+                "Raw Bedrock response structure",
+                extra={
+                    "response_data_keys": list(response_data.keys()),
+                    "embeddings_count": len(embeddings_data),
+                    "first_embedding_keys": (
+                        list(embeddings_data[0].keys())
+                        if embeddings_data and isinstance(embeddings_data[0], dict)
+                        else []
+                    ),
+                    "first_embedding_sample": (
+                        {
+                            k: v
+                            for k, v in embeddings_data[0].items()
+                            if k != "embedding"
+                        }
+                        if embeddings_data and isinstance(embeddings_data[0], dict)
+                        else {}
+                    ),
+                },
+            )
+
             # Extract asset information from the input event to preserve for embedding store
             assets = payload.get("assets", [])
 
@@ -286,11 +309,51 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
             elif input_type in ["video", "audio"]:
                 # For video/audio, there can be multiple embeddings with time segments
+                # Determine embedding_scope by comparing to actual asset duration from metadata
+
+                # Extract asset duration from metadata
+                asset_duration = None
+                if assets and len(assets) > 0:
+                    asset = assets[0]
+                    # Try to get duration from embedded metadata
+                    try:
+                        general_metadata = (
+                            asset.get("Metadata", {})
+                            .get("EmbeddedMetadata", {})
+                            .get("general", {})
+                        )
+                        duration_str = general_metadata.get("Duration")
+                        if duration_str:
+                            asset_duration = float(duration_str)
+                            logger.info(
+                                "Extracted asset duration from metadata",
+                                extra={"asset_duration": asset_duration},
+                            )
+                    except (ValueError, TypeError, KeyError) as e:
+                        logger.warning(
+                            f"Could not extract asset duration from metadata: {e}"
+                        )
+
+                # If we couldn't get duration from metadata, find the longest embedding
+                if asset_duration is None:
+                    max_end_sec = max(
+                        (emb.get("endSec", 0.0) for emb in embeddings_data), default=0
+                    )
+                    asset_duration = max_end_sec
+                    logger.info(
+                        "Using maximum end_sec as asset duration",
+                        extra={"asset_duration": asset_duration},
+                    )
+
+                # Process each embedding
                 for i, embedding_obj in enumerate(embeddings_data):
                     embedding_vector = embedding_obj.get("embedding", [])
                     start_sec = embedding_obj.get("startSec", 0.0)
                     end_sec = embedding_obj.get("endSec", 0.0)
                     embedding_option = embedding_obj.get("embeddingOption")
+
+                    # Use Bedrock's embeddingScope directly - it knows whether this is asset or clip level
+                    embedding_scope = embedding_obj.get("embeddingScope", "clip")
 
                     # Ensure embedding is float32 format (convert to list of floats)
                     embedding_float32 = [float(x) for x in embedding_vector]
@@ -301,7 +364,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         "start_offset_sec": start_sec,  # embedding store expects "start_offset_sec"
                         "end_offset_sec": end_sec,  # embedding store expects "end_offset_sec"
                         "segment_index": i,
-                        "embedding_scope": "clip",
+                        "embedding_scope": embedding_scope,
                         "input_type": input_type,
                     }
 
@@ -314,6 +377,16 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         processed_embedding["asset_id"] = asset_id
                     if inventory_id:
                         processed_embedding["inventory_id"] = inventory_id
+
+                    logger.info(
+                        f"Processed embedding {i}",
+                        extra={
+                            "start_sec": start_sec,
+                            "end_sec": end_sec,
+                            "embedding_scope": embedding_scope,
+                            "embedding_option": embedding_option,
+                        },
+                    )
 
                     processed_embeddings.append(processed_embedding)
 
