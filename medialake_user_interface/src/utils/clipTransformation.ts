@@ -29,6 +29,9 @@ interface ClipData {
   end?: number;
   score?: number;
   embedding_option?: string;
+  model_version?: string; // e.g., "3.0" for Marengo 3.0, "2.7" for Marengo 2.7
+  model_provider?: string;
+  model_name?: string;
 }
 
 type ClipAssetItem = AssetItem & {
@@ -312,6 +315,25 @@ export function getOriginalAssetId(asset: any): string {
 export function clearTransformationCache(): void {
   transformationCache.clear();
   console.log("🧹 Transformation cache cleared");
+}
+
+/**
+ * Detects the model version from the results by looking at the first clip's model_version
+ * Returns undefined if no model version is found (defaults to 2.7 behavior)
+ */
+export function detectModelVersionFromResults(results: any[]): string | undefined {
+  for (const asset of results) {
+    // Check if it's a clip asset with clipData
+    if (isClipAsset(asset) && asset.clipData?.model_version) {
+      return asset.clipData.model_version;
+    }
+    // Check if asset has clips array
+    const clips = asset.clips as ClipData[] | undefined;
+    if (clips && clips.length > 0 && clips[0].model_version) {
+      return clips[0].model_version;
+    }
+  }
+  return undefined;
 }
 
 export type { ClipAssetItem };

@@ -8,6 +8,12 @@ import AssetPagination from "./AssetPagination";
 import AssetGridView from "./AssetGridView";
 import AssetTableView from "./AssetTableView";
 import ErrorDisplay from "./ErrorDisplay";
+import {
+  CONFIDENCE_COLORS,
+  MODEL_THRESHOLDS,
+  getConfidenceLabel,
+  getThresholdsForModel,
+} from "@/components/common/utils";
 
 export interface AssetField {
   id: string;
@@ -32,6 +38,7 @@ export interface AssetResultsViewProps<T> {
   isSemantic?: boolean;
   confidenceThreshold?: number;
   onConfidenceThresholdChange?: (threshold: number) => void;
+  detectedModelVersion?: string; // Model version detected from search results for threshold calculation
 
   // Search fields
   selectedFields?: string[];
@@ -112,6 +119,7 @@ function AssetResultsView<T>({
   isSemantic = false,
   confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
+  detectedModelVersion,
 
   // Search fields
   selectedFields,
@@ -325,68 +333,153 @@ function AssetResultsView<T>({
           </Typography>
 
           {/* Confidence Slider - Only show for semantic search */}
-          {isSemantic && (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                minWidth: 280,
-                flexShrink: 0,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: "0.875rem",
-                  color: "text.secondary",
-                  whiteSpace: "nowrap",
-                  pr: 0.5,
-                }}
-              >
-                Confidence:
-              </Typography>
-              <Slider
-                value={sliderValue}
-                onChange={(_, value) => {
-                  setSliderValue(value as number);
-                  setIsSliderActive(true);
-                }}
-                onChangeCommitted={(_, value) => {
-                  setIsSliderActive(false);
-                  onConfidenceThresholdChange?.(value as number);
-                }}
-                min={0}
-                max={1}
-                step={0.01}
-                size="small"
-                sx={{
-                  width: 140,
-                  "& .MuiSlider-thumb": {
-                    width: 16,
-                    height: 16,
-                  },
-                  "& .MuiSlider-track": {
-                    height: 3,
-                  },
-                  "& .MuiSlider-rail": {
-                    height: 3,
-                  },
-                }}
-              />
-              <Typography
-                variant="body2"
-                sx={{
-                  minWidth: 40,
-                  fontSize: "0.875rem",
-                  color: "text.secondary",
-                  textAlign: "right",
-                }}
-              >
-                {sliderValue.toFixed(2)}
-              </Typography>
-            </Box>
-          )}
+          {isSemantic &&
+            (() => {
+              // Use detected model version for thresholds, defaults to 2.7 if not available
+              const thresholds = getThresholdsForModel(detectedModelVersion);
+              const confidenceMarks = [
+                {
+                  value: 0,
+                  label: (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: CONFIDENCE_COLORS.LOW,
+                        }}
+                      />
+                      <span>Low</span>
+                    </Box>
+                  ),
+                },
+                {
+                  value: thresholds.MEDIUM,
+                  label: (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: CONFIDENCE_COLORS.MEDIUM,
+                        }}
+                      />
+                      <span>Med</span>
+                    </Box>
+                  ),
+                },
+                {
+                  value: thresholds.HIGH,
+                  label: (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: CONFIDENCE_COLORS.HIGH,
+                        }}
+                      />
+                      <span>High</span>
+                    </Box>
+                  ),
+                },
+              ];
+
+              return (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    minWidth: 320,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: "0.875rem",
+                      color: "text.secondary",
+                      whiteSpace: "nowrap",
+                      pr: 0.5,
+                      mt: -3.0,
+                    }}
+                  >
+                    Confidence:
+                  </Typography>
+                  <Slider
+                    value={sliderValue}
+                    onChange={(_, value) => {
+                      setSliderValue(value as number);
+                      setIsSliderActive(true);
+                    }}
+                    onChangeCommitted={(_, value) => {
+                      setIsSliderActive(false);
+                      onConfidenceThresholdChange?.(value as number);
+                    }}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    marks={confidenceMarks}
+                    size="small"
+                    sx={{
+                      width: 200,
+                      mb: 3,
+                      "& .MuiSlider-thumb": {
+                        width: 16,
+                        height: 16,
+                      },
+                      "& .MuiSlider-track": {
+                        height: 3,
+                      },
+                      "& .MuiSlider-rail": {
+                        height: 3,
+                      },
+                      "& .MuiSlider-mark": {
+                        display: "none",
+                      },
+                      "& .MuiSlider-markLabel": {
+                        fontSize: "0.7rem",
+                        color: "text.secondary",
+                        top: 28,
+                      },
+                      // Position Low at 0% (left edge)
+                      "& .MuiSlider-markLabel[data-index='0']": {
+                        left: "0% !important",
+                        transform: "translateX(0)",
+                      },
+                      // Position Med at 50%
+                      "& .MuiSlider-markLabel[data-index='1']": {
+                        left: "50% !important",
+                        transform: "translateX(-50%)",
+                      },
+                      // Position High at 90%
+                      "& .MuiSlider-markLabel[data-index='2']": {
+                        left: "90% !important",
+                        transform: "translateX(-50%)",
+                      },
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      minWidth: 90,
+                      fontSize: "0.875rem",
+                      color: "text.secondary",
+                      textAlign: "center",
+                      fontWeight: 500,
+                      mt: -3.0,
+                    }}
+                  >
+                    {sliderValue.toFixed(2)} (
+                    {getConfidenceLabel(sliderValue, detectedModelVersion)})
+                  </Typography>
+                </Box>
+              );
+            })()}
         </Box>
       </Box>
       <AssetViewControls

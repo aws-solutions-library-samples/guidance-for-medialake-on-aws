@@ -240,6 +240,10 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
     """
     Retrieve clips for a specific asset from OpenSearch.
 
+    Supports both:
+    - Marengo 3.0: Queries 'asset-embeddings' index for embedding documents with inventory_id
+    - Legacy Marengo 2.7: Queries 'media' index for master document with embedding_scope: "clip"
+
     Args:
         asset_id: The ID of the asset to retrieve clips for
 
@@ -248,10 +252,86 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
     """
     try:
         client = get_opensearch_client()
-        index_name = os.environ["OPENSEARCH_INDEX"]
+        media_index = os.environ["OPENSEARCH_INDEX"]
+        # Get asset-embeddings index, defaulting to "asset-embeddings" if not set
+        asset_embeddings_index = os.environ.get(
+            "ASSET_EMBEDDINGS_INDEX", "asset-embeddings"
+        )
 
-        # Query for clips associated with this asset
-        query = {
+        # Try Marengo 3.0 query first from 'asset-embeddings' index
+        query_30 = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"inventory_id": asset_id}},
+                        {"term": {"embedding_granularity": "segment"}},
+                    ]
+                }
+            },
+            "size": 100,
+            "_source": {
+                "excludes": [
+                    "embedding_256_cosine",
+                    "embedding_384_cosine",
+                    "embedding_512_cosine",
+                    "embedding_1024_cosine",
+                    "embedding_1536_cosine",
+                    "embedding_3072_cosine",
+                ]
+            },
+            "sort": [{"start_seconds": {"order": "asc"}}],
+            "track_scores": True,
+        }
+
+        # First try asset-embeddings index for Marengo 3.0 data
+        clips = []
+        try:
+            logger.info(
+                f"[INDEX ROUTING] Querying '{asset_embeddings_index}' for Marengo 3.0 clips for asset {asset_id}"
+            )
+            response = client.search(body=query_30, index=asset_embeddings_index)
+
+            if response["hits"]["total"]["value"] > 0:
+                for hit in response["hits"]["hits"]:
+                    source = hit["_source"]
+                    clip = {
+                        "score": hit.get("_score", 0.0),
+                        "start_timecode": source.get("start_smpte_timecode")
+                        or source.get("start_timecode", ""),
+                        "end_timecode": source.get("end_smpte_timecode")
+                        or source.get("end_timecode", ""),
+                        "start_seconds": source.get("start_seconds"),
+                        "end_seconds": source.get("end_seconds"),
+                        "embedding_scope": source.get(
+                            "embedding_granularity", "segment"
+                        ),
+                        "embedding_option": source.get(
+                            "embedding_representation", "visual"
+                        ),
+                        "type": source.get("embedding_type", "video"),
+                        "timestamp": source.get("created_at"),
+                    }
+                    clips.append(clip)
+
+                logger.info(
+                    f"[INDEX ROUTING] Retrieved {len(clips)} clips for asset {asset_id} from '{asset_embeddings_index}' (Marengo 3.0)"
+                )
+                return clips
+        except NotFoundError:
+            # Index doesn't exist yet - this is expected before first Marengo 3.0 asset
+            logger.info(
+                f"[INDEX ROUTING] Index '{asset_embeddings_index}' not found, falling back to '{media_index}'"
+            )
+        except RequestError as e:
+            logger.warning(
+                f"[INDEX ROUTING] Error querying '{asset_embeddings_index}': {str(e)}, falling back to '{media_index}'"
+            )
+
+        # Fallback to legacy Marengo 2.7 query from 'media' index
+        logger.info(
+            f"[INDEX ROUTING] Querying '{media_index}' for Marengo 2.7 clips for asset {asset_id}"
+        )
+        query_27 = {
             "query": {
                 "bool": {
                     "must": [
@@ -260,13 +340,13 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
                     ]
                 }
             },
-            "size": 100,  # Limit to 100 clips per asset
+            "size": 100,
             "_source": {"excludes": ["embedding"]},
-            "sort": [{"start_timecode": {"order": "asc"}}],  # Sort by start time
-            "track_scores": True,  # Ensure scores are calculated even with sorting
+            "sort": [{"start_timecode": {"order": "asc"}}],
+            "track_scores": True,
         }
 
-        response = client.search(body=query, index=index_name)
+        response = client.search(body=query_27, index=media_index)
 
         clips = []
         for hit in response["hits"]["hits"]:
@@ -286,7 +366,9 @@ def get_asset_clips(asset_id: str) -> List[Dict[str, Any]]:
 
             clips.append(clip)
 
-        logger.info(f"Retrieved {len(clips)} clips for asset {asset_id}")
+        logger.info(
+            f"[INDEX ROUTING] Retrieved {len(clips)} clips for asset {asset_id} from '{media_index}' (Marengo 2.7)"
+        )
         return clips
 
     except (RequestError, NotFoundError) as e:

@@ -66,6 +66,7 @@ interface MarkerInfo {
   score?: number; // Optional score property for markers created from clips
   type: "user" | "semantic"; // Track marker origin
   createdAt?: number; // Track creation time for sorting
+  model_version?: string; // Model version for model-aware confidence thresholds (e.g., "3.0", "2.7")
 }
 
 // localStorage utilities for marker persistence
@@ -632,9 +633,12 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     }
 
     // If no stored value, calculate default based on clips
+    // Support both Marengo 2.7 ("visual-text") and Marengo 3.0 ("visual") embedding types
     const visualTextClips = asset.clips.filter(
       (clip) =>
-        clip.embedding_option === "visual-text" && clip.score !== null && clip.score !== undefined
+        (clip.embedding_option === "visual-text" || clip.embedding_option === "visual") &&
+        clip.score !== null &&
+        clip.score !== undefined
     );
 
     if (visualTextClips.length > 0) {
@@ -1412,7 +1416,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     },
     [videoViewerRef, markers]
   );
-
   // Retry mechanism for marker creation
   const createMarkersWithRetry = useCallback(
     (retryCount = 0) => {
@@ -1468,9 +1471,14 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
         const allVisualTextClips = asset.clips
           .filter((clip) => {
-            // Support both embedding_option (TwelveLabs API/Coative) and embedding_scope (TwelveLabs Bedrock)
+            // Support embedding types from different providers:
+            // - Marengo 2.7: "visual-text"
+            // - Marengo 3.0: "visual"
+            // - TwelveLabs Bedrock: embedding_scope === "clip"
             const isValidEmbedding =
-              clip.embedding_option === "visual-text" || clip.embedding_scope === "clip";
+              clip.embedding_option === "visual-text" ||
+              clip.embedding_option === "visual" ||
+              clip.embedding_scope === "clip";
 
             const hasValidScore = clip.score !== null && clip.score !== undefined;
             const hasValidTimes =
@@ -1543,7 +1551,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           const newId = `clip_${startTime}_${endTime}_${index}`;
 
           // Use confidence-based color for semantic markers
-          const markerColor = getMarkerColorByConfidence(clipScore ?? undefined);
+          // Pass model_version for model-aware thresholds (3.0 vs 2.7)
+          const markerColor = getMarkerColorByConfidence(
+            clipScore ?? undefined,
+            clip.model_version
+          );
 
           const periodMarker = new PeriodMarker({
             timeObservation: {
@@ -1588,6 +1600,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               },
               score: clipScore !== null ? clipScore : undefined, // Add score only if it exists
               type: "semantic" as const,
+              model_version: clip.model_version, // Pass model version for model-aware thresholds
             },
           ]);
         });
@@ -1743,7 +1756,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           } else {
             // For semantic markers, always use confidence-based color from the clip's score
             // This ensures colors are based on the actual score from the payload, not the filter threshold
-            markerColor = getMarkerColorByConfidence(marker.score);
+            // Pass model_version for model-aware thresholds (3.0 vs 2.7)
+            markerColor = getMarkerColorByConfidence(marker.score, marker.model_version);
           }
 
           markerRef = new PeriodMarker({
