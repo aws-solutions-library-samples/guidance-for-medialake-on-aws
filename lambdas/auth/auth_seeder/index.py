@@ -35,7 +35,7 @@ PREFIX_GROUP = "GROUP#"
 PREFIX_METADATA = "METADATA"
 
 # Permission set schema version - increment this to force update of system permission sets
-PERMISSION_SCHEMA_VERSION = "2.3.0"
+PERMISSION_SCHEMA_VERSION = "2.4.0"
 
 # Default groups definitions
 DEFAULT_GROUPS = [
@@ -156,6 +156,10 @@ DEFAULT_PERMISSION_SETS = [
                 "delete": True,
                 "manage": True,
             },
+            # Settings menu visibility (only admins see the Settings menu in sidebar)
+            "settings-menu": {
+                "view": True,
+            },
             # Nested settings permissions (for frontend UI compatibility)
             "settings": {
                 "users": {"edit": True, "view": True, "delete": True, "create": True},
@@ -228,6 +232,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
             },
             # Top-level resource permissions (required by custom authorizer)
+            # Connectors (view only - needed to browse assets on the assets page)
+            "connectors": {
+                "view": True,
+            },
             "nodes": {
                 "view": True,
             },
@@ -281,6 +289,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
             },
             # Top-level resource permissions (required by custom authorizer)
+            # Connectors (view only - needed to browse assets on the assets page)
+            "connectors": {
+                "view": True,
+            },
             "nodes": {
                 "view": True,
             },

@@ -143,26 +143,14 @@ function Sidebar() {
   // Memoize permission checks with error handling
   const canViewSettings = useMemo(() => {
     try {
-      // Check if user has any settings-related permissions
-      return (
-        (ability?.can("view", "settings") ||
-          ability?.can("view", "user") ||
-          ability?.can("view", "group") ||
-          ability?.can("view", "permission-set") ||
-          ability?.can("view", "connector") ||
-          ability?.can("view", "integration") ||
-          safePermissionCheck("view", "settings.users") ||
-          safePermissionCheck("view", "settings.connectors") ||
-          safePermissionCheck("view", "settings.integrations") ||
-          safePermissionCheck("view", "settings.system") ||
-          safePermissionCheck("view", "settings.permissions")) ??
-        false
-      );
+      // Check if user has the settings-menu:view permission (only admins)
+      // This controls visibility of the Settings menu in the sidebar
+      return safePermissionCheck("view", "settings-menu") ?? false;
     } catch (error) {
       console.error("Error checking settings permission:", error);
       return false;
     }
-  }, [ability, safePermissionCheck]);
+  }, [safePermissionCheck]);
 
   // Build menu items based on permissions
   const mainMenuItems = [
