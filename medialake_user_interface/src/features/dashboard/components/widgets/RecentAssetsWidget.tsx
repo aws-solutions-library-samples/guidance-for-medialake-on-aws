@@ -46,6 +46,10 @@ const getAssetThumbnail = (asset: any): string => {
   return asset?.thumbnailUrl || asset?.thumbnail || "";
 };
 
+const getAssetProxy = (asset: any): string => {
+  return asset?.proxyUrl || "";
+};
+
 const getAssetId = (asset: any): string => {
   return asset?.InventoryID || asset?.id || "";
 };
@@ -134,6 +138,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
             name: getAssetName(asset),
             assetType: getAssetType(asset),
             thumbnailUrl: getAssetThumbnail(asset),
+            proxyUrl: getAssetProxy(asset),
           },
         });
       }
@@ -224,6 +229,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
           const assetName = getAssetName(asset);
           const assetType = getAssetType(asset);
           const thumbnailUrl = getAssetThumbnail(asset);
+          const proxyUrl = getAssetProxy(asset);
           const format = getAssetFormat(asset);
           const isFavorited = isAssetFavorited(assetId);
           const isSelected = dashboardSelection?.isAssetSelected(assetId) ?? false;
@@ -233,6 +239,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
               id={assetId}
               name={assetName}
               thumbnailUrl={thumbnailUrl}
+              proxyUrl={proxyUrl}
               assetType={assetType}
               fields={[
                 { id: "name", label: "Name", visible: true },
