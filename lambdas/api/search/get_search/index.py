@@ -19,7 +19,14 @@ from opensearchpy import (
     RequestsAWSV4SignerAuth,
     RequestsHttpConnection,
 )
-from pydantic import BaseModel, ConfigDict, Field, conint
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    conint,
+    field_validator,
+    model_validator,
+)
 from search_utils import parse_search_query
 
 # Import unified search components
@@ -31,6 +38,15 @@ CLIP_LOGIC_ENABLED = True
 
 # Thumbnail index configuration (0-4, default to middle thumbnail)
 THUMBNAIL_INDEX = int(os.getenv("THUMBNAIL_INDEX", "2"))
+
+# Pagination constants
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 500
+
+# Storage identifier field configuration
+STORAGE_IDENTIFIER_FIELD = (
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket"
+)
 
 # Initialize AWS clients and utilities
 logger = Logger()
@@ -83,11 +99,16 @@ class SearchParams(BaseModelWithConfig):
 
     q: str = Field(..., min_length=1)
     page: conint(gt=0) = Field(default=1)  # type: ignore
-    pageSize: conint(gt=0, le=500) = Field(default=50)  # type: ignore
+    pageSize: conint(gt=0, le=MAX_PAGE_SIZE) = Field(default=DEFAULT_PAGE_SIZE)  # type: ignore
     min_score: float = Field(default=0.01)
     filters: Optional[List[Dict]] = None
     search_fields: Optional[List[str]] = None
     semantic: bool = Field(default=False)
+
+    # Sort parameters
+    sort: Optional[str] = None  # Format: "-fieldName" (desc) or "fieldName" (asc)
+    sort_by: Optional[str] = None  # Extracted field name
+    sort_direction: Optional[str] = Field(default="desc")  # "asc" or "desc"
 
     # New facet parameters
     type: Optional[str] = None
@@ -101,6 +122,56 @@ class SearchParams(BaseModelWithConfig):
 
     # For asset explorer
     storageIdentifier: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_sort_parameter(cls, data: Any) -> Any:
+        """Parse sort parameter into sort_by and sort_direction"""
+        if isinstance(data, dict):
+            sort_value = data.get("sort")
+            if sort_value:
+                # Extract field name and direction from sort parameter
+                if sort_value.startswith("-"):
+                    # Descending order: "-fieldName"
+                    data["sort_by"] = sort_value[1:]
+                    data["sort_direction"] = "desc"
+                else:
+                    # Ascending order: "fieldName"
+                    data["sort_by"] = sort_value
+                    data["sort_direction"] = "asc"
+        return data
+
+    @field_validator("sort_by")
+    @classmethod
+    def validate_sort_field(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that sort_by is a recognized sortable field"""
+        if v:
+            # Allowed sortable fields (both frontend-friendly and OpenSearch paths)
+            allowed_fields = [
+                "createdAt",
+                "name",
+                "size",
+                "type",
+                "format",
+                "DigitalSourceAsset.CreateDate",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
+                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
+                "DigitalSourceAsset.Type",
+                "DigitalSourceAsset.MainRepresentation.Format",
+            ]
+            if v not in allowed_fields:
+                raise ValueError(
+                    f"Invalid sort field: {v}. Allowed fields: {', '.join(allowed_fields)}"
+                )
+        return v
+
+    @field_validator("sort_direction")
+    @classmethod
+    def validate_sort_direction(cls, v: Optional[str]) -> Optional[str]:
+        """Validate sort direction"""
+        if v and v not in ["asc", "desc"]:
+            raise ValueError(f"Invalid sort direction: {v}. Must be 'asc' or 'desc'")
+        return v
 
     @property
     def from_(self) -> int:
@@ -152,7 +223,9 @@ class AssetSearchResult(BaseModelWithConfig):
     DerivedRepresentations: List[Dict[str, Any]]
     FileHash: str
     Metadata: Dict[str, Any]
-    score: float
+    score: Optional[float] = (
+        0.0  # Default to 0.0 for queries without scoring (e.g., term queries)
+    )
     thumbnailUrl: Optional[str] = None
     proxyUrl: Optional[str] = None
     clips: Optional[List[Dict[str, Any]]] = None
@@ -210,6 +283,110 @@ def get_opensearch_client() -> OpenSearch:
     return _opensearch_client
 
 
+def verify_opensearch_field_exists(
+    client: OpenSearch, index_name: str, field_path: str
+) -> bool:
+    """
+    Verify that a field exists in the OpenSearch index mapping.
+
+    This function checks if a specific field path exists in the OpenSearch index
+    mapping structure. It's used to validate that expected fields are present
+    before constructing queries that depend on them.
+
+    Args:
+        client: OpenSearch client instance
+        index_name: Name of the OpenSearch index to check
+        field_path: Dot-notation field path to verify (e.g., "DigitalSourceAsset.Type")
+
+    Returns:
+        True if the field exists in the mapping, False otherwise
+
+    Note:
+        This function logs a warning if the field doesn't exist but doesn't raise
+        an exception, allowing queries to continue with potentially degraded results.
+    """
+    try:
+        # Get the index mapping
+        mapping_response = client.indices.get_mapping(index=index_name)
+
+        # Navigate through the mapping structure
+        # The response structure is: {index_name: {"mappings": {"properties": {...}}}}
+        if index_name not in mapping_response:
+            logger.warning(f"Index {index_name} not found in mapping response")
+            return False
+
+        mappings = mapping_response[index_name].get("mappings", {})
+        properties = mappings.get("properties", {})
+
+        # Split the field path and navigate through nested properties
+        field_parts = field_path.split(".")
+        current_level = properties
+
+        for part in field_parts:
+            if part not in current_level:
+                logger.warning(
+                    f"Field path component '{part}' not found in mapping. "
+                    f"Full path: {field_path}"
+                )
+                return False
+
+            # Move to the next level
+            field_info = current_level[part]
+            if "properties" in field_info:
+                current_level = field_info["properties"]
+            elif part == field_parts[-1]:
+                # We've reached the final field
+                return True
+            else:
+                # Field exists but has no nested properties when we expect more
+                logger.warning(
+                    f"Field '{part}' exists but has no nested properties. "
+                    f"Cannot continue to verify full path: {field_path}"
+                )
+                return False
+
+        return True
+
+    except Exception as e:
+        logger.warning(
+            f"Could not verify field {field_path} in index {index_name}: {str(e)}"
+        )
+        return False
+
+
+def map_sort_field_to_opensearch_path(field_name: str) -> str:
+    """
+    Map frontend field names to OpenSearch field paths.
+
+    This function converts user-friendly field names from the frontend
+    to the actual OpenSearch field paths used in the index.
+
+    Args:
+        field_name: The field name to map (e.g., 'createdAt', 'name', 'size')
+
+    Returns:
+        The OpenSearch field path. If the field name is already an OpenSearch path,
+        it is returned as-is. Otherwise, it is looked up in the mapping dictionary.
+
+    Field Mappings:
+        - 'createdAt' → 'DigitalSourceAsset.CreateDate'
+        - 'name' → 'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword'
+        - 'size' → 'DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size'
+        - 'type' → 'DigitalSourceAsset.Type.keyword'
+        - 'format' → 'DigitalSourceAsset.MainRepresentation.Format.keyword'
+    """
+    field_mapping = {
+        "createdAt": "DigitalSourceAsset.CreateDate",
+        "name": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword",
+        "size": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
+        "type": "DigitalSourceAsset.Type.keyword",
+        "format": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+    }
+
+    # Return mapped field or original if already in OpenSearch format
+    return field_mapping.get(field_name, field_name)
+
+
 def build_search_query(params: SearchParams) -> Dict:
     """Build search query from search parameters"""
     start_time = time.time()
@@ -244,16 +421,38 @@ def build_search_query(params: SearchParams) -> Dict:
     if params.q.startswith("storageIdentifier:"):
         # split off the identifier
 
-        bucket_name = params.q.split(":", 1)[1]
-        print(bucket_name)
-        return {
+        bucket_name = params.q.split(":", 1)[1].strip()
+        logger.info(f"Storage identifier query for bucket: {bucket_name}")
+
+        # Note: Storage identifier field verification is performed at index creation time
+        # Expected field path: DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket
+        # This field is used to filter assets by their S3 bucket location
+
+        # Try both the exact field and .keyword variant for better compatibility
+        query_body = {
             "query": {
-                "match_phrase": {
-                    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": bucket_name
+                "bool": {
+                    "should": [
+                        {"term": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
+                        {"term": {f"{STORAGE_IDENTIFIER_FIELD}.keyword": bucket_name}},
+                        {"match_phrase": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
+                    ],
+                    "minimum_should_match": 1,
                 }
             },
-            "size": params.size,
+            "from": (params.page - 1) * params.pageSize,
+            "size": params.pageSize,
         }
+
+        # Add sort clause if sort parameters are present
+        if params.sort_by:
+            sort_field = map_sort_field_to_opensearch_path(params.sort_by)
+            sort_order = params.sort_direction or "desc"
+            query_body["sort"] = [{sort_field: {"order": sort_order}}]
+
+        logger.info(f"Storage identifier query body: {query_body}")
+
+        return query_body
     # ─────────────────────────────────────────────────────────────────
 
     parse_start = time.time()
@@ -454,7 +653,7 @@ def build_search_query(params: SearchParams) -> Dict:
     query["bool"]["filter"].extend(filters_to_add)
 
     # Build the complete OpenSearch query with aggregations for facets
-    return {
+    query_body = {
         "query": query,
         "min_score": params.min_score,
         "size": params.size,
@@ -516,9 +715,17 @@ def build_search_query(params: SearchParams) -> Dict:
         },
     }
 
+    # Add sort clause if sort parameters are present
+    if params.sort_by:
+        sort_field = map_sort_field_to_opensearch_path(params.sort_by)
+        sort_order = params.sort_direction or "desc"
+        query_body["sort"] = [{sort_field: {"order": sort_order}}]
+
     logger.info(
         f"[PERF] Total search query build time (regular): {time.time() - start_time:.3f}s"
     )
+
+    return query_body
 
 
 def add_common_fields(result: Dict, prefix: str = "") -> Dict:
@@ -1099,12 +1306,37 @@ def perform_search(params: SearchParams) -> Dict:
 
     index_name = os.environ["OPENSEARCH_INDEX"]
 
+    # Validate bucket name format for storageIdentifier queries
+    if params.q.startswith("storageIdentifier:"):
+        bucket_name = params.q.split(":", 1)[1]
+        # S3 bucket name validation rules
+        if not bucket_name or len(bucket_name) < 3 or len(bucket_name) > 63:
+            return {
+                "status": "400",
+                "message": "Invalid bucket name format",
+                "data": {
+                    "error": "INVALID_BUCKET_NAME",
+                    "details": "Bucket name must be between 3 and 63 characters long",
+                    "guidance": "Please check the bucket name and try again",
+                    "searchMetadata": {
+                        "totalResults": 0,
+                        "page": params.page,
+                        "pageSize": params.pageSize,
+                        "searchTerm": params.q,
+                    },
+                    "results": [],
+                },
+            }
+
     try:
         query_build_start = time.time()
         search_body = build_search_query(params)
         logger.info(
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
+
+        # For page range validation, we need to know total results first
+        # We'll validate after getting the initial response
 
         # Handle semantic search with embedding stores
         if params.semantic and "embedding_store_result" in search_body:
@@ -1194,6 +1426,32 @@ def perform_search(params: SearchParams) -> Dict:
             logger.info(
                 f"OpenSearch returned {len(hits)} hits from {total_results} total"
             )
+
+            # Validate page range
+            import math
+
+            total_pages = (
+                math.ceil(total_results / params.pageSize) if total_results > 0 else 0
+            )
+            if params.page > total_pages and total_pages > 0:
+                logger.warning(
+                    f"Page {params.page} is out of range. Total pages: {total_pages}"
+                )
+                return {
+                    "status": "400",
+                    "message": f"Page {params.page} is out of range. Valid range: 1-{total_pages}",
+                    "data": {
+                        "searchMetadata": {
+                            "totalResults": total_results,
+                            "totalPages": total_pages,
+                            "requestedPage": params.page,
+                            "page": total_pages,  # Return last valid page
+                            "pageSize": params.pageSize,
+                            "searchTerm": params.q,
+                        },
+                        "results": [],
+                    },
+                }
 
         if params.semantic:
             if CLIP_LOGIC_ENABLED:
@@ -1489,6 +1747,24 @@ def perform_search(params: SearchParams) -> Dict:
 
         empty_metadata = create_search_metadata(0, params)
 
+        # Check for bucket-specific errors
+        if params.q.startswith("storageIdentifier:"):
+            bucket_name = params.q.split(":", 1)[1]
+
+            # Check if this is a "no results" case (bucket not found in index)
+            if "no mapping found for field" in str(e) or "index_not_found" in str(e):
+                return {
+                    "status": "404",
+                    "message": f"Bucket '{bucket_name}' not found in the index",
+                    "data": {
+                        "error": "BUCKET_NOT_FOUND",
+                        "details": f"No assets found for bucket '{bucket_name}'. The bucket may not be indexed yet.",
+                        "guidance": "Please verify the bucket name or wait for the bucket to be indexed",
+                        "searchMetadata": empty_metadata.model_dump(by_alias=True),
+                        "results": [],
+                    },
+                }
+
         if "no mapping found for field" in str(e):
             return {
                 "status": "200",
@@ -1507,6 +1783,37 @@ def perform_search(params: SearchParams) -> Dict:
                     "results": [],
                 },
             }
+    except PermissionError as e:
+        logger.error(f"Permission denied: {str(e)}")
+
+        if params.q.startswith("storageIdentifier:"):
+            bucket_name = params.q.split(":", 1)[1]
+            return {
+                "status": "403",
+                "message": f"Permission denied to access bucket '{bucket_name}'",
+                "data": {
+                    "error": "PERMISSION_DENIED",
+                    "details": "You do not have permission to access this bucket",
+                    "guidance": "Please contact your administrator to request access",
+                    "searchMetadata": create_search_metadata(0, params).model_dump(
+                        by_alias=True
+                    ),
+                    "results": [],
+                },
+            }
+
+        return {
+            "status": "403",
+            "message": "Permission denied",
+            "data": {
+                "error": "PERMISSION_DENIED",
+                "details": str(e),
+                "searchMetadata": create_search_metadata(0, params).model_dump(
+                    by_alias=True
+                ),
+                "results": [],
+            },
+        }
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise SearchException("An unexpected error occurred")

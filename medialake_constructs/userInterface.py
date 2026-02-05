@@ -528,12 +528,9 @@ class UIConstruct(Construct):
             "default_root_object": props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
             "error_responses": [
-                cloudfront.ErrorResponse(
-                    http_status=403,
-                    response_http_status=200,
-                    response_page_path="/index.html",
-                    ttl=Duration.minutes(0),
-                ),
+                # NOTE: Only handle 404 errors for SPA routing
+                # 403 errors from API must pass through to be handled by axios interceptor
+                # S3 with OAC returns 404 (not 403) for missing files, so this works for SPA routing
                 cloudfront.ErrorResponse(
                     http_status=404,
                     response_http_status=200,

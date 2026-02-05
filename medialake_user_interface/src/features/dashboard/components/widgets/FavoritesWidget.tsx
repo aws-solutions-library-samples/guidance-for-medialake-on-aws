@@ -21,6 +21,7 @@ import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import ApiStatusModal from "@/components/ApiStatusModal";
+import { useDashboardSelection } from "../../contexts/DashboardSelectionContext";
 import type { BaseWidgetProps } from "../../types";
 import type { Favorite } from "@/api/hooks/useFavorites";
 
@@ -88,6 +89,9 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
 
   // Asset operations hook for delete, download
   const assetOperations = useAssetOperations<FavoriteAsset>();
+
+  // Dashboard selection context for batch operations
+  const dashboardSelection = useDashboardSelection();
 
   // Add to collection mutation
   const addItemToCollection = useAddItemToCollection();
@@ -204,6 +208,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
         }
         renderCard={(favorite: Favorite) => {
           const asset = favoriteToAsset(favorite);
+          const isSelected = dashboardSelection?.isAssetSelected(favorite.itemId) ?? false;
           return (
             <AssetCard
               id={favorite.itemId}
@@ -227,6 +232,15 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
               onAddToCollectionClick={(e) => handleAddToCollectionClick(favorite, e)}
               isFavorite={true}
               onFavoriteToggle={(e) => handleFavoriteToggle(favorite.itemId, favorite.itemType, e)}
+              isSelected={isSelected}
+              onSelectToggle={
+                dashboardSelection
+                  ? (id, e) => {
+                      e.stopPropagation();
+                      dashboardSelection.handleSelectToggle(asset);
+                    }
+                  : undefined
+              }
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fit"

@@ -29,6 +29,7 @@ import {
   useApplyDashboardPreset,
   useUpdateDashboardPreset,
   useSaveDashboardAsDefault,
+  useGetDefaultDashboard,
   type PresetSummary,
 } from "@/api/hooks/useDashboard";
 import { useDashboardStore, convertApiLayoutToFrontend } from "../store/dashboardStore";
@@ -63,19 +64,14 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   // API hooks
   const { data: presets = [], isLoading: isLoadingPresets } = useGetDashboardPresets();
 
-  // Permission check for dashboard admin
+  // Permission check for editing default dashboard
   const { can } = usePermission();
-  const canAdminDashboard = can("admin", "dashboard");
+  const canEditDefaultDashboard = can("edit", "defaultDashboard");
 
-  // Debug logging
-  console.log("[DashboardSelector] Presets from query:", presets);
-  console.log("[DashboardSelector] Is loading:", isLoadingPresets);
-  console.log("[DashboardSelector] Active preset ID:", activePresetId);
-  console.log("[DashboardSelector] Active preset name:", activePresetName);
-  console.log("[DashboardSelector] Can admin dashboard:", canAdminDashboard);
   const applyPresetMutation = useApplyDashboardPreset();
   const updatePresetMutation = useUpdateDashboardPreset();
   const saveAsDefaultMutation = useSaveDashboardAsDefault();
+  const { data: defaultDashboard, refetch: refetchDefaultDashboard } = useGetDefaultDashboard();
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -105,10 +101,27 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
     }
   };
 
-  const handleDefaultSelect = () => {
+  const handleDefaultSelect = async () => {
     handleClose();
-    // Clear active preset to indicate using default/custom layout
-    setActivePreset(null, null);
+
+    try {
+      // Refetch the default dashboard to get the latest
+      const { data: defaultLayout } = await refetchDefaultDashboard();
+
+      if (defaultLayout) {
+        // Convert and apply the default layout
+        const frontendLayout = convertApiLayoutToFrontend(defaultLayout);
+        setLayout(frontendLayout);
+      }
+
+      // Clear active preset to indicate using default layout
+      setActivePreset(null, null);
+      setHasPendingChanges(false);
+    } catch (error) {
+      console.error("Failed to load default dashboard:", error);
+      // Still clear the active preset even if fetch fails
+      setActivePreset(null, null);
+    }
   };
 
   const handleSaveCurrentLayout = async () => {
@@ -166,6 +179,8 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
         widgets: layout.widgets,
         layouts: layout.layouts,
       });
+      // Clear pending changes since layout is now saved as default
+      setHasPendingChanges(false);
     } catch (error) {
       console.error("Failed to save default dashboard:", error);
     }
@@ -339,8 +354,8 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
           />
         </MenuItem>
 
-        {/* Save as Default Dashboard - only visible to users with dashboard:admin permission */}
-        {canAdminDashboard && (
+        {/* Save as Default Dashboard - only visible to users with defaultDashboard:edit permission */}
+        {canEditDefaultDashboard && (
           <>
             <Divider sx={{ my: 0.5 }} />
             <MenuItem onClick={handleSaveAsDefault} disabled={isSavingDefault}>

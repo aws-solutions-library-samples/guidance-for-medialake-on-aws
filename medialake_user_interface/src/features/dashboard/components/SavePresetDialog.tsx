@@ -42,6 +42,7 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
 
   const layout = useDashboardStore((state) => state.layout);
   const setActivePreset = useDashboardStore((state) => state.setActivePreset);
+  const setHasPendingChanges = useDashboardStore((state) => state.setHasPendingChanges);
 
   const createPresetMutation = useCreateDashboardPreset();
 
@@ -104,6 +105,9 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
 
       // Set the newly created preset as active
       setActivePreset(result.presetId, result.name);
+
+      // Clear pending changes since layout is now saved
+      setHasPendingChanges(false);
 
       console.log("[SavePresetDialog] Closing dialog...");
       // Close the dialog

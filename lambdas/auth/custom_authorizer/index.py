@@ -528,6 +528,10 @@ def check_authorization_with_avp(
     """
     Check authorization using Amazon Verified Permissions with token.
 
+    NOTE: This function is currently commented out and not in use.
+    AVP integration is planned for future implementation as a secondary
+    authorization layer alongside custom claims validation.
+
     Args:
         token: Bearer token
         action_id: Action ID to check
@@ -537,133 +541,146 @@ def check_authorization_with_avp(
     Returns:
         Tuple of (is_authorized, decision_details)
     """
-    start_time = time.time()
+    # TODO: Uncomment and integrate AVP as secondary authorization layer
+    # This will provide defense-in-depth security by validating both:
+    # 1. Custom claims from JWT (primary, fast check)
+    # 2. AVP policies (secondary, flexible policy engine)
 
-    if DEBUG_MODE:
-        logger.warning(
-            f"DEBUG_MODE enabled: Bypassing AVP authorization check for action {action_id}",
-            extra={"correlation_id": correlation_id},
-        )
-        metrics.add_metric(
-            name="authorize.request.debug_bypass", unit=MetricUnit.Count, value=1
-        )
-        return True, {"reason": "DEBUG_MODE enabled, authorization check bypassed"}
+    logger.info(
+        "AVP integration not yet enabled, skipping AVP check",
+        extra={"correlation_id": correlation_id},
+    )
+    metrics.add_metric(name="authorize.avp.not_enabled", unit=MetricUnit.Count, value=1)
+    return True, {"reason": "AVP not yet enabled"}
 
-    if not POLICY_STORE_ID:
-        logger.warning(
-            "POLICY_STORE_ID not set, skipping authorization check",
-            extra={"correlation_id": correlation_id},
-        )
-        metrics.add_metric(
-            name="authorize.request.missing_policy_store",
-            unit=MetricUnit.Count,
-            value=1,
-        )
-        return True, {"reason": "POLICY_STORE_ID not set"}
-
-    try:
-        # Get context map from event
-        context = get_context_map(event)
-
-        # Prepare input for isAuthorizedWithToken
-        input_params = {
-            "policyStoreId": POLICY_STORE_ID,
-            "action": {"actionType": ACTION_TYPE, "actionId": action_id},
-            "resource": {"entityType": RESOURCE_TYPE, "entityId": RESOURCE_ID},
-        }
-
-        # Add token parameter based on TOKEN_TYPE
-        if TOKEN_TYPE in ["identityToken", "accessToken"]:
-            input_params[TOKEN_TYPE] = token
-        else:
-            # Default to identityToken for Cognito JWT tokens
-            input_params["identityToken"] = token
-
-        # Add context if available
-        if context:
-            input_params["context"] = context
-
-        # Redact token for logging in production
-        log_params = input_params.copy()
-        if ENVIRONMENT == "prod":
-            if TOKEN_TYPE in log_params:
-                log_params[TOKEN_TYPE] = "***REDACTED***"
-            if "identityToken" in log_params:
-                log_params["identityToken"] = "***REDACTED***"
-
-        logger.info(
-            f"AVP IsAuthorizedWithToken request: {json.dumps(log_params)}",
-            extra={"correlation_id": correlation_id},
-        )
-
-        # Call AVP IsAuthorizedWithToken API
-        avp_start_time = time.time()
-        response = verified_permissions.is_authorized_with_token(**input_params)
-        avp_duration = (time.time() - avp_start_time) * 1000
-
-        metrics.add_metric(
-            name="authorize.avp.latency",
-            unit=MetricUnit.Milliseconds,
-            value=avp_duration,
-        )
-
-        decision = response.get("decision", "DENY")
-        is_authorized = decision.upper() == "ALLOW"
-
-        logger.info(
-            f"AVP authorization decision: {decision}",
-            extra={"correlation_id": correlation_id},
-        )
-
-        # Record metrics based on decision
-        if is_authorized:
-            metrics.add_metric(
-                name="authorize.request.allow", unit=MetricUnit.Count, value=1
-            )
-        else:
-            metrics.add_metric(
-                name="authorize.request.deny", unit=MetricUnit.Count, value=1
-            )
-
-            errors = response.get("errors", [])
-            if errors:
-                logger.error(
-                    f"AVP authorization errors: {json.dumps(errors)}",
-                    extra={"correlation_id": correlation_id},
-                )
-                metrics.add_metric(
-                    name="authorize.request.errors",
-                    unit=MetricUnit.Count,
-                    value=len(errors),
-                )
-
-            # Log the decision details
-            decision_details = response.get("decisionDetails", {})
-            logger.info(
-                f"Decision details: {json.dumps(decision_details)}",
-                extra={"correlation_id": correlation_id},
-            )
-
-        # Record total authorization time
-        total_duration = (time.time() - start_time) * 1000
-        metrics.add_metric(
-            name="authorize.request.latency",
-            unit=MetricUnit.Milliseconds,
-            value=total_duration,
-        )
-
-        return is_authorized, response
-
-    except Exception as e:
-        logger.error(
-            f"Error checking authorization with AVP: {str(e)}",
-            extra={"correlation_id": correlation_id},
-        )
-        metrics.add_metric(
-            name="authorize.request.error", unit=MetricUnit.Count, value=1
-        )
-        # Default to deny on error
-        return False, {"error": str(e)}
+    # FUTURE AVP INTEGRATION CODE (commented out):
+    # start_time = time.time()
+    #
+    # if DEBUG_MODE:
+    #     logger.warning(
+    #         f"DEBUG_MODE enabled: Bypassing AVP authorization check for action {action_id}",
+    #         extra={"correlation_id": correlation_id},
+    #     )
+    #     metrics.add_metric(
+    #         name="authorize.request.debug_bypass", unit=MetricUnit.Count, value=1
+    #     )
+    #     return True, {"reason": "DEBUG_MODE enabled, authorization check bypassed"}
+    #
+    # if not POLICY_STORE_ID:
+    #     logger.warning(
+    #         "POLICY_STORE_ID not set, skipping authorization check",
+    #         extra={"correlation_id": correlation_id},
+    #     )
+    #     metrics.add_metric(
+    #         name="authorize.request.missing_policy_store",
+    #         unit=MetricUnit.Count,
+    #         value=1,
+    #     )
+    #     return True, {"reason": "POLICY_STORE_ID not set"}
+    #
+    # try:
+    #     # Get context map from event
+    #     context = get_context_map(event)
+    #
+    #     # Prepare input for isAuthorizedWithToken
+    #     input_params = {
+    #         "policyStoreId": POLICY_STORE_ID,
+    #         "action": {"actionType": ACTION_TYPE, "actionId": action_id},
+    #         "resource": {"entityType": RESOURCE_TYPE, "entityId": RESOURCE_ID},
+    #     }
+    #
+    #     # Add token parameter based on TOKEN_TYPE
+    #     if TOKEN_TYPE in ["identityToken", "accessToken"]:
+    #         input_params[TOKEN_TYPE] = token
+    #     else:
+    #         # Default to identityToken for Cognito JWT tokens
+    #         input_params["identityToken"] = token
+    #
+    #     # Add context if available
+    #     if context:
+    #         input_params["context"] = context
+    #
+    #     # Redact token for logging in production
+    #     log_params = input_params.copy()
+    #     if ENVIRONMENT == "prod":
+    #         if TOKEN_TYPE in log_params:
+    #             log_params[TOKEN_TYPE] = "***REDACTED***"
+    #         if "identityToken" in log_params:
+    #             log_params["identityToken"] = "***REDACTED***"
+    #
+    #     logger.info(
+    #         f"AVP IsAuthorizedWithToken request: {json.dumps(log_params)}",
+    #         extra={"correlation_id": correlation_id},
+    #     )
+    #
+    #     # Call AVP IsAuthorizedWithToken API
+    #     avp_start_time = time.time()
+    #     response = verified_permissions.is_authorized_with_token(**input_params)
+    #     avp_duration = (time.time() - avp_start_time) * 1000
+    #
+    #     metrics.add_metric(
+    #         name="authorize.avp.latency",
+    #         unit=MetricUnit.Milliseconds,
+    #         value=avp_duration,
+    #     )
+    #
+    #     decision = response.get("decision", "DENY")
+    #     is_authorized = decision.upper() == "ALLOW"
+    #
+    #     logger.info(
+    #         f"AVP authorization decision: {decision}",
+    #         extra={"correlation_id": correlation_id},
+    #     )
+    #
+    #     # Record metrics based on decision
+    #     if is_authorized:
+    #         metrics.add_metric(
+    #             name="authorize.request.allow", unit=MetricUnit.Count, value=1
+    #         )
+    #     else:
+    #         metrics.add_metric(
+    #             name="authorize.request.deny", unit=MetricUnit.Count, value=1
+    #         )
+    #
+    #         errors = response.get("errors", [])
+    #         if errors:
+    #             logger.error(
+    #                 f"AVP authorization errors: {json.dumps(errors)}",
+    #                 extra={"correlation_id": correlation_id},
+    #             )
+    #             metrics.add_metric(
+    #                 name="authorize.request.errors",
+    #                 unit=MetricUnit.Count,
+    #                 value=len(errors),
+    #             )
+    #
+    #         # Log the decision details
+    #         decision_details = response.get("decisionDetails", {})
+    #         logger.info(
+    #             f"Decision details: {json.dumps(decision_details)}",
+    #             extra={"correlation_id": correlation_id},
+    #         )
+    #
+    #     # Record total authorization time
+    #     total_duration = (time.time() - start_time) * 1000
+    #     metrics.add_metric(
+    #         name="authorize.request.latency",
+    #         unit=MetricUnit.Milliseconds,
+    #         value=total_duration,
+    #     )
+    #
+    #     return is_authorized, response
+    #
+    # except Exception as e:
+    #     logger.error(
+    #         f"Error checking authorization with AVP: {str(e)}",
+    #         extra={"correlation_id": correlation_id},
+    #     )
+    #     metrics.add_metric(
+    #         name="authorize.request.error", unit=MetricUnit.Count, value=1
+    #     )
+    #     # Default to deny on error
+    #     return False, {"error": str(e)}
 
 
 @tracer.capture_method
@@ -931,129 +948,163 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
 def create_permission_mapping() -> Dict[str, Dict[str, str]]:
     """
     Create a mapping between HTTP methods/resource paths and required permissions.
-    Updated to match the new nested permission structure.
+    Updated to match the flat JWT permission format (resource:action).
+
+    NOTE: API Gateway paths do NOT include /api prefix - they start directly with the resource name.
 
     Returns:
         Dictionary mapping resource patterns to required permissions
     """
     return {
         # Assets endpoints
-        "get /api/assets": "assets:view",
-        "post /api/assets/upload": "assets:upload",
-        "delete /api/assets/{id}": "assets:delete",
-        "put /api/assets/{id}": "assets:edit",
-        "get /api/assets/{id}": "assets:view",
-        "post /api/assets/{id}/rename": "assets:edit",
-        "get /api/assets/{id}/transcript": "assets:view",
-        "get /api/assets/{id}/related_versions": "assets:view",
-        "post /api/assets/generate_presigned_url": "assets:upload",
+        "get /assets": "assets:view",
+        "post /assets/upload": "assets:upload",
+        "delete /assets/{id}": "assets:delete",
+        "put /assets/{id}": "assets:edit",
+        "get /assets/{id}": "assets:view",
+        "post /assets/{id}/rename": "assets:edit",
+        "get /assets/{id}/transcript": "assets:view",
+        "get /assets/{id}/related_versions": "assets:view",
+        "post /assets/generate_presigned_url": "assets:upload",
         # Download endpoints
-        "get /api/download/bulk": "assets:download",
-        "post /api/download/bulk": "assets:download",
-        "get /api/download/bulk/{jobId}": "assets:download",
-        "put /api/download/bulk/{jobId}/downloaded": "assets:download",
-        "delete /api/download/bulk/{jobId}": "assets:download",
-        "get /api/download/bulk/user": "assets:download",
+        "get /download/bulk": "assets:download",
+        "post /download/bulk": "assets:download",
+        "get /download/bulk/{jobId}": "assets:download",
+        "put /download/bulk/{jobId}/downloaded": "assets:download",
+        "delete /download/bulk/{jobId}": "assets:download",
+        "get /download/bulk/user": "assets:download",
         # Collections endpoints
-        "get /api/collections": "collections:view",
-        "post /api/collections": "collections:create",
-        "put /api/collections/{id}": "collections:edit",
-        "delete /api/collections/{id}": "collections:delete",
-        # Connectors endpoints - now using settings.connectors
-        "get /api/connectors": "settings.connectors:view",
-        "post /api/connectors": "settings.connectors:create",
-        "put /api/connectors/{id}": "settings.connectors:edit",
-        "delete /api/connectors/{id}": "settings.connectors:delete",
-        "post /api/connectors/{id}/sync": "settings.connectors:edit",
-        "get /api/connectors/s3": "settings.connectors:view",
-        "post /api/connectors/s3": "settings.connectors:create",
-        "get /api/connectors/s3/buckets": "settings.connectors:view",
-        "get /api/connectors/s3/explorer/{id}": "settings.connectors:view",
+        "get /collections": "collections:view",
+        "post /collections": "collections:create",
+        "get /collections/{collectionId}": "collections:view",
+        "put /collections/{collectionId}": "collections:edit",
+        "patch /collections/{collectionId}": "collections:edit",
+        "delete /collections/{collectionId}": "collections:delete",
+        "get /collections/{collectionId}/assets": "collections:view",
+        "get /collections/{collectionId}/items": "collections:view",
+        "post /collections/{collectionId}/items": "collections:edit",
+        "delete /collections/{collectionId}/items/{itemId}": "collections:edit",
+        "get /collections/{collectionId}/rules": "collections:view",
+        "post /collections/{collectionId}/rules": "collections:edit",
+        "put /collections/{collectionId}/rules/{ruleId}": "collections:edit",
+        "delete /collections/{collectionId}/rules/{ruleId}": "collections:edit",
+        "get /collections/{collectionId}/share": "collections:view",
+        "post /collections/{collectionId}/share": "collections:edit",
+        "delete /collections/{collectionId}/share/{userId}": "collections:edit",
+        "get /collections/{collectionId}/ancestors": "collections:view",
+        "get /collections/shared-with-me": "collections:view",
+        "get /collections/shared-by-me": "collections:view",
+        # Connectors endpoints
+        "get /connectors": "connectors:view",
+        "post /connectors": "connectors:create",
+        "put /connectors/{connector_id}": "connectors:edit",
+        "delete /connectors/{connector_id}": "connectors:delete",
+        "post /connectors/{connector_id}/sync": "connectors:edit",
+        "get /connectors/s3": "connectors:view",
+        "post /connectors/s3": "connectors:create",
+        "get /connectors/s3/buckets": "connectors:view",
+        "get /connectors/s3/explorer/{connector_id}": "connectors:view",
         # Environments endpoints
-        "get /api/environments": "environments:view",
-        "post /api/environments": "environments:create",
-        "put /api/environments/{id}": "environments:edit",
-        "delete /api/environments/{id}": "environments:delete",
-        # Groups endpoints - now using settings.users (groups are part of user management)
-        "get /api/groups": "settings.users:view",
-        "post /api/groups": "settings.users:create",
-        "put /api/groups/{id}": "settings.users:edit",
-        "delete /api/groups/{id}": "settings.users:delete",
-        "post /api/groups/add_group_members": "settings.users:edit",
-        "post /api/groups/remove_group_member": "settings.users:edit",
-        # Integrations endpoints - now using settings.integrations
-        "get /api/integrations": "settings.integrations:view",
-        "post /api/integrations": "settings.integrations:create",
-        "put /api/integrations/{id}": "settings.integrations:edit",
-        "delete /api/integrations/{id}": "settings.integrations:delete",
+        "get /environments": "environments:view",
+        "post /environments": "environments:create",
+        "put /environments/{id}": "environments:edit",
+        "delete /environments/{id}": "environments:delete",
+        # Groups endpoints
+        "get /groups": "groups:view",
+        "post /groups": "groups:create",
+        "put /groups/{id}": "groups:edit",
+        "delete /groups/{id}": "groups:delete",
+        "post /groups/add_group_members": "groups:edit",
+        "post /groups/remove_group_member": "groups:edit",
+        # Integrations endpoints
+        "get /integrations": "integrations:view",
+        "post /integrations": "integrations:create",
+        "put /integrations/{id}": "integrations:edit",
+        "delete /integrations/{id}": "integrations:delete",
         # Nodes endpoints
-        "get /api/nodes": "nodes:view",
-        "get /api/nodes/{id}": "nodes:view",
-        # Permissions endpoints - now using settings.permissions
-        "get /api/permissions": "settings.permissions:view",
-        "post /api/permissions": "settings.permissions:create",
-        "put /api/permissions/{id}": "settings.permissions:edit",
-        "delete /api/permissions/{id}": "settings.permissions:delete",
-        "get /api/authorization/permission_sets": "settings.permissions:view",
-        "post /api/authorization/permission_sets": "settings.permissions:create",
-        "put /api/authorization/permission_sets/{id}": "settings.permissions:edit",
-        "delete /api/authorization/permission_sets/{id}": "settings.permissions:delete",
+        "get /nodes": "nodes:view",
+        "get /nodes/{id}": "nodes:view",
+        # Permissions endpoints
+        "get /permissions": "permissions:view",
+        "post /permissions": "permissions:create",
+        "put /permissions/{id}": "permissions:edit",
+        "delete /permissions/{id}": "permissions:delete",
+        "get /authorization/permission_sets": "permissions:view",
+        "post /authorization/permission_sets": "permissions:create",
+        "put /authorization/permission_sets/{id}": "permissions:edit",
+        "delete /authorization/permission_sets/{id}": "permissions:delete",
         # Assignment endpoints
-        "post /api/authorization/assignments/assign_ps_to_user": "settings.permissions:edit",
-        "post /api/authorization/assignments/assign_ps_to_group": "settings.permissions:edit",
-        "get /api/authorization/assignments/list_user_assignments": "settings.permissions:view",
-        "get /api/authorization/assignments/list_group_assignments": "settings.permissions:view",
-        "delete /api/authorization/assignments/remove_user_assignment": "settings.permissions:edit",
-        "delete /api/authorization/assignments/remove_group_assignment": "settings.permissions:edit",
+        "post /authorization/assignments/assign_ps_to_user": "permissions:edit",
+        "post /authorization/assignments/assign_ps_to_group": "permissions:edit",
+        "get /authorization/assignments/list_user_assignments": "permissions:view",
+        "get /authorization/assignments/list_group_assignments": "permissions:view",
+        "delete /authorization/assignments/remove_user_assignment": "permissions:edit",
+        "delete /authorization/assignments/remove_group_assignment": "permissions:edit",
         # Pipelines endpoints
-        "get /api/pipelines": "pipelines:view",
-        "post /api/pipelines": "pipelines:create",
-        "put /api/pipelines/{id}": "pipelines:edit",
-        "delete /api/pipelines/{id}": "pipelines:delete",
-        "get /api/pipelines/{id}": "pipelines:view",
-        "get /api/pipelines/executions": "pipelinesExecutions:view",
-        "get /api/pipelines/executions/{id}": "pipelinesExecutions:view",
-        "post /api/pipelines/executions/{id}/retry": "pipelinesExecutions:retry",
+        "get /pipelines": "pipelines:view",
+        "post /pipelines": "pipelines:create",
+        "put /pipelines/{pipelineId}": "pipelines:edit",
+        "delete /pipelines/{pipelineId}": "pipelines:delete",
+        "get /pipelines/{pipelineId}": "pipelines:view",
+        "post /pipelines/{pipelineId}/trigger": "pipelines:edit",
+        "get /pipelines/executions": "pipelinesExecutions:view",
+        "get /pipelines/executions/{executionId}": "pipelinesExecutions:view",
+        "post /pipelines/executions/{executionId}/retry": "pipelinesExecutions:retry",
+        "get /pipelines/status/{executionArn}": "pipelinesExecutions:view",
         # Reviews endpoints
-        "get /api/reviews/{id}": "reviews:view",
-        "put /api/reviews/{id}": "reviews:edit",
-        "delete /api/reviews/{id}": "reviews:delete",
-        "get /api/reviews/{id}/annotations": "reviews:view",
-        "put /api/reviews/{id}/annotations": "reviews:edit",
-        "delete /api/reviews/{id}/annotations": "reviews:delete",
-        "get /api/reviews/{id}/status": "reviews:view",
-        "post /api/reviews/{id}/status": "reviews:edit",
-        # Roles endpoints - now using settings.permissions
-        "get /api/roles": "settings.permissions:view",
-        "post /api/roles": "settings.permissions:create",
-        "put /api/roles/{id}": "settings.permissions:edit",
-        "delete /api/roles/{id}": "settings.permissions:delete",
-        "get /api/settings/roles": "settings.permissions:view",
-        "post /api/settings/roles": "settings.permissions:create",
-        "put /api/settings/roles/{id}": "settings.permissions:edit",
-        "delete /api/settings/roles/{id}": "settings.permissions:delete",
+        "get /reviews/{id}": "reviews:view",
+        "put /reviews/{id}": "reviews:edit",
+        "delete /reviews/{id}": "reviews:delete",
+        "get /reviews/{id}/annotations": "reviews:view",
+        "put /reviews/{id}/annotations": "reviews:edit",
+        "delete /reviews/{id}/annotations": "reviews:delete",
+        "get /reviews/{id}/status": "reviews:view",
+        "post /reviews/{id}/status": "reviews:edit",
+        # Roles endpoints
+        "get /roles": "permissions:view",
+        "post /roles": "permissions:create",
+        "put /roles/{role_id}": "permissions:edit",
+        "delete /roles/{role_id}": "permissions:delete",
+        "get /settings/roles": "permissions:view",
+        "post /settings/roles": "permissions:create",
+        "put /settings/roles/{id}": "permissions:edit",
+        "delete /settings/roles/{id}": "permissions:delete",
         # Search endpoints
-        "get /api/search": "search:view",
-        "get /api/search/fields": "search:view",
-        # Settings endpoints - now using nested structure
-        "get /api/settings/api_keys": "settings.api-keys:view",  # pragma: allowlist secret
-        "post /api/settings/api_keys": "settings.api-keys:create",  # pragma: allowlist secret
-        "put /api/settings/api_keys/{id}": "settings.api-keys:edit",
-        "delete /api/settings/api_keys/{id}": "settings.api-keys:delete",
-        "get /api/settings/system": "settings.system:view",
-        "get /api/settings/system/search": "settings.system:view",
-        "post /api/settings/system/search": "settings.system:edit",
-        "put /api/settings/system/search": "settings.system:edit",
-        "get /api/settings/userprofile": "settings.users:view",
-        "get /api/settings/users": "settings.users:view",
-        "put /api/settings/users/{id}": "settings.users:edit",
-        "delete /api/settings/users/{id}": "settings.users:delete",
-        "get /api/settings/users/{id}": "settings.users:view",
+        "get /search": "search:view",
+        "get /search/fields": "search:view",
+        # Settings endpoints
+        "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
+        "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
+        "put /settings/api-keys/{id}": "api-keys:edit",
+        "delete /settings/api-keys/{id}": "api-keys:delete",
+        # Collection types endpoints
+        "get /settings/collection-types": "collection-types:view",
+        "post /settings/collection-types": "collection-types:create",
+        "put /settings/collection-types/{type_id}": "collection-types:edit",
+        "delete /settings/collection-types/{type_id}": "collection-types:delete",
+        "post /settings/collection-types/{type_id}/migrate": "collection-types:edit",
+        # System settings endpoints
+        "get /settings/system": "system:view",
+        "get /settings/system/search": "system:view",
+        "post /settings/system/search": "system:edit",
+        "put /settings/system/search": "system:edit",
+        "get /settings/userprofile": "users:view",
+        "get /settings/users": "users:view",
+        "put /settings/users/{id}": "users:edit",
+        "delete /settings/users/{id}": "users:delete",
+        "get /settings/users/{id}": "users:view",
         # Storage endpoints
-        "get /api/storage/s3/buckets": "storage:view",
-        "get /api/storage/s3/object": "storage:view",
-        # AWS endpoints - now using settings.regions
-        "get /api/aws/get_regions": "settings.regions:view",
+        "get /storage/s3/buckets": "storage:view",
+        "get /storage/s3/object": "storage:view",
+        # AWS endpoints
+        "get /aws/regions": "regions:view",
+        # Users endpoints
+        "get /users": "users:view",
+        "get /users/{user_id}": "users:view",
+        "put /users/{user_id}": "users:edit",
+        "delete /users/{user_id}": "users:delete",
+        "post /users/{user_id}/enable": "users:edit",
+        "post /users/{user_id}/disable": "users:edit",
     }
 
 
@@ -1165,6 +1216,143 @@ def _paths_match(path1: str, path2: str) -> bool:
             return False
 
     return True
+
+
+@tracer.capture_method
+def validate_jwt_permissions(
+    parsed_token: Dict[str, Any], required_permission: str, correlation_id: str
+) -> Tuple[bool, Optional[str]]:
+    """
+    Validate that a JWT token has the required permission in its custom claims.
+
+    Args:
+        parsed_token: Decoded JWT token claims
+        required_permission: The permission required for this action (e.g., "assets:view")
+        correlation_id: Request correlation ID for tracing
+
+    Returns:
+        Tuple of (has_permission, error_message)
+        - has_permission: True if user has the required permission
+        - error_message: None if authorized, descriptive error message if denied
+    """
+    start_time = time.time()
+
+    try:
+        # Extract custom:permissions claim from JWT
+        custom_permissions_str = parsed_token.get("custom:permissions")
+
+        if not custom_permissions_str:
+            logger.warning(
+                f"JWT token missing custom:permissions claim",
+                extra={"correlation_id": correlation_id},
+            )
+            metrics.add_metric(
+                name="validate.jwt_permissions.missing_claim",
+                unit=MetricUnit.Count,
+                value=1,
+            )
+            error_msg = "Access denied: No permissions found in token"
+            return False, error_msg
+
+        # Parse the custom permissions JSON string
+        try:
+            custom_permissions = json.loads(custom_permissions_str)
+            if not isinstance(custom_permissions, list):
+                logger.warning(
+                    f"custom:permissions is not a list: {type(custom_permissions)}",
+                    extra={"correlation_id": correlation_id},
+                )
+                custom_permissions = []
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"Failed to parse custom:permissions JSON: {str(e)}",
+                extra={"correlation_id": correlation_id},
+            )
+            metrics.add_metric(
+                name="validate.jwt_permissions.parse_error",
+                unit=MetricUnit.Count,
+                value=1,
+            )
+            error_msg = "Access denied: Invalid permissions format in token"
+            return False, error_msg
+
+        # Log the permissions for debugging (non-production only)
+        if ENVIRONMENT != "prod":
+            logger.info(
+                f"User permissions: {custom_permissions}",
+                extra={"correlation_id": correlation_id},
+            )
+
+        # Check if user has the required permission
+        # Also check for settings.* prefixed version for backward compatibility
+        # e.g., "connectors:view" should also match "settings.connectors:view"
+        has_permission = required_permission in custom_permissions
+
+        # If not found, check for settings.* prefixed version
+        if not has_permission:
+            # Parse the required permission to get resource and action
+            if ":" in required_permission:
+                resource, action = required_permission.split(":", 1)
+                # Check if settings.{resource}:{action} exists in permissions
+                settings_permission = f"settings.{resource}:{action}"
+                has_permission = settings_permission in custom_permissions
+                if has_permission:
+                    logger.info(
+                        f"Permission granted via settings prefix: {settings_permission}",
+                        extra={"correlation_id": correlation_id},
+                    )
+
+        if has_permission:
+            logger.info(
+                f"User has required permission: {required_permission}",
+                extra={"correlation_id": correlation_id},
+            )
+            metrics.add_metric(
+                name="validate.jwt_permissions.granted", unit=MetricUnit.Count, value=1
+            )
+
+            # Record validation time
+            validation_time = (time.time() - start_time) * 1000
+            metrics.add_metric(
+                name="validate.jwt_permissions.latency",
+                unit=MetricUnit.Milliseconds,
+                value=validation_time,
+            )
+
+            return True, None
+        else:
+            logger.warning(
+                f"User lacks required permission: {required_permission}. "
+                f"Available permissions: {custom_permissions}",
+                extra={"correlation_id": correlation_id},
+            )
+            metrics.add_metric(
+                name="validate.jwt_permissions.denied", unit=MetricUnit.Count, value=1
+            )
+
+            # Record validation time
+            validation_time = (time.time() - start_time) * 1000
+            metrics.add_metric(
+                name="validate.jwt_permissions.latency",
+                unit=MetricUnit.Milliseconds,
+                value=validation_time,
+            )
+
+            error_msg = (
+                f"Access denied: Missing required permission '{required_permission}'"
+            )
+            return False, error_msg
+
+    except Exception as e:
+        logger.error(
+            f"Error validating JWT permissions: {str(e)}",
+            extra={"correlation_id": correlation_id},
+        )
+        metrics.add_metric(
+            name="validate.jwt_permissions.error", unit=MetricUnit.Count, value=1
+        )
+        error_msg = "Access denied: Error validating permissions"
+        return False, error_msg
 
 
 @tracer.capture_method
@@ -1834,16 +2022,105 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 f"Action ID: {action_id}", extra={"correlation_id": correlation_id}
             )
 
-            # Check authorization with AVP
-            is_authorized, auth_response = check_authorization_with_avp(
-                bearer_token, action_id, event, correlation_id
+            # Get path parameters for proper resource path normalization
+            path_parameters = event.get("pathParameters", {}) or {}
+
+            # Get the required permission for this action
+            required_permission = get_required_permission(
+                http_method, resource_path, path_parameters
             )
 
+            # Initialize authorization variables
+            is_authorized = False
+            auth_response = {}
+
+            if required_permission:
+                # Validate JWT custom claims for the required permission
+                logger.info(
+                    f"Validating JWT permission: {required_permission}",
+                    extra={"correlation_id": correlation_id},
+                )
+
+                if DEBUG_MODE:
+                    # In DEBUG_MODE, still validate but log warnings
+                    has_permission, error_message = validate_jwt_permissions(
+                        parsed_token, required_permission, correlation_id
+                    )
+
+                    if not has_permission:
+                        logger.warning(
+                            f"DEBUG_MODE: Permission check failed but allowing request. "
+                            f"Error: {error_message}",
+                            extra={"correlation_id": correlation_id},
+                        )
+                        metrics.add_metric(
+                            name="authorize.jwt.debug_bypass",
+                            unit=MetricUnit.Count,
+                            value=1,
+                        )
+
+                    # Allow in DEBUG_MODE regardless
+                    is_authorized = True
+                    auth_response = {
+                        "decision": "ALLOW",
+                        "reason": f"DEBUG_MODE enabled, permission validation bypassed. "
+                        f"Would have been: {error_message or 'ALLOWED'}",
+                    }
+                else:
+                    # Production mode - enforce permission check
+                    has_permission, error_message = validate_jwt_permissions(
+                        parsed_token, required_permission, correlation_id
+                    )
+
+                    is_authorized = has_permission
+
+                    if is_authorized:
+                        auth_response = {
+                            "decision": "ALLOW",
+                            "reason": f"User has required permission: {required_permission}",
+                        }
+                    else:
+                        auth_response = {
+                            "decision": "DENY",
+                            "reason": error_message,
+                            "requiredPermission": required_permission,
+                        }
+
+                        logger.warning(
+                            f"JWT authorization denied: {error_message}",
+                            extra={"correlation_id": correlation_id},
+                        )
+
+                # TODO: Future AVP integration point
+                # When AVP is enabled, add secondary validation here:
+                # avp_authorized, avp_response = check_authorization_with_avp(
+                #     bearer_token, action_id, event, correlation_id
+                # )
+                # is_authorized = is_authorized and avp_authorized  # Both must pass
+
+            else:
+                # No specific permission required for this route
+                logger.info(
+                    f"No specific permission required for {action_id}, allowing access",
+                    extra={"correlation_id": correlation_id},
+                )
+                is_authorized = True
+                auth_response = {
+                    "decision": "ALLOW",
+                    "reason": "No specific permission required for this action",
+                }
+                metrics.add_metric(
+                    name="authorize.jwt.no_permission_required",
+                    unit=MetricUnit.Count,
+                    value=1,
+                )
+
             # Extract principal ID
-            principal_id = extract_principal_id(parsed_token, auth_response)
+            principal_id = parsed_token.get("sub", "unknown")
+            username = parsed_token.get("cognito:username", "unknown")
 
             logger.info(
-                f"Using principal ID: {principal_id}",
+                f"Using principal ID: {principal_id}, username: {username}",
                 extra={"correlation_id": correlation_id},
             )
 
@@ -1855,13 +2132,22 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 context = {
                     "actionId": str(action_id),
                     "userId": str(principal_id),
-                    "username": str(parsed_token.get("cognito:username", "")),
-                    "sub": str(parsed_token.get("sub", "")),
+                    "username": str(username),
+                    "sub": str(principal_id),
                     "requestId": str(correlation_id),
-                    "claims": json.dumps(
-                        parsed_token, default=str
-                    ),  # Stringify claims for context with fallback
+                    "claims": json.dumps(parsed_token, default=str),
                 }
+
+                # Add authorization details for frontend
+                if not is_authorized:
+                    context["authError"] = str(
+                        auth_response.get("reason", "Access denied")
+                    )
+                    if "requiredPermission" in auth_response:
+                        context["requiredPermission"] = str(
+                            auth_response["requiredPermission"]
+                        )
+
             except Exception as context_err:
                 logger.error(
                     f"Error creating context: {str(context_err)}",
@@ -1871,11 +2157,13 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 context = {
                     "actionId": str(action_id),
                     "userId": str(principal_id),
-                    "username": "Unknown",
-                    "sub": "Unknown",
+                    "username": str(username),
+                    "sub": str(principal_id),
                     "requestId": str(correlation_id),
                     "claims": "{}",
                 }
+                if not is_authorized:
+                    context["authError"] = "Access denied"
 
             policy = {
                 "principalId": str(principal_id),
@@ -1905,7 +2193,8 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
             # Log the policy response before returning
             logger.info(
-                f"Returning JWT policy response: {json.dumps(policy, default=str)}",
+                f"Returning JWT policy response: Effect={effect}, "
+                f"Reason={auth_response.get('reason', 'N/A')}",
                 extra={"correlation_id": correlation_id},
             )
 
@@ -1932,7 +2221,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         }
                     ],
                 },
-                "context": {"error": str(e), "requestId": str(correlation_id)},
+                "context": {"authError": str(e), "requestId": str(correlation_id)},
             }
 
             # Record execution time
@@ -1948,7 +2237,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
             # Log the error policy response before returning
             logger.info(
-                f"Returning JWT error policy response: {json.dumps(policy, default=str)}",
+                f"Returning JWT error policy response: {str(e)}",
                 extra={"correlation_id": correlation_id},
             )
 
@@ -1972,7 +2261,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     }
                 ],
             },
-            "context": {"error": str(e), "requestId": str(correlation_id)},
+            "context": {"authError": str(e), "requestId": str(correlation_id)},
         }
 
         # Record execution time
@@ -1984,7 +2273,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
         # Log the final error policy response before returning
         logger.info(
-            f"Returning final error policy response: {json.dumps(policy, default=str)}",
+            f"Returning final error policy response: {str(e)}",
             extra={"correlation_id": correlation_id},
         )
 

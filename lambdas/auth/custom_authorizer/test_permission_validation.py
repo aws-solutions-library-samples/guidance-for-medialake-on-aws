@@ -27,12 +27,12 @@ def test_permission_mapping():
     mapping = create_permission_mapping()
 
     # Test some key mappings
-    assert mapping["get /api/assets"] == "assets:read"
-    assert mapping["post /api/assets/upload"] == "assets:create"
+    assert mapping["get /api/assets"] == "assets:view"
+    assert mapping["post /api/assets/upload"] == "assets:upload"
     assert mapping["delete /api/assets/{id}"] == "assets:delete"
     assert (
         mapping["get /api/settings/api_keys"]
-        == "settings:read"  # pragma: allowlist secret
+        == "api-keys:view"  # pragma: allowlist secret
     )
 
     print(f"✅ Permission mapping created with {len(mapping)} entries")
@@ -85,7 +85,7 @@ def test_get_required_permission():
 
     # Test exact matches
     result = get_required_permission("get", "/api/assets", None)
-    assert result == "assets:read"
+    assert result == "assets:view"
 
     # Test with path parameters
     result = get_required_permission("delete", "/api/assets/123", {"id": "123"})
@@ -93,7 +93,7 @@ def test_get_required_permission():
 
     # Test pattern matching
     result = get_required_permission("get", "/api/assets/456", {"id": "456"})
-    assert result == "assets:read"
+    assert result == "assets:view"
 
     # Test non-existent permission
     result = get_required_permission("patch", "/api/nonexistent", None)
@@ -111,8 +111,8 @@ def test_validate_api_key_permissions():
         "id": "test-key-1",
         "name": "Test Key",
         "permissions": {
-            "assets:read": True,
-            "assets:create": True,
+            "assets:view": True,
+            "assets:upload": True,
             "assets:delete": False,
         },
     }
@@ -126,7 +126,7 @@ def test_validate_api_key_permissions():
 
     # Test with valid permission
     result = validate_api_key_permissions(
-        api_key_with_permissions, "assets:read", "test-correlation-id"
+        api_key_with_permissions, "assets:view", "test-correlation-id"
     )
     assert result == True
 
@@ -138,13 +138,13 @@ def test_validate_api_key_permissions():
 
     # Test with missing permission
     result = validate_api_key_permissions(
-        api_key_with_permissions, "settings:read", "test-correlation-id"
+        api_key_with_permissions, "api-keys:view", "test-correlation-id"
     )
     assert result == False
 
     # Test with no permissions
     result = validate_api_key_permissions(
-        api_key_no_permissions, "assets:read", "test-correlation-id"
+        api_key_no_permissions, "assets:view", "test-correlation-id"
     )
     assert result == False
 
@@ -155,11 +155,11 @@ def test_integration_scenarios():
     """Test complete integration scenarios."""
     print("\nTesting integration scenarios...")
 
-    # Scenario 1: GET /api/assets/123 with assets:read permission
-    api_key = {"id": "integration-test-1", "permissions": {"assets:read": True}}
+    # Scenario 1: GET /api/assets/123 with assets:view permission
+    api_key = {"id": "integration-test-1", "permissions": {"assets:view": True}}
 
     required_perm = get_required_permission("get", "/api/assets/123", {"id": "123"})
-    assert required_perm == "assets:read"
+    assert required_perm == "assets:view"
 
     has_permission = validate_api_key_permissions(api_key, required_perm, "test-id")
     assert has_permission == True
@@ -171,14 +171,14 @@ def test_integration_scenarios():
     has_permission = validate_api_key_permissions(api_key, required_perm, "test-id")
     assert has_permission == False
 
-    # Scenario 3: POST /api/settings/api_keys with settings:create permission
+    # Scenario 3: POST /api/settings/api_keys with api-keys:create permission
     api_key_admin = {
         "id": "admin-key",
-        "permissions": {"settings:create": True, "settings:read": True},
+        "permissions": {"api-keys:create": True, "api-keys:view": True},
     }
 
     required_perm = get_required_permission("post", "/api/settings/api_keys", None)
-    assert required_perm == "settings:create"
+    assert required_perm == "api-keys:create"
 
     has_permission = validate_api_key_permissions(
         api_key_admin, required_perm, "test-id"

@@ -22,6 +22,7 @@ import { useAddFavorite, useRemoveFavorite, useGetFavorites } from "@/api/hooks/
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import ApiStatusModal from "@/components/ApiStatusModal";
+import { useDashboardSelection } from "../../contexts/DashboardSelectionContext";
 import type { BaseWidgetProps } from "../../types";
 import type { ImageItem, VideoItem, AudioItem } from "@/types/search/searchResults";
 
@@ -77,6 +78,9 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
 
   // Asset operations hook for delete, download, rename
   const assetOperations = useAssetOperations<AssetItem>();
+
+  // Dashboard selection context for batch operations
+  const dashboardSelection = useDashboardSelection();
 
   // Favorites
   const { data: favorites } = useGetFavorites("ASSET");
@@ -222,6 +226,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
           const thumbnailUrl = getAssetThumbnail(asset);
           const format = getAssetFormat(asset);
           const isFavorited = isAssetFavorited(assetId);
+          const isSelected = dashboardSelection?.isAssetSelected(assetId) ?? false;
 
           return (
             <AssetCard
@@ -245,6 +250,15 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
               onAddToCollectionClick={(e) => handleAddToCollectionClick(asset, e)}
               isFavorite={isFavorited}
               onFavoriteToggle={(e) => handleFavoriteToggle(asset, e)}
+              isSelected={isSelected}
+              onSelectToggle={
+                dashboardSelection
+                  ? (id, e) => {
+                      e.stopPropagation();
+                      dashboardSelection.handleSelectToggle(asset);
+                    }
+                  : undefined
+              }
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fit"

@@ -136,6 +136,7 @@ class LoggingConfig(BaseModel):
     cloudwatch_retention_days: int = 90
     waf_retention_days: int = 90
     api_gateway_retention_days: int = 90
+    lambda_cloudwatch_log_retention_days: int = 90  # Lambda log group retention
 
     @field_validator("level")
     @classmethod

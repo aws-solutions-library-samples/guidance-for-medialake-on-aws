@@ -24,6 +24,7 @@ import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { type AssetItem, type Filters, type ExpandedSections } from "./types";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { useSemanticMode } from "@/stores/searchStore";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 
 interface SearchPagePresentationProps {
   // Search data
@@ -476,7 +477,7 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
                 searchMetadata={{
                   totalResults: error ? 0 : searchMetadata?.totalResults || 0,
                   page: searchMetadata?.page || 1,
-                  pageSize: searchMetadata?.pageSize || 50,
+                  pageSize: searchMetadata?.pageSize || DEFAULT_PAGE_SIZE,
                 }}
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}

@@ -16,15 +16,15 @@ def create_permission_mapping() -> Dict[str, str]:
     """
     return {
         # Assets endpoints
-        "get /api/assets": "assets:read",
-        "post /api/assets/upload": "assets:create",
+        "get /api/assets": "assets:view",
+        "post /api/assets/upload": "assets:upload",
         "delete /api/assets/{id}": "assets:delete",
-        "put /api/assets/{id}": "assets:update",
-        "get /api/assets/{id}": "assets:read",
-        "post /api/assets/{id}/rename": "assets:update",
-        "get /api/assets/{id}/transcript": "assets:read",
-        "get /api/assets/{id}/related_versions": "assets:read",
-        "post /api/assets/generate_presigned_url": "assets:create",
+        "put /api/assets/{id}": "assets:edit",
+        "get /api/assets/{id}": "assets:view",
+        "post /api/assets/{id}/rename": "assets:edit",
+        "get /api/assets/{id}/transcript": "assets:view",
+        "get /api/assets/{id}/related_versions": "assets:view",
+        "post /api/assets/generate_presigned_url": "assets:upload",
         # Download endpoints
         "get /api/download/bulk": "assets:download",
         "post /api/download/bulk": "assets:download",
@@ -33,14 +33,14 @@ def create_permission_mapping() -> Dict[str, str]:
         "delete /api/download/bulk/{jobId}": "assets:download",
         "get /api/download/bulk/user": "assets:download",
         # Settings endpoints
-        "get /api/settings/api_keys": "settings:read",  #  pragma: allowlist secret
-        "post /api/settings/api_keys": "settings:create",  #  pragma: allowlist secret
-        "put /api/settings/api_keys/{id}": "settings:update",
-        "delete /api/settings/api_keys/{id}": "settings:delete",
+        "get /api/settings/api_keys": "api-keys:view",  #  pragma: allowlist secret
+        "post /api/settings/api_keys": "api-keys:create",  #  pragma: allowlist secret
+        "put /api/settings/api_keys/{id}": "api-keys:edit",
+        "delete /api/settings/api_keys/{id}": "api-keys:delete",
         # Permissions endpoints
-        "get /api/permissions": "permissions:read",
+        "get /api/permissions": "permissions:view",
         "post /api/permissions": "permissions:create",
-        "put /api/permissions/{id}": "permissions:update",
+        "put /api/permissions/{id}": "permissions:edit",
         "delete /api/permissions/{id}": "permissions:delete",
     }
 
@@ -191,12 +191,12 @@ def test_permission_mapping():
     mapping = create_permission_mapping()
 
     # Test some key mappings
-    assert mapping["get /api/assets"] == "assets:read"
-    assert mapping["post /api/assets/upload"] == "assets:create"
+    assert mapping["get /api/assets"] == "assets:view"
+    assert mapping["post /api/assets/upload"] == "assets:upload"
     assert mapping["delete /api/assets/{id}"] == "assets:delete"
     assert (
         mapping["get /api/settings/api_keys"]
-        == "settings:read"  #  pragma: allowlist secret
+        == "api-keys:view"  #  pragma: allowlist secret
     )
 
     print(f"✅ Permission mapping created with {len(mapping)} entries")
@@ -249,7 +249,7 @@ def test_get_required_permission():
 
     # Test exact matches
     result = get_required_permission("get", "/api/assets", None)
-    assert result == "assets:read"
+    assert result == "assets:view"
 
     # Test with path parameters
     result = get_required_permission("delete", "/api/assets/123", {"id": "123"})
@@ -257,7 +257,7 @@ def test_get_required_permission():
 
     # Test pattern matching
     result = get_required_permission("get", "/api/assets/456", {"id": "456"})
-    assert result == "assets:read"
+    assert result == "assets:view"
 
     # Test non-existent permission
     result = get_required_permission("patch", "/api/nonexistent", None)
@@ -275,8 +275,8 @@ def test_validate_api_key_permissions():
         "id": "test-key-1",
         "name": "Test Key",
         "permissions": {
-            "assets:read": True,
-            "assets:create": True,
+            "assets:view": True,
+            "assets:upload": True,
             "assets:delete": False,
         },
     }
@@ -289,7 +289,7 @@ def test_validate_api_key_permissions():
     }
 
     # Test with valid permission
-    result = validate_api_key_permissions(api_key_with_permissions, "assets:read")
+    result = validate_api_key_permissions(api_key_with_permissions, "assets:view")
     assert result == True
 
     # Test with denied permission
@@ -297,11 +297,11 @@ def test_validate_api_key_permissions():
     assert result == False
 
     # Test with missing permission
-    result = validate_api_key_permissions(api_key_with_permissions, "settings:read")
+    result = validate_api_key_permissions(api_key_with_permissions, "api-keys:view")
     assert result == False
 
     # Test with no permissions
-    result = validate_api_key_permissions(api_key_no_permissions, "assets:read")
+    result = validate_api_key_permissions(api_key_no_permissions, "assets:view")
     assert result == False
 
     print("✅ API key permission validation working correctly")
@@ -311,12 +311,12 @@ def test_integration_scenarios():
     """Test complete integration scenarios."""
     print("\nTesting integration scenarios...")
 
-    # Scenario 1: GET /api/assets/123 with assets:read permission
-    print("\n--- Scenario 1: GET /api/assets/123 with assets:read permission ---")
-    api_key = {"id": "integration-test-1", "permissions": {"assets:read": True}}
+    # Scenario 1: GET /api/assets/123 with assets:view permission
+    print("\n--- Scenario 1: GET /api/assets/123 with assets:view permission ---")
+    api_key = {"id": "integration-test-1", "permissions": {"assets:view": True}}
 
     required_perm = get_required_permission("get", "/api/assets/123", {"id": "123"})
-    assert required_perm == "assets:read"
+    assert required_perm == "assets:view"
 
     has_permission = validate_api_key_permissions(api_key, required_perm)
     assert has_permission == True
@@ -331,17 +331,17 @@ def test_integration_scenarios():
     has_permission = validate_api_key_permissions(api_key, required_perm)
     assert has_permission == False
 
-    # Scenario 3: POST /api/settings/api_keys with settings:create permission
+    # Scenario 3: POST /api/settings/api_keys with api-keys:create permission
     print(
-        "\n--- Scenario 3: POST /api/settings/api_keys with settings:create permission ---"
+        "\n--- Scenario 3: POST /api/settings/api_keys with api-keys:create permission ---"
     )
     api_key_admin = {
         "id": "admin-key",
-        "permissions": {"settings:create": True, "settings:read": True},
+        "permissions": {"api-keys:create": True, "api-keys:view": True},
     }
 
     required_perm = get_required_permission("post", "/api/settings/api_keys", None)
-    assert required_perm == "settings:create"
+    assert required_perm == "api-keys:create"
 
     has_permission = validate_api_key_permissions(api_key_admin, required_perm)
     assert has_permission == True

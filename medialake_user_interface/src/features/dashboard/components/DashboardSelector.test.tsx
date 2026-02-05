@@ -7,87 +7,87 @@
  *
  * Property 5: UI Visibility Based on Permission
  * *For any* user viewing the dashboard selector menu, the "Save as Default Dashboard"
- * option SHALL be visible if and only if the user has the `dashboard:admin` permission.
+ * option SHALL be visible if and only if the user has the `defaultDashboard:edit` permission.
  *
  * These tests verify the component's permission-based visibility logic without
  * requiring DOM rendering, following the project's testing patterns.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 /**
  * Test the permission check logic that controls "Save as Default Dashboard" visibility.
  *
  * The DashboardSelector component uses:
  *   const { can } = usePermission();
- *   const canAdminDashboard = can("admin", "dashboard");
+ *   const canEditDefaultDashboard = can("edit", "defaultDashboard");
  *
  * And conditionally renders the menu item:
- *   {canAdminDashboard && ( <MenuItem>Save as Default Dashboard</MenuItem> )}
+ *   {canEditDefaultDashboard && ( <MenuItem>Save as Default Dashboard</MenuItem> )}
  */
 describe("DashboardSelector - Property 5: UI Visibility Based on Permission", () => {
   /**
    * Property 5a: Permission check interface.
    *
-   * The component should check for "admin" action on "dashboard" subject.
+   * The component should check for "edit" action on "defaultDashboard" subject.
    *
    * **Validates: Requirements 5.1, 5.2, 7.1**
    */
-  it("should use correct permission check: can('admin', 'dashboard')", () => {
+  it("should use correct permission check: can('edit', 'defaultDashboard')", () => {
     // The permission check in DashboardSelector is:
-    // const canAdminDashboard = can("admin", "dashboard");
+    // const canEditDefaultDashboard = can("edit", "defaultDashboard");
     const mockCan = vi.fn().mockReturnValue(true);
 
     // Simulate the permission check
-    const canAdminDashboard = mockCan("admin", "dashboard");
+    const canEditDefaultDashboard = mockCan("edit", "defaultDashboard");
 
-    expect(mockCan).toHaveBeenCalledWith("admin", "dashboard");
-    expect(canAdminDashboard).toBe(true);
+    expect(mockCan).toHaveBeenCalledWith("edit", "defaultDashboard");
+    expect(canEditDefaultDashboard).toBe(true);
   });
 
   /**
-   * Property 5b: Visibility logic for admin users.
+   * Property 5b: Visibility logic for users with permission.
    *
-   * When can("admin", "dashboard") returns true, the "Save as Default Dashboard"
-   * menu item should be rendered (canAdminDashboard && <MenuItem>).
+   * When can("edit", "defaultDashboard") returns true, the "Save as Default Dashboard"
+   * menu item should be rendered (canEditDefaultDashboard && <MenuItem>).
    *
    * **Validates: Requirement 5.1**
    */
-  it("should show 'Save as Default Dashboard' when user has dashboard:admin permission", () => {
+  it("should show 'Save as Default Dashboard' when user has defaultDashboard:edit permission", () => {
     const mockCan = vi.fn().mockImplementation((action: string, subject: string) => {
-      return action === "admin" && subject === "dashboard";
+      return action === "edit" && subject === "defaultDashboard";
     });
 
-    const canAdminDashboard = mockCan("admin", "dashboard");
+    const canEditDefaultDashboard = mockCan("edit", "defaultDashboard");
 
-    // The component renders: {canAdminDashboard && <MenuItem>...}
-    // So when canAdminDashboard is true, the menu item is rendered
-    expect(canAdminDashboard).toBe(true);
+    // The component renders: {canEditDefaultDashboard && <MenuItem>...}
+    // So when canEditDefaultDashboard is true, the menu item is rendered
+    expect(canEditDefaultDashboard).toBe(true);
 
     // Verify the conditional rendering logic
-    const shouldRenderSaveAsDefault = canAdminDashboard;
+    const shouldRenderSaveAsDefault = canEditDefaultDashboard;
     expect(shouldRenderSaveAsDefault).toBe(true);
   });
 
   /**
-   * Property 5c: Visibility logic for non-admin users.
+   * Property 5c: Visibility logic for users without permission.
    *
-   * When can("admin", "dashboard") returns false, the "Save as Default Dashboard"
+   * When can("edit", "defaultDashboard") returns false, the "Save as Default Dashboard"
    * menu item should NOT be rendered.
    *
    * **Validates: Requirement 5.2**
    */
-  it("should NOT show 'Save as Default Dashboard' when user lacks dashboard:admin permission", () => {
+  it("should NOT show 'Save as Default Dashboard' when user lacks defaultDashboard:edit permission", () => {
     const mockCan = vi.fn().mockReturnValue(false);
 
-    const canAdminDashboard = mockCan("admin", "dashboard");
+    const canEditDefaultDashboard = mockCan("edit", "defaultDashboard");
 
-    // The component renders: {canAdminDashboard && <MenuItem>...}
-    // So when canAdminDashboard is false, the menu item is NOT rendered
-    expect(canAdminDashboard).toBe(false);
+    // The component renders: {canEditDefaultDashboard && <MenuItem>...}
+    // So when canEditDefaultDashboard is false, the menu item is NOT rendered
+    expect(canEditDefaultDashboard).toBe(false);
 
     // Verify the conditional rendering logic
-    const shouldRenderSaveAsDefault = canAdminDashboard;
+    const shouldRenderSaveAsDefault = canEditDefaultDashboard;
     expect(shouldRenderSaveAsDefault).toBe(false);
   });
 
@@ -95,27 +95,27 @@ describe("DashboardSelector - Property 5: UI Visibility Based on Permission", ()
    * Property 5d: Permission specificity.
    *
    * Having other permissions should NOT make the "Save as Default Dashboard"
-   * option visible - only dashboard:admin matters.
+   * option visible - only defaultDashboard:edit matters.
    *
    * **Validates: Requirements 5.1, 5.2**
    */
-  it("should only check for dashboard:admin, not other permissions", () => {
+  it("should only check for defaultDashboard:edit, not other permissions", () => {
     const mockCan = vi.fn().mockImplementation((action: string, subject: string) => {
-      // User has various permissions but NOT dashboard:admin
+      // User has various permissions but NOT defaultDashboard:edit
       if (action === "view" && subject === "asset") return true;
       if (action === "edit" && subject === "settings") return true;
       if (action === "manage" && subject === "user") return true;
-      if (action === "admin" && subject === "dashboard") return false;
+      if (action === "edit" && subject === "defaultDashboard") return false;
       return false;
     });
 
-    // The component only checks dashboard:admin
-    const canAdminDashboard = mockCan("admin", "dashboard");
+    // The component only checks defaultDashboard:edit
+    const canEditDefaultDashboard = mockCan("edit", "defaultDashboard");
 
-    expect(canAdminDashboard).toBe(false);
+    expect(canEditDefaultDashboard).toBe(false);
 
     // Even though user has other permissions, Save as Default should not show
-    const shouldRenderSaveAsDefault = canAdminDashboard;
+    const shouldRenderSaveAsDefault = canEditDefaultDashboard;
     expect(shouldRenderSaveAsDefault).toBe(false);
   });
 });
@@ -128,22 +128,26 @@ describe("DashboardSelector - Property 5: UI Visibility Based on Permission", ()
 describe("DashboardSelector - Property-Based UI Visibility", () => {
   /**
    * Property 5: For any permission state, the Save as Default option
-   * visibility should match the dashboard:admin permission exactly.
+   * visibility should match the defaultDashboard:edit permission exactly.
    */
   it.each([
-    { hasAdmin: true, expectedVisible: true, description: "admin user sees option" },
-    { hasAdmin: false, expectedVisible: false, description: "non-admin user does not see option" },
+    { hasPermission: true, expectedVisible: true, description: "user with permission sees option" },
+    {
+      hasPermission: false,
+      expectedVisible: false,
+      description: "user without permission does not see option",
+    },
   ])(
-    "should render Save as Default = $expectedVisible when hasAdmin = $hasAdmin ($description)",
-    ({ hasAdmin, expectedVisible }) => {
+    "should render Save as Default = $expectedVisible when hasPermission = $hasPermission ($description)",
+    ({ hasPermission, expectedVisible }) => {
       const mockCan = vi.fn().mockImplementation((action: string, subject: string) => {
-        return hasAdmin && action === "admin" && subject === "dashboard";
+        return hasPermission && action === "edit" && subject === "defaultDashboard";
       });
 
-      const canAdminDashboard = mockCan("admin", "dashboard");
+      const canEditDefaultDashboard = mockCan("edit", "defaultDashboard");
 
-      // The conditional rendering: {canAdminDashboard && <MenuItem>...}
-      const shouldRenderSaveAsDefault = canAdminDashboard;
+      // The conditional rendering: {canEditDefaultDashboard && <MenuItem>...}
+      const shouldRenderSaveAsDefault = canEditDefaultDashboard;
 
       expect(shouldRenderSaveAsDefault).toBe(expectedVisible);
     }
@@ -209,24 +213,24 @@ describe("DashboardSelector - Save as Default Handler", () => {
 });
 
 /**
- * Test that standard menu items remain visible regardless of admin permission.
+ * Test that standard menu items remain visible regardless of permission.
  *
  * **Validates: Requirement 6.4**
  */
 describe("DashboardSelector - Standard Menu Items", () => {
   /**
    * Standard menu items (Save Current Layout, Save New Dashboard, Manage Dashboards)
-   * should always be available regardless of dashboard:admin permission.
+   * should always be available regardless of defaultDashboard:edit permission.
    *
    * **Validates: Requirement 6.4**
    */
-  it("should always render standard menu items regardless of admin permission", () => {
-    // These menu items are always rendered (not conditional on canAdminDashboard):
+  it("should always render standard menu items regardless of permission", () => {
+    // These menu items are always rendered (not conditional on canEditDefaultDashboard):
     // - Save Current Layout
     // - Save New Dashboard
     // - Manage Dashboards
 
-    // The component structure shows these are NOT wrapped in {canAdminDashboard && ...}
+    // The component structure shows these are NOT wrapped in {canEditDefaultDashboard && ...}
     // They are always rendered, only "Save as Default Dashboard" is conditional
 
     const standardMenuItems = ["Save Current Layout", "Save New Dashboard", "Manage Dashboards"];

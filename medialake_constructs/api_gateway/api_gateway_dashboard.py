@@ -118,6 +118,15 @@ class DashboardApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /dashboard/layout/default resource
+        layout_default_resource = layout_resource.add_resource("default")
+        layout_default_method = layout_default_resource.add_method(
+            "ANY", dashboard_integration
+        )
+        cfn_method = layout_default_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # /dashboard/layout/reset resource
         layout_reset_resource = layout_resource.add_resource("reset")
         layout_reset_method = layout_reset_resource.add_method(
@@ -153,6 +162,7 @@ class DashboardApi(Construct):
         # Add CORS support to all resources
         add_cors_options_method(dashboard_resource)
         add_cors_options_method(layout_resource)
+        add_cors_options_method(layout_default_resource)
         add_cors_options_method(layout_reset_resource)
         add_cors_options_method(presets_resource)
         add_cors_options_method(preset_id_resource)

@@ -37,7 +37,8 @@ export type Subjects =
   | "region"
   | "system-settings"
   | "collection-types"
-  | "dashboard";
+  | "dashboard"
+  | "defaultDashboard";
 
 // Define the conditions type for subject-based authorization
 export type Conditions = MongoQuery;

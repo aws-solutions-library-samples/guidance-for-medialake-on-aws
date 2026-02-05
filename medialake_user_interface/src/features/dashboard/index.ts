@@ -22,3 +22,8 @@ export {
   useCollectionsWidgetData,
   useRecentAssetsWidgetData,
 } from "./hooks/useWidgetData";
+export {
+  DashboardSelectionProvider,
+  useDashboardSelection,
+  useDashboardSelectionRequired,
+} from "./contexts/DashboardSelectionContext";

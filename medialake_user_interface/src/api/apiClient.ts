@@ -83,26 +83,38 @@ class ApiClient extends ApiClientBase {
 
     this.axiosInstance.interceptors.response.use(
       (response) => {
+        // Check if response is HTML (CloudFront returning index.html for non-existent routes)
+        const isHtmlResponse =
+          typeof response.data === "string" && response.data.includes("<!DOCTYPE html>");
+
+        if (isHtmlResponse) {
+          console.log("⚠️ API Response returned HTML (endpoint likely doesn't exist):", {
+            status: response.status,
+            url: response.config.url,
+            method: response.config.method?.toUpperCase(),
+          });
+          // Return response as-is, let the calling code handle it
+          return response;
+        }
+
         console.log("✅ API Response Success:", {
           status: response.status,
           url: response.config.url,
           method: response.config.method?.toUpperCase(),
-          rawData: response.data,
-          hasBody: "body" in (response.data || {}),
-          hasSuccess: "success" in (response.data || {}),
-          hasData: "data" in (response.data || {}),
         });
 
         // Unwrap Lambda proxy integration response format
         // API returns: {statusCode, body: {success, data}}
         // We need: {success, data}
-        if (response.data && typeof response.data === "object" && "body" in response.data) {
+        // Only unwrap if body is an object, not a string (some APIs return stringified JSON)
+        if (
+          response.data &&
+          typeof response.data === "object" &&
+          "body" in response.data &&
+          typeof response.data.body === "object"
+        ) {
           console.log("🔄 Unwrapping Lambda proxy response format");
-          console.log("Before unwrap:", JSON.stringify(response.data, null, 2));
           response.data = response.data.body;
-          console.log("After unwrap:", JSON.stringify(response.data, null, 2));
-        } else {
-          console.log("ℹ️ Response already in correct format (no body field to unwrap)");
         }
 
         return response;
@@ -118,6 +130,53 @@ class ApiClient extends ApiClientBase {
         });
 
         const originalRequest = error.config;
+
+        // Handle 403 Forbidden errors from API Gateway (not S3)
+        // API Gateway returns JSON, S3 returns XML
+        // We need to check this before CloudFront converts the error
+        if (error.response?.status === 403) {
+          const contentType = error.response?.headers?.["content-type"] || "";
+          const isApiError =
+            contentType.includes("application/json") ||
+            error.response?.data?.authError ||
+            error.response?.data?.message;
+
+          // Only redirect if this is an API authorization error, not an S3 error
+          if (isApiError) {
+            console.log("🚫 403 Forbidden from API - Redirecting to access-denied page");
+
+            // Extract error details from response
+            const authError =
+              error.response?.data?.authError ||
+              error.response?.data?.message ||
+              "You don't have permission to perform this action";
+            const requiredPermission = error.response?.data?.requiredPermission;
+
+            console.log("Permission Error Details:", {
+              authError,
+              requiredPermission,
+              fullResponse: error.response?.data,
+            });
+
+            // Use dynamic import to avoid circular dependency issues
+            import("@/utils/navigation").then(({ navigateToAccessDenied }) => {
+              navigateToAccessDenied({
+                message: authError,
+                requiredPermission,
+                attemptedUrl: error.config?.url,
+                timestamp: new Date().toISOString(),
+              });
+            });
+
+            // Still reject the promise so calling code can handle it if needed
+            return Promise.reject(error);
+          } else {
+            console.log(
+              "🗂️ 403 Forbidden from S3 - Letting CloudFront handle it (will serve index.html)"
+            );
+            // Let S3 403 errors pass through - CloudFront will convert to index.html
+          }
+        }
 
         // Check if error is token expiration
         if (

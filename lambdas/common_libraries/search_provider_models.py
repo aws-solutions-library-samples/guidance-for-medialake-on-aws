@@ -10,6 +10,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+# Pagination constants
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 500
+
 
 class SearchArchitectureType(Enum):
     """Types of search architectures supported"""
@@ -103,7 +107,7 @@ def create_search_query_from_params(query_params: Dict[str, Any]) -> SearchQuery
     # Extract basic parameters
     query_text = query_params.get("q", "")
     page = int(query_params.get("page", 1))
-    page_size = int(query_params.get("pageSize", 50))
+    page_size = int(query_params.get("pageSize", DEFAULT_PAGE_SIZE))
     semantic = query_params.get("semantic", "false").lower() == "true"
 
     # Calculate page offset

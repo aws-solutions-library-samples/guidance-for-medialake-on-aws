@@ -136,12 +136,26 @@ export default {
       size: "Taille",
     },
   },
+  facetFilter: {
+    title: "Filtres",
+    clearAll: "Tout effacer",
+    activeFilters: "{{count}} filtre actif",
+    activeFilters_other: "{{count}} filtres actifs",
+    fileType: "Type de fichier",
+    format: "Format",
+    noFiltersAvailable: "Aucun filtre disponible",
+  },
   assetExplorer: {
     noConnectorSelected: "Sélectionnez un connecteur pour afficher les actifs",
     noAssetsFound: "Aucun actif trouvé pour ce connecteur",
     noIndexedAssets:
       'Aucun actif indexé n\'a été trouvé pour ce connecteur avec le compartiment "{{bucketName}}".',
     loadingAssets: "Chargement des actifs...",
+    bucketNotFound: "Compartiment introuvable",
+    invalidBucketName: "Nom de compartiment invalide",
+    permissionDenied: "Permission refusée",
+    pageOutOfRange:
+      "La page {{requestedPage}} est hors limites. Redirection vers la page {{totalPages}}.",
     menu: {
       rename: "Renommer",
       share: "Partager",

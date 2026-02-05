@@ -23,7 +23,7 @@ tracer = Tracer(service="dashboard-layout")
 metrics = Metrics(namespace="medialake", service="dashboard")
 
 # Permission constants
-DASHBOARD_ADMIN_PERMISSION = "dashboard:admin"
+DEFAULT_DASHBOARD_EDIT_PERMISSION = "defaultDashboard:edit"
 
 
 def register_layout_routes(app):
@@ -36,7 +36,7 @@ def register_layout_routes(app):
         Save the current layout as the system default.
 
         POST /dashboard/layout/default
-        Requires dashboard:admin permission.
+        Requires defaultDashboard:edit permission.
 
         Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5
         """
@@ -49,17 +49,17 @@ def register_layout_routes(app):
             if not user_id:
                 return _error_response(401, "UNAUTHORIZED", "Authentication required")
 
-            # Check for dashboard:admin permission
-            if not _has_dashboard_admin_permission(app.current_event.raw_event):
+            # Check for defaultDashboard:edit permission
+            if not _has_default_dashboard_edit_permission(app.current_event.raw_event):
                 logger.warning(
-                    "Dashboard admin permission denied",
+                    "Default dashboard edit permission denied",
                     extra={"user_id": user_id},
                 )
                 metrics.add_metric(
                     name="DefaultLayoutSavesDenied", unit=MetricUnit.Count, value=1
                 )
                 return _error_response(
-                    403, "FORBIDDEN", "Dashboard admin permission required"
+                    403, "FORBIDDEN", "Default dashboard edit permission required"
                 )
 
             body = app.current_event.json_body or {}
@@ -460,25 +460,25 @@ def _validation_error_response(errors: list) -> dict:
 
 # Permission helper functions
 @tracer.capture_method
-def _has_dashboard_admin_permission(event: dict) -> bool:
+def _has_default_dashboard_edit_permission(event: dict) -> bool:
     """
-    Check if the user has dashboard:admin permission.
+    Check if the user has defaultDashboard:edit permission.
 
     Extracts permissions from the JWT claims in the authorizer context
-    and checks for the dashboard:admin permission.
+    and checks for the defaultDashboard:edit permission.
 
     Args:
         event: The raw Lambda event from API Gateway
 
     Returns:
-        True if user has dashboard:admin permission, False otherwise
+        True if user has defaultDashboard:edit permission, False otherwise
     """
     try:
         permissions = _extract_permissions_from_event(event)
-        has_permission = DASHBOARD_ADMIN_PERMISSION in permissions
+        has_permission = DEFAULT_DASHBOARD_EDIT_PERMISSION in permissions
 
         logger.debug(
-            "Dashboard admin permission check",
+            "Default dashboard edit permission check",
             extra={
                 "has_permission": has_permission,
                 "permissions_count": len(permissions),
@@ -488,7 +488,7 @@ def _has_dashboard_admin_permission(event: dict) -> bool:
         return has_permission
     except Exception as e:
         logger.warning(
-            "Error checking dashboard admin permission",
+            "Error checking default dashboard edit permission",
             extra={"error": str(e)},
         )
         return False
@@ -506,7 +506,7 @@ def _extract_permissions_from_event(event: dict) -> list:
         event: The raw Lambda event from API Gateway
 
     Returns:
-        List of permission strings (e.g., ["dashboard:admin", "assets:view"])
+        List of permission strings (e.g., ["defaultDashboard:edit", "assets:view"])
     """
     try:
         request_context = event.get("requestContext", {})

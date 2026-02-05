@@ -45,10 +45,25 @@ def validate_widget_count(widgets: List[Dict[str, Any]]) -> ValidationResult:
 def validate_widget_sizes(
     widgets: List[Dict[str, Any]], layouts: Dict[str, List[Dict[str, Any]]]
 ) -> ValidationResult:
-    """Validate widget sizes against type constraints."""
+    """
+    Validate widget sizes against type constraints.
+
+    Size constraints are applied per breakpoint:
+    - lg (large): Full constraints apply (12-column grid)
+    - md (medium): Relaxed minimum width (10-column grid)
+    - sm (small): Minimal constraints (1-2 column grid, widgets can be full width)
+    """
     result = ValidationResult()
 
     widget_types = {w["id"]: w.get("type") for w in widgets}
+
+    # Breakpoint-specific minimum width multipliers
+    # sm breakpoint typically has 1-2 columns, so min width of 1 is valid
+    breakpoint_min_width_override = {
+        "sm": 1,  # Small screens: allow width of 1 (full width on mobile)
+        "md": 2,  # Medium screens: allow smaller widgets
+        # "lg" uses the default constraints
+    }
 
     for breakpoint, layout_items in layouts.items():
         for item in layout_items:
@@ -64,16 +79,22 @@ def validate_widget_sizes(
 
             w, h = item.get("w", 0), item.get("h", 0)
 
-            if w < min_size["w"]:
+            # Apply breakpoint-specific minimum width override
+            effective_min_w = breakpoint_min_width_override.get(
+                breakpoint, min_size["w"]
+            )
+
+            if w < effective_min_w:
                 result.add_error(
                     f"layouts.{breakpoint}[{widget_id}].w",
-                    f"Width {w} below minimum {min_size['w']} for '{widget_type}'",
+                    f"Width {w} below minimum {effective_min_w} for '{widget_type}'",
                 )
             if w > max_size["w"]:
                 result.add_error(
                     f"layouts.{breakpoint}[{widget_id}].w",
                     f"Width {w} exceeds maximum {max_size['w']} for '{widget_type}'",
                 )
+            # Height constraints remain the same across breakpoints
             if h < min_size["h"]:
                 result.add_error(
                     f"layouts.{breakpoint}[{widget_id}].h",

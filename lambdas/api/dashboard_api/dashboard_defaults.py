@@ -17,6 +17,11 @@ WIDGET_CONSTRAINTS = {
         "minSize": {"w": 4, "h": 2},
         "maxSize": {"w": 12, "h": 8},
     },
+    "collection-group": {
+        "defaultSize": {"w": 6, "h": 4},
+        "minSize": {"w": 3, "h": 2},
+        "maxSize": {"w": 12, "h": 8},
+    },
 }
 
 # Default layout configuration with 8 widgets

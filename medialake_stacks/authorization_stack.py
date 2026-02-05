@@ -241,6 +241,7 @@ class AuthorizationStack(Stack):
                 "timestamp": str(
                     datetime.datetime.now().timestamp()
                 ),  # Force update on each deployment
+                "schemaVersion": "2.3.0",  # Increment to force permission set updates
             },
         )
 

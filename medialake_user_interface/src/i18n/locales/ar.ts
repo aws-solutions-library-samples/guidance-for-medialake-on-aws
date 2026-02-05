@@ -131,11 +131,25 @@ export default {
       size: "Size",
     },
   },
+  facetFilter: {
+    title: "المرشحات",
+    clearAll: "مسح الكل",
+    activeFilters: "{{count}} مرشح نشط",
+    activeFilters_other: "{{count}} مرشحات نشطة",
+    fileType: "نوع الملف",
+    format: "التنسيق",
+    noFiltersAvailable: "لا توجد مرشحات متاحة",
+  },
   assetExplorer: {
     noConnectorSelected: "اختر موصل لعرض الأصول",
     noAssetsFound: "لم يتم العثور على أصول لهذا الموصل",
     noIndexedAssets: 'لم يتم العثور على أصول مفهرسة لهذا الموصل في الحاوية "{{bucketName}}".',
     loadingAssets: "جارٍ تحميل الأصول...",
+    bucketNotFound: "الحاوية غير موجودة",
+    invalidBucketName: "اسم الحاوية غير صالح",
+    permissionDenied: "تم رفض الإذن",
+    pageOutOfRange:
+      "الصفحة {{requestedPage}} خارج النطاق. إعادة التوجيه إلى الصفحة {{totalPages}}.",
     menu: {
       rename: "إعادة التسمية",
       share: "مشاركة",
