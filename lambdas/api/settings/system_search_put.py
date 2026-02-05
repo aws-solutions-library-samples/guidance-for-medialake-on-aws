@@ -191,6 +191,8 @@ def register_route(app):
                 "endpoint",
                 "isEnabled",
                 "embeddingStore",
+                "dimensions",
+                "inference_provider",
             ]
             for field in body:
                 if field not in allowed_fields:
@@ -199,6 +201,26 @@ def register_route(app):
                         "message": f"Invalid field: {field}. Allowed fields are: {', '.join(allowed_fields)}",
                         "data": {},
                     }
+
+            # Validate dimensions if provided
+            if "dimensions" in body:
+                allowed_dimensions = [256, 384, 512, 1024, 1536, 3072]
+                if body["dimensions"] not in allowed_dimensions:
+                    return {
+                        "status": "error",
+                        "message": f"Invalid dimensions. Allowed values: {allowed_dimensions}",
+                        "data": {},
+                    }
+
+            # Validate inference_provider if provided
+            if "inference_provider" in body and not isinstance(
+                body["inference_provider"], str
+            ):
+                return {
+                    "status": "error",
+                    "message": "inference_provider must be a string",
+                    "data": {},
+                }
 
             # Validate embedding store if provided
             if "embeddingStore" in body:
@@ -330,6 +352,14 @@ def register_route(app):
                     "updatedAt": now,
                 }
 
+                if "dimensions" in body:
+                    search_provider_item["dimensions"] = body["dimensions"]
+
+                if "inference_provider" in body:
+                    search_provider_item["inference_provider"] = body[
+                        "inference_provider"
+                    ]
+
                 if secret_arn:
                     search_provider_item["secretArn"] = secret_arn
 
@@ -361,6 +391,18 @@ def register_route(app):
                 if "isEnabled" in body:
                     update_expression_parts.append("isEnabled = :isEnabled")
                     expression_attribute_values[":isEnabled"] = body["isEnabled"]
+
+                if "dimensions" in body:
+                    update_expression_parts.append("dimensions = :dimensions")
+                    expression_attribute_values[":dimensions"] = body["dimensions"]
+
+                if "inference_provider" in body:
+                    update_expression_parts.append(
+                        "inference_provider = :inference_provider"
+                    )
+                    expression_attribute_values[":inference_provider"] = body[
+                        "inference_provider"
+                    ]
 
                 if coactive_dataset_id:
                     update_expression_parts.append("datasetId = :datasetId")
@@ -395,7 +437,10 @@ def register_route(app):
                 # Don't expose the secret ARN in the response
                 has_secret = updated_provider.pop("secretArn", None) is not None
                 # Provider is configured if it has a secret ARN or if it's Bedrock (which doesn't need one)
-                is_bedrock = updated_provider.get("type") == "twelvelabs-bedrock"
+                is_bedrock = updated_provider.get("type") in [
+                    "twelvelabs-bedrock",
+                    "twelvelabs-bedrock-3-0",
+                ]
                 updated_provider["isConfigured"] = has_secret or is_bedrock
 
             # Handle embedding store update if provided

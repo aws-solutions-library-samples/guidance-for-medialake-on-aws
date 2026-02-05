@@ -1,3 +1,17 @@
+"""
+OpenSearch Index Creation for Media Assets
+
+ARCHITECTURE: Separate Documents Approach
+------------------------------------------
+Clip embeddings are stored as individual documents (not nested arrays) to avoid:
+- Document size limits (4GB max caused circuit breaker errors)
+- Version conflicts from concurrent writes to same parent document
+- Slow updates as arrays grow large
+
+Each clip document has parent_asset_id linking to its master asset document.
+Search queries filter by embedding_scope="clip" and group results by parent_asset_id.
+"""
+
 import json
 import os
 import time
@@ -9,6 +23,9 @@ from lambda_utils import lambda_handler_decorator, logger
 from requests import request
 
 VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
+
+# Index name for the separate asset embeddings index (Marengo 3.0)
+ASSET_EMBEDDINGS_INDEX = "asset-embeddings"
 
 
 def index_exists(
@@ -256,14 +273,56 @@ def handler(event, context):
         },
         "mappings": {
             "properties": {
+                # ═══════════════════════════════════════════════════════════
+                # COMMON FIELDS (used by both master and separate embedding documents)
+                # ═══════════════════════════════════════════════════════════
                 "type": {"type": "text"},
                 "document_id": {"type": "text"},
                 "InventoryID": {"type": "text"},
                 "FileHash": {"type": "text"},
                 "StoragePath": {"type": "text"},
-                "start_timecode": {"type": "keyword"},
-                "end_timecode": {"type": "keyword"},
-                "embedding_scope": {"type": "keyword"},
+                "timestamp": {"type": "date"},
+                # ═══════════════════════════════════════════════════════════
+                # LEGACY FIELDS (backward compatibility)
+                # ═══════════════════════════════════════════════════════════
+                "embedding_scope": {
+                    "type": "keyword"
+                },  # LEGACY: Used for backward compatibility
+                # ═══════════════════════════════════════════════════════════
+                # SEPARATE EMBEDDING DOCUMENT FIELDS (per EmbeddingSegment schema)
+                # Used for separate clip/asset embedding documents
+                # ═══════════════════════════════════════════════════════════
+                # Required fields per schema
+                "inventory_id": {"type": "keyword"},
+                "embedding_type": {"type": "keyword"},
+                "model_provider": {"type": "keyword"},
+                "inference_provider": {"type": "keyword"},
+                "model_name": {"type": "keyword"},
+                "model_version": {"type": "keyword"},
+                "start_seconds": {"type": "integer"},
+                "end_seconds": {"type": "integer"},
+                "start_smpte_timecode": {"type": "keyword"},
+                "end_smpte_timecode": {"type": "keyword"},
+                "created_at": {"type": "date"},
+                "embedding_granularity": {"type": "keyword"},
+                "segmentation_method": {"type": "keyword"},
+                "embedding_representation": {"type": "keyword"},
+                "embedding_dimension": {"type": "integer"},
+                "space_type": {"type": "keyword"},
+                # LEGACY: Kept for backward compatibility
+                "parent_asset_id": {
+                    "type": "keyword"
+                },  # LEGACY: Use inventory_id instead
+                "start_timecode": {
+                    "type": "keyword"
+                },  # LEGACY: Use start_smpte_timecode instead
+                "end_timecode": {
+                    "type": "keyword"
+                },  # LEGACY: Use end_smpte_timecode instead
+                "timestamp": {"type": "date"},  # LEGACY: Use created_at instead
+                # ═══════════════════════════════════════════════════════════
+                # EMBEDDING VECTOR FIELDS (multiple dimensions supported)
+                # ═══════════════════════════════════════════════════════════
                 "embedding": {
                     "type": "knn_vector",
                     "dimension": 1024,
@@ -273,6 +332,63 @@ def handler(event, context):
                         "engine": "nmslib",
                     },
                 },
+                "embedding_256_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 256,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_384_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 384,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_512_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 512,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_1024_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_1536_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 1536,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_3072_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 3072,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                # ═══════════════════════════════════════════════════════════
+                # MASTER DOCUMENT FIELDS (asset metadata)
+                # ═══════════════════════════════════════════════════════════
                 "DerivedRepresentations": {
                     "type": "nested",
                     "properties": {
@@ -382,97 +498,216 @@ def handler(event, context):
                         "EmbeddedMetadata": {"type": "object", "dynamic": True},
                     },
                 },
-                "DigitalAsset": {
-                    "type": "nested",
-                    "properties": {
-                        "asset_id": {"type": "keyword"},
-                        "start_timecode": {"type": "keyword"},
-                        "end_timecode": {"type": "keyword"},
-                        "embedding_scope": {"type": "keyword"},
-                        "embedding": {
-                            "type": "knn_vector",
-                            "dimension": 1024,
-                            "method": {
-                                "name": "hnsw",
-                                "space_type": "cosinesimil",
-                                "engine": "nmslib",
-                            },
-                        },
-                        "EmbeddedMetadata": {"type": "object", "dynamic": True},
+                # ═══════════════════════════════════════════════════════════
+                # DEPRECATED: AssetEmbeddings Nested Structure
+                # ═══════════════════════════════════════════════════════════
+                # This nested structure was deprecated in favor of separate documents.
+                #
+                # WHY NOT USE NESTED STRUCTURE:
+                # 1. Document size limits: Large videos with many clips hit 4GB limit
+                # 2. Version conflicts: Concurrent writes to same parent cause conflicts
+                # 3. Performance: Large nested arrays slow down updates and queries
+                # 4. Scalability: Cannot distribute writes across multiple documents
+                #
+                # CURRENT ARCHITECTURE:
+                # - Embeddings stored as separate documents with inventory_id reference
+                # - Each embedding document links to parent via inventory_id field
+                # - Search queries group results by inventory_id to reconstruct parent-child relationships
+                # - This approach scales to unlimited embeddings per asset
+                #
+                # "AssetEmbeddings": {
+                #     "type": "nested",
+                #     "properties": {
+                #         "inventory_id": {"type": "keyword"},
+                #         "embedding_type": {"type": "keyword"},
+                #         "model_provider": {"type": "keyword"},
+                #         "inference_provider": {"type": "keyword"},
+                #         "model_name": {"type": "keyword"},
+                #         "model_version": {"type": "keyword"},
+                #         "start_seconds": {"type": "integer"},
+                #         "end_seconds": {"type": "integer"},
+                #         "start_smpte_timecode": {"type": "keyword"},
+                #         "end_smpte_timecode": {"type": "keyword"},
+                #         "created_at": {"type": "date"},
+                #         "embedding_granularity": {"type": "keyword"},
+                #         "segmentation_method": {"type": "keyword"},
+                #         "embedding_representation": {"type": "keyword"},
+                #         "embedding_dimension": {"type": "integer"},
+                #         "space_type": {"type": "keyword"},
+                #         "embedding": {
+                #             "type": "knn_vector",
+                #             "dimension": 1024,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_256_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 256,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_384_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 384,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_512_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 512,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_1024_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 1024,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_1536_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 1536,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #         "embedding_3072_cosine": {
+                #             "type": "knn_vector",
+                #             "dimension": 3072,
+                #             "method": {
+                #                 "name": "hnsw",
+                #                 "space_type": "cosinesimil",
+                #                 "engine": "nmslib",
+                #             },
+                #         },
+                #     },
+                # },
+            }
+        },
+    }
+
+    # Mapping for "asset-embeddings" index - optimized for Marengo 3.0 vector embeddings
+    # This index stores embeddings separately from asset metadata for better scalability
+    asset_embeddings_payload = {
+        "settings": {
+            "index": {
+                "knn": True,
+                "mapping.total_fields.limit": 1000,
+            }
+        },
+        "mappings": {
+            "properties": {
+                # Reference to parent asset in the "media" index
+                "inventory_id": {"type": "keyword"},
+                # Embedding granularity: "asset" (whole asset) or "segment" (clip/segment)
+                "embedding_granularity": {"type": "keyword"},
+                # How the segment was created (e.g., "scene_detection", "fixed_interval")
+                "segmentation_method": {"type": "keyword"},
+                # Modality of the embedding: "visual", "audio", "text", "video"
+                "embedding_representation": {"type": "keyword"},
+                # Dimension of the embedding vector (e.g., 1024, 3072)
+                "embedding_dimension": {"type": "integer"},
+                # Type of embedding (e.g., "marengo_3.0", "clip")
+                "embedding_type": {"type": "keyword"},
+                # Model version that generated the embedding
+                "model_version": {"type": "keyword"},
+                # Model provider (e.g., "twelve_labs")
+                "model_provider": {"type": "keyword"},
+                # Inference provider (e.g., "bedrock", "api")
+                "inference_provider": {"type": "keyword"},
+                # Model name (e.g., "Marengo-retrieval-2.7")
+                "model_name": {"type": "keyword"},
+                # When the embedding was created
+                "created_at": {"type": "date"},
+                # Start time of segment in seconds (for segment embeddings)
+                "start_seconds": {"type": "float"},
+                # End time of segment in seconds (for segment embeddings)
+                "end_seconds": {"type": "float"},
+                # Start SMPTE timecode (for segment embeddings)
+                "start_smpte_timecode": {"type": "keyword"},
+                # End SMPTE timecode (for segment embeddings)
+                "end_smpte_timecode": {"type": "keyword"},
+                # Space type for the vector (e.g., "cosine", "l2")
+                "space_type": {"type": "keyword"},
+                # KNN vector fields for different dimensions
+                "embedding": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
                     },
                 },
-                "asset_embeddings": {
-                    "type": "nested",
-                    "properties": {
-                        "inventory_id": {"type": "keyword"},
-                        "embedding_type": {"type": "keyword"},
-                        "model_provider": {"type": "keyword"},
-                        "model_name": {"type": "keyword"},
-                        "model_version": {"type": "keyword"},
-                        "start_seconds": {"type": "integer"},
-                        "end_seconds": {"type": "integer"},
-                        "start_smpte_timecode": {"type": "keyword"},
-                        "end_smpte_timecode": {"type": "keyword"},
-                        "created_at": {"type": "date"},
-                        "embedding_granularity": {"type": "keyword"},
-                        "segmentation_method": {"type": "keyword"},
-                        "embedding_representation": {"type": "keyword"},
-                        "embedding_dimension": {"type": "integer"},
-                        "space_type": {"type": "keyword"},
-                        "embedding_256_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 256,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
-                        "embedding_384_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 384,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
-                        "embedding_512_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 512,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
-                        "embedding_1024_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 1024,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
-                        "embedding_1536_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 1536,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
-                        "embedding_3072_cosine": {
-                            "type": "knn_vector",
-                            "dimension": 3072,
-                            "method": {
-                                "engine": "nmslib",
-                                "space_type": "cosinesimil",
-                                "name": "hnsw",
-                            },
-                        },
+                "embedding_256_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 256,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_384_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 384,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_512_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 512,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_1024_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 1024,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_1536_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 1536,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
+                    },
+                },
+                "embedding_3072_cosine": {
+                    "type": "knn_vector",
+                    "dimension": 3072,
+                    "method": {
+                        "name": "hnsw",
+                        "space_type": "cosinesimil",
+                        "engine": "nmslib",
                     },
                 },
             }
@@ -492,9 +727,24 @@ def handler(event, context):
     logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
 
     for index_name in indexes:
+        index_name = index_name.strip()
         logger.info("Processing index", extra={"index_name": index_name})
+
+        # Use index-specific mapping
+        if index_name == ASSET_EMBEDDINGS_INDEX:
+            index_payload = asset_embeddings_payload
+            logger.info(
+                "Using asset-embeddings specific mapping",
+                extra={"index_name": index_name},
+            )
+        else:
+            index_payload = payload
+            logger.info(
+                "Using default media index mapping", extra={"index_name": index_name}
+            )
+
         success = create_index_with_retry(
-            host, index_name.strip(), payload, headers, credentials, service, region
+            host, index_name, index_payload, headers, credentials, service, region
         )
         if not success:
             msg = f"Failed to create index {index_name} after multiple retries"

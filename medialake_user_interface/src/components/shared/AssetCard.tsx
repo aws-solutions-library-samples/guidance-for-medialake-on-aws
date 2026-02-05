@@ -369,7 +369,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           }
 
                           // Use confidence-based colors for markers
-                          const markerColor = getMarkerColorByConfidence(clip.score);
+                          // Pass model_version for model-aware thresholds (3.0 vs 2.7)
+                          const markerColor = getMarkerColorByConfidence(
+                            clip.score,
+                            clip.model_version
+                          );
 
                           // Follow JSFiddle approach: let byomakase library generate its own IDs
                           // This prevents querySelector errors with colon-containing custom IDs
@@ -621,7 +625,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }
 
                 // Use confidence-based colors for markers
-                const markerColor = getMarkerColorByConfidence(clip.score);
+                // Pass model_version for model-aware thresholds (3.0 vs 2.7)
+                const markerColor = getMarkerColorByConfidence(clip.score, clip.model_version);
 
                 // Follow JSFiddle approach: let byomakase library generate its own IDs
                 // This prevents querySelector errors with colon-containing custom IDs

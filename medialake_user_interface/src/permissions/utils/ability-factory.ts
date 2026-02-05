@@ -124,6 +124,17 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             connectors: "connector",
             permissions: "permission-set",
             systems: "settings",
+            "api-keys": "api-key",
+            "collection-types": "collection-types",
+            "settings-menu": "settings-menu",
+            regions: "region",
+            nodes: "nodes",
+            environments: "environments",
+            reviews: "reviews",
+            storage: "storage",
+            search: "search",
+            system: "system-settings",
+            pipelinesExecutions: "pipeline",
           };
 
           const caslResource = resourceMapping[resource] || resource;
