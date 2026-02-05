@@ -31,6 +31,7 @@ export type Subjects =
   | "user"
   | "group"
   | "settings"
+  | "settings-menu"
   | "permission-set"
   | "integration"
   | "region"
