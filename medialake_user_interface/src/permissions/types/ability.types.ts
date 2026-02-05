@@ -19,7 +19,8 @@ export type Actions =
   | "manage"
   | "run"
   | "add"
-  | "disable";
+  | "disable"
+  | "externalShare";
 
 // Define the possible subjects
 export type Subjects =

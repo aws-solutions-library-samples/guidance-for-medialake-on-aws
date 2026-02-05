@@ -359,6 +359,57 @@ class UIConstruct(Construct):
             ),
         )
 
+        # Embed-specific response headers policy - redirects to presigned URLs (no iframe embedding)
+        embed_response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "EmbedSecurityHeadersPolicy",
+            security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
+                content_security_policy={
+                    "content_security_policy": (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                        "style-src 'self' 'unsafe-inline'; "
+                        "img-src 'self' data: https: blob:; "
+                        "font-src 'self' data:; "
+                        "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
+                        "connect-src 'self' https://*.amazonaws.com https://*.cloudfront.net; "
+                        "frame-ancestors 'none'; "
+                        "base-uri 'self'; "
+                        "form-action 'self'; "
+                        "object-src 'none'"
+                    ),
+                    "override": True,
+                },
+                strict_transport_security={
+                    "override": True,
+                    "access_control_max_age": Duration.seconds(31536000),
+                    "include_subdomains": True,
+                    "preload": True,
+                },
+                content_type_options={"override": True},
+                referrer_policy={
+                    "referrer_policy": cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
+                    "override": True,
+                },
+            ),
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=[
+                    "Content-Type",
+                ],
+                access_control_allow_methods=[
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
+                ],
+                access_control_allow_origins=["*"],
+                origin_override=True,
+                access_control_expose_headers=["*"],
+                access_control_max_age=Duration.seconds(7200),
+            ),
+        )
+
+
         # Create a custom cache policy for static assets
         static_assets_cache_policy = cloudfront.CachePolicy(
             self,
@@ -422,6 +473,7 @@ class UIConstruct(Construct):
         edge_lambda_version_arn = edge_lambda_version_arn_param.get_response_field(
             "Parameter.Value"
         )
+
 
         # Create a shared CF Origin for static assets (S3)
         s3_orig = origins.S3BucketOrigin.with_origin_access_control(
@@ -489,6 +541,35 @@ class UIConstruct(Construct):
                         # Remove the viewer-response Lambda
                     ],
                 ),
+                "/embed/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
+                        origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
+                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+                        origin_path=f"/{config.api_path}/public",
+                    ),
+                    cache_policy=cloudfront.CachePolicy(
+                        self,
+                        "EmbedBehaviorCachePolicy",
+                        comment="Cache policy for embed endpoint",
+                        default_ttl=Duration.seconds(0),
+                        min_ttl=Duration.seconds(0),
+                        max_ttl=Duration.seconds(1),
+                        cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+                        header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
+                            "Origin",
+                            "Access-Control-Request-Method",
+                            "Access-Control-Request-Headers",
+                        ),
+                        query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
+                        enable_accept_encoding_gzip=True,
+                        enable_accept_encoding_brotli=True,
+                    ),
+                    response_headers_policy=embed_response_headers_policy,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                ),
+
                 f"/{config.api_path}/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",

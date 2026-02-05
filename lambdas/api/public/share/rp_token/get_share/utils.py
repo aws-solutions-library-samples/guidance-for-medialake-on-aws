@@ -1,6 +1,6 @@
-from typing import Dict, Optional
+from typing import Dict
 
-from url_utils import generate_presigned_url, generate_presigned_download_url
+from url_utils import generate_presigned_url
 
 def enrich_asset_for_public_access(asset: Dict, settings: Dict) -> Dict:
     """Generate presigned viewing URL and filter asset data for public access"""

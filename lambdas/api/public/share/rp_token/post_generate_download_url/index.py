@@ -64,8 +64,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handles download URL generation for public shared assets"""
     
     try:
-        share_token = event['pathParameters']['token']
-        # Fetch share details
+        share_token = event['pathParameters']['shareToken']
         share_response = shares_table.get_item(Key={'ShareToken': share_token})
         
         if 'Item' not in share_response:
@@ -74,17 +73,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         share = share_response['Item']
         current_time = int(time.time())
 
-        # Check if share is active
         if share['Status'] != 'active':
             return create_response(410, "Share has been revoked")
 
         if share.get('ExpiresAt') and current_time > share['ExpiresAt']:
-            shares_table.update_item(
-                Key={'ShareToken': share_token},
-                UpdateExpression='SET #status = :expired',
-                ExpressionAttributeNames={'#status': 'Status'},
-                ExpressionAttributeValues={':expired': 'expired'}
-            )
             return create_response(410, "Share has expired")
 
         asset_id = share['AssetID']
@@ -93,20 +85,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not asset:
             return create_response(404, "Asset not found")
 
-        # Update download access tracking
         shares_table.update_item(
             Key={'ShareToken': share_token},
             UpdateExpression='SET DownloadCount = DownloadCount + :inc',
             ExpressionAttributeValues={':inc': 1}
         )
 
-        # Generate presigned download URL
         download_url = generate_download_url_for_share(asset, share['ShareSettings'])
 
         if not download_url:
             return create_response(500, "Failed to generate download URL")
 
-        # Log access
         logger.info(f"Download URL generated for asset {asset_id} via share {share_token}")
         metrics.add_metric(name="PublicShareDownload", unit="Count", value=1)
 

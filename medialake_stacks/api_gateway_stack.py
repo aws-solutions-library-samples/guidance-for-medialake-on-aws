@@ -243,6 +243,9 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
+        # Add public resource to reuse across constructs
+        public_resource = self._rest_api.root.add_resource("public")
+
         # Update the SearchConstruct to include the system settings table
         self._search_construct = SearchConstruct(
             self,
@@ -293,6 +296,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 asset_table=props.asset_table,
                 asset_shares_table=props.asset_shares_table,
                 asset_resource=self._assets_construct.asset_resource,
+                public_resource=public_resource,
                 authorizer=self._authorizer,
             ),
         )

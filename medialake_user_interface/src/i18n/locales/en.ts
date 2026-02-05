@@ -1326,6 +1326,7 @@ export default {
     },
     permissions: "Permissions",
     showMetadata: "Show metadata",
+    allowEmbedding: "Allow embedding",
     existingShares: "Existing Shares",
     created: "Created",
     expires: "Expires",
@@ -1349,6 +1350,12 @@ export default {
       originalQuality: "Original Quality",
     },
     expiry: "Expires",
+    embed: {
+      title: "Embed This Asset",
+      description: "Copy and share this link to embed the asset:",
+      copyLink: "Copy link",
+      linkCopied: "Link copied to clipboard",
+    },
     media: {
       previewNotAvailable: "Media preview is not available at this time.",
       previewNotAvailableFormat:

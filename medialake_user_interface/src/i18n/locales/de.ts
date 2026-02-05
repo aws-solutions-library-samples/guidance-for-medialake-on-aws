@@ -1337,6 +1337,7 @@ export default {
     },
     permissions: "Berechtigungen",
     showMetadata: "Metadaten anzeigen",
+    allowEmbedding: "Einbettung zulassen",
     existingShares: "Bestehende Freigaben",
     created: "Erstellt",
     expires: "Ablauf",
@@ -1360,6 +1361,12 @@ export default {
       originalQuality: "Originalqualität",
     },
     expiry: "Läuft ab",
+    embed: {
+      title: "Diesen Vermögenswert einbetten",
+      description: "Kopieren Sie diesen Link und teilen Sie ihn, um den Vermögenswert einzubetten:",
+      copyLink: "Link kopieren",
+      linkCopied: "Link in die Zwischenablage kopiert",
+    },
     media: {
       previewNotAvailable: "Medienvorschau ist derzeit nicht verfügbar.",
       previewNotAvailableFormat:

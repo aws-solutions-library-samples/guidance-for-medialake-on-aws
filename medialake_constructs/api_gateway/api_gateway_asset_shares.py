@@ -1,13 +1,9 @@
 
 from dataclasses import dataclass
-from typing import Optional
 from constructs import Construct
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_iam as iam
-from aws_cdk import aws_secretsmanager as secretsmanager
-from aws_cdk import Stack
 from cdk_logger import get_logger
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -35,6 +31,7 @@ class AssetSharesConstructProps:
     asset_table: dynamodb.TableV2
     asset_shares_table: dynamodb.TableV2
     asset_resource: api_gateway.IResource
+    public_resource: api_gateway.IResource
     authorizer: api_gateway.IAuthorizer
 
 class AssetSharesConstruct(Construct):
@@ -286,7 +283,7 @@ class AssetSharesConstruct(Construct):
         )
 
         # Add GET method to /api/public/share/{token}
-        public_share_token_resource = props.api.root.add_resource("public").add_resource("share").add_resource("{token}")
+        public_share_token_resource = props.public_resource.add_resource("share").add_resource("{shareToken}")
         add_cors_options_method(public_share_token_resource)
         
         public_share_token_method = public_share_token_resource.add_method(
@@ -382,6 +379,94 @@ class AssetSharesConstruct(Construct):
             "POST",
             api_gateway.LambdaIntegration(
                 public_share_generate_download_url_lambda.function,
+                proxy=True,
+                integration_responses=[
+                    api_gateway.IntegrationResponse(
+                        status_code="200",
+                        response_parameters={
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                        },
+                    )
+                ],
+            ),
+            method_responses=[
+                api_gateway.MethodResponse(
+                    status_code="200",
+                    response_parameters={
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                )
+            ],
+            authorization_type=api_gateway.AuthorizationType.NONE,
+        )
+
+        # GET /api/public/embed/{token}
+        public_embed_lambda = Lambda(
+            self,
+            "PublicEmbedLambda",
+            config=LambdaConfig(
+                name="public_embed_get",
+                entry="lambdas/api/public/embed/rp_token/get_embed",
+                layers=[search_layer.layer],
+                environment_variables={
+                    "SHARES_TABLE_NAME": props.asset_shares_table.table_name,
+                    "ASSETS_TABLE_NAME": props.asset_table.table_name,
+                },
+            ),
+        )
+
+        public_embed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+                resources=[props.asset_shares_table.table_arn],
+            )
+        )
+
+        public_embed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+
+        public_embed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "kms:Decrypt",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+            )
+        )
+
+        public_embed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                ],
+                resources=[
+                    "arn:aws:s3:::*/*"
+                ],
+            )
+        )
+
+        public_embed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetBucketLocation"],
+                resources=[
+                    "arn:aws:s3:::*"
+                ]
+            )
+        )
+
+        public_embed_resource = props.public_resource.add_resource("embed").add_resource("{shareToken}")
+        add_cors_options_method(public_embed_resource)
+
+        public_embed_method = public_embed_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(
+                public_embed_lambda.function,
                 proxy=True,
                 integration_responses=[
                     api_gateway.IntegrationResponse(

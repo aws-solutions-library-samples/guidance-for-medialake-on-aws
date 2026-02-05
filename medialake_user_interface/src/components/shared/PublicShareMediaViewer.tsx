@@ -1,5 +1,5 @@
-import React, { useRef, useMemo } from "react";
-import { Box, Alert, CircularProgress, Paper } from "@mui/material";
+import { Alert, Box, CircularProgress, Paper } from "@mui/material";
+import React, { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import AssetVideo from "../asset/AssetVideo";
 import ImageViewer from "../common/ImageViewer";
@@ -93,7 +93,7 @@ export const PublicShareMediaViewer: React.FC<PublicShareMediaViewerProps> = ({
             width: "100%",
           }}
         >
-          <AssetVideo ref={videoViewerRef} src={viewUrl} protocol="video" />
+          <AssetVideo src={viewUrl} protocol="video" />
         </Paper>
       </Box>
     );

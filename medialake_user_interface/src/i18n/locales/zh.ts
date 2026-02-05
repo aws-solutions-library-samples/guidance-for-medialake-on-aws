@@ -1321,6 +1321,7 @@ export default {
     },
     permissions: "权限",
     showMetadata: "显示元数据",
+    allowEmbedding: "允许嵌入",
     existingShares: "现有共享",
     created: "已创建",
     expires: "过期",
@@ -1344,6 +1345,12 @@ export default {
       originalQuality: "原始质量",
     },
     expiry: "过期",
+    embed: {
+      title: "嵌入此资产",
+      description: "复制并共享此链接以嵌入资产:",
+      copyLink: "复制链接",
+      linkCopied: "链接已复制到剪贴板",
+    },
     media: {
       previewNotAvailable: "媒体预览当前不可用。",
       previewNotAvailableFormat: "此文件类型不支持预览。您可以下载文件来查看。",

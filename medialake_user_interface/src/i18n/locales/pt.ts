@@ -1334,6 +1334,7 @@ export default {
     },
     permissions: "Permissões",
     showMetadata: "Mostrar metadados",
+    allowEmbedding: "Permitir incorporação",
     existingShares: "Compartilhamentos existentes",
     created: "Criado",
     expires: "Expira",
@@ -1357,6 +1358,12 @@ export default {
       originalQuality: "Qualidade original",
     },
     expiry: "Expira",
+    embed: {
+      title: "Incorporar este ativo",
+      description: "Copie e compartilhe este link para incorporar o ativo:",
+      copyLink: "Copiar link",
+      linkCopied: "Link copiado para a área de transferência",
+    },
     media: {
       previewNotAvailable: "A visualização de mídia não está disponível no momento.",
       previewNotAvailableFormat:

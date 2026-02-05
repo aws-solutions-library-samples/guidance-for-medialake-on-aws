@@ -1323,6 +1323,7 @@ export default {
     },
     permissions: "권한",
     showMetadata: "메타데이터 표시",
+    allowEmbedded: "임베드 허용",
     existingShares: "기존 공유",
     created: "생성됨",
     expires: "만료",
@@ -1346,6 +1347,12 @@ export default {
       originalQuality: "원본 품질",
     },
     expiry: "만료",
+    embed: {
+      title: "이 자산 포함",
+      description: "이 링크를 복사하여 공유하여 자산을 포함합니다:",
+      copyLink: "링크 복사",
+      linkCopied: "링크가 클립보드에 복사되었습니다",
+    },
     media: {
       previewNotAvailable: "지금 미디어 미리보기를 사용할 수 없습니다.",
       previewNotAvailableFormat:

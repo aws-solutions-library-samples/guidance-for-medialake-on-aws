@@ -1329,6 +1329,7 @@ export default {
     },
     permissions: "権限",
     showMetadata: "メタデータを表示",
+    allowEmbedding: "埋め込みを許可",
     existingShares: "既存の共有",
     created: "作成日時",
     expires: "有効期限",
@@ -1352,6 +1353,12 @@ export default {
       originalQuality: "オリジナル品質",
     },
     expiry: "有効期限",
+    embed: {
+      title: "このアセットを埋め込む",
+      description: "このリンクをコピーして共有してアセットを埋め込みます:",
+      copyLink: "リンクをコピー",
+      linkCopied: "リンクがクリップボードにコピーされました",
+    },
     media: {
       previewNotAvailable: "メディアプレビューは現在利用できません。",
       previewNotAvailableFormat:

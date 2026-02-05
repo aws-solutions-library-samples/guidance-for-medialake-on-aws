@@ -1322,6 +1322,7 @@ export default {
     },
     permissions: "הרשאות",
     showMetadata: "הצג מטא-נתונים",
+    allowEmbedding: "אפשר הטבעה",
     existingShares: "שיתופים קיימים",
     created: "נוצר",
     expires: "פקיעה",
@@ -1345,6 +1346,12 @@ export default {
       originalQuality: "איכות מקורית",
     },
     expiry: "תוקף עד",
+    embed: {
+      title: "הטמע נכס זה",
+      description: "העתק ושתף קישור זה כדי להטמיע את הנכס:",
+      copyLink: "העתק קישור",
+      linkCopied: "הקישור הועתק ללוח",
+    },
     media: {
       previewNotAvailable: "תצוגה מקדימה של המדיה אינה זמינה כרגע.",
       previewNotAvailableFormat:

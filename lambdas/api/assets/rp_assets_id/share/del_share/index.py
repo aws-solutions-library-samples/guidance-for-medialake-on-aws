@@ -1,14 +1,12 @@
 
 from decimal import Decimal
-from http import HTTPStatus
 import json
 import os
 from typing import Dict, Any
 from aws_lambda_powertools.logging import correlation_paths
 import boto3
 from aws_lambda_powertools import Logger, Tracer, Metrics
-from botocore.exceptions import ClientError
-from utils import is_admin
+from utils import is_admin, extract_user_context
 
 logger = Logger()
 tracer = Tracer()
@@ -44,18 +42,6 @@ def create_response(
         "body": json.dumps(body, cls=DecimalEncoder),  # Use custom encoder
     }
 
-def get_user_id_from_event(event: Dict[str, Any]) -> str:
-    """Extract user ID from API Gateway event"""
-    request_context = event.get("requestContext", {})
-    authorizer = request_context.get("authorizer", {})
-    user_id = authorizer.get("sub") or authorizer.get("principalId")
-
-    if not user_id:
-        logger.warning("No user ID found in event", extra={"event": event})
-        raise ValueError("User ID not found in request context")
-
-    return user_id
-
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
@@ -65,7 +51,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         asset_id = event['pathParameters']['id']
         share_token = event['pathParameters']['shareToken']
-        user_id = get_user_id_from_event(event)
+        user_context = extract_user_context(event)
+        user_id = user_context['user_id']
         
         share_response = shares_table.get_item(Key={'ShareToken': share_token})
 
@@ -77,7 +64,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if share['AssetID'] != asset_id:
             return create_response(400, "Share does not belong to the specified asset")
         
-        if share['CreatedBy'] != user_id and not is_admin(user_id):
+        if share['CreatedBy'] != user_id and not is_admin(user_context):
             return create_response(403, "User not authorized to delete this share")
         
         shares_table.update_item(

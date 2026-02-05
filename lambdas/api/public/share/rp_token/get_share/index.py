@@ -63,8 +63,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handles public access to shared assets via share tokens"""
     
     try:
-        share_token = event['pathParameters']['token']
-        # Fetch share details
+        share_token = event['pathParameters']['shareToken']
         share_response = shares_table.get_item(Key={'ShareToken': share_token})
         
         if 'Item' not in share_response:
@@ -73,17 +72,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         share = share_response['Item']
         current_time = int(time.time())
 
-        # Check if share is active
         if share['Status'] != 'active':
             return create_response(410, "Share has been revoked")
 
         if share.get('ExpiresAt') and current_time > share['ExpiresAt']:
-            shares_table.update_item(
-                Key={'ShareToken': share_token},
-                UpdateExpression='SET #status = :expired',
-                ExpressionAttributeNames={'#status': 'Status'},
-                ExpressionAttributeValues={':expired': 'expired'}
-            )
             return create_response(410, "Share has expired")
 
         asset_id = share['AssetID']
@@ -92,23 +84,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not asset:
             return create_response(404, "Asset not found")
 
-        # Update access tracking
         shares_table.update_item(
             Key={'ShareToken': share_token},
             UpdateExpression='SET AccessCount = AccessCount + :inc, LastAccessedAt = :time',
             ExpressionAttributeValues={':inc': 1, ':time': current_time}
         )
 
-        # Generate presigned URLs for asset access based on shared representation type
         enriched_asset = enrich_asset_for_public_access(asset, share['ShareSettings'])
 
-        # Log access
         logger.info(f"Public access to asset {asset_id} via share {share_token}")
         metrics.add_metric(name="PublicShareAccess", unit="Count", value=1)
 
         return create_response(200, "Asset retrieved successfully", {
             'asset': enriched_asset,
             'shareInfo': {
+                'allowEmbedding': share['ShareSettings'].get('allowEmbedding', False),
                 'representationType': share['ShareSettings']['representationType'],
                 'expiresAt': share.get('ExpiresAt'),
             }

@@ -1,4 +1,9 @@
-import { usePublicShare, useGenerateDownloadUrlMutation } from "@/api/hooks/useShares";
+import { useGenerateDownloadUrlMutation, usePublicShare } from "@/api/hooks/useShares";
+import { useAwsConfig } from "@/common/hooks/aws-config-context";
+import TechnicalMetadataTab from "@/components/TechnicalMetadataTab";
+import PublicShareMediaViewer from "@/components/shared/PublicShareMediaViewer";
+import { transformMetadata } from "@/utils/metadataUtils";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/Download";
 import {
   Alert,
@@ -8,27 +13,39 @@ import {
   CircularProgress,
   Container,
   Divider,
+  IconButton,
   Paper,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import { useSnackbar } from "notistack";
 import React, { useMemo } from "react";
-import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import TechnicalMetadataTab from "@/components/TechnicalMetadataTab";
-import PublicShareMediaViewer from "@/components/shared/PublicShareMediaViewer";
-import { useAwsConfig } from "@/common/hooks/aws-config-context";
-import { transformMetadata } from "@/utils/metadataUtils";
+import { useParams } from "react-router-dom";
 
 export const PublicSharePage: React.FC = () => {
   const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const awsConfig = useAwsConfig();
+  const { enqueueSnackbar } = useSnackbar();
 
   const { data, isLoading, error } = usePublicShare(token!, {
     enabled: !!token,
   });
 
   const generateDownloadUrl = useGenerateDownloadUrlMutation();
+
+  const assetType = data?.asset?.DigitalSourceAsset?.Type?.toLowerCase() ?? "";
+  const fileName =
+    data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey
+      ?.Name ?? "Unknown";
+
+  const origin = useMemo(() => {
+    return typeof window !== "undefined" ? window.location.origin : "";
+  }, []);
+
+  /* Get direct link to asset */
+  const assetLink = `${origin}/embed/${token}`;
 
   /* Transform metadata into TechnicalMetadataTab format */
   const metadataAccordions = useMemo(() => {
@@ -56,6 +73,17 @@ export const PublicSharePage: React.FC = () => {
     );
   }
 
+  const handleDownload = () => {
+    if (token) {
+      generateDownloadUrl.mutate(token);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(assetLink);
+    enqueueSnackbar(t("publicShare.embed.linkCopied"), { variant: "success" });
+  };
+
   if (error || !data) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
@@ -81,17 +109,6 @@ export const PublicSharePage: React.FC = () => {
       </Container>
     );
   }
-
-  const assetType = data?.asset?.DigitalSourceAsset?.Type?.toLowerCase() ?? "";
-  const fileName =
-    data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey
-      ?.Name ?? "Unknown";
-
-  const handleDownload = () => {
-    if (token) {
-      generateDownloadUrl.mutate(token);
-    }
-  };
 
   return (
     <Box
@@ -158,6 +175,58 @@ export const PublicSharePage: React.FC = () => {
                     : t("publicShare.downloadFile")}
                 </Button>
               </Box>
+            )}
+
+            {/* Share Link Section */}
+            {data?.shareInfo?.allowEmbedding && (
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Box>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="h6">{t("publicShare.embed.title")}</Typography>
+                    <Tooltip title={t("publicShare.embed.copyLink")}>
+                      <IconButton size="small" onClick={handleCopyLink}>
+                        <ContentCopyIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {t("publicShare.embed.description")}
+                  </Typography>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      bgcolor: "background.paper",
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      overflow: "auto",
+                      boxShadow: 1,
+                    }}
+                  >
+                    <Typography
+                      component="pre"
+                      sx={{
+                        fontFamily: "monospace",
+                        fontSize: "0.875rem",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        color: "text.primary",
+                        m: 0,
+                      }}
+                    >
+                      {assetLink}
+                    </Typography>
+                  </Paper>
+                </Box>
+              </>
             )}
 
             {/* Metadata Section */}

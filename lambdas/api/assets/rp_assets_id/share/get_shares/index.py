@@ -1,12 +1,12 @@
 
 from decimal import Decimal
-from http import HTTPStatus
 import json
 import os
 from typing import Dict, Any
 from aws_lambda_powertools.logging import correlation_paths
 import boto3
 from aws_lambda_powertools import Logger, Tracer, Metrics
+from utils import extract_user_context, is_admin
 
 logger = Logger()
 tracer = Tracer()
@@ -51,6 +51,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     try:
         asset_id = event['pathParameters']['id']
+        user_context = extract_user_context(event)
+        user_id = user_context['user_id']
         
         logger.info(f"Querying shares for asset {asset_id}")
         
@@ -65,6 +67,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
         
         shares = response.get('Items', [])
+        for share in shares:
+            share['IsOwner'] = is_admin(user_context) or (share['CreatedBy'] == user_id)
         
         logger.info(f"Found {len(shares)} active shares for asset {asset_id}")
         

@@ -1323,6 +1323,7 @@ export default {
     },
     permissions: "الأذونات",
     showMetadata: "إظهار البيانات الوصفية",
+    allowEmbedding: "السماح بالتضمين",
     existingShares: "المشاركات الموجودة",
     created: "تم الإنشاء",
     expires: "انتهاء الصلاحية",
@@ -1346,6 +1347,12 @@ export default {
       originalQuality: "الجودة الأصلية",
     },
     expiry: "ينتهي في",
+    embed: {
+      title: "تضمين هذا الأصل",
+      description: "انسخ وشارك هذا الرابط لتضمين الأصل:",
+      copyLink: "نسخ الرابط",
+      linkCopied: "تم نسخ الرابط إلى الحافظة",
+    },
     media: {
       previewNotAvailable: "معاينة الوسائط غير متاحة في الوقت الحالي.",
       previewNotAvailableFormat: "المعاينة غير متاحة لهذا نوع الملف. يمكنك تحميل الملف لعرضه.",

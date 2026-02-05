@@ -1334,6 +1334,7 @@ export default {
     },
     permissions: "Permisos",
     showMetadata: "Mostrar metadatos",
+    allowEmbedding: "Permitir incrustación",
     existingShares: "Comparticiones existentes",
     created: "Creado",
     expires: "Expira",
@@ -1357,6 +1358,12 @@ export default {
       originalQuality: "Calidad original",
     },
     expiry: "Expira",
+    embed: {
+      title: "Incrustar este activo",
+      description: "Copiar y compartir este enlace para incrustar el activo:",
+      copyLink: "Copiar enlace",
+      linkCopied: "Enlace copiado al portapapeles",
+    },
     media: {
       previewNotAvailable:
         "La vista previa del contenido multimedia no está disponible en este momento.",

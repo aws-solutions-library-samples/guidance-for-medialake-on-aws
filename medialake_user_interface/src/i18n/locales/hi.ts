@@ -1332,6 +1332,7 @@ export default {
     },
     permissions: "अनुमतियां",
     showMetadata: "मेटाडेटा दिखाएं",
+    allowEmbedding: "एम्बेडिंग की अनुमति दें",
     existingShares: "मौजूदा साझाकरण",
     created: "बनाया गया",
     expires: "समाप्ति",
@@ -1355,6 +1356,12 @@ export default {
       originalQuality: "मूल गुणवत्ता",
     },
     expiry: "समाप्ति",
+    embed: {
+      title: "इस संपत्ति को एम्बेड करें",
+      description: "इस लिंक को कॉपी और साझा करें संपत्ति को एम्बेड करने के लिए:",
+      copyLink: "लिंक कॉपी करें",
+      linkCopied: "लिंक क्लिपबोर्ड पर कॉपी किया गया",
+    },
     media: {
       previewNotAvailable: "मीडिया पूर्वावलोकन इस समय उपलब्ध नहीं है।",
       previewNotAvailableFormat:

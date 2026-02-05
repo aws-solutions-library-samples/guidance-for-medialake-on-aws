@@ -145,7 +145,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'ShareType': 'public',
             'ShareSettings': {
                 'representationType': representation_type,
-                'allowMetadata': body.get('allowMetadata', True)
+                'allowMetadata': body.get('allowMetadata', True),
+                'allowEmbedding': body.get('allowEmbedding', True)
             },
             'Metadata': {
                 'ipAddress': event['requestContext'].get('identity', {}).get('sourceIp'),
@@ -153,7 +154,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         }
 
-        # Store in DynamoDB
         shares_table.put_item(Item=share_item)
 
         logger.info(f"Share created for asset {asset_id} by user {user_id}")

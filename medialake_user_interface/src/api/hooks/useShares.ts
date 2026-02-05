@@ -11,6 +11,7 @@ export interface CreateShareOptions {
   expiresIn?: number; // Seconds until expiration (optional)
   representationType: "proxy" | "original";
   allowMetadata: boolean;
+  allowEmbedding: boolean;
 }
 
 export interface CreateShareParams {
@@ -18,7 +19,7 @@ export interface CreateShareParams {
   options: CreateShareOptions;
 }
 
-export interface ShareInfo {
+export interface Share {
   ShareToken: string;
   AssetID: string;
   CreatedBy: string;
@@ -32,6 +33,7 @@ export interface ShareInfo {
   ShareSettings: {
     representationType: "proxy" | "original";
     allowMetadata: boolean;
+    allowEmbedding: boolean;
   };
   Metadata?: {
     ipAddress?: string;
@@ -39,10 +41,12 @@ export interface ShareInfo {
   };
   // Constructed URL for the share link (not from backend)
   ShareURL?: string;
+  // Indicates if the current user can edit/revoke this share (only from GET shares)
+  IsOwner?: boolean;
 }
 
 export interface CreateShareResponse {
-  shareItem: ShareInfo;
+  shareItem: Share;
   shareToken: string;
   shareUrl: string;
   representationType: "proxy" | "original";
@@ -79,6 +83,7 @@ export interface PublicShareAsset {
 export interface PublicShareData {
   asset: PublicShareAsset;
   shareInfo: {
+    allowEmbedding: boolean;
     representationType: "proxy" | "original";
     expiresAt?: number;
   };
@@ -131,7 +136,7 @@ export const useAssetShares = (assetId: string, options?: { enabled?: boolean })
     queryKey: QUERY_KEYS.SHARES.FOR_ASSET(assetId),
     queryFn: async () => {
       logger.info("Fetching shares for asset", { assetId });
-      const response = await apiClient.get<{ data: { shares: ShareInfo[] } }>(
+      const response = await apiClient.get<{ data: { shares: Share[] } }>(
         API_ENDPOINTS.SHARES.GET_FOR_ASSET(assetId)
       );
       // Add constructed ShareURL to each share
