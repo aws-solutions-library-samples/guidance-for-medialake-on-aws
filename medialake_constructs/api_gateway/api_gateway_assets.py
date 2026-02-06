@@ -16,6 +16,8 @@ from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_efs as efs
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from aws_cdk import aws_logs as logs
@@ -28,6 +30,7 @@ from constructs import Construct
 
 from cdk_logger import get_logger
 from config import config
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
@@ -177,7 +180,6 @@ class AssetsConstruct(Construct):
                 security_groups=[props.security_group],
                 layers=[search_layer.layer],
                 memory_size=512,  # VPC Lambda needs sufficient memory for ENI setup
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for fast asset retrieval
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -187,6 +189,22 @@ class AssetsConstruct(Construct):
                     "SCOPE": "es",
                 },
             ),
+        )
+
+        # Lambda warming for asset retrieval API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "GetAssetLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    get_asset_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps asset retrieval API Lambda warm via scheduled EventBridge rule.",
         )
 
         get_asset_lambda.function.add_to_role_policy(

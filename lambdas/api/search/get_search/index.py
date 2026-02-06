@@ -12,6 +12,7 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from lambda_middleware import is_lambda_warmer_event
 from opensearchpy import (
     NotFoundError,
     OpenSearch,
@@ -1892,6 +1893,10 @@ def handle_provider_status():
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     """Lambda handler function"""
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
+
     lambda_start = time.time()
     logger.info("[PERF] Lambda handler started")
 

@@ -23,6 +23,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from lambda_middleware import is_lambda_warmer_event
 from opensearchpy import (
     NotFoundError,
     OpenSearch,
@@ -189,6 +190,10 @@ def lambda_handler(
     event: APIGatewayProxyEvent, context: LambdaContext
 ) -> Dict[str, Any]:
     """Lambda handler for getting asset details."""
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
+
     try:
         # Extract and validate asset ID
         asset_id = event.get("pathParameters", {}).get("id")

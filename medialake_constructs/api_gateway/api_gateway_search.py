@@ -1,14 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Stack
+from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
@@ -70,7 +73,6 @@ class SearchConstruct(Construct):
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
                 memory_size=9000,  # High memory for vector/semantic search operations
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for search performance
                 timeout_minutes=10,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -93,6 +95,22 @@ class SearchConstruct(Construct):
                     "THUMBNAIL_INDEX": "2",
                 },
             ),
+        )
+
+        # Lambda warming for search API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "SearchLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    search_get_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps search API Lambda warm via scheduled EventBridge rule.",
         )
 
         search_get_lambda.function.add_to_role_policy(
