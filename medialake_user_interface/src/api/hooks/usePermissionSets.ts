@@ -29,6 +29,12 @@ export const useGetPermissionSets = (enabled = false) => {
           `Permission sets API response [${new Date().toISOString()}] for hook instance: ${hookId}`
         );
 
+        // Handle HTML response (CloudFront returning index.html for 404)
+        if (typeof data === "string" && data.includes("<!DOCTYPE html>")) {
+          console.log("Permission sets API returned HTML (endpoint likely doesn't exist)");
+          return [];
+        }
+
         // Handle string body format (older API format)
         if (typeof data.body === "string") {
           const parsedBody = JSON.parse(data.body) as PermissionSetListResponse;
@@ -58,8 +64,14 @@ export const useGetPermissionSets = (enabled = false) => {
           // Return empty array instead of throwing an error
           return [];
         }
-        // Re-throw other errors
-        throw error;
+        // Handle 404 errors gracefully (endpoint doesn't exist)
+        if (error?.response?.status === 404) {
+          console.log(`Permission sets API returned 404 Not Found for hook instance: ${hookId}`);
+          return [];
+        }
+        // For any other error, log and return empty array to prevent infinite loading
+        console.error(`Permission sets API error for hook instance: ${hookId}`, error);
+        return [];
       }
     },
   });

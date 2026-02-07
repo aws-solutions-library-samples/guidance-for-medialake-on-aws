@@ -85,6 +85,7 @@ DEFAULT_PERMISSION_SETS = [
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "defaultDashboard": {"edit": True},
             # System permissions (top-level for app initialization)
             "system": {
                 "view": True,

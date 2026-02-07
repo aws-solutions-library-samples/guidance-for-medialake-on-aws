@@ -1,4 +1,11 @@
 export const QUERY_KEYS = {
+  DASHBOARD: {
+    all: ["dashboard"] as const,
+    layout: () => [...QUERY_KEYS.DASHBOARD.all, "layout"] as const,
+    defaultLayout: () => [...QUERY_KEYS.DASHBOARD.all, "default"] as const,
+    presets: () => [...QUERY_KEYS.DASHBOARD.all, "presets"] as const,
+    preset: (presetId: string) => [...QUERY_KEYS.DASHBOARD.presets(), presetId] as const,
+  },
   CONNECTORS: {
     all: ["connectors"] as const,
     lists: () => [...QUERY_KEYS.CONNECTORS.all, "list"] as const,
@@ -68,11 +75,12 @@ export const QUERY_KEYS = {
       pageSize: number,
       isSemantic: boolean,
       fields?: string[],
-      facetParams?: Record<string, any>
+      facetParams?: Record<string, any>,
+      sort?: string
     ) =>
       [
         ...QUERY_KEYS.SEARCH.lists(),
-        { query, page, pageSize, isSemantic, fields, facetParams },
+        { query, page, pageSize, isSemantic, fields, facetParams, sort },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
   },
@@ -170,5 +178,15 @@ export const QUERY_KEYS = {
       [...QUERY_KEYS.COLLECTION_TYPES.lists(), filters] as const,
     details: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.COLLECTION_TYPES.details(), id] as const,
+  },
+  COLLECTION_GROUPS: {
+    all: ["collection-groups"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.lists(), filters] as const,
+    details: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.details(), id] as const,
+    collections: (id: string) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.detail(id), "collections"] as const,
   },
 } as const;

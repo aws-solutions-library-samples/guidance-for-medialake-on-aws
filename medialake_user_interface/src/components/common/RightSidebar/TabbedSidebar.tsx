@@ -33,20 +33,16 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   filterComponent,
 }) => {
   const { t } = useTranslation();
-  const { setHasSelectedItems } = useRightSidebar();
+  const { setHasSelectedItems, closeSidebar } = useRightSidebar();
   const [activeTab, setActiveTab] = React.useState<"filter" | "batch">(
     selectedAssets.length > 0 ? "batch" : "filter"
   );
 
-  // Auto-switch to batch tab when items are first selected,
-  // but don't force it if user manually switches to filter tab
+  // Update hasSelectedItems when selection changes - this controls sidebar visibility
   useEffect(() => {
-    // Only auto-switch when going from 0 to some selected items
     if (selectedAssets.length > 0) {
       setHasSelectedItems(true);
-
-      // Only switch to batch tab if this is the initial selection
-      // (when going from 0 selected to some selected)
+      // Switch to batch tab when first item is selected
       if (selectedAssets.length === 1) {
         setActiveTab("batch");
       }
@@ -58,6 +54,14 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: "filter" | "batch") => {
     setActiveTab(newValue);
+  };
+
+  // Handle clear selection - close sidebar after clearing
+  const handleClearSelection = () => {
+    if (onClearSelection) {
+      onClearSelection();
+    }
+    // Sidebar will close automatically via the useEffect when selectedAssets becomes empty
   };
 
   return (
@@ -137,7 +141,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
                 onBatchShare={onBatchShare}
                 isDownloadLoading={isDownloadLoading}
                 isDeleteLoading={isDeleteLoading}
-                onClearSelection={onClearSelection}
+                onClearSelection={handleClearSelection}
                 onRemoveItem={onRemoveItem}
               />
             </Box>

@@ -22,28 +22,39 @@ export function usePermission() {
    */
   const can = useCallback(
     (action: Actions, subject: Subjects | any, field?: string) => {
+      // Don't use cache if ability is not yet initialized (no rules)
+      // This prevents caching false results before permissions are loaded
+      const abilityInitialized = ability && ability.rules && ability.rules.length > 0;
+
       // Generate a cache key based on the parameters
       const subjectKey = typeof subject === "string" ? subject : JSON.stringify(subject);
       const cacheKey = `${action}:${subjectKey}:${field || ""}`;
 
-      // Check global cache first for performance
-      const cachedResult = globalPermissionCache.getPermissionCheck(cacheKey);
-      if (cachedResult !== null) {
-        return cachedResult;
+      // Only check cache if ability is initialized
+      if (abilityInitialized) {
+        const cachedResult = globalPermissionCache.getPermissionCheck(cacheKey);
+        if (cachedResult !== null) {
+          return cachedResult;
+        }
       }
 
-      // Perform the check and cache the result
+      // Perform the check
       let result = false;
       try {
         result = ability.can(action, subject, field);
 
-        // Cache the result in global cache
-        globalPermissionCache.setPermissionCheck(cacheKey, result);
+        // Only cache the result if ability is initialized
+        // This prevents caching false results before permissions are loaded
+        if (abilityInitialized) {
+          globalPermissionCache.setPermissionCheck(cacheKey, result);
+        }
       } catch (error) {
         console.error("Error during permission check:", error);
         result = false;
-        // Cache the failed result to avoid repeated errors
-        globalPermissionCache.setPermissionCheck(cacheKey, result);
+        // Don't cache errors when ability is not initialized
+        if (abilityInitialized) {
+          globalPermissionCache.setPermissionCheck(cacheKey, result);
+        }
       }
 
       return result;

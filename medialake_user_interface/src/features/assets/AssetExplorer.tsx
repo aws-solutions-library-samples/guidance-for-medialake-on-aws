@@ -183,6 +183,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
               .Name,
             assetType: asset.DigitalSourceAsset.Type,
             thumbnailUrl: asset.thumbnailUrl || "",
+            proxyUrl: asset.proxyUrl || "",
             format: asset.DigitalSourceAsset.MainRepresentation.Format,
           },
         });

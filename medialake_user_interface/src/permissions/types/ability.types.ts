@@ -19,7 +19,8 @@ export type Actions =
   | "manage"
   | "run"
   | "add"
-  | "disable";
+  | "disable"
+  | "admin";
 
 // Define the possible subjects
 export type Subjects =
@@ -36,7 +37,9 @@ export type Subjects =
   | "integration"
   | "region"
   | "system-settings"
-  | "collection-types";
+  | "collection-types"
+  | "dashboard"
+  | "defaultDashboard";
 
 // Define the conditions type for subject-based authorization
 export type Conditions = MongoQuery;

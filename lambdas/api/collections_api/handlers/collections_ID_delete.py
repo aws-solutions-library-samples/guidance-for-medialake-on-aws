@@ -163,6 +163,25 @@ def register_route(app):
                 collection_id, user_id, current_timestamp
             )
 
+            # Step 2.5: Remove this collection from all collection groups (cascade)
+            try:
+                import boto3
+                from collection_groups_utils import remove_collection_from_all_groups
+
+                dynamodb = boto3.resource("dynamodb")
+                table_name = os.environ.get(
+                    "COLLECTIONS_TABLE_NAME", "collections_table_dev"
+                )
+                groups_table = dynamodb.Table(table_name)
+
+                logger.info(
+                    f"[DELETE] Removing collection {collection_id} from all groups"
+                )
+                remove_collection_from_all_groups(groups_table, collection_id)
+                logger.info("[DELETE] Successfully removed collection from all groups")
+            except Exception as e:
+                logger.warning(f"[DELETE] Failed to remove collection from groups: {e}")
+
             # Step 3: If this is a child collection, remove CHILD# reference from parent
             parent_id = (
                 collection.parentId

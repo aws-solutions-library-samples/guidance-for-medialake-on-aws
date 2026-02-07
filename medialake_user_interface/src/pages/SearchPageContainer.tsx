@@ -107,6 +107,7 @@ const SearchPageContainer: React.FC = () => {
     asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
   const getAssetType = (asset: AssetItem) => asset.DigitalSourceAsset.Type;
   const getAssetThumbnail = (asset: AssetItem) => asset.thumbnailUrl || "";
+  const getAssetProxy = (asset: AssetItem) => asset.proxyUrl || "";
 
   // View preferences
   const viewPreferences = useViewPreferences({
@@ -131,6 +132,7 @@ const SearchPageContainer: React.FC = () => {
     getAssetName,
     getAssetType,
     getAssetThumbnail,
+    getAssetProxy,
   });
 
   // Asset operations
