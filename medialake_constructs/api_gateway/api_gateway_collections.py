@@ -17,14 +17,17 @@ The module handles:
 
 from dataclasses import dataclass
 
-from aws_cdk import Stack
+from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -150,7 +153,7 @@ class CollectionsApi(Construct):
         from config import config
 
         # Create single consolidated Collections Lambda with routing
-        # High-traffic API with VPC access needs higher memory + provisioned concurrency
+        # High-traffic API with VPC access needs higher memory
         collections_lambda = Lambda(
             self,
             "CollectionsLambda",
@@ -160,7 +163,6 @@ class CollectionsApi(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 memory_size=1024,  # VPC Lambdas need more memory for ENI setup
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for immediate response
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
@@ -171,6 +173,22 @@ class CollectionsApi(Construct):
                     "ENVIRONMENT": config.environment,
                 },
             ),
+        )
+
+        # Lambda warming for collections API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "CollectionsLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    collections_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps collections API Lambda warm via scheduled EventBridge rule.",
         )
 
         # Grant DynamoDB permissions

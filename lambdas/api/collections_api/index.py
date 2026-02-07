@@ -36,6 +36,7 @@ from db_models import (
     ShareModel,
     UserRelationshipModel,
 )
+from lambda_middleware import is_lambda_warmer_event
 
 # Initialize PowerTools
 logger = Logger(service="collections-api", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -105,6 +106,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     Returns:
         API Gateway Lambda proxy integration response
     """
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
+
     logger.info(
         "Collections API Lambda invoked",
         extra={
