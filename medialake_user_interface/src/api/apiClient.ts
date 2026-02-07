@@ -83,11 +83,40 @@ class ApiClient extends ApiClientBase {
 
     this.axiosInstance.interceptors.response.use(
       (response) => {
+        // Check if response is HTML (CloudFront returning index.html for non-existent routes)
+        const isHtmlResponse =
+          typeof response.data === "string" && response.data.includes("<!DOCTYPE html>");
+
+        if (isHtmlResponse) {
+          console.log("⚠️ API Response returned HTML (endpoint likely doesn't exist):", {
+            status: response.status,
+            url: response.config.url,
+            method: response.config.method?.toUpperCase(),
+          });
+          // Return response as-is, let the calling code handle it
+          return response;
+        }
+
         console.log("✅ API Response Success:", {
           status: response.status,
           url: response.config.url,
           method: response.config.method?.toUpperCase(),
         });
+
+        // Unwrap Lambda proxy integration response format
+        // API returns: {statusCode, body: {success, data}}
+        // We need: {success, data}
+        // Only unwrap if body is an object, not a string (some APIs return stringified JSON)
+        if (
+          response.data &&
+          typeof response.data === "object" &&
+          "body" in response.data &&
+          typeof response.data.body === "object"
+        ) {
+          console.log("🔄 Unwrapping Lambda proxy response format");
+          response.data = response.data.body;
+        }
+
         return response;
       },
       async (error) => {

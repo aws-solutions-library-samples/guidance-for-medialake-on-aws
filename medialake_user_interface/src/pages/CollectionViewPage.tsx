@@ -200,6 +200,7 @@ const CollectionViewPage: React.FC = () => {
     getAssetName,
     getAssetType,
     getAssetThumbnail,
+    getAssetProxy,
   });
 
   const {

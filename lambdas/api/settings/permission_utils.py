@@ -4,7 +4,7 @@ import json
 from typing import Any, Dict
 
 from aws_lambda_powertools import Logger
-from aws_lambda_powertools.event_handler.exceptions import ForbiddenError
+from custom_exceptions import ForbiddenError
 
 logger = Logger(service="permission-utils")
 

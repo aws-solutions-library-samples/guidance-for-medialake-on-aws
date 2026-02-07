@@ -242,3 +242,39 @@ class CollectionTypeModel(Model):
     schema = MapAttribute(null=True)
     createdAt = UnicodeAttribute()
     updatedAt = UnicodeAttribute()
+
+
+class CollectionGroupModel(Model):
+    """
+    Collection group model.
+    PK=GROUP#{group_id}, SK=METADATA
+
+    Collection groups allow users to organize collections into logical groupings
+    and filter dashboard widgets based on group membership.
+    """
+
+    class Meta:
+        table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
+        region = os.environ.get("AWS_REGION", "us-east-1")
+
+    # Primary keys
+    PK = UnicodeAttribute(hash_key=True)  # GROUP#{group_id}
+    SK = UnicodeAttribute(range_key=True)  # METADATA
+
+    # Group attributes
+    name = UnicodeAttribute()
+    description = UnicodeAttribute(null=True)
+    ownerId = UnicodeAttribute()
+    isPublic = BooleanAttribute(default=True)
+    sharedWith = ListAttribute(default=list)  # List of user IDs (for future use)
+    collectionIds = ListAttribute(default=list)  # List of collection IDs
+    createdAt = UnicodeAttribute()
+    updatedAt = UnicodeAttribute()
+
+    # GSI1 - Owner index (PK=USER#{user_id}, SK=GROUP#{group_id})
+    GSI1_PK = UnicodeAttribute(null=True)
+    GSI1_SK = UnicodeAttribute(null=True)
+
+    # GSI2 - All groups index (PK="GROUPS", SK=createdAt)
+    GSI2_PK = UnicodeAttribute(null=True)
+    GSI2_SK = UnicodeAttribute(null=True)

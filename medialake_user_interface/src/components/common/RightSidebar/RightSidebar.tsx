@@ -2,7 +2,6 @@ import React, { ReactNode, useState, useEffect, useRef } from "react";
 import { Box, Button } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { useRightSidebar, COLLAPSED_WIDTH } from "./SidebarContext";
-import { useLocation } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 
 interface RightSidebarProps {
@@ -13,8 +12,7 @@ const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-  const { isExpanded, setIsExpanded, width, setWidth, setHasSelectedItems } = useRightSidebar();
-  const location = useLocation();
+  const { isExpanded, setIsExpanded, width, setWidth } = useRightSidebar();
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
 
@@ -24,20 +22,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
       localStorage.setItem("rightSidebarWidth", width.toString());
     }
   }, [width]);
-
-  // Check if items are selected based on URL
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const hasSelectedItems = searchParams.has("selected");
-    setHasSelectedItems(hasSelectedItems);
-
-    // Only auto-close if no items are selected
-    if (location.pathname === "/search" && !hasSelectedItems) {
-      setIsExpanded(false);
-    } else if (hasSelectedItems) {
-      setIsExpanded(true);
-    }
-  }, [location.pathname, location.search, setIsExpanded, setHasSelectedItems]);
 
   // Handle resize start
   const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {

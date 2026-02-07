@@ -82,6 +82,30 @@ def _setup_aws_mocks():
     sys.modules["botocore"] = mock_botocore
     sys.modules["botocore.exceptions"] = mock_botocore_exceptions
 
+    # Mock pynamodb
+    mock_pynamodb = MagicMock()
+    mock_pynamodb_models = MagicMock()
+    mock_pynamodb_attributes = MagicMock()
+    mock_pynamodb_indexes = MagicMock()
+    mock_pynamodb_exceptions = MagicMock()
+
+    # Create DoesNotExist exception class
+    class DoesNotExist(Exception):
+        pass
+
+    # Create PutError exception class
+    class PutError(Exception):
+        pass
+
+    mock_pynamodb_exceptions.DoesNotExist = DoesNotExist
+    mock_pynamodb_exceptions.PutError = PutError
+
+    sys.modules["pynamodb"] = mock_pynamodb
+    sys.modules["pynamodb.models"] = mock_pynamodb_models
+    sys.modules["pynamodb.attributes"] = mock_pynamodb_attributes
+    sys.modules["pynamodb.indexes"] = mock_pynamodb_indexes
+    sys.modules["pynamodb.exceptions"] = mock_pynamodb_exceptions
+
     return {
         "logger": mock_logger,
         "tracer": mock_tracer,

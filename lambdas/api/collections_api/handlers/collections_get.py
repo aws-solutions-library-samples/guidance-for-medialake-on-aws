@@ -80,6 +80,8 @@ def register_route(app):
                     "filter[search]"
                 ):
                     query_params_dict["filter_search"] = filter_search
+                if group_ids := app.current_event.get_query_string_value("groupIds"):
+                    query_params_dict["groupIds"] = group_ids
                 if sort_val := app.current_event.get_query_string_value("sort"):
                     query_params_dict["sort"] = sort_val
                 if fields_val := app.current_event.get_query_string_value("fields"):
@@ -133,6 +135,40 @@ def register_route(app):
             # - Private collections are only visible to their owners
             # - Unauthenticated users see no collections
             items = _filter_collections_by_access(items, user_id)
+
+            # Apply group filtering if groupIds parameter provided (OR logic)
+            if query_params.groupIds:
+                from collection_groups_utils import get_collection_ids_by_group_ids
+
+                group_id_list = [
+                    gid.strip()
+                    for gid in query_params.groupIds.split(",")
+                    if gid.strip()
+                ]
+                if group_id_list:
+                    # Get all collection IDs from specified groups
+                    collection_ids_from_groups = set(
+                        get_collection_ids_by_group_ids(
+                            collections_table, group_id_list
+                        )
+                    )
+
+                    # Filter items to only include collections in the groups (AND logic with other filters)
+                    items = [
+                        item
+                        for item in items
+                        if item.get("PK", "").replace(COLLECTION_PK_PREFIX, "")
+                        in collection_ids_from_groups
+                    ]
+
+                    logger.debug(
+                        {
+                            "message": "Applied group filtering",
+                            "group_count": len(group_id_list),
+                            "collection_count": len(items),
+                            "operation": "collections_get",
+                        }
+                    )
 
             has_more = len(items) > query_params.limit
             if has_more:
@@ -225,7 +261,10 @@ def _query_collections_by_owner(user_id, limit, start_key):
             f"{USER_PK_PREFIX}{user_id}",
             limit=limit + 1,
         ):
-            if collection.ownerId == user_id:
+            # Filter out collection groups and ensure owner matches
+            if collection.ownerId == user_id and collection.PK.startswith(
+                COLLECTION_PK_PREFIX
+            ):
                 items.append(_model_to_dict(collection))
     except QueryError as e:
         logger.warning(f"Error querying collections by owner: {e}")
@@ -234,7 +273,9 @@ def _query_collections_by_owner(user_id, limit, start_key):
         # Fallback: query all collections and filter
         items = []
         for collection in _query_all_collections(limit, start_key):
-            if collection.get("ownerId") == user_id:
+            if collection.get("ownerId") == user_id and collection.get(
+                "PK", ""
+            ).startswith(COLLECTION_PK_PREFIX):
                 items.append(collection)
                 if len(items) > limit:
                     break
@@ -249,9 +290,13 @@ def _query_all_collections(limit, start_key):
     try:
         # Query all collections - simplified without GSI for now
         # In production, define GSI5 index class in db_models.py
+        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
             limit=limit + 1,
-            filter_condition=(CollectionModel.SK == METADATA_SK),
+            filter_condition=(
+                (CollectionModel.SK == METADATA_SK)
+                & (CollectionModel.PK.startswith(COLLECTION_PK_PREFIX))
+            ),
         ):
             items.append(_model_to_dict(collection))
     except Exception as e:
@@ -266,11 +311,13 @@ def _query_collections_by_type(collection_type_id, limit, start_key):
     items = []
     try:
         # Simplified - scan and filter by type
+        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
             limit=limit + 1,
             filter_condition=(
                 (CollectionModel.SK == METADATA_SK)
                 & (CollectionModel.collectionTypeId == collection_type_id)
+                & (CollectionModel.PK.startswith(COLLECTION_PK_PREFIX))
             ),
         ):
             items.append(_model_to_dict(collection))
@@ -402,9 +449,14 @@ def _filter_collections_by_access(items, user_id):
     shared_collection_info = _get_shared_collection_ids(user_id)
 
     for item in items:
+        # Skip collection groups (PK starts with GROUP#)
+        pk = item.get("PK", "")
+        if not pk.startswith(COLLECTION_PK_PREFIX):
+            continue
+
         is_public = item.get("isPublic", False)
         owner_id = item.get("ownerId")
-        collection_id = item.get("PK", "").replace(COLLECTION_PK_PREFIX, "")
+        collection_id = pk.replace(COLLECTION_PK_PREFIX, "")
 
         # Public collections are accessible to authenticated users
         if is_public:

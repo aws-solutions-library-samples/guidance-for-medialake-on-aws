@@ -243,11 +243,24 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
             );
           }
         } else if (!shouldFetchPermissions) {
-          // If no custom permissions and no permission sets yet, enable fetching
-          // but only if we haven't already enabled it
-          console.log("No custom permissions in JWT, enabling permission sets API fetch");
-          setShouldFetchPermissions(true);
-          setPermissionsInitialized(false);
+          // NOTE: The /permissions API endpoint doesn't exist yet.
+          // Instead of fetching from API, initialize with empty permissions.
+          // This allows the app to function using JWT custom:permissions claims only.
+          console.log(
+            "No custom permissions in JWT, initializing with empty permissions (API endpoint not available)"
+          );
+
+          // Create ability with empty permissions - user will have base access only
+          const newAbility = defineAbilityFor(user, []);
+          setAbility(newAbility);
+          setPermissionsInitialized(true);
+
+          // Store in global cache
+          const exp = JSON.parse(atob(token.split(".")[1])).exp;
+          const expiresIn = exp - Math.floor(Date.now() / 1000);
+          if (expiresIn > 0) {
+            globalPermissionCache.setGlobalCache(user, [], newAbility, [], token, expiresIn);
+          }
         }
       } catch (error) {
         console.error("Error creating ability:", error);

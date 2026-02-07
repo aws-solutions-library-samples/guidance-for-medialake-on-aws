@@ -1,4 +1,5 @@
 pytest>=8.0.0
+hypothesis>=6.0.0
 aws-lambda-powertools
 opensearch-py
 hypothesis>=6.0.0

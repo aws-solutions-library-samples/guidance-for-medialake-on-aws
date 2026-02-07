@@ -30,6 +30,10 @@ workflow:
       when: always
     - if: $CI_COMMIT_BRANCH == "release"
       when: always
+    - if: $CI_COMMIT_BRANCH == "main-v2"
+      when: always
+    - if: $CI_COMMIT_BRANCH == "feat/dashboards"
+      when: always
     - when: never
 
 # This job should ONLY run on MRs targeting 'stable'
