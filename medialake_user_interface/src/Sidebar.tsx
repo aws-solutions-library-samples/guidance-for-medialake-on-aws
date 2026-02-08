@@ -34,7 +34,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Group as GroupIcon,
-  Security as SecurityIcon,
   Home as HomeIcon,
   Extension as IntegrationIcon,
   Terrain as LogoIcon,
@@ -208,12 +207,6 @@ function Sidebar() {
             safePermissionCheck("view", "user") ||
             safePermissionCheck("view", "group") ||
             safePermissionCheck("view", "settings.users"),
-        },
-        {
-          text: t("sidebar.submenu.permissionSets", "Permissions"),
-          icon: <SecurityIcon />,
-          path: "/settings/permission-sets",
-          visible: advancedPermissionsEnabled && safePermissionCheck("view", "permission-set"),
         },
         {
           text: t("sidebar.submenu.integrations"),
@@ -681,9 +674,7 @@ function Sidebar() {
                       {item.subItems.map((subItem) => {
                         // Check if this is a system settings item that requires permission
                         const isSystemSettings =
-                          subItem.path === "/settings/system" ||
-                          subItem.path === "/settings/users" ||
-                          subItem.path === "/settings/permission-sets";
+                          subItem.path === "/settings/system" || subItem.path === "/settings/users";
 
                         // Wrap system settings items with Can component
                         const menuItem = (

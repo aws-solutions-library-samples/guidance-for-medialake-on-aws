@@ -19,7 +19,6 @@ import {
   useDisableUser,
   useEnableUser,
 } from "@/api/hooks/useUsers";
-import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
 import { User, CreateUserRequest, UpdateUserRequest } from "@/api/types/api.types";
@@ -45,7 +44,6 @@ const UserManagement: React.FC = () => {
 
   const { data: users, isLoading: isLoadingUsers, error: usersError } = useGetUsers(isReady);
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(isReady);
-  useGetPermissionSets(isReady);
 
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
