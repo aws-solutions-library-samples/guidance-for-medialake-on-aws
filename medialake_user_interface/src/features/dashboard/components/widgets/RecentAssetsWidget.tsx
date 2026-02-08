@@ -146,7 +146,11 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
           ? "/audio/"
           : `/${assetType?.toLowerCase() || "image"}s/`;
       const originalAssetId = getOriginalAssetId({ InventoryID: assetId });
-      navigate(`${pathPrefix}${originalAssetId}`);
+      navigate(`${pathPrefix}${originalAssetId}`, {
+        state: {
+          assetType: assetType,
+        },
+      });
     },
     [navigate]
   );
