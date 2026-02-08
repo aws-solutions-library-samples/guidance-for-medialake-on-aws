@@ -127,7 +127,11 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
       const pathPrefix =
         assetType.toLowerCase() === "audio" ? "/audio/" : `/${assetType.toLowerCase()}s/`;
       const originalAssetId = getOriginalAssetId({ InventoryID: assetId });
-      navigate(`${pathPrefix}${originalAssetId}`);
+      navigate(`${pathPrefix}${originalAssetId}`, {
+        state: {
+          assetType: assetType,
+        },
+      });
     },
     [navigate]
   );

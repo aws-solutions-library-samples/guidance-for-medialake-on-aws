@@ -914,7 +914,7 @@ interface VideoDetailContentProps {
 
 const VideoDetailPage: React.FC = () => {
   const location = useLocation();
-  const { assetType, searchTerm, asset } = location.state;
+  const { assetType, searchTerm, asset } = location.state || {};
   return (
     <RecentlyViewedProvider>
       <RightSidebarProvider>
