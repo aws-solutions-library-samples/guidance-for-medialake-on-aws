@@ -3,8 +3,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AppAbility, createAppAbility } from "../types/ability.types";
 import { PermissionContextType, User } from "../types/permission.types";
 import { defineAbilityFor, extractUserFromClaims } from "../utils/ability-factory";
-import { transformPermissions } from "../transformers/permission-transformer";
-import { useGetPermissionSets } from "../../api/hooks/usePermissionSets";
 import { useAuth } from "../../common/hooks/auth-context";
 import { StorageHelper } from "../../common/helpers/storage-helper";
 import { globalPermissionCache } from "../utils/global-permission-cache";
@@ -26,17 +24,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<User | null>(null);
   const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
   const [permissionsInitialized, setPermissionsInitialized] = useState(false);
-
-  // State to control when to fetch permission sets from API
-  const [shouldFetchPermissions, setShouldFetchPermissions] = useState(false);
-
-  // Get permission sets from API only when explicitly enabled
-  const {
-    data: permissionSets,
-    isLoading,
-    error,
-    refetch,
-  } = useGetPermissionSets(shouldFetchPermissions);
 
   // Extract user information from JWT token and check global cache
   useEffect(() => {
@@ -172,13 +159,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [isAuthenticated]);
 
-  // Update ability when user or permission sets change
+  // Update ability when user changes
   useEffect(() => {
     console.log("Permission context effect triggered");
     console.log("isAuthenticated:", isAuthenticated);
     console.log("user:", user);
     console.log("user.customPermissions:", (user as any)?.customPermissions);
-    console.log("permissionSets:", permissionSets);
 
     if (isAuthenticated && isInitialized && user) {
       try {
@@ -194,73 +180,24 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        // Check if we have custom permissions from JWT
-        if ((user as any).customPermissions) {
-          console.log("Using custom permissions from JWT, skipping permission sets API");
+        // Create ability using custom permissions from JWT (or empty if none)
+        const newAbility = defineAbilityFor(user, []);
+        console.log("New ability created:", newAbility);
+        setAbility(newAbility);
+        setPermissionsInitialized(true);
 
-          // Create ability using custom permissions (empty permission sets)
-          const newAbility = defineAbilityFor(user, []);
-          console.log("New ability created with custom permissions:", newAbility);
-          setAbility(newAbility);
-          setPermissionsInitialized(true);
-
-          // Store in global cache
-          const exp = JSON.parse(atob(token.split(".")[1])).exp;
-          const expiresIn = exp - Math.floor(Date.now() / 1000);
-          if (expiresIn > 0) {
-            globalPermissionCache.setGlobalCache(
-              user,
-              (user as any).customPermissions,
-              newAbility,
-              [],
-              token,
-              expiresIn
-            );
-          }
-        } else if (permissionSets) {
-          // If no custom permissions but we have permission sets from API
-          // Transform permission sets to the format expected by CASL
-          const transformedPermissions = transformPermissions(permissionSets || []);
-          console.log("Transformed permissions:", transformedPermissions);
-
-          // Create the ability instance
-          const newAbility = defineAbilityFor(user, transformedPermissions);
-          console.log("New ability created:", newAbility);
-          setAbility(newAbility);
-          setPermissionsInitialized(true);
-
-          // Store in global cache
-          const exp = JSON.parse(atob(token.split(".")[1])).exp;
-          const expiresIn = exp - Math.floor(Date.now() / 1000);
-          if (expiresIn > 0) {
-            globalPermissionCache.setGlobalCache(
-              user,
-              [],
-              newAbility,
-              permissionSets,
-              token,
-              expiresIn
-            );
-          }
-        } else if (!shouldFetchPermissions) {
-          // NOTE: The /permissions API endpoint doesn't exist yet.
-          // Instead of fetching from API, initialize with empty permissions.
-          // This allows the app to function using JWT custom:permissions claims only.
-          console.log(
-            "No custom permissions in JWT, initializing with empty permissions (API endpoint not available)"
+        // Store in global cache
+        const exp = JSON.parse(atob(token.split(".")[1])).exp;
+        const expiresIn = exp - Math.floor(Date.now() / 1000);
+        if (expiresIn > 0) {
+          globalPermissionCache.setGlobalCache(
+            user,
+            (user as any)?.customPermissions || [],
+            newAbility,
+            [],
+            token,
+            expiresIn
           );
-
-          // Create ability with empty permissions - user will have base access only
-          const newAbility = defineAbilityFor(user, []);
-          setAbility(newAbility);
-          setPermissionsInitialized(true);
-
-          // Store in global cache
-          const exp = JSON.parse(atob(token.split(".")[1])).exp;
-          const expiresIn = exp - Math.floor(Date.now() / 1000);
-          if (expiresIn > 0) {
-            globalPermissionCache.setGlobalCache(user, [], newAbility, [], token, expiresIn);
-          }
         }
       } catch (error) {
         console.error("Error creating ability:", error);
@@ -274,24 +211,43 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       setAbility(createAppAbility());
       setPermissionsInitialized(false);
     }
-  }, [isAuthenticated, isInitialized, user, permissionSets]);
+  }, [isAuthenticated, isInitialized, user]);
 
-  // Function to refresh permissions
+  // Function to refresh permissions (re-reads from JWT)
   const refreshPermissions = useCallback(async () => {
     if (isAuthenticated) {
-      // Enable fetching permissions from API
-      setShouldFetchPermissions(true);
-      // Then trigger the refetch
-      await refetch();
+      // Force re-read from JWT by clearing cache and re-triggering the user effect
+      globalPermissionCache.clear();
+      setPermissionsInitialized(false);
+      // Re-extract user from token to trigger the ability update
+      try {
+        const token = StorageHelper.getToken();
+        if (token) {
+          const tokenParts = token.split(".");
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            const extractedUser = extractUserFromClaims(payload);
+            if (payload["custom:permissions"]) {
+              try {
+                extractedUser.customPermissions = JSON.parse(payload["custom:permissions"]);
+              } catch (e) {
+                console.error("Failed to parse custom:permissions:", e);
+              }
+            }
+            setUser(extractedUser);
+          }
+        }
+      } catch (error) {
+        console.error("Error refreshing permissions:", error);
+      }
     }
-  }, [isAuthenticated, refetch, setShouldFetchPermissions]);
+  }, [isAuthenticated]);
 
   // Context value - ensure we stay in loading state until permissions are fully initialized
   const value = {
     ability,
-    loading:
-      isLoading || authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
-    error,
+    loading: authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
+    error: null,
     refreshPermissions,
   };
 
