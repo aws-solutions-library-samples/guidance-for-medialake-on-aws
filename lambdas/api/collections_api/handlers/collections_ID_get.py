@@ -109,6 +109,13 @@ def register_route(app):
                 collection_dict["tags"] = list(collection.tags)
             if collection.expiresAt:
                 collection_dict["expiresAt"] = collection.expiresAt
+            # Add thumbnail fields
+            if collection.thumbnailType:
+                collection_dict["thumbnailType"] = collection.thumbnailType
+            if collection.thumbnailValue:
+                collection_dict["thumbnailValue"] = collection.thumbnailValue
+            if collection.thumbnailS3Key:
+                collection_dict["thumbnailS3Key"] = collection.thumbnailS3Key
 
             formatted_collection = format_collection_item(collection_dict, user_context)
 

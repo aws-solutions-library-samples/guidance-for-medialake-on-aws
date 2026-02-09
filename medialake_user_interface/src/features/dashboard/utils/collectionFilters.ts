@@ -37,6 +37,10 @@ export interface Collection {
     name: string;
     parentId?: string;
   }>;
+  // Thumbnail fields
+  thumbnailType?: "icon" | "upload" | "asset" | "frame";
+  thumbnailValue?: string;
+  thumbnailUrl?: string;
 }
 
 /**

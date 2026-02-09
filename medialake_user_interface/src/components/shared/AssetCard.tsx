@@ -71,6 +71,7 @@ export interface AssetCardProps {
   // Semantic search confidence filtering for clips
   isSemantic?: boolean;
   confidenceThreshold?: number;
+  variant?: "compact" | "full"; // compact = dashboard style, full = search results style
 }
 
 const AssetCard: React.FC<AssetCardProps> = React.memo(
@@ -109,6 +110,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     // Semantic search confidence filtering for clips
     isSemantic = false,
     confidenceThreshold = 0.57,
+    variant = "full",
   }) => {
     const { t } = useTranslation();
     const [isHovering, setIsHovering] = useState(false);
@@ -719,7 +721,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       }
     }, [thumbnailScale, assetType, id]); // Update object-fit when thumbnailScale changes
 
-    // Determine the card dimensions based on props
+    const isCompact = variant === "compact";
+
+    // Determine the card dimensions based on props (used by full variant)
     const getCardDimensions = () => {
       const baseHeight =
         aspectRatio === "vertical"
@@ -729,9 +733,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             : aspectRatio === "horizontal"
               ? 150
               : 200;
-
       const sizeMultiplier = cardSize === "small" ? 0.8 : cardSize === "large" ? 1.4 : 1.1;
-
       return {
         height: baseHeight * sizeMultiplier,
         width: "100%",
@@ -868,36 +870,47 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         ref={cardContainerRef}
         sx={{
           position: "relative",
-          transition: "all 0.2s ease-in-out",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          cursor: "pointer",
+          borderRadius: 3,
+          overflow: "hidden",
+          border: "1px solid",
+          borderColor: (theme) => alpha(theme.palette.divider, 0.1),
+          bgcolor: "background.paper",
+          transition:
+            "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           "&:hover": {
             transform: "translateY(-4px)",
+            boxShadow: (theme) => `0 8px 32px ${alpha(theme.palette.common.black, 0.15)}`,
           },
         }}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
-        <Box
-          sx={{
-            borderRadius: 4, // Increased from 2 to 4 for more curved corners
-            overflow: "hidden",
-            bgcolor: "background.paper",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-            position: "relative", // Ensure this is a positioning context
-            "&:hover": {
-              boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
-            },
-          }}
-        >
-          {/* Render appropriate content based on asset type */}
-          {assetType === "Video" || assetType === "Audio" ? (
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
-              {proxyUrl && !videoLoadError ? (
+        {/* Thumbnail area */}
+        <Box sx={{ p: isCompact ? 1 : 0, pb: 0, position: "relative" }}>
+          <Box
+            sx={{
+              height: isCompact ? 120 : dimensions.height,
+              borderRadius: isCompact ? 2.5 : 0,
+              overflow: "hidden",
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+            }}
+          >
+            {assetType === "Video" || assetType === "Audio" ? (
+              proxyUrl && !videoLoadError ? (
                 <div
                   id={`${assetType.toLowerCase()}-asset-${id}`}
                   className={`asset-card-${assetType.toLowerCase()}`}
                   style={{
-                    width: dimensions.width,
-                    height: dimensions.height,
+                    width: "100%",
+                    height: "100%",
                     backgroundColor: "rgba(0,0,0,0.03)",
                     cursor: "pointer",
                     position: "relative",
@@ -918,144 +931,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   data-image-id={id}
                   sx={{
                     cursor: "pointer",
-                    width: dimensions.width,
-                    height: dimensions.height,
-                    backgroundColor: "rgba(0,0,0,0.03)",
+                    width: "100%",
+                    height: "100%",
                     objectFit: thumbnailScale === "fit" ? "contain" : "cover",
-                    transition: "all 0.2s ease-in-out",
                   }}
                 />
-              )}
-
-              {/* Video/Audio Control Bar */}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  p: 1,
-                  bgcolor: "background.paper",
-                  borderTop: "1px solid",
-                  borderColor: "divider",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <IconButton
-                  size="small"
-                  onClick={handleDownloadClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title={t("common.actions.download")}
-                >
-                  <DownloadIcon fontSize="small" />
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onAddToCollectionClick) {
-                      onAddToCollectionClick(e);
-                    }
-                  }}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title={t("common.actions.addToCollection")}
-                >
-                  {showRemoveButton ? (
-                    <RemoveIcon fontSize="small" />
-                  ) : (
-                    <AddIcon fontSize="small" />
-                  )}
-                </IconButton>
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    flex: 1,
-                    mx: 1,
-                    minWidth: "40px",
-                    fontSize: "0.75rem",
-                    py: 0.5,
-                    textAlign: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                  title={t("common.actions.assetDetail")}
-                >
-                  <Box
-                    sx={{
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      width: "100%",
-                      textAlign: "center",
-                    }}
-                  >
-                    {t("common.actions.assetDetail")}
-                  </Box>
-                </Button>
-
-                {/* Favorite button */}
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onFavoriteToggle) {
-                      onFavoriteToggle(e);
-                    }
-                  }}
-                  sx={{
-                    color: isFavorite ? "error.main" : "primary.main",
-                    "&:hover": {
-                      bgcolor: isFavorite ? "error.main" : "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
-                  data-testid="favorite-button"
-                >
-                  {isFavorite ? (
-                    <FavoriteIcon fontSize="small" />
-                  ) : (
-                    <FavoriteBorderIcon fontSize="small" />
-                  )}
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={handleDeleteClick}
-                  sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
-                  }}
-                  title={t("common.actions.delete")}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-          ) : (
-            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              )
+            ) : (
               <Box
                 onClick={onAssetClick}
                 component="img"
@@ -1065,25 +947,28 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 data-image-id={id}
                 sx={{
                   cursor: "pointer",
-                  width: dimensions.width,
-                  height: dimensions.height,
-                  backgroundColor: "rgba(0,0,0,0.03)",
+                  width: "100%",
+                  height: "100%",
                   objectFit: thumbnailScale === "fit" ? "contain" : "cover",
-                  transition: "all 0.2s ease-in-out",
                 }}
               />
+            )}
 
-              {/* Image Control Bar */}
+            {/* Hover overlay with action buttons (compact variant only) */}
+            {isCompact && (
               <Box
                 sx={{
+                  position: "absolute",
+                  inset: 0,
+                  bgcolor: (theme) => alpha(theme.palette.common.black, 0.5),
+                  opacity: shouldShowButtons ? 1 : 0,
+                  transition: "opacity 0.2s ease-in-out",
+                  pointerEvents: shouldShowButtons ? "auto" : "none",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  p: 1,
-                  bgcolor: "background.paper",
-                  borderTop: "1px solid",
-                  borderColor: "divider",
+                  justifyContent: "center",
+                  gap: 0.5,
+                  borderRadius: 2.5,
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -1092,15 +977,16 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     size="small"
                     onClick={handleDownloadClick}
                     sx={{
-                      color: "primary.main",
-                      "&:hover": {
-                        bgcolor: "primary.main",
-                        color: "primary.contrastText",
-                      },
+                      color: "common.white",
+                      bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
+                      backdropFilter: "blur(4px)",
+                      "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
+                      width: 30,
+                      height: 30,
                     }}
                     title={t("common.actions.download")}
                   >
-                    <DownloadIcon fontSize="small" />
+                    <DownloadIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 )}
 
@@ -1111,11 +997,12 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     onAddToCollectionClick?.(e);
                   }}
                   sx={{
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                    },
+                    color: "common.white",
+                    bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
+                    backdropFilter: "blur(4px)",
+                    "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
+                    width: 30,
+                    height: 30,
                   }}
                   title={
                     showRemoveButton
@@ -1124,67 +1011,33 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   }
                 >
                   {showRemoveButton ? (
-                    <RemoveIcon fontSize="small" />
+                    <RemoveIcon sx={{ fontSize: 16 }} />
                   ) : (
-                    <AddIcon fontSize="small" />
+                    <AddIcon sx={{ fontSize: 16 }} />
                   )}
                 </IconButton>
 
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssetClick();
-                  }}
-                  sx={{
-                    flex: 1,
-                    mx: 1,
-                    minWidth: "40px",
-                    fontSize: "0.75rem",
-                    py: 0.5,
-                    textAlign: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                  title={t("common.actions.assetDetail")}
-                >
-                  <Box
-                    sx={{
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      width: "100%",
-                      textAlign: "center",
-                    }}
-                  >
-                    Asset Detail
-                  </Box>
-                </Button>
-
-                {/* Favorite button */}
                 <IconButton
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (onFavoriteToggle) {
-                      onFavoriteToggle(e);
-                    }
+                    onFavoriteToggle?.(e);
                   }}
                   sx={{
-                    color: isFavorite ? "error.main" : "primary.main",
-                    "&:hover": {
-                      bgcolor: isFavorite ? "error.main" : "primary.main",
-                      color: "primary.contrastText",
-                    },
+                    color: isFavorite ? "#FC8181" : "common.white",
+                    bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
+                    backdropFilter: "blur(4px)",
+                    "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
+                    width: 30,
+                    height: 30,
                   }}
                   title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
                   data-testid="favorite-button"
                 >
                   {isFavorite ? (
-                    <FavoriteIcon fontSize="small" />
+                    <FavoriteIcon sx={{ fontSize: 16 }} />
                   ) : (
-                    <FavoriteBorderIcon fontSize="small" />
+                    <FavoriteBorderIcon sx={{ fontSize: 16 }} />
                   )}
                 </IconButton>
 
@@ -1193,362 +1046,507 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     size="small"
                     onClick={handleDeleteClick}
                     sx={{
-                      color: "primary.main",
+                      color: "common.white",
+                      bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
+                      backdropFilter: "blur(4px)",
                       "&:hover": {
-                        bgcolor: "primary.main",
-                        color: "primary.contrastText",
+                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.6),
                       },
+                      width: 30,
+                      height: 30,
                     }}
                     title={t("common.actions.delete")}
                   >
-                    <DeleteIcon fontSize="small" />
+                    <DeleteIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 )}
               </Box>
-            </Box>
-          )}
+            )}
+          </Box>
+        </Box>
 
-          {/* Position checkbox at the top left of the card */}
+        {/* Bottom control bar (full variant only) */}
+        {!isCompact && (
           <Box
             sx={{
-              position: "absolute",
-              top: 8,
-              left: 8,
               display: "flex",
-              gap: 1,
-              zIndex: 1000, // Keep high z-index to ensure it's above other elements
-              opacity: shouldShowButtons || isSelected ? 1 : 0, // Visible when hovering or selected
-              transition: "opacity 0.2s ease-in-out",
-              pointerEvents: shouldShowButtons || isSelected ? "auto" : "none", // Ensure buttons are clickable when visible
-              "&:hover": {
-                opacity: shouldShowButtons || isSelected ? 1 : 0,
-              },
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 0.5,
+              px: 1,
+              py: 0.75,
+              bgcolor: "background.paper",
+              borderTop: "1px solid",
+              borderColor: (theme) => alpha(theme.palette.divider, 0.08),
             }}
-            onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Checkbox for bulk selection */}
-            {
-              <Box
-                sx={(theme) => ({
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  // if selected and not hovered, make it transparent; otherwise show the light circle
-                  bgcolor: isSelected ? "transparent" : alpha(theme.palette.background.paper, 0.7),
-                  borderRadius: "50%",
-                  width: 28,
-                  height: 28,
-                  transition: "all 0.2s ease-in-out",
-                  "&:hover": {
-                    // on hover always show the background
-                    bgcolor: alpha(theme.palette.background.default, 0.9),
-                  },
-                })}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectToggle?.(id, e);
-                }}
-              >
-                <Checkbox
-                  size="small"
-                  disableRipple
-                  checked={isSelected}
-                  data-testid="asset-checkbox"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectToggle?.(id, e);
-                  }}
-                  icon={<CheckBoxOutlineBlankIcon />}
-                  checkedIcon={<CheckBoxIcon />}
-                  sx={{
-                    padding: 0,
-                    "& .MuiSvgIcon-root": {
-                      fontSize: 18,
-                    },
-                  }}
-                />
-              </Box>
-            }
-          </Box>
-
-          {/* Position buttons at the top right of the card, visible on hover or when menu is open - Removed since all assets now have bottom control bars */}
-          {false && (
-            <Box
-              sx={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                display: "flex",
-                gap: 1,
-                zIndex: 10, // Increased z-index to ensure buttons are above other elements
-                opacity: shouldShowButtons ? 1 : 0, // Visible when hovering or menu is clicked
-                transition: "opacity 0.2s ease-in-out",
-                pointerEvents: shouldShowButtons ? "auto" : "none", // Ensure buttons are clickable when visible
-              }}
-              onClick={(e) => e.stopPropagation()} // Stop propagation at the container level
-            >
-              <IconButton
-                size="small"
-                onClick={handleDeleteClick}
-                sx={(theme) => ({
-                  bgcolor: alpha(theme.palette.background.paper, 0.7),
-                  padding: "4px",
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.background.default, 0.9),
-                  },
-                })}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+            {!isClipMode && (
               <IconButton
                 size="small"
                 onClick={handleDownloadClick}
-                sx={(theme) => ({
-                  bgcolor: alpha(theme.palette.background.paper, 0.7),
-                  padding: "4px",
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.background.default, 0.9),
-                  },
-                })}
+                sx={{
+                  color: "primary.main",
+                  "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
+                }}
+                title={t("common.actions.download")}
               >
                 <DownloadIcon fontSize="small" />
               </IconButton>
-            </Box>
-          )}
+            )}
 
-          {/* Metadata section */}
-          {showMetadata && (
-            <Box sx={{ p: 2 }}>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {visibleFields.map((field) => (
-                  <Box
-                    key={field.id}
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCollectionClick?.(e);
+              }}
+              sx={{
+                color: "primary.main",
+                "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
+              }}
+              title={
+                showRemoveButton
+                  ? t("common.actions.removeFromCollection")
+                  : t("common.actions.addToCollection")
+              }
+            >
+              {showRemoveButton ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+            </IconButton>
+
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAssetClick();
+              }}
+              sx={{
+                flex: 1,
+                mx: 0.5,
+                minWidth: "40px",
+                fontSize: "0.7rem",
+                py: 0.4,
+                textTransform: "none",
+                borderColor: (theme) => alpha(theme.palette.primary.main, 0.3),
+              }}
+              title={t("common.actions.assetDetail")}
+            >
+              <Box
+                sx={{
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  width: "100%",
+                  textAlign: "center",
+                }}
+              >
+                {t("common.actions.assetDetail")}
+              </Box>
+            </Button>
+
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavoriteToggle?.(e);
+              }}
+              sx={{
+                color: isFavorite ? "error.main" : "primary.main",
+                "&:hover": {
+                  bgcolor: isFavorite ? "error.main" : "primary.main",
+                  color: "primary.contrastText",
+                },
+              }}
+              title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+              data-testid="favorite-button"
+            >
+              {isFavorite ? (
+                <FavoriteIcon fontSize="small" />
+              ) : (
+                <FavoriteBorderIcon fontSize="small" />
+              )}
+            </IconButton>
+
+            {!isClipMode && (
+              <IconButton
+                size="small"
+                onClick={handleDeleteClick}
+                sx={{
+                  color: "primary.main",
+                  "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
+                }}
+                title={t("common.actions.delete")}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        )}
+
+        {/* Checkbox for bulk selection - top left of thumbnail */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 10,
+            opacity: shouldShowButtons || isSelected ? 1 : 0,
+            transition: "opacity 0.2s ease-in-out",
+            pointerEvents: shouldShowButtons || isSelected ? "auto" : "none",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box
+            sx={(theme) => ({
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              bgcolor: isSelected
+                ? alpha(theme.palette.primary.main, 0.9)
+                : alpha(theme.palette.background.paper, 0.85),
+              borderRadius: "50%",
+              width: 26,
+              height: 26,
+              backdropFilter: "blur(4px)",
+              transition: "all 0.2s ease-in-out",
+              "&:hover": {
+                bgcolor: alpha(theme.palette.background.default, 0.95),
+              },
+            })}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectToggle?.(id, e);
+            }}
+          >
+            <Checkbox
+              size="small"
+              disableRipple
+              checked={isSelected}
+              data-testid="asset-checkbox"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectToggle?.(id, e);
+              }}
+              icon={<CheckBoxOutlineBlankIcon />}
+              checkedIcon={<CheckBoxIcon />}
+              sx={{
+                padding: 0,
+                color: isSelected ? "common.white" : undefined,
+                "&.Mui-checked": { color: "common.white" },
+                "& .MuiSvgIcon-root": { fontSize: 16 },
+              }}
+            />
+          </Box>
+        </Box>
+
+        {/* Info section */}
+        {showMetadata && isCompact && (
+          <Box sx={{ px: 1.5, pt: 1, pb: 1, cursor: "pointer" }} onClick={onAssetClick}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
+              {isEditing && onEditClick ? (
+                <Box
+                  sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <InlineTextEditor
+                    initialValue={editedName || ""}
+                    editingCellId={id}
+                    preventCommitRef={preventCommitRef}
+                    commitRef={commitRef}
+                    onChangeCommit={(value) => {
+                      onEditNameChange?.({
+                        target: { value },
+                      } as React.ChangeEvent<HTMLInputElement>);
+                    }}
+                    onComplete={(save, value) => onEditNameComplete?.(save, value)}
+                    isEditing={true}
+                    disabled={isRenaming}
+                    autoFocus
+                    size="small"
+                    fullWidth
+                    sx={{ "& .MuiInputBase-root": { fontSize: "0.82rem" } }}
+                    InputProps={{ endAdornment: isRenaming && <CircularProgress size={14} /> }}
+                  />
+                  <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={isRenaming}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        preventCommitRef.current = true;
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        preventCommitRef.current = false;
+                        commitRef.current?.();
+                      }}
+                      sx={{ fontSize: "0.7rem", py: 0.25, px: 1, minWidth: 0 }}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="small"
+                      disabled={isRenaming}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        preventCommitRef.current = true;
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditNameComplete?.(false, undefined);
+                      }}
+                      sx={{ fontSize: "0.7rem", py: 0.25, px: 1, minWidth: 0 }}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <>
+                  <Typography
+                    variant="subtitle2"
+                    component="h4"
+                    title={name}
                     sx={{
-                      display: "grid",
-                      gridTemplateColumns: "100px 1fr",
-                      alignItems: "center",
-                      width: "100%",
+                      fontWeight: 600,
+                      fontSize: "0.82rem",
+                      lineHeight: 1.4,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
                     }}
                   >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        flexShrink: 0,
-                        paddingRight: 1,
+                    {name}
+                  </Typography>
+                  {onEditClick && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditClick(e);
                       }}
+                      disabled={isRenaming}
+                      sx={{ p: 0.25 }}
                     >
-                      {field.label}:
-                    </Typography>
-                    {field.id === "name" && onEditClick ? (
-                      isEditing ? (
-                        <Box
-                          sx={{
-                            gridColumn: "1 / span 2",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                            width: "100%",
-                            mt: 1,
-                          }}
-                        >
-                          <InlineTextEditor
-                            initialValue={editedName || ""}
-                            editingCellId={id} // ← pass a stable ID (e.g. asset ID)
-                            preventCommitRef={preventCommitRef} // ← pass the ref to prevent commit
-                            commitRef={commitRef} // ← pass the ref to expose commit function
-                            onChangeCommit={(value) => {
-                              // Update parent state
-                              onEditNameChange({
-                                target: { value },
-                              } as React.ChangeEvent<HTMLInputElement>);
-                            }}
-                            onComplete={(save, value) => {
-                              console.log("🎯 AssetCard onComplete - save:", save, "value:", value);
-                              console.log(
-                                "🎯 Calling onEditNameComplete with save:",
-                                save,
-                                "value:",
-                                value
-                              );
-                              onEditNameComplete?.(save, value);
-                            }}
-                            isEditing={true}
-                            disabled={isRenaming}
-                            autoFocus
-                            size="small"
-                            fullWidth
-                            multiline
-                            rows={2}
-                            sx={{
-                              width: "100%",
-                              "& .MuiInputBase-root": {
-                                width: "100%",
-                              },
-                              "& .MuiInputBase-input": {
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                              },
-                            }}
-                            InputProps={{
-                              endAdornment: isRenaming && <CircularProgress size={16} />,
-                            }}
-                          />
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "flex-end",
-                              gap: 1,
-                            }}
-                          >
-                            <Button
-                              size="small"
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                console.log("💾 AssetCard Save mousedown");
-                                // Set flag to prevent blur from canceling
-                                preventCommitRef.current = true;
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                console.log("💾 AssetCard Save clicked");
-                                console.log("💾 AssetCard commitRef.current:", commitRef.current);
-                                // Reset the prevent flag
-                                preventCommitRef.current = false;
-                                // Call the commit function directly via ref
-                                if (commitRef.current) {
-                                  console.log("💾 AssetCard calling commitRef.current()");
-                                  commitRef.current();
-                                } else {
-                                  console.error("💾 AssetCard commitRef.current is null!");
-                                }
-                              }}
-                              variant="contained"
-                              disabled={isRenaming}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              size="small"
-                              disabled={isRenaming}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                console.log("🚫 AssetCard Cancel clicked");
-                                // Set flag to prevent InlineTextEditor commit from being called
-                                // Use onMouseDown instead of onClick to set the flag before onBlur
-                                preventCommitRef.current = true;
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditNameComplete?.(false, undefined);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </Box>
-                        </Box>
+                      {isRenaming ? (
+                        <CircularProgress size={12} />
                       ) : (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            width: "100%",
-                            justifyContent: "space-between",
+                        <EditIcon sx={{ fontSize: 14 }} />
+                      )}
+                    </IconButton>
+                  )}
+                </>
+              )}
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+                {visibleFields
+                  .filter((f) => f.id !== "name")
+                  .map((f) => String(renderField(f.id)))
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Typography>
+              {assetType && (
+                <Box
+                  component="span"
+                  sx={(theme) => ({
+                    display: "inline-flex",
+                    alignItems: "center",
+                    height: 20,
+                    px: 1,
+                    borderRadius: 10,
+                    fontSize: "0.65rem",
+                    fontWeight: 500,
+                    color: theme.palette.primary.main,
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    border: "1px solid",
+                    borderColor: alpha(theme.palette.primary.main, 0.2),
+                    whiteSpace: "nowrap",
+                  })}
+                >
+                  {assetType}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Metadata section (full variant) */}
+        {showMetadata && !isCompact && (
+          <Box sx={{ px: 1.5, pt: 1.5, pb: 1.5 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+              {visibleFields.map((field) => (
+                <Box
+                  key={field.id}
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "80px 1fr",
+                    alignItems: "center",
+                    width: "100%",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ flexShrink: 0, pr: 1, fontSize: "0.75rem" }}
+                  >
+                    {field.label}:
+                  </Typography>
+                  {field.id === "name" && onEditClick ? (
+                    isEditing ? (
+                      <Box
+                        sx={{
+                          gridColumn: "1 / span 2",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                          width: "100%",
+                          mt: 1,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <InlineTextEditor
+                          initialValue={editedName || ""}
+                          editingCellId={id}
+                          preventCommitRef={preventCommitRef}
+                          commitRef={commitRef}
+                          onChangeCommit={(value) => {
+                            onEditNameChange?.({
+                              target: { value },
+                            } as React.ChangeEvent<HTMLInputElement>);
                           }}
-                        >
-                          <Typography
-                            sx={{
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
+                          onComplete={(save, value) => onEditNameComplete?.(save, value)}
+                          isEditing={true}
+                          disabled={isRenaming}
+                          autoFocus
+                          size="small"
+                          fullWidth
+                          multiline
+                          rows={2}
+                          sx={{
+                            width: "100%",
+                            "& .MuiInputBase-root": { width: "100%" },
+                            "& .MuiInputBase-input": {
                               whiteSpace: "normal",
                               wordBreak: "break-word",
-                              flexGrow: 1,
-                              userSelect: "text", // Allow text selection
-                              maxHeight: "2.4em", // Limit to exactly 2 lines
-                              lineHeight: "1.2em",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                              "&:hover": {
-                                maxHeight: "none", // Remove height limit on hover
-                                WebkitLineClamp: "unset",
-                              },
-                            }}
-                            display="inline"
-                            variant="body2"
-                            title={String(renderField(field.id))}
-                          >
-                            {renderField(field.id)}
-                          </Typography>
-                          <IconButton
+                            },
+                          }}
+                          InputProps={{
+                            endAdornment: isRenaming && <CircularProgress size={16} />,
+                          }}
+                        />
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+                          <Button
                             size="small"
+                            variant="contained"
+                            disabled={isRenaming}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              preventCommitRef.current = true;
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditClick(e);
+                              e.preventDefault();
+                              preventCommitRef.current = false;
+                              commitRef.current?.();
                             }}
-                            disabled={isRenaming}
                           >
-                            {isRenaming ? (
-                              <CircularProgress size={16} />
-                            ) : (
-                              <EditIcon fontSize="small" />
-                            )}
-                          </IconButton>
+                            Save
+                          </Button>
+                          <Button
+                            size="small"
+                            disabled={isRenaming}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              preventCommitRef.current = true;
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditNameComplete?.(false, undefined);
+                            }}
+                          >
+                            Cancel
+                          </Button>
                         </Box>
-                      )
+                      </Box>
                     ) : (
-                      <Box sx={{ width: "100%" }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <Typography
                           variant="body2"
+                          title={String(renderField(field.id))}
                           sx={{
-                            userSelect: "text",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "normal",
                             wordBreak: "break-word",
-                            width: "100%",
-                            maxHeight: "2.4em", // Limit to exactly 2 lines
+                            flexGrow: 1,
+                            userSelect: "text",
+                            maxHeight: "2.4em",
                             lineHeight: "1.2em",
                             display: "-webkit-box",
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: "vertical",
-                            position: "relative",
-                            "&:after": {
-                              content: '"..."',
-                              position: "absolute",
-                              bottom: 0,
-                              right: 0,
-                              paddingLeft: "4px",
-                              backgroundColor: "inherit",
-                              boxShadow: "-8px 0 8px rgba(255,255,255,0.8)",
-                              display: "none",
-                            },
-                            "&.truncated:after": {
-                              display: "inline",
-                            },
-                            "&:hover": {
-                              maxHeight: "none", // Remove height limit on hover
-                              WebkitLineClamp: "unset",
-                              "&:after": {
-                                display: "none",
-                              },
-                            },
+                            "&:hover": { maxHeight: "none", WebkitLineClamp: "unset" },
                           }}
-                          className={String(renderField(field.id)).length > 60 ? "truncated" : ""}
-                          title={String(renderField(field.id))}
                         >
                           {renderField(field.id)}
                         </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditClick(e);
+                          }}
+                          disabled={isRenaming}
+                        >
+                          {isRenaming ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <EditIcon fontSize="small" />
+                          )}
+                        </IconButton>
                       </Box>
-                    )}
-                  </Box>
-                ))}
-              </Box>
+                    )
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      title={String(renderField(field.id))}
+                      sx={{
+                        userSelect: "text",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                        width: "100%",
+                        maxHeight: "2.4em",
+                        lineHeight: "1.2em",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        "&:hover": { maxHeight: "none", WebkitLineClamp: "unset" },
+                      }}
+                    >
+                      {renderField(field.id)}
+                    </Typography>
+                  )}
+                </Box>
+              ))}
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
     );
   }

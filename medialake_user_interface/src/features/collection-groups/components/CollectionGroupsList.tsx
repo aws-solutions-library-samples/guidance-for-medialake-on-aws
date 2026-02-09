@@ -1,6 +1,6 @@
 /**
  * Collection Groups List Component
- * Displays a list of collection groups with search and pagination
+ * Displays collection groups in a card grid cohesive with the collections page design
  */
 
 import React, { useState } from "react";
@@ -10,13 +10,15 @@ import {
   Box,
   Card,
   CardContent,
-  CardActions,
   Typography,
   Button,
   TextField,
+  InputAdornment,
+  IconButton,
   CircularProgress,
   Alert,
   Chip,
+  Tooltip,
   alpha,
   useTheme,
 } from "@mui/material";
@@ -28,11 +30,12 @@ import {
   FolderOpen as FolderOpenIcon,
   Public as PublicIcon,
   Lock as PrivateIcon,
-  CalendarToday as CalendarIcon,
   Collections as CollectionsIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useCollectionGroups, useDeleteCollectionGroup } from "../hooks/useCollectionGroups";
-import { formatDate } from "@/utils/dateFormat";
+import { formatDateOnly } from "@/utils/dateFormat";
 import type { CollectionGroup } from "../types";
 
 interface CollectionGroupsListProps {
@@ -51,7 +54,8 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
   const { data, isLoading, error } = useCollectionGroups({ search, limit: 20 });
   const deleteGroup = useDeleteCollectionGroup();
 
-  const handleDelete = async (groupId: string, groupName: string) => {
+  const handleDelete = async (e: React.MouseEvent, groupId: string, groupName: string) => {
+    e.stopPropagation();
     if (window.confirm(t("collectionGroups.list.confirmDelete", { name: groupName }))) {
       try {
         await deleteGroup.mutateAsync(groupId);
@@ -63,8 +67,8 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="360px">
+        <CircularProgress size={36} />
       </Box>
     );
   }
@@ -77,43 +81,110 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
 
   return (
     <Box>
-      {/* Search */}
-      <Box mb={3}>
+      {/* Search — matches the collections page search style */}
+      <Box sx={{ mb: 2.5, display: "flex", justifyContent: "flex-end" }}>
         <TextField
-          fullWidth
-          placeholder={t("collectionGroups.list.searchPlaceholder")}
+          size="small"
+          placeholder={t("collectionGroups.list.searchPlaceholder", "Search groups...")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          variant="outlined"
+          sx={{
+            width: 260,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2,
+              height: 36,
+              fontSize: "0.85rem",
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+              </InputAdornment>
+            ),
+            endAdornment: search ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearch("")} sx={{ p: 0.25 }}>
+                  <ClearIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
         />
       </Box>
 
-      {/* Groups List */}
+      {/* Empty state — matches collections empty state */}
       {groups.length === 0 ? (
-        <Box textAlign="center" py={8}>
-          <FolderOpenIcon
-            sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.5), mb: 2 }}
-          />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            {t("collectionGroups.list.noGroupsYet")}
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 360,
+            textAlign: "center",
+            py: 6,
+          }}
+        >
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mb: 2.5,
+            }}
+          >
+            <FolderOpenIcon
+              sx={{
+                fontSize: 40,
+                color: alpha(theme.palette.primary.main, 0.4),
+              }}
+            />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, color: "text.primary" }}>
+            {search
+              ? t("collectionGroups.list.noSearchResults", "No matching groups")
+              : t("collectionGroups.list.noGroupsYet", "No collection groups yet")}
           </Typography>
-          <Typography variant="body2" color="text.secondary" mb={3}>
-            {t("collectionGroups.list.createFirstGroup")}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 320 }}>
+            {search
+              ? t("collectionGroups.list.tryDifferentSearch", "Try a different search term")
+              : t(
+                  "collectionGroups.list.createFirstGroup",
+                  "Create your first group to organize collections"
+                )}
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={onCreateClick}>
-            {t("collectionsPage.filters.createGroup")}
-          </Button>
+          {!search && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={onCreateClick}
+              sx={{
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3,
+              }}
+            >
+              {t("collectionsPage.filters.createGroup", "Create Group")}
+            </Button>
+          )}
         </Box>
       ) : (
+        /* Card grid — matches collection cards layout */
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: {
               xs: "1fr",
-              sm: "repeat(auto-fill, minmax(300px, 1fr))",
-              md: "repeat(auto-fill, minmax(350px, 1fr))",
+              sm: "repeat(auto-fill, minmax(280px, 1fr))",
+              md: "repeat(auto-fill, minmax(300px, 1fr))",
             },
-            gap: 3,
+            gap: 2.5,
             pt: 0.5,
           }}
         >
@@ -124,193 +195,224 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: 3,
-                border: "2px solid",
-                borderColor: theme.palette.primary.main,
-                overflow: "visible",
-                transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                overflow: "hidden",
+                border: "1px solid",
+                borderColor: alpha(theme.palette.divider, 0.1),
+                bgcolor: "background.paper",
+                transition:
+                  "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                 "&:hover": {
                   transform: "translateY(-4px)",
-                  boxShadow: theme.shadows[6],
+                  boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.2)}`,
                   cursor: "pointer",
+                  "& .card-actions-overlay": {
+                    opacity: 1,
+                  },
                 },
               }}
               onClick={() => navigate(`/collections/groups/${group.id}`)}
             >
-              <CardContent
-                sx={{
-                  flexGrow: 1,
-                  pb: 2,
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                {/* Header with icon and name */}
+              {/* Thumbnail area — gradient with icon */}
+              <Box sx={{ p: 1.25, pb: 0 }}>
                 <Box
                   sx={{
+                    height: 180,
+                    borderRadius: 2.5,
+                    overflow: "hidden",
+                    position: "relative",
+                    background: `linear-gradient(135deg, ${alpha(
+                      theme.palette.primary.main,
+                      0.08
+                    )} 0%, ${alpha(theme.palette.primary.light, 0.04)} 100%)`,
                     display: "flex",
-                    alignItems: "flex-start",
-                    mb: 2,
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1.5,
                   }}
                 >
                   <FolderSpecialIcon
-                    sx={{ color: theme.palette.primary.main, fontSize: 32, mr: 1.5 }}
+                    sx={{
+                      fontSize: 56,
+                      color: alpha(theme.palette.primary.main, 0.18),
+                    }}
                   />
-                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Typography
-                      variant="h6"
-                      component="h3"
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: "1.1rem",
-                        lineHeight: 1.3,
-                        mb: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {group.name}
-                    </Typography>
-                    {/* Badges: Public/Private */}
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      <Chip
-                        label={group.isPublic ? t("common.public") : t("common.private")}
-                        size="small"
-                        icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
-                        sx={{
-                          height: 22,
-                          color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
-                          bgcolor: group.isPublic
-                            ? "#e8f5e8"
-                            : alpha(theme.palette.primary.main, 0.1),
-                          border: `1px solid ${
-                            group.isPublic ? "#2e7d32" : theme.palette.primary.main
-                          }`,
-                          "& .MuiChip-icon": {
-                            color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
-                            fontSize: 14,
-                          },
-                        }}
-                      />
-                      {group.userRole && group.userRole !== "owner" && (
-                        <Chip
-                          label={group.userRole}
-                          size="small"
-                          sx={{
-                            height: 22,
-                            color: theme.palette.info.main,
-                            bgcolor: alpha(theme.palette.info.main, 0.1),
-                            border: `1px solid ${theme.palette.info.main}`,
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </Box>
-                </Box>
 
-                {/* Description */}
-                <Box
-                  sx={{
-                    minHeight: group.description ? "40px" : "0px",
-                    mb: 2,
-                  }}
-                >
-                  {group.description && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                      }}
-                    >
-                      {group.description}
-                    </Typography>
-                  )}
-                </Box>
-
-                {/* Stats */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                    mt: "auto",
-                  }}
-                >
-                  {/* Collection count */}
+                  {/* Collection count pill */}
                   <Box
                     sx={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 1,
+                      gap: 0.5,
+                      px: 1.5,
+                      py: 0.4,
+                      borderRadius: 5,
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      border: "1px solid",
+                      borderColor: alpha(theme.palette.primary.main, 0.12),
                     }}
                   >
-                    <CollectionsIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                    <Typography variant="body2" color="text.secondary">
-                      {t("collectionGroups.list.collectionCount", { count: group.collectionCount })}
+                    <CollectionsIcon
+                      sx={{ fontSize: 14, color: alpha(theme.palette.primary.main, 0.6) }}
+                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: "0.72rem",
+                        color: alpha(theme.palette.primary.main, 0.7),
+                      }}
+                    >
+                      {group.collectionCount}{" "}
+                      {group.collectionCount === 1
+                        ? t("collectionGroups.list.collection", "collection")
+                        : t("collectionGroups.list.collections", "collections")}
                     </Typography>
                   </Box>
 
-                  {/* Created date */}
-                  {group.createdAt && (
+                  {/* Action buttons overlay */}
+                  {group.isOwner && (
                     <Box
+                      className="card-actions-overlay"
                       sx={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
                         display: "flex",
-                        alignItems: "center",
-                        gap: 1,
+                        gap: 0.5,
+                        opacity: 0,
+                        transition: "opacity 0.15s ease",
                       }}
                     >
-                      <CalendarIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {t("common.created")}: {formatDate(group.createdAt)}
-                      </Typography>
+                      {[
+                        {
+                          icon: <EditIcon sx={{ fontSize: 15 }} />,
+                          tip: t("common.edit", "Edit"),
+                          handler: (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            onEditClick?.(group);
+                          },
+                          color: "text.primary",
+                        },
+                        {
+                          icon: <DeleteIcon sx={{ fontSize: 15 }} />,
+                          tip: t("common.delete", "Delete"),
+                          handler: (e: React.MouseEvent) => handleDelete(e, group.id, group.name),
+                          color: "error.main",
+                        },
+                      ].map(({ icon, tip, handler, color }) => (
+                        <Tooltip key={tip} title={tip}>
+                          <Button
+                            size="small"
+                            sx={{
+                              minWidth: 0,
+                              p: 0.6,
+                              borderRadius: 1.5,
+                              bgcolor: alpha(theme.palette.background.paper, 0.85),
+                              backdropFilter: "blur(8px)",
+                              color,
+                              border: "1px solid",
+                              borderColor: alpha(theme.palette.divider, 0.12),
+                              "&:hover": {
+                                bgcolor: theme.palette.background.paper,
+                              },
+                            }}
+                            onClick={handler}
+                            disabled={tip === t("common.delete", "Delete") && deleteGroup.isPending}
+                          >
+                            {icon}
+                          </Button>
+                        </Tooltip>
+                      ))}
                     </Box>
                   )}
                 </Box>
-              </CardContent>
+              </Box>
 
-              {/* Actions */}
-              {group.isOwner && (
-                <CardActions
+              {/* Info section — matches collection card info */}
+              <CardContent sx={{ px: 1.75, pt: 1.25, pb: 1.25, "&:last-child": { pb: 1.25 } }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
+                  <FolderSpecialIcon
+                    sx={{
+                      fontSize: 18,
+                      color: alpha(theme.palette.primary.main, 0.5),
+                    }}
+                  />
+                  <Typography
+                    variant="subtitle2"
+                    component="h3"
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.9rem",
+                      lineHeight: 1.4,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                    }}
+                  >
+                    {group.name}
+                  </Typography>
+                </Box>
+
+                {/* Description */}
+                {group.description && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      display: "-webkit-box",
+                      WebkitLineClamp: 1,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      fontSize: "0.75rem",
+                      mb: 0.5,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {group.description}
+                  </Typography>
+                )}
+
+                <Box
                   sx={{
-                    pt: 0,
-                    px: 2,
-                    pb: 2,
                     display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 1,
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <Button
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+                    {group.collectionCount}{" "}
+                    {group.collectionCount === 1
+                      ? t("collectionGroups.list.collection", "collection")
+                      : t("collectionGroups.list.collections", "collections")}
+                    {group.createdAt && ` · ${formatDateOnly(group.createdAt)}`}
+                  </Typography>
+                  <Chip
+                    label={
+                      group.isPublic ? t("common.public", "Public") : t("common.private", "Private")
+                    }
                     size="small"
-                    startIcon={<EditIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditClick?.(group);
+                    icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
+                    variant="outlined"
+                    sx={{
+                      height: 22,
+                      fontSize: "0.68rem",
+                      fontWeight: 500,
+                      color: group.isPublic ? "#38A169" : "text.secondary",
+                      borderColor: group.isPublic
+                        ? alpha("#38A169", 0.35)
+                        : alpha(theme.palette.text.secondary, 0.15),
+                      bgcolor: group.isPublic ? alpha("#38A169", 0.06) : "transparent",
+                      "& .MuiChip-icon": {
+                        color: group.isPublic ? "#38A169" : "text.secondary",
+                        fontSize: 13,
+                      },
                     }}
-                    sx={{ textTransform: "none" }}
-                  >
-                    {t("common.edit")}
-                  </Button>
-                  <Button
-                    size="small"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(group.id, group.name);
-                    }}
-                    disabled={deleteGroup.isPending}
-                    sx={{ textTransform: "none" }}
-                  >
-                    {t("common.delete")}
-                  </Button>
-                </CardActions>
-              )}
+                  />
+                </Box>
+              </CardContent>
             </Card>
           ))}
         </Box>

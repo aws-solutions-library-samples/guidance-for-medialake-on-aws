@@ -14,6 +14,15 @@ class CollectionStatus(str, Enum):
     DELETED = "DELETED"
 
 
+class ThumbnailType(str, Enum):
+    """Thumbnail type values."""
+
+    ICON = "icon"  # MUI icon name (e.g., "Movie", "Folder")
+    UPLOAD = "upload"  # User uploaded image
+    ASSET = "asset"  # Copied from an existing asset's thumbnail
+    FRAME = "frame"  # Captured from a video frame
+
+
 class RelationshipType(str, Enum):
     """User-collection relationship types."""
 

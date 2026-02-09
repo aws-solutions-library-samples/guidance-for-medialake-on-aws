@@ -85,6 +85,7 @@ export interface DashboardState {
 
 export interface DashboardActions {
   setLayout: (layout: DashboardLayout) => void;
+  initializeLayout: (layout: DashboardLayout) => void;
   updateLayoutItem: (itemId: string, updates: Partial<LayoutItem>) => void;
   addWidget: (type: WidgetType) => void;
   removeWidget: (widgetId: string) => void;

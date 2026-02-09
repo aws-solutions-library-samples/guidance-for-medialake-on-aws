@@ -5,6 +5,9 @@ import { QUERY_KEYS } from "@/api/queryKeys";
 import { logger } from "../../common/helpers/logger";
 import { useErrorModal } from "../../hooks/useErrorModal";
 
+// Thumbnail types matching the backend enum
+export type ThumbnailType = "icon" | "upload" | "asset" | "frame";
+
 // Collection types following the backend API schema
 export interface Collection {
   id: string;
@@ -23,6 +26,10 @@ export interface Collection {
   userRole?: string;
   createdAt: string;
   updatedAt: string;
+  // Thumbnail fields
+  thumbnailType?: ThumbnailType;
+  thumbnailValue?: string; // icon name or source asset ID
+  thumbnailUrl?: string; // resolved CloudFront URL for uploaded/asset/frame thumbnails
   // Sharing metadata
   isShared?: boolean;
   shareCount?: number;
@@ -828,6 +835,136 @@ export const useMigrateCollectionType = () => {
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+    },
+  });
+};
+
+// =============================================================================
+// Collection Thumbnail Hooks
+// =============================================================================
+
+export type ThumbnailSource = "upload" | "asset" | "frame";
+
+export interface SetCollectionThumbnailRequest {
+  source: ThumbnailSource;
+  data?: string; // Base64 image data for 'upload' or 'frame' source
+  assetId?: string; // Asset ID for 'asset' source
+}
+
+export interface SetCollectionThumbnailResponse {
+  success: boolean;
+  data: {
+    thumbnailType: ThumbnailType;
+    thumbnailValue?: string;
+    thumbnailUrl: string;
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
+/**
+ * Hook to set a collection thumbnail
+ * Supports uploading an image, using an asset's thumbnail, or capturing a video frame
+ */
+export const useSetCollectionThumbnail = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation<
+    SetCollectionThumbnailResponse,
+    Error,
+    { collectionId: string; data: SetCollectionThumbnailRequest }
+  >({
+    mutationFn: async ({ collectionId, data }) => {
+      try {
+        const response = await apiClient.post<SetCollectionThumbnailResponse>(
+          API_ENDPOINTS.COLLECTIONS.THUMBNAIL(collectionId),
+          data
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Set collection thumbnail error:", error);
+        showError("Failed to set collection thumbnail");
+        throw error;
+      }
+    },
+    onSuccess: (_, { collectionId }) => {
+      // Invalidate collections list and specific collection
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
+      });
+    },
+  });
+};
+
+/**
+ * Hook to delete a collection thumbnail
+ */
+export const useDeleteCollectionThumbnail = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation<void, Error, string>({
+    mutationFn: async (collectionId) => {
+      try {
+        await apiClient.delete(API_ENDPOINTS.COLLECTIONS.THUMBNAIL(collectionId));
+      } catch (error) {
+        logger.error("Delete collection thumbnail error:", error);
+        showError("Failed to remove collection thumbnail");
+        throw error;
+      }
+    },
+    onSuccess: (_, collectionId) => {
+      // Invalidate collections list and specific collection
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
+      });
+    },
+  });
+};
+
+/**
+ * Hook to set a collection thumbnail to an icon
+ * This uses the PATCH endpoint to set thumbnailType: 'icon' and thumbnailValue: iconName
+ */
+export const useSetCollectionIcon = () => {
+  const queryClient = useQueryClient();
+  const { showError } = useErrorModal();
+
+  return useMutation<CollectionResponse, Error, { collectionId: string; iconName: string }>({
+    mutationFn: async ({ collectionId, iconName }) => {
+      try {
+        const response = await apiClient.patch<CollectionResponse>(
+          API_ENDPOINTS.COLLECTIONS.UPDATE(collectionId),
+          {
+            thumbnailType: "icon",
+            thumbnailValue: iconName,
+          }
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Set collection icon error:", error);
+        showError("Failed to set collection icon");
+        throw error;
+      }
+    },
+    onSuccess: (_, { collectionId }) => {
+      // Invalidate collections list and specific collection
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
       });
     },
   });

@@ -345,6 +345,7 @@ class MediaLakeStack(cdk.Stack):
                 vpc=props.base_infrastructure.vpc,
                 security_group=props.base_infrastructure.security_group,
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
+                asset_table=props.base_infrastructure.asset_table,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)

@@ -59,6 +59,13 @@ class CollectionModel(Model):
     updatedAt = UnicodeAttribute()
     expiresAt = UnicodeAttribute(null=True)
 
+    # Thumbnail fields
+    thumbnailType = UnicodeAttribute(null=True)  # 'icon' | 'upload' | 'asset' | 'frame'
+    thumbnailValue = UnicodeAttribute(null=True)  # icon name or source asset ID
+    thumbnailS3Key = UnicodeAttribute(
+        null=True
+    )  # S3 key: 'collections/{id}/thumbnail.png'
+
     # GSI1 - User collections (PK=USER#{user_id}, SK=COLL#{collection_id})
     GSI1_PK = UnicodeAttribute(null=True)
     GSI1_SK = UnicodeAttribute(null=True)

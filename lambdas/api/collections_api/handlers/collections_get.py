@@ -582,5 +582,12 @@ def _model_to_dict(collection) -> dict[str, Any]:
         item_dict["tags"] = list(collection.tags)
     if collection.expiresAt:
         item_dict["expiresAt"] = collection.expiresAt
+    # Add thumbnail fields
+    if collection.thumbnailType:
+        item_dict["thumbnailType"] = collection.thumbnailType
+    if collection.thumbnailValue:
+        item_dict["thumbnailValue"] = collection.thumbnailValue
+    if collection.thumbnailS3Key:
+        item_dict["thumbnailS3Key"] = collection.thumbnailS3Key
 
     return item_dict

@@ -57,7 +57,7 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   const layout = useDashboardStore((state) => state.layout);
   const activePresetId = useDashboardStore((state) => state.activePresetId);
   const activePresetName = useDashboardStore((state) => state.activePresetName);
-  const setLayout = useDashboardStore((state) => state.setLayout);
+  const initializeLayout = useDashboardStore((state) => state.initializeLayout);
   const setActivePreset = useDashboardStore((state) => state.setActivePreset);
   const setHasPendingChanges = useDashboardStore((state) => state.setHasPendingChanges);
 
@@ -93,9 +93,8 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
       const frontendLayout = convertApiLayoutToFrontend(result);
       console.log("Converted frontend layout:", frontendLayout);
 
-      setLayout(frontendLayout);
+      initializeLayout(frontendLayout);
       setActivePreset(preset.presetId, preset.name);
-      setHasPendingChanges(false);
     } catch (error) {
       console.error("Failed to apply preset:", error);
     }
@@ -109,14 +108,13 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
       const { data: defaultLayout } = await refetchDefaultDashboard();
 
       if (defaultLayout) {
-        // Convert and apply the default layout
+        // Convert and apply the default layout without marking as dirty
         const frontendLayout = convertApiLayoutToFrontend(defaultLayout);
-        setLayout(frontendLayout);
+        initializeLayout(frontendLayout);
       }
 
       // Clear active preset to indicate using default layout
       setActivePreset(null, null);
-      setHasPendingChanges(false);
     } catch (error) {
       console.error("Failed to load default dashboard:", error);
       // Still clear the active preset even if fetch fails

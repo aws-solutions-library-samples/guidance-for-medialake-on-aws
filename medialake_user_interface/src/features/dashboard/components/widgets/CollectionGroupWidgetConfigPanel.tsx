@@ -23,6 +23,7 @@ import {
   FormControlLabel,
   Radio,
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { useCollectionGroups } from "@/features/collection-groups/hooks/useCollectionGroups";
 import { useDashboardStore } from "../../store/dashboardStore";
 import type { CollectionGroupWidgetConfig, SortBy, SortOrder } from "../../types";
@@ -40,6 +41,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetCon
   widgetId,
   config,
 }) => {
+  const { t } = useTranslation();
   const updateWidgetConfig = useDashboardStore((state) => state.updateWidgetConfig);
   const updateWidgetCustomName = useDashboardStore((state) => state.updateWidgetCustomName);
 
@@ -83,32 +85,36 @@ export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetCon
 
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
-      <DialogTitle>Configure Collection Group Widget</DialogTitle>
+      <DialogTitle>{t("dashboard.widgets.collectionGroup.configTitle")}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 2 }}>
           {/* Custom Widget Name */}
           <FormControl fullWidth>
-            <FormLabel>Widget Name (Optional)</FormLabel>
+            <FormLabel>{t("dashboard.widgets.collectionGroup.widgetNameLabel")}</FormLabel>
             <TextField
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              placeholder="Leave empty to use group name"
+              placeholder={t("dashboard.widgets.collectionGroup.widgetNamePlaceholder")}
               size="small"
-              helperText="Custom name for this widget instance"
+              helperText={t("dashboard.widgets.collectionGroup.widgetNameHelperText")}
             />
           </FormControl>
 
           {/* Collection Group Selection */}
           <FormControl fullWidth required>
-            <FormLabel>Collection Group</FormLabel>
+            <FormLabel>{t("dashboard.widgets.collectionGroup.selectGroup")}</FormLabel>
             {isLoading ? (
               <Box display="flex" justifyContent="center" py={2}>
                 <CircularProgress size={24} />
               </Box>
             ) : error ? (
-              <Alert severity="error">Failed to load collection groups</Alert>
+              <Alert severity="error">
+                {t("dashboard.widgets.collectionGroup.loadGroupsError")}
+              </Alert>
             ) : groups.length === 0 ? (
-              <Alert severity="info">No collection groups available. Create a group first.</Alert>
+              <Alert severity="info">
+                {t("dashboard.widgets.collectionGroup.noGroupsAvailable")}
+              </Alert>
             ) : (
               <Select
                 value={groupId}
@@ -117,7 +123,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetCon
                 displayEmpty
               >
                 <MenuItem value="" disabled>
-                  <em>Select a collection group</em>
+                  <em>{t("dashboard.widgets.collectionGroup.selectGroupPlaceholder")}</em>
                 </MenuItem>
                 {groups.map((group) => (
                   <MenuItem key={group.id} value={group.id}>
@@ -140,7 +146,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetCon
 
           {/* Sort By */}
           <FormControl fullWidth>
-            <FormLabel>Sort By</FormLabel>
+            <FormLabel>{t("dashboard.widgets.collectionGroup.sortBy")}</FormLabel>
             <RadioGroup value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} row>
               <FormControlLabel value="name" control={<Radio />} label="Name" />
               <FormControlLabel value="createdAt" control={<Radio />} label="Created" />
@@ -150,7 +156,7 @@ export const CollectionGroupWidgetConfigPanel: React.FC<CollectionGroupWidgetCon
 
           {/* Sort Order */}
           <FormControl fullWidth>
-            <FormLabel>Sort Order</FormLabel>
+            <FormLabel>{t("dashboard.widgets.collectionGroup.sortOrder")}</FormLabel>
             <RadioGroup
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as SortOrder)}

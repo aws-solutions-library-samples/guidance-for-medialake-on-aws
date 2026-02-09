@@ -80,6 +80,28 @@ def register_route(app):
             if request_data.tags is not None:
                 actions.append(CollectionModel.tags.set(request_data.tags))
 
+            # Handle thumbnail updates
+            if request_data.thumbnailType is not None:
+                actions.append(
+                    CollectionModel.thumbnailType.set(request_data.thumbnailType.value)
+                )
+                # For icon type, just store the icon name
+                if request_data.thumbnailType.value == "icon":
+                    if request_data.thumbnailValue:
+                        actions.append(
+                            CollectionModel.thumbnailValue.set(
+                                request_data.thumbnailValue
+                            )
+                        )
+                    # Clear S3 key for icon type (no image stored)
+                    actions.append(CollectionModel.thumbnailS3Key.remove())
+
+            elif request_data.thumbnailValue is not None:
+                # Only set thumbnailValue independently if thumbnailType wasn't also provided
+                actions.append(
+                    CollectionModel.thumbnailValue.set(request_data.thumbnailValue)
+                )
+
             # Perform update
             try:
                 collection.update(actions=actions)

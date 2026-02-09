@@ -7,12 +7,14 @@ export function useAssetFavorites<T>({
   getAssetType,
   getAssetThumbnail,
   getAssetProxy,
+  getAssetFormat,
 }: {
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
   getAssetType: (asset: T) => string;
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
+  getAssetFormat?: (asset: T) => string;
 }) {
   const { data: favorites } = useGetFavorites("ASSET");
   const { mutate: addFavorite } = useAddFavorite();
@@ -43,6 +45,7 @@ export function useAssetFavorites<T>({
             assetType: getAssetType(asset),
             thumbnailUrl: getAssetThumbnail(asset) || "",
             proxyUrl: getAssetProxy ? getAssetProxy(asset) : "",
+            format: getAssetFormat ? getAssetFormat(asset) : "",
           },
         });
       }
@@ -56,6 +59,7 @@ export function useAssetFavorites<T>({
       getAssetType,
       getAssetThumbnail,
       getAssetProxy,
+      getAssetFormat,
     ]
   );
 

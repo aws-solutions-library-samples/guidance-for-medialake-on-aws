@@ -63,6 +63,7 @@ interface ModularUnifiedResultsViewProps {
   isLoading?: boolean;
   isRenaming?: boolean;
   renamingAssetId?: string;
+  onAddToCollectionClick?: (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => void;
 }
 
 const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
@@ -108,6 +109,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
   isLoading,
   isRenaming = false,
   renamingAssetId,
+  onAddToCollectionClick,
 }) => {
   const { t } = useTranslation();
 
@@ -171,6 +173,7 @@ const ModularUnifiedResultsView: React.FC<ModularUnifiedResultsViewProps> = ({
       onAssetClick={onAssetClick}
       onDeleteClick={onDeleteClick}
       onDownloadClick={onMenuClick}
+      onAddToCollectionClick={onAddToCollectionClick}
       onEditClick={onEditClick}
       onEditNameChange={onEditNameChange}
       onEditNameComplete={onEditNameComplete}

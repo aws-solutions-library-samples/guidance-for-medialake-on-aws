@@ -20,7 +20,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Favorites",
     description: "Quick access to your favorited assets and collections",
     icon: "favorite",
-    defaultSize: { w: 6, h: 5 },
+    defaultSize: { w: 6, h: 6 },
     minSize: { w: 3, h: 4 },
     maxSize: { w: 12, h: 12 },
   },
@@ -29,7 +29,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Collections",
     description: "Configurable view of your collections",
     icon: "folder",
-    defaultSize: { w: 6, h: 5 },
+    defaultSize: { w: 6, h: 6 },
     minSize: { w: 3, h: 2 },
     maxSize: { w: 12, h: 8 },
     defaultConfig: {
@@ -45,7 +45,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Collection Group",
     description: "Display collections from a specific group",
     icon: "folder_special",
-    defaultSize: { w: 6, h: 5 },
+    defaultSize: { w: 6, h: 6 },
     minSize: { w: 3, h: 2 },
     maxSize: { w: 12, h: 8 },
   },
@@ -54,7 +54,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     title: "Recent Assets",
     description: "Recently ingested media assets",
     icon: "schedule",
-    defaultSize: { w: 12, h: 5 },
+    defaultSize: { w: 12, h: 6 },
     minSize: { w: 4, h: 4 },
     maxSize: { w: 12, h: 12 },
   },
@@ -74,25 +74,25 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
   ],
   layouts: {
     lg: [
-      { i: "recent-assets-1", x: 0, y: 0, w: 12, h: 5, minW: 4, minH: 4, maxW: 12, maxH: 12 },
-      { i: "favorites-1", x: 0, y: 5, w: 6, h: 5, minW: 3, minH: 4, maxW: 12, maxH: 12 },
-      { i: "collections-1", x: 6, y: 5, w: 6, h: 5, minW: 3, minH: 2, maxW: 12, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 0, w: 12, h: 6, minW: 4, minH: 4, maxW: 12, maxH: 12 },
+      { i: "favorites-1", x: 0, y: 6, w: 6, h: 6, minW: 3, minH: 4, maxW: 12, maxH: 12 },
+      { i: "collections-1", x: 6, y: 6, w: 6, h: 6, minW: 3, minH: 2, maxW: 12, maxH: 8 },
     ],
     md: [
-      { i: "recent-assets-1", x: 0, y: 0, w: 10, h: 5, minW: 4, minH: 4, maxW: 10, maxH: 12 },
-      { i: "favorites-1", x: 0, y: 5, w: 5, h: 5, minW: 3, minH: 4, maxW: 10, maxH: 12 },
-      { i: "collections-1", x: 5, y: 5, w: 5, h: 5, minW: 3, minH: 2, maxW: 10, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 0, w: 10, h: 6, minW: 4, minH: 4, maxW: 10, maxH: 12 },
+      { i: "favorites-1", x: 0, y: 6, w: 5, h: 6, minW: 3, minH: 4, maxW: 10, maxH: 12 },
+      { i: "collections-1", x: 5, y: 6, w: 5, h: 6, minW: 3, minH: 2, maxW: 10, maxH: 8 },
     ],
     sm: [
-      { i: "recent-assets-1", x: 0, y: 0, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
-      { i: "favorites-1", x: 0, y: 5, w: 1, h: 5, minW: 1, minH: 4, maxW: 1, maxH: 12 },
-      { i: "collections-1", x: 0, y: 10, w: 1, h: 5, minW: 1, minH: 2, maxW: 1, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 0, w: 1, h: 6, minW: 1, minH: 4, maxW: 1, maxH: 12 },
+      { i: "favorites-1", x: 0, y: 6, w: 1, h: 6, minW: 1, minH: 4, maxW: 1, maxH: 12 },
+      { i: "collections-1", x: 0, y: 12, w: 1, h: 6, minW: 1, minH: 2, maxW: 1, maxH: 8 },
     ],
   },
 };
 
 const STORAGE_KEY = "dashboard-layout";
-const CURRENT_VERSION = 6; // Bumped version for preset tracking
+const CURRENT_VERSION = 7; // Bumped version for widget height changes
 
 // Helper to generate unique widget ID
 const generateWidgetId = (type: WidgetType): string => {
@@ -231,6 +231,10 @@ export const useDashboardStore = create<DashboardStore>()(
       // Actions
       setLayout: (layout) => {
         set({ layout, hasPendingChanges: true });
+      },
+
+      initializeLayout: (layout) => {
+        set({ layout, hasPendingChanges: false });
       },
 
       updateLayoutItem: (itemId, updates) => {
