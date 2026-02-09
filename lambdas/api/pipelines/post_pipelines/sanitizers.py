@@ -55,6 +55,17 @@ def sanitize_state_machine_name(name: str) -> str:
     Returns:
         A sanitized name suitable for AWS Step Functions state machines
     """
+    # AWS Step Functions has an 80-character limit for state machine names
+    max_length = 80
+
+    # Calculate the space needed for prefix and suffix
+    suffix = "_pipeline"
+    prefix = f"{resource_prefix}_" if resource_prefix else ""
+    reserved_space = len(prefix) + len(suffix)
+
+    # Calculate available space for the actual pipeline name
+    available_space = max_length - reserved_space
+
     # Replace spaces with hyphens
     sanitized_name = name.replace(" ", "-")
 
@@ -64,13 +75,14 @@ def sanitize_state_machine_name(name: str) -> str:
     # Ensure the name starts with a letter or number
     sanitized_name = re.sub(r"^[^a-zA-Z0-9]+", "", sanitized_name)
 
-    # Truncate to 80 characters (maximum length for Step Function names)
-    sanitized_name = sanitized_name[:80]
+    # Truncate to fit within available space
+    if len(sanitized_name) > available_space:
+        sanitized_name = sanitized_name[:available_space]
 
-    # Ensure the name doesn't end with a hyphen or underscore
+    # Ensure the name doesn't end with a hyphen or underscore after truncation
     sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
 
-    return f"{resource_prefix}_{sanitized_name}_pipeline"
+    return f"{prefix}{sanitized_name}{suffix}"
 
 
 def sanitize_state_name(name: str, node_id: str) -> str:

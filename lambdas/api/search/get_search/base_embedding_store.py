@@ -93,7 +93,7 @@ class BaseEmbeddingStore(ABC):
         )
         self.logger.info(f"Using search provider type: {provider_type}")
 
-        if provider_type == "twelvelabs-bedrock":
+        if provider_type in ["twelvelabs-bedrock", "twelvelabs-bedrock-3-0"]:
             return self._generate_embedding_via_bedrock(query_text, start_time)
         else:
             return self._generate_embedding_via_twelvelabs_api(query_text, start_time)

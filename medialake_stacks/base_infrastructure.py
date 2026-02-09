@@ -76,6 +76,7 @@ class BaseInfrastructureStack(Stack):
         Stack.of(self).account
         region = Stack.of(self).region
         opensearch_index_name = "media"
+        asset_embeddings_index_name = "asset-embeddings"
         s3_vector_index_name = "media-vectors"
         parent_stack = cdk.Stack.of(self)
         parent_stack.region
@@ -256,7 +257,7 @@ class BaseInfrastructureStack(Stack):
                 domain_name=domain_name,
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
-                collection_indexes=[opensearch_index_name],
+                collection_indexes=[opensearch_index_name, asset_embeddings_index_name],
                 security_group=self._security_group,
             ),
         )
@@ -1019,3 +1020,16 @@ class BaseInfrastructureStack(Stack):
         """
         indexes = self._s3_vector_cluster.indexes
         return indexes[0] if indexes else "media-vectors"
+
+    @property
+    def asset_embeddings_index_name(self) -> str:
+        """
+        Returns the name of the asset embeddings OpenSearch index.
+
+        This index is dedicated to storing Marengo 3.0 vector embeddings
+        separately from the main media index.
+
+        Returns:
+            str: The asset embeddings index name ("asset-embeddings")
+        """
+        return "asset-embeddings"

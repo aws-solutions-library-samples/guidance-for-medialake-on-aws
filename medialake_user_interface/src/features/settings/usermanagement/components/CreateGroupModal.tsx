@@ -28,7 +28,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
     id: "",
     description: "",
     department: "",
-    assignedPermissionSets: [],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [snackbar, setSnackbar] = useState<{
@@ -85,7 +84,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({ open, onClose }) =>
         id: "",
         description: "",
         department: "",
-        assignedPermissionSets: [],
       });
       setTimeout(() => {
         onClose();

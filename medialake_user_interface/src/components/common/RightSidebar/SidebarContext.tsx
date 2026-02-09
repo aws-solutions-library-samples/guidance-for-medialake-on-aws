@@ -41,8 +41,14 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({ chil
     }
   }, []);
 
-  // Note: Removed automatic sidebar opening when items are selected
-  // Users can now manually control sidebar visibility regardless of selection state
+  // Automatically open/close sidebar based on selected items
+  useEffect(() => {
+    if (hasSelectedItems) {
+      setIsExpanded(true);
+    } else {
+      setIsExpanded(false);
+    }
+  }, [hasSelectedItems]);
 
   return (
     <RightSidebarContext.Provider

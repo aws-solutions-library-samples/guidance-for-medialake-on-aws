@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0] - 2026-02-09
+
+### Features
+
+- feat: Collection thumbnails, refactor collections page, update dashboards page
+- feat: Dashboards implemented for home screen
+- feat: Add TwelveLabs Marengo 3.0 On a New Index
+
+### Bug Fixes
+
+- fix: asset detail links from dashboard
+- fix: added permissions for assets page for view and edit role
+
+### Code Refactoring
+
+- refactor: Removal of unused permissions and cloudfront 403 or index.html behavior depending on origin
+- refactor: update to provisioned lambdas to use warmer due to intermittent deployment failures
+
 ## [1.7.0] - 2026-02-03
 
 ### Features

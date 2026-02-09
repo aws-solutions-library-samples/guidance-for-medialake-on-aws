@@ -31,6 +31,12 @@ node:
                 - kms:Decrypt
               resources:
                 - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              resources:
+                - ${SYSTEM_SETTINGS_TABLE_ARN}
 actions:
   store:
     summary: Store Embeddings

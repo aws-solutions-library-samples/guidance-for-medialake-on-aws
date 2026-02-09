@@ -428,6 +428,34 @@ class UIConstruct(Construct):
             medialake_ui_s3_bucket.concrete_bucket,
         )
 
+        # CloudFront Function for SPA routing: rewrites non-file URIs to /index.html
+        # so the React router handles client-side routes like /settings/users.
+        # This runs only on the default behavior (S3 origin), so API Gateway
+        # 403 responses are never affected.
+        spa_rewrite_function = cloudfront.Function(
+            self,
+            "SpaUrlRewriteFunction",
+            code=cloudfront.FunctionCode.from_inline(
+                """
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+
+    // If the URI has a file extension, serve it as-is from S3
+    if (uri.includes('.')) {
+        return request;
+    }
+
+    // Otherwise rewrite to /index.html for SPA routing
+    request.uri = '/index.html';
+    return request;
+}
+"""
+            ),
+            function_name=f"{config.resource_prefix}-spa-url-rewrite",
+            comment="Rewrites non-file SPA routes to /index.html for client-side routing",
+        )
+
         # Create CF Origin for media assets bucket
         media_origin = origins.S3BucketOrigin.with_origin_access_control(
             props.media_assets_bucket,
@@ -445,6 +473,12 @@ class UIConstruct(Construct):
                 cache_policy=static_assets_cache_policy,
                 origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                 compress=True,
+                function_associations=[
+                    cloudfront.FunctionAssociation(
+                        function=spa_rewrite_function,
+                        event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                    ),
+                ],
             ),
             "additional_behaviors": {
                 "*.js": cloudfront.BehaviorOptions(
@@ -527,23 +561,11 @@ class UIConstruct(Construct):
             "price_class": cloudfront.PriceClass.PRICE_CLASS_100,
             "default_root_object": props.distribution_default_root_object,
             # geo_restriction=cloudfront.GeoRestriction.allowlist("US", "GB"),
-            "error_responses": [
-                # Handle 404 errors for SPA routing
-                cloudfront.ErrorResponse(
-                    http_status=404,
-                    response_http_status=200,
-                    response_page_path="/index.html",
-                    ttl=Duration.minutes(0),
-                ),
-                # Handle 403 errors for SPA routing (S3 returns 403 for non-existent paths)
-                # This enables deep linking - direct navigation to routes like /settings/connectors
-                cloudfront.ErrorResponse(
-                    http_status=403,
-                    response_http_status=200,
-                    response_page_path="/index.html",
-                    ttl=Duration.minutes(0),
-                ),
-            ],
+            # No custom error responses — SPA routing is handled by the
+            # CloudFront Function on the default behavior which rewrites
+            # non-file paths to /index.html before they reach S3.
+            # This keeps API Gateway 403s untouched.
+            "error_responses": [],
         }
 
         # Conditionally add custom domain configuration if provided

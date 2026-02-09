@@ -33,6 +33,11 @@ import {
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useGetFavorites, useAddFavorite, useRemoveFavorite } from "@/api/hooks/useFavorites";
+import { useAddItemToCollection } from "@/api/hooks/useCollections";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import { RightSidebarProvider, RightSidebar } from "@/components/common/RightSidebar";
+import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
+import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
@@ -183,6 +188,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
               .Name,
             assetType: asset.DigitalSourceAsset.Type,
             thumbnailUrl: asset.thumbnailUrl || "",
+            proxyUrl: asset.proxyUrl || "",
             format: asset.DigitalSourceAsset.MainRepresentation.Format,
           },
         });
@@ -191,6 +197,34 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
       console.error("Error toggling favorite:", error);
     }
   };
+
+  // Add to Collection state
+  const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
+  const [selectedAssetForCollection, setSelectedAssetForCollection] = useState<AssetItem | null>(
+    null
+  );
+  const addItemToCollectionMutation = useAddItemToCollection();
+
+  const handleAddToCollectionClick = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      event.stopPropagation();
+      setSelectedAssetForCollection(asset);
+      setAddToCollectionModalOpen(true);
+    },
+    []
+  );
+
+  const handleAddToCollection = useCallback(
+    async (collectionId: string) => {
+      if (!selectedAssetForCollection) return;
+      const assetId = getOriginalAssetId(selectedAssetForCollection);
+      await addItemToCollectionMutation.mutateAsync({
+        collectionId,
+        data: { assetId },
+      });
+    },
+    [selectedAssetForCollection, addItemToCollectionMutation]
+  );
 
   // Asset operations
   const {
@@ -512,237 +546,302 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   }
 
   return (
-    <Box sx={{ height: "100%", display: "flex", overflow: "hidden" }}>
-      {/* Facet Filter Panel */}
-      {facets.length > 0 && (
-        <FacetFilterPanel
-          facets={facets}
-          selectedFacets={selectedFacets}
-          onFacetChange={handleFacetChange}
-          onClearAll={handleClearAllFacets}
-        />
-      )}
-
-      {/* Main Content Area */}
-      <Box sx={{ flex: 1, height: "100%", overflow: "auto", p: 2 }}>
-        {isLoading && (
-          <LinearProgress
-            sx={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 9999,
-            }}
+    <RightSidebarProvider>
+      <Box sx={{ height: "100%", display: "flex", overflow: "hidden" }}>
+        {/* Facet Filter Panel */}
+        {facets.length > 0 && (
+          <FacetFilterPanel
+            facets={facets}
+            selectedFacets={selectedFacets}
+            onFacetChange={handleFacetChange}
+            onClearAll={handleClearAllFacets}
           />
         )}
 
-        {/* Page out of range warning */}
-        {showPageWarning && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            {t("assetExplorer.pageOutOfRange", {
-              requestedPage: page,
-              totalPages: totalPages,
-            }) || `Page ${page} is out of range. Redirecting to page ${totalPages}.`}
-          </Alert>
-        )}
-
-        {/* Only show the results view when we have data or after initial loading */}
-        {(!isLoading ||
-          (searchResponse && searchResponse?.data != null && searchResponse?.data?.results)) && (
-          <Box
-            sx={{
-              "& h1": {
-                display: "none !important",
-              },
-              "& > div > div:first-of-type": {
-                mb: 0,
-              },
-            }}
-          >
-            <ModularUnifiedResultsView
-              results={searchResponse?.data?.results || []}
-              searchMetadata={{
-                totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
-                page,
-                pageSize,
+        {/* Main Content Area */}
+        <Box sx={{ flex: 1, height: "100%", overflow: "auto", p: 2 }}>
+          {isLoading && (
+            <LinearProgress
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 9999,
               }}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
-              searchTerm=""
-              groupByType={groupByType}
-              onGroupByTypeChange={setGroupByType}
-              viewMode={viewMode}
-              onViewModeChange={handleViewModeChange}
-              cardSize={cardSize}
-              onCardSizeChange={setCardSize}
-              aspectRatio={aspectRatio}
-              onAspectRatioChange={setAspectRatio}
-              thumbnailScale={thumbnailScale}
-              onThumbnailScaleChange={setThumbnailScale}
-              showMetadata={showMetadata}
-              onShowMetadataChange={setShowMetadata}
-              sorting={sorting}
-              onSortChange={handleSortChange}
-              cardFields={cardFields}
-              onCardFieldToggle={handleCardFieldToggle}
-              columns={columns}
-              onColumnToggle={handleColumnToggle}
-              onAssetClick={handleAssetClick}
-              onDeleteClick={handleDeleteClick}
-              onMenuClick={handleMenuOpen}
-              onEditClick={handleStartEditing}
-              onEditNameChange={handleNameChange}
-              onEditNameComplete={handleNameEditComplete}
-              editingAssetId={editingAssetId}
-              editedName={editedName}
-              isAssetFavorited={isAssetFavorited}
-              onFavoriteToggle={handleFavoriteToggle}
-              selectedAssets={assetSelection.selectedAssetIds}
-              onSelectToggle={assetSelection.handleSelectToggle}
-              hasSelectedAssets={assetSelection.selectedAssets.length > 0}
-              selectAllState={assetSelection.getSelectAllState(searchResponse?.data?.results || [])}
-              onSelectAllToggle={() => {
-                assetSelection.handleSelectAll(searchResponse?.data?.results || []);
-              }}
-              error={
-                error
-                  ? {
-                      status: error.name || "Error",
-                      message: error.message || t("assetExplorer.failedToLoadAssets"),
-                    }
-                  : undefined
-              }
-              isLoading={isLoading || isFavoritesLoading}
-              isRenaming={assetOperationsLoading.rename}
-              renamingAssetId={renamingAssetId}
             />
-          </Box>
-        )}
+          )}
 
-        {/* Show loading indicator during initial load */}
-        {isLoading &&
-          (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results) && (
+          {/* Page out of range warning */}
+          {showPageWarning && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {t("assetExplorer.pageOutOfRange", {
+                requestedPage: page,
+                totalPages: totalPages,
+              }) || `Page ${page} is out of range. Redirecting to page ${totalPages}.`}
+            </Alert>
+          )}
+
+          {/* Only show the results view when we have data or after initial loading */}
+          {(!isLoading ||
+            (searchResponse && searchResponse?.data != null && searchResponse?.data?.results)) && (
             <Box
               sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",
-                p: 2,
+                "& h1": {
+                  display: "none !important",
+                },
+                "& > div > div:first-of-type": {
+                  mb: 0,
+                },
               }}
             >
-              <CircularProgress size={40} />
-              <Typography variant="body1" sx={{ mt: 2 }}>
-                {t("assetExplorer.loadingAssets")}
-              </Typography>
+              <ModularUnifiedResultsView
+                results={searchResponse?.data?.results || []}
+                searchMetadata={{
+                  totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
+                  page,
+                  pageSize,
+                }}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                searchTerm=""
+                groupByType={groupByType}
+                onGroupByTypeChange={setGroupByType}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
+                cardSize={cardSize}
+                onCardSizeChange={setCardSize}
+                aspectRatio={aspectRatio}
+                onAspectRatioChange={setAspectRatio}
+                thumbnailScale={thumbnailScale}
+                onThumbnailScaleChange={setThumbnailScale}
+                showMetadata={showMetadata}
+                onShowMetadataChange={setShowMetadata}
+                sorting={sorting}
+                onSortChange={handleSortChange}
+                cardFields={cardFields}
+                onCardFieldToggle={handleCardFieldToggle}
+                columns={columns}
+                onColumnToggle={handleColumnToggle}
+                onAssetClick={handleAssetClick}
+                onDeleteClick={handleDeleteClick}
+                onMenuClick={handleMenuOpen}
+                onEditClick={handleStartEditing}
+                onEditNameChange={handleNameChange}
+                onEditNameComplete={handleNameEditComplete}
+                editingAssetId={editingAssetId}
+                editedName={editedName}
+                isAssetFavorited={isAssetFavorited}
+                onFavoriteToggle={handleFavoriteToggle}
+                selectedAssets={assetSelection.selectedAssetIds}
+                onSelectToggle={assetSelection.handleSelectToggle}
+                hasSelectedAssets={assetSelection.selectedAssets.length > 0}
+                selectAllState={assetSelection.getSelectAllState(
+                  searchResponse?.data?.results || []
+                )}
+                onSelectAllToggle={() => {
+                  assetSelection.handleSelectAll(searchResponse?.data?.results || []);
+                }}
+                error={
+                  error
+                    ? {
+                        status: error.name || "Error",
+                        message: error.message || t("assetExplorer.failedToLoadAssets"),
+                      }
+                    : undefined
+                }
+                isLoading={isLoading || isFavoritesLoading}
+                isRenaming={assetOperationsLoading.rename}
+                renamingAssetId={renamingAssetId}
+                onAddToCollectionClick={handleAddToCollectionClick}
+              />
             </Box>
           )}
 
-        {/* Asset Menu */}
-        <Menu
-          anchorEl={menuAnchorEl}
-          open={Boolean(menuAnchorEl)}
-          onClose={handleMenuClose}
-          MenuListProps={{
-            "aria-labelledby": selectedAsset
-              ? `asset-menu-button-${selectedAsset.InventoryID}`
-              : undefined,
-          }}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          PaperProps={{
-            elevation: 0,
-            sx: {
-              borderRadius: "8px",
-              minWidth: 200,
-              mt: 1,
-              border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              backgroundColor: (theme) => theme.palette.background.paper,
-              overflow: "visible",
-              position: "fixed",
-              zIndex: 1400,
-            },
-          }}
-          slotProps={{
-            paper: {
+          {/* Show loading indicator during initial load */}
+          {isLoading &&
+            (!searchResponse || searchResponse?.data == null || !searchResponse?.data?.results) && (
+              <Box
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  p: 2,
+                }}
+              >
+                <CircularProgress size={40} />
+                <Typography variant="body1" sx={{ mt: 2 }}>
+                  {t("assetExplorer.loadingAssets")}
+                </Typography>
+              </Box>
+            )}
+
+          {/* Asset Menu */}
+          <Menu
+            anchorEl={menuAnchorEl}
+            open={Boolean(menuAnchorEl)}
+            onClose={handleMenuClose}
+            MenuListProps={{
+              "aria-labelledby": selectedAsset
+                ? `asset-menu-button-${selectedAsset.InventoryID}`
+                : undefined,
+            }}
+            anchorOrigin={{
+              vertical: "bottom",
+              horizontal: "right",
+            }}
+            transformOrigin={{
+              vertical: "top",
+              horizontal: "right",
+            }}
+            PaperProps={{
+              elevation: 0,
               sx: {
+                borderRadius: "8px",
+                minWidth: 200,
+                mt: 1,
+                border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                backgroundColor: (theme) => theme.palette.background.paper,
                 overflow: "visible",
                 position: "fixed",
+                zIndex: 1400,
               },
-            },
-          }}
-        >
-          <MenuItem onClick={() => handleAction("rename")}>
-            {t("assetExplorer.menu.rename")}
-          </MenuItem>
-          <MenuItem onClick={() => handleAction("share")}>{t("assetExplorer.menu.share")}</MenuItem>
-          <MenuItem onClick={() => handleAction("download")}>
-            {t("assetExplorer.menu.download")}
-          </MenuItem>
-        </Menu>
+            }}
+            slotProps={{
+              paper: {
+                sx: {
+                  overflow: "visible",
+                  position: "fixed",
+                },
+              },
+            }}
+          >
+            <MenuItem onClick={() => handleAction("rename")}>
+              {t("assetExplorer.menu.rename")}
+            </MenuItem>
+            <MenuItem onClick={() => handleAction("share")}>
+              {t("assetExplorer.menu.share")}
+            </MenuItem>
+            <MenuItem onClick={() => handleAction("download")}>
+              {t("assetExplorer.menu.download")}
+            </MenuItem>
+          </Menu>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={isDeleteModalOpen}
-          onClose={handleDeleteCancel}
-          aria-labelledby="delete-dialog-title"
-          aria-describedby="delete-dialog-description"
-        >
-          <DialogTitle id="delete-dialog-title">
-            {t("assetExplorer.deleteDialog.title")}
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText id="delete-dialog-description">
-              {t("assetExplorer.deleteDialog.description")}
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleDeleteCancel} disabled={assetOperationsLoading.delete}>
-              {t("assetExplorer.deleteDialog.cancel")}
-            </Button>
-            <Button
-              onClick={handleDeleteConfirm}
-              color="error"
-              autoFocus
-              disabled={assetOperationsLoading.delete}
-              startIcon={assetOperationsLoading.delete ? <CircularProgress size={16} /> : undefined}
-            >
-              {assetOperationsLoading.delete
-                ? t("assetExplorer.deleteDialog.deleting")
-                : t("assetExplorer.deleteDialog.confirm")}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          {/* Delete Confirmation Dialog */}
+          <Dialog
+            open={isDeleteModalOpen}
+            onClose={handleDeleteCancel}
+            aria-labelledby="delete-dialog-title"
+            aria-describedby="delete-dialog-description"
+          >
+            <DialogTitle id="delete-dialog-title">
+              {t("assetExplorer.deleteDialog.title")}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText id="delete-dialog-description">
+                {t("assetExplorer.deleteDialog.description")}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleDeleteCancel} disabled={assetOperationsLoading.delete}>
+                {t("assetExplorer.deleteDialog.cancel")}
+              </Button>
+              <Button
+                onClick={handleDeleteConfirm}
+                color="error"
+                autoFocus
+                disabled={assetOperationsLoading.delete}
+                startIcon={
+                  assetOperationsLoading.delete ? <CircularProgress size={16} /> : undefined
+                }
+              >
+                {assetOperationsLoading.delete
+                  ? t("assetExplorer.deleteDialog.deleting")
+                  : t("assetExplorer.deleteDialog.confirm")}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
-        <Snackbar
-          open={!!alert}
-          autoHideDuration={6000}
-          onClose={handleAlertClose}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        >
-          <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: "100%" }}>
-            {alert?.message}
-          </Alert>
-        </Snackbar>
+          <Snackbar
+            open={!!alert}
+            autoHideDuration={6000}
+            onClose={handleAlertClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          >
+            <Alert onClose={handleAlertClose} severity={alert?.severity} sx={{ width: "100%" }}>
+              {alert?.message}
+            </Alert>
+          </Snackbar>
 
-        {/* API Status Modal for delete operation */}
-        <ApiStatusModal
-          open={deleteModalState.open}
-          onClose={handleDeleteModalClose}
-          status={deleteModalState.status}
-          action={deleteModalState.action}
-          message={deleteModalState.message}
-        />
+          {/* API Status Modal for delete operation */}
+          <ApiStatusModal
+            open={deleteModalState.open}
+            onClose={handleDeleteModalClose}
+            status={deleteModalState.status}
+            action={deleteModalState.action}
+            message={deleteModalState.message}
+          />
+
+          {/* Add to Collection Modal */}
+          {selectedAssetForCollection && (
+            <AddToCollectionModal
+              open={addToCollectionModalOpen}
+              onClose={() => {
+                setAddToCollectionModalOpen(false);
+                setSelectedAssetForCollection(null);
+              }}
+              assetId={getOriginalAssetId(selectedAssetForCollection)}
+              assetName={
+                selectedAssetForCollection.DigitalSourceAsset.MainRepresentation.StorageInfo
+                  .PrimaryLocation.ObjectKey.Name
+              }
+              assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+              onAddToCollection={handleAddToCollection}
+            />
+          )}
+        </Box>
+
+        {/* Right Sidebar for batch operations */}
+        <RightSidebar>
+          <TabbedSidebar
+            selectedAssets={assetSelection.selectedAssets}
+            onBatchDelete={assetSelection.handleBatchDelete}
+            onBatchDownload={assetSelection.handleBatchDownload}
+            onBatchShare={assetSelection.handleBatchShare}
+            onClearSelection={assetSelection.handleClearSelection}
+            onRemoveItem={assetSelection.handleRemoveAsset}
+            isDownloadLoading={assetSelection.isDownloadLoading}
+            isDeleteLoading={assetSelection.isDeleteLoading}
+          />
+        </RightSidebar>
       </Box>
-    </Box>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <BulkDeleteDialog
+        open={assetSelection.isDeleteDialogOpen}
+        onClose={assetSelection.handleDeleteDialogClose}
+        onConfirm={assetSelection.handleConfirmDelete}
+        selectedCount={assetSelection.selectedAssets.length}
+        confirmationText={assetSelection.deleteConfirmationText}
+        onConfirmationTextChange={assetSelection.setDeleteConfirmationText}
+        isLoading={assetSelection.isDeleteLoading}
+      />
+
+      {/* API Status Modal for batch operations */}
+      <ApiStatusModal
+        open={assetSelection.modalState.open}
+        onClose={assetSelection.handleModalClose}
+        status={assetSelection.modalState.status}
+        action={assetSelection.modalState.action}
+        message={assetSelection.modalState.message}
+        progress={assetSelection.modalState.progress}
+        jobId={assetSelection.modalState.jobId}
+        onCancel={assetSelection.modalState.onCancel}
+        cancelDisabled={assetSelection.modalState.cancelDisabled}
+      />
+    </RightSidebarProvider>
   );
 };
 

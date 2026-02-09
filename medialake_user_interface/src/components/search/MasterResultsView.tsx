@@ -313,6 +313,16 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
     return filtered;
   }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);
 
+  // Detect model version from the first clip in results for threshold calculation
+  const detectedModelVersion = React.useMemo(() => {
+    for (const asset of transformedResults) {
+      if (isClipAsset(asset) && asset.clipData?.model_version) {
+        return asset.clipData.model_version;
+      }
+    }
+    return undefined; // Default to 2.7 thresholds when no model version found
+  }, [transformedResults]);
+
   return (
     <AssetResultsView
       results={filteredResults}
@@ -320,6 +330,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       isSemantic={isSemantic}
       confidenceThreshold={confidenceThreshold}
       onConfidenceThresholdChange={onConfidenceThresholdChange}
+      detectedModelVersion={detectedModelVersion}
       searchMetadata={adjustedSearchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}

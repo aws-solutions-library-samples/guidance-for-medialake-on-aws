@@ -30,6 +30,9 @@ class TwelveLabsPlugin(ExternalServicePlugin):
         # Environment configuration
         self.opensearch_endpoint = os.environ.get("OPENSEARCH_ENDPOINT", "")
         self.opensearch_index = os.environ.get("INDEX_NAME", "media")
+        self.asset_embeddings_index = os.environ.get(
+            "ASSET_EMBEDDINGS_INDEX", "asset-embeddings"
+        )
         self.opensearch_service = os.environ.get("OPENSEARCH_SERVICE", "es")
         self.aws_region = os.environ.get("AWS_REGION", "us-east-1")
         self.vector_bucket_name = os.environ.get("VECTOR_BUCKET_NAME", "")
@@ -153,26 +156,85 @@ class TwelveLabsPlugin(ExternalServicePlugin):
             )
 
     def _delete_from_opensearch(self, asset_id: str) -> int:
-        """Delete embeddings from OpenSearch"""
+        """Delete embeddings from OpenSearch from both indexes.
+
+        Deletes from:
+        1. 'media' index: Master documents and Marengo 2.7 embeddings (DigitalSourceAsset.ID)
+        2. 'asset-embeddings' index: Marengo 3.0 embedding documents (inventory_id)
+        """
         if not self.opensearch_endpoint:
             return 0
 
         host = self.opensearch_endpoint.lstrip("https://").lstrip("http://")
-        url = f"https://{host}/{self.opensearch_index}/_delete_by_query?refresh=true&conflicts=proceed"
-        query = {"query": {"term": {"DigitalSourceAsset.ID": asset_id}}}
+        total_deleted = 0
 
-        status, body = self._signed_request("POST", url, payload=query)
+        # Delete from 'media' index - master documents by DigitalSourceAsset.ID
+        media_deleted = self._delete_from_index(
+            host=host,
+            index_name=self.opensearch_index,
+            query={"query": {"term": {"DigitalSourceAsset.ID": asset_id}}},
+        )
+        total_deleted += media_deleted
+        self.logger.info(
+            f"[INDEX DELETION] Deleted {media_deleted} docs from '{self.opensearch_index}' for asset {asset_id}"
+        )
 
-        if status not in (200, 202):
-            raise Exception(f"OpenSearch deletion failed (status={status}): {body}")
+        # Delete from 'asset-embeddings' index - Marengo 3.0 embeddings by inventory_id
+        # Note: asset_id is the DigitalSourceAsset.ID which may differ from inventory_id
+        # But for TwelveLabs embeddings, we use inventory_id as the reference
+        if self.asset_embeddings_index:
+            embeddings_deleted = self._delete_from_index(
+                host=host,
+                index_name=self.asset_embeddings_index,
+                query={"query": {"term": {"inventory_id": asset_id}}},
+            )
+            total_deleted += embeddings_deleted
+            self.logger.info(
+                f"[INDEX DELETION] Deleted {embeddings_deleted} docs from '{self.asset_embeddings_index}' for asset {asset_id}"
+            )
 
-        deleted = 0
+        return total_deleted
+
+    def _delete_from_index(self, host: str, index_name: str, query: dict) -> int:
+        """Delete documents from a specific OpenSearch index.
+
+        Args:
+            host: OpenSearch host (without protocol)
+            index_name: Name of the index to delete from
+            query: OpenSearch query to match documents for deletion
+
+        Returns:
+            Number of documents deleted
+        """
+        url = f"https://{host}/{index_name}/_delete_by_query?refresh=true&conflicts=proceed"
+
         try:
-            deleted = json.loads(body).get("deleted", 0)
-        except Exception:
-            pass
+            status, body = self._signed_request("POST", url, payload=query)
 
-        return deleted
+            if status not in (200, 202):
+                # Index might not exist (e.g., asset-embeddings before first Marengo 3.0 asset)
+                if status == 404:
+                    self.logger.info(
+                        f"[INDEX DELETION] Index '{index_name}' not found, skipping"
+                    )
+                    return 0
+                self.logger.error(
+                    f"[INDEX DELETION] OpenSearch deletion from '{index_name}' failed (status={status}): {body}"
+                )
+                return 0
+
+            deleted = 0
+            try:
+                deleted = json.loads(body).get("deleted", 0)
+            except Exception:
+                pass
+
+            return deleted
+        except Exception as e:
+            self.logger.error(
+                f"[INDEX DELETION] Error deleting from '{index_name}': {e}"
+            )
+            return 0
 
     def _delete_from_s3_vectors(self, inventory_id: str) -> int:
         """Delete vectors from S3 Vector Store"""

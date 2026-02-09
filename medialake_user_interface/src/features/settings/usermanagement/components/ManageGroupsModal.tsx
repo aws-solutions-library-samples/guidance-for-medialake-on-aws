@@ -13,14 +13,9 @@ import {
   TextField,
   Button,
   IconButton,
-  Chip,
-  Stack,
   CircularProgress,
   Snackbar,
   Alert,
-  Divider,
-  Menu,
-  MenuItem,
   Tooltip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
@@ -29,12 +24,6 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useGetGroups, useUpdateGroup, useDeleteGroup } from "@/api/hooks/useGroups";
-import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
-import {
-  useListGroupAssignments,
-  useAssignPsToGroup,
-  useRemoveGroupAssignment,
-} from "@/api/hooks/useAssignments";
 import { Group, UpdateGroupRequest } from "@/api/types/group.types";
 
 interface ManageGroupsModalProps {
@@ -59,10 +48,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<Group | null>(null);
-  const [permissionSetMenuAnchor, setPermissionSetMenuAnchor] = useState<null | HTMLElement>(null);
-  const [activeGroupForPermissionSet, setActiveGroupForPermissionSet] = useState<string | null>(
-    null
-  );
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -75,17 +60,9 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
 
   // Queries
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
-  const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
   const updateGroupMutation = useUpdateGroup();
   const deleteGroupMutation = useDeleteGroup();
-  const assignPsToGroupMutation = useAssignPsToGroup();
-  const removeGroupAssignmentMutation = useRemoveGroupAssignment();
-
-  // Get assignments for the selected group
-  const { data: groupAssignments } = useListGroupAssignments(
-    groups && groups.length > 0 ? groups[selectedTab]?.id : ""
-  );
 
   // Reset editing state when modal closes
   useEffect(() => {
@@ -94,8 +71,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
       setEditFormData({ name: "", description: "", department: "" });
       setErrors({});
       setConfirmDeleteGroup(null);
-      setPermissionSetMenuAnchor(null);
-      setActiveGroupForPermissionSet(null);
     }
   }, [open]);
 
@@ -217,75 +192,9 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
     }
   };
 
-  const handleOpenPermissionSetMenu = (event: React.MouseEvent<HTMLElement>, groupId: string) => {
-    setPermissionSetMenuAnchor(event.currentTarget);
-    setActiveGroupForPermissionSet(groupId);
-  };
-
-  const handleClosePermissionSetMenu = () => {
-    setPermissionSetMenuAnchor(null);
-    setActiveGroupForPermissionSet(null);
-  };
-
-  const handleAssignPermissionSet = async (permissionSetId: string) => {
-    if (!activeGroupForPermissionSet) return;
-
-    try {
-      await assignPsToGroupMutation.mutateAsync({
-        groupId: activeGroupForPermissionSet,
-        request: {
-          permissionSetIds: [permissionSetId],
-        },
-      });
-
-      setSnackbar({
-        open: true,
-        message: t("groups.messages.assignPermissionSetSuccess"),
-        severity: "success",
-      });
-
-      handleClosePermissionSetMenu();
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: t("groups.messages.assignPermissionSetError"),
-        severity: "error",
-      });
-    }
-  };
-
-  const handleRemovePermissionSet = async (groupId: string, permissionSetId: string) => {
-    try {
-      await removeGroupAssignmentMutation.mutateAsync({
-        groupId,
-        permissionSetId,
-      });
-
-      setSnackbar({
-        open: true,
-        message: t("groups.messages.removePermissionSetSuccess"),
-        severity: "success",
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: t("groups.messages.removePermissionSetError"),
-        severity: "error",
-      });
-    }
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
-
-  // Get assigned permission set IDs for the current group
-  const assignedPermissionSetIds =
-    groupAssignments?.assignments?.map((a) => a.permissionSetId) || [];
-
-  // Filter out already assigned permission sets
-  const availablePermissionSets =
-    permissionSets?.filter((ps) => !assignedPermissionSetIds.includes(ps.id)) || [];
 
   return (
     <>
@@ -461,48 +370,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
                           </CardContent>
                         </Card>
                       )}
-
-                      <Box sx={{ mt: 3 }}>
-                        <Box
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          mb={2}
-                        >
-                          <Typography variant="h6">{t("groups.permissionSets")}</Typography>
-                          <Button
-                            startIcon={<AddIcon />}
-                            onClick={(e) => handleOpenPermissionSetMenu(e, group.id)}
-                            variant="outlined"
-                            size="small"
-                            disabled={availablePermissionSets.length === 0}
-                          >
-                            {t("groups.actions.assignPermissionSet")}
-                          </Button>
-                        </Box>
-
-                        <Divider sx={{ mb: 2 }} />
-
-                        {groupAssignments?.assignments &&
-                        groupAssignments.assignments.length > 0 ? (
-                          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            {groupAssignments.assignments.map((assignment) => (
-                              <Chip
-                                key={assignment.permissionSetId}
-                                label={assignment.permissionSetName}
-                                onDelete={() =>
-                                  handleRemovePermissionSet(group.id, assignment.permissionSetId)
-                                }
-                                sx={{ mb: 1 }}
-                              />
-                            ))}
-                          </Stack>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            {t("groups.noPermissionSets")}
-                          </Typography>
-                        )}
-                      </Box>
                     </Box>
                   )}
                 </Box>
@@ -520,22 +387,6 @@ const ManageGroupsModal: React.FC<ManageGroupsModalProps> = ({ open, onClose }) 
           )}
         </DialogContent>
       </Dialog>
-
-      <Menu
-        anchorEl={permissionSetMenuAnchor}
-        open={Boolean(permissionSetMenuAnchor)}
-        onClose={handleClosePermissionSetMenu}
-      >
-        {availablePermissionSets.length > 0 ? (
-          availablePermissionSets.map((ps) => (
-            <MenuItem key={ps.id} onClick={() => handleAssignPermissionSet(ps.id)}>
-              {ps.name}
-            </MenuItem>
-          ))
-        ) : (
-          <MenuItem disabled>{t("groups.noAvailablePermissionSets")}</MenuItem>
-        )}
-      </Menu>
 
       <Snackbar
         open={snackbar.open}

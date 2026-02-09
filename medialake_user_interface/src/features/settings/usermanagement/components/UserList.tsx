@@ -31,8 +31,6 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import GroupIcon from "@mui/icons-material/Group";
 import { User } from "@/api/types/api.types";
 import { useGetGroups } from "@/api/hooks/useGroups";
-import { useGetPermissionSets } from "@/api/hooks/usePermissionSets";
-import { useListUserAssignments } from "@/api/hooks/useAssignments";
 import { useUpdateUser } from "@/api/hooks/useUsers";
 import { useTranslation } from "react-i18next";
 import { UserFilterPopover } from "./UserFilterPopover";
@@ -57,24 +55,6 @@ interface UserListProps {
   onSortChange?: (columnId: string, desc: boolean) => void;
   handleMutation: (options: any, variables: any) => Promise<any>;
 }
-
-// Helper component for managing permission set chips
-const PermissionSetCell: React.FC<{
-  user: User;
-  theme: any;
-  permissionSets: any[] | undefined;
-}> = ({ user, theme, permissionSets }) => {
-  const { data: userAssignments } = useListUserAssignments(user.username);
-
-  return (
-    <PermissionSetChips
-      user={user}
-      theme={theme}
-      permissionSets={permissionSets}
-      userAssignments={userAssignments}
-    />
-  );
-};
 
 // Helper component for managing single group selection
 const GroupChips: React.FC<{
@@ -189,51 +169,6 @@ const GroupChips: React.FC<{
   );
 };
 
-// Helper component for displaying permission set chips (read-only)
-const PermissionSetChips: React.FC<{
-  user: User;
-  theme: any;
-  permissionSets: any[] | undefined;
-  userAssignments: any | undefined;
-}> = ({ theme, userAssignments }) => {
-  const { t } = useTranslation();
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 1,
-        alignItems: "center",
-      }}
-    >
-      {userAssignments?.assignments && userAssignments.assignments.length > 0 ? (
-        userAssignments.assignments.map((assignment) => (
-          <Chip
-            key={assignment.permissionSetId}
-            label={assignment.permissionSetName}
-            size="small"
-            sx={{
-              backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-              color: theme.palette.secondary.main,
-              fontWeight: 600,
-              borderRadius: "6px",
-              height: "24px",
-              "& .MuiChip-label": {
-                px: 1.5,
-              },
-            }}
-          />
-        ))
-      ) : (
-        <Typography variant="body2" color="text.secondary">
-          {t("permissionSets.noAssignments")}
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
 const containsFilter: FilterFn<any> = (row, columnId, filterValue) => {
   const cellValue = row.getValue(columnId);
   if (cellValue == null) return false;
@@ -266,9 +201,8 @@ const UserList: React.FC<UserListProps> = ({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-  // Fetch groups and permission sets at the parent level
+  // Fetch groups at the parent level
   const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
-  const { data: permissionSets } = useGetPermissionSets(true); // Enable API call when this component is loaded
 
   // Sync external state with internal state
   React.useEffect(() => {
@@ -317,7 +251,6 @@ const UserList: React.FC<UserListProps> = ({
   const [columnVisibility, setColumnVisibility] = useState({
     username: false,
     modified: true, // Show modified column by default
-    permissionSets: false, // Hide permission sets column by default
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
@@ -445,20 +378,6 @@ const UserList: React.FC<UserListProps> = ({
         },
       },
       {
-        header: t("common.columns.permissionSets"),
-        id: "permissionSets",
-        minSize: 200,
-        size: 250,
-        enableResizing: true,
-        enableSorting: false,
-        enableFiltering: false,
-        cell: ({ row }) => {
-          return (
-            <PermissionSetCell user={row.original} theme={theme} permissionSets={permissionSets} />
-          );
-        },
-      },
-      {
         header: t("common.columns.created"),
         accessorKey: "created",
         minSize: 120,
@@ -582,7 +501,6 @@ const UserList: React.FC<UserListProps> = ({
     onToggleUserStatus,
     groups,
     isLoadingGroups,
-    permissionSets,
     handleMutation,
   ]);
 
@@ -703,7 +621,7 @@ const UserList: React.FC<UserListProps> = ({
           anchorEl={columnMenuAnchor}
           columns={table.getAllLeafColumns()}
           onClose={handleColumnMenuClose}
-          excludeIds={["actions", "permissionSets"]}
+          excludeIds={["actions"]}
         />
 
         <UserFilterPopover

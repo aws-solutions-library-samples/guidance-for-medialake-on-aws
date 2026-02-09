@@ -9,6 +9,9 @@ interface SearchParams {
   page?: number;
   pageSize?: number;
   isSemantic?: boolean;
+  // Sorting parameters
+  sortBy?: "createdAt" | "name" | "size" | "type" | "format";
+  sortDirection?: "asc" | "desc";
   // New facet parameters
   type?: string;
   extension?: string;
@@ -50,6 +53,11 @@ export const useSearch = (query: string, params?: SearchParams) => {
   const pageSize = params?.pageSize || 20;
   const isSemantic = params?.isSemantic ?? false;
   const fields = params?.fields || [];
+  const sortBy = params?.sortBy;
+  const sortDirection = params?.sortDirection || "desc";
+
+  // Construct the sort parameter (e.g., "-createdAt" for descending)
+  const sort = sortBy ? `${sortDirection === "desc" ? "-" : ""}${sortBy}` : undefined;
 
   // Extract facet parameters from params
   const facetParams = params
@@ -66,7 +74,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
     : undefined;
 
   return useQuery<SearchResponseType, SearchError>({
-    queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams),
+    queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, isSemantic, fields, facetParams, sort),
     queryFn: async ({ signal }) => {
       try {
         // Build query parameters
@@ -75,6 +83,9 @@ export const useSearch = (query: string, params?: SearchParams) => {
         queryParams.append("page", page.toString());
         queryParams.append("pageSize", pageSize.toString());
         queryParams.append("semantic", isSemantic.toString());
+
+        // Add sort parameter if specified
+        if (sort) queryParams.append("sort", sort);
 
         // Add facet parameters if they exist
         if (params?.type) queryParams.append("type", params.type);

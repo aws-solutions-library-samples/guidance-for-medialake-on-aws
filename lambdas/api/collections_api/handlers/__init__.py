@@ -22,9 +22,18 @@ from . import (
     collections_ID_share_get,
     collections_ID_share_ID_delete,
     collections_ID_share_post,
+    collections_ID_thumbnail_delete,
+    collections_ID_thumbnail_post,
     collections_post,
     collections_shared_by_me_get,
     collections_shared_with_me_get,
+    groups_get,
+    groups_ID_collections_delete,
+    groups_ID_collections_post,
+    groups_ID_delete,
+    groups_ID_get,
+    groups_ID_put,
+    groups_post,
 )
 
 __all__ = [
@@ -47,6 +56,15 @@ __all__ = [
     "collections_ID_rules_post",
     "collections_ID_rules_ID_put",
     "collections_ID_rules_ID_delete",
+    "collections_ID_thumbnail_post",
+    "collections_ID_thumbnail_delete",
+    "groups_get",
+    "groups_post",
+    "groups_ID_get",
+    "groups_ID_put",
+    "groups_ID_delete",
+    "groups_ID_collections_post",
+    "groups_ID_collections_delete",
 ]
 
 
@@ -87,3 +105,16 @@ def register_all_routes(app):
     collections_ID_rules_post.register_route(app)
     collections_ID_rules_ID_put.register_route(app)
     collections_ID_rules_ID_delete.register_route(app)
+
+    # Collection thumbnail endpoints
+    collections_ID_thumbnail_post.register_route(app)
+    collections_ID_thumbnail_delete.register_route(app)
+
+    # Collection groups endpoints
+    groups_get.register_route(app)
+    groups_post.register_route(app)
+    groups_ID_get.register_route(app)
+    groups_ID_put.register_route(app)
+    groups_ID_delete.register_route(app)
+    groups_ID_collections_post.register_route(app)
+    groups_ID_collections_delete.register_route(app)

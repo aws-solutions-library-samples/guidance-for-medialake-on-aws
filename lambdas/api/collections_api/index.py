@@ -22,13 +22,19 @@ import os
 from typing import Any, Dict
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.event_handler import (
+    APIGatewayRestResolver,
+    CORSConfig,
+    Response,
+)
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from custom_exceptions import ForbiddenError
 
 # Import PynamoDB models
 from db_models import (
     ChildReferenceModel,
+    CollectionGroupModel,
     CollectionItemModel,
     CollectionModel,
     CollectionTypeModel,
@@ -36,6 +42,7 @@ from db_models import (
     ShareModel,
     UserRelationshipModel,
 )
+from lambda_middleware import is_lambda_warmer_event
 
 # Initialize PowerTools
 logger = Logger(service="collections-api", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -76,6 +83,7 @@ for model in [
     ShareModel,
     RuleModel,
     CollectionTypeModel,
+    CollectionGroupModel,
 ]:
     model.Meta.table_name = table_name
     model.Meta.region = region
@@ -86,6 +94,22 @@ logger.info(f"PynamoDB models initialized for table: {table_name} in region: {re
 from handlers import register_all_routes  # noqa: E402
 
 register_all_routes(app)
+
+
+# Register custom exception handler for ForbiddenError
+@app.exception_handler(ForbiddenError)
+def handle_forbidden_error(ex: ForbiddenError):
+    """Handle ForbiddenError exceptions with 403 status code."""
+    logger.warning(f"Forbidden access attempt: {ex.message}")
+    metrics.add_metric(name="ForbiddenErrors", unit="Count", value=1)
+
+    return Response(
+        status_code=403,
+        content_type="application/json",
+        body=json.dumps(
+            {"success": False, "error": {"code": "FORBIDDEN", "message": ex.message}}
+        ),
+    )
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
@@ -105,6 +129,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     Returns:
         API Gateway Lambda proxy integration response
     """
+    # Lambda warmer short-circuit
+    if is_lambda_warmer_event(event):
+        return {"warmed": True}
+
     logger.info(
         "Collections API Lambda invoked",
         extra={

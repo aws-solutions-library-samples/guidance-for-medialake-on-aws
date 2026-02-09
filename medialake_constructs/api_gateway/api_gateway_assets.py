@@ -16,6 +16,8 @@ from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_efs as efs
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from aws_cdk import aws_logs as logs
@@ -28,6 +30,7 @@ from constructs import Construct
 
 from cdk_logger import get_logger
 from config import config
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
@@ -177,15 +180,31 @@ class AssetsConstruct(Construct):
                 security_groups=[props.security_group],
                 layers=[search_layer.layer],
                 memory_size=512,  # VPC Lambda needs sufficient memory for ENI setup
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for fast asset retrieval
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.opensearch_index,
+                    "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
                 },
             ),
+        )
+
+        # Lambda warming for asset retrieval API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "GetAssetLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    get_asset_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps asset retrieval API Lambda warm via scheduled EventBridge rule.",
         )
 
         get_asset_lambda.function.add_to_role_policy(
@@ -217,6 +236,7 @@ class AssetsConstruct(Construct):
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "INDEX_NAME": props.opensearch_index,
+                    "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
@@ -364,6 +384,16 @@ class AssetsConstruct(Construct):
                     "ec2:DeleteNetworkInterface",
                 ],
                 resources=["*"],
+            )
+        )
+
+        # Add EventBridge permissions to DELETE Lambda (for publishing deletion events)
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["events:PutEvents"],
+                resources=[
+                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
+                ],
             )
         )
 
@@ -2403,9 +2433,14 @@ class AssetsConstruct(Construct):
             "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
             "OPEN_SEARCH_ENDPOINT": props.open_search_endpoint,
+            "OPENSEARCH_ENDPOINT": props.open_search_endpoint,  # For TwelveLabs plugin
             "OPENSEARCH_INDEX": props.opensearch_index,
+            "INDEX_NAME": props.opensearch_index,  # For TwelveLabs plugin
+            "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",  # For dual-index deletion
             "S3_VECTOR_BUCKET": props.s3_vector_bucket_name,
+            "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,  # For TwelveLabs plugin
             "S3_VECTOR_INDEX": props.s3_vector_index_name,
+            "VECTOR_INDEX_NAME": props.s3_vector_index_name,  # For TwelveLabs plugin
             "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
         }
 
@@ -2584,6 +2619,16 @@ class AssetsConstruct(Construct):
                     "kms:DescribeKey",
                 ],
                 resources=["*"],
+            )
+        )
+
+        # Grant EventBridge permissions to processor Lambda (for publishing deletion events)
+        self._batch_delete_processor_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["events:PutEvents"],
+                resources=[
+                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
+                ],
             )
         )
 

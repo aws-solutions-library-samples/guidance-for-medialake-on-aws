@@ -1,0 +1,143 @@
+import { useEffect, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetDashboardLayout,
+  useSaveDashboardLayout,
+  useResetDashboardLayout,
+} from "@/api/hooks/useDashboard";
+import { QUERY_KEYS } from "@/api/queryKeys";
+import {
+  useDashboardStore,
+  convertApiLayoutToFrontend,
+  convertFrontendLayoutToApi,
+  DEFAULT_LAYOUT,
+} from "../store/dashboardStore";
+
+/**
+ * Hook to synchronize dashboard layout between local store and API.
+ *
+ * This hook:
+ * 1. Loads the layout from API on mount
+ * 2. Falls back to localStorage if API fails
+ * 3. Provides manual save/reset functions
+ * 4. NO AUTO-SAVE - user must explicitly save changes
+ */
+export const useDashboardSync = () => {
+  const queryClient = useQueryClient();
+  const isInitialLoadRef = useRef(true);
+
+  // Store state - use individual selectors for stable references
+  const layout = useDashboardStore((state) => state.layout);
+  const hasPendingChanges = useDashboardStore((state) => state.hasPendingChanges);
+
+  // Store actions - use individual selectors for stable references (these are stable function references)
+  const setLayout = useDashboardStore((state) => state.setLayout);
+  const initializeLayout = useDashboardStore((state) => state.initializeLayout);
+  const setIsSyncing = useDashboardStore((state) => state.setIsSyncing);
+  const setLastSyncError = useDashboardStore((state) => state.setLastSyncError);
+  const setHasPendingChanges = useDashboardStore((state) => state.setHasPendingChanges);
+
+  // API hooks
+  const {
+    data: apiLayout,
+    isLoading: isLoadingLayout,
+    error: loadError,
+    isSuccess: isLoadSuccess,
+  } = useGetDashboardLayout();
+
+  const saveLayoutMutation = useSaveDashboardLayout();
+  const resetLayoutMutation = useResetDashboardLayout();
+
+  // Invalidate widget data queries on mount so data is fresh when returning to the dashboard
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    queryClient.invalidateQueries({ queryKey: ["search"] });
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    queryClient.invalidateQueries({ queryKey: ["collection-groups"] });
+    queryClient.invalidateQueries({ queryKey: ["collection-types"] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load layout from API on mount
+  useEffect(() => {
+    if (isLoadSuccess && apiLayout && isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      const frontendLayout = convertApiLayoutToFrontend(apiLayout);
+      initializeLayout(frontendLayout);
+      setLastSyncError(null);
+    }
+  }, [isLoadSuccess, apiLayout, initializeLayout, setLastSyncError]);
+
+  // Handle load error - keep using localStorage data
+  useEffect(() => {
+    if (loadError && isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      console.warn("Failed to load dashboard layout from API, using local storage:", loadError);
+      setLastSyncError("Failed to load layout from server");
+    }
+  }, [loadError, setLastSyncError]);
+
+  // Manual save function (saves current layout to active preset or default layout)
+  const saveNow = useCallback(() => {
+    const apiPayload = convertFrontendLayoutToApi(layout);
+    setIsSyncing(true);
+
+    return saveLayoutMutation
+      .mutateAsync(apiPayload)
+      .then(() => {
+        setHasPendingChanges(false);
+        setLastSyncError(null);
+        setIsSyncing(false);
+      })
+      .catch((error) => {
+        setLastSyncError("Failed to save layout");
+        setIsSyncing(false);
+        throw error;
+      });
+  }, [layout, saveLayoutMutation, setIsSyncing, setHasPendingChanges, setLastSyncError]);
+
+  // Reset to default layout via API
+  const resetLayout = useCallback(() => {
+    setIsSyncing(true);
+
+    return resetLayoutMutation
+      .mutateAsync()
+      .then((apiLayout) => {
+        const frontendLayout = convertApiLayoutToFrontend(apiLayout);
+        initializeLayout(frontendLayout);
+        setLastSyncError(null);
+        setIsSyncing(false);
+      })
+      .catch((error) => {
+        // Fallback to local default if API fails
+        console.warn("API reset failed, using local default:", error);
+        setLayout(DEFAULT_LAYOUT);
+        setHasPendingChanges(true); // Mark for sync
+        setLastSyncError("Reset to local default (server unavailable)");
+        setIsSyncing(false);
+      });
+  }, [
+    resetLayoutMutation,
+    initializeLayout,
+    setLayout,
+    setIsSyncing,
+    setHasPendingChanges,
+    setLastSyncError,
+  ]);
+
+  // Refresh layout from API
+  const refreshLayout = useCallback(() => {
+    return queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.layout() });
+  }, [queryClient]);
+
+  return {
+    isLoading: isLoadingLayout,
+    isSaving: saveLayoutMutation.isPending,
+    hasPendingChanges,
+    saveNow,
+    resetLayout,
+    refreshLayout,
+    error: loadError,
+  };
+};
+
+export default useDashboardSync;

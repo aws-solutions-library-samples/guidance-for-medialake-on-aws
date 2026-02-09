@@ -113,6 +113,11 @@ class SearchProviderConfig:
     metadata_mapping: Optional[Dict[str, str]] = None
     callbacks: Optional[Dict[str, str]] = None
     dataset_id: Optional[str] = None  # For external services like Coactive
+    name: Optional[str] = None
+    id: Optional[str] = None
+    type: Optional[str] = None
+    dimensions: Optional[int] = None
+    target_index: Optional[str] = None  # Target OpenSearch index for search queries
 
 
 def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:

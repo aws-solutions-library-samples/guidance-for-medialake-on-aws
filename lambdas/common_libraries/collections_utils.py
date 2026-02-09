@@ -505,6 +505,24 @@ def format_collection_item(
         "sharedWithMe": item.get("sharedWithMe", False),
     }
 
+    # Add thumbnail fields
+    thumbnail_type = item.get("thumbnailType")
+    thumbnail_value = item.get("thumbnailValue")
+    thumbnail_s3_key = item.get("thumbnailS3Key")
+
+    if thumbnail_type:
+        formatted_item["thumbnailType"] = thumbnail_type
+        formatted_item["thumbnailValue"] = thumbnail_value
+
+        # Resolve thumbnail URL based on type
+        if thumbnail_type == "icon":
+            # For icons, frontend handles rendering - no URL needed
+            formatted_item["thumbnailUrl"] = None
+        elif thumbnail_s3_key:
+            # For upload, asset, or frame types - generate CloudFront URL
+            thumbnail_url = _resolve_collection_thumbnail_url(thumbnail_s3_key)
+            formatted_item["thumbnailUrl"] = thumbnail_url
+
     # Add user-specific fields if user context available
     if user_id:
         formatted_item["isFavorite"] = False  # TODO: Query user collection relationship
@@ -529,6 +547,49 @@ def format_collection_item(
     )
 
     return formatted_item
+
+
+@tracer.capture_method
+def _resolve_collection_thumbnail_url(s3_key: str) -> Optional[str]:
+    """
+    Resolve a collection thumbnail S3 key to a CloudFront URL.
+
+    Args:
+        s3_key: S3 key for the thumbnail (e.g., 'collections/{id}/thumbnail.png')
+
+    Returns:
+        CloudFront URL or None if resolution fails
+    """
+    try:
+        # Import here to avoid circular dependencies
+        import os
+
+        from url_utils import generate_cloudfront_url
+
+        # Get the media assets bucket name from environment
+        bucket = os.environ.get("MEDIA_ASSETS_BUCKET_NAME")
+        if not bucket:
+            logger.warning(
+                {
+                    "message": "MEDIA_ASSETS_BUCKET_NAME not set, cannot resolve thumbnail URL",
+                    "s3_key": s3_key,
+                    "operation": "_resolve_collection_thumbnail_url",
+                }
+            )
+            return None
+
+        url = generate_cloudfront_url(bucket, s3_key)
+        return url
+    except Exception as e:
+        logger.warning(
+            {
+                "message": "Failed to resolve collection thumbnail URL",
+                "s3_key": s3_key,
+                "error": str(e),
+                "operation": "_resolve_collection_thumbnail_url",
+            }
+        )
+        return None
 
 
 @tracer.capture_method

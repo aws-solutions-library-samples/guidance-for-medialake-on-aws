@@ -14,6 +14,15 @@ class CollectionStatus(str, Enum):
     DELETED = "DELETED"
 
 
+class ThumbnailType(str, Enum):
+    """Thumbnail type values."""
+
+    ICON = "icon"  # MUI icon name (e.g., "Movie", "Folder")
+    UPLOAD = "upload"  # User uploaded image
+    ASSET = "asset"  # Copied from an existing asset's thumbnail
+    FRAME = "frame"  # Captured from a video frame
+
+
 class RelationshipType(str, Enum):
     """User-collection relationship types."""
 
@@ -64,6 +73,9 @@ class ListCollectionsQueryParams(BaseModel):
     filter_parentId: Optional[str] = Field(None, alias="filter[parentId]")
     filter_status: Optional[CollectionStatus] = Field(None, alias="filter[status]")
     filter_search: Optional[str] = Field(None, alias="filter[search]")
+    groupIds: Optional[str] = Field(
+        None, description="Comma-separated list of group IDs to filter by"
+    )
     sort: Optional[str] = Field(None, description="Sort field and direction")
     fields: Optional[str] = Field(None, description="Comma-separated fields to return")
 

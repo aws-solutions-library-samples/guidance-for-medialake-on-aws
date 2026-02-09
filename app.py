@@ -38,6 +38,7 @@ from medialake_stacks.collection_types_stack import (
     CollectionTypesStackProps,
 )
 from medialake_stacks.collections_stack import CollectionsStack, CollectionsStackProps
+from medialake_stacks.dashboard_stack import DashboardStack, DashboardStackProps
 from medialake_stacks.edge_lambda_stack import EdgeLambdaStack
 from medialake_stacks.groups_stack import GroupsStack, GroupsStackProps
 from medialake_stacks.integrations_environment_stack import (
@@ -344,12 +345,29 @@ class MediaLakeStack(cdk.Stack):
                 vpc=props.base_infrastructure.vpc,
                 security_group=props.base_infrastructure.security_group,
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
+                asset_table=props.base_infrastructure.asset_table,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)
 
         # Store reference to collections_stack
         self._collections_stack = collections_stack
+
+        # Create the Dashboard Stack
+        dashboard_stack = DashboardStack(
+            self,
+            "MediaLakeDashboardStack",
+            props=DashboardStackProps(
+                cognito_user_pool=props.cognito_stack.user_pool,
+                x_origin_verify_secret=self.shared_x_origin_secret,
+                authorizer=api_gateway_stack.authorizer,
+                api_resource=self.shared_rest_api,
+            ),
+        )
+        dashboard_stack.add_dependency(props.authorization_stack)
+
+        # Store reference to dashboard_stack
+        self._dashboard_stack = dashboard_stack
 
         # Create the Collection Types Settings Stack
         collection_types_stack = CollectionTypesStack(
@@ -435,6 +453,9 @@ class MediaLakeStack(cdk.Stack):
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
                 s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,
                 s3_vector_dimension=props.base_infrastructure.s3_vector_dimension,
+                # System Settings table configuration
+                system_settings_table_name=settings_stack.system_settings_table_name,
+                system_settings_table_arn=settings_stack.system_settings_table_arn,
                 authorizer=api_gateway_stack.authorizer,
                 api_resource=self.shared_rest_api,
             ),
@@ -545,6 +566,9 @@ class MediaLakeStack(cdk.Stack):
 
         if hasattr(self, "_collections_stack"):
             props.resource_collector.add_resource(self._collections_stack)
+
+        if hasattr(self, "_dashboard_stack"):
+            props.resource_collector.add_resource(self._dashboard_stack)
 
         if hasattr(self, "_collection_types_stack"):
             props.resource_collector.add_resource(self._collection_types_stack)

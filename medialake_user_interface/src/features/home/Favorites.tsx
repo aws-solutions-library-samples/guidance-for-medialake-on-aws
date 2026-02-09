@@ -138,6 +138,7 @@ export const Favorites: React.FC = () => {
               id={favorite.itemId}
               name={favorite.metadata?.name || favorite.itemId}
               thumbnailUrl={favorite.metadata?.thumbnailUrl || ""}
+              proxyUrl={favorite.metadata?.proxyUrl || ""}
               assetType={favorite.metadata?.assetType || "Unknown"}
               fields={[
                 { id: "name", label: "Name", visible: true },

@@ -1,6 +1,14 @@
 // src/api/endpoints.ts
 
 export const API_ENDPOINTS = {
+  DASHBOARD: {
+    LAYOUT: "/dashboard/layout",
+    LAYOUT_RESET: "/dashboard/layout/reset",
+    LAYOUT_DEFAULT: "/dashboard/layout/default",
+    PRESETS: "/dashboard/presets",
+    PRESET: (presetId: string) => `/dashboard/presets/${presetId}`,
+    PRESET_APPLY: (presetId: string) => `/dashboard/presets/${presetId}/apply`,
+  },
   CONNECTORS: "/connectors",
   PIPELINES: "/pipelines",
   PIPELINE_EXECUTIONS: "/pipelines/executions",
@@ -25,12 +33,7 @@ export const API_ENDPOINTS = {
   USERS: "/settings/users",
   USER: "/users",
   ROLES: "/settings/roles",
-  PERMISSION_SETS: {
-    BASE: "/permissions",
-    GET: (id: string) => `/permissions/${id}`,
-    UPDATE: (id: string) => `/permissions/${id}`,
-    DELETE: (id: string) => `/permissions/${id}`,
-  },
+
   API_KEYS: {
     BASE: "/settings/api-keys",
     GET: (id: string) => `/settings/api-keys/${id}`,
@@ -45,18 +48,7 @@ export const API_ENDPOINTS = {
     ADD_MEMBERS: (id: string) => `/groups/${id}/members`,
     REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
   },
-  ASSIGNMENTS: {
-    USER: {
-      BASE: (userId: string) => `/assignments/users/${userId}`,
-      REMOVE: (userId: string, permissionSetId: string) =>
-        `/assignments/users/${userId}/permission-sets/${permissionSetId}`,
-    },
-    GROUP: {
-      BASE: (groupId: string) => `/assignments/groups/${groupId}`,
-      REMOVE: (groupId: string, permissionSetId: string) =>
-        `/assignments/groups/${groupId}/permission-sets/${permissionSetId}`,
-    },
-  },
+
   DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
   ENABLE_USER: (userId: string) => `/users/${userId}/enable`,
   SYSTEM_SETTINGS: {
@@ -80,6 +72,7 @@ export const API_ENDPOINTS = {
     SHARED_BY_ME: "/collections/shared-by-me",
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
+    THUMBNAIL: (id: string) => `/collections/${id}/thumbnail`,
   },
   COLLECTION_TYPES: {
     BASE: "/settings/collection-types",

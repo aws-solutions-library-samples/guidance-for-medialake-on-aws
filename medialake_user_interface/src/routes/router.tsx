@@ -11,6 +11,7 @@ import SearchPage from "@/pages/SearchPage";
 import AssetsPage from "@/pages/AssetsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
 import CollectionViewPage from "@/pages/CollectionViewPage";
+import { CollectionGroupDetailPage } from "@/features/collection-groups";
 import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
 import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
@@ -24,11 +25,16 @@ import RoleManagement from "@/pages/settings/RoleManagement";
 import IntegrationsPage from "@/pages/settings/IntegrationsPage";
 import EnvironmentsPage from "@/pages/settings/EnvironmentsPage";
 import SystemSettingsPage from "@/pages/settings/SystemSettingsPage";
-import PermissionSetsPage from "@/pages/settings/PermissionSetsPage";
 
 const S3ExplorerWrapper = () => {
   const { connectorId } = useParams<{ connectorId: string }>();
   return <S3Explorer connectorId={connectorId!} />;
+};
+
+// Redirect component for old collection-groups detail route
+const CollectionGroupDetailRedirect = () => {
+  const { groupId } = useParams<{ groupId: string }>();
+  return <Navigate to={`/collections/groups/${groupId}`} replace />;
 };
 
 export const router = createBrowserRouter([
@@ -90,6 +96,20 @@ export const router = createBrowserRouter([
       {
         path: "collections/:id/view",
         element: <CollectionViewPage />,
+      },
+      {
+        path: "collections/groups/:groupId",
+        element: <CollectionGroupDetailPage />,
+      },
+      {
+        // Redirect old collection-groups route to new location
+        path: "collection-groups",
+        element: <Navigate to="/collections?filter=groups" replace />,
+      },
+      {
+        // Redirect old collection-groups detail route to new location
+        path: "collection-groups/:groupId",
+        element: <CollectionGroupDetailRedirect />,
       },
       {
         path: "executions",
@@ -173,15 +193,6 @@ export const router = createBrowserRouter([
           <RoutePermissionGuard
             permission={{ action: "manage", subject: "permission-set" }}
             element={<RoleManagement />}
-          />
-        ),
-      },
-      {
-        path: "settings/permission-sets",
-        element: (
-          <RoutePermissionGuard
-            permission={{ action: "manage", subject: "permission-set" }}
-            element={<PermissionSetsPage />}
           />
         ),
       },

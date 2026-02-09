@@ -5,10 +5,10 @@ import os
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
-    ForbiddenError,
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
+from custom_exceptions import ForbiddenError
 from db_models import CollectionTypeModel
 from permission_utils import check_admin_permission, extract_user_context
 from pynamodb.exceptions import DoesNotExist

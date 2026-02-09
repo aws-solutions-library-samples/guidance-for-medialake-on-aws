@@ -28,6 +28,7 @@ from config import (
     OPENSEARCH_SECURITY_GROUP_ID,
     OPENSEARCH_VPC_SUBNET_IDS,
     PIPELINES_EVENT_BUS_NAME,
+    SYSTEM_SETTINGS_TABLE_NAME,
 )
 
 # Initialize logger
@@ -849,6 +850,12 @@ def create_lambda_function(
                     "NODE_TEMPLATES_BUCKET": os.environ.get("NODE_TEMPLATES_BUCKET"),
                     "OPENSEARCH_ENDPOINT": os.environ.get("OPENSEARCH_ENDPOINT"),
                     "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
+                    # System settings table for provider configuration lookup
+                    "SYSTEM_SETTINGS_TABLE_NAME": SYSTEM_SETTINGS_TABLE_NAME or "",
+                    # OpenSearch index for Marengo 3.0 asset embeddings (separate from media index)
+                    "ASSET_EMBEDDINGS_INDEX": os.environ.get(
+                        "ASSET_EMBEDDINGS_INDEX", "asset-embeddings"
+                    ),
                     # Add required environment variables
                     "SERVICE": node.data.id,  # node Title
                     "STEP_NAME": node.data.label,  # friendly name of the node
