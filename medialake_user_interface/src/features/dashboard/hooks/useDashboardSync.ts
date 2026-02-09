@@ -32,6 +32,7 @@ export const useDashboardSync = () => {
 
   // Store actions - use individual selectors for stable references (these are stable function references)
   const setLayout = useDashboardStore((state) => state.setLayout);
+  const initializeLayout = useDashboardStore((state) => state.initializeLayout);
   const setIsSyncing = useDashboardStore((state) => state.setIsSyncing);
   const setLastSyncError = useDashboardStore((state) => state.setLastSyncError);
   const setHasPendingChanges = useDashboardStore((state) => state.setHasPendingChanges);
@@ -47,16 +48,24 @@ export const useDashboardSync = () => {
   const saveLayoutMutation = useSaveDashboardLayout();
   const resetLayoutMutation = useResetDashboardLayout();
 
+  // Invalidate widget data queries on mount so data is fresh when returning to the dashboard
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    queryClient.invalidateQueries({ queryKey: ["search"] });
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    queryClient.invalidateQueries({ queryKey: ["collection-groups"] });
+    queryClient.invalidateQueries({ queryKey: ["collection-types"] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load layout from API on mount
   useEffect(() => {
     if (isLoadSuccess && apiLayout && isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
       const frontendLayout = convertApiLayoutToFrontend(apiLayout);
-      setLayout(frontendLayout);
-      setHasPendingChanges(false);
+      initializeLayout(frontendLayout);
       setLastSyncError(null);
     }
-  }, [isLoadSuccess, apiLayout, setLayout, setHasPendingChanges, setLastSyncError]);
+  }, [isLoadSuccess, apiLayout, initializeLayout, setLastSyncError]);
 
   // Handle load error - keep using localStorage data
   useEffect(() => {
@@ -94,8 +103,7 @@ export const useDashboardSync = () => {
       .mutateAsync()
       .then((apiLayout) => {
         const frontendLayout = convertApiLayoutToFrontend(apiLayout);
-        setLayout(frontendLayout);
-        setHasPendingChanges(false);
+        initializeLayout(frontendLayout);
         setLastSyncError(null);
         setIsSyncing(false);
       })
@@ -107,7 +115,14 @@ export const useDashboardSync = () => {
         setLastSyncError("Reset to local default (server unavailable)");
         setIsSyncing(false);
       });
-  }, [resetLayoutMutation, setLayout, setIsSyncing, setHasPendingChanges, setLastSyncError]);
+  }, [
+    resetLayoutMutation,
+    initializeLayout,
+    setLayout,
+    setIsSyncing,
+    setHasPendingChanges,
+    setLastSyncError,
+  ]);
 
   // Refresh layout from API
   const refreshLayout = useCallback(() => {

@@ -58,9 +58,9 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     }
   }, [selectedAssets.length, setHasSelectedItems]);
 
-  // Group assets by type
+  // Group assets by type, then sort by type and by name within each group
   const assetsByType = React.useMemo(() => {
-    return selectedAssets.reduce(
+    const grouped = selectedAssets.reduce(
       (acc, asset) => {
         if (!acc[asset.type]) {
           acc[asset.type] = [];
@@ -70,7 +70,25 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
       },
       {} as Record<string, typeof selectedAssets>
     );
+
+    // Sort assets within each group numerically-alphabetically
+    for (const type of Object.keys(grouped)) {
+      grouped[type].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+      );
+    }
+
+    return grouped;
   }, [selectedAssets]);
+
+  // Sort type keys numerically-alphabetically
+  const sortedTypes = React.useMemo(
+    () =>
+      Object.keys(assetsByType).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      ),
+    [assetsByType]
+  );
 
   // Handle removing a single item
   const handleRemoveItem = (assetId: string) => {
@@ -154,7 +172,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
 
       {/* Selected items list */}
       <Box sx={{ flexGrow: 1, overflow: "auto" }}>
-        {Object.entries(assetsByType).map(([type, assets]) => (
+        {sortedTypes.map((type) => (
           <Box key={type}>
             <Typography
               variant="subtitle2"
@@ -165,10 +183,10 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                 fontWeight: 600,
               }}
             >
-              {type} ({assets.length})
+              {type} ({assetsByType[type].length})
             </Typography>
             <List dense disablePadding>
-              {assets.map((asset) => (
+              {assetsByType[type].map((asset) => (
                 <ListItem
                   key={asset.id}
                   secondaryAction={
@@ -183,6 +201,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                   }
                   sx={{
                     px: 2,
+                    pr: 6,
                     "&:hover": {
                       bgcolor: "action.hover",
                     },
@@ -192,8 +211,11 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                     primary={asset.name}
                     primaryTypographyProps={{
                       variant: "body2",
-                      noWrap: true,
                       title: asset.name,
+                      sx: {
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                      },
                     }}
                   />
                 </ListItem>

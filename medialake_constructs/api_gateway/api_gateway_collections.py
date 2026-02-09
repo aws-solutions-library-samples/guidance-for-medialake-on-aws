@@ -45,6 +45,7 @@ class CollectionsApiProps:
     vpc: ec2.IVpc
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
+    asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
 
 
 class CollectionsApi(Construct):
@@ -171,6 +172,8 @@ class CollectionsApi(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "SCOPE": "es",
                     "ENVIRONMENT": config.environment,
+                    "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                 },
             ),
         )
@@ -193,6 +196,9 @@ class CollectionsApi(Construct):
 
         # Grant DynamoDB permissions
         self._collections_table.table.grant_read_write_data(collections_lambda.function)
+
+        # Grant read access to asset table (for copying asset thumbnails)
+        props.asset_table.grant_read_data(collections_lambda.function)
 
         # Grant VPC network interface permissions for Lambda in VPC
         collections_lambda.function.add_to_role_policy(
@@ -222,7 +228,7 @@ class CollectionsApi(Construct):
             )
         )
 
-        # Add S3 and KMS permissions for generating CloudFront URLs
+        # Add S3 and KMS permissions for generating CloudFront URLs and uploading thumbnails
         collections_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -230,6 +236,9 @@ class CollectionsApi(Construct):
                     "s3:GetObjectVersion",
                     "s3:GetBucketLocation",
                     "s3:ListBucket",
+                    "s3:PutObject",  # For uploading collection thumbnails
+                    "s3:DeleteObject",  # For removing collection thumbnails
+                    "s3:CopyObject",  # For copying asset thumbnails
                     "kms:Decrypt",
                     "kms:GenerateDataKey",
                 ],

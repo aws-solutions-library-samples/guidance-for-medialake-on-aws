@@ -5,7 +5,7 @@ import { Box, Skeleton } from "@mui/material";
 const CARD_WIDTH = 240;
 const CARD_HEIGHT = 200;
 const CARD_GAP = 16;
-const PADDING = 16;
+const PADDING = 8;
 
 interface CollectionCarouselProps<T> {
   items: T[];
@@ -88,7 +88,7 @@ export function CollectionCarousel<T>({
             flex: 1,
             overflowX: "auto",
             overflowY: "hidden",
-            p: 2,
+            p: 1,
           }}
         >
           <Box
@@ -149,7 +149,9 @@ export function CollectionCarousel<T>({
           flex: 1,
           overflowX: "auto",
           overflowY: "hidden",
-          p: 2,
+          px: 1,
+          pb: 1,
+          pt: 0,
           "&::-webkit-scrollbar": {
             height: "8px",
             display: "block",
@@ -176,6 +178,7 @@ export function CollectionCarousel<T>({
             gridAutoColumns: `${cardWidth}px`,
             gap: `${CARD_GAP}px`,
             width: "max-content",
+            pt: "6px",
           }}
         >
           {items.map((item, index) => (

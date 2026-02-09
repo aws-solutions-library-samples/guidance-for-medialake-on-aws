@@ -18,10 +18,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         alignItems: "center",
         justifyContent: "center",
         textAlign: "center",
-        py: 4,
+        py: 3,
         px: 2,
         height: "100%",
-        minHeight: 150,
+        minHeight: 120,
       }}
     >
       <Box

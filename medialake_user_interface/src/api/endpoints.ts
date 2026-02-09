@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
     SHARED_BY_ME: "/collections/shared-by-me",
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
+    THUMBNAIL: (id: string) => `/collections/${id}/thumbnail`,
   },
   COLLECTION_TYPES: {
     BASE: "/settings/collection-types",

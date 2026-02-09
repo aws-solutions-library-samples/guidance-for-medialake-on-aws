@@ -3,9 +3,9 @@ import { Box, Skeleton } from "@mui/material";
 
 // Carousel configuration constants
 const CARD_WIDTH = 240;
-const CARD_HEIGHT = 280; // Height including metadata area
+const CARD_HEIGHT = 200; // Match collection card height for cohesive dashboard
 const CARD_GAP = 16;
-const PADDING = 16;
+const PADDING = 8;
 
 interface AssetCarouselProps<T> {
   items: T[];
@@ -88,7 +88,7 @@ export function AssetCarousel<T>({
             flex: 1,
             overflowX: "auto",
             overflowY: "hidden",
-            p: 2,
+            p: 1,
           }}
         >
           <Box
@@ -149,7 +149,9 @@ export function AssetCarousel<T>({
           flex: 1,
           overflowX: "auto",
           overflowY: "hidden",
-          p: 2,
+          px: 1,
+          pb: 1,
+          pt: 0,
           // Always show horizontal scrollbar
           "&::-webkit-scrollbar": {
             height: "8px",
@@ -177,6 +179,7 @@ export function AssetCarousel<T>({
             gridAutoColumns: `${cardWidth}px`,
             gap: `${CARD_GAP}px`,
             width: "max-content",
+            pt: "6px",
           }}
         >
           {items.map((item, index) => (
@@ -185,7 +188,6 @@ export function AssetCarousel<T>({
               sx={{
                 width: cardWidth,
                 height: cardHeight,
-                overflow: "hidden",
               }}
             >
               {renderCard(item, index)}

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import aws_cdk as cdk
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
+from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
@@ -28,6 +29,7 @@ class CollectionsStackProps:
     vpc: ec2.IVpc
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
+    asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
 
 
 class CollectionsStack(cdk.NestedStack):
@@ -65,6 +67,7 @@ class CollectionsStack(cdk.NestedStack):
                 vpc=props.vpc,
                 security_group=props.security_group,
                 media_assets_bucket=props.media_assets_bucket,
+                asset_table=props.asset_table,
             ),
         )
 

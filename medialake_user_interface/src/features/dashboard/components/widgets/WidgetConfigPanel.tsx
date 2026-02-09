@@ -21,6 +21,7 @@ import {
   ArrowUpward as AscIcon,
   ArrowDownward as DescIcon,
   Clear as ClearIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useCollectionGroups } from "@/features/collection-groups/hooks/useCollectionGroups";
@@ -32,6 +33,7 @@ interface WidgetConfigPanelProps {
   config: CollectionsWidgetConfig;
   onChange: (config: CollectionsWidgetConfig) => void;
   onCustomNameChange: (customName: string | undefined) => void;
+  onClose?: () => void;
 }
 
 export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
@@ -40,6 +42,7 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
   config,
   onChange,
   onCustomNameChange,
+  onClose,
 }) => {
   const { t } = useTranslation();
   const [nameValue, setNameValue] = React.useState(customName || "");
@@ -114,9 +117,27 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
         borderRadius: 1,
       }}
     >
-      <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-        {t("dashboard.widgets.collections.configTitle", "Widget Configuration")}
-      </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {t("dashboard.widgets.collections.configTitle", "Widget Configuration")}
+        </Typography>
+        {onClose && (
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{
+              color: "text.secondary",
+              "&:hover": {
+                color: "text.primary",
+                backgroundColor: "action.hover",
+              },
+            }}
+            aria-label={t("common.close", "Close")}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        )}
+      </Box>
 
       {/* Custom Name Input */}
       <TextField

@@ -132,6 +132,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
             assetType: getAssetType(asset),
             thumbnailUrl: getAssetThumbnail(asset),
             proxyUrl: getAssetProxy(asset),
+            format: getAssetFormat(asset),
           },
         });
       }
@@ -240,12 +241,11 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
               assetType={assetType}
               fields={[
                 { id: "name", label: "Name", visible: true },
-                { id: "type", label: "Type", visible: true },
+                { id: "format", label: "Format", visible: true },
               ]}
               renderField={(fieldId) => {
                 if (fieldId === "name") return assetName;
-                if (fieldId === "type") return assetType;
-                if (fieldId === "format") return format;
+                if (fieldId === "format") return format ? format.toUpperCase() : "";
                 return "";
               }}
               onAssetClick={() => handleAssetClick(assetId, assetType)}
@@ -267,6 +267,7 @@ export const RecentAssetsWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpa
               aspectRatio="square"
               thumbnailScale="fit"
               showMetadata={true}
+              variant="compact"
             />
           );
         }}

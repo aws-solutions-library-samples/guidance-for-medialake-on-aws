@@ -31,7 +31,7 @@ export const WidgetHeader: React.FC<WidgetHeaderProps> = ({
         alignItems: "center",
         justifyContent: "space-between",
         px: 2,
-        py: 1.5,
+        py: 1,
         borderBottom: "1px solid",
         borderColor: "divider",
         cursor: isDraggable ? "grab" : "default",

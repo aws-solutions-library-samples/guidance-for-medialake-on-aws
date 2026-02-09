@@ -75,11 +75,17 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
   const layout = useDashboardStore((state) => state.layout);
   const isWidgetSelectorOpen = useDashboardStore((state) => state.isWidgetSelectorOpen);
   const setLayout = useDashboardStore((state) => state.setLayout);
+  const initializeLayout = useDashboardStore((state) => state.initializeLayout);
   const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
   const addWidget = useDashboardStore((state) => state.addWidget);
   const resetToDefault = useDashboardStore((state) => state.resetToDefault);
 
   const availableWidgets = useAvailableWidgets();
+
+  // Track whether the user has interacted with the grid (drag/resize).
+  // onLayoutChange fires on mount and on programmatic updates — those should
+  // NOT mark the dashboard as having unsaved changes.
+  const userInteractedRef = useRef(false);
 
   // Measure container width
   useEffect(() => {
@@ -119,16 +125,30 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
       // Use xl layout for lg if available, otherwise fall back
       const lgLayout = allLayouts.xl || allLayouts.lg || currentLayout;
 
-      setLayout({
-        ...layout,
-        layouts: {
-          lg: convertLayout(lgLayout),
-          md: convertLayout(allLayouts.md || currentLayout),
-          sm: convertLayout(allLayouts.sm || currentLayout),
-        },
-      });
+      const newLayouts = {
+        lg: convertLayout(lgLayout),
+        md: convertLayout(allLayouts.md || currentLayout),
+        sm: convertLayout(allLayouts.sm || currentLayout),
+      };
+
+      // Only update the store if the layout actually changed.
+      // react-grid-layout fires onLayoutChange during mount and on programmatic
+      // layout updates — those should not mark the dashboard as modified.
+      if (JSON.stringify(layout.layouts) !== JSON.stringify(newLayouts)) {
+        const updatedLayout = { ...layout, layouts: newLayouts };
+
+        if (userInteractedRef.current) {
+          // User dragged or resized a widget — mark as dirty
+          setLayout(updatedLayout);
+          userInteractedRef.current = false;
+        } else {
+          // Grid-internal adjustment (mount, compaction, breakpoint change)
+          // Update the layout silently without marking pending changes
+          initializeLayout(updatedLayout);
+        }
+      }
     },
-    [layout, setLayout]
+    [layout, setLayout, initializeLayout]
   );
 
   const handleAddWidget = useCallback(
@@ -157,6 +177,17 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
 
   const handleResetCancel = useCallback(() => {
     setResetDialogOpen(false);
+  }, []);
+
+  // Mark that the user has interacted with the grid via drag or resize.
+  // This flag is consumed by handleLayoutChange to decide whether to mark
+  // the layout as dirty.
+  const handleDragStop = useCallback(() => {
+    userInteractedRef.current = true;
+  }, []);
+
+  const handleResizeStop = useCallback(() => {
+    userInteractedRef.current = true;
   }, []);
 
   // Convert our layout format to react-grid-layout format
@@ -245,6 +276,8 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
         margin={MARGIN}
         containerPadding={[0, 0]}
         onLayoutChange={handleLayoutChange}
+        onDragStop={handleDragStop}
+        onResizeStop={handleResizeStop}
         dragConfig={{
           enabled: true,
           handle: ".widget-drag-handle",

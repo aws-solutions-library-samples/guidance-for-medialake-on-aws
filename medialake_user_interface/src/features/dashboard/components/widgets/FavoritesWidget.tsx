@@ -222,11 +222,14 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
               assetType={favorite.metadata?.assetType || "Unknown"}
               fields={[
                 { id: "name", label: "Name", visible: true },
-                { id: "type", label: "Type", visible: true },
+                { id: "format", label: "Format", visible: true },
               ]}
               renderField={(fieldId) => {
                 if (fieldId === "name") return favorite.metadata?.name || favorite.itemId;
-                if (fieldId === "type") return favorite.metadata?.assetType || "Unknown";
+                if (fieldId === "format") {
+                  const fmt = favorite.metadata?.format;
+                  return fmt ? fmt.toUpperCase() : "";
+                }
                 return "";
               }}
               onAssetClick={() =>
@@ -250,6 +253,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
               aspectRatio="square"
               thumbnailScale="fit"
               showMetadata={true}
+              variant="compact"
             />
           );
         }}
