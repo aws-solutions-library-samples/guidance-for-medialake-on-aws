@@ -5,7 +5,7 @@ from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import custom_resources as cr
-from aws_cdk.aws_cognito_identitypool_alpha import (
+from aws_cdk.aws_cognito_identitypool import (
     IdentityPool,
     IdentityPoolAuthenticationProviders,
     UserPoolAuthenticationProvider,
