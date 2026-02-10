@@ -168,6 +168,7 @@ export const QUERY_KEYS = {
     all: ["shares"] as const,
     FOR_ASSET: (assetId: string) => [...QUERY_KEYS.SHARES.all, "asset", assetId] as const,
     PUBLIC: (shareToken: string) => [...QUERY_KEYS.SHARES.all, "public", shareToken] as const,
+  },
   COLLECTION_GROUPS: {
     all: ["collection-groups"] as const,
     lists: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "list"] as const,
