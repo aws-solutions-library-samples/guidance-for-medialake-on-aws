@@ -309,8 +309,9 @@ Resources:
         Status: Enabled
       LifecycleConfiguration:
         Rules:
-          - Id: DeleteOldArtifacts
+          - Id: DeleteOldPipelineArtifacts
             Status: Enabled
+            Prefix: 'MediaLakeCDKPipeline/'
             ExpirationInDays: 30
           - Id: CleanupBeforeDeletion
             Status: Enabled
