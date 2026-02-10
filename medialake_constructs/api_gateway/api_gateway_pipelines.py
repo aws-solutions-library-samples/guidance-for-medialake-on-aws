@@ -58,18 +58,19 @@ class ApiGatewayPipelinesProps:
     open_search_endpoint: str
     api_resource: apigateway.IResource
     pipelines_event_bus: events.EventBus
-    iac_assets_bucket: s3.IBucket
     media_assets_bucket: S3Bucket
     x_origin_verify_secret: secretsmanager.Secret
     authorizer: apigateway.IAuthorizer
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
-    mediaconvert_queue_arn: str = None
-    mediaconvert_role_arn: str = None
+    system_settings_table_name: Optional[str] = None
+    system_settings_table_arn: Optional[str] = None
+    mediaconvert_queue_arn: Optional[str] = None
+    mediaconvert_role_arn: Optional[str] = None
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     # S3 Vector configuration
-    s3_vector_bucket_name: str = None
+    s3_vector_bucket_name: Optional[str] = None
     s3_vector_index_name: str = "media-vectors"
     s3_vector_dimension: int = 1024
 
@@ -273,6 +274,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
                 "PIPELINES_TABLE": props.pipeline_table.table_arn,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
+                "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name,
+                "SYSTEM_SETTINGS_TABLE_ARN": props.system_settings_table_arn,
                 "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
@@ -294,6 +297,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                 "INDEX_NAME": props.s3_vector_index_name,
                 "VECTOR_DIMENSION": str(props.s3_vector_dimension),
+                # Marengo 3.0 embeddings index - separate from media index for vector search
+                "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
             },
         )
 

@@ -1,12 +1,39 @@
 import React from "react";
-import { Box, Typography, useTheme, useMediaQuery, Container, Fade } from "@mui/material";
+import {
+  Box,
+  Typography,
+  useTheme,
+  useMediaQuery,
+  Fade,
+  Button,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import { Add as AddIcon, RestartAlt as ResetIcon, Edit as EditIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useDirection } from "../contexts/DirectionContext";
 import { useSidebar } from "../contexts/SidebarContext";
 import { drawerWidth, collapsedDrawerWidth } from "../constants";
-import { alpha } from "@mui/material/styles";
+import {
+  DashboardGrid,
+  ExpandedWidgetModal,
+  DashboardSelector,
+  useDashboardSync,
+  DashboardSelectionProvider,
+  useDashboardSelectionRequired,
+} from "@/features/dashboard";
+import {
+  useDashboardStore,
+  useAvailableWidgets,
+  useDashboardSyncState,
+} from "@/features/dashboard/store/dashboardStore";
+import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
+import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
+import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
+import ApiStatusModal from "../components/ApiStatusModal";
 
-const Home: React.FC = () => {
+// Inner component that uses the selection context
+const HomeContent: React.FC = () => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { t } = useTranslation();
@@ -14,166 +41,181 @@ const Home: React.FC = () => {
   const isRTL = direction === "rtl";
   const { isCollapsed } = useSidebar();
 
+  const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
+  const availableWidgets = useAvailableWidgets();
+  const { hasPendingChanges } = useDashboardSyncState();
+
+  // Initialize dashboard sync with API
+  const { isLoading, resetLayout } = useDashboardSync();
+
+  // Get selection state from context
+  const assetSelection = useDashboardSelectionRequired();
+
+  const handleOpenWidgetSelector = () => {
+    setWidgetSelectorOpen(true);
+  };
+
+  const handleReset = () => {
+    resetLayout();
+  };
+
   return (
-    <Box
-      component="main"
-      sx={{
-        position: "fixed",
-        top: 64,
-        ...(isRTL
-          ? { left: 0, right: isCollapsed ? collapsedDrawerWidth : drawerWidth }
-          : {
-              left: isCollapsed ? collapsedDrawerWidth : drawerWidth,
-              right: 0,
-            }),
-        bottom: 0,
-        backgroundColor: "transparent",
-        overflowY: "auto",
-        overflowX: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: theme.transitions.create(["left", "right"], {
-          easing: theme.transitions.easing.sharp,
-          duration: theme.transitions.duration.leavingScreen,
-        }),
-      }}
-    >
-      <Container maxWidth="lg" sx={{ textAlign: "center", px: { xs: 3, sm: 4 } }}>
-        <Fade in={true} timeout={1200}>
-          <Box
-            sx={{
-              maxWidth: { xs: "100%", sm: 800, md: 900, lg: 1000 },
-              mx: "auto",
-              position: "relative",
-            }}
-          >
-            {/* Floating background elements for visual appeal */}
-            <Box
-              sx={{
-                position: "absolute",
-                top: "-20%",
-                left: "10%",
-                width: "200px",
-                height: "200px",
-                background: `radial-gradient(circle, ${alpha(
-                  theme.palette.primary.main,
-                  0.1
-                )} 0%, transparent 70%)`,
-                borderRadius: "50%",
-                filter: "blur(40px)",
-                animation: "float 6s ease-in-out infinite",
-                "@keyframes float": {
-                  "0%, 100%": { transform: "translateY(0px)" },
-                  "50%": { transform: "translateY(-20px)" },
-                },
-              }}
-            />
-
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: "-20%",
-                right: "15%",
-                width: "150px",
-                height: "150px",
-                background: `radial-gradient(circle, ${alpha(
-                  theme.palette.secondary.main,
-                  0.08
-                )} 0%, transparent 70%)`,
-                borderRadius: "50%",
-                filter: "blur(30px)",
-                animation: "float 8s ease-in-out infinite reverse",
-              }}
-            />
-
-            {/* Main Header */}
-            <Typography
-              variant={isSmall ? "h2" : "h1"}
-              component="h1"
-              sx={{
-                fontWeight: 800,
-                background: `linear-gradient(45deg, ${theme.palette.primary.main} 20%, ${theme.palette.secondary.main} 80%)`,
-                backgroundClip: "text",
-                WebkitBackgroundClip: "text",
-                color: "transparent",
-                mb: { xs: 2, sm: 2.5, md: 3 },
-                letterSpacing: { xs: "-0.02em", sm: "-0.03em", md: "-0.04em" },
-                fontSize: {
-                  xs: "2.5rem",
-                  sm: "3.5rem",
-                  md: "4.5rem",
-                  lg: "5.5rem",
-                  xl: "6rem",
-                },
-                lineHeight: { xs: 1.1, sm: 1.15, md: 1.2 },
-                textShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-                position: "relative",
-                zIndex: 2,
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  width: "120%",
-                  height: "120%",
-                  background: `radial-gradient(ellipse, ${alpha(
-                    theme.palette.primary.main,
-                    0.05
-                  )} 0%, transparent 70%)`,
-                  borderRadius: "50%",
-                  zIndex: -1,
-                },
-              }}
-            >
-              {t("app.branding.name")}
-            </Typography>
-
-            {/* Visual separator */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                mb: { xs: 2, sm: 2.5, md: 3 },
-              }}
-            >
+    <>
+      <Box
+        component="main"
+        sx={{
+          position: "fixed",
+          top: 64,
+          ...(isRTL
+            ? { left: 0, right: isCollapsed ? collapsedDrawerWidth : drawerWidth }
+            : {
+                left: isCollapsed ? collapsedDrawerWidth : drawerWidth,
+                right: 0,
+              }),
+          bottom: 0,
+          backgroundColor: "transparent",
+          overflowY: "auto",
+          overflowX: "hidden",
+          transition: theme.transitions.create(["left", "right"], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
+        }}
+      >
+        <Box sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 }, width: "100%" }}>
+          <Fade in={true} timeout={800}>
+            <Box sx={{ mb: 4 }}>
+              {/* Header Section */}
               <Box
                 sx={{
-                  width: { xs: 80, sm: 120, md: 160 },
-                  height: 1,
-                  background: `linear-gradient(90deg, transparent 0%, ${theme.palette.primary.main} 30%, ${theme.palette.secondary.main} 70%, transparent 100%)`,
-                  opacity: 0.4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 3,
                 }}
-              />
-            </Box>
+              >
+                {/* Left side - Dashboard Selector */}
+                <Box sx={{ flex: 1 }}>
+                  <DashboardSelector />
+                </Box>
 
-            {/* Subtitle */}
-            <Typography
-              variant={isSmall ? "h5" : "h3"}
-              component="p"
-              sx={{
-                fontWeight: 300,
-                color: theme.palette.text.primary,
-                lineHeight: { xs: 1.4, sm: 1.5, md: 1.6 },
-                fontSize: {
-                  xs: "1.25rem",
-                  sm: "1.5rem",
-                  md: "2rem",
-                  lg: "2.25rem",
-                },
-                maxWidth: { xs: "100%", sm: 600, md: 750, lg: 800 },
-                mx: "auto",
-                opacity: 0.9,
-              }}
-            >
-              {t("home.description")}
-            </Typography>
-          </Box>
-        </Fade>
-      </Container>
-    </Box>
+                {/* Centered Title */}
+                <Box sx={{ textAlign: "center" }}>
+                  <Typography
+                    variant={isSmall ? "h4" : "h3"}
+                    component="h1"
+                    sx={{
+                      fontWeight: 700,
+                      background: `linear-gradient(45deg, ${theme.palette.primary.main} 20%, ${theme.palette.secondary.main} 80%)`,
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      color: "transparent",
+                    }}
+                  >
+                    {t("app.branding.name")}
+                  </Typography>
+                </Box>
+
+                {/* Right side controls */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 1,
+                    alignItems: "center",
+                  }}
+                >
+                  {/* Unsaved changes indicator */}
+                  {hasPendingChanges && (
+                    <Tooltip title={t("dashboard.status.unsavedChanges")}>
+                      <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+                        <EditIcon fontSize="small" sx={{ color: "warning.main" }} />
+                      </Box>
+                    </Tooltip>
+                  )}
+
+                  <Tooltip title={t("dashboard.actions.resetLayout")}>
+                    <IconButton
+                      onClick={handleReset}
+                      size="small"
+                      disabled={isLoading}
+                      sx={{
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: "warning.main",
+                        },
+                      }}
+                    >
+                      <ResetIcon />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenWidgetSelector}
+                    disabled={availableWidgets.length === 0 || isLoading}
+                  >
+                    {t("dashboard.actions.addWidget")}
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Dashboard Grid */}
+              <DashboardGrid showHeader={false} />
+            </Box>
+          </Fade>
+        </Box>
+
+        {/* Right Sidebar for batch operations */}
+        <RightSidebar>
+          <TabbedSidebar
+            selectedAssets={assetSelection.selectedAssets}
+            onBatchDelete={assetSelection.handleBatchDelete}
+            onBatchDownload={assetSelection.handleBatchDownload}
+            onBatchShare={assetSelection.handleBatchShare}
+            onClearSelection={assetSelection.handleClearSelection}
+            onRemoveItem={assetSelection.handleRemoveAsset}
+          />
+        </RightSidebar>
+
+        {/* Expanded Widget Modal */}
+        <ExpandedWidgetModal />
+      </Box>
+
+      {/* Bulk Delete Dialog */}
+      <BulkDeleteDialog
+        open={assetSelection.isDeleteDialogOpen}
+        onClose={assetSelection.handleDeleteDialogClose}
+        onConfirm={assetSelection.handleConfirmDelete}
+        selectedCount={assetSelection.selectedAssets.length}
+        confirmationText={assetSelection.deleteConfirmationText}
+        onConfirmationTextChange={assetSelection.setDeleteConfirmationText}
+        isLoading={assetSelection.isDeleteLoading}
+      />
+
+      {/* API Status Modal */}
+      <ApiStatusModal
+        open={assetSelection.modalState.open}
+        onClose={assetSelection.handleModalClose}
+        status={assetSelection.modalState.status}
+        action={assetSelection.modalState.action}
+        message={assetSelection.modalState.message}
+        progress={assetSelection.modalState.progress}
+      />
+    </>
+  );
+};
+
+const Home: React.FC = () => {
+  return (
+    <RightSidebarProvider>
+      <DashboardSelectionProvider>
+        <HomeContent />
+      </DashboardSelectionProvider>
+    </RightSidebarProvider>
   );
 };
 

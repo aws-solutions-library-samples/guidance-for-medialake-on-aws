@@ -1,14 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Stack
+from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
@@ -70,7 +73,6 @@ class SearchConstruct(Construct):
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
                 memory_size=9000,  # High memory for vector/semantic search operations
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for search performance
                 timeout_minutes=10,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
@@ -78,6 +80,8 @@ class SearchConstruct(Construct):
                     ),
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                     "OPENSEARCH_INDEX": props.open_search_index,
+                    # Marengo 3.0 embeddings are stored in a separate index
+                    "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
                     "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
@@ -85,13 +89,28 @@ class SearchConstruct(Construct):
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
                     # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
                     # Lambda will fetch this from SSM parameter at runtime
-                    # Bedrock inference profile ID for TwelveLabs Marengo Embed v2.7
-                    # Dynamically set based on deployment region
-                    "BEDROCK_INFERENCE_PROFILE_ARN": self._get_regional_inference_profile_id(),
+                    # Bedrock inference profile: Auto-selected based on DynamoDB config (2.7 or 3.0)
+                    # BEDROCK_INFERENCE_PROFILE_ARN removed - Lambda auto-selects based on system settings
                     # Thumbnail index for video posters (0-4, default 2 = middle thumbnail)
                     "THUMBNAIL_INDEX": "2",
                 },
             ),
+        )
+
+        # Lambda warming for search API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "SearchLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    search_get_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps search API Lambda warm via scheduled EventBridge rule.",
         )
 
         search_get_lambda.function.add_to_role_policy(
@@ -187,7 +206,7 @@ class SearchConstruct(Construct):
             )
         )
 
-        # Add Bedrock permissions for TwelveLabs embedding generation
+        # Add Bedrock permissions for TwelveLabs embedding generation (both 2.7 and 3.0)
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -201,6 +220,7 @@ class SearchConstruct(Construct):
                 ],
                 resources=[
                     f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
                     f"arn:aws:bedrock:{Stack.of(self).region}:{Stack.of(self).account}:async-invoke/*",
                 ],
             )
@@ -223,7 +243,7 @@ class SearchConstruct(Construct):
             )
         )
 
-        # Add Bedrock permissions for TwelveLabs embedding generation
+        # Add Bedrock permissions for TwelveLabs embedding generation (both 2.7 and 3.0)
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -237,6 +257,7 @@ class SearchConstruct(Construct):
                 ],
                 resources=[
                     f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
                     f"arn:aws:bedrock:{Stack.of(self).region}:{Stack.of(self).account}:async-invoke/*",
                 ],
             )
@@ -268,8 +289,8 @@ class SearchConstruct(Construct):
             )
         )
 
-        # Add Bedrock InvokeModel permissions for TwelveLabs embedding generation
-        # Using system-defined cross-Region inference profile
+        # Add Bedrock InvokeModel permissions for TwelveLabs embedding generation (both 2.7 and 3.0)
+        # Using system-defined cross-Region inference profiles
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -277,11 +298,16 @@ class SearchConstruct(Construct):
                     "bedrock:InvokeModel",
                 ],
                 resources=[
-                    # Foundation model ARN - required for InvokeModel calls
+                    # Foundation model ARNs - required for InvokeModel calls (both 2.7 and 3.0)
                     "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
-                    # System-defined cross-Region inference profile for TwelveLabs Marengo
-                    # Dynamically determine the correct regional inference profile based on deployment region
-                    f"arn:aws:bedrock:*:{Stack.of(self).account}:inference-profile/{self._get_regional_inference_profile_id()}",
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
+                    # System-defined cross-Region inference profiles for TwelveLabs Marengo (all regions, both versions)
+                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-3-0-v1:0",
                 ],
             )
         )
@@ -298,7 +324,7 @@ class SearchConstruct(Construct):
             )
         )
 
-        # Add permissions access marketplace bedrock models under new simplified model access policy
+        # Add permissions access marketplace bedrock models under new simplified model access policy (both 2.7 and 3.0)
         # https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -307,7 +333,8 @@ class SearchConstruct(Construct):
                     "aws-marketplace:Subscribe",
                 ],
                 resources=[
-                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0"
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
                 ],
                 conditions={
                     "StringEquals": {"aws:CalledViaLast": "lambda.amazonaws.com"}

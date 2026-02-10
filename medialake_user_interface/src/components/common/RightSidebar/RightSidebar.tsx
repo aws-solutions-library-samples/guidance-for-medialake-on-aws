@@ -2,7 +2,6 @@ import React, { ReactNode, useState, useEffect, useRef } from "react";
 import { Box, Button } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { useRightSidebar, COLLAPSED_WIDTH } from "./SidebarContext";
-import { useLocation } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 
 interface RightSidebarProps {
@@ -13,8 +12,7 @@ const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
-  const { isExpanded, setIsExpanded, width, setWidth, setHasSelectedItems } = useRightSidebar();
-  const location = useLocation();
+  const { isExpanded, setIsExpanded, width, setWidth, hasSelectedItems } = useRightSidebar();
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
 
@@ -25,34 +23,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
     }
   }, [width]);
 
-  // Check if items are selected based on URL
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const hasSelectedItems = searchParams.has("selected");
-    setHasSelectedItems(hasSelectedItems);
-
-    // Only auto-close if no items are selected
-    if (location.pathname === "/search" && !hasSelectedItems) {
-      setIsExpanded(false);
-    } else if (hasSelectedItems) {
-      setIsExpanded(true);
-    }
-  }, [location.pathname, location.search, setIsExpanded, setHasSelectedItems]);
-
-  // Handle resize start
-  const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
-
   // Handle resizing
   useEffect(() => {
     const handleResize = (e: MouseEvent) => {
       if (isResizing && isExpanded) {
-        // Calculate new width based on mouse position
         const newWidth = window.innerWidth - e.clientX;
-
-        // Apply constraints
         if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
           setWidth(newWidth);
         }
@@ -73,6 +48,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
       document.removeEventListener("mouseup", handleResizeEnd);
     };
   }, [isResizing, isExpanded]);
+
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  // Don't render sidebar UI when there are no selected items,
+  // but always render children so TabbedSidebar can sync hasSelectedItems
+  if (!hasSelectedItems) {
+    return <Box sx={{ display: "none" }}>{children}</Box>;
+  }
 
   return (
     <>

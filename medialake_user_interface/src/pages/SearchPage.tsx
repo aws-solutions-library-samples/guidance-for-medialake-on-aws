@@ -256,6 +256,7 @@ const SearchPage: React.FC = () => {
   );
   const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
   const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
+  const getAssetProxy = useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
 
   // Use custom hooks for asset selection and favorites
   const assetSelection = useAssetSelection({
@@ -269,6 +270,7 @@ const SearchPage: React.FC = () => {
     getAssetName,
     getAssetType,
     getAssetThumbnail,
+    getAssetProxy,
   });
 
   const {

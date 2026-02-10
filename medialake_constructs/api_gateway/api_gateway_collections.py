@@ -17,14 +17,17 @@ The module handles:
 
 from dataclasses import dataclass
 
-from aws_cdk import Stack
+from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
+from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -42,6 +45,7 @@ class CollectionsApiProps:
     vpc: ec2.IVpc
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
+    asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
 
 
 class CollectionsApi(Construct):
@@ -150,7 +154,7 @@ class CollectionsApi(Construct):
         from config import config
 
         # Create single consolidated Collections Lambda with routing
-        # High-traffic API with VPC access needs higher memory + provisioned concurrency
+        # High-traffic API with VPC access needs higher memory
         collections_lambda = Lambda(
             self,
             "CollectionsLambda",
@@ -160,7 +164,6 @@ class CollectionsApi(Construct):
                 vpc=props.vpc,
                 security_groups=[props.security_group],
                 memory_size=1024,  # VPC Lambdas need more memory for ENI setup
-                provisioned_concurrent_executions=2,  # Keep 2 instances warm for immediate response
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
@@ -169,12 +172,33 @@ class CollectionsApi(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "SCOPE": "es",
                     "ENVIRONMENT": config.environment,
+                    "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
+                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                 },
             ),
         )
 
+        # Lambda warming for collections API (replaces provisioned concurrency)
+        events.Rule(
+            self,
+            "CollectionsLambdaWarmerRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    collections_lambda.function,
+                    event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
+                ),
+            ],
+            description="Keeps collections API Lambda warm via scheduled EventBridge rule.",
+        )
+
         # Grant DynamoDB permissions
         self._collections_table.table.grant_read_write_data(collections_lambda.function)
+
+        # Grant read access to asset table (for copying asset thumbnails)
+        props.asset_table.grant_read_data(collections_lambda.function)
 
         # Grant VPC network interface permissions for Lambda in VPC
         collections_lambda.function.add_to_role_policy(
@@ -204,7 +228,7 @@ class CollectionsApi(Construct):
             )
         )
 
-        # Add S3 and KMS permissions for generating CloudFront URLs
+        # Add S3 and KMS permissions for generating CloudFront URLs and uploading thumbnails
         collections_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -212,6 +236,9 @@ class CollectionsApi(Construct):
                     "s3:GetObjectVersion",
                     "s3:GetBucketLocation",
                     "s3:ListBucket",
+                    "s3:PutObject",  # For uploading collection thumbnails
+                    "s3:DeleteObject",  # For removing collection thumbnails
+                    "s3:CopyObject",  # For copying asset thumbnails
                     "kms:Decrypt",
                     "kms:GenerateDataKey",
                 ],

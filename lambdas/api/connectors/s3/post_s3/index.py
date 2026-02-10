@@ -1562,7 +1562,10 @@ def create_connector(createconnector: S3Connector) -> dict:
                     {
                         "Effect": "Allow",
                         "Action": ["events:PutEvents"],
-                        "Resource": f"arn:aws:events:{bucket_region}:{account_id}:event-bus/{pipelines_event_bus}",
+                        "Resource": [
+                            f"arn:aws:events:{bucket_region}:{account_id}:event-bus/{pipelines_event_bus}",
+                            f"arn:aws:events:{bucket_region}:{account_id}:event-bus/default",
+                        ],
                     }
                 ],
             }

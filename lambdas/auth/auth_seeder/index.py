@@ -35,7 +35,7 @@ PREFIX_GROUP = "GROUP#"
 PREFIX_METADATA = "METADATA"
 
 # Permission set schema version - increment this to force update of system permission sets
-PERMISSION_SCHEMA_VERSION = "2.3.0"
+PERMISSION_SCHEMA_VERSION = "2.4.0"
 
 # Default groups definitions
 DEFAULT_GROUPS = [
@@ -86,6 +86,7 @@ DEFAULT_PERMISSION_SETS = [
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "defaultDashboard": {"edit": True},
             # System permissions (top-level for app initialization)
             "system": {
                 "view": True,
@@ -156,6 +157,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": True,
                 "delete": True,
                 "manage": True,
+            },
+            # Settings menu visibility (only admins see the Settings menu in sidebar)
+            "settings-menu": {
+                "view": True,
             },
             # Nested settings permissions (for frontend UI compatibility)
             "settings": {
@@ -230,6 +235,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
             },
             # Top-level resource permissions (required by custom authorizer)
+            # Connectors (view only - needed to browse assets on the assets page)
+            "connectors": {
+                "view": True,
+            },
             "nodes": {
                 "view": True,
             },
@@ -284,6 +293,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
             },
             # Top-level resource permissions (required by custom authorizer)
+            # Connectors (view only - needed to browse assets on the assets page)
+            "connectors": {
+                "view": True,
+            },
             "nodes": {
                 "view": True,
             },

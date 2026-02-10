@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .common_models import CollectionStatus
+from .common_models import CollectionStatus, ThumbnailType
 
 
 class CreateCollectionRequest(BaseModel):
@@ -62,6 +62,15 @@ class UpdateCollectionRequest(BaseModel):
     status: Optional[CollectionStatus] = None
     metadata: Optional[Dict[str, Any]] = None
     tags: Optional[List[str]] = None
+    # Thumbnail fields
+    thumbnailType: Optional[ThumbnailType] = Field(
+        None, description="Type of thumbnail: icon, upload, asset, or frame"
+    )
+    thumbnailValue: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Icon name (for icon type) or source asset ID (for asset type)",
+    )
 
     @field_validator("name")
     @classmethod
@@ -73,11 +82,21 @@ class UpdateCollectionRequest(BaseModel):
             return v.strip()
         return v
 
+    @field_validator("thumbnailValue")
+    @classmethod
+    def validate_thumbnail_value(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and clean the thumbnail value."""
+        if v is not None:
+            return v.strip()
+        return v
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "description": "Updated description",
                 "tags": ["marketing", "2024", "q1"],
+                "thumbnailType": "icon",
+                "thumbnailValue": "Movie",
             }
         }
     )
@@ -104,6 +123,16 @@ class CollectionMetadata(BaseModel):
     )
     createdAt: str = Field(..., description="Creation timestamp")
     updatedAt: str = Field(..., description="Last update timestamp")
+    # Thumbnail fields
+    thumbnailType: Optional[ThumbnailType] = Field(
+        None, description="Type of thumbnail"
+    )
+    thumbnailValue: Optional[str] = Field(
+        None, description="Icon name or source asset ID"
+    )
+    thumbnailUrl: Optional[str] = Field(
+        None, description="Resolved thumbnail URL (CloudFront URL for images)"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 

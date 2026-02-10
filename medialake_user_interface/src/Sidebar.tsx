@@ -34,7 +34,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Group as GroupIcon,
-  Security as SecurityIcon,
   Home as HomeIcon,
   Extension as IntegrationIcon,
   Terrain as LogoIcon,
@@ -143,26 +142,14 @@ function Sidebar() {
   // Memoize permission checks with error handling
   const canViewSettings = useMemo(() => {
     try {
-      // Check if user has any settings-related permissions
-      return (
-        (ability?.can("view", "settings") ||
-          ability?.can("view", "user") ||
-          ability?.can("view", "group") ||
-          ability?.can("view", "permission-set") ||
-          ability?.can("view", "connector") ||
-          ability?.can("view", "integration") ||
-          safePermissionCheck("view", "settings.users") ||
-          safePermissionCheck("view", "settings.connectors") ||
-          safePermissionCheck("view", "settings.integrations") ||
-          safePermissionCheck("view", "settings.system") ||
-          safePermissionCheck("view", "settings.permissions")) ??
-        false
-      );
+      // Check if user has the settings-menu:view permission (only admins)
+      // This controls visibility of the Settings menu in the sidebar
+      return safePermissionCheck("view", "settings-menu") ?? false;
     } catch (error) {
       console.error("Error checking settings permission:", error);
       return false;
     }
-  }, [ability, safePermissionCheck]);
+  }, [safePermissionCheck]);
 
   // Build menu items based on permissions
   const mainMenuItems = [
@@ -220,12 +207,6 @@ function Sidebar() {
             safePermissionCheck("view", "user") ||
             safePermissionCheck("view", "group") ||
             safePermissionCheck("view", "settings.users"),
-        },
-        {
-          text: t("sidebar.submenu.permissionSets", "Permissions"),
-          icon: <SecurityIcon />,
-          path: "/settings/permission-sets",
-          visible: advancedPermissionsEnabled && safePermissionCheck("view", "permission-set"),
         },
         {
           text: t("sidebar.submenu.integrations"),
@@ -693,9 +674,7 @@ function Sidebar() {
                       {item.subItems.map((subItem) => {
                         // Check if this is a system settings item that requires permission
                         const isSystemSettings =
-                          subItem.path === "/settings/system" ||
-                          subItem.path === "/settings/users" ||
-                          subItem.path === "/settings/permission-sets";
+                          subItem.path === "/settings/system" || subItem.path === "/settings/users";
 
                         // Wrap system settings items with Can component
                         const menuItem = (

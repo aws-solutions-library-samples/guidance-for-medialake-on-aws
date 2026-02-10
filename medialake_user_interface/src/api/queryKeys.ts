@@ -1,4 +1,11 @@
 export const QUERY_KEYS = {
+  DASHBOARD: {
+    all: ["dashboard"] as const,
+    layout: () => [...QUERY_KEYS.DASHBOARD.all, "layout"] as const,
+    defaultLayout: () => [...QUERY_KEYS.DASHBOARD.all, "default"] as const,
+    presets: () => [...QUERY_KEYS.DASHBOARD.all, "presets"] as const,
+    preset: (presetId: string) => [...QUERY_KEYS.DASHBOARD.presets(), presetId] as const,
+  },
   CONNECTORS: {
     all: ["connectors"] as const,
     lists: () => [...QUERY_KEYS.CONNECTORS.all, "list"] as const,
@@ -68,11 +75,12 @@ export const QUERY_KEYS = {
       pageSize: number,
       isSemantic: boolean,
       fields?: string[],
-      facetParams?: Record<string, any>
+      facetParams?: Record<string, any>,
+      sort?: string
     ) =>
       [
         ...QUERY_KEYS.SEARCH.lists(),
-        { query, page, pageSize, isSemantic, fields, facetParams },
+        { query, page, pageSize, isSemantic, fields, facetParams, sort },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
   },
@@ -102,13 +110,7 @@ export const QUERY_KEYS = {
     details: () => [...QUERY_KEYS.ROLES.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.ROLES.details(), id] as const,
   },
-  PERMISSION_SETS: {
-    all: ["permission-sets"] as const,
-    lists: () => [...QUERY_KEYS.PERMISSION_SETS.all, "list"] as const,
-    list: (filters: string) => [...QUERY_KEYS.PERMISSION_SETS.lists(), { filters }] as const,
-    details: () => [...QUERY_KEYS.PERMISSION_SETS.all, "detail"] as const,
-    detail: (id: string) => [...QUERY_KEYS.PERMISSION_SETS.details(), id] as const,
-  },
+
   API_KEYS: {
     all: ["api-keys"] as const,
     lists: () => [...QUERY_KEYS.API_KEYS.all, "list"] as const,
@@ -124,16 +126,7 @@ export const QUERY_KEYS = {
     detail: (id: string) => [...QUERY_KEYS.GROUPS.details(), id] as const,
     members: (id: string) => [...QUERY_KEYS.GROUPS.detail(id), "members"] as const,
   },
-  ASSIGNMENTS: {
-    user: {
-      all: (userId: string) => ["assignments", "user", userId] as const,
-      list: (userId: string) => [...QUERY_KEYS.ASSIGNMENTS.user.all(userId), "list"] as const,
-    },
-    group: {
-      all: (groupId: string) => ["assignments", "group", groupId] as const,
-      list: (groupId: string) => [...QUERY_KEYS.ASSIGNMENTS.group.all(groupId), "list"] as const,
-    },
-  },
+
   ENVIRONMENTS: {
     all: ["environments"] as const,
     lists: () => [...QUERY_KEYS.ENVIRONMENTS.all, "list"] as const,
@@ -175,5 +168,14 @@ export const QUERY_KEYS = {
     all: ["shares"] as const,
     FOR_ASSET: (assetId: string) => [...QUERY_KEYS.SHARES.all, "asset", assetId] as const,
     PUBLIC: (shareToken: string) => [...QUERY_KEYS.SHARES.all, "public", shareToken] as const,
+  COLLECTION_GROUPS: {
+    all: ["collection-groups"] as const,
+    lists: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.lists(), filters] as const,
+    details: () => [...QUERY_KEYS.COLLECTION_GROUPS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.COLLECTION_GROUPS.details(), id] as const,
+    collections: (id: string) =>
+      [...QUERY_KEYS.COLLECTION_GROUPS.detail(id), "collections"] as const,
   },
 } as const;

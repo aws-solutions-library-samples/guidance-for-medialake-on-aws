@@ -44,6 +44,7 @@ eventbridge = boto3.client("events")
 
 OPENSEARCH_ENDPOINT = os.getenv("OPENSEARCH_ENDPOINT", "")
 INDEX_NAME = os.getenv("INDEX_NAME", "media")
+ASSET_EMBEDDINGS_INDEX = os.getenv("ASSET_EMBEDDINGS_INDEX", "asset-embeddings")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 OPENSEARCH_SERVICE = os.getenv("OPENSEARCH_SERVICE", "es")
 VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "")
@@ -460,18 +461,80 @@ class AssetDeletionService:
 
     @tracer.capture_method
     def _delete_opensearch_docs(self, inventory_id: str) -> int:
-        """Delete OpenSearch documents for the asset"""
+        """Delete OpenSearch documents for the asset from both indexes.
+
+        Deletes from:
+        1. 'media' index: Master documents (InventoryID) and any legacy Marengo 2.7/3.0 docs
+        2. 'asset-embeddings' index: Marengo 3.0 embedding documents (inventory_id)
+        """
         if not OPENSEARCH_ENDPOINT:
             self.logger.info(
                 "OPENSEARCH_ENDPOINT not set, skipping OpenSearch deletion"
             )
             return 0
 
-        try:
-            host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
-            query = {"query": {"match_phrase": {"InventoryID": inventory_id}}}
+        total_deleted = 0
+        host = OPENSEARCH_ENDPOINT.lstrip("https://").lstrip("http://")
 
-            url = f"https://{host}/{INDEX_NAME}/_delete_by_query?refresh=true&conflicts=proceed"
+        # Delete from 'media' index - master documents and any embeddings stored there
+        media_deleted = self._delete_from_opensearch_index(
+            host=host,
+            index_name=INDEX_NAME,
+            inventory_id=inventory_id,
+            query={
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"match_phrase": {"InventoryID": inventory_id}},
+                            {"match_phrase": {"inventory_id": inventory_id}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                }
+            },
+        )
+        total_deleted += media_deleted
+
+        # Delete from 'asset-embeddings' index - Marengo 3.0 embedding documents
+        if ASSET_EMBEDDINGS_INDEX:
+            embeddings_deleted = self._delete_from_opensearch_index(
+                host=host,
+                index_name=ASSET_EMBEDDINGS_INDEX,
+                inventory_id=inventory_id,
+                query={"query": {"term": {"inventory_id": inventory_id}}},
+            )
+            total_deleted += embeddings_deleted
+
+        self.logger.info(
+            f"[INDEX DELETION] Total deleted {total_deleted} OpenSearch documents for {inventory_id} "
+            f"(media: {media_deleted}, asset-embeddings: {embeddings_deleted if ASSET_EMBEDDINGS_INDEX else 0})"
+        )
+        self.metrics.add_metric(
+            "OpenSearchDocsDeleted", MetricUnit.Count, total_deleted
+        )
+
+        return total_deleted
+
+    def _delete_from_opensearch_index(
+        self,
+        host: str,
+        index_name: str,
+        inventory_id: str,
+        query: dict,
+    ) -> int:
+        """Delete documents from a specific OpenSearch index.
+
+        Args:
+            host: OpenSearch host (without protocol)
+            index_name: Name of the index to delete from
+            inventory_id: Asset inventory ID (for logging)
+            query: OpenSearch query to match documents for deletion
+
+        Returns:
+            Number of documents deleted
+        """
+        try:
+            url = f"https://{host}/{index_name}/_delete_by_query?refresh=true&conflicts=proceed"
 
             status, body = self._signed_request(
                 "POST",
@@ -484,12 +547,16 @@ class AssetDeletionService:
             )
 
             if status not in (200, 202):
+                # Index might not exist yet (e.g., asset-embeddings before first Marengo 3.0 asset)
+                if status == 404:
+                    self.logger.info(
+                        f"[INDEX DELETION] Index '{index_name}' not found, skipping deletion for {inventory_id}"
+                    )
+                    return 0
                 self.logger.error(
-                    f"OpenSearch deletion failed: status={status}, body={body}"
+                    f"[INDEX DELETION] OpenSearch deletion from '{index_name}' failed: status={status}, body={body}"
                 )
-                raise AssetDeletionError(
-                    f"OpenSearch deletion failed (status {status})"
-                )
+                return 0
 
             deleted = 0
             try:
@@ -498,14 +565,14 @@ class AssetDeletionService:
                 pass
 
             self.logger.info(
-                f"Deleted {deleted} OpenSearch documents for {inventory_id}"
+                f"[INDEX DELETION] Deleted {deleted} documents from '{index_name}' for {inventory_id}"
             )
-            self.metrics.add_metric("OpenSearchDocsDeleted", MetricUnit.Count, deleted)
-
             return deleted
 
         except Exception as e:
-            self.logger.error(f"OpenSearch deletion error: {e}")
+            self.logger.error(
+                f"[INDEX DELETION] Error deleting from '{index_name}': {e}"
+            )
             # Don't fail the entire deletion for OpenSearch errors
             return 0
 

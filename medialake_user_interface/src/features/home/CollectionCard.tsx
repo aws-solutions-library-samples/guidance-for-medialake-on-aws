@@ -20,6 +20,7 @@ import {
   LocalOffer,
 } from "@mui/icons-material";
 import { useGetCollectionTypes } from "@/api/hooks/useCollections";
+import { ALL_ICONS } from "@/components/collections/ThumbnailSelector";
 import type { Collection } from "../../types/collection";
 
 // Map of icon names to Material-UI icon components
@@ -60,6 +61,15 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) =>
 
   // Get the icon to display
   const displayIcon = useMemo(() => {
+    // Priority 1: Collection's own thumbnail icon
+    if (collection.thumbnailType === "icon" && collection.thumbnailValue) {
+      const ThumbnailIcon = ALL_ICONS[collection.thumbnailValue];
+      if (ThumbnailIcon) {
+        return <ThumbnailIcon sx={{ fontSize: 60, color: "primary.main" }} />;
+      }
+    }
+
+    // Priority 2: Collection type icon
     if (collectionType?.icon && ICON_MAP[collectionType.icon]) {
       return React.cloneElement(ICON_MAP[collectionType.icon], {
         sx: { fontSize: 60, color: collectionType.color || "grey.400" },
@@ -73,7 +83,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) =>
         }}
       />
     );
-  }, [collectionType]);
+  }, [collection.thumbnailType, collection.thumbnailValue, collectionType]);
 
   return (
     <Card
@@ -97,19 +107,22 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) =>
         sx={{
           height: 140,
           backgroundColor: (theme) =>
-            collection.thumbnailUrl ? "transparent" : theme.palette.grey[200],
+            collection.thumbnailUrl && collection.thumbnailType !== "icon"
+              ? "transparent"
+              : theme.palette.grey[200],
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        {!collection.thumbnailUrl && displayIcon}
-        {collection.thumbnailUrl && (
+        {collection.thumbnailUrl && collection.thumbnailType !== "icon" ? (
           <img
             src={collection.thumbnailUrl}
             alt={collection.name}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
+        ) : (
+          displayIcon
         )}
       </CardMedia>
       <CardContent sx={{ flexGrow: 1, pb: 2 }}>

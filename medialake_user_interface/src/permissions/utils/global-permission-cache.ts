@@ -181,6 +181,19 @@ class GlobalPermissionCache {
   }
 
   /**
+   * Clear only the permission check cache (useful when ability is rebuilt)
+   */
+  clearPermissionChecks(): void {
+    this.checkCache = {};
+    try {
+      localStorage.removeItem(GlobalPermissionCache.CHECK_CACHE_KEY);
+      console.log("Permission check cache cleared");
+    } catch (error) {
+      console.error("Failed to clear permission check cache:", error);
+    }
+  }
+
+  /**
    * Update only the token in the cache (for token refresh scenarios)
    */
   updateToken(newToken: string, expiresIn: number): void {

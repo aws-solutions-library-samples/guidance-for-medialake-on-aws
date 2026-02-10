@@ -1,6 +1,12 @@
 """
 Unified search orchestrator that routes queries to appropriate providers
 and handles the unified search architecture.
+
+Index Routing Logic (Phase 3):
+- twelvelabs / twelvelabs-bedrock → Query 'media' index (Marengo 2.7)
+- twelvelabs-bedrock-3-0 → Query 'asset-embeddings' index (Marengo 3.0)
+- s3-vector → Uses S3 Vector Store (no OpenSearch index)
+- coactive → Query 'media' index
 """
 
 import os
@@ -24,6 +30,19 @@ from unified_search_provider import (
     SearchProviderFactory,
     create_search_provider_config,
 )
+
+# Provider type to index mapping constants
+PROVIDER_INDEX_MAPPING = {
+    # Marengo 2.7 providers use the 'media' index
+    "twelvelabs": "OPENSEARCH_INDEX",
+    "twelvelabs-api": "OPENSEARCH_INDEX",
+    "twelvelabs-bedrock": "OPENSEARCH_INDEX",
+    "bedrock twelvelabs": "OPENSEARCH_INDEX",
+    # Marengo 3.0 providers use the 'asset-embeddings' index
+    "twelvelabs-bedrock-3-0": "ASSET_EMBEDDINGS_INDEX",
+    # Coactive uses the 'media' index
+    "coactive": "OPENSEARCH_INDEX",
+}
 
 
 class UnifiedSearchOrchestrator:
@@ -98,6 +117,20 @@ class UnifiedSearchOrchestrator:
                     self.logger.info(
                         f"Processing provider config: {config_data.get('provider', 'unknown')}"
                     )
+                    # Inject target_index based on provider type if not already set
+                    if (
+                        "target_index" not in config_data
+                        or config_data["target_index"] is None
+                    ):
+                        provider_type = config_data.get("type", "")
+                        target_index = self._get_target_index_for_provider(
+                            provider_type
+                        )
+                        config_data["target_index"] = target_index
+                        self.logger.info(
+                            f"[INDEX ROUTING] Set target_index='{target_index}' for provider type '{provider_type}'"
+                        )
+
                     config = create_search_provider_config(config_data)
                     provider = self.provider_factory.create_provider(config)
 
@@ -194,7 +227,13 @@ class UnifiedSearchOrchestrator:
                         "name": item.get("name", "Coactive AI"),
                         "id": item.get("id"),
                     }
-                elif provider_type in ["bedrock twelvelabs", "twelvelabs-bedrock"]:
+                elif provider_type in [
+                    "bedrock twelvelabs",
+                    "twelvelabs-bedrock",
+                    "twelvelabs-bedrock-3-0",
+                ]:
+                    # Determine target index based on provider type
+                    target_index = self._get_target_index_for_provider(provider_type)
                     provider_config = {
                         "provider": "bedrock_twelvelabs",
                         "provider_location": "internal",
@@ -212,8 +251,18 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Bedrock TwelveLabs"),
                         "id": item.get("id"),
+                        "type": provider_type,
+                        "dimensions": item.get("dimensions"),
+                        # Target index for OpenSearch queries (Phase 3)
+                        "target_index": target_index,
                     }
+                    self.logger.info(
+                        f"[INDEX ROUTING] Bedrock TwelveLabs provider '{provider_type}' "
+                        f"configured to query index: '{target_index}'"
+                    )
                 elif provider_type in ["twelvelabs", "twelvelabs-api"]:
+                    # Determine target index based on provider type
+                    target_index = self._get_target_index_for_provider(provider_type)
                     provider_config = {
                         "provider": "twelvelabs_api",
                         "provider_location": "internal",
@@ -233,7 +282,15 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "TwelveLabs API"),
                         "id": item.get("id"),
+                        "type": provider_type,
+                        "dimensions": item.get("dimensions"),
+                        # Target index for OpenSearch queries (Phase 3)
+                        "target_index": target_index,
                     }
+                    self.logger.info(
+                        f"[INDEX ROUTING] TwelveLabs API provider '{provider_type}' "
+                        f"configured to query index: '{target_index}'"
+                    )
                 else:
                     # For unknown types, try to infer from the type string
                     self.logger.warning(
@@ -323,6 +380,53 @@ class UnifiedSearchOrchestrator:
         self.logger.info("Setting up legacy embedding store fallback")
         # This will use the existing embedding store factory as fallback
         self._legacy_fallback = True
+
+    def _get_target_index_for_provider(self, provider_type: str) -> str:
+        """
+        Determine the target OpenSearch index based on the search provider type.
+
+        Index Routing:
+        - twelvelabs / twelvelabs-bedrock → 'media' index (Marengo 2.7)
+        - twelvelabs-bedrock-3-0 → 'asset-embeddings' index (Marengo 3.0)
+        - coactive → 'media' index
+
+        Args:
+            provider_type: The search provider type from configuration
+
+        Returns:
+            The target index name to query
+        """
+        # Normalize provider type for lookup
+        normalized_type = provider_type.lower().strip()
+
+        # Look up the environment variable name from the mapping
+        env_var_name = PROVIDER_INDEX_MAPPING.get(normalized_type)
+
+        if env_var_name:
+            index_name = os.environ.get(env_var_name)
+            if index_name:
+                self.logger.info(
+                    f"[INDEX ROUTING] Provider '{provider_type}' → index '{index_name}' "
+                    f"(from {env_var_name})"
+                )
+                return index_name
+            else:
+                self.logger.warning(
+                    f"[INDEX ROUTING] Environment variable {env_var_name} not set, "
+                    f"falling back to OPENSEARCH_INDEX"
+                )
+        else:
+            self.logger.warning(
+                f"[INDEX ROUTING] Unknown provider type '{provider_type}', "
+                f"defaulting to OPENSEARCH_INDEX (media)"
+            )
+
+        # Default fallback to OPENSEARCH_INDEX (media) for backward compatibility
+        default_index = os.environ.get("OPENSEARCH_INDEX", "media")
+        self.logger.info(
+            f"[INDEX ROUTING] Using default index '{default_index}' for provider '{provider_type}'"
+        )
+        return default_index
 
     def search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
         """
