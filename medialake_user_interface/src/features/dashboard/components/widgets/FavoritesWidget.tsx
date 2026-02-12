@@ -213,12 +213,14 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
         renderCard={(favorite: Favorite) => {
           const asset = favoriteToAsset(favorite);
           const isSelected = dashboardSelection?.isAssetSelected(favorite.itemId) ?? false;
+          const thumbnailUrl = favorite.metadata?.thumbnailUrl || "";
+          const proxyUrl = favorite.metadata?.proxyUrl || "";
           return (
             <AssetCard
               id={favorite.itemId}
               name={favorite.metadata?.name || favorite.itemId}
-              thumbnailUrl={favorite.metadata?.thumbnailUrl || ""}
-              proxyUrl={favorite.metadata?.proxyUrl || ""}
+              thumbnailUrl={thumbnailUrl}
+              proxyUrl={proxyUrl}
               assetType={favorite.metadata?.assetType || "Unknown"}
               fields={[
                 { id: "name", label: "Name", visible: true },

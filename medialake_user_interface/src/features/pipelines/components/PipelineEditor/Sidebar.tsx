@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
 import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
 import { RightSidebar } from "@/components/common/RightSidebar/RightSidebar";
+import { useRightSidebar } from "@/components/common/RightSidebar/SidebarContext";
 
 interface NodeSection {
   title: string;
@@ -601,8 +602,16 @@ const SidebarContent: React.FC = () => {
 };
 
 const Sidebar: React.FC = () => {
+  const { setHasSelectedItems } = useRightSidebar();
+
+  // Pipeline sidebar should always be visible and start expanded
+  React.useEffect(() => {
+    setHasSelectedItems(true);
+    return () => setHasSelectedItems(false);
+  }, [setHasSelectedItems]);
+
   return (
-    <RightSidebar>
+    <RightSidebar alwaysVisible>
       <SidebarContent />
     </RightSidebar>
   );
