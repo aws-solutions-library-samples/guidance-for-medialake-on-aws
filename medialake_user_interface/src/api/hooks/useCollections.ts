@@ -386,11 +386,20 @@ export const useCreateCollection = () => {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch collections list
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
       });
+      // If a sub-collection was created, also invalidate the parent's children and detail queries
+      if (variables.parentId) {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.COLLECTIONS.children(variables.parentId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.COLLECTIONS.detail(variables.parentId),
+        });
+      }
     },
   });
 };
