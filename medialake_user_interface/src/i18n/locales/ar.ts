@@ -272,6 +272,9 @@ export default {
       ascending: "تصاعدي",
       descending: "تنازلي",
     },
+    pagination: {
+      page: "صفحة {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -823,6 +826,8 @@ export default {
     },
     loading: "جارٍ التحميل...",
     loadMore: "تحميل المزيد",
+    previous: "السابق",
+    next: "التالي",
     tableDensity: "كثافة الجدول",
     moreInfo: "مزيد من المعلومات",
     error: "خطأ",

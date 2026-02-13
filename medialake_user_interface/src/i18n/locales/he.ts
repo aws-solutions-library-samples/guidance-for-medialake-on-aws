@@ -271,6 +271,9 @@ export default {
       ascending: "סדר עולה",
       descending: "סדר יורד",
     },
+    pagination: {
+      page: "עמוד {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -822,6 +825,8 @@ export default {
     },
     loading: "טוען...",
     loadMore: "טען עוד",
+    previous: "הקודם",
+    next: "הבא",
     tableDensity: "צפיפות טבלה",
     moreInfo: "מידע נוסף",
     error: "שגיאה",

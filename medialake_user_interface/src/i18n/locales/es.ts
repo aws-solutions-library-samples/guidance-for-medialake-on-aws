@@ -277,6 +277,9 @@ export default {
       ascending: "Ascendente",
       descending: "Descendente",
     },
+    pagination: {
+      page: "Página {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -833,6 +836,8 @@ export default {
     },
     loading: "Cargando...",
     loadMore: "Cargar más",
+    previous: "Anterior",
+    next: "Siguiente",
     tableDensity: "Densidad de tabla",
     moreInfo: "Más información",
     error: "Error",

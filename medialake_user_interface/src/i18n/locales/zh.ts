@@ -270,6 +270,9 @@ export default {
       ascending: "升序",
       descending: "降序",
     },
+    pagination: {
+      page: "第 {{page}} 页",
+    },
   },
   sidebar: {
     menu: {
@@ -821,6 +824,8 @@ export default {
     },
     loading: "加载中...",
     loadMore: "加载更多",
+    previous: "上一页",
+    next: "下一页",
     tableDensity: "表格密度",
     moreInfo: "更多信息",
     error: "错误",

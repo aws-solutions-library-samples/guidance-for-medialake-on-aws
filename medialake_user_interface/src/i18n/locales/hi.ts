@@ -277,6 +277,9 @@ export default {
       ascending: "आरोही",
       descending: "अवरोही",
     },
+    pagination: {
+      page: "पृष्ठ {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -831,6 +834,8 @@ export default {
     },
     loading: "लोड हो रहा है...",
     loadMore: "और लोड करें",
+    previous: "पिछला",
+    next: "अगला",
     tableDensity: "टेबल घनत्व",
     moreInfo: "अधिक जानकारी",
     error: "त्रुटि",

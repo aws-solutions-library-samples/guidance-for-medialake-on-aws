@@ -275,6 +275,9 @@ export default {
       ascending: "昇順",
       descending: "降順",
     },
+    pagination: {
+      page: "ページ {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -828,6 +831,8 @@ export default {
     },
     loading: "読み込み中...",
     loadMore: "さらに読み込む",
+    previous: "前へ",
+    next: "次へ",
     tableDensity: "テーブル密度",
     moreInfo: "詳細情報",
     error: "エラー",
