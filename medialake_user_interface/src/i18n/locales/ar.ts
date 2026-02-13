@@ -328,13 +328,16 @@ export default {
       label: "دلالي",
       enable: "تفعيل البحث الدلالي",
       disable: "تعطيل البحث الدلالي",
-      configure: "انقر لتكوين البحث الدلالي",
       configDialog: {
         title: "البحث الدلالي غير مكوّن",
         description:
           "البحث الدلالي غير مكوّن حالياً أو معطل. لتفعيل هذه الميزة، انتقل إلى إعدادات النظام > البحث لتكوين مزود البحث، أو اضغط على الزر أدناه.",
         goToSettings: "الانتقال إلى إعدادات البحث",
       },
+    },
+    mode: {
+      fullTooltip: "تجميع جميع التطابقات تحت كل أصل",
+      clipTooltip: "عرض كل تطابق كنتيجة منفصلة",
     },
     filters: {
       title: "تصفية النتائج",
@@ -352,7 +355,8 @@ export default {
     },
     bar: {
       label: "بحث",
-      placeholder: "بحث (مثال: sunset type:image)",
+      placeholder: "بحث (مثال: mountains)",
+      placeholderSemantic: "بحث (مثال: a peaceful place)",
       helperText: "استخدم كلمات مثل type:, format:, size:, date:, metadata: لتصفية النتائج",
     },
     results: {
@@ -779,6 +783,8 @@ export default {
     },
   },
   common: {
+    full: "كامل",
+    clip: "مقطع",
     back: "رجوع",
     search: "بحث",
     public: "عام",
@@ -837,8 +843,7 @@ export default {
     enabled: "مُفعل",
     disabled: "معطل",
     versions: "الإصدارات",
-    full: "كامل",
-    clip: "مقطع",
+
     none: "لا يوجد",
     clearChatHistory: "مسح سجل المحادثة",
     closeChat: "إغلاق المحادثة",

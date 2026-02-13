@@ -331,13 +331,16 @@ export default {
       label: "セマンティック",
       enable: "セマンティック検索を有効にする",
       disable: "セマンティック検索を無効にする",
-      configure: "クリックしてセマンティック検索を設定",
       configDialog: {
         title: "セマンティック検索が設定されていません",
         description:
           "セマンティック検索は現在設定されていないか、無効になっています。この機能を有効にするには、システム設定 > 検索に移動して検索プロバイダーを設定するか、下のボタンを押してください。",
         goToSettings: "検索設定に移動",
       },
+    },
+    mode: {
+      fullTooltip: "すべての一致をアセットごとにグループ化",
+      clipTooltip: "各一致を個別の結果として表示",
     },
     filters: {
       title: "結果をフィルタリング",
@@ -355,7 +358,8 @@ export default {
     },
     bar: {
       label: "検索",
-      placeholder: "検索（例：sunset type:image）",
+      placeholder: "検索（例：mountains）",
+      placeholderSemantic: "検索（例：a peaceful place）",
       helperText:
         "type:、format:、size:、date:、metadata:などのキーワードを使用して結果をフィルタリング",
     },
@@ -784,6 +788,8 @@ export default {
     },
   },
   common: {
+    full: "フル",
+    clip: "クリップ",
     back: "戻る",
     search: "検索",
     public: "公開",
@@ -844,8 +850,7 @@ export default {
     enabled: "有効",
     disabled: "無効",
     versions: "バージョン",
-    full: "フル",
-    clip: "クリップ",
+
     none: "なし",
     permissions: "権限",
     actions: {

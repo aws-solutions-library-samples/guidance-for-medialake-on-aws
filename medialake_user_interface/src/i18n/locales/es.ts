@@ -333,13 +333,16 @@ export default {
       label: "Semántico",
       enable: "Habilitar búsqueda semántica",
       disable: "Deshabilitar búsqueda semántica",
-      configure: "Haz clic para configurar la búsqueda semántica",
       configDialog: {
         title: "Búsqueda semántica no configurada",
         description:
           "La búsqueda semántica no está configurada o está deshabilitada. Para habilitar esta función, ve a Configuración del sistema > Búsqueda para configurar un proveedor de búsqueda, o presiona el botón a continuación.",
         goToSettings: "Ir a configuración de búsqueda",
       },
+    },
+    mode: {
+      fullTooltip: "Agrupar todas las coincidencias bajo cada activo",
+      clipTooltip: "Mostrar cada coincidencia como un resultado separado",
     },
     filters: {
       title: "Filtrar resultados",
@@ -358,6 +361,7 @@ export default {
     bar: {
       label: "Buscar",
       placeholder: "Buscar (ej., atardecer type:imagen)",
+      placeholderSemantic: "Buscar (ej., un lugar tranquilo)",
       helperText:
         "Usa palabras clave como type:, format:, size:, date:, metadata: para filtrar resultados",
     },
@@ -789,6 +793,8 @@ export default {
     },
   },
   common: {
+    full: "Completo",
+    clip: "Clip",
     back: "Atrás",
     search: "Buscar",
     public: "Público",
@@ -849,8 +855,7 @@ export default {
     enabled: "Habilitado",
     disabled: "Deshabilitado",
     versions: "Versiones",
-    full: "Completo",
-    clip: "Clip",
+
     none: "Ninguno",
     clearChatHistory: "Borrar historial de chat",
     closeChat: "Cerrar chat",

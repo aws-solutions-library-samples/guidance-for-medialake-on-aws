@@ -327,13 +327,16 @@ export default {
       label: "סמנטי",
       enable: "הפעל חיפוש סמנטי",
       disable: "השבת חיפוש סמנטי",
-      configure: "לחץ להגדרת חיפוש סמנטי",
       configDialog: {
         title: "חיפוש סמנטי לא מוגדר",
         description:
           "חיפוש סמנטי אינו מוגדר כרגע או מושבת. כדי להפעיל תכונה זו, עבור להגדרות מערכת > חיפוש להגדרת ספק חיפוש, או לחץ על הכפתור למטה.",
         goToSettings: "עבור להגדרות חיפוש",
       },
+    },
+    mode: {
+      fullTooltip: "קבץ את כל ההתאמות תחת כל נכס",
+      clipTooltip: "הצג כל התאמה כתוצאה נפרדת",
     },
     filters: {
       title: "סנן תוצאות",
@@ -351,7 +354,8 @@ export default {
     },
     bar: {
       label: "חיפוש",
-      placeholder: "חפש (לדוגמה: sunset type:image)",
+      placeholder: "חפש (לדוגמה: mountains)",
+      placeholderSemantic: "חפש (לדוגמה: a peaceful place)",
       helperText: "השתמש במילות מפתח כמו type:, format:, size:, date:, metadata: לסינון תוצאות",
     },
     results: {
@@ -778,6 +782,8 @@ export default {
     },
   },
   common: {
+    full: "מלא",
+    clip: "קליפ",
     back: "חזור",
     search: "חפש",
     public: "ציבורי",
@@ -836,8 +842,7 @@ export default {
     enabled: "מאופשר",
     disabled: "מושבת",
     versions: "גרסאות",
-    full: "מלא",
-    clip: "קליפ",
+
     none: "אין",
     permissions: "הרשאות",
     root: "שורש",

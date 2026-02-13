@@ -333,13 +333,16 @@ export default {
       label: "सार्थक",
       enable: "सार्थक खोज सक्षम करें",
       disable: "सार्थक खोज अक्षम करें",
-      configure: "सार्थक खोज कॉन्फ़िगर करने के लिए क्लिक करें",
       configDialog: {
         title: "सार्थक खोज कॉन्फ़िगर नहीं है",
         description:
           "सार्थक खोज वर्तमान में कॉन्फ़िगर नहीं है या अक्षम है। इस सुविधा को सक्षम करने के लिए, खोज प्रदाता को कॉन्फ़िगर करने के लिए सिस्टम सेटिंग्स > खोज पर जाएं, या नीचे दिए गए बटन को दबाएं।",
         goToSettings: "खोज सेटिंग्स पर जाएं",
       },
+    },
+    mode: {
+      fullTooltip: "सभी मिलान प्रत्येक एसेट के अंतर्गत समूहित करें",
+      clipTooltip: "प्रत्येक मिलान को अलग परिणाम के रूप में दिखाएं",
     },
     filters: {
       title: "परिणाम फ़िल्टर करें",
@@ -357,7 +360,8 @@ export default {
     },
     bar: {
       label: "खोजें",
-      placeholder: "खोजें (उदा: sunset type:image)",
+      placeholder: "खोजें (उदा: mountains)",
+      placeholderSemantic: "खोजें (उदा: a peaceful place)",
       helperText:
         "परिणाम फ़िल्टर करने के लिए type:, format:, size:, date:, metadata: जैसे कीवर्ड का उपयोग करें",
     },
@@ -787,6 +791,8 @@ export default {
     },
   },
   common: {
+    full: "पूर्ण",
+    clip: "क्लिप",
     back: "वापस",
     search: "खोजें",
     public: "सार्वजनिक",
@@ -845,8 +851,7 @@ export default {
     enabled: "सक्रिय",
     disabled: "निष्क्रिय",
     versions: "संस्करण",
-    full: "पूर्ण",
-    clip: "क्लिप",
+
     none: "कोई नहीं",
     clearChatHistory: "चैट इतिहास साफ़ करें",
     closeChat: "चैट बंद करें",
