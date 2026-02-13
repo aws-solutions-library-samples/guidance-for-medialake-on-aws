@@ -272,6 +272,9 @@ export default {
       ascending: "오름차순",
       descending: "내림차순",
     },
+    pagination: {
+      page: "페이지 {{page}}",
+    },
   },
   sidebar: {
     menu: {
@@ -823,6 +826,8 @@ export default {
     },
     loading: "로딩 중...",
     loadMore: "더 보기",
+    previous: "이전",
+    next: "다음",
     tableDensity: "테이블 밀도",
     moreInfo: "자세한 정보",
     error: "오류",
