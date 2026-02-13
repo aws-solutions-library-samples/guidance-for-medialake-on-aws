@@ -40,8 +40,10 @@ import {
   useGetChildCollections,
   useDeleteCollection,
   useDeleteItemFromCollection,
+  useGetCollectionTypes,
 } from "@/api/hooks/useCollections";
 import { useGetCollectionAssets } from "@/api/hooks/useCollections";
+import { CollectionCardSimple } from "@/features/dashboard/components/CollectionCardSimple";
 import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import AssetResultsView from "../components/shared/AssetResultsView";
@@ -141,8 +143,15 @@ const CollectionViewPage: React.FC = () => {
   const assets = assetsData?.results || [];
   const searchMetadata = assetsData?.searchMetadata;
 
-  // Get child collections (not currently used but kept for future feature)
-  useGetChildCollections(id!);
+  // Get child collections for sub-collection cards (backend returns all, up to 1,000)
+  const { data: childCollectionsResponse, isLoading: isLoadingChildren } = useGetChildCollections(
+    id!
+  );
+  const childCollections = childCollectionsResponse?.data || [];
+
+  // Get collection types for sub-collection card icons/colors
+  const { data: collectionTypesResponse } = useGetCollectionTypes();
+  const collectionTypes = collectionTypesResponse?.data || [];
 
   // Get ancestors from collection data (now included in collection response)
   const ancestors = collection?.ancestors || [];
@@ -555,6 +564,16 @@ const CollectionViewPage: React.FC = () => {
     }
   }, []);
 
+  // Helper to get collection type info for sub-collection cards
+  const getCollectionTypeInfo = useCallback(
+    (collectionTypeId?: string) => {
+      if (!collectionTypeId) return { iconName: undefined, color: undefined };
+      const ct = collectionTypes.find((t) => t.id === collectionTypeId);
+      return { iconName: ct?.icon, color: ct?.color };
+    },
+    [collectionTypes]
+  );
+
   // Show error if collection not found and not loading
   if (!isLoadingCollection && !collection) {
     return (
@@ -788,6 +807,57 @@ const CollectionViewPage: React.FC = () => {
                 </Box>
               )}
             </Box>
+
+            {/* Sub-Collections Cards */}
+            {childCollections.length > 0 && (
+              <Box sx={{ mb: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  sx={{
+                    mb: 1.5,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  Sub-Collections ({childCollections.length})
+                </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "repeat(1, 1fr)",
+                      sm: "repeat(2, 1fr)",
+                      md: "repeat(3, 1fr)",
+                      lg: "repeat(4, 1fr)",
+                      xl: "repeat(5, 1fr)",
+                    },
+                    gap: 2,
+                  }}
+                >
+                  {childCollections.map((child) => {
+                    const typeInfo = getCollectionTypeInfo(child.collectionTypeId);
+                    return (
+                      <CollectionCardSimple
+                        key={child.id}
+                        name={child.name}
+                        itemCount={child.itemCount}
+                        childCollectionCount={child.childCollectionCount}
+                        isPublic={child.isPublic}
+                        iconName={typeInfo.iconName}
+                        color={typeInfo.color}
+                        thumbnailType={child.thumbnailType}
+                        thumbnailValue={child.thumbnailValue}
+                        thumbnailUrl={child.thumbnailUrl}
+                        onClick={() => navigate(`/collections/${child.id}/view`)}
+                      />
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
 
             {isLoading || isFetching ? (
               <Box
