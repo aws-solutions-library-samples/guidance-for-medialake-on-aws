@@ -40,7 +40,9 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
 
     // Recursively build children
     if (children.length > 0) {
-      node.children = children.map((child) => buildTree(child, allCollections));
+      node.children = children
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((child) => buildTree(child, allCollections));
     }
 
     return node;
@@ -52,7 +54,9 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
     const allCollections = allCollectionsResponse.data;
 
     // Filter to only root collections (no parentId)
-    const rootCollections = allCollections.filter((c: Collection) => !c.parentId);
+    const rootCollections = allCollections
+      .filter((c: Collection) => !c.parentId)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return rootCollections.map((root) => buildTree(root, allCollections));
   }, [allCollectionsResponse]);

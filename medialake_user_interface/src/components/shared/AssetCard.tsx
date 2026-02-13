@@ -1,6 +1,17 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useId } from "react";
 import { useTranslation } from "react-i18next";
-import { Box, Typography, IconButton, Button, CircularProgress, Checkbox } from "@mui/material";
+import {
+  Box,
+  Typography,
+  IconButton,
+  Button,
+  CircularProgress,
+  Checkbox,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -8,7 +19,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
-// import InfoIcon from "@mui/icons-material/Info";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
@@ -115,6 +126,13 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const { t } = useTranslation();
     const [isHovering, setIsHovering] = useState(false);
     const [isMenuClicked, setIsMenuClicked] = useState(false);
+    const [compactMenuAnchor, setCompactMenuAnchor] = useState<null | HTMLElement>(null);
+    const compactMenuOpen = Boolean(compactMenuAnchor);
+
+    // Unique instance ID — guarantees unique DOM IDs even when the same asset
+    // appears in multiple widgets (e.g. Favorites + Recent Assets).
+    const reactId = useId();
+    const instanceSuffix = reactId.replace(/:/g, "-");
     const preventCommitRef = useRef<boolean>(false);
     const commitRef = useRef<(() => void) | null>(null);
     const omakasePlayerRef = useRef<OmakasePlayer | null>(null);
@@ -148,34 +166,59 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       // Only observe if this is a video or audio asset
       if ((assetType !== "Video" && assetType !== "Audio") || !cardContainerRef.current) return;
 
+      // For compact cards (dashboard widgets), skip lazy loading entirely —
+      // there are only a handful of cards and the navigate-back remount needs
+      // the player to initialize immediately without waiting for an observer callback.
+      if (variant === "compact") {
+        setIsVisible(true);
+        return;
+      }
+
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
-              // Stagger initialization to spread load across frames
-              // Use requestAnimationFrame for smoother initialization
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  setIsVisible(true);
-                }, Math.random() * 100); // 0-100ms random delay per video
-              });
+              setIsVisible(true);
               observer.unobserve(entry.target);
             }
           });
         },
         {
-          rootMargin: "400px", // Start loading 400px before entering viewport (increased from 200px)
+          rootMargin: "400px",
           threshold: 0.01,
         }
       );
 
       observer.observe(cardContainerRef.current);
 
-      return () => observer.disconnect();
-    }, [assetType]);
+      return () => {
+        observer.disconnect();
+      };
+    }, [assetType, variant]);
 
     // Initialize Omakase player for video and audio assets
     useEffect(() => {
+      const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+      const playerId = `omakase-player-${sanitizedId}-${instanceSuffix}`;
+
+      if (assetType === "Video" || assetType === "Audio") {
+        const playerDiv = document.getElementById(playerId);
+
+        // Detect stale player: refs say initialized but DOM element has no children
+        // (the OmakasePlayer injects its own DOM tree; 0 children = DOM was replaced by React)
+        if (playerInitializedRef.current && playerDiv && playerDiv.children.length === 0) {
+          if (omakasePlayerRef.current) {
+            try {
+              omakasePlayerRef.current.destroy();
+            } catch (e) {
+              // Player may already be in a bad state, that's fine
+            }
+          }
+          omakasePlayerRef.current = null;
+          playerInitializedRef.current = false;
+        }
+      }
+
       // Only initialize if it's a video or audio, has a proxy URL, is visible, and hasn't been initialized yet
       if (
         (assetType === "Video" || assetType === "Audio") &&
@@ -183,19 +226,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         isVisible &&
         !playerInitializedRef.current
       ) {
-        // Sanitize the ID to remove characters that are invalid in CSS selectors (colons, etc.)
-        const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
-        const playerId = `omakase-player-${sanitizedId}`;
-
-        // Check if player container already exists
-        let playerContainer = document.getElementById(playerId);
-        if (!playerContainer) {
-          playerContainer = document.createElement("div");
-          playerContainer.id = playerId;
-          playerContainer.style.width = "100%";
-          playerContainer.style.height = "100%";
-        }
-
         // Initialize Omakase player
         try {
           const omakasePlayer = new OmakasePlayer({
@@ -232,12 +262,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 const callback = () => {
                   try {
                     // Clear any default markers that might have been created by the player
-                    console.log(`🧹 Clearing any default markers for asset ${id}`);
                     try {
                       omakasePlayer.progressMarkerTrack.removeAllMarkers();
-                      console.log(`🧹 ✅ Default markers cleared`);
                     } catch (e) {
-                      console.warn(`🧹 ❌ Could not clear default markers:`, e);
+                      // Marker track may not be ready
                     }
 
                     if (Array.isArray(clips) && clips.length > 0) {
@@ -251,77 +279,27 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                       // Check if this is a clip asset (ID contains #CLIP# or _clip_)
                       const isClipAsset = id.includes("#CLIP#") || id.includes("_clip_");
 
-                      console.log(`🎬 INITIAL Asset ${id}:`);
-                      console.log(`  - isClipAsset: ${isClipAsset}`);
-                      console.log(`  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`);
-                      console.log(
-                        `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`
-                      );
-                      console.log(`  - clips count: ${clips?.length || 0}`);
-                      console.log(
-                        `  - clips:`,
-                        clips?.map((c, idx) => ({
-                          index: idx,
-                          score: c.score,
-                          start_timecode: c.start_timecode,
-                          end_timecode: c.end_timecode,
-                          start_seconds: c.start,
-                          end_seconds: c.end,
-                        }))
-                      );
-
                       // For clip assets, we only want to show the single clip marker
                       // For full assets, we show all clips that pass the confidence threshold
                       let filteredClips;
                       if (isClipAsset) {
-                        // This is a clip asset, so clips array should contain only one clip
-                        // But let's be extra careful and ensure we only process valid clips
                         filteredClips = (clips || []).filter((clip) => {
                           const hasValidTimes =
                             (clip.start_timecode && clip.end_timecode) ||
                             (typeof clip.start === "number" && typeof clip.end === "number");
-                          console.log(`    Validating clip:`, {
-                            hasValidTimes,
-                            start_timecode: clip.start_timecode,
-                            end_timecode: clip.end_timecode,
-                            start: clip.start,
-                            end: clip.end,
-                          });
                           return hasValidTimes;
                         });
-                        console.log(
-                          `  - Clip asset: showing ${filteredClips.length} of ${
-                            clips?.length || 0
-                          } marker(s)`
-                        );
                       } else {
                         // This is a full asset, show all clips from API response
                         // Only apply confidence filtering if explicitly enabled and threshold > 0
                         const shouldFilter = isSemantic && confidenceThreshold > 0;
-                        console.log(
-                          `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`
-                        );
 
                         filteredClips = shouldFilter
                           ? clips.filter((clip) => {
                               const score = clip.score ?? 1;
-                              const passes = score >= confidenceThreshold;
-                              console.log(
-                                `    Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`
-                              );
-                              return passes;
+                              return score >= confidenceThreshold;
                             })
-                          : clips; // Show all clips when not filtering
-
-                        console.log(
-                          `  - Full asset: showing ${filteredClips.length} of ${
-                            clips.length
-                          } markers${
-                            shouldFilter
-                              ? ` (confidence >= ${confidenceThreshold})`
-                              : " (all clips)"
-                          }`
-                        );
+                          : clips;
                       }
 
                       filteredClips.forEach((clip, index) => {
@@ -338,35 +316,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                               ? timecodeToSeconds(clip.end_timecode)
                               : undefined;
 
-                        console.log(`  🎯 Processing clip ${index}:`, {
-                          start_timecode: clip.start_timecode,
-                          end_timecode: clip.end_timecode,
-                          start_seconds: clip.start,
-                          end_seconds: clip.end,
-                          calculated_start: start,
-                          calculated_end: end,
-                          score: clip.score,
-                        });
-
                         if (start !== undefined && end !== undefined) {
                           // Skip markers that have very short duration (likely unwanted markers)
                           // Only skip clips starting at 0 if they're very short (< 1 second)
                           if ((start === 0 && end - start < 1) || (start < 2 && end - start < 1)) {
-                            console.log(
-                              `  ⚠️ Skipping unwanted short marker: ${start}s - ${end}s (duration: ${
-                                end - start
-                              }s)`
-                            );
                             return;
                           }
 
-                          // Additional validation: ensure the marker has reasonable duration
                           if (end - start < 1) {
-                            console.log(
-                              `  ⚠️ Skipping marker with too short duration: ${start}s - ${end}s (duration: ${
-                                end - start
-                              }s)`
-                            );
                             return;
                           }
 
@@ -388,25 +345,15 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                           // Add marker to progress track when available
                           try {
                             omakasePlayer.progressMarkerTrack.addMarker(marker);
-                            // Store marker reference for later removal since we don't control the ID
                             markerIdsRef.current.push(marker.id || `${start}-${end}`);
-                            console.log(
-                              `  ✅ Added marker: ${start}s - ${end}s (color: ${markerColor})`
-                            );
 
                             // For clip assets or single-clip items, seek to the beginning of the clip
-                            // This includes collection items with a specific clip boundary
                             if (isClipAsset || (filteredClips.length === 1 && index === 0)) {
                               try {
                                 omakasePlayer.video.seekToTime(start);
-                                console.log(
-                                  `  🎯 Seeked to clip start time: ${start}s for ${
-                                    isClipAsset ? "clip asset" : "single-clip item"
-                                  } ${assetType.toLowerCase()} ${id}`
-                                );
                               } catch (seekError) {
                                 console.warn(
-                                  `  ⚠️ Failed to seek to clip start time ${start}s for ${assetType.toLowerCase()} asset:`,
+                                  `Failed to seek to clip start time ${start}s:`,
                                   seekError
                                 );
                               }
@@ -415,7 +362,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                             console.warn("progressMarkerTrack not ready", e);
                           }
                         } else {
-                          console.log(`  ❌ Skipped clip ${index}: invalid start/end times`);
+                          // Invalid start/end times, skip this clip
                         }
                       });
                     }
@@ -441,11 +388,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               setVideoLoadError(true);
             },
           });
-
-          console.log(`Omakase player initialized for ${assetType.toLowerCase()} asset: ${id}`);
         } catch (error) {
           console.error(
-            `Failed to initialize Omakase player for ${assetType.toLowerCase()} asset ${id}:`,
+            `Failed to initialize player for ${assetType.toLowerCase()} asset ${id}:`,
             error
           );
         }
@@ -462,7 +407,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         const loadOptions = assetType === "Audio" ? { protocol: "audio" as const } : undefined;
         omakasePlayerRef.current.loadVideo(proxyUrl, loadOptions).subscribe({
           next: () => {
-            console.log(`${assetType} reloaded for asset ${id}`);
+            // Video/audio reloaded successfully
           },
           error: (error) => {
             console.error(`Failed to reload ${assetType.toLowerCase()} for asset ${id}:`, error);
@@ -478,16 +423,15 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             omakasePlayerRef.current.destroy();
             omakasePlayerRef.current = null;
             playerInitializedRef.current = false;
-            console.log(`Omakase player destroyed for ${assetType.toLowerCase()} asset: ${id}`);
           } catch (error) {
             console.error(
-              `Failed to destroy Omakase player for ${assetType.toLowerCase()} asset ${id}:`,
+              `Failed to destroy player for ${assetType.toLowerCase()} asset ${id}:`,
               error
             );
           }
         }
       };
-    }, [assetType, proxyUrl, id, isVisible]); // Removed thumbnailScale to prevent reload on appearance change
+    }, [assetType, proxyUrl, id, isVisible, instanceSuffix]);
 
     // Separate effect to handle clip marker updates when confidence threshold changes
     useEffect(() => {
@@ -500,23 +444,17 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         // Defer marker updates to idle time to avoid blocking interactions
         const updateMarkers = () => {
           try {
-            // Clear ALL existing markers using removeAllMarkers method
-            console.log(
-              `🧹 CLEARING ALL existing markers for asset ${id} using removeAllMarkers()`
-            );
+            // Clear ALL existing markers
             try {
               omakasePlayerRef.current?.progressMarkerTrack.removeAllMarkers();
-              markerIdsRef.current = []; // Reset our tracking array
-              console.log(`🧹 ✅ All markers cleared successfully`);
+              markerIdsRef.current = [];
             } catch (e) {
-              console.warn(`🧹 ❌ Could not clear all markers:`, e);
               // Fallback to individual removal if removeAllMarkers fails
               markerIdsRef.current.forEach((markerId) => {
                 try {
                   omakasePlayerRef.current?.progressMarkerTrack.removeMarker(markerId);
-                  console.log(`  ✅ Fallback removed marker: ${markerId}`);
                 } catch (e) {
-                  console.warn(`  ❌ Could not remove marker ${markerId}:`, e);
+                  // ignore
                 }
               });
               markerIdsRef.current = [];
@@ -532,62 +470,23 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             // Check if this is a clip asset (has clipData property)
             const isClipAsset = id.includes("_clip_");
 
-            console.log(`🔄 UPDATE Asset ${id}:`);
-            console.log(`  - isClipAsset: ${isClipAsset}`);
-            console.log(`  - isSemantic: ${isSemantic} (type: ${typeof isSemantic})`);
-            console.log(
-              `  - confidenceThreshold: ${confidenceThreshold} (type: ${typeof confidenceThreshold})`
-            );
-            console.log(`  - clips count: ${clips?.length || 0}`);
-
-            // For clip assets, we only want to show the single clip marker
-            // For full assets, we show all clips that pass the confidence threshold
             let filteredClips;
             if (isClipAsset) {
-              // This is a clip asset, so clips array should contain only one clip
-              // But let's be extra careful and ensure we only process valid clips
               filteredClips = (clips || []).filter((clip) => {
                 const hasValidTimes =
                   (clip.start_timecode && clip.end_timecode) ||
                   (typeof clip.start === "number" && typeof clip.end === "number");
-                console.log(`    UPDATE: Validating clip:`, {
-                  hasValidTimes,
-                  start_timecode: clip.start_timecode,
-                  end_timecode: clip.end_timecode,
-                  start: clip.start,
-                  end: clip.end,
-                });
                 return hasValidTimes;
               });
-              console.log(
-                `  - Clip asset: updating ${filteredClips.length} of ${
-                  clips?.length || 0
-                } marker(s)`
-              );
             } else {
-              // This is a full asset, show all clips from API response
-              // Only apply confidence filtering if explicitly enabled and threshold > 0
               const shouldFilter = isSemantic && confidenceThreshold > 0;
-              console.log(
-                `  - shouldFilter: ${shouldFilter} (isSemantic=${isSemantic} && confidenceThreshold=${confidenceThreshold} > 0)`
-              );
 
               filteredClips = shouldFilter
                 ? clips.filter((clip) => {
                     const score = clip.score ?? 1;
-                    const passes = score >= confidenceThreshold;
-                    console.log(
-                      `    UPDATE Clip ${clip.start_timecode}-${clip.end_timecode}: score=${score}, threshold=${confidenceThreshold}, passes=${passes}`
-                    );
-                    return passes;
+                    return score >= confidenceThreshold;
                   })
-                : clips; // Show all clips when not filtering
-
-              console.log(
-                `  - Full asset: updating ${filteredClips.length} of ${clips.length} markers${
-                  shouldFilter ? ` (confidence >= ${confidenceThreshold})` : " (all clips)"
-                }`
-              );
+                : clips;
             }
 
             filteredClips.forEach((clip) => {
@@ -605,24 +504,12 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     : undefined;
 
               if (start !== undefined && end !== undefined) {
-                // Skip markers that have very short duration (likely unwanted markers)
-                // Only skip clips starting at 0 if they're very short (< 1 second)
+                // Skip markers with very short duration
                 if ((start === 0 && end - start < 1) || (start < 2 && end - start < 1)) {
-                  console.log(
-                    `  ⚠️ UPDATE: Skipping unwanted short marker: ${start}s - ${end}s (duration: ${
-                      end - start
-                    }s)`
-                  );
                   return;
                 }
 
-                // Additional validation: ensure the marker has reasonable duration
                 if (end - start < 1) {
-                  console.log(
-                    `  ⚠️ UPDATE: Skipping marker with too short duration: ${start}s - ${end}s (duration: ${
-                      end - start
-                    }s)`
-                  );
                   return;
                 }
 
@@ -641,25 +528,14 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 // Add marker to progress track when available
                 try {
                   omakasePlayerRef.current.progressMarkerTrack.addMarker(marker);
-                  // Store marker reference for later removal since we don't control the ID
                   markerIdsRef.current.push(marker.id || `${start}-${end}`);
-                  console.log(
-                    `  ✅ Added marker: ${marker.id || "auto-generated"} (${start}s-${end}s)`
-                  );
 
                   // For clip assets, seek to the beginning of the clip
                   if (isClipAsset) {
                     try {
-                      // Use video.seekToTime for both video and audio assets
                       omakasePlayerRef.current.video.seekToTime(start);
-                      console.log(
-                        `  🎯 UPDATE: Seeked to clip start time: ${start}s for ${assetType.toLowerCase()} clip asset ${id}`
-                      );
                     } catch (seekError) {
-                      console.warn(
-                        `  ⚠️ UPDATE: Failed to seek to clip start time ${start}s for ${assetType.toLowerCase()} asset:`,
-                        seekError
-                      );
+                      console.warn(`Failed to seek to clip start time ${start}s:`, seekError);
                     }
                   }
                 } catch (e) {
@@ -667,10 +543,6 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 }
               }
             });
-
-            console.log(
-              `🎯 SUMMARY for Asset ${id}: Created ${markerIdsRef.current.length} markers from ${filteredClips.length} filtered clips (out of ${clips.length} total clips)`
-            );
           } catch (e) {
             console.error("Failed to update semantic markers:", e);
           }
@@ -704,7 +576,9 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
             // Also update any video elements within the player container
             const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
-            const playerContainer = document.getElementById(`omakase-player-${sanitizedId}`);
+            const playerContainer = document.getElementById(
+              `omakase-player-${sanitizedId}-${instanceSuffix}`
+            );
             if (playerContainer) {
               // Find all video elements within the container and update them
               const videoElements = playerContainer.querySelectorAll("video");
@@ -712,14 +586,12 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                 video.style.objectFit = objectFitValue;
               });
             }
-
-            console.log(`Updated video object-fit to: ${objectFitValue} for asset ${id}`);
           }
         } catch (error) {
           console.warn(`Failed to update video object-fit for asset ${id}:`, error);
         }
       }
-    }, [thumbnailScale, assetType, id]); // Update object-fit when thumbnailScale changes
+    }, [thumbnailScale, assetType, id, instanceSuffix]);
 
     const isCompact = variant === "compact";
 
@@ -780,7 +652,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     }, []);
 
     // Determine if buttons should be visible
-    const shouldShowButtons = isHovering || isMenuClicked;
+    const shouldShowButtons = isHovering || isMenuClicked || compactMenuOpen;
 
     // Create a mapping between API field IDs and card field IDs based on the new API response structure
     const fieldMapping: Record<string, string> = {
@@ -890,11 +762,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         onMouseLeave={() => setIsHovering(false)}
       >
         {/* Thumbnail area */}
-        <Box sx={{ p: isCompact ? 1 : 0, pb: 0, position: "relative" }}>
+        <Box sx={{ p: 0, pb: 0, position: "relative" }}>
           <Box
             sx={{
-              height: isCompact ? 120 : dimensions.height,
-              borderRadius: isCompact ? 2.5 : 0,
+              height: isCompact ? 140 : dimensions.height,
+              borderRadius: isCompact ? 0 : 0,
               overflow: "hidden",
               bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
               display: "flex",
@@ -917,7 +789,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                   }}
                 >
                   <div
-                    id={`omakase-player-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
+                    id={`omakase-player-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}-${instanceSuffix}`}
                     style={{ width: "100%", height: "100%" }}
                   />
                 </div>
@@ -954,114 +826,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               />
             )}
 
-            {/* Hover overlay with action buttons (compact variant only) */}
-            {isCompact && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  bgcolor: (theme) => alpha(theme.palette.common.black, 0.5),
-                  opacity: shouldShowButtons ? 1 : 0,
-                  transition: "opacity 0.2s ease-in-out",
-                  pointerEvents: shouldShowButtons ? "auto" : "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 0.5,
-                  borderRadius: 2.5,
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {!isClipMode && (
-                  <IconButton
-                    size="small"
-                    onClick={handleDownloadClick}
-                    sx={{
-                      color: "common.white",
-                      bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
-                      backdropFilter: "blur(4px)",
-                      "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
-                      width: 30,
-                      height: 30,
-                    }}
-                    title={t("common.actions.download")}
-                  >
-                    <DownloadIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                )}
-
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddToCollectionClick?.(e);
-                  }}
-                  sx={{
-                    color: "common.white",
-                    bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
-                    backdropFilter: "blur(4px)",
-                    "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
-                    width: 30,
-                    height: 30,
-                  }}
-                  title={
-                    showRemoveButton
-                      ? t("common.actions.removeFromCollection")
-                      : t("common.actions.addToCollection")
-                  }
-                >
-                  {showRemoveButton ? (
-                    <RemoveIcon sx={{ fontSize: 16 }} />
-                  ) : (
-                    <AddIcon sx={{ fontSize: 16 }} />
-                  )}
-                </IconButton>
-
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onFavoriteToggle?.(e);
-                  }}
-                  sx={{
-                    color: isFavorite ? "#FC8181" : "common.white",
-                    bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
-                    backdropFilter: "blur(4px)",
-                    "&:hover": { bgcolor: (theme) => alpha(theme.palette.common.white, 0.3) },
-                    width: 30,
-                    height: 30,
-                  }}
-                  title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
-                  data-testid="favorite-button"
-                >
-                  {isFavorite ? (
-                    <FavoriteIcon sx={{ fontSize: 16 }} />
-                  ) : (
-                    <FavoriteBorderIcon sx={{ fontSize: 16 }} />
-                  )}
-                </IconButton>
-
-                {!isClipMode && (
-                  <IconButton
-                    size="small"
-                    onClick={handleDeleteClick}
-                    sx={{
-                      color: "common.white",
-                      bgcolor: (theme) => alpha(theme.palette.common.white, 0.15),
-                      backdropFilter: "blur(4px)",
-                      "&:hover": {
-                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.6),
-                      },
-                      width: 30,
-                      height: 30,
-                    }}
-                    title={t("common.actions.delete")}
-                  >
-                    <DeleteIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                )}
-              </Box>
-            )}
+            {/* No overlay on thumbnail for compact variant — actions are in the info section below */}
           </Box>
         </Box>
 
@@ -1344,34 +1109,162 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               )}
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  fontSize: "0.7rem",
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {visibleFields
                   .filter((f) => f.id !== "name")
                   .map((f) => String(renderField(f.id)))
                   .filter(Boolean)
                   .join(" · ")}
               </Typography>
-              {assetType && (
-                <Box
-                  component="span"
-                  sx={(theme) => ({
-                    display: "inline-flex",
-                    alignItems: "center",
-                    height: 20,
-                    px: 1,
-                    borderRadius: 10,
-                    fontSize: "0.65rem",
-                    fontWeight: 500,
-                    color: theme.palette.primary.main,
-                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                    border: "1px solid",
-                    borderColor: alpha(theme.palette.primary.main, 0.2),
-                    whiteSpace: "nowrap",
-                  })}
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.5, flexShrink: 0 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Quick favorite toggle */}
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFavoriteToggle?.(e);
+                  }}
+                  sx={{
+                    p: 0.25,
+                    color: isFavorite ? "error.main" : "text.secondary",
+                    transition: "color 0.15s ease",
+                    "&:hover": {
+                      color: isFavorite ? "error.dark" : "error.main",
+                      bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                    },
+                  }}
+                  title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+                  data-testid="favorite-button"
                 >
-                  {assetType}
-                </Box>
-              )}
+                  {isFavorite ? (
+                    <FavoriteIcon sx={{ fontSize: 16 }} />
+                  ) : (
+                    <FavoriteBorderIcon sx={{ fontSize: 16 }} />
+                  )}
+                </IconButton>
+                {/* More actions menu trigger */}
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCompactMenuAnchor(e.currentTarget);
+                  }}
+                  sx={{
+                    p: 0.25,
+                    color: "text.secondary",
+                    "&:hover": {
+                      color: "primary.main",
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                    },
+                  }}
+                  aria-label={t("common.actions.more", "More actions")}
+                  aria-controls={compactMenuOpen ? "compact-asset-menu" : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={compactMenuOpen ? "true" : undefined}
+                >
+                  <MoreHorizIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+                <Menu
+                  id="compact-asset-menu"
+                  anchorEl={compactMenuAnchor}
+                  open={compactMenuOpen}
+                  onClose={(e: React.SyntheticEvent) => {
+                    e.stopPropagation?.();
+                    setCompactMenuAnchor(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                  transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  slotProps={{
+                    paper: {
+                      elevation: 3,
+                      sx: {
+                        minWidth: 180,
+                        borderRadius: 2,
+                        mt: -0.5,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        "& .MuiMenuItem-root": {
+                          fontSize: "0.82rem",
+                          py: 0.75,
+                          gap: 1,
+                        },
+                      },
+                    },
+                  }}
+                >
+                  {!isClipMode && (
+                    <MenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCompactMenuAnchor(null);
+                        handleDownloadClick(e);
+                      }}
+                      disabled={isRenaming}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ListItemIcon>
+                        <DownloadIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText>{t("common.actions.download")}</ListItemText>
+                    </MenuItem>
+                  )}
+                  <MenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCompactMenuAnchor(null);
+                      onAddToCollectionClick?.(e);
+                    }}
+                  >
+                    <ListItemIcon>
+                      {showRemoveButton ? (
+                        <RemoveIcon fontSize="small" />
+                      ) : (
+                        <AddIcon fontSize="small" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText>
+                      {showRemoveButton
+                        ? t("common.actions.removeFromCollection")
+                        : t("common.actions.addToCollection")}
+                    </ListItemText>
+                  </MenuItem>
+                  {!isClipMode && (
+                    <MenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCompactMenuAnchor(null);
+                        handleDeleteClick(e);
+                      }}
+                      sx={{
+                        color: "error.main",
+                        "&:hover": {
+                          bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <DeleteIcon fontSize="small" sx={{ color: "error.main" }} />
+                      </ListItemIcon>
+                      <ListItemText>{t("common.actions.delete")}</ListItemText>
+                    </MenuItem>
+                  )}
+                </Menu>
+              </Box>
             </Box>
           </Box>
         )}
@@ -1551,50 +1444,5 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     );
   }
 );
-
-// Utility function to iterate through all video asset divs and log their IDs
-export const logAllVideoAssetIds = () => {
-  const videoAssetDivs = document.querySelectorAll('[id^="video-asset-"]');
-  console.log(`Found ${videoAssetDivs.length} video asset divs:`);
-
-  videoAssetDivs.forEach((div) => {
-    const id = div.id;
-    const assetId = id.replace("video-asset-", "");
-    console.log(`Video Asset ID: ${assetId}`);
-
-    // Also log the corresponding Omakase player ID
-    const playerId = `omakase-player-${assetId}`;
-    const playerElement = document.getElementById(playerId);
-    if (playerElement) {
-      console.log(`  └─ Omakase Player ID: ${playerId} (found)`);
-    } else {
-      console.log(`  └─ Omakase Player ID: ${playerId} (not found)`);
-    }
-  });
-
-  return Array.from(videoAssetDivs).map((div) => div.id.replace("video-asset-", ""));
-};
-
-// Utility function to get all video asset IDs as an array
-export const getAllVideoAssetIds = (): string[] => {
-  const videoAssetDivs = document.querySelectorAll('[id^="video-asset-"]');
-  return Array.from(videoAssetDivs).map((div) => div.id.replace("video-asset-", ""));
-};
-
-// Utility function to get a specific video asset div by asset ID
-export const getVideoAssetDiv = (assetId: string): HTMLDivElement | null => {
-  return document.getElementById(`video-asset-${assetId}`) as HTMLDivElement;
-};
-
-// Utility function to get all Omakase player IDs
-export const getAllOmakasePlayerIds = (): string[] => {
-  const playerDivs = document.querySelectorAll('[id^="omakase-player-"]');
-  return Array.from(playerDivs).map((div) => div.id);
-};
-
-// Utility function to get a specific Omakase player element by asset ID
-export const getOmakasePlayerElement = (assetId: string): HTMLDivElement | null => {
-  return document.getElementById(`omakase-player-${assetId}`) as HTMLDivElement;
-};
 
 export default AssetCard;

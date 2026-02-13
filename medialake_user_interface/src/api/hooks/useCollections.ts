@@ -235,6 +235,8 @@ export interface CollectionAssetsResponse {
 }
 
 // Hook to get all collections for the current user
+export const COLLECTIONS_PAGE_SIZE = 1000;
+
 export const useGetCollections = (filters?: Record<string, any>) => {
   const { showError } = useErrorModal();
 
@@ -243,6 +245,7 @@ export const useGetCollections = (filters?: Record<string, any>) => {
     queryFn: async ({ signal }) => {
       try {
         const params = new URLSearchParams();
+        params.append("limit", String(COLLECTIONS_PAGE_SIZE));
         if (filters) {
           Object.entries(filters).forEach(([key, value]) => {
             if (value !== undefined && value !== null) {
@@ -251,9 +254,7 @@ export const useGetCollections = (filters?: Record<string, any>) => {
           });
         }
 
-        const url = params.toString()
-          ? `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`
-          : API_ENDPOINTS.COLLECTIONS.BASE;
+        const url = `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`;
 
         const response = await apiClient.get<CollectionsResponse>(url, {
           signal,
@@ -385,11 +386,20 @@ export const useCreateCollection = () => {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch collections list
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
       });
+      // If a sub-collection was created, also invalidate the parent's children and detail queries
+      if (variables.parentId) {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.COLLECTIONS.children(variables.parentId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.COLLECTIONS.detail(variables.parentId),
+        });
+      }
     },
   });
 };

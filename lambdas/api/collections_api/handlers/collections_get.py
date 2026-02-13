@@ -1,4 +1,4 @@
-"""GET /collections - List collections with filtering and pagination."""
+"""GET /collections - List collections."""
 
 import os
 from typing import Any
@@ -23,7 +23,7 @@ from db_models import ChildReferenceModel, CollectionModel
 from models import ListCollectionsQueryParams
 from pynamodb.exceptions import QueryError
 from user_auth import extract_user_context
-from utils.pagination_utils import apply_sorting, create_cursor, parse_cursor
+from utils.pagination_utils import apply_sorting
 
 # Initialize DynamoDB resource for dynamic item count queries
 dynamodb = boto3.resource("dynamodb")
@@ -34,8 +34,8 @@ logger = Logger(service="collections-get", level=os.environ.get("LOG_LEVEL", "IN
 tracer = Tracer(service="collections-get")
 metrics = Metrics(namespace="medialake", service="collections")
 
-DEFAULT_LIMIT = 20
-MAX_LIMIT = 100
+DEFAULT_LIMIT = 1000
+MAX_LIMIT = 1000
 
 
 def register_route(app):
@@ -44,7 +44,7 @@ def register_route(app):
     @app.get("/collections")
     @tracer.capture_method
     def collections_get():
-        """Get list of collections with comprehensive filtering and pagination"""
+        """Get list of collections up to the requested limit (default 1000)"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
             user_id = user_context.get("user_id")
@@ -53,7 +53,6 @@ def register_route(app):
             try:
                 # Build query params dict - use field names, not aliases
                 query_params_dict = {
-                    "cursor": app.current_event.get_query_string_value("cursor"),
                     "limit": int(
                         app.current_event.get_query_string_value("limit", DEFAULT_LIMIT)
                     ),
@@ -100,40 +99,23 @@ def register_route(app):
                 },
             )
 
-            # Parse cursor for pagination
-            start_key = None
-            parsed_cursor = parse_cursor(query_params.cursor)
-            if parsed_cursor:
-                start_key = {
-                    "PK": parsed_cursor.get("pk"),
-                    "SK": parsed_cursor.get("sk"),
-                }
-                if parsed_cursor.get("gsi_pk"):
-                    start_key["GSI1_PK"] = parsed_cursor.get("gsi_pk")
-                if parsed_cursor.get("gsi_sk"):
-                    start_key["GSI1_SK"] = parsed_cursor.get("gsi_sk")
-
             # Determine query strategy based on filters
             if query_params.filter_parentId:
                 items = _query_child_collections(
-                    query_params.filter_parentId, query_params.limit, start_key
+                    query_params.filter_parentId, query_params.limit
                 )
             elif query_params.filter_ownerId:
                 items = _query_collections_by_owner(
-                    query_params.filter_ownerId, query_params.limit, start_key
+                    query_params.filter_ownerId, query_params.limit
                 )
             elif query_params.filter_type:
                 items = _query_collections_by_type(
-                    query_params.filter_type, query_params.limit, start_key
+                    query_params.filter_type, query_params.limit
                 )
             else:
-                items = _query_all_collections(query_params.limit, start_key)
+                items = _query_all_collections(query_params.limit)
 
             # Filter collections based on privacy and ownership
-            # This ensures:
-            # - Public collections are visible to authenticated users only
-            # - Private collections are only visible to their owners
-            # - Unauthenticated users see no collections
             items = _filter_collections_by_access(items, user_id)
 
             # Apply group filtering if groupIds parameter provided (OR logic)
@@ -146,14 +128,11 @@ def register_route(app):
                     if gid.strip()
                 ]
                 if group_id_list:
-                    # Get all collection IDs from specified groups
                     collection_ids_from_groups = set(
                         get_collection_ids_by_group_ids(
                             collections_table, group_id_list
                         )
                     )
-
-                    # Filter items to only include collections in the groups (AND logic with other filters)
                     items = [
                         item
                         for item in items
@@ -170,9 +149,8 @@ def register_route(app):
                         }
                     )
 
-            has_more = len(items) > query_params.limit
-            if has_more:
-                items = items[: query_params.limit]
+            # Trim to limit
+            items = items[: query_params.limit]
 
             # Apply post-query filters
             if query_params.filter_status or query_params.filter_search:
@@ -195,29 +173,12 @@ def register_route(app):
             # Apply sorting
             sorted_items = apply_sorting(formatted_items, query_params.sort)
 
-            # Create pagination
+            # Simplified pagination metadata (no cursor)
             pagination = {
-                "has_next_page": has_more,
-                "has_prev_page": query_params.cursor is not None,
+                "has_next_page": False,
+                "has_prev_page": False,
                 "limit": query_params.limit,
             }
-
-            if has_more and items:
-                last_item = items[-1]
-                gsi_pk = None
-                gsi_sk = None
-
-                if query_params.filter_ownerId:
-                    gsi_pk = f"{USER_PK_PREFIX}{query_params.filter_ownerId}"
-                    gsi_sk = last_item.get("lastAccessed", last_item.get("updatedAt"))
-                elif query_params.filter_type:
-                    gsi_pk = query_params.filter_type
-                    gsi_sk = last_item["SK"]
-
-                next_cursor = create_cursor(
-                    last_item["PK"], last_item["SK"], gsi_pk, gsi_sk
-                )
-                pagination["next_cursor"] = next_cursor
 
             metrics.add_metric(
                 name="SuccessfulCollectionRetrievals", unit=MetricUnit.Count, value=1
@@ -249,56 +210,49 @@ def register_route(app):
 
 # Helper functions
 @tracer.capture_method
-def _query_collections_by_owner(user_id, limit, start_key):
-    """Query collections by owner using GSI1 - PynamoDB doesn't easily support GSI queries without index classes"""
-    # For now, we'll use a workaround - query all and filter
-    # In production, you'd want to define GSI index classes in db_models.py
+def _query_collections_by_owner(user_id, limit):
+    """Query collections by owner, paginating through DynamoDB until limit is reached."""
     items = []
     try:
-        # Query using the primary key pattern
-        # This is a simplified version - ideally use GSI
         for collection in CollectionModel.query(
             f"{USER_PK_PREFIX}{user_id}",
-            limit=limit + 1,
         ):
-            # Filter out collection groups and ensure owner matches
             if collection.ownerId == user_id and collection.PK.startswith(
                 COLLECTION_PK_PREFIX
             ):
                 items.append(_model_to_dict(collection))
+                if len(items) >= limit:
+                    break
     except QueryError as e:
         logger.warning(f"Error querying collections by owner: {e}")
     except Exception as e:
         logger.warning(f"Query not supported, falling back to scan: {e}")
-        # Fallback: query all collections and filter
         items = []
-        for collection in _query_all_collections(limit, start_key):
+        for collection in _query_all_collections(limit):
             if collection.get("ownerId") == user_id and collection.get(
                 "PK", ""
             ).startswith(COLLECTION_PK_PREFIX):
                 items.append(collection)
-                if len(items) > limit:
+                if len(items) >= limit:
                     break
 
-    return items[: limit + 1]
+    return items[:limit]
 
 
 @tracer.capture_method
-def _query_all_collections(limit, start_key):
-    """Query all collections using GSI5"""
+def _query_all_collections(limit):
+    """Scan all collections, paginating through DynamoDB until limit is reached."""
     items = []
     try:
-        # Query all collections - simplified without GSI for now
-        # In production, define GSI5 index class in db_models.py
-        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
-            limit=limit + 1,
             filter_condition=(
                 (CollectionModel.SK == METADATA_SK)
                 & (CollectionModel.PK.startswith(COLLECTION_PK_PREFIX))
             ),
         ):
             items.append(_model_to_dict(collection))
+            if len(items) >= limit:
+                break
     except Exception as e:
         logger.warning(f"Error querying all collections: {e}")
 
@@ -306,14 +260,11 @@ def _query_all_collections(limit, start_key):
 
 
 @tracer.capture_method
-def _query_collections_by_type(collection_type_id, limit, start_key):
-    """Query collections by type using GSI3"""
+def _query_collections_by_type(collection_type_id, limit):
+    """Scan collections by type, paginating through DynamoDB until limit is reached."""
     items = []
     try:
-        # Simplified - scan and filter by type
-        # Filter out collection groups (PK starts with GROUP#)
         for collection in CollectionModel.scan(
-            limit=limit + 1,
             filter_condition=(
                 (CollectionModel.SK == METADATA_SK)
                 & (CollectionModel.collectionTypeId == collection_type_id)
@@ -321,6 +272,8 @@ def _query_collections_by_type(collection_type_id, limit, start_key):
             ),
         ):
             items.append(_model_to_dict(collection))
+            if len(items) >= limit:
+                break
     except Exception as e:
         logger.warning(f"Error querying collections by type: {e}")
 
@@ -328,26 +281,25 @@ def _query_collections_by_type(collection_type_id, limit, start_key):
 
 
 @tracer.capture_method
-def _query_child_collections(parent_id, limit, start_key):
-    """Query child collections by parent ID using CHILD# references"""
+def _query_child_collections(parent_id, limit):
+    """Query child collections by parent ID, paginating until limit is reached."""
     logger.info(f"Querying child collections for parent: {parent_id}")
 
     child_items = []
     try:
-        # Query for child references using PynamoDB
         for child_ref in ChildReferenceModel.query(
             f"{COLLECTION_PK_PREFIX}{parent_id}",
             ChildReferenceModel.SK.startswith(CHILD_SK_PREFIX),
-            limit=limit + 1,
         ):
             child_id = child_ref.childCollectionId
             if child_id:
                 try:
-                    # Get full collection data
                     collection = CollectionModel.get(
                         f"{COLLECTION_PK_PREFIX}{child_id}", METADATA_SK
                     )
                     child_items.append(_model_to_dict(collection))
+                    if len(child_items) >= limit:
+                        break
                 except Exception as e:
                     logger.warning(f"Failed to get child collection {child_id}: {e}")
     except Exception as e:

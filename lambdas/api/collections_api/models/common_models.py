@@ -66,8 +66,10 @@ class ApiResponse(BaseModel):
 class ListCollectionsQueryParams(BaseModel):
     """Query parameters for listing collections."""
 
-    cursor: Optional[str] = Field(None, description="Pagination cursor")
-    limit: int = Field(default=20, ge=1, le=100, description="Number of results")
+    cursor: Optional[str] = Field(
+        None, description="Pagination cursor (unused, kept for API compatibility)"
+    )
+    limit: int = Field(default=1000, ge=1, le=1000, description="Number of results")
     filter_type: Optional[str] = Field(None, alias="filter[type]")
     filter_ownerId: Optional[str] = Field(None, alias="filter[ownerId]")
     filter_parentId: Optional[str] = Field(None, alias="filter[parentId]")

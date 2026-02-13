@@ -6,12 +6,13 @@ import { alpha } from "@mui/material/styles";
 
 interface RightSidebarProps {
   children: ReactNode;
+  alwaysVisible?: boolean;
 }
 
 const MIN_WIDTH = 275;
 const MAX_WIDTH = 600;
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisible = false }) => {
   const { isExpanded, setIsExpanded, width, setWidth, hasSelectedItems } = useRightSidebar();
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
@@ -57,7 +58,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children }) => {
 
   // Don't render sidebar UI when there are no selected items,
   // but always render children so TabbedSidebar can sync hasSelectedItems
-  if (!hasSelectedItems) {
+  if (!alwaysVisible && !hasSelectedItems) {
     return <Box sx={{ display: "none" }}>{children}</Box>;
   }
 
