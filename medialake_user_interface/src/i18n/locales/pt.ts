@@ -333,13 +333,16 @@ export default {
       label: "Semântica",
       enable: "Ativar pesquisa semântica",
       disable: "Desativar pesquisa semântica",
-      configure: "Clique para configurar a pesquisa semântica",
       configDialog: {
         title: "Pesquisa Semântica Não Configurada",
         description:
           "A pesquisa semântica não está configurada ou está desativada. Para ativar este recurso, vá para Configurações do Sistema > Pesquisa para configurar um provedor de pesquisa, ou pressione o botão abaixo.",
         goToSettings: "Ir para Configurações de Pesquisa",
       },
+    },
+    mode: {
+      fullTooltip: "Agrupar todas as correspondências em cada ativo",
+      clipTooltip: "Mostrar cada correspondência como um resultado separado",
     },
     filters: {
       title: "Filtrar Resultados",
@@ -357,7 +360,8 @@ export default {
     },
     bar: {
       label: "Pesquisar",
-      placeholder: "Pesquisar (ex: pôr do sol type:image)",
+      placeholder: "Pesquisar (ex: mountains)",
+      placeholderSemantic: "Pesquisar (ex: a peaceful place)",
       helperText:
         "Use palavras-chave como type:, format:, size:, date:, metadata: para filtrar resultados",
     },
@@ -790,6 +794,8 @@ export default {
     },
   },
   common: {
+    full: "Completo",
+    clip: "Clip",
     back: "Voltar",
     search: "Pesquisar",
     public: "Público",
@@ -882,8 +888,7 @@ export default {
     enabled: "Ativado",
     disabled: "Desativado",
     versions: "Versões",
-    full: "Completo",
-    clip: "Clipe",
+
     none: "Nenhum",
     clearChatHistory: "Limpar histórico do chat",
     closeChat: "Fechar chat",

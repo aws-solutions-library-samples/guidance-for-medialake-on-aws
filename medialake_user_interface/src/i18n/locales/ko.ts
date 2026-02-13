@@ -328,13 +328,16 @@ export default {
       label: "시맨틱",
       enable: "시맨틱 검색 활성화",
       disable: "시맨틱 검색 비활성화",
-      configure: "클릭하여 시맨틱 검색 구성",
       configDialog: {
         title: "시맨틱 검색이 구성되지 않음",
         description:
           "시맨틱 검색이 현재 구성되지 않았거나 비활성화되어 있습니다. 이 기능을 활성화하려면 시스템 설정 > 검색으로 이동하여 검색 제공업체를 구성하거나 아래 버튼을 누르세요.",
         goToSettings: "검색 설정으로 이동",
       },
+    },
+    mode: {
+      fullTooltip: "모든 일치 항목을 각 자산 아래에 그룹화",
+      clipTooltip: "각 일치 항목을 별도의 결과로 표시",
     },
     filters: {
       title: "결과 필터링",
@@ -352,7 +355,8 @@ export default {
     },
     bar: {
       label: "검색",
-      placeholder: "검색 (예: sunset type:image)",
+      placeholder: "검색 (예: mountains)",
+      placeholderSemantic: "검색 (예: a peaceful place)",
       helperText: "type:, format:, size:, date:, metadata: 등의 키워드를 사용하여 결과 필터링",
     },
     results: {
@@ -779,6 +783,8 @@ export default {
     },
   },
   common: {
+    full: "전체",
+    clip: "클립",
     back: "뒤로",
     search: "검색",
     public: "공개",
@@ -839,8 +845,7 @@ export default {
     enabled: "활성화",
     disabled: "비활성화",
     versions: "버전",
-    full: "전체",
-    clip: "클립",
+
     none: "없음",
     clearChatHistory: "채팅 기록 지우기",
     closeChat: "채팅 닫기",

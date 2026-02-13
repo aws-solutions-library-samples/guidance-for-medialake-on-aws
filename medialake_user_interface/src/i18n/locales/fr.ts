@@ -334,13 +334,16 @@ export default {
       label: "Sémantique",
       enable: "Activer la recherche sémantique",
       disable: "Désactiver la recherche sémantique",
-      configure: "Cliquez pour configurer la recherche sémantique",
       configDialog: {
         title: "Recherche sémantique non configurée",
         description:
           "La recherche sémantique n'est actuellement pas configurée ou est désactivée. Pour activer cette fonctionnalité, allez dans Paramètres système > Recherche pour configurer un fournisseur de recherche, ou appuyez sur le bouton ci-dessous.",
         goToSettings: "Aller aux paramètres de recherche",
       },
+    },
+    mode: {
+      fullTooltip: "Regrouper toutes les correspondances sous chaque asset",
+      clipTooltip: "Afficher chaque correspondance comme un résultat séparé",
     },
     filters: {
       title: "Filtrer les résultats",
@@ -359,6 +362,7 @@ export default {
     bar: {
       label: "Rechercher",
       placeholder: "Rechercher (par ex., coucher de soleil type:image)",
+      placeholderSemantic: "Rechercher (par ex., un endroit paisible)",
       helperText:
         "Utilisez des mots-clés comme type:, format:, size:, date:, metadata: pour filtrer les résultats",
     },
@@ -747,6 +751,8 @@ export default {
     },
   },
   common: {
+    full: "Complet",
+    clip: "Clip",
     back: "Retour",
     search: "Rechercher",
     public: "Public",
@@ -839,8 +845,7 @@ export default {
     enabled: "Activé",
     disabled: "Désactivé",
     versions: "Versions",
-    full: "Complet",
-    clip: "Clip",
+
     none: "Aucun",
     clearChatHistory: "Effacer l'historique du chat",
     closeChat: "Fermer le chat",

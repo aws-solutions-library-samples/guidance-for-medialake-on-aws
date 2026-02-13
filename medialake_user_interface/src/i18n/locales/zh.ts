@@ -326,13 +326,16 @@ export default {
       label: "语义",
       enable: "启用语义搜索",
       disable: "禁用语义搜索",
-      configure: "点击配置语义搜索",
       configDialog: {
         title: "语义搜索未配置",
         description:
           "语义搜索当前未配置或已禁用。要启用此功能，请转到系统设置 > 搜索以配置搜索提供商，或按下面的按钮。",
         goToSettings: "前往搜索设置",
       },
+    },
+    mode: {
+      fullTooltip: "将所有匹配项归入每个资产下",
+      clipTooltip: "将每个匹配项显示为单独的结果",
     },
     filters: {
       title: "筛选结果",
@@ -350,7 +353,8 @@ export default {
     },
     bar: {
       label: "搜索",
-      placeholder: "搜索（例如：sunset type:image）",
+      placeholder: "搜索（例如：mountains）",
+      placeholderSemantic: "搜索（例如：a peaceful place）",
       helperText: "使用关键字如 type:、format:、size:、date:、metadata: 来筛选结果",
     },
     results: {
@@ -777,6 +781,8 @@ export default {
     },
   },
   common: {
+    full: "完整",
+    clip: "片段",
     back: "返回",
     search: "搜索",
     public: "公开",
@@ -835,8 +841,7 @@ export default {
     enabled: "已启用",
     disabled: "已禁用",
     versions: "版本",
-    full: "完整",
-    clip: "片段",
+
     none: "无",
     permissions: "权限",
     root: "根目录",

@@ -329,13 +329,16 @@ export default {
       label: "Semantic",
       enable: "Enable semantic search",
       disable: "Disable semantic search",
-      configure: "Click to configure semantic search",
       configDialog: {
         title: "Semantic Search Not Configured",
         description:
           "Semantic search is currently not configured or disabled. To enable this feature, go to System Settings > Search to configure a search provider, or press the button below.",
         goToSettings: "Go to Search Settings",
       },
+    },
+    mode: {
+      fullTooltip: "Group all matches under each asset",
+      clipTooltip: "Show each match as a separate result",
     },
     filters: {
       title: "Filter Results",
@@ -353,7 +356,8 @@ export default {
     },
     bar: {
       label: "Search",
-      placeholder: "Search (e.g., sunset type:image)",
+      placeholder: "Search (e.g., mountains)",
+      placeholderSemantic: "Search (e.g., a peaceful place)",
       helperText: "Use keywords like type:, format:, size:, date:, metadata: to filter results",
     },
     results: {
@@ -737,6 +741,8 @@ export default {
     },
   },
   common: {
+    full: "Full",
+    clip: "Clip",
     back: "Back",
     search: "Search",
     public: "Public",
@@ -833,8 +839,7 @@ export default {
     enabled: "Enabled",
     disabled: "Disabled",
     versions: "Versions",
-    full: "Full",
-    clip: "Clip",
+
     none: "None",
     clearChatHistory: "Clear chat history",
     closeChat: "Close chat",

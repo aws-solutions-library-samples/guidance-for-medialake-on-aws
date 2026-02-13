@@ -402,6 +402,8 @@ function TopBar() {
     handleCloseUploadModal();
   };
 
+  const hasActiveFilters = Object.keys(filters).filter((k) => k !== "date_range_option").length > 0;
+
   return (
     <Box
       sx={{
@@ -447,193 +449,270 @@ function TopBar() {
             alignItems: "center",
             justifyContent: "center",
             width: "100%",
-            maxWidth: "700px",
+            maxWidth: "750px",
             mx: "auto",
+            gap: 1,
           }}
         >
+          {/* Unified search pill — mirrors Mantine Paper shadow="sm" radius="xl" withBorder */}
           <Box
             ref={searchBoxRef}
             sx={{
               display: "flex",
               alignItems: "center",
-              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
-              borderRadius: "24px",
-              padding: "8px 16px",
+              gap: "6px",
+              backgroundColor:
+                theme === "dark"
+                  ? alpha(muiTheme.palette.background.paper, 0.85)
+                  : muiTheme.palette.background.paper,
+              borderRadius: "9999px",
+              padding: "5px 6px",
+              minHeight: 46,
               width: "100%",
               flexDirection: isRTL ? "row-reverse" : "row",
-              boxShadow: theme === "dark" ? "0 2px 5px rgba(0,0,0,0.2)" : "none",
+              border: `1px solid ${
+                theme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"
+              }`,
+              boxShadow:
+                theme === "dark"
+                  ? "0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)"
+                  : "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+              "&:focus-within": {
+                borderColor: alpha(muiTheme.palette.primary.main, 0.5),
+                boxShadow:
+                  theme === "dark"
+                    ? `0 0 0 2px ${alpha(muiTheme.palette.primary.main, 0.25)}`
+                    : `0 0 0 2px ${alpha(muiTheme.palette.primary.main, 0.15)}`,
+              },
             }}
           >
-            <SearchIcon
-              sx={{
-                color: theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
-                [isRTL ? "ml" : "mr"]: 1.5,
-                fontSize: "20px",
-              }}
-            />
+            {/* Full / Clip Segmented Control */}
+            <SemanticModeToggle isVisible={storeIsSemantic} />
+
+            {/* Search Input — unstyled, flex: 1 like Mantine TextInput variant="unstyled" */}
             <InputBase
-              placeholder={t("common.search")}
+              placeholder={
+                storeIsSemantic
+                  ? t("search.bar.placeholderSemantic", "Search (e.g., a peaceful place)")
+                  : t("search.bar.placeholder", "Search (e.g., mountains)")
+              }
               value={searchInput}
               onChange={handleSearchInputChange}
               onKeyUp={handleSearchKeyPress}
               fullWidth
               sx={{
                 textAlign: isRTL ? "right" : "left",
-                fontSize: "16px",
-                color: theme === "dark" ? "white" : muiTheme.palette.text.primary,
+                fontSize: "14px",
+                color: theme === "dark" ? "#fff" : muiTheme.palette.text.primary,
+                [isRTL ? "mr" : "ml"]: storeIsSemantic ? 0 : 1.5,
                 "& input": {
-                  padding: "6px 0",
+                  padding: "8px 0",
                   "&::placeholder": {
-                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "inherit",
+                    color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.38)",
                     opacity: 1,
                   },
                 },
               }}
             />
 
-            {/* Clear Search Button */}
+            {/* Clear button */}
             {searchInput && (
               <IconButton
                 size="small"
                 onClick={handleClearSearch}
                 sx={{
-                  color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)",
+                  color: theme === "dark" ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.3)",
                   padding: "4px",
-                  [isRTL ? "ml" : "mr"]: 0.5,
+                  flexShrink: 0,
                   "&:hover": {
                     backgroundColor: "transparent",
-                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)",
+                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)",
                   },
                 }}
                 title={t("search.clear", "Clear search")}
               >
-                <ClearIcon fontSize="small" />
+                <ClearIcon sx={{ fontSize: "18px" }} />
               </IconButton>
             )}
 
-            {/* Semantic Mode Toggle */}
-            <SemanticModeToggle isVisible={storeIsSemantic} />
-
-            {/* Filter Button */}
-            <IconButton
-              size="small"
-              onClick={handleOpenFilterModal}
+            {/* Right section: AI toggle + search button — matches Mantine rightSection */}
+            <Box
               sx={{
-                color:
-                  Object.keys(filters).length > 0
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                flexShrink: 0,
+                [isRTL ? "ml" : "mr"]: "1px",
+              }}
+            >
+              {/* Semantic label + Switch */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  flexShrink: 0,
+                }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)",
+                    userSelect: "none",
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {t("search.semantic.label", "Semantic")}
+                </Box>
+                <Box
+                  role="switch"
+                  aria-checked={storeIsSemantic}
+                  aria-label={
+                    storeIsSemantic
+                      ? t("search.semantic.disable", "Disable semantic search")
+                      : t("search.semantic.enable", "Enable semantic search")
+                  }
+                  tabIndex={0}
+                  onClick={handleSemanticSearchToggle}
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSemanticSearchToggle(e as unknown as React.MouseEvent);
+                    }
+                  }}
+                  sx={{
+                    width: 34,
+                    height: 19,
+                    borderRadius: "10px",
+                    backgroundColor: storeIsSemantic
+                      ? muiTheme.palette.primary.main
+                      : theme === "dark"
+                        ? "rgba(255,255,255,0.18)"
+                        : "rgba(0,0,0,0.14)",
+                    position: "relative",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                    flexShrink: 0,
+                    "&:hover": {
+                      backgroundColor: storeIsSemantic
+                        ? muiTheme.palette.primary.dark
+                        : theme === "dark"
+                          ? "rgba(255,255,255,0.25)"
+                          : "rgba(0,0,0,0.2)",
+                    },
+                    "&:focus-visible": {
+                      outline: `2px solid ${muiTheme.palette.primary.main}`,
+                      outlineOffset: "2px",
+                    },
+                    "&::after": {
+                      content: '""',
+                      position: "absolute",
+                      top: "2px",
+                      left: storeIsSemantic ? "17px" : "2px",
+                      width: 15,
+                      height: 15,
+                      borderRadius: "50%",
+                      backgroundColor: "#fff",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                      transition: "left 0.2s ease",
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Vertical divider */}
+              <Box
+                sx={{
+                  width: "1px",
+                  height: 16,
+                  backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.09)",
+                  flexShrink: 0,
+                }}
+              />
+
+              {/* Filter button — inside the pill, between Semantic and search */}
+              <IconButton
+                size="small"
+                onClick={handleOpenFilterModal}
+                sx={{
+                  color: hasActiveFilters
                     ? muiTheme.palette.primary.main
                     : theme === "dark"
-                      ? "rgba(255,255,255,0.5)"
-                      : "rgba(0,0,0,0.4)",
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  color:
-                    Object.keys(filters).length > 0
+                      ? "rgba(255,255,255,0.45)"
+                      : "rgba(0,0,0,0.35)",
+                  padding: "5px",
+                  flexShrink: 0,
+                  position: "relative",
+                  "&:hover": {
+                    backgroundColor:
+                      theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
+                    color: hasActiveFilters
                       ? muiTheme.palette.primary.dark
                       : theme === "dark"
                         ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.6)",
-                },
-                mr: 1,
-              }}
-              title={t("search.filters.title", "Filter Results")}
-            >
-              <FilterListIcon />
-              {Object.keys(filters).length > 0 && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: -2,
-                    right: -2,
-                    backgroundColor: muiTheme.palette.primary.main,
-                    color: muiTheme.palette.primary.contrastText,
-                    borderRadius: "50%",
-                    width: 16,
-                    height: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.75rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {Object.keys(filters).length}
-                </Box>
-              )}
-            </IconButton>
+                        : "rgba(0,0,0,0.55)",
+                  },
+                }}
+                title={t("search.filters.title", "Filter Results")}
+              >
+                <FilterListIcon sx={{ fontSize: "20px" }} />
+                {hasActiveFilters && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: -3,
+                      right: -3,
+                      backgroundColor: muiTheme.palette.primary.main,
+                      color: muiTheme.palette.primary.contrastText,
+                      borderRadius: "50%",
+                      width: 14,
+                      height: 14,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "0.55rem",
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      border: `2px solid ${
+                        theme === "dark"
+                          ? muiTheme.palette.background.paper
+                          : muiTheme.palette.background.paper
+                      }`,
+                      boxSizing: "content-box",
+                    }}
+                  >
+                    {Object.keys(filters).filter((k) => k !== "date_range_option").length}
+                  </Box>
+                )}
+              </IconButton>
+
+              {/* Search icon button */}
+              <IconButton
+                onClick={handleSearchSubmit}
+                sx={{
+                  backgroundColor: muiTheme.palette.primary.main,
+                  color: "#fff",
+                  width: 34,
+                  height: 34,
+                  flexShrink: 0,
+                  transition: "background-color 0.15s, transform 0.1s",
+                  "&:hover": {
+                    backgroundColor: muiTheme.palette.primary.dark,
+                  },
+                  "&:active": {
+                    transform: "scale(0.94)",
+                  },
+                }}
+                title={t("common.search")}
+              >
+                <SearchIcon sx={{ fontSize: "18px" }} />
+              </IconButton>
+            </Box>
           </Box>
-
-          {/* Search Button */}
-          <Button
-            variant="contained"
-            onClick={handleSearchSubmit}
-            sx={{
-              minWidth: "80px",
-              [isRTL ? "mr" : "ml"]: 2,
-              borderRadius: "20px",
-              height: "40px",
-            }}
-          >
-            {t("common.search")}
-          </Button>
-
-          {/* Semantic Search Button */}
-          <Button
-            variant={storeIsSemantic ? "contained" : "outlined"}
-            onClick={handleSemanticSearchToggle}
-            sx={{
-              minWidth: "100px",
-              [isRTL ? "mr" : "ml"]: 2,
-              borderRadius: "20px",
-              height: "40px",
-              color: storeIsSemantic
-                ? muiTheme.palette.primary.contrastText
-                : theme === "dark"
-                  ? "rgba(255,255,255,0.7)"
-                  : "text.secondary",
-              backgroundColor: storeIsSemantic ? muiTheme.palette.primary.main : "transparent",
-              borderColor: storeIsSemantic
-                ? muiTheme.palette.primary.main
-                : theme === "dark"
-                  ? "rgba(255,255,255,0.3)"
-                  : "rgba(0,0,0,0.23)",
-              transition: (theme) =>
-                theme.transitions.create(
-                  ["color", "background-color", "border-color", "transform"],
-                  {
-                    duration: theme.transitions.duration.short,
-                  }
-                ),
-              "&:hover": {
-                backgroundColor: storeIsSemantic
-                  ? muiTheme.palette.primary.dark
-                  : theme === "dark"
-                    ? "rgba(255,255,255,0.08)"
-                    : "rgba(0,0,0,0.04)",
-                transform: "scale(1.02)",
-              },
-              "&:focus": {
-                outline: `2px solid ${
-                  storeIsSemantic ? muiTheme.palette.primary.main : "rgba(0,0,0,0.2)"
-                }`,
-                outlineOffset: "2px",
-              },
-              boxShadow: storeIsSemantic
-                ? `0 0 8px ${alpha(muiTheme.palette.primary.main, 0.4)}`
-                : "none",
-            }}
-            title={
-              !isSemanticSearchEnabled || !isConfigured
-                ? t("search.semantic.configure", "Click to configure semantic search")
-                : storeIsSemantic
-                  ? t("search.semantic.disable", "Disable semantic search")
-                  : t("search.semantic.enable", "Enable semantic search")
-            }
-            aria-pressed={storeIsSemantic}
-          >
-            {t("search.semantic.label", "Semantic")}
-          </Button>
         </Box>
       </Box>
 

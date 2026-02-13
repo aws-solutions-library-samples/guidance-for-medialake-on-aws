@@ -335,13 +335,16 @@ export default {
       label: "Semantisch",
       enable: "Semantische Suche aktivieren",
       disable: "Semantische Suche deaktivieren",
-      configure: "Klicken Sie hier, um die semantische Suche zu konfigurieren",
       configDialog: {
         title: "Semantische Suche nicht konfiguriert",
         description:
           "Die semantische Suche ist derzeit nicht konfiguriert oder deaktiviert. Um diese Funktion zu aktivieren, gehen Sie zu Systemeinstellungen > Suche, um einen Suchanbieter zu konfigurieren, oder drücken Sie die Schaltfläche unten.",
         goToSettings: "Zu Sucheinstellungen gehen",
       },
+    },
+    mode: {
+      fullTooltip: "Alle Treffer unter jedem Asset gruppieren",
+      clipTooltip: "Jeden Treffer als separates Ergebnis anzeigen",
     },
     filters: {
       title: "Ergebnisse filtern",
@@ -360,6 +363,7 @@ export default {
     bar: {
       label: "Suchen",
       placeholder: "Suchen (z.B. Sonnenuntergang type:image)",
+      placeholderSemantic: "Suchen (z.B. ein friedlicher Ort)",
       helperText:
         "Verwenden Sie Schlüsselwörter wie type:, format:, size:, date:, metadata: zum Filtern",
     },
@@ -791,6 +795,8 @@ export default {
     },
   },
   common: {
+    full: "Vollständig",
+    clip: "Clip",
     back: "Zurück",
     search: "Suchen",
     public: "Öffentlich",
@@ -851,8 +857,7 @@ export default {
     enabled: "Aktiviert",
     disabled: "Deaktiviert",
     versions: "Versionen",
-    full: "Vollständig",
-    clip: "Clip",
+
     none: "Keine",
     clearChatHistory: "Chat-Verlauf löschen",
     closeChat: "Chat schließen",
