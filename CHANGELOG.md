@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.8.1] - 2026-02-13
+
+### Bug Fixes
+
+- fix: remove S3 lifecycle policy for code pipeline S3 bucket artifact, keep lifecycle policy for artifacts that can be removed
+- fix: resolve CDK alpha package version mismatch
+
+### Code Refactoring
+
+- refactor: add collection asset cards to collection detail page
+- refactor: number of collections is more than 30 on collections
+- refactor: refactore the search bar
+- refactor: dashboard thumbnails
+
 ## [1.8.0] - 2026-02-09
 
 ### Features
