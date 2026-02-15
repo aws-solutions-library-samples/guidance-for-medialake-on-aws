@@ -94,7 +94,49 @@ def _delete_group_with_rollback(
                 )
                 raise
 
-        # Step 4: Delete from DynamoDB in batches
+        # Step 4: Delete the associated Permission Set (if any)
+        group_metadata = None
+        for item in items:
+            if item.get("SK") == "METADATA":
+                group_metadata = item
+                break
+
+        if group_metadata:
+            permission_set_id = group_metadata.get("permissionSetId")
+            assigned_ps = group_metadata.get("assignedPermissionSets", [])
+
+            # Collect all permission set IDs to delete
+            ps_ids_to_delete = set()
+            if permission_set_id:
+                ps_ids_to_delete.add(permission_set_id)
+            if assigned_ps:
+                for ps_id in assigned_ps:
+                    ps_ids_to_delete.add(ps_id)
+
+            for ps_id in ps_ids_to_delete:
+                try:
+                    logger.info(
+                        f"Deleting associated permission set: {ps_id}",
+                        extra={"group_id": group_id},
+                    )
+                    table.delete_item(Key={"PK": f"PS#{ps_id}", "SK": "METADATA"})
+                    logger.info(
+                        f"Successfully deleted permission set: {ps_id}",
+                        extra={"group_id": group_id},
+                    )
+                    metrics.add_metric(
+                        name="PermissionSetAutoDeleted",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                except ClientError as ps_error:
+                    # Log but don't fail - continue with group deletion
+                    logger.warning(
+                        f"Failed to delete permission set: {ps_id}: {str(ps_error)}",
+                        extra={"group_id": group_id},
+                    )
+
+        # Step 5: Delete from DynamoDB in batches
         logger.info(f"Deleting DynamoDB items for group: {group_id}")
         batch_size = 25  # DynamoDB batch write limit
 

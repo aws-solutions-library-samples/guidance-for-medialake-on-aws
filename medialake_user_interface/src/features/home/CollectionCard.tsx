@@ -19,7 +19,7 @@ import {
   BookmarkBorder,
   LocalOffer,
 } from "@mui/icons-material";
-import { useGetCollectionTypes } from "@/api/hooks/useCollections";
+import { useCollectionCollectionTypes } from "@/api/hooks/useCollectionCollectionTypes";
 import { ALL_ICONS } from "@/components/collections/ThumbnailSelector";
 import type { Collection } from "../../types/collection";
 
@@ -50,7 +50,8 @@ interface CollectionCardProps {
 
 export const CollectionCard: React.FC<CollectionCardProps> = ({ collection }) => {
   // Fetch collection types to get icon and color
-  const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
+    useCollectionCollectionTypes();
   const collectionTypes = collectionTypesResponse?.data || [];
 
   // Find the collection type for this collection

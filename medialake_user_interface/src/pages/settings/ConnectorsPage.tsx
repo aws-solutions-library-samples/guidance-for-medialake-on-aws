@@ -5,6 +5,7 @@ import { Add as AddIcon } from "@mui/icons-material";
 import ConnectorCard from "@/features/settings/connectors/components/ConnectorCard";
 import ConnectorModal from "@/features/settings/connectors/components/ConnectorModal";
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   useGetConnectors,
   useDeleteConnector,
@@ -17,6 +18,12 @@ import queryClient from "@/api/queryClient";
 
 const ConnectorsPage: React.FC = () => {
   const { t } = useTranslation();
+
+  // Permission checks for connector actions
+  const createConnectorPermission = useActionPermission("create", "connector");
+  const editConnectorPermission = useActionPermission("edit", "connector");
+  const deleteConnectorPermission = useActionPermission("delete", "connector");
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConnector, setEditingConnector] = useState<ConnectorResponse | undefined>();
   const [alert, setAlert] = useState<{
@@ -150,7 +157,13 @@ const ConnectorsPage: React.FC = () => {
         title={t("connectors.title")}
         description={t("connectors.description")}
         action={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddClick}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+            disabled={createConnectorPermission.disabled}
+            title={createConnectorPermission.tooltip}
+          >
             {t("connectors.addConnector")}
           </Button>
         }
@@ -175,8 +188,8 @@ const ConnectorsPage: React.FC = () => {
               <Box key={connector.id ?? index}>
                 <ConnectorCard
                   connector={connector}
-                  onEdit={handleEditClick}
-                  onDelete={handleDelete}
+                  onEdit={editConnectorPermission.allowed ? handleEditClick : undefined}
+                  onDelete={deleteConnectorPermission.allowed ? handleDelete : undefined}
                   onToggleStatus={handleToggleStatus}
                   onSync={handleSync}
                 />

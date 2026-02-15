@@ -6,6 +6,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import { useTranslation } from "react-i18next";
 import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import UserList from "@/features/settings/usermanagement/components/UserList";
 import UserForm from "@/features/settings/usermanagement/components/UserForm";
 import CreateGroupModal from "@/features/settings/usermanagement/components/CreateGroupModal";
@@ -26,6 +27,13 @@ import { useAuth } from "@/common/hooks/auth-context";
 
 const UserManagement: React.FC = () => {
   const { t } = useTranslation();
+
+  // Permission checks for user management actions
+  const createUserPermission = useActionPermission("create", "user");
+  const deleteUserPermission = useActionPermission("delete", "user");
+  const editUserPermission = useActionPermission("edit", "user");
+  const disableUserPermission = useActionPermission("disable", "user");
+
   const [openUserForm, setOpenUserForm] = useState(false);
   const [openCreateGroupModal, setOpenCreateGroupModal] = useState(false);
   const [openManageGroupsModal, setOpenManageGroupsModal] = useState(false);
@@ -219,6 +227,8 @@ const UserManagement: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddUser}
+              disabled={createUserPermission.disabled}
+              title={createUserPermission.tooltip}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
@@ -235,9 +245,9 @@ const UserManagement: React.FC = () => {
       <PageContent isLoading={isLoadingUsers} error={usersError as Error}>
         <UserList
           users={users || []}
-          onEditUser={handleEditUser}
-          onDeleteUser={handleDeleteUser}
-          onToggleUserStatus={handleToggleUserStatus}
+          onEditUser={editUserPermission.allowed ? handleEditUser : undefined}
+          onDeleteUser={deleteUserPermission.allowed ? handleDeleteUser : undefined}
+          onToggleUserStatus={disableUserPermission.allowed ? handleToggleUserStatus : undefined}
           activeFilters={activeFilters}
           activeSorting={activeSorting}
           handleMutation={handleMutation}

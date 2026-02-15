@@ -17,6 +17,137 @@ tracer = Tracer()
 dynamodb = boto3.resource("dynamodb")
 secretsmanager = boto3.client("secretsmanager")
 
+# ============================================================================
+# Scope-based permission presets
+# ============================================================================
+# These map to predefined permission sets using the flat resource:action format
+# that matches the authorizer's permission mapping and JWT custom claims.
+
+SCOPE_PRESETS = {
+    "read-only": {
+        "assets:view": True,
+        "assets:download": True,
+        "collections:view": True,
+        "connectors:view": True,
+        "environments:view": True,
+        "groups:view": True,
+        "integrations:view": True,
+        "nodes:view": True,
+        "permissions:view": True,
+        "pipelines:view": True,
+        "pipelinesExecutions:view": True,
+        "reviews:view": True,
+        "search:view": True,
+        "api-keys:view": True,
+        "collection-types:view": True,
+        "system:view": True,
+        "users:view": True,
+        "storage:view": True,
+        "regions:view": True,
+    },
+    "read-write": {
+        # All read-only permissions
+        "assets:view": True,
+        "assets:upload": True,
+        "assets:edit": True,
+        "assets:delete": True,
+        "assets:download": True,
+        "collections:view": True,
+        "collections:create": True,
+        "collections:edit": True,
+        "collections:delete": True,
+        "connectors:view": True,
+        "connectors:create": True,
+        "connectors:edit": True,
+        "connectors:delete": True,
+        "environments:view": True,
+        "environments:create": True,
+        "environments:edit": True,
+        "environments:delete": True,
+        "groups:view": True,
+        "integrations:view": True,
+        "integrations:create": True,
+        "integrations:edit": True,
+        "integrations:delete": True,
+        "nodes:view": True,
+        "pipelines:view": True,
+        "pipelines:create": True,
+        "pipelines:edit": True,
+        "pipelines:delete": True,
+        "pipelinesExecutions:view": True,
+        "pipelinesExecutions:retry": True,
+        "reviews:view": True,
+        "reviews:edit": True,
+        "reviews:delete": True,
+        "search:view": True,
+        "api-keys:view": True,
+        "collection-types:view": True,
+        "system:view": True,
+        "users:view": True,
+        "storage:view": True,
+        "regions:view": True,
+    },
+    "admin": {
+        "assets:view": True,
+        "assets:upload": True,
+        "assets:edit": True,
+        "assets:delete": True,
+        "assets:download": True,
+        "collections:view": True,
+        "collections:create": True,
+        "collections:edit": True,
+        "collections:delete": True,
+        "connectors:view": True,
+        "connectors:create": True,
+        "connectors:edit": True,
+        "connectors:delete": True,
+        "environments:view": True,
+        "environments:create": True,
+        "environments:edit": True,
+        "environments:delete": True,
+        "groups:view": True,
+        "groups:create": True,
+        "groups:edit": True,
+        "groups:delete": True,
+        "integrations:view": True,
+        "integrations:create": True,
+        "integrations:edit": True,
+        "integrations:delete": True,
+        "nodes:view": True,
+        "permissions:view": True,
+        "permissions:create": True,
+        "permissions:edit": True,
+        "permissions:delete": True,
+        "pipelines:view": True,
+        "pipelines:create": True,
+        "pipelines:edit": True,
+        "pipelines:delete": True,
+        "pipelinesExecutions:view": True,
+        "pipelinesExecutions:retry": True,
+        "reviews:view": True,
+        "reviews:edit": True,
+        "reviews:delete": True,
+        "search:view": True,
+        "api-keys:view": True,
+        "api-keys:create": True,
+        "api-keys:edit": True,
+        "api-keys:delete": True,
+        "collection-types:view": True,
+        "collection-types:create": True,
+        "collection-types:edit": True,
+        "collection-types:delete": True,
+        "system:view": True,
+        "system:edit": True,
+        "users:view": True,
+        "users:edit": True,
+        "users:delete": True,
+        "storage:view": True,
+        "regions:view": True,
+    },
+}
+
+VALID_SCOPES = set(SCOPE_PRESETS.keys())
+
 
 def generate_api_key(length=32):
     """Generate a secure random API key"""
@@ -98,16 +229,24 @@ def register_route(app):
             # Create API key metadata in DynamoDB
             now = datetime.utcnow().isoformat()
 
-            # Define default permissions for API keys
-            default_permissions = {
-                "api-key:view": True,
-                "api-key:create": True,
-                "api-key:edit": True,
-                "api-key:delete": True,
-            }
+            # Define default permissions for API keys using the flat resource:action
+            # format that matches the authorizer's permission mapping.
+            default_permissions = SCOPE_PRESETS["read-write"]
 
-            # Allow custom permissions if provided, otherwise use defaults
-            permissions = body.get("permissions", default_permissions)
+            # Resolve permissions: scope preset > custom permissions > default
+            scope = body.get("scope")
+            if scope:
+                if scope not in VALID_SCOPES:
+                    return {
+                        "status": "error",
+                        "message": f"Invalid scope '{scope}'. Valid scopes: {', '.join(sorted(VALID_SCOPES))}",
+                        "data": {"validScopes": sorted(VALID_SCOPES)},
+                    }
+                permissions = SCOPE_PRESETS[scope].copy()
+            elif "permissions" in body:
+                permissions = body["permissions"]
+            else:
+                permissions = default_permissions
 
             api_key_item = {
                 "id": api_key_id,
@@ -116,6 +255,7 @@ def register_route(app):
                 "secretArn": secret_arn,
                 "isEnabled": body.get("isEnabled", True),
                 "permissions": json.dumps(permissions),
+                "scope": scope or "custom",
                 "createdAt": now,
                 "updatedAt": now,
             }
@@ -130,6 +270,7 @@ def register_route(app):
                 "description": api_key_item["description"],
                 "isEnabled": api_key_item["isEnabled"],
                 "permissions": permissions,
+                "scope": api_key_item["scope"],
                 "createdAt": api_key_item["createdAt"],
                 "updatedAt": api_key_item["updatedAt"],
                 # Include the full API key value only on creation

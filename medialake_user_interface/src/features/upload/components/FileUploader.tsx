@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import { useTranslation } from "react-i18next";
-import { useGetConnectors } from "@/api/hooks/useConnectors";
+import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
 import useS3Upload from "../hooks/useS3Upload";
 import { MultipartUploadMetadata } from "../types/upload.types";
 import PathBrowser from "./PathBrowser";
@@ -73,7 +73,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadPath, setUploadPath] = useState<string>(path || "");
   const [isPathBrowserOpen, setIsPathBrowserOpen] = useState<boolean>(false);
-  const { data: connectorsResponse, isLoading: isLoadingConnectors } = useGetConnectors();
+  const { data: connectorsResponse, isLoading: isLoadingConnectors } = useSearchConnectors();
   const {
     getPresignedUrl,
     signPart: signPartBackend,

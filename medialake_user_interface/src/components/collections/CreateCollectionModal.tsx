@@ -33,11 +33,11 @@ import {
 import {
   useCreateCollection,
   useGetCollections,
-  useGetCollectionTypes,
   useSetCollectionThumbnail,
   useSetCollectionIcon,
   type Collection,
 } from "../../api/hooks/useCollections";
+import { useCollectionCollectionTypes } from "../../api/hooks/useCollectionCollectionTypes";
 import { ThumbnailSelector } from "./ThumbnailSelector";
 
 interface CreateCollectionModalProps {
@@ -78,7 +78,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   const setThumbnailMutation = useSetCollectionThumbnail();
   const setIconMutation = useSetCollectionIcon();
   const { data: collectionsResponse } = useGetCollections();
-  const { data: collectionTypesResponse } = useGetCollectionTypes();
+  const { data: collectionTypesResponse } = useCollectionCollectionTypes();
 
   const collections = collectionsResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];

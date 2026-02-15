@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
     BASE: (id: string) => `/pipelines/executions/${id}/retry`,
   },
   SEARCH: "/search",
+  SEARCH_CONNECTORS: "/search/connectors",
   ASSETS: {
     GET: (id: string) => `/assets/${id}`,
     DELETE: (id: string) => `/assets/${id}`,
@@ -39,6 +40,7 @@ export const API_ENDPOINTS = {
     GET: (id: string) => `/settings/api-keys/${id}`,
     UPDATE: (id: string) => `/settings/api-keys/${id}`,
     DELETE: (id: string) => `/settings/api-keys/${id}`,
+    PERMISSIONS: (id: string) => `/settings/api-keys/${id}/permissions`,
   },
   GROUPS: {
     BASE: "/groups",
@@ -47,6 +49,11 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/groups/${id}`,
     ADD_MEMBERS: (id: string) => `/groups/${id}/members`,
     REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
+  },
+
+  GROUP_PERMISSIONS: {
+    GET: (groupId: string) => `/groups/${groupId}/permissions`,
+    UPDATE: (groupId: string) => `/groups/${groupId}/permissions`,
   },
 
   DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
@@ -61,6 +68,8 @@ export const API_ENDPOINTS = {
   },
   COLLECTIONS: {
     BASE: "/collections",
+    COLLECTION_TYPES: "/collections/collection-types",
+    USERS: "/collections/users",
     GET: (id: string) => `/collections/${id}`,
     UPDATE: (id: string) => `/collections/${id}`,
     DELETE: (id: string) => `/collections/${id}`,

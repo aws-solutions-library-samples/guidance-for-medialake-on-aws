@@ -50,7 +50,8 @@ import {
   useAddCollectionsToGroup,
   useRemoveCollectionsFromGroup,
 } from "../hooks/useCollectionGroups";
-import { useGetCollections, useGetCollectionTypes } from "@/api/hooks/useCollections";
+import { useGetCollections } from "@/api/hooks/useCollections";
+import { useCollectionCollectionTypes } from "@/api/hooks/useCollectionCollectionTypes";
 import { CollectionGroupForm } from "../components/CollectionGroupForm";
 import { formatDate } from "@/utils/dateFormat";
 import type { CollectionGroup } from "../types";
@@ -72,7 +73,8 @@ export const CollectionGroupDetailPage: React.FC = () => {
 
   const { data: groupData, isLoading, error } = useCollectionGroup(groupId!);
   const { data: collectionsData, isLoading: isLoadingCollections } = useGetCollections();
-  const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
+    useCollectionCollectionTypes();
   const deleteGroup = useDeleteCollectionGroup();
   const addCollections = useAddCollectionsToGroup();
   const removeCollections = useRemoveCollectionsFromGroup();

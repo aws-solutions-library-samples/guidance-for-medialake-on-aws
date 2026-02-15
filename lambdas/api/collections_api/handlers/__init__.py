@@ -6,6 +6,7 @@ Each file handles exactly one API endpoint (method + resource).
 """
 
 from . import (
+    collections_collection_types_get,
     collections_get,
     collections_ID_ancestors_get,
     collections_ID_assets_get,
@@ -27,6 +28,7 @@ from . import (
     collections_post,
     collections_shared_by_me_get,
     collections_shared_with_me_get,
+    collections_users_get,
     groups_get,
     groups_ID_collections_delete,
     groups_ID_collections_post,
@@ -37,10 +39,12 @@ from . import (
 )
 
 __all__ = [
+    "collections_collection_types_get",
     "collections_get",
     "collections_post",
     "collections_shared_by_me_get",
     "collections_shared_with_me_get",
+    "collections_users_get",
     "collections_ID_get",
     "collections_ID_patch",
     "collections_ID_delete",
@@ -78,6 +82,8 @@ def register_all_routes(app):
     # Collections endpoints
     collections_get.register_route(app)
     collections_post.register_route(app)
+    collections_collection_types_get.register_route(app)
+    collections_users_get.register_route(app)
     collections_shared_by_me_get.register_route(app)
     collections_shared_with_me_get.register_route(app)
 

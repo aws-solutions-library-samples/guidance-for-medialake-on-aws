@@ -55,6 +55,7 @@ app = APIGatewayRestResolver(
 import api_keys_get  # noqa: E402
 import api_keys_ID_delete  # noqa: E402
 import api_keys_ID_get  # noqa: E402
+import api_keys_ID_permissions_put  # noqa: E402
 import api_keys_ID_put  # noqa: E402
 import api_keys_post  # noqa: E402
 import collection_types_get  # noqa: E402
@@ -86,6 +87,7 @@ api_keys_get.register_route(app)
 api_keys_post.register_route(app)
 api_keys_ID_get.register_route(app)
 api_keys_ID_put.register_route(app)
+api_keys_ID_permissions_put.register_route(app)
 api_keys_ID_delete.register_route(app)
 
 settings_users_get.register_route(app)

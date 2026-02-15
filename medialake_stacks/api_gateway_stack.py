@@ -255,6 +255,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 security_group=props.security_group,
                 system_settings_table=props.system_settings_table,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                connector_table=self._connectors_api_gateway.connector_table,
             ),
         )
 

@@ -21,6 +21,10 @@ from groups_groupId_delete import handle_delete_group
 from groups_groupId_get import handle_get_group
 from groups_groupId_members_post import handle_post_group_members
 from groups_groupId_members_userId_delete import handle_delete_group_member
+from groups_groupId_permissions import (
+    handle_get_group_permissions,
+    handle_put_group_permissions,
+)
 from groups_groupId_put import handle_put_group
 from groups_post import handle_post_groups
 
@@ -118,6 +122,25 @@ def delete_group(group_id: str):
         logger,
         metrics,
         tracer,
+    )
+
+
+# Group permissions routes
+@app.get("/groups/<group_id>/permissions")
+@tracer.capture_method
+def get_group_permissions(group_id: str):
+    """GET /groups/{groupId}/permissions - Get group permissions"""
+    return handle_get_group_permissions(
+        group_id, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer
+    )
+
+
+@app.put("/groups/<group_id>/permissions")
+@tracer.capture_method
+def put_group_permissions(group_id: str):
+    """PUT /groups/{groupId}/permissions - Update group permissions"""
+    return handle_put_group_permissions(
+        group_id, app, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer
     )
 
 

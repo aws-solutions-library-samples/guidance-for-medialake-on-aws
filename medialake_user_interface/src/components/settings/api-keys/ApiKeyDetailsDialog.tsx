@@ -13,13 +13,22 @@ import {
   TextField,
   InputAdornment,
   Tooltip,
+  alpha,
+  CircularProgress,
 } from "@mui/material";
-import { Close as CloseIcon, Edit as EditIcon, ContentCopy as CopyIcon } from "@mui/icons-material";
-import { format } from "date-fns";
+import {
+  Close as CloseIcon,
+  Edit as EditIcon,
+  ContentCopy as CopyIcon,
+  AccessTime as AccessTimeIcon,
+  VpnKey as VpnKeyIcon,
+  Shield as ShieldIcon,
+} from "@mui/icons-material";
 import { ActionButton } from "@/components/common/button/ActionButton";
 import { Can } from "@/permissions/components/Can";
 import { useGetApiKey } from "@/api/hooks/useApiKeys";
 import { ApiKey } from "@/api/types/apiKey.types";
+import { formatLocalDateTime, formatRelativeTime } from "@/shared/utils/dateUtils";
 
 interface ApiKeyDetailsDialogProps {
   open: boolean;
@@ -46,10 +55,6 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
 
   // Use detailed data if available, otherwise fall back to provided apiKey
   const displayApiKey = detailedApiKey || apiKey;
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "PPpp");
-  };
 
   const handleCopyId = async () => {
     if (displayApiKey?.id) {
@@ -79,6 +84,19 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
     return `${id.slice(0, 8)}${"•".repeat(Math.max(0, id.length - 12))}${id.slice(-4)}`;
   };
 
+  const scopeColor = (scope?: string) => {
+    switch (scope) {
+      case "admin":
+        return "error";
+      case "read-write":
+        return "primary";
+      case "read-only":
+        return "default";
+      default:
+        return "info";
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -86,15 +104,16 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: {
-          minHeight: "500px",
-        },
+        sx: { borderRadius: 2 },
       }}
     >
-      <DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">{t("apiKeys.dialogs.detailsTitle")}</Typography>
-          <IconButton onClick={onClose} size="small">
+          <Box display="flex" alignItems="center" gap={1}>
+            <VpnKeyIcon sx={{ color: "primary.main", fontSize: 22 }} />
+            <Typography variant="h6">{t("apiKeys.dialogs.detailsTitle")}</Typography>
+          </Box>
+          <IconButton onClick={onClose} size="small" aria-label={t("common.dialogs.close")}>
             <CloseIcon />
           </IconButton>
         </Box>
@@ -102,8 +121,8 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
 
       <DialogContent>
         {isLoading && (
-          <Box display="flex" justifyContent="center" py={4}>
-            <Typography>{t("apiKeys.loading")}</Typography>
+          <Box display="flex" justifyContent="center" alignItems="center" py={6}>
+            <CircularProgress size={32} />
           </Box>
         )}
 
@@ -116,8 +135,18 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
         {displayApiKey && !isLoading && (
           <Box>
             {/* Name and Status */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6" component="h2">
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={2}
+              sx={{
+                p: 1.5,
+                borderRadius: 1.5,
+                backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04),
+              }}
+            >
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
                 {displayApiKey.name}
               </Typography>
               <Chip
@@ -126,93 +155,181 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
                 }
                 color={displayApiKey.isEnabled ? "success" : "default"}
                 size="small"
+                sx={{ fontWeight: 500 }}
               />
             </Box>
 
             {/* Description */}
             {displayApiKey.description && (
-              <>
-                <Typography variant="subtitle2" gutterBottom>
+              <Box mb={2}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}
+                >
                   {t("apiKeys.details.description")}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                   {displayApiKey.description}
                 </Typography>
-              </>
+              </Box>
             )}
 
             <Divider sx={{ my: 2 }} />
 
             {/* API Key ID */}
-            <Typography variant="subtitle2" gutterBottom>
-              {t("apiKeys.details.apiKeyId")}
-            </Typography>
-            <TextField
-              fullWidth
-              value={maskApiKeyId(displayApiKey.id)}
-              InputProps={{
-                readOnly: true,
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Tooltip
-                      title={
-                        copySuccess
-                          ? t("common.actions.copied")
-                          : t("apiKeys.tooltips.copyApiKeyId")
-                      }
-                    >
-                      <IconButton
-                        onClick={handleCopyId}
-                        size="small"
-                        color={copySuccess ? "success" : "default"}
+            <Box mb={2}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}
+              >
+                {t("apiKeys.details.apiKeyId")}
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={maskApiKeyId(displayApiKey.id)}
+                InputProps={{
+                  readOnly: true,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip
+                        title={
+                          copySuccess
+                            ? t("common.actions.copied")
+                            : t("apiKeys.tooltips.copyApiKeyId")
+                        }
                       >
-                        <CopyIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                ),
-                sx: {
-                  fontFamily: "monospace",
-                  fontSize: "0.875rem",
-                },
-              }}
-              sx={{ mb: 2 }}
-            />
+                        <IconButton
+                          onClick={handleCopyId}
+                          size="small"
+                          color={copySuccess ? "success" : "default"}
+                          aria-label={t("apiKeys.tooltips.copyApiKeyId")}
+                        >
+                          <CopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    fontFamily: "monospace",
+                    fontSize: "0.85rem",
+                  },
+                }}
+                sx={{ mt: 0.5 }}
+              />
+            </Box>
 
             <Divider sx={{ my: 2 }} />
 
-            {/* Metadata */}
+            {/* Scope & Permissions */}
+            {displayApiKey.scope && (
+              <Box mb={2}>
+                <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
+                  <ShieldIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}
+                  >
+                    {t("apiKeys.details.scope")}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={displayApiKey.scope}
+                  size="small"
+                  color={scopeColor(displayApiKey.scope)}
+                  sx={{ textTransform: "capitalize" }}
+                />
+              </Box>
+            )}
+
+            {displayApiKey.permissions && Object.keys(displayApiKey.permissions).length > 0 && (
+              <Box mb={2}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    fontWeight: 600,
+                    display: "block",
+                    mb: 0.5,
+                  }}
+                >
+                  {t("apiKeys.details.permissions")}
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {Object.entries(displayApiKey.permissions)
+                    .filter(([, v]) => v === true)
+                    .map(([perm]) => (
+                      <Chip key={perm} label={perm} size="small" variant="outlined" />
+                    ))}
+                </Box>
+              </Box>
+            )}
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Timestamps */}
             <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                {t("apiKeys.details.created")}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                {formatDate(displayApiKey.createdAt)}
-              </Typography>
+              <Box display="flex" alignItems="center" gap={0.5} mb={1.5}>
+                <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}
+                >
+                  {t("apiKeys.details.timeline", "Timeline")}
+                </Typography>
+              </Box>
 
-              <Typography variant="subtitle2" gutterBottom>
-                {t("apiKeys.details.lastUpdated")}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                {formatDate(displayApiKey.updatedAt)}
-              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr",
+                  gap: 1,
+                  alignItems: "baseline",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                  {t("apiKeys.details.created")}
+                </Typography>
+                <Tooltip title={formatRelativeTime(displayApiKey.createdAt)} arrow>
+                  <Typography variant="body2">
+                    {formatLocalDateTime(displayApiKey.createdAt)}
+                  </Typography>
+                </Tooltip>
 
-              {displayApiKey.lastUsed && (
-                <>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {t("apiKeys.details.lastUsed")}
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                  {t("apiKeys.details.lastUpdated")}
+                </Typography>
+                <Tooltip title={formatRelativeTime(displayApiKey.updatedAt)} arrow>
+                  <Typography variant="body2">
+                    {formatLocalDateTime(displayApiKey.updatedAt)}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    {formatDate(displayApiKey.lastUsed)}
-                  </Typography>
-                </>
-              )}
+                </Tooltip>
+
+                {displayApiKey.lastUsed && (
+                  <>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                      {t("apiKeys.details.lastUsed")}
+                    </Typography>
+                    <Tooltip title={formatRelativeTime(displayApiKey.lastUsed)} arrow>
+                      <Typography variant="body2">
+                        {formatLocalDateTime(displayApiKey.lastUsed)}
+                      </Typography>
+                    </Tooltip>
+                  </>
+                )}
+              </Box>
             </Box>
           </Box>
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <ActionButton variant="text" onClick={onClose}>
           {t("common.dialogs.close")}
         </ActionButton>

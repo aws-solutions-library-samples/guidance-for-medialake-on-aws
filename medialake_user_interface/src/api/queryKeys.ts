@@ -127,6 +127,12 @@ export const QUERY_KEYS = {
     members: (id: string) => [...QUERY_KEYS.GROUPS.detail(id), "members"] as const,
   },
 
+  GROUP_PERMISSIONS: {
+    all: ["group-permissions"] as const,
+    details: () => [...QUERY_KEYS.GROUP_PERMISSIONS.all, "detail"] as const,
+    detail: (groupId: string) => [...QUERY_KEYS.GROUP_PERMISSIONS.details(), groupId] as const,
+  },
+
   ENVIRONMENTS: {
     all: ["environments"] as const,
     lists: () => [...QUERY_KEYS.ENVIRONMENTS.all, "list"] as const,

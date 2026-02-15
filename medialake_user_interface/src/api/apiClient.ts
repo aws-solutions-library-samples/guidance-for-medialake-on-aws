@@ -142,7 +142,17 @@ class ApiClient extends ApiClientBase {
             error.response?.data?.message;
 
           // Only redirect if this is an API authorization error, not an S3 error
+          // Skip redirect if the request opted out via skipAccessDeniedRedirect
           if (isApiError) {
+            const skipRedirect = originalRequest?.skipAccessDeniedRedirect === true;
+
+            if (skipRedirect) {
+              console.log(
+                "🚫 403 Forbidden from API - Skipping redirect (skipAccessDeniedRedirect)"
+              );
+              return Promise.reject(error);
+            }
+
             console.log("🚫 403 Forbidden from API - Redirecting to access-denied page");
 
             // Extract error details from response

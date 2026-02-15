@@ -6,9 +6,11 @@ export * from "./types/permission.types";
 
 // Export hooks
 export * from "./hooks/usePermission";
+export * from "./hooks/useActionPermission";
 
 // Export components
 export * from "./components/Can";
+export * from "./components/DisabledWrapper";
 export * from "./components/PermissionGuard";
 
 // Export context

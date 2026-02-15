@@ -36,7 +36,7 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-import { useGetUsers } from "@/api/hooks/useUsers";
+import { useCollectionUsers } from "@/api/hooks/useCollectionUsers";
 import {
   useShareCollection,
   useUnshareCollection,
@@ -67,7 +67,7 @@ export const ShareManagementModal: React.FC<ShareManagementModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // API hooks
-  const { data: users, isLoading: isLoadingUsers } = useGetUsers();
+  const { data: users, isLoading: isLoadingUsers } = useCollectionUsers();
   const { data: sharesResponse, isLoading: isLoadingShares } = useGetCollectionShares(
     collection?.id || "",
     open && !!collection?.id

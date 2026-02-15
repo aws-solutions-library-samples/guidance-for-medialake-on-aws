@@ -18,6 +18,7 @@ import { Add as AddIcon, FileUpload as FileUploadIcon } from "@mui/icons-materia
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   useReactTable,
   getCoreRowModel,
@@ -51,6 +52,10 @@ const PIPELINES_QUERY_KEYS = {
 const PipelinesPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  // Permission checks for pipeline actions
+  const createPipelinePermission = useActionPermission("create", "pipeline");
+  const deletePipelinePermission = useActionPermission("delete", "pipeline");
 
   // Add Pipeline Button Menu state
   const addPipelineButtonRef = useRef<HTMLDivElement>(null);
@@ -321,7 +326,7 @@ const PipelinesPage: React.FC = () => {
   // Create columns
   const columns = usePipelineColumns({
     onEdit: handleEdit,
-    onDelete: openDeleteDialog,
+    onDelete: deletePipelinePermission.allowed ? openDeleteDialog : () => {},
     onToggleActive: toggleActive,
   });
 
@@ -378,6 +383,7 @@ const PipelinesPage: React.FC = () => {
                 variant="contained"
                 ref={addPipelineButtonRef}
                 aria-label={t("common.breadcrumb.ariaLabels.pipelineActions")}
+                disabled={createPipelinePermission.disabled}
                 sx={{
                   boxShadow: "none",
                   "&:hover": {
