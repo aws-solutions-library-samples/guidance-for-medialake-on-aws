@@ -1,0 +1,12 @@
+title = "Gitleaks Configuration"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''package-lock\.json''',
+    '''lambdas/api/collections/collections-openapi\.json''',
+    '''INTERNAL-ai-documentation/.*''',
+    '''lambdas/nodes/image_metadata_extractor/.*''',
+    '''lambdas/layers/warmer/nodejs/.*''',
+    '''\.kiro/.*''',
+  ]

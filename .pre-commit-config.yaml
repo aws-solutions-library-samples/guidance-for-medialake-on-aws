@@ -130,21 +130,13 @@ repos:
         args: [--strict, --optional-scope]
 
   # Security scanning (Phase 2)
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+  - repo: local
     hooks:
-      - id: detect-secrets
-        args: ["--baseline", ".secrets.baseline"]
-        exclude: |
-          (?x)^(
-            package-lock\.json|
-            \.secrets\.baseline|
-            lambdas/api/collections/collections-openapi\.json|
-            INTERNAL-ai-documentation/.*|
-            lambdas/nodes/image_metadata_extractor/.*|
-            lambdas/layers/warmer/nodejs/.*|
-            \.kiro/.*
-          )$
+      - id: gitleaks
+        name: gitleaks
+        entry: gitleaks protect --staged --config .gitleaks.toml --verbose
+        language: system
+        pass_filenames: false
 
   # Python security scanning (Phase 2)
   # Temporarily disabled
