@@ -46,6 +46,8 @@ export interface CanProps {
   field?: string;
   subject?: any;
   passThrough?: boolean;
+  /** Custom tooltip shown when passThrough renders the disabled state */
+  disabledTooltip?: string;
   children: React.ReactNode | ((allowed: boolean) => React.ReactNode);
 }
 

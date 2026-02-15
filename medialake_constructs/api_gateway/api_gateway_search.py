@@ -45,6 +45,7 @@ class SearchProps:
     open_search_index: str
     system_settings_table: str
     s3_vector_bucket_name: str
+    connector_table: Optional[dynamodb.TableV2] = None
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -93,6 +94,16 @@ class SearchConstruct(Construct):
                     # BEDROCK_INFERENCE_PROFILE_ARN removed - Lambda auto-selects based on system settings
                     # Thumbnail index for video posters (0-4, default 2 = middle thumbnail)
                     "THUMBNAIL_INDEX": "2",
+                    # Connector table for /search/connectors endpoint
+                    # Allows search API to return connector summaries without
+                    # requiring separate connectors:view permission
+                    **(
+                        {
+                            "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
+                        }
+                        if props.connector_table
+                        else {}
+                    ),
                 },
             ),
         )
@@ -123,6 +134,10 @@ class SearchConstruct(Construct):
                 resources=["*"],
             )
         )
+
+        # Grant read access to connector table for /search/connectors endpoint
+        if props.connector_table:
+            props.connector_table.grant_read_data(search_get_lambda.function)
 
         # Add OpenSearch read permissions to the Lambda
         search_get_lambda.function.add_to_role_policy(
@@ -361,6 +376,15 @@ class SearchConstruct(Construct):
         )
         apply_custom_authorization(search_get, props.authorizer)
 
+        # Create /search/connectors resource for returning connector summaries
+        # under search:view permission (avoids requiring connectors:view)
+        connectors_resource = search_resource.add_resource("connectors")
+        search_connectors_get = connectors_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(search_get_lambda.function),
+        )
+        apply_custom_authorization(search_connectors_get, props.authorizer)
+
         # Add CORS support
 
         # Create fields resource under search
@@ -417,6 +441,7 @@ class SearchConstruct(Construct):
         apply_custom_authorization(search_fields_get, props.authorizer)
 
         add_cors_options_method(search_resource)
+        add_cors_options_method(connectors_resource)
         add_cors_options_method(fields_resource)
 
     def _get_regional_inference_profile_id(self) -> str:

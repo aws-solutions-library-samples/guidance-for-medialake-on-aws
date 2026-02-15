@@ -1,6 +1,7 @@
 """POST /groups - Create a new group"""
 
 import json
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -160,12 +161,78 @@ def _create_group_with_rollback(
                 )
                 raise
 
+        # Step 3: Auto-create a Permission Set for this group
+        permission_set_id = str(uuid.uuid4())
+        logger.info(
+            f"Auto-creating permission set for group: {group_request.id}",
+            extra={"permission_set_id": permission_set_id},
+        )
+
+        permission_set_item = {
+            "PK": f"PS#{permission_set_id}",
+            "SK": "METADATA",
+            "id": permission_set_id,
+            "name": group_request.name,
+            "description": f"Auto-managed permission set for group: {group_request.name}",
+            "permissions": [],
+            "isSystem": False,
+            "linkedGroupId": group_request.id,
+            "createdBy": created_by,
+            "createdAt": current_time,
+            "updatedAt": current_time,
+            "type": "PERMISSION_SET",
+            "GSI1PK": "PERMISSION_SETS",
+            "GSI1SK": f"PS#{permission_set_id}",
+        }
+
+        try:
+            table.put_item(Item=permission_set_item)
+            logger.info(
+                f"Successfully created permission set for group: {group_request.id}",
+                extra={"permission_set_id": permission_set_id},
+            )
+
+            # Update the group metadata with the linked permission set ID
+            table.update_item(
+                Key={
+                    "PK": f"GROUP#{group_request.id}",
+                    "SK": "METADATA",
+                },
+                UpdateExpression="SET #psId = :psId, #aps = :aps",
+                ExpressionAttributeNames={
+                    "#psId": "permissionSetId",
+                    "#aps": "assignedPermissionSets",
+                },
+                ExpressionAttributeValues={
+                    ":psId": permission_set_id,
+                    ":aps": [permission_set_id],
+                },
+            )
+            metrics.add_metric(
+                name="PermissionSetAutoCreated", unit=MetricUnit.Count, value=1
+            )
+        except ClientError as e:
+            # Log but don't fail - the group was created, PS can be created later
+            logger.error(
+                f"Failed to auto-create permission set for group: {str(e)}",
+                extra={
+                    "group_id": group_request.id,
+                    "permission_set_id": permission_set_id,
+                },
+            )
+            permission_set_id = None
+
         # Return the created group (without the DynamoDB-specific keys)
         result = {
             "id": group_request.id,
             "name": group_request.name,
             "description": group_request.description,
-            "assignedPermissionSets": group_request.assignedPermissionSets or [],
+            "assignedPermissionSets": (
+                [permission_set_id]
+                if permission_set_id
+                else (group_request.assignedPermissionSets or [])
+            ),
+            "permissionSetId": permission_set_id,
             "createdAt": current_time,
             "updatedAt": current_time,
             "entity": "group",
@@ -257,33 +324,44 @@ def handle_post_groups(
     - Proper rollback if either operation fails
     """
     try:
-        # Extract user ID from Cognito authorizer context
+        # Extract user ID from authorizer context
         request_context = app.current_event.raw_event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
 
-        # Get the user ID from the Cognito claims or directly from the authorizer context
-        user_id = claims.get("sub")
+        user_id = None
 
-        # If not found in claims, try to get it directly from the authorizer context
+        # 1. Try direct authorizer context fields (set by custom authorizer)
+        user_id = authorizer.get("userId") or authorizer.get("sub")
+
+        # 2. Try parsing claims - custom authorizer passes claims as a JSON string
         if not user_id:
-            user_id = authorizer.get("userId")
-            logger.info(
-                "Using userId from authorizer context", extra={"user_id": user_id}
-            )
+            claims_raw = authorizer.get("claims", {})
+            if isinstance(claims_raw, str):
+                try:
+                    claims = json.loads(claims_raw)
+                    user_id = claims.get("sub")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            elif isinstance(claims_raw, dict):
+                user_id = claims_raw.get("sub")
+
+        # 3. Try principalId (set by API Gateway from authorizer response)
+        if not user_id:
+            user_id = request_context.get("authorizer", {}).get("principalId")
+
+        if user_id:
+            logger.info("Identified user", extra={"user_id": user_id})
         else:
-            logger.info("Using sub from claims", extra={"user_id": user_id})
-
-        if not user_id:
             logger.error(
-                "Missing user_id in both Cognito claims and authorizer context"
+                "Missing user_id in authorizer context",
+                extra={"authorizer_keys": list(authorizer.keys())},
             )
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
             return _create_error_response(
                 400,
-                "Unable to identify user - missing from both claims and authorizer context",
+                "Unable to identify user",
             )
 
         # Parse the request body

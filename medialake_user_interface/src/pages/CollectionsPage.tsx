@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   Box,
   Typography,
@@ -65,9 +66,9 @@ import {
   useGetCollectionsSharedWithMe,
   useGetCollectionsSharedByMe,
   useDeleteCollection,
-  useGetCollectionTypes,
   type Collection,
 } from "../api/hooks/useCollections";
+import { useCollectionCollectionTypes } from "../api/hooks/useCollectionCollectionTypes";
 import { CreateCollectionModal } from "../components/collections/CreateCollectionModal";
 import { EditCollectionModal } from "../components/collections/EditCollectionModal";
 import { ShareManagementModal } from "../components/collections/ShareManagementModal";
@@ -143,6 +144,12 @@ const CollectionsPage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Permission checks for collection actions
+  const createCollectionPermission = useActionPermission("create", "collection");
+  const deleteCollectionPermission = useActionPermission("delete", "collection");
+  const editCollectionPermission = useActionPermission("edit", "collection");
+
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -173,7 +180,8 @@ const CollectionsPage: React.FC = () => {
     useGetCollectionsSharedWithMe();
   const { data: sharedByMeResponse, isLoading: isLoadingSharedByMe } =
     useGetCollectionsSharedByMe();
-  const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
+  const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
+    useCollectionCollectionTypes();
   const deleteCollectionMutation = useDeleteCollection();
 
   const allCollections = collectionsResponse?.data || [];
@@ -454,6 +462,8 @@ const CollectionsPage: React.FC = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={handleCreateGroupClick}
+                disabled={createCollectionPermission.disabled}
+                title={createCollectionPermission.tooltip}
                 sx={{
                   borderRadius: 2,
                   textTransform: "none",
@@ -469,6 +479,8 @@ const CollectionsPage: React.FC = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setCreateModalOpen(true)}
+                disabled={createCollectionPermission.disabled}
+                title={createCollectionPermission.tooltip}
                 sx={{
                   borderRadius: 2,
                   textTransform: "none",
@@ -730,6 +742,8 @@ const CollectionsPage: React.FC = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setCreateModalOpen(true)}
+                disabled={createCollectionPermission.disabled}
+                title={createCollectionPermission.tooltip}
                 sx={{
                   borderRadius: 2,
                   textTransform: "none",
@@ -844,23 +858,31 @@ const CollectionsPage: React.FC = () => {
                               tip: t("common.share", "Share"),
                               handler: handleShareClick,
                               color: "text.primary",
+                              disabled: false,
                             },
                             {
                               icon: <EditIcon sx={{ fontSize: 15 }} />,
-                              tip: t("common.edit", "Edit"),
+                              tip: editCollectionPermission.disabled
+                                ? editCollectionPermission.tooltip
+                                : t("common.edit", "Edit"),
                               handler: handleEditClick,
                               color: "text.primary",
+                              disabled: editCollectionPermission.disabled,
                             },
                             {
                               icon: <DeleteIcon sx={{ fontSize: 15 }} />,
-                              tip: t("common.delete", "Delete"),
+                              tip: deleteCollectionPermission.disabled
+                                ? deleteCollectionPermission.tooltip
+                                : t("common.delete", "Delete"),
                               handler: handleDeleteClick,
                               color: "error.main",
+                              disabled: deleteCollectionPermission.disabled,
                             },
-                          ].map(({ icon, tip, handler, color }) => (
+                          ].map(({ icon, tip, handler, color, disabled }) => (
                             <Tooltip key={tip} title={tip}>
                               <Button
                                 size="small"
+                                disabled={disabled}
                                 sx={{
                                   minWidth: 0,
                                   p: 0.6,

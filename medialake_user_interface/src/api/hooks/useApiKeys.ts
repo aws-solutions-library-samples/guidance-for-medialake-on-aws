@@ -7,6 +7,8 @@ import {
   ApiKey,
   CreateApiKeyRequest,
   UpdateApiKeyRequest,
+  UpdateApiKeyPermissionsRequest,
+  UpdateApiKeyPermissionsResponse,
   ApiKeyListResponse,
   ApiKeyResponse,
   CreateApiKeyResponse,
@@ -149,6 +151,32 @@ export const useRotateApiKey = () => {
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.API_KEYS.detail(apiKeyId),
+      });
+    },
+  });
+};
+
+export const useUpdateApiKeyPermissions = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    UpdateApiKeyPermissionsResponse,
+    Error,
+    { id: string; request: UpdateApiKeyPermissionsRequest }
+  >({
+    mutationFn: async ({ id, request }) => {
+      const { data } = await apiClient.put<{
+        statusCode: number;
+        body: string;
+      }>(API_ENDPOINTS.API_KEYS.PERMISSIONS(id), request);
+      return parseStringBodyResponse<UpdateApiKeyPermissionsResponse>(data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.API_KEYS.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.API_KEYS.detail(variables.id),
       });
     },
   });

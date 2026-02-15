@@ -1889,6 +1889,72 @@ def handle_provider_status():
         }
 
 
+@app.get("/search/connectors")
+def handle_search_connectors():
+    """
+    Return connector summaries under search:view permission.
+
+    This endpoint allows the Assets page and File Uploader to fetch
+    connector metadata without requiring the separate connectors:view
+    permission. Only a lightweight summary is returned (id, name, type,
+    storageIdentifier, status).
+    """
+    try:
+        connector_table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
+        if not connector_table_name:
+            logger.warning(
+                "MEDIALAKE_CONNECTOR_TABLE not configured, "
+                "returning empty connectors list"
+            )
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {"connectors": []},
+            }
+
+        dynamodb_resource = boto3.resource("dynamodb")
+        table = dynamodb_resource.Table(connector_table_name)
+
+        response = table.scan()
+        items = response.get("Items", [])
+
+        while "LastEvaluatedKey" in response:
+            response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+            items.extend(response.get("Items", []))
+
+        connectors = [
+            {
+                "id": item.get("id", ""),
+                "name": item.get("name", ""),
+                "type": item.get("type", ""),
+                "storageIdentifier": item.get("storageIdentifier", ""),
+                "status": item.get("status", ""),
+                "objectPrefix": item.get("objectPrefix", ""),
+                "region": item.get("region", ""),
+                "configuration": {
+                    "objectPrefix": item.get("objectPrefix", ""),
+                    "allowUploads": item.get("allowUploads", False),
+                },
+            }
+            for item in items
+        ]
+
+        logger.info(f"Returned {len(connectors)} connector summaries")
+        return {
+            "status": "200",
+            "message": "ok",
+            "data": {"connectors": connectors},
+        }
+
+    except Exception as e:
+        logger.exception(f"Error fetching connector summaries: {str(e)}")
+        return {
+            "status": "500",
+            "message": "Error fetching connectors",
+            "data": {"connectors": []},
+        }
+
+
 @metrics.log_metrics
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:

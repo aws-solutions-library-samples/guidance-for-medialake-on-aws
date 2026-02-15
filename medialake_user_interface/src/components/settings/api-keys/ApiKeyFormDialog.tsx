@@ -14,12 +14,25 @@ import {
   Alert,
   Divider,
   Checkbox,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { ActionButton } from "@/components/common/button/ActionButton";
-import { useCreateApiKey, useUpdateApiKey } from "@/api/hooks/useApiKeys";
-import { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest } from "@/api/types/apiKey.types";
+import {
+  useCreateApiKey,
+  useUpdateApiKey,
+  useUpdateApiKeyPermissions,
+} from "@/api/hooks/useApiKeys";
+import {
+  ApiKey,
+  ApiKeyScope,
+  ApiKeyPermissions,
+  CreateApiKeyRequest,
+  UpdateApiKeyRequest,
+} from "@/api/types/apiKey.types";
+import ApiKeyPermissionsEditor from "./ApiKeyPermissionsEditor";
 
 interface ApiKeyFormDialogProps {
   open: boolean;
@@ -42,12 +55,15 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
     description: "",
     isEnabled: true,
   });
+  const [scope, setScope] = useState<ApiKeyScope>("read-write");
+  const [permissions, setPermissions] = useState<ApiKeyPermissions>({});
   const [rotateKey, setRotateKey] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newSecret, setNewSecret] = useState<string | null>(null);
 
   const createMutation = useCreateApiKey();
   const updateMutation = useUpdateApiKey();
+  const updatePermissionsMutation = useUpdateApiKeyPermissions();
 
   // Initialize form data when editing
   useEffect(() => {
@@ -57,12 +73,16 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
         description: apiKey.description,
         isEnabled: apiKey.isEnabled,
       });
+      setScope(apiKey.scope || "custom");
+      setPermissions(apiKey.permissions || {});
     } else {
       setFormData({
         name: "",
         description: "",
         isEnabled: true,
       });
+      setScope("read-write");
+      setPermissions({});
     }
     setRotateKey(false);
     setErrors({});
@@ -89,7 +109,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
 
     try {
       if (isEditMode && apiKey) {
-        // Update existing API key
+        // Update existing API key metadata
         const updateData: UpdateApiKeyRequest = {
           name: formData.name.trim(),
           description: formData.description.trim(),
@@ -105,6 +125,14 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
           updates: updateData,
         });
 
+        // Update permissions separately via the dedicated endpoint
+        if (scope === "custom") {
+          await updatePermissionsMutation.mutateAsync({
+            id: apiKey.id,
+            request: { permissions, mode: "replace" },
+          });
+        }
+
         // Check if key was rotated and new secret is returned
         if (rotateKey && response.data && "apiKey" in response.data) {
           setNewSecret(response.data.apiKey);
@@ -119,6 +147,13 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
           description: formData.description.trim(),
           isEnabled: formData.isEnabled,
         };
+
+        // Use scope preset or custom permissions
+        if (scope !== "custom") {
+          createData.scope = scope;
+        } else {
+          createData.permissions = permissions;
+        }
 
         const response = await createMutation.mutateAsync(createData);
 
@@ -177,13 +212,14 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
     }
   };
 
-  const isLoading = createMutation.isPending || updateMutation.isPending;
+  const isLoading =
+    createMutation.isPending || updateMutation.isPending || updatePermissionsMutation.isPending;
 
   return (
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       PaperProps={{
         sx: {
@@ -285,6 +321,45 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
                 "Disabled API keys cannot be used for authentication"
               )}
             </FormHelperText>
+
+            {/* Scope / Permissions Section */}
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" gutterBottom>
+              Permissions
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Choose a preset scope or configure custom permissions.
+            </Typography>
+
+            <ToggleButtonGroup
+              value={scope}
+              exclusive
+              onChange={(_, newScope) => {
+                if (newScope !== null) setScope(newScope as ApiKeyScope);
+              }}
+              size="small"
+              fullWidth
+              sx={{ mb: 2 }}
+            >
+              <ToggleButton value="read-only">{t("apiKeys.scopes.readOnly")}</ToggleButton>
+              <ToggleButton value="read-write">{t("apiKeys.scopes.readWrite")}</ToggleButton>
+              <ToggleButton value="admin">{t("apiKeys.scopes.admin")}</ToggleButton>
+              <ToggleButton value="custom">{t("apiKeys.scopes.custom")}</ToggleButton>
+            </ToggleButtonGroup>
+
+            {scope !== "custom" && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {scope === "read-only" && t("apiKeys.scopes.readOnlyDesc")}
+                {scope === "read-write" && t("apiKeys.scopes.readWriteDesc")}
+                {scope === "admin" && t("apiKeys.scopes.adminDesc")}
+              </Alert>
+            )}
+
+            {scope === "custom" && (
+              <Box sx={{ maxHeight: 300, overflow: "auto", mb: 2 }}>
+                <ApiKeyPermissionsEditor permissions={permissions} onChange={setPermissions} />
+              </Box>
+            )}
 
             {/* Rotate Key Option (Edit Mode Only) */}
             {isEditMode && (

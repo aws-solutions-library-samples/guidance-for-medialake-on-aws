@@ -723,6 +723,99 @@ def generate_policy(
 
 
 @tracer.capture_method
+def _normalize_permissions_to_flat(permissions: Dict[str, Any]) -> Dict[str, bool]:
+    """
+    Normalize permissions from any format (nested or flat) to the canonical
+    flat resource:action format (e.g., {"assets:view": True}).
+
+    Args:
+        permissions: Permission dict in any supported format
+
+    Returns:
+        Flat permission dict with resource:action keys and True values
+    """
+    if not isinstance(permissions, dict):
+        return {}
+
+    flat = {}
+
+    # Check if this is already flat format (all values are booleans with ":" in key)
+    is_flat = all(isinstance(v, bool) and ":" in k for k, v in permissions.items())
+
+    if is_flat:
+        # Already flat - just keep True values
+        for k, v in permissions.items():
+            if v is True:
+                flat[k] = True
+        return flat
+
+    # Has nested structure - flatten it
+    nested_flattened = _flatten_nested_permissions(permissions)
+    for perm in nested_flattened:
+        flat[perm] = True
+
+    # Also preserve any flat entries that were mixed in
+    for k, v in permissions.items():
+        if isinstance(v, bool) and v is True and ":" in k:
+            flat[k] = True
+
+    return flat
+
+
+@tracer.capture_method
+def _lazy_migrate_permissions(
+    api_key_id: str, permissions: Dict[str, Any], correlation_id: str
+) -> Dict[str, bool]:
+    """
+    Lazy-migrate legacy nested permissions to flat format on read.
+    Writes the normalized permissions back to DynamoDB so future reads are fast.
+
+    Args:
+        api_key_id: The API key ID
+        permissions: The current permissions dict (possibly nested)
+        correlation_id: Request correlation ID
+
+    Returns:
+        Normalized flat permissions dict
+    """
+    normalized = _normalize_permissions_to_flat(permissions)
+
+    # Check if migration is needed (permissions changed after normalization)
+    if normalized == permissions:
+        return permissions
+
+    logger.info(
+        f"Lazy-migrating API key {api_key_id} permissions from nested to flat format. "
+        f"Before: {permissions}, After: {normalized}",
+        extra={"correlation_id": correlation_id},
+    )
+    metrics.add_metric(
+        name="validate.api_key.permissions_migrated", unit=MetricUnit.Count, value=1
+    )
+
+    # Write normalized permissions back to DynamoDB (best-effort, don't fail the request)
+    try:
+        dynamodb.update_item(
+            TableName=API_KEYS_TABLE_NAME,
+            Key={"id": {"S": api_key_id}},
+            UpdateExpression="SET permissions = :permissions",
+            ExpressionAttributeValues={":permissions": {"S": json.dumps(normalized)}},
+        )
+        logger.info(
+            f"Successfully migrated permissions for API key {api_key_id}",
+            extra={"correlation_id": correlation_id},
+        )
+    except Exception as migrate_err:
+        # Non-fatal: log and continue with the normalized permissions in memory
+        logger.warning(
+            f"Failed to write migrated permissions for API key {api_key_id}: {str(migrate_err)}",
+            extra={"correlation_id": correlation_id},
+        )
+
+    return normalized
+
+
+@tracer.capture_method
 def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
     """
     Validate an API key by looking it up in DynamoDB and verifying against Secrets Manager.
@@ -832,6 +925,11 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
                     api_key_item["permissions"] = {}
             else:
                 api_key_item["permissions"] = {}
+
+            # Lazy-migrate nested permissions to flat format on read
+            api_key_item["permissions"] = _lazy_migrate_permissions(
+                api_key_item["id"], api_key_item["permissions"], correlation_id
+            )
 
         except (KeyError, TypeError, AttributeError) as conversion_err:
             metrics.add_metric(
@@ -976,6 +1074,8 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         # Collections endpoints
         "get /collections": "collections:view",
         "post /collections": "collections:create",
+        "get /collections/collection-types": "collections:view",
+        "get /collections/users": "collections:edit",
         "get /collections/{collectionId}": "collections:view",
         "put /collections/{collectionId}": "collections:edit",
         "patch /collections/{collectionId}": "collections:edit",
@@ -1072,10 +1172,12 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         # Search endpoints
         "get /search": "search:view",
         "get /search/fields": "search:view",
+        "get /search/connectors": "search:view",
         # Settings endpoints
         "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
         "put /settings/api-keys/{id}": "api-keys:edit",
+        "put /settings/api-keys/{id}/permissions": "api-keys:edit",
         "delete /settings/api-keys/{id}": "api-keys:delete",
         # Collection types endpoints
         "get /settings/collection-types": "collection-types:view",
@@ -1356,15 +1458,57 @@ def validate_jwt_permissions(
 
 
 @tracer.capture_method
+def _flatten_nested_permissions(permissions: Dict[str, Any]) -> list:
+    """
+    Flatten a nested permission structure into a list of 'resource:action' strings.
+
+    Handles nested formats like:
+        {"settings": {"api-keys": {"create": True, "view": True}}}
+    Produces:
+        ["settings.api-keys:create", "settings.api-keys:view"]
+
+    Args:
+        permissions: Nested permission dictionary
+
+    Returns:
+        List of flattened permission strings
+    """
+    flattened = []
+
+    def flatten(obj, prefix=""):
+        if not isinstance(obj, dict):
+            return
+        for key, value in obj.items():
+            if isinstance(value, dict):
+                # Check if this is a leaf node with boolean values (actions)
+                if all(isinstance(v, bool) for v in value.values()):
+                    for action, enabled in value.items():
+                        if enabled:
+                            perm_key = f"{prefix}.{key}" if prefix else key
+                            flattened.append(f"{perm_key}:{action}")
+                else:
+                    # Nested resource - recurse deeper
+                    new_prefix = f"{prefix}.{key}" if prefix else key
+                    flatten(value, new_prefix)
+
+    flatten(permissions)
+    return flattened
+
+
+@tracer.capture_method
 def validate_api_key_permissions(
     api_key_item: Dict[str, Any], required_permission: str, correlation_id: str
 ) -> bool:
     """
     Validate that an API key has the required permission for the requested action.
 
+    Supports both flat and nested permission formats:
+    - Flat:   {"assets:view": True, "assets:edit": True}
+    - Nested: {"settings": {"api-keys": {"create": True, "view": True}}}
+
     Args:
         api_key_item: API key item from DynamoDB
-        required_permission: The permission required for this action
+        required_permission: The permission required for this action (e.g., "assets:view")
         correlation_id: Request correlation ID for tracing
 
     Returns:
@@ -1376,15 +1520,16 @@ def validate_api_key_permissions(
         # Get permissions from API key
         permissions = api_key_item.get("permissions", {})
 
-        # Add debug logging
         logger.info(
-            f"API key permissions type: {type(permissions)}, value: {permissions}"
+            f"API key permissions type: {type(permissions)}, value: {permissions}",
+            extra={"correlation_id": correlation_id},
         )
 
         # Ensure permissions is a dictionary
         if not isinstance(permissions, dict):
             logger.warning(
-                f"API key permissions is not a dictionary, type: {type(permissions)}"
+                f"API key permissions is not a dictionary, type: {type(permissions)}",
+                extra={"correlation_id": correlation_id},
             )
             permissions = {}
 
@@ -1400,14 +1545,59 @@ def validate_api_key_permissions(
             )
             return False
 
-        # Check if the required permission exists and is enabled
-        permission_granted = permissions.get(required_permission, False)
+        permission_granted = False
 
-        if permission_granted:
+        # 1. Check flat format first (e.g., {"assets:view": True})
+        if permissions.get(required_permission, False) is True:
+            permission_granted = True
             logger.info(
-                f"API key {api_key_item['id']} has required permission: {required_permission}",
+                f"Permission granted via flat lookup: {required_permission}",
                 extra={"correlation_id": correlation_id},
             )
+
+        # 2. Check with settings. prefix for backward compatibility
+        #    e.g., required "api-keys:view" might be stored as "settings.api-keys:view"
+        if not permission_granted:
+            settings_key = f"settings.{required_permission}"
+            if permissions.get(settings_key, False) is True:
+                permission_granted = True
+                logger.info(
+                    f"Permission granted via settings prefix lookup: {settings_key}",
+                    extra={"correlation_id": correlation_id},
+                )
+
+        # 3. If required_permission has settings. prefix, try without it
+        if not permission_granted and required_permission.startswith("settings."):
+            stripped = required_permission[len("settings.") :]
+            if permissions.get(stripped, False) is True:
+                permission_granted = True
+                logger.info(
+                    f"Permission granted via stripped settings prefix: {stripped}",
+                    extra={"correlation_id": correlation_id},
+                )
+
+        # 4. Flatten nested permissions and check against those
+        if not permission_granted:
+            flattened = _flatten_nested_permissions(permissions)
+            if flattened:
+                logger.info(
+                    f"Flattened nested permissions: {flattened}",
+                    extra={"correlation_id": correlation_id},
+                )
+                if required_permission in flattened:
+                    permission_granted = True
+                    logger.info(
+                        f"Permission granted via flattened nested lookup: {required_permission}",
+                        extra={"correlation_id": correlation_id},
+                    )
+                elif f"settings.{required_permission}" in flattened:
+                    permission_granted = True
+                    logger.info(
+                        f"Permission granted via flattened nested settings prefix: settings.{required_permission}",
+                        extra={"correlation_id": correlation_id},
+                    )
+
+        if permission_granted:
             metrics.add_metric(
                 name="validate.api_key_permissions.granted",
                 unit=MetricUnit.Count,
@@ -1460,7 +1650,6 @@ def generate_api_key_context(api_key_item: Dict[str, Any]) -> Dict[str, Any]:
     # Get permissions from API key item
     permissions = api_key_item.get("permissions", {})
 
-    # Add debug logging to understand the permissions structure
     logger.info(f"Permissions type: {type(permissions)}, value: {permissions}")
 
     # Ensure permissions is a dictionary
@@ -1468,48 +1657,20 @@ def generate_api_key_context(api_key_item: Dict[str, Any]) -> Dict[str, Any]:
         logger.warning(f"Permissions is not a dictionary, type: {type(permissions)}")
         permissions = {}
 
-    # Transform nested permission structure to flat format expected by CASL
+    # Build custom permissions list from both flat and nested formats
     custom_permissions = []
 
-    # Handle nested permission structure like:
-    # {
-    #   "settings": {
-    #     "api-keys": {"create": True, "view": True, "edit": True, "delete": True}
-    #   }
-    # }
-    def flatten_permissions(obj, prefix=""):
-        try:
-            if not isinstance(obj, dict):
-                logger.warning(
-                    f"flatten_permissions called with non-dict object: {type(obj)}"
-                )
-                return
-
-            for key, value in obj.items():
-                if isinstance(value, dict):
-                    # Check if this is a leaf node with boolean values (actions)
-                    if all(isinstance(v, bool) for v in value.values()):
-                        # This is an action level - add permissions for each True action
-                        for action, enabled in value.items():
-                            if enabled:
-                                permission_key = f"{prefix}.{key}" if prefix else key
-                                custom_permissions.append(f"{permission_key}:{action}")
-                    else:
-                        # This is a nested resource - recurse
-                        new_prefix = f"{prefix}.{key}" if prefix else key
-                        flatten_permissions(value, new_prefix)
-                elif isinstance(value, bool) and value:
-                    # Direct boolean permission
-                    permission_key = f"{prefix}.{key}" if prefix else key
-                    custom_permissions.append(
-                        f"{permission_key}:view"
-                    )  # Default to view
-        except Exception as e:
-            logger.error(f"Error in flatten_permissions: {str(e)}")
-            logger.error(f"Object: {obj}, prefix: {prefix}")
-
     if permissions:
-        flatten_permissions(permissions)
+        # Collect flat format permissions (e.g., {"assets:view": True})
+        for key, value in permissions.items():
+            if isinstance(value, bool) and value and ":" in key:
+                custom_permissions.append(key)
+
+        # Flatten nested format permissions using shared helper
+        nested_flattened = _flatten_nested_permissions(permissions)
+        for perm in nested_flattened:
+            if perm not in custom_permissions:
+                custom_permissions.append(perm)
 
     logger.info(
         f"Generated custom permissions for API key {api_key_item['id']}: {custom_permissions}"

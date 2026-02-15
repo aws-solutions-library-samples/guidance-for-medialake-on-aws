@@ -108,7 +108,7 @@ class GroupsStack(cdk.NestedStack):
             # authorizer=props.authorizer,
         )
 
-        cfn_method = groups_resource.node.default_child
+        cfn_method = groups_post_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
@@ -176,6 +176,37 @@ class GroupsStack(cdk.NestedStack):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # Group permissions resource
+        group_permissions_resource = group_id_resource.add_resource("permissions")
+
+        # GET /groups/{groupId}/permissions - Get group permissions
+        group_permissions_get_method = group_permissions_resource.add_method(
+            "GET",
+            api_gateway.LambdaIntegration(
+                groups_unified_lambda.function,
+                request_templates={
+                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
+                },
+            ),
+        )
+        cfn_method = group_permissions_get_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # PUT /groups/{groupId}/permissions - Update group permissions
+        group_permissions_put_method = group_permissions_resource.add_method(
+            "PUT",
+            api_gateway.LambdaIntegration(
+                groups_unified_lambda.function,
+                request_templates={
+                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
+                },
+            ),
+        )
+        cfn_method = group_permissions_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # Group members resource
         group_members_resource = group_id_resource.add_resource("members")
 
@@ -217,7 +248,6 @@ class GroupsStack(cdk.NestedStack):
         # Add CORS support to all resources
         add_cors_options_method(groups_resource)
         add_cors_options_method(group_id_resource)
+        add_cors_options_method(group_permissions_resource)
         add_cors_options_method(group_members_resource)
         add_cors_options_method(group_member_id_resource)
-        add_cors_options_method(groups_resource)
-        add_cors_options_method(group_members_resource)

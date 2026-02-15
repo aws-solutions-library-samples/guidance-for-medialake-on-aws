@@ -68,6 +68,7 @@ class CollectionsStack(cdk.NestedStack):
                 security_group=props.security_group,
                 media_assets_bucket=props.media_assets_bucket,
                 asset_table=props.asset_table,
+                cognito_user_pool=props.cognito_user_pool,
             ),
         )
 

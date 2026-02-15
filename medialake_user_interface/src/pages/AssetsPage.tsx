@@ -29,7 +29,7 @@ import {
 import { PageHeader, PageContent } from "@/components/common/layout";
 // import { S3Explorer } from "../features/home/S3Explorer";
 import AssetExplorer from "../features/assets/AssetExplorer";
-import { useGetConnectors } from "../api/hooks/useConnectors";
+import { useSearchConnectors } from "../api/hooks/useSearchConnectors";
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 60; // Wider collapsed width to avoid overlap
@@ -40,7 +40,7 @@ const AssetsPage: React.FC = () => {
   const [selectedConnector, setSelectedConnector] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { data: connectorsResponse, isLoading } = useGetConnectors();
+  const { data: connectorsResponse, isLoading } = useSearchConnectors();
 
   const connectors = connectorsResponse?.data.connectors || [];
 

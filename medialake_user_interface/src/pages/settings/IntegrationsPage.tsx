@@ -13,6 +13,7 @@ import AddIcon from "@mui/icons-material/Add";
 import WarningIcon from "@mui/icons-material/Warning";
 import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import IntegrationList from "@/features/settings/integrations/components/IntegrationList/index";
 import IntegrationForm from "@/features/settings/integrations/components/IntegrationForm/IntegrationForm";
 import {
@@ -33,6 +34,12 @@ import queryClient from "@/api/queryClient";
 
 const IntegrationsPage: React.FC = () => {
   const { t } = useTranslation();
+
+  // Permission checks for integration actions
+  const createIntegrationPermission = useActionPermission("create", "integration");
+  const editIntegrationPermission = useActionPermission("edit", "integration");
+  const deleteIntegrationPermission = useActionPermission("delete", "integration");
+
   const [openIntegrationForm, setOpenIntegrationForm] = useState(false);
   const [editingIntegration, setEditingIntegration] = useState<Integration | null>(null);
   const [activeFilters, setActiveFilters] = useState<IntegrationFilters[]>([]);
@@ -240,6 +247,8 @@ const IntegrationsPage: React.FC = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={handleAddIntegration}
+            disabled={createIntegrationPermission.disabled}
+            title={createIntegrationPermission.tooltip}
             sx={{
               borderRadius: "8px",
               textTransform: "none",
@@ -255,8 +264,10 @@ const IntegrationsPage: React.FC = () => {
       <PageContent isLoading={isLoading} error={error as Error}>
         <IntegrationList
           integrations={(integrationsData as IntegrationsResponse)?.data || []}
-          onEditIntegration={handleEditIntegration}
-          onDeleteIntegration={handleDeleteIntegration}
+          onEditIntegration={editIntegrationPermission.allowed ? handleEditIntegration : undefined}
+          onDeleteIntegration={
+            deleteIntegrationPermission.allowed ? handleDeleteIntegration : undefined
+          }
           activeFilters={activeFilters}
           activeSorting={activeSorting}
           onFilterChange={(columnId, value) => {

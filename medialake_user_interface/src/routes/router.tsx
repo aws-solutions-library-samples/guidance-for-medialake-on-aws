@@ -22,6 +22,7 @@ import ConnectorsPage from "@/pages/settings/ConnectorsPage";
 import ProfilePage from "@/pages/settings/ProfilePage";
 import UserManagement from "@/pages/settings/UserManagement";
 import RoleManagement from "@/pages/settings/RoleManagement";
+import PermissionsPage from "@/pages/settings/PermissionsPage";
 import IntegrationsPage from "@/pages/settings/IntegrationsPage";
 import EnvironmentsPage from "@/pages/settings/EnvironmentsPage";
 import SystemSettingsPage from "@/pages/settings/SystemSettingsPage";
@@ -173,7 +174,7 @@ export const router = createBrowserRouter([
         path: "settings/connectors",
         element: (
           <RoutePermissionGuard
-            permission={{ action: "manage", subject: "connector" }}
+            permission={{ action: "view", subject: "connector" }}
             element={<ConnectorsPage />}
           />
         ),
@@ -182,7 +183,7 @@ export const router = createBrowserRouter([
         path: "settings/users",
         element: (
           <RoutePermissionGuard
-            permission={{ action: "manage", subject: "user" }}
+            permission={{ action: "view", subject: "user" }}
             element={<UserManagement />}
           />
         ),
@@ -197,10 +198,19 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "settings/permissions",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "view", subject: "permission-set" }}
+            element={<PermissionsPage />}
+          />
+        ),
+      },
+      {
         path: "settings/integrations",
         element: (
           <RoutePermissionGuard
-            permission={{ action: "manage", subject: "integration" }}
+            permission={{ action: "view", subject: "integration" }}
             element={<IntegrationsPage />}
           />
         ),
@@ -245,7 +255,7 @@ export const router = createBrowserRouter([
         path: "settings/system",
         element: (
           <RoutePermissionGuard
-            permission={{ action: "manage", subject: "settings" }}
+            permission={{ action: "view", subject: "settings" }}
             element={<SystemSettingsPage />}
           />
         ),

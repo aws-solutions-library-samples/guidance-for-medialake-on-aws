@@ -16,9 +16,11 @@ The module handles:
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_events as events
@@ -46,6 +48,9 @@ class CollectionsApiProps:
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
     asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
+    cognito_user_pool: Optional[cognito.UserPool] = (
+        None  # For /collections/users endpoint
+    )
 
 
 class CollectionsApi(Construct):
@@ -174,6 +179,15 @@ class CollectionsApi(Construct):
                     "ENVIRONMENT": config.environment,
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    # Cognito user pool for /collections/users endpoint
+                    # Allows sharing UI to list users without requiring users:view
+                    **(
+                        {
+                            "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
+                        }
+                        if props.cognito_user_pool
+                        else {}
+                    ),
                 },
             ),
         )
@@ -199,6 +213,18 @@ class CollectionsApi(Construct):
 
         # Grant read access to asset table (for copying asset thumbnails)
         props.asset_table.grant_read_data(collections_lambda.function)
+
+        # Grant Cognito permissions for /collections/users endpoint
+        if props.cognito_user_pool:
+            collections_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "cognito-idp:ListUsers",
+                    ],
+                    resources=[props.cognito_user_pool.user_pool_arn],
+                )
+            )
 
         # Grant VPC network interface permissions for Lambda in VPC
         collections_lambda.function.add_to_role_policy(
@@ -313,6 +339,28 @@ class CollectionsApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /collections/collection-types (static route — returns types under collections:view)
+        collection_types_sub_resource = collections_resource.add_resource(
+            "collection-types"
+        )
+        collection_types_sub_method = collection_types_sub_resource.add_method(
+            "GET",
+            collections_integration,
+        )
+        cfn_method = collection_types_sub_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # /collections/users (static route — returns user summaries under collections:edit)
+        collections_users_resource = collections_resource.add_resource("users")
+        collections_users_method = collections_users_resource.add_method(
+            "GET",
+            collections_integration,
+        )
+        cfn_method = collections_users_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # /collections/{collectionId} - Variable path for specific collections
         collection_id_resource = collections_resource.add_resource("{collectionId}")
 
@@ -341,6 +389,8 @@ class CollectionsApi(Construct):
         add_cors_options_method(collections_resource)
         add_cors_options_method(shared_with_me_resource)
         add_cors_options_method(shared_by_me_resource)
+        add_cors_options_method(collection_types_sub_resource)
+        add_cors_options_method(collections_users_resource)
         add_cors_options_method(collection_id_resource)
         add_cors_options_method(collection_proxy_resource)
 

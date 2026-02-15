@@ -128,7 +128,7 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
             "collection-types": "collection-types",
             "settings-menu": "settings-menu",
             regions: "region",
-            nodes: "nodes",
+            nodes: "node",
             environments: "environments",
             reviews: "reviews",
             storage: "storage",

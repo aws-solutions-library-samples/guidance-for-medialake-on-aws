@@ -49,7 +49,7 @@ class SharedAuthorizerConstruct(Construct):
             "AVP_POLICY_STORE_ID": props.avp_policy_store_id,
             "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
             "API_KEYS_TABLE_NAME": props.api_keys_table_name,
-            "DEBUG_MODE": "true",  # Temporarily enabled for debugging user creation issue
+            "DEBUG_MODE": "False",  # Temporarily enabled for debugging user creation issue
             "NAMESPACE": "MediaLake",
             "TOKEN_TYPE": "identityToken",
         }

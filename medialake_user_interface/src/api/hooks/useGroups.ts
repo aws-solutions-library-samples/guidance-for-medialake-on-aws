@@ -18,7 +18,9 @@ export const useGetGroups = (enabled: boolean = true) => {
     enabled: enabled,
     queryFn: async () => {
       try {
-        const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE);
+        const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUPS.BASE, {
+          skipAccessDeniedRedirect: true,
+        } as any);
 
         if (typeof data.body === "string") {
           const parsedBody = JSON.parse(data.body) as GroupListResponse;
