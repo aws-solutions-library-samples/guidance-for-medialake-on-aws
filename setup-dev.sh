@@ -167,11 +167,24 @@ if [ -d "cdk" ]; then
     popd > /dev/null
 fi
 
-# Install pre-commit and security tools
-echo "Installing pre-commit and security tools..."
-if ! pip install pre-commit detect-secrets; then
-    log_error "Failed to install pre-commit and security tools"
+# Install pre-commit
+echo "Installing pre-commit..."
+if ! pip install pre-commit; then
+    log_error "Failed to install pre-commit"
     exit 1
+fi
+
+# Install gitleaks for secret scanning
+echo "Installing gitleaks..."
+if [[ "$OS" == "Darwin" ]]; then
+    if command_exists brew; then
+        brew install gitleaks || log_info "gitleaks may already be installed"
+    else
+        log_info "Homebrew not found. Install gitleaks manually: https://github.com/gitleaks/gitleaks#installing"
+    fi
+elif [[ "$OS" == "Linux" ]]; then
+    GITLEAKS_VERSION="8.21.2"
+    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /usr/local/bin gitleaks || log_info "Failed to install gitleaks automatically. Install manually: https://github.com/gitleaks/gitleaks#installing"
 fi
 
 # Install additional tools for enhanced pre-commit hooks
@@ -265,16 +278,12 @@ if ! git config core.hooksPath .githooks; then
     exit 1
 fi
 
-# Initialize secrets baseline for detect-secrets
-echo "Initializing security tools..."
-if [ -f ".pre-commit-config.yaml" ] && command_exists detect-secrets; then
-    if [ ! -f ".secrets.baseline" ]; then
-        echo "Creating secrets baseline..."
-        detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins || log_info "Secrets baseline created with warnings"
-        echo "Secrets baseline created at .secrets.baseline"
-    else
-        echo "Secrets baseline already exists"
-    fi
+# Verify gitleaks is available for secret scanning
+echo "Verifying security tools..."
+if command_exists gitleaks; then
+    echo "gitleaks $(gitleaks version) is installed"
+else
+    log_info "gitleaks not found in PATH. Pre-commit will download it automatically when the hook runs."
 fi
 
 # Initialize pre-commit without installing hooks

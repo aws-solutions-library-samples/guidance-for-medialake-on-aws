@@ -450,7 +450,7 @@ sync-to-github:
     - cd github-repo
     - echo "Current GitHub main commit:" && git log --oneline -1
     - rsync -av --delete --exclude=.git ../ ./
-    - rm -f secrets.txt .roomodes .gitleaksignore fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .secrets.baseline .gitlab-ci.yml .gitattributes .flake8
+    - rm -f secrets.txt .roomodes .gitleaksignore .gitleaks.toml fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .gitlab-ci.yml .gitattributes .flake8
     - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
     - git add -A
     - git commit --allow-empty -m "${COMMIT_MESSAGE}"
