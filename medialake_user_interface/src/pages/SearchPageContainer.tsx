@@ -12,6 +12,7 @@ import {
   useSemanticSearch,
   useSemanticMode,
   useSearchFilters,
+  useSearchModes,
   useDomainActions,
   useUIActions,
 } from "@/stores/searchStore";
@@ -21,6 +22,8 @@ import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import SearchPagePresentation from "./SearchPagePresentation";
 import { type AssetItem, type LocationState } from "./types";
+import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
+import { getThresholdsForModel } from "@/components/common/utils";
 
 const SearchPageContainer: React.FC = () => {
   const location = useLocation();
@@ -45,9 +48,20 @@ const SearchPageContainer: React.FC = () => {
   const semantic = useSemanticSearch();
   const semanticMode = useSemanticMode();
   const filters = useSearchFilters();
+  const searchModes = useSearchModes();
 
-  // Confidence threshold state for semantic search
-  const [confidenceThreshold, setConfidenceThreshold] = React.useState<number>(0.57);
+  // Confidence threshold state for semantic search — default based on configured model
+  const { providerData } = useSemanticSearchStatus();
+  const modelVersion =
+    providerData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0" ? "3.0" : "2.7";
+  const [confidenceThreshold, setConfidenceThreshold] = React.useState<number>(
+    getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE
+  );
+
+  // Update threshold when model version changes (e.g. settings change)
+  React.useEffect(() => {
+    setConfidenceThreshold(getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE);
+  }, [modelVersion]);
 
   // Actions
   const { updateFilter } = useDomainActions();
@@ -58,6 +72,7 @@ const SearchPageContainer: React.FC = () => {
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
     isSemantic: semantic,
+    searchModes: searchModes,
     fields: [], // Default empty fields
     type: filters.type,
     extension: filters.extension,

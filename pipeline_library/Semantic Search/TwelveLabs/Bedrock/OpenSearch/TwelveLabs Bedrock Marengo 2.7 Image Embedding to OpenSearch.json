@@ -72,6 +72,10 @@
             "method": "store",
             "parameters": {
               "Index Name": "media",
+              "Asset Embeddings Index": "media",
+              "Model Provider": "twelvelabs",
+              "Model Name": "Marengo-retrieval-2.7",
+              "Model Version": "2.7",
               "Content Type": "image"
             }
           },

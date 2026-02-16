@@ -727,6 +727,8 @@ class UnifiedSearchOrchestrator:
                 search_params["storageIdentifier"] = query_params["storageIdentifier"]
             if "sort" in query_params:
                 search_params["sort"] = query_params["sort"]
+            if "searchModality" in query_params:
+                search_params["searchModality"] = query_params["searchModality"]
 
             # Create SearchParams object
             params = SearchParams(**search_params)

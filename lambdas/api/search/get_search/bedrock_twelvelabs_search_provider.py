@@ -108,7 +108,9 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             f"target_index: {self._target_index})"
         )
 
-    def get_allowed_clip_embedding_types(self) -> List[str]:
+    def get_allowed_clip_embedding_types(
+        self, search_modes: List[str] = None
+    ) -> List[str]:
         """
         Get the list of embedding types that should be included in clips for timeline display.
         This is model-specific as different models return different embedding types.
@@ -119,17 +121,22 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
         For TwelveLabs Marengo 3.0:
         - Embedding types: visual, audio, transcription
-        - Currently only using "visual" for clips
-        - audio and transcription support to be added later
+        - Respects search_modes parameter to filter by user-selected modes
         """
         if "marengo-embed-2-7" in self.embedding_model or self.model_version == "2.7":
             # For Marengo 2.7, only include visual-text for clips
             return ["visual-text"]
 
         if "marengo-embed-3-0" in self.embedding_model or self.model_version == "3.0":
-            # For Marengo 3.0, only use visual embeddings for search
-            # Audio and transcription embeddings to be supported in future iteration
-            return ["visual"]
+            # For Marengo 3.0, use search_modes to determine allowed types
+            if search_modes:
+                from unified_search_models import get_allowed_types_for_modes
+
+                allowed = get_allowed_types_for_modes(search_modes)
+                if allowed is not None:
+                    return allowed
+            # Default: visual + transcription (original behavior)
+            return ["visual", "transcription"]
 
         # Default: include common types across models
         return ["visual-text", "visual"]
@@ -412,8 +419,12 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             # Build semantic query - let S3VectorEmbeddingStore generate embeddings internally
             # But we already have embeddings, so we need to override them
+            search_modes = getattr(query, "search_modes", None)
             semantic_query = s3_vector_store.build_semantic_query(
-                params, allowed_embedding_types=self.get_allowed_clip_embedding_types()
+                params,
+                allowed_embedding_types=self.get_allowed_clip_embedding_types(
+                    search_modes=search_modes
+                ),
             )
 
             # Override the embedding with our Bedrock-generated one
@@ -449,7 +460,29 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
                 # Get source data and preserve clips if they exist
                 source_data = hit.get("_source", {}).copy()
-                if "clips" in hit:
+
+                # For images, promote embedding metadata to top level instead of clips
+                # Images have a single asset-level embedding — the clips wrapper is misleading
+                if asset_type.lower() == "image":
+                    clips = hit.get("clips", [])
+                    if clips and len(clips) == 1:
+                        image_clip = clips[0]
+                        source_data["embedding_info"] = {
+                            "model_provider": image_clip.get(
+                                "model_provider", "twelvelabs"
+                            ),
+                            "model_name": image_clip.get("model_name", "marengo"),
+                            "model_version": image_clip.get("model_version", "3.0"),
+                            "embedding_representation": image_clip.get(
+                                "embedding_representation", "visual"
+                            ),
+                            "embedding_granularity": image_clip.get(
+                                "embedding_granularity", "asset"
+                            ),
+                            "type": image_clip.get("type", "image"),
+                        }
+                    # else: no clips for this image, no embedding_info either — that's fine
+                elif "clips" in hit:
                     source_data["clips"] = hit["clips"]
 
                 search_hit = SearchHit(
@@ -513,33 +546,38 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             # Marengo 2.7 (1024d): Use BOTH legacy embedding field AND asset_embeddings for backward compatibility
 
             # Get allowed embedding types for filtering the nested query
-            allowed_types = self.get_allowed_clip_embedding_types()
+            allowed_types = self.get_allowed_clip_embedding_types(
+                search_modes=getattr(query, "search_modes", None)
+            )
 
             if self.model_version == "3.0":
                 # Marengo 3.0: Query separate embedding documents with inventory_id reference
                 # Uses embedding_representation (visual/audio/text/video) for filtering
-                # Matches both clips (embedding_granularity: segment) and whole assets (embedding_granularity: asset)
-                # For images: embedding_type="image", embedding_representation="visual"
-                # For video clips/assets: embedding_type="video", embedding_representation="visual"
+                # Build dynamic filters based on search_modes
+                from unified_search_models import get_os_filters_for_modes
+
+                search_modes = getattr(query, "search_modes", ["visual"])
+                mode_filters = get_os_filters_for_modes(search_modes)
+
+                if mode_filters is not None:
+                    # Specific modes selected — apply representation filter
+                    filter_clause = {
+                        "bool": {
+                            "should": mode_filters,
+                            "minimum_should_match": 1,
+                            "must": [],
+                        }
+                    }
+                else:
+                    # All modes selected — no representation filter, but keep bool
+                    # wrapper so _add_filters_to_opensearch_query can append to ["bool"]["must"]
+                    filter_clause = {"bool": {"must": []}}
+
                 opensearch_query = {
                     "size": query.page_size * 20,
                     "query": {
                         "bool": {
-                            "filter": {
-                                "bool": {
-                                    "should": [
-                                        # Match by embedding_representation (visual, audio, transcription)
-                                        {
-                                            "terms": {
-                                                "embedding_representation": allowed_types
-                                            }
-                                        },
-                                        # Also match images explicitly (embedding_type: "image")
-                                        {"term": {"embedding_type": "image"}},
-                                    ],
-                                    "minimum_should_match": 1,
-                                }
-                            },
+                            "filter": filter_clause,
                             "must": [
                                 {
                                     "knn": {
@@ -565,7 +603,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 }
                 self.logger.info(
                     f"Using Marengo 3.0 separate documents query "
-                    f"(field: {field_name}, filtered to representations: {allowed_types}, including images)"
+                    f"(field: {field_name}, search_modes: {search_modes})"
                 )
             else:
                 # Marengo 2.7: Try legacy first, fallback to new structure if needed
@@ -691,7 +729,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             )
 
             # Filter clips based on allowed embedding types (post-processing)
-            allowed_types = self.get_allowed_clip_embedding_types()
+            # allowed_types already computed above with search_modes awareness
             filtered_results = []
             total_clips_before = 0
             total_clips_after = 0
@@ -699,6 +737,11 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             for result in processed_results:
                 clips = result.get("clips", [])
                 total_clips_before += len(clips)
+
+                # Images don't have clips — skip clip filtering for them
+                if "embedding_info" in result:
+                    filtered_results.append(result)
+                    continue
 
                 # Debug: Log clip embedding_option values before filtering
                 if clips:
@@ -708,11 +751,15 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                     )
 
                 # Filter clips to only include allowed embedding types
-                filtered_clips = [
-                    clip
-                    for clip in clips
-                    if clip.get("embedding_option") in allowed_types
-                ]
+                # When allowed_types is None (all modes), keep all clips
+                if allowed_types is not None:
+                    filtered_clips = [
+                        clip
+                        for clip in clips
+                        if clip.get("embedding_option") in allowed_types
+                    ]
+                else:
+                    filtered_clips = clips
                 total_clips_after += len(filtered_clips)
 
                 result["clips"] = filtered_clips
@@ -794,6 +841,27 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             parent_id = source.get("inventory_id") or source.get("InventoryID", "")
             embedding_type = source.get("embedding_type", "video")
 
+            # Log the raw asset-embeddings document (excluding vector fields)
+            source_for_logging = {
+                k: v
+                for k, v in source.items()
+                if not k.startswith("embedding_")
+                or k
+                in (
+                    "embedding_type",
+                    "embedding_granularity",
+                    "embedding_representation",
+                    "embedding_dimension",
+                )
+            }
+            self.logger.info(
+                f"[ASSET-EMBEDDINGS] Raw hit for {parent_id}",
+                extra={
+                    "score": hit.get("_score", 0.0),
+                    "document": source_for_logging,
+                },
+            )
+
             # Skip asset-granularity embeddings for videos (they represent the whole video, not clips)
             # BUT keep asset-granularity embeddings for images (images only have asset-level embeddings)
             embedding_granularity = source.get("embedding_granularity", "segment")
@@ -818,10 +886,10 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 or source.get("end_smpte_timecode", ""),
                 "start_seconds": source.get("start_seconds"),
                 "end_seconds": source.get("end_seconds"),
-                "type": source.get("type", "video"),
+                "type": source.get("embedding_type") or source.get("type", "video"),
                 "model_provider": source.get("model_provider", "twelvelabs"),
                 "model_name": source.get("model_name", "marengo"),
-                "model_version": source.get("model_version", 3.0),
+                "model_version": source.get("model_version", "3.0"),
                 "embedding_representation": source.get(
                     "embedding_representation", "visual"
                 ),
@@ -873,6 +941,13 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 if search_resp["hits"]["total"]["value"] > 0:
                     parent_source = search_resp["hits"]["hits"][0]["_source"]
 
+                    # Determine asset type from parent document
+                    asset_type = (
+                        parent_source.get("DigitalSourceAsset", {})
+                        .get("Type", "")
+                        .lower()
+                    )
+
                     # Build result from parent document
                     result = {
                         "InventoryID": parent_id,
@@ -885,10 +960,32 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                         "FileHash": parent_source.get("FileHash", ""),
                         "Metadata": parent_source.get("Metadata", {}),
                         "score": max(clip["score"] for clip in clips),
-                        "clips": sorted(
-                            clips, key=lambda x: x.get("score", 0), reverse=True
-                        ),
                     }
+
+                    # For images, promote embedding metadata to top level instead of wrapping in clips
+                    # Images have a single asset-level embedding — the clips wrapper is misleading
+                    if asset_type == "image" and len(clips) == 1:
+                        image_embedding = clips[0]
+                        result["embedding_info"] = {
+                            "model_provider": image_embedding.get(
+                                "model_provider", "twelvelabs"
+                            ),
+                            "model_name": image_embedding.get("model_name", "marengo"),
+                            "model_version": image_embedding.get(
+                                "model_version", "3.0"
+                            ),
+                            "embedding_representation": image_embedding.get(
+                                "embedding_representation", "visual"
+                            ),
+                            "embedding_granularity": image_embedding.get(
+                                "embedding_granularity", "asset"
+                            ),
+                            "type": image_embedding.get("type", "image"),
+                        }
+                    else:
+                        result["clips"] = sorted(
+                            clips, key=lambda x: x.get("score", 0), reverse=True
+                        )
 
                     # Generate URLs for derived representations
                     derived_reps = parent_source.get("DerivedRepresentations", [])
@@ -926,6 +1023,23 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                         result["id"] = parent_id
 
                     processed_results.append(result)
+
+                    # Log the processed result (what gets sent to the API response)
+                    result_summary = {
+                        "InventoryID": result.get("InventoryID"),
+                        "asset_type": asset_type,
+                        "score": result.get("score"),
+                        "has_clips": "clips" in result,
+                        "clip_count": len(result["clips"]) if "clips" in result else 0,
+                        "has_embedding_info": "embedding_info" in result,
+                        "embedding_info": result.get("embedding_info"),
+                        "has_thumbnailUrl": "thumbnailUrl" in result,
+                        "has_proxyUrl": "proxyUrl" in result,
+                    }
+                    self.logger.info(
+                        f"[ASSET-EMBEDDINGS] Processed result for {parent_id}",
+                        extra={"result_summary": result_summary},
+                    )
                 else:
                     self.logger.warning(
                         f"Parent document not found for {parent_id}, skipping clips"
@@ -954,7 +1068,15 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             if operator == "in" and isinstance(value, list):
                 if field_key == "mediaType":
-                    filters_to_add.append({"terms": {"DigitalSourceAsset.Type": value}})
+                    if self.model_version == "3.0":
+                        # Marengo 3.0 separate documents use embedding_type instead of DigitalSourceAsset.Type
+                        filters_to_add.append(
+                            {"terms": {"embedding_type": [v.lower() for v in value]}}
+                        )
+                    else:
+                        filters_to_add.append(
+                            {"terms": {"DigitalSourceAsset.Type": value}}
+                        )
                 elif field_key == "DigitalSourceAsset.MainRepresentation.Format":
                     filters_to_add.append({"terms": {field_key: value}})
             elif operator == "==" or operator == "eq":
@@ -972,7 +1094,11 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 filters_to_add.append(range_filter)
 
         # Add all filters to the query
-        query["query"]["bool"]["filter"]["bool"]["must"].extend(filters_to_add)
+        # Ensure the 'must' array exists in the filter bool (Marengo 3.0 queries may only have 'should')
+        filter_bool = query["query"]["bool"]["filter"]["bool"]
+        if "must" not in filter_bool:
+            filter_bool["must"] = []
+        filter_bool["must"].extend(filters_to_add)
 
     def search(self, query: SearchQuery) -> SearchResult:
         """Execute the complete search process"""

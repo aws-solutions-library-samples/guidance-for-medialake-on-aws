@@ -16,7 +16,7 @@ Current Implementation:
 
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
 from base_embedding_store import BaseEmbeddingStore, SearchResult
@@ -26,6 +26,9 @@ from opensearchpy import (
     RequestsHttpConnection,
 )
 from search_utils import normalize_distance
+
+# Sentinel to distinguish "caller didn't pass allowed_embedding_types" from explicit None (all modes)
+_EMBEDDING_TYPES_DEFAULT = object()
 
 
 class S3VectorEmbeddingStore(BaseEmbeddingStore):
@@ -93,15 +96,18 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
             return False
 
     def build_semantic_query(
-        self, params, allowed_embedding_types: List[str] = None
+        self,
+        params,
+        allowed_embedding_types: Optional[List[str]] = _EMBEDDING_TYPES_DEFAULT,
     ) -> Dict[str, Any]:
         """
         Build S3 Vector semantic query using Twelve Labs embeddings.
 
         Args:
             params: Query parameters
-            allowed_embedding_types: Optional list of embedding types to include (e.g., ["visual-text"])
-                                    If not provided, defaults to ["visual-text"] for timeline display
+            allowed_embedding_types: List of embedding types to include (e.g., ["visual-text"]).
+                                    None means no filtering (all modes / search everything).
+                                    If not passed, defaults to ["visual-text"].
         """
         start_time = time.time()
         self.logger.info(
@@ -111,8 +117,8 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
         # Use centralized embedding generation
         embedding = self.generate_text_embedding(params.q)
 
-        # Default to visual-text only if not specified (safest for timeline display)
-        if allowed_embedding_types is None:
+        # Resolve sentinel: if caller didn't pass anything, default to visual-text
+        if allowed_embedding_types is _EMBEDDING_TYPES_DEFAULT:
             allowed_embedding_types = ["visual-text"]
 
         # Return S3 Vector query parameters - using actual environment variable names
@@ -279,10 +285,11 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                 # Get asset type for this inventory_id
                 asset_type = inventory_type_map.get(inventory_id, "Unknown")
 
-                # Build filter based on asset type:
-                # - For Video: Apply allowed_embedding_types filter to exclude unwanted clip types
+                # Build filter based on asset type and allowed_types:
+                # - allowed_types=None means all modes selected — no embedding_option filter
+                # - For Video with specific modes: Apply allowed_embedding_types filter
                 # - For Image/Audio: Only filter by inventory_id (no embedding type restriction)
-                if asset_type == "Video":
+                if allowed_types is not None and asset_type == "Video":
                     # Filter out unwanted embedding types (e.g., audio, visual-image for video clips)
                     vector_filter = {
                         "$and": [
@@ -291,7 +298,7 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
                         ]
                     }
                 else:
-                    # For images and audio, don't filter by embedding_option
+                    # No embedding_option filter: all modes selected, or non-video asset
                     vector_filter = {"inventory_id": {"$eq": inventory_id}}
 
                 # Log the filter being applied

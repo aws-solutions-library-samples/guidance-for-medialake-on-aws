@@ -45,7 +45,9 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
 import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
-import { useSemanticMode } from "@/stores/searchStore";
+import { useSemanticMode, useSearchModes } from "@/stores/searchStore";
+import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
+import { getThresholdsForModel } from "@/components/common/utils";
 
 interface LocationState {
   query?: string;
@@ -148,18 +150,30 @@ const SearchPage: React.FC = () => {
   const currentQuery = searchState.query;
   const currentSemantic = searchState.isSemantic;
   const semanticMode = useSemanticMode();
+  const searchModes = useSearchModes();
   const facetFilters = searchState.filters;
 
   // State for selected fields
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
-  // State for confidence threshold (semantic search)
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.57);
+  // State for confidence threshold (semantic search) — default based on configured model
+  const { providerData: searchProviderData } = useSemanticSearchStatus();
+  const modelVersion =
+    searchProviderData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0" ? "3.0" : "2.7";
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(
+    getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE
+  );
+
+  // Update threshold when model version changes
+  useEffect(() => {
+    setConfidenceThreshold(getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE);
+  }, [modelVersion]);
 
   const { data, isLoading, isFetching, error } = useSearch(currentQuery, {
     page: currentPage,
     pageSize: pageSize,
     isSemantic: currentSemantic,
+    searchModes: searchModes,
     fields: selectedFields,
     ...facetFilters, // Include facet filters in the search
   });

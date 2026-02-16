@@ -40,6 +40,7 @@ import {
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
 import SemanticModeToggle from "./components/TopBar/SemanticModeToggle";
+import SearchModeSelector from "./components/TopBar/SearchModeSelector";
 import { useSemanticSearchStatus } from "./features/settings/system/hooks/useSystemSettings";
 
 interface SearchTag {
@@ -74,7 +75,8 @@ function TopBar() {
   const { toggleChat, isOpen: isChatOpen } = useChat();
 
   // Check semantic search configuration status
-  const { isSemanticSearchEnabled, isConfigured } = useSemanticSearchStatus();
+  const { isSemanticSearchEnabled, isConfigured, providerData } = useSemanticSearchStatus();
+  const isMarengo30 = providerData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0";
 
   // Initialize semantic search from URL params on mount
   useEffect(() => {
@@ -689,6 +691,9 @@ function TopBar() {
                   </Box>
                 )}
               </IconButton>
+
+              {/* Search mode selector (Visual/Audio/Transcript) — Marengo 3.0 only */}
+              <SearchModeSelector isVisible={storeIsSemantic && isMarengo30} />
 
               {/* Search icon button */}
               <IconButton
