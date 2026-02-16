@@ -26,9 +26,6 @@ from opensearchpy import AWSV4SignerAuth, OpenSearch, RequestsHttpConnection, ex
 # S3 client for downloading external payloads
 s3_client = boto3.client("s3")
 
-# DynamoDB client for fetching search provider config
-dynamodb = boto3.resource("dynamodb")
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Powertools
 logger = Logger()
@@ -38,15 +35,16 @@ tracer = Tracer(disabled=False)
 OPENSEARCH_ENDPOINT = os.getenv("OPENSEARCH_ENDPOINT", "")
 INDEX_NAME = os.getenv("INDEX_NAME", "media")
 ASSET_EMBEDDINGS_INDEX = os.getenv("ASSET_EMBEDDINGS_INDEX", "asset-embeddings")
-CONTENT_TYPE = os.getenv("CONTENT_TYPE", "video").lower()  # "video" | "audio"
+CONTENT_TYPE = os.getenv("CONTENT_TYPE", "video").lower()  # "video" | "audio" | "image"
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
-SYSTEM_SETTINGS_TABLE_NAME = os.getenv("SYSTEM_SETTINGS_TABLE_NAME", "")
+
+# Model metadata env vars (set per-pipeline from template parameters)
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "")
+MODEL_NAME = os.getenv("MODEL_NAME", "")
+MODEL_VERSION = os.getenv("MODEL_VERSION", "")
 
 IS_AUDIO_CONTENT = CONTENT_TYPE == "audio"
-
-# Cache for search provider config (refreshed on cold start)
-_search_provider_config_cache: Dict[str, Any] = {}
 
 # OpenSearch client
 _session = boto3.Session()
@@ -499,10 +497,13 @@ def _get_embedding_field_name(dimension: int, space_type: str = "cosine") -> str
 
 def _extract_embedding_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract embedding metadata from payload for storage in asset_embeddings.
+    Extract embedding metadata for storage alongside the embedding document.
 
-    Prioritizes DynamoDB search provider config for model info, then falls back
-    to payload extraction if DynamoDB is not available.
+    Priority order:
+    1. Environment variables (MODEL_PROVIDER, MODEL_NAME, MODEL_VERSION)
+       — set per-pipeline from template parameters, most reliable source
+    2. Payload fields (data, data.data, map.item, top-level)
+    3. Defaults to "unknown"
 
     Returns metadata including:
     - model_provider: e.g., "twelvelabs", "openai", "coactive"
@@ -511,120 +512,65 @@ def _extract_embedding_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
     - embedding_granularity: e.g., "clip", "video", "frame"
     - segmentation_method: e.g., "shot", "scene", "fixed"
     """
-    metadata = {}
+    metadata: Dict[str, Any] = {}
 
-    # First, try to get model info from DynamoDB search provider config (most reliable source)
-    try:
-        provider_config = _get_search_provider_config()
-        provider_type = provider_config.get("type", "")
-        provider_name = provider_config.get("name", "")
-        dimensions = provider_config.get("dimensions")
+    # 1. Environment variables (set per-pipeline at deployment time)
+    if MODEL_PROVIDER:
+        metadata["model_provider"] = MODEL_PROVIDER
+    if MODEL_NAME:
+        metadata["model_name"] = MODEL_NAME
+    if MODEL_VERSION:
+        metadata["model_version"] = MODEL_VERSION
 
-        # Determine model info from provider type
-        if "3-0" in provider_type or "3.0" in provider_type:
-            metadata["model_provider"] = "twelvelabs"
-            metadata["model_name"] = "Marengo-retrieval-3.0"
-            metadata["model_version"] = "3.0"
-        elif "2-7" in provider_type or "2.7" in provider_type:
-            metadata["model_provider"] = "twelvelabs"
-            metadata["model_name"] = "Marengo-retrieval-2.7"
-            metadata["model_version"] = "2.7"
-        elif "3-0" in provider_name or "3.0" in provider_name:
-            metadata["model_provider"] = "twelvelabs"
-            metadata["model_name"] = "Marengo-retrieval-3.0"
-            metadata["model_version"] = "3.0"
-        elif "2-7" in provider_name or "2.7" in provider_name:
-            metadata["model_provider"] = "twelvelabs"
-            metadata["model_name"] = "Marengo-retrieval-2.7"
-            metadata["model_version"] = "2.7"
-        elif "twelvelabs" in provider_type.lower():
-            # Default TwelveLabs - infer from dimensions
-            metadata["model_provider"] = "twelvelabs"
-            if dimensions == 512 or str(dimensions) == "512":
-                metadata["model_name"] = "Marengo-retrieval-3.0"
-                metadata["model_version"] = "3.0"
-            elif dimensions == 1024 or str(dimensions) == "1024":
-                metadata["model_name"] = "Marengo-retrieval-2.7"
-                metadata["model_version"] = "2.7"
-            else:
-                metadata["model_name"] = provider_name or "Marengo-retrieval"
-                metadata["model_version"] = "unknown"
-        else:
-            # Non-TwelveLabs provider
-            metadata["model_provider"] = provider_type or "unknown"
-            metadata["model_name"] = provider_name or "unknown"
-            metadata["model_version"] = "unknown"
+    # 2. Payload fields (fill in anything not already set by env vars)
+    data = payload.get("data", {})
+    if isinstance(data, dict):
+        if data.get("model_provider") and "model_provider" not in metadata:
+            metadata["model_provider"] = data["model_provider"]
+        if data.get("model_name") and "model_name" not in metadata:
+            metadata["model_name"] = data["model_name"]
+        if data.get("model_version") and "model_version" not in metadata:
+            metadata["model_version"] = data["model_version"]
 
-        logger.info(
-            "Determined embedding metadata from DynamoDB config",
-            extra={
-                "model_provider": metadata.get("model_provider"),
-                "model_name": metadata.get("model_name"),
-                "model_version": metadata.get("model_version"),
-                "source": "dynamodb",
-            },
-        )
+        if isinstance(data.get("data"), dict):
+            nested = data["data"]
+            if nested.get("model_provider") and "model_provider" not in metadata:
+                metadata["model_provider"] = nested["model_provider"]
+            if nested.get("model_name") and "model_name" not in metadata:
+                metadata["model_name"] = nested["model_name"]
+            if nested.get("model_version") and "model_version" not in metadata:
+                metadata["model_version"] = nested["model_version"]
 
-    except Exception as e:
-        logger.warning(
-            f"Could not get model info from DynamoDB: {e}, falling back to payload extraction"
-        )
-        # Fall back to payload extraction
-        data = payload.get("data", {})
-        if isinstance(data, dict):
-            # Direct metadata fields
-            if data.get("model_provider"):
-                metadata["model_provider"] = data["model_provider"]
-            if data.get("model_name"):
-                metadata["model_name"] = data["model_name"]
-            if data.get("model_version"):
-                metadata["model_version"] = data["model_version"]
+    map_item = payload.get("map", {}).get("item", {})
+    if isinstance(map_item, dict):
+        if map_item.get("model_provider") and "model_provider" not in metadata:
+            metadata["model_provider"] = map_item["model_provider"]
+        if map_item.get("model_name") and "model_name" not in metadata:
+            metadata["model_name"] = map_item["model_name"]
+        if map_item.get("model_version") and "model_version" not in metadata:
+            metadata["model_version"] = map_item["model_version"]
 
-            # Check nested data.data structure (Bedrock Results pattern)
-            if isinstance(data.get("data"), dict):
-                nested = data["data"]
-                if nested.get("model_provider") and "model_provider" not in metadata:
-                    metadata["model_provider"] = nested["model_provider"]
-                if nested.get("model_name") and "model_name" not in metadata:
-                    metadata["model_name"] = nested["model_name"]
-                if nested.get("model_version") and "model_version" not in metadata:
-                    metadata["model_version"] = nested["model_version"]
+    if payload.get("model_provider") and "model_provider" not in metadata:
+        metadata["model_provider"] = payload["model_provider"]
+    if payload.get("model_name") and "model_name" not in metadata:
+        metadata["model_name"] = payload["model_name"]
+    if payload.get("model_version") and "model_version" not in metadata:
+        metadata["model_version"] = payload["model_version"]
 
-        # Check map.item structure
-        map_item = payload.get("map", {}).get("item", {})
-        if isinstance(map_item, dict):
-            if map_item.get("model_provider") and "model_provider" not in metadata:
-                metadata["model_provider"] = map_item["model_provider"]
-            if map_item.get("model_name") and "model_name" not in metadata:
-                metadata["model_name"] = map_item["model_name"]
-            if map_item.get("model_version") and "model_version" not in metadata:
-                metadata["model_version"] = map_item["model_version"]
+    # 3. Final defaults
+    metadata.setdefault("model_provider", "unknown")
+    metadata.setdefault("model_name", "unknown")
+    metadata.setdefault("model_version", "unknown")
 
-        # Check top-level payload
-        if payload.get("model_provider") and "model_provider" not in metadata:
-            metadata["model_provider"] = payload["model_provider"]
-        if payload.get("model_name") and "model_name" not in metadata:
-            metadata["model_name"] = payload["model_name"]
-        if payload.get("model_version") and "model_version" not in metadata:
-            metadata["model_version"] = payload["model_version"]
-
-        # Set defaults only if no metadata was found at all
-        if not metadata.get("model_provider"):
-            metadata["model_provider"] = "unknown"
-        if not metadata.get("model_name"):
-            metadata["model_name"] = "unknown"
-        if not metadata.get("model_version"):
-            metadata["model_version"] = "unknown"
-
-        logger.info(
-            "Extracted embedding metadata from payload (fallback)",
-            extra={
-                "model_provider": metadata.get("model_provider"),
-                "model_name": metadata.get("model_name"),
-                "model_version": metadata.get("model_version"),
-                "source": "payload_fallback",
-            },
-        )
+    logger.info(
+        "Extracted embedding metadata",
+        extra={
+            "model_provider": metadata.get("model_provider"),
+            "model_name": metadata.get("model_name"),
+            "model_version": metadata.get("model_version"),
+            "source_env": bool(MODEL_PROVIDER or MODEL_NAME or MODEL_VERSION),
+        },
+    )
 
     # Extract additional metadata from payload (granularity, segmentation)
     data = payload.get("data", {})
@@ -640,113 +586,44 @@ def _extract_embedding_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
     return metadata
 
 
-def _get_search_provider_config() -> Dict[str, Any]:
-    """
-    Query DynamoDB for the configured search provider.
-
-    Returns cached config if available, otherwise fetches from DynamoDB.
-    Raises an error if the configuration cannot be retrieved.
-    """
-    global _search_provider_config_cache
-
-    # Return cached config if available
-    if _search_provider_config_cache:
-        return _search_provider_config_cache
-
-    if not SYSTEM_SETTINGS_TABLE_NAME:
-        error_msg = "SYSTEM_SETTINGS_TABLE_NAME environment variable not configured - cannot determine search provider"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
-
-    try:
-        table = dynamodb.Table(SYSTEM_SETTINGS_TABLE_NAME)
-        response = table.get_item(
-            Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
-        )
-
-        if "Item" in response:
-            config = response["Item"]
-            _search_provider_config_cache = config
-            logger.info(
-                "Fetched search provider config from DynamoDB",
-                extra={
-                    "provider_type": config.get("type", "unknown"),
-                    "provider_name": config.get("name", "unknown"),
-                    "dimensions": config.get("dimensions", "unknown"),
-                },
-            )
-            return config
-        else:
-            error_msg = f"No search provider configured in DynamoDB table {SYSTEM_SETTINGS_TABLE_NAME}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-
-    except RuntimeError:
-        # Re-raise RuntimeError (from our own checks)
-        raise
-    except Exception as e:
-        error_msg = f"Failed to fetch search provider config from DynamoDB table {SYSTEM_SETTINGS_TABLE_NAME}: {str(e)}"
-        logger.error(error_msg, extra={"error": str(e)})
-        raise RuntimeError(error_msg) from e
-
-
 def _should_use_asset_embeddings_mode(payload: Dict[str, Any]) -> bool:
     """
-    Determine if we should use the new asset_embeddings nested structure
-    based on the embedding provider configured in DynamoDB.
+    Determine if we should use the new asset_embeddings separate-document mode
+    based on the ASSET_EMBEDDINGS_INDEX environment variable.
 
-    Uses asset_embeddings mode for:
-    - TwelveLabs Marengo 3.0 - type: twelvelabs-bedrock-3-0
-
-    Uses legacy mode for:
-    - TwelveLabs Marengo 2.7 (backward compatibility) - types: twelvelabs-api, twelvelabs-bedrock
-    - All other providers (OpenAI, Coactive, etc.)
+    When ASSET_EMBEDDINGS_INDEX is "asset-embeddings", this is a Marengo 3.0
+    pipeline and embeddings are stored as separate documents.
+    When ASSET_EMBEDDINGS_INDEX is "media", this is a Marengo 2.7 pipeline
+    and embeddings update the master document in-place.
 
     Args:
-        payload: The Lambda event payload (not used for detection, kept for compatibility)
+        payload: The Lambda event payload (not used, kept for compatibility)
 
     Returns:
         True to use asset_embeddings mode, False for legacy mode
-
-    Raises:
-        RuntimeError: If search provider config cannot be retrieved from DynamoDB
     """
-    # Get provider config from DynamoDB (will raise if not available)
-    provider_config = _get_search_provider_config()
-    provider_type = provider_config.get("type", "").lower()
+    use_asset_mode = ASSET_EMBEDDINGS_INDEX == "asset-embeddings"
 
-    # Use new mode ONLY for TwelveLabs Marengo 3.0
-    if (
-        provider_type == "twelvelabs-bedrock-3-0"
-        or "3-0" in provider_type
-        or "3.0" in provider_type
-    ):
-        logger.info(
-            "Using asset_embeddings mode for TwelveLabs Marengo 3.0",
-            extra={
-                "provider_type": provider_type,
-                "provider_name": provider_config.get("name", "unknown"),
-            },
-        )
-        return True
-
-    # Use legacy mode for Marengo 2.7 and all other providers
     logger.info(
-        "Using legacy mode for backward compatibility",
+        "Determined storage mode from ASSET_EMBEDDINGS_INDEX",
         extra={
-            "provider_type": provider_type,
-            "provider_name": provider_config.get("name", "unknown"),
+            "ASSET_EMBEDDINGS_INDEX": ASSET_EMBEDDINGS_INDEX,
+            "use_asset_embeddings_mode": use_asset_mode,
         },
     )
-    return False
+    return use_asset_mode
 
 
 def _get_target_index(is_marengo_30: bool) -> str:
     """
     Determine which OpenSearch index to use for embedding storage.
 
-    Routes Marengo 3.0 embeddings to the dedicated asset-embeddings index,
-    while Marengo 2.7 and other embeddings continue to use the media index.
+    The ASSET_EMBEDDINGS_INDEX env var is set per-pipeline at deployment time:
+    - Marengo 3.0 pipelines: "asset-embeddings"
+    - Marengo 2.7 pipelines: "media"
+
+    For the 3.0 separate-document path, embeddings go to ASSET_EMBEDDINGS_INDEX.
+    For the legacy path, embeddings update the master doc in INDEX_NAME (media).
 
     Args:
         is_marengo_30: True if this is a Marengo 3.0 embedding
@@ -756,24 +633,18 @@ def _get_target_index(is_marengo_30: bool) -> str:
     """
     if is_marengo_30:
         target_index = ASSET_EMBEDDINGS_INDEX
-        logger.info(
-            "Index routing: Marengo 3.0 embedding -> asset-embeddings index",
-            extra={
-                "target_index": target_index,
-                "model_version": "3.0",
-                "routing_reason": "Marengo 3.0 uses dedicated asset-embeddings index",
-            },
-        )
     else:
         target_index = INDEX_NAME
-        logger.info(
-            "Index routing: Legacy embedding -> media index",
-            extra={
-                "target_index": target_index,
-                "model_version": "2.7 or other",
-                "routing_reason": "Non-Marengo 3.0 embeddings use legacy media index",
-            },
-        )
+
+    logger.info(
+        "Index routing",
+        extra={
+            "target_index": target_index,
+            "is_marengo_30": is_marengo_30,
+            "INDEX_NAME": INDEX_NAME,
+            "ASSET_EMBEDDINGS_INDEX": ASSET_EMBEDDINGS_INDEX,
+        },
+    )
     return target_index
 
 
@@ -1394,6 +1265,24 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
                 # Route Marengo 3.0 embeddings to dedicated asset-embeddings index
                 target_index = _get_target_index(is_marengo_30=True)
 
+                # Log the full asset-embeddings document (excluding the vector for readability)
+                doc_for_logging = {
+                    k: v
+                    for k, v in document.items()
+                    if not k.startswith("embedding_")
+                    or k
+                    in (
+                        "embedding_type",
+                        "embedding_granularity",
+                        "embedding_representation",
+                        "embedding_dimension",
+                    )
+                }
+                logger.info(
+                    "asset-embeddings document (clip)",
+                    extra={"document": doc_for_logging},
+                )
+
                 logger.info(
                     "Indexing separate clip document (Marengo 3.0)",
                     extra={
@@ -1528,6 +1417,124 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
             }
 
         # ── MASTER-DOC UPDATE for VIDEO ───────────────────────────────────────
+
+        if _should_use_asset_embeddings_mode(payload):
+            # MARENGO 3.0 MODE: Create separate document for video/image-level embedding
+            # Do NOT search for or update master document - keep embeddings separate
+            logger.info(
+                "Using Marengo 3.0 mode - creating separate document for video/image-level embedding",
+                extra={
+                    "inventory_id": inventory_id,
+                    "scope": scope,
+                    "content_type": CONTENT_TYPE,
+                },
+            )
+
+            # Extract embedding metadata
+            metadata = _extract_embedding_metadata(payload)
+
+            # For asset-level embeddings, try to get actual duration from payload
+            # Otherwise default to 0 (for images or when duration not available)
+            try:
+                start_sec, end_sec = _get_segment_bounds(payload)
+                # Get framerate for SMPTE timecode calculation
+                framerate = extract_framerate(payload)
+                if framerate:
+                    start_tc = seconds_to_smpte(start_sec, framerate)
+                    end_tc = seconds_to_smpte(end_sec, framerate)
+                else:
+                    start_tc = "00:00:00:00"
+                    end_tc = "00:00:00:00"
+            except Exception as e:
+                logger.warning(
+                    f"Could not extract segment bounds for asset-level embedding: {e}, using defaults"
+                )
+                start_sec = 0
+                end_sec = 0
+                start_tc = "00:00:00:00"
+                end_tc = "00:00:00:00"
+
+            # Create separate document for video/image-level embedding
+            document = _create_separate_embedding_document(
+                embedding_vector=embedding_vector,
+                inventory_id=inventory_id,
+                scope=scope or CONTENT_TYPE or "video",
+                embedding_option=embedding_option,
+                content_type=CONTENT_TYPE,
+                start_sec=start_sec,
+                end_sec=end_sec,
+                start_tc=start_tc,
+                end_tc=end_tc,
+                metadata=metadata,
+            )
+
+            # Route Marengo 3.0 embeddings to dedicated asset-embeddings index
+            target_index = _get_target_index(is_marengo_30=True)
+
+            # Log the full asset-embeddings document (excluding the vector for readability)
+            doc_for_logging = {
+                k: v
+                for k, v in document.items()
+                if not k.startswith("embedding_")
+                or k
+                in (
+                    "embedding_type",
+                    "embedding_granularity",
+                    "embedding_representation",
+                    "embedding_dimension",
+                )
+            }
+            logger.info(
+                "asset-embeddings document (asset-level)",
+                extra={"document": doc_for_logging},
+            )
+
+            logger.info(
+                "Indexing separate document for video/image-level embedding (Marengo 3.0)",
+                extra={
+                    "index": target_index,
+                    "inventory_id": inventory_id,
+                    "parent_asset_id": inventory_id,
+                    "embedding_type": document.get("embedding_type"),
+                    "embedding_representation": document.get(
+                        "embedding_representation"
+                    ),
+                    "embedding_granularity": document.get("embedding_granularity"),
+                    "dimension": document.get("embedding_dimension"),
+                },
+            )
+
+            try:
+                res = client.index(index=target_index, body=document)
+                check_opensearch_response(res, "index")
+
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Video/image-level embedding stored as separate document (Marengo 3.0)",
+                            "index": target_index,
+                            "document_id": res.get("_id", "unknown"),
+                            "parent_asset_id": inventory_id,
+                            "inventory_id": inventory_id,
+                            "mode": "marengo_3.0_separate_documents",
+                        }
+                    ),
+                }
+            except Exception as e:
+                logger.error(
+                    "Failed to index video/image-level embedding document (Marengo 3.0)",
+                    extra={
+                        "inventory_id": inventory_id,
+                        "error": str(e),
+                        "index": target_index,
+                    },
+                )
+                raise RuntimeError(
+                    f"Failed to index video/image-level embedding document for asset {inventory_id}: {str(e)}"
+                ) from e
+
+        # ── LEGACY MODE: Search for master doc and update in-place ────────────
         search_query = {
             "query": {
                 "bool": {
@@ -1601,208 +1608,105 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
 
         existing_id = search_resp["hits"]["hits"][0]["_id"]
 
-        if _should_use_asset_embeddings_mode(payload):
-            # MARENGO 3.0 MODE: Create separate document for video/image-level embedding
-            # Do NOT update master document - keep embeddings separate
-            logger.info(
-                "Using Marengo 3.0 mode - creating separate document for video/image-level embedding",
+        # LEGACY MODE: Update root-level embedding field (backward compatible)
+        logger.info(
+            "Using legacy mode - updating root-level embedding field",
+            extra={
+                "inventory_id": inventory_id,
+                "scope": scope,
+                "document_id": existing_id,
+            },
+        )
+
+        try:
+            meta = client.get(index=INDEX_NAME, id=existing_id)
+            check_opensearch_response(meta, "get")
+            seq_no = meta["_seq_no"]
+            p_term = meta["_primary_term"]
+        except Exception as e:
+            logger.error(
+                "Failed to get document metadata",
                 extra={
                     "inventory_id": inventory_id,
-                    "scope": scope,
-                    "content_type": CONTENT_TYPE,
-                },
-            )
-
-            # Extract embedding metadata
-            metadata = _extract_embedding_metadata(payload)
-
-            # For asset-level embeddings, try to get actual duration from payload
-            # Otherwise default to 0 (for images or when duration not available)
-            try:
-                start_sec, end_sec = _get_segment_bounds(payload)
-                # Get framerate for SMPTE timecode calculation
-                framerate = extract_framerate(payload)
-                if framerate:
-                    start_tc = seconds_to_smpte(start_sec, framerate)
-                    end_tc = seconds_to_smpte(end_sec, framerate)
-                else:
-                    start_tc = "00:00:00:00"
-                    end_tc = "00:00:00:00"
-            except Exception as e:
-                logger.warning(
-                    f"Could not extract segment bounds for asset-level embedding: {e}, using defaults"
-                )
-                start_sec = 0
-                end_sec = 0
-                start_tc = "00:00:00:00"
-                end_tc = "00:00:00:00"
-
-            # Create separate document for video/image-level embedding
-            document = _create_separate_embedding_document(
-                embedding_vector=embedding_vector,
-                inventory_id=inventory_id,
-                scope=scope or "video",
-                embedding_option=embedding_option,
-                content_type=CONTENT_TYPE,
-                start_sec=start_sec,
-                end_sec=end_sec,
-                start_tc=start_tc,
-                end_tc=end_tc,
-                metadata=metadata,
-            )
-
-            # Route Marengo 3.0 embeddings to dedicated asset-embeddings index
-            target_index = _get_target_index(is_marengo_30=True)
-
-            logger.info(
-                "Indexing separate document for video/image-level embedding (Marengo 3.0)",
-                extra={
-                    "index": target_index,
-                    "inventory_id": inventory_id,
-                    "parent_asset_id": inventory_id,
-                    "embedding_type": document.get("embedding_type"),
-                    "embedding_representation": document.get(
-                        "embedding_representation"
-                    ),
-                    "embedding_granularity": document.get("embedding_granularity"),
-                    "dimension": document.get("embedding_dimension"),
-                },
-            )
-
-            try:
-                res = client.index(index=target_index, body=document)
-                check_opensearch_response(res, "index")
-
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {
-                            "message": "Video/image-level embedding stored as separate document (Marengo 3.0)",
-                            "index": target_index,
-                            "document_id": res.get("_id", "unknown"),
-                            "parent_asset_id": inventory_id,
-                            "inventory_id": inventory_id,
-                            "mode": "marengo_3.0_separate_documents",
-                        }
-                    ),
-                }
-            except Exception as e:
-                logger.error(
-                    "Failed to index video/image-level embedding document (Marengo 3.0)",
-                    extra={
-                        "inventory_id": inventory_id,
-                        "error": str(e),
-                        "index": target_index,
-                    },
-                )
-                raise RuntimeError(
-                    f"Failed to index video/image-level embedding document for asset {inventory_id}: {str(e)}"
-                ) from e
-
-            # Note: We intentionally do NOT update the master document
-            # All embeddings are stored as separate documents for Marengo 3.0
-            # The master document only contains asset metadata (DerivedRepresentations, etc.)
-
-        else:
-            # LEGACY MODE: Update root-level embedding field (backward compatible)
-            logger.info(
-                "Using legacy mode - updating root-level embedding field",
-                extra={
-                    "inventory_id": inventory_id,
-                    "scope": scope,
                     "document_id": existing_id,
+                    "error": str(e),
+                    "index": INDEX_NAME,
                 },
             )
+            raise RuntimeError(
+                f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
+            ) from e
 
+        # Determine the correct embedding field based on dimension
+        dimension = _determine_embedding_dimension(embedding_vector)
+
+        # For 1024-d use legacy "embedding" field, otherwise use dimension-specific field
+        if dimension == 1024:
+            embedding_field = "embedding"
+        else:
+            embedding_field = _get_embedding_field_name(dimension)
+
+        update_body = {
+            "doc": {
+                "type": CONTENT_TYPE,
+                embedding_field: embedding_vector,
+                "embedding_scope": scope,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        }
+        if embedding_option == "audio":
+            update_body["doc"]["audio_embedding"] = embedding_vector
+        else:
+            update_body["doc"][embedding_field] = embedding_vector
+
+        if embedding_option is not None:
+            update_body["doc"]["embedding_option"] = embedding_option
+
+        for attempt in range(50):
             try:
-                meta = client.get(index=INDEX_NAME, id=existing_id)
-                check_opensearch_response(meta, "get")
-                seq_no = meta["_seq_no"]
-                p_term = meta["_primary_term"]
-            except Exception as e:
-                logger.error(
-                    "Failed to get document metadata",
-                    extra={
-                        "inventory_id": inventory_id,
-                        "document_id": existing_id,
-                        "error": str(e),
-                        "index": INDEX_NAME,
-                    },
+                res = client.update(
+                    index=INDEX_NAME,
+                    id=existing_id,
+                    body=update_body,
+                    if_seq_no=seq_no,
+                    if_primary_term=p_term,
                 )
-                raise RuntimeError(
-                    f"Failed to get metadata for document {existing_id} (asset {inventory_id}): {str(e)}"
-                ) from e
-
-            # Determine the correct embedding field based on dimension
-            dimension = _determine_embedding_dimension(embedding_vector)
-
-            # For 1024-d use legacy "embedding" field, otherwise use dimension-specific field
-            if dimension == 1024:
-                embedding_field = "embedding"
-            else:
-                embedding_field = _get_embedding_field_name(dimension)
-
-            update_body = {
-                "doc": {
-                    "type": CONTENT_TYPE,
-                    embedding_field: embedding_vector,
-                    "embedding_scope": scope,
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-            }
-            if embedding_option == "audio":
-                update_body["doc"]["audio_embedding"] = embedding_vector
-            else:
-                update_body["doc"][embedding_field] = embedding_vector
-
-            if embedding_option is not None:
-                update_body["doc"]["embedding_option"] = embedding_option
-
-            for attempt in range(50):
+                check_opensearch_response(res, "update")
+                break
+            except exceptions.ConflictError:
                 try:
-                    res = client.update(
-                        index=INDEX_NAME,
-                        id=existing_id,
-                        body=update_body,
-                        if_seq_no=seq_no,
-                        if_primary_term=p_term,
+                    meta = client.get(index=INDEX_NAME, id=existing_id)
+                    seq_no = meta["_seq_no"]
+                    p_term = meta["_primary_term"]
+                    time.sleep(1)
+                except Exception as e:
+                    logger.error(
+                        "Failed to resolve conflict during document update",
+                        extra={
+                            "inventory_id": inventory_id,
+                            "document_id": existing_id,
+                            "error": str(e),
+                            "attempt": attempt + 1,
+                        },
                     )
-                    check_opensearch_response(res, "update")
-                    break
-                except exceptions.ConflictError:
-                    try:
-                        meta = client.get(index=INDEX_NAME, id=existing_id)
-                        seq_no = meta["_seq_no"]
-                        p_term = meta["_primary_term"]
-                        time.sleep(1)
-                    except Exception as e:
-                        logger.error(
-                            "Failed to resolve conflict during document update",
-                            extra={
-                                "inventory_id": inventory_id,
-                                "document_id": existing_id,
-                                "error": str(e),
-                                "attempt": attempt + 1,
-                            },
-                        )
-                        raise RuntimeError(
-                            f"Failed to resolve conflict for document {existing_id} (asset {inventory_id}): {str(e)}"
-                        ) from e
-            else:
-                raise RuntimeError("Failed to update master document after 50 retries")
+                    raise RuntimeError(
+                        f"Failed to resolve conflict for document {existing_id} (asset {inventory_id}): {str(e)}"
+                    ) from e
+        else:
+            raise RuntimeError("Failed to update master document after 50 retries")
 
-            return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "message": "Embedding stored successfully",
-                        "index": INDEX_NAME,
-                        "document_id": existing_id,
-                        "inventory_id": inventory_id,
-                        "mode": "legacy",
-                    }
-                ),
-            }
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "Embedding stored successfully",
+                    "index": INDEX_NAME,
+                    "document_id": existing_id,
+                    "inventory_id": inventory_id,
+                    "mode": "legacy",
+                }
+            ),
+        }
 
     except Exception:
         logger.exception("Error storing embedding")

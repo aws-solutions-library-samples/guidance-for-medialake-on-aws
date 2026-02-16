@@ -76,11 +76,12 @@ export const QUERY_KEYS = {
       isSemantic: boolean,
       fields?: string[],
       facetParams?: Record<string, any>,
-      sort?: string
+      sort?: string,
+      searchModes?: string[]
     ) =>
       [
         ...QUERY_KEYS.SEARCH.lists(),
-        { query, page, pageSize, isSemantic, fields, facetParams, sort },
+        { query, page, pageSize, isSemantic, fields, facetParams, sort, searchModes },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
   },

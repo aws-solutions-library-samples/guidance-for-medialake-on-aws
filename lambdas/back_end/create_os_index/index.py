@@ -224,10 +224,115 @@ def create_index_with_retry(
     return False
 
 
+def create_index_if_not_exists(
+    host, index_name, payload, headers, credentials, service, region, max_retries=5
+):
+    """
+    Create an OpenSearch index ONLY if it does not already exist.
+    This is safe for Update events — it will never delete existing data.
+    """
+    if index_exists(host, index_name, credentials, service, region):
+        logger.info(
+            "Index already exists – skipping creation (safe mode)",
+            extra={"index_name": index_name},
+        )
+        return True
+
+    url = f"{host}/{index_name}"
+    logger.info(
+        "Creating new OpenSearch index (safe mode)",
+        extra={"url": url, "index_name": index_name},
+    )
+
+    for attempt in range(max_retries):
+        try:
+            req = AWSRequest(
+                method="PUT", url=url, data=json.dumps(payload), headers=headers
+            )
+            req.headers["X-Amz-Content-SHA256"] = SigV4Auth(
+                credentials, service, region
+            ).payload(req)
+            SigV4Auth(credentials, service, region).add_auth(req)
+            prepared = req.prepare()
+
+            response = request(
+                method=prepared.method,
+                url=prepared.url,
+                headers=prepared.headers,
+                data=prepared.body,
+            )
+
+            if response.status_code == 200:
+                logger.info(
+                    "Index creation successful (safe mode)",
+                    extra={
+                        "index_name": index_name,
+                        "status_code": response.status_code,
+                    },
+                )
+                return True
+            else:
+                error = (
+                    response.json()
+                    .get("error", {})
+                    .get("root_cause", [{}])[0]
+                    .get("type")
+                )
+                if error == "resource_already_exists_exception":
+                    logger.info(
+                        "Index already exists (race condition – safe)",
+                        extra={"index_name": index_name},
+                    )
+                    return True
+
+                logger.error(
+                    "Failed to create OpenSearch index (safe mode)",
+                    extra={
+                        "index_name": index_name,
+                        "status_code": response.status_code,
+                        "response": response.text,
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries,
+                    },
+                )
+
+        except Exception as e:
+            logger.error(
+                "Error creating OpenSearch index (safe mode)",
+                extra={
+                    "index_name": index_name,
+                    "error": str(e),
+                    "attempt": attempt + 1,
+                    "max_retries": max_retries,
+                },
+                exc_info=True,
+            )
+
+        backoff_time = 2**attempt
+        logger.info(
+            "Retrying index creation after backoff (safe mode)",
+            extra={
+                "index_name": index_name,
+                "attempt": attempt + 1,
+                "max_retries": max_retries,
+                "backoff_seconds": backoff_time,
+            },
+        )
+        time.sleep(backoff_time)
+
+    return False
+
+
 @lambda_handler_decorator(cors=True)
 def handler(event, context):
     """
     Lambda handler for creating OpenSearch indexes
+
+    Handles CloudFormation custom resource lifecycle events:
+    - Create: Creates all indexes (deletes and recreates if they exist)
+    - Update: Safely creates only the asset-embeddings index if it doesn't exist
+              (never deletes existing indexes or data)
+    - Delete: No-op (indexes are not deleted to preserve data)
 
     Args:
         event: Lambda event
@@ -239,9 +344,10 @@ def handler(event, context):
     logger.info("Received event", extra={"event": event})
 
     req_type = event.get("RequestType")
-    if req_type != "Create":
-        logger.info("Skipping non-Create request", extra={"RequestType": req_type})
-        return {"statusCode": 200, "body": f"Skipped {req_type} request"}
+
+    if req_type == "Delete":
+        logger.info("Skipping Delete request – indexes are preserved")
+        return {"statusCode": 200, "body": "Skipped Delete request"}
 
     host = os.environ["COLLECTION_ENDPOINT"]
     index_names = os.environ["INDEX_NAMES"]
@@ -726,6 +832,49 @@ def handler(event, context):
     indexes = index_names.split(",")
     logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
 
+    if req_type == "Update":
+        # On Update: only create the asset-embeddings index if it doesn't exist.
+        # Never delete or recreate existing indexes.
+        logger.info(
+            "Update request – safely creating asset-embeddings index only",
+        )
+        if ASSET_EMBEDDINGS_INDEX not in [i.strip() for i in indexes]:
+            logger.info(
+                "asset-embeddings not in INDEX_NAMES, adding it for Update",
+            )
+            indexes.append(ASSET_EMBEDDINGS_INDEX)
+
+        for index_name in indexes:
+            index_name = index_name.strip()
+            if index_name != ASSET_EMBEDDINGS_INDEX:
+                logger.info(
+                    "Skipping existing index on Update (no changes)",
+                    extra={"index_name": index_name},
+                )
+                continue
+
+            logger.info(
+                "Safely creating asset-embeddings index if not exists",
+                extra={"index_name": index_name},
+            )
+            success = create_index_if_not_exists(
+                host,
+                index_name,
+                asset_embeddings_payload,
+                headers,
+                credentials,
+                service,
+                region,
+            )
+            if not success:
+                msg = f"Failed to create index {index_name} after multiple retries"
+                logger.error(msg)
+                raise Exception(msg)
+
+        logger.info("Update completed – asset-embeddings index ensured")
+        return {"statusCode": 200, "body": "Update completed successfully"}
+
+    # Create: create all indexes (original behavior)
     for index_name in indexes:
         index_name = index_name.strip()
         logger.info("Processing index", extra={"index_name": index_name})

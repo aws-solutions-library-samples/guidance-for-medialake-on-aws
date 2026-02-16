@@ -187,11 +187,14 @@ function convertFormStateToFilters(formState: FilterModalFormState): FacetFilter
   return filters;
 }
 
+export type SearchMode = "visual" | "audio" | "transcript";
+
 export interface SearchState {
   // Domain state
   query: string;
   isSemantic: boolean;
   semanticMode: "full" | "clip";
+  searchModes: SearchMode[];
   filters: FacetFilters;
 
   // UI state
@@ -208,6 +211,8 @@ export interface SearchState {
     setQuery: (query: string) => void;
     setIsSemantic: (isSemantic: boolean) => void;
     setSemanticMode: (mode: "full" | "clip") => void;
+    setSearchModes: (modes: SearchMode[]) => void;
+    toggleSearchMode: (mode: SearchMode) => void;
     setFilters: (filters: FacetFilters) => void;
     updateFilter: <K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => void;
     clearFilters: () => void;
@@ -234,6 +239,7 @@ export const useSearchStore = create<SearchState>()(
       query: "",
       isSemantic: false,
       semanticMode: "full",
+      searchModes: ["visual"] as SearchMode[],
       filters: {},
 
       // UI state
@@ -252,6 +258,18 @@ export const useSearchStore = create<SearchState>()(
         setIsSemantic: (isSemantic) => set({ isSemantic }),
 
         setSemanticMode: (semanticMode) => set({ semanticMode }),
+
+        setSearchModes: (searchModes) =>
+          set({ searchModes: searchModes.length > 0 ? searchModes : ["visual"] }),
+
+        toggleSearchMode: (mode) => {
+          const current = get().searchModes;
+          const updated = current.includes(mode)
+            ? current.filter((m) => m !== mode)
+            : [...current, mode];
+          // Ensure at least one mode is always selected
+          set({ searchModes: updated.length > 0 ? updated : ["visual"] });
+        },
 
         setFilters: (filters) => {
           // Only update if different to prevent infinite loops
@@ -376,6 +394,7 @@ export const useSearchStore = create<SearchState>()(
         query: state.query,
         isSemantic: state.isSemantic,
         semanticMode: state.semanticMode,
+        searchModes: state.searchModes,
         filters: state.filters,
       }),
     }
@@ -386,6 +405,7 @@ export const useSearchStore = create<SearchState>()(
 export const useSearchQuery = () => useSearchStore((state) => state.query);
 export const useSemanticSearch = () => useSearchStore((state) => state.isSemantic);
 export const useSemanticMode = () => useSearchStore((state) => state.semanticMode);
+export const useSearchModes = () => useSearchStore((state) => state.searchModes);
 export const useSearchFilters = () => useSearchStore((state) => state.filters);
 
 // UI state selectors
@@ -395,12 +415,22 @@ export const useFilterModalDraft = () => useSearchStore((state) => state.ui.filt
 // Action selectors
 export const useSearchActions = () => useSearchStore((state) => state.actions);
 export const useDomainActions = () => {
-  const { setQuery, setIsSemantic, setSemanticMode, setFilters, updateFilter, clearFilters } =
-    useSearchStore((state) => state.actions);
+  const {
+    setQuery,
+    setIsSemantic,
+    setSemanticMode,
+    setSearchModes,
+    toggleSearchMode,
+    setFilters,
+    updateFilter,
+    clearFilters,
+  } = useSearchStore((state) => state.actions);
   return {
     setQuery,
     setIsSemantic,
     setSemanticMode,
+    setSearchModes,
+    toggleSearchMode,
     setFilters,
     updateFilter,
     clearFilters,

@@ -8,12 +8,7 @@ import AssetPagination from "./AssetPagination";
 import AssetGridView from "./AssetGridView";
 import AssetTableView from "./AssetTableView";
 import ErrorDisplay from "./ErrorDisplay";
-import {
-  CONFIDENCE_COLORS,
-  MODEL_THRESHOLDS,
-  getConfidenceLabel,
-  getThresholdsForModel,
-} from "@/components/common/utils";
+import { CONFIDENCE_COLORS, getThresholdsForModel } from "@/components/common/utils";
 
 export interface AssetField {
   id: string;
@@ -339,7 +334,7 @@ function AssetResultsView<T>({
               const thresholds = getThresholdsForModel(detectedModelVersion);
               const confidenceMarks = [
                 {
-                  value: 0,
+                  value: thresholds.MIN,
                   label: (
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Box
@@ -420,9 +415,9 @@ function AssetResultsView<T>({
                       setIsSliderActive(false);
                       onConfidenceThresholdChange?.(value as number);
                     }}
-                    min={0}
-                    max={1}
-                    step={0.01}
+                    min={thresholds.MIN}
+                    max={thresholds.MAX}
+                    step={0.001}
                     marks={confidenceMarks}
                     size="small"
                     sx={{
@@ -446,27 +441,27 @@ function AssetResultsView<T>({
                         color: "text.secondary",
                         top: 28,
                       },
-                      // Position Low at 0% (left edge)
+                      // Position Low at left edge (min)
                       "& .MuiSlider-markLabel[data-index='0']": {
                         left: "0% !important",
                         transform: "translateX(0)",
                       },
-                      // Position Med at 50%
+                      // Position Med at center
                       "& .MuiSlider-markLabel[data-index='1']": {
                         left: "50% !important",
                         transform: "translateX(-50%)",
                       },
-                      // Position High at 90%
+                      // Position High at right edge (max)
                       "& .MuiSlider-markLabel[data-index='2']": {
-                        left: "90% !important",
-                        transform: "translateX(-50%)",
+                        left: "100% !important",
+                        transform: "translateX(-100%)",
                       },
                     }}
                   />
                   <Typography
                     variant="body2"
                     sx={{
-                      minWidth: 90,
+                      minWidth: 50,
                       fontSize: "0.875rem",
                       color: "text.secondary",
                       textAlign: "center",
@@ -474,8 +469,7 @@ function AssetResultsView<T>({
                       mt: -3.0,
                     }}
                   >
-                    {sliderValue.toFixed(2)} (
-                    {getConfidenceLabel(sliderValue, detectedModelVersion)})
+                    {sliderValue.toFixed(3).substring(1)}
                   </Typography>
                 </Box>
               );

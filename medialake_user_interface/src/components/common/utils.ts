@@ -14,17 +14,24 @@ export const CONFIDENCE_COLORS = {
 
 // Model-specific confidence thresholds
 // Different embedding models produce different score distributions
+// MIN/MAX define the slider range per model
 export const MODEL_THRESHOLDS = {
   // Marengo 3.0 produces scores in a narrower range (0.45-0.60)
   "3.0": {
+    MIN: 0.4, // Slider minimum
+    MAX: 0.6, // Slider maximum
     HIGH: 0.55, // Best matches are typically 0.55+
     MEDIUM: 0.48, // Medium matches are 0.48-0.55
+    DEFAULT_CONFIDENCE: 0.5, // Default slider starting position
   },
   // Marengo 2.7 and other models produce scores in a wider range (0.45-0.70)
   // This is also the default for clips without model_version (legacy data)
   "2.7": {
+    MIN: 0.4, // Slider minimum
+    MAX: 0.75, // Slider maximum
     HIGH: 0.6, // Best matches are typically 0.60+
     MEDIUM: 0.5, // Medium matches are 0.50-0.60
+    DEFAULT_CONFIDENCE: 0.57, // Default slider starting position
   },
 } as const;
 
@@ -34,8 +41,11 @@ export type ModelVersion = "3.0" | "2.7";
 // Get thresholds for a specific model version
 // If modelVersion is undefined/missing, defaults to 2.7 thresholds (legacy behavior)
 export function getThresholdsForModel(modelVersion?: string): {
+  MIN: number;
+  MAX: number;
   HIGH: number;
   MEDIUM: number;
+  DEFAULT_CONFIDENCE: number;
 } {
   if (modelVersion === "3.0") {
     return MODEL_THRESHOLDS["3.0"];

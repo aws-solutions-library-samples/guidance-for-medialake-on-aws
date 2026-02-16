@@ -124,6 +124,9 @@ class SearchParams(BaseModelWithConfig):
     # For asset explorer
     storageIdentifier: Optional[str] = None
 
+    # Semantic search modality (Marengo 3.0): comma-separated visual,audio,transcript
+    searchModality: Optional[str] = Field(default="visual")
+
     @model_validator(mode="before")
     @classmethod
     def parse_sort_parameter(cls, data: Any) -> Any:
@@ -1469,8 +1472,16 @@ def perform_search(params: SearchParams) -> Dict:
                         # Preserve the clips array before processing
                         clips = hit.get("clips", None)
                         processed_hit = process_search_hit(hit)
-                        # Restore the clips array after processing
-                        processed_hit["clips"] = clips
+                        # For images, don't restore clips — they have asset-level embeddings
+                        asset_type = (
+                            hit.get("_source", {})
+                            .get("DigitalSourceAsset", {})
+                            .get("Type", "")
+                            .lower()
+                        )
+                        if asset_type != "image":
+                            # Restore the clips array after processing
+                            processed_hit["clips"] = clips
                         processed_results.append(processed_hit)
                     logger.info(
                         f"[PERF] S3 Vector results processing took: {time.time() - semantic_processing_start:.3f}s"

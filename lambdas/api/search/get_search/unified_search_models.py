@@ -3,12 +3,113 @@ Unified search data models and enums for MediaLake search architecture.
 Supports both provider+store and external semantic service patterns.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 # Import pagination constants from common library
 from search_provider_models import DEFAULT_PAGE_SIZE
+
+# Valid search modes for semantic search (Marengo 3.0 only)
+VALID_SEARCH_MODES = {"visual", "audio", "transcript"}
+ALL_SEARCH_MODES = VALID_SEARCH_MODES  # When all selected, skip filtering
+
+# Maps search_mode values to embedding_representation values used in OpenSearch / S3 Vector metadata
+SEARCH_MODE_TO_REPRESENTATIONS = {
+    "visual": ["visual"],
+    "audio": ["audio"],
+    "transcript": ["transcription"],
+}
+
+# Maps search_mode values to OpenSearch filter clauses for the asset-embeddings index
+SEARCH_MODE_OS_FILTERS = {
+    "visual": [
+        # Video assets: visual embeddings
+        {
+            "bool": {
+                "must": [
+                    {"term": {"embedding_type": "video"}},
+                    {"term": {"embedding_representation": "visual"}},
+                ]
+            }
+        },
+        # Images: always visual
+        {"term": {"embedding_type": "image"}},
+    ],
+    "audio": [
+        # Video assets: audio embeddings
+        {
+            "bool": {
+                "must": [
+                    {"term": {"embedding_type": "video"}},
+                    {"term": {"embedding_representation": "audio"}},
+                ]
+            }
+        },
+        # Audio assets: audio embeddings
+        {
+            "bool": {
+                "must": [
+                    {"term": {"embedding_type": "audio"}},
+                    {"term": {"embedding_representation": "audio"}},
+                ]
+            }
+        },
+    ],
+    "transcript": [
+        # Video assets: transcription embeddings
+        {
+            "bool": {
+                "must": [
+                    {"term": {"embedding_type": "video"}},
+                    {"term": {"embedding_representation": "transcription"}},
+                ]
+            }
+        },
+        # Audio assets: transcription embeddings
+        {
+            "bool": {
+                "must": [
+                    {"term": {"embedding_type": "audio"}},
+                    {"term": {"embedding_representation": "transcription"}},
+                ]
+            }
+        },
+    ],
+}
+
+
+def parse_search_modes(raw: str) -> List[str]:
+    """Parse and validate a comma-separated search_mode string. Returns list of valid modes."""
+    modes = [m.strip().lower() for m in raw.split(",") if m.strip()]
+    valid = [m for m in modes if m in VALID_SEARCH_MODES]
+    return valid if valid else ["visual"]
+
+
+def get_os_filters_for_modes(modes: List[str]) -> Optional[List[Dict]]:
+    """
+    Build OpenSearch should-clause filters for the given search modes.
+    Returns None when all modes are selected (skip filtering).
+    """
+    if set(modes) >= ALL_SEARCH_MODES:
+        return None  # All modes — no filter needed
+    filters = []
+    for mode in modes:
+        filters.extend(SEARCH_MODE_OS_FILTERS.get(mode, []))
+    return filters
+
+
+def get_allowed_types_for_modes(modes: List[str]) -> Optional[List[str]]:
+    """
+    Get the allowed embedding_option / embedding_representation values for S3 Vector filtering.
+    Returns None when all modes are selected (skip filtering).
+    """
+    if set(modes) >= ALL_SEARCH_MODES:
+        return None  # All modes — no filter needed
+    types = []
+    for mode in modes:
+        types.extend(SEARCH_MODE_TO_REPRESENTATIONS.get(mode, []))
+    return list(dict.fromkeys(types))  # dedupe preserving order
 
 
 class SearchType(Enum):
@@ -57,6 +158,9 @@ class SearchQuery:
     threshold: float = 0.7
     include_clips: bool = True
     fields: Optional[List[str]] = None  # Fields to return to FE (used in enrichment)
+    search_modes: List[str] = field(
+        default_factory=lambda: ["visual"]
+    )  # Marengo 3.0: visual/audio/transcript
 
     def __post_init__(self):
         """Validate query parameters"""
@@ -223,6 +327,9 @@ def create_search_query_from_params(query_params: Dict[str, Any]) -> SearchQuery
     filters = parse_filters_from_query_params(query_params)
     fields = parse_fields_from_query_params(query_params)
 
+    # Parse searchModality (comma-separated, Marengo 3.0 only)
+    search_modes = parse_search_modes(query_params.get("searchModality", "visual"))
+
     return SearchQuery(
         query_text=query_text,
         search_type=SearchType.SEMANTIC if semantic else SearchType.KEYWORD,
@@ -232,4 +339,5 @@ def create_search_query_from_params(query_params: Dict[str, Any]) -> SearchQuery
         threshold=threshold,
         include_clips=include_clips,
         fields=fields,
+        search_modes=search_modes,
     )
