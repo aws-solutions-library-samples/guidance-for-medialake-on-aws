@@ -10,7 +10,7 @@ import { StorageHelper } from "../common/helpers/storage-helper";
 import { theme, components } from "./auth/theme";
 
 const AuthPage = () => {
-  const { setIsAuthenticated, isAuthenticated } = useAuth();
+  const { completeLogin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const awsConfig = useAwsConfig();
 
@@ -273,7 +273,7 @@ const AuthPage = () => {
 
                         if (token) {
                           StorageHelper.setToken(token);
-                          setIsAuthenticated(true);
+                          completeLogin();
                           navigate("/");
                         }
 
@@ -297,7 +297,7 @@ const AuthPage = () => {
 
                         if (token) {
                           StorageHelper.setToken(token);
-                          setIsAuthenticated(true);
+                          completeLogin();
                           navigate("/");
                         }
 

@@ -66,6 +66,24 @@ class ApiClient extends ApiClientBase {
           hasAuthHeader: !!config.headers?.Authorization,
         });
 
+        // Proactively refresh the token if it's expiring within 60 seconds
+        // so we never send an almost-expired token to the API
+        const currentToken = StorageHelper.getToken();
+        if (currentToken) {
+          const { isTokenExpiringSoon } = await import("@/common/helpers/token-helper");
+          if (isTokenExpiringSoon(currentToken, 60)) {
+            console.log("🔄 Token expiring soon, refreshing before request...");
+            try {
+              const newToken = await authService.refreshToken();
+              if (newToken) {
+                console.log("✅ Proactive token refresh succeeded");
+              }
+            } catch (e) {
+              console.warn("⚠️ Proactive token refresh failed, using current token", e);
+            }
+          }
+        }
+
         const headers = await this.getHeaders();
         config.headers = {
           ...config.headers,
@@ -131,6 +149,50 @@ class ApiClient extends ApiClientBase {
 
         const originalRequest = error.config;
 
+        // Handle 401 Unauthorized (expired token from API Gateway UNAUTHORIZED response)
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          console.log("🔄 Token expired (401), attempting refresh...");
+
+          if (this.isRefreshing) {
+            console.log("⏳ Token refresh already in progress, queuing request...");
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            })
+              .then(() => {
+                return this.axiosInstance(originalRequest);
+              })
+              .catch((err) => Promise.reject(err));
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const newToken = await authService.refreshToken();
+            if (!newToken) {
+              console.error("❌ Failed to refresh token");
+              this.processQueue(new Error("Failed to refresh token"));
+              return Promise.reject(error);
+            }
+
+            console.log("✅ Token refreshed successfully");
+            // Update the failed request with new token
+            originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+
+            // Process any requests that were waiting
+            this.processQueue();
+
+            // Retry the original request
+            return this.axiosInstance(originalRequest);
+          } catch (refreshError) {
+            console.error("❌ Token refresh failed:", refreshError);
+            this.processQueue(refreshError);
+            return Promise.reject(refreshError);
+          } finally {
+            this.isRefreshing = false;
+          }
+        }
+
         // Handle 403 Forbidden errors from API Gateway (not S3)
         // API Gateway returns JSON, S3 returns XML
         // We need to check this before CloudFront converts the error
@@ -144,6 +206,54 @@ class ApiClient extends ApiClientBase {
           // Only redirect if this is an API authorization error, not an S3 error
           // Skip redirect if the request opted out via skipAccessDeniedRedirect
           if (isApiError) {
+            // Before redirecting to access-denied, check if the local token is
+            // expired. If so, this 403 is likely a stale-token issue rather than
+            // a genuine permission denial — attempt a refresh first.
+            if (!originalRequest._retry) {
+              const { isTokenExpiringSoon } = await import("@/common/helpers/token-helper");
+              const token = StorageHelper.getToken();
+              if (token && isTokenExpiringSoon(token, 30)) {
+                console.log(
+                  "🔄 403 received but token is expired/expiring — attempting refresh before redirect"
+                );
+                originalRequest._retry = true;
+
+                // Use the same isRefreshing guard as the 401 handler to avoid
+                // duplicate concurrent refresh calls
+                if (this.isRefreshing) {
+                  console.log(
+                    "⏳ Token refresh already in progress (403 path), queuing request..."
+                  );
+                  return new Promise((resolve, reject) => {
+                    this.failedQueue.push({ resolve, reject });
+                  })
+                    .then(() => {
+                      return this.axiosInstance(originalRequest);
+                    })
+                    .catch((err) => Promise.reject(err));
+                }
+
+                this.isRefreshing = true;
+
+                try {
+                  const newToken = await authService.refreshToken();
+                  if (newToken) {
+                    console.log("✅ Token refreshed on 403 recovery, retrying request");
+                    originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+                    this.processQueue();
+                    return this.axiosInstance(originalRequest);
+                  } else {
+                    this.processQueue(new Error("Failed to refresh token"));
+                  }
+                } catch (refreshError) {
+                  console.error("❌ Token refresh on 403 recovery failed:", refreshError);
+                  this.processQueue(refreshError);
+                } finally {
+                  this.isRefreshing = false;
+                }
+              }
+            }
+
             const skipRedirect = originalRequest?.skipAccessDeniedRedirect === true;
 
             if (skipRedirect) {
@@ -185,54 +295,6 @@ class ApiClient extends ApiClientBase {
               "🗂️ 403 Forbidden from S3 - Letting CloudFront handle it (will serve index.html)"
             );
             // Let S3 403 errors pass through - CloudFront will convert to index.html
-          }
-        }
-
-        // Check if error is token expiration
-        if (
-          error.response?.status === 401 &&
-          error.response?.data?.message === "The incoming token has expired" &&
-          !originalRequest._retry
-        ) {
-          console.log("🔄 Token expired, attempting refresh...");
-
-          if (this.isRefreshing) {
-            console.log("⏳ Token refresh already in progress, queuing request...");
-            return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            })
-              .then(() => {
-                return this.axiosInstance(originalRequest);
-              })
-              .catch((err) => Promise.reject(err));
-          }
-
-          originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          try {
-            const newToken = await authService.refreshToken();
-            if (!newToken) {
-              console.error("❌ Failed to refresh token");
-              this.processQueue(new Error("Failed to refresh token"));
-              return Promise.reject(error);
-            }
-
-            console.log("✅ Token refreshed successfully");
-            // Update the failed request with new token
-            originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
-
-            // Process any requests that were waiting
-            this.processQueue();
-
-            // Retry the original request
-            return this.axiosInstance(originalRequest);
-          } catch (refreshError) {
-            console.error("❌ Token refresh failed:", refreshError);
-            this.processQueue(refreshError);
-            return Promise.reject(refreshError);
-          } finally {
-            this.isRefreshing = false;
           }
         }
 
