@@ -11,7 +11,12 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
-from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    COLLECTIONS_GSI5_PK,
+    METADATA_SK,
+    create_error_response,
+)
 from db_models import CollectionModel
 from models import UpdateCollectionRequest
 from pynamodb.exceptions import DoesNotExist, UpdateError
@@ -56,7 +61,13 @@ def register_route(app):
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
             # Build update actions for PynamoDB
-            actions = [CollectionModel.updatedAt.set(current_timestamp)]
+            actions = [
+                CollectionModel.updatedAt.set(current_timestamp),
+                # Keep GSI5 (RecentlyModifiedGSI) in sync so listing queries
+                # return collections ordered by most recent update.
+                CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
+                CollectionModel.GSI5_SK.set(current_timestamp),
+            ]
 
             if request_data.name is not None:
                 actions.append(CollectionModel.name.set(request_data.name))
