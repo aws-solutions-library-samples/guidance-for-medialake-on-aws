@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   Box,
   Typography,
@@ -249,6 +250,11 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     deleteModalState,
     handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
+
+  // Permission checks for asset actions
+  const deleteAssetPermission = useActionPermission("delete", "asset");
+  const editAssetPermission = useActionPermission("edit", "asset");
+  const downloadAssetPermission = useActionPermission("download", "asset");
 
   // Card fields configuration
   const [cardFields, setCardFields] = useState([
@@ -624,9 +630,9 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
                 columns={columns}
                 onColumnToggle={handleColumnToggle}
                 onAssetClick={handleAssetClick}
-                onDeleteClick={handleDeleteClick}
+                onDeleteClick={deleteAssetPermission.allowed ? handleDeleteClick : undefined}
                 onMenuClick={handleMenuOpen}
-                onEditClick={handleStartEditing}
+                onEditClick={editAssetPermission.allowed ? handleStartEditing : undefined}
                 onEditNameChange={handleNameChange}
                 onEditNameComplete={handleNameEditComplete}
                 editingAssetId={editingAssetId}
@@ -718,13 +724,19 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
               },
             }}
           >
-            <MenuItem onClick={() => handleAction("rename")}>
+            <MenuItem
+              onClick={() => handleAction("rename")}
+              disabled={editAssetPermission.disabled}
+            >
               {t("assetExplorer.menu.rename")}
             </MenuItem>
             <MenuItem onClick={() => handleAction("share")}>
               {t("assetExplorer.menu.share")}
             </MenuItem>
-            <MenuItem onClick={() => handleAction("download")}>
+            <MenuItem
+              onClick={() => handleAction("download")}
+              disabled={downloadAssetPermission.disabled}
+            >
               {t("assetExplorer.menu.download")}
             </MenuItem>
           </Menu>

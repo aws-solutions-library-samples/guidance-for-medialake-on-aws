@@ -38,6 +38,11 @@ export type Subjects =
   | "region"
   | "system-settings"
   | "collection-types"
+  | "collection"
+  | "search"
+  | "storage"
+  | "execution"
+  | "node"
   | "dashboard"
   | "defaultDashboard";
 

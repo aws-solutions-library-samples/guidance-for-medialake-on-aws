@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import { useAuth } from "./common/hooks/auth-context";
 import { useDirection } from "./contexts/DirectionContext";
-import { Can, usePermission } from "./permissions";
+import { Can, usePermission, DisabledWrapper } from "./permissions";
 import { useFeatureFlag } from "./contexts/FeatureFlagsContext";
 import {
   Drawer,
@@ -38,6 +38,7 @@ import {
   Extension as IntegrationIcon,
   Terrain as LogoIcon,
   Folder as FolderIcon,
+  Security as SecurityIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme as useCustomTheme } from "./hooks/useTheme";
@@ -152,36 +153,43 @@ function Sidebar() {
   }, [safePermissionCheck]);
 
   // Build menu items based on permissions
+  // Items are always shown but greyed out when user lacks permission,
+  // except admin-only items (Settings) which are hidden entirely for non-admins.
   const mainMenuItems = [
     {
       text: t("sidebar.menu.home"),
       icon: <HomeIcon />,
       path: "/",
-      visible: true, // Always show home
+      disabled: false,
+      adminOnly: false,
     },
     {
       text: t("sidebar.menu.assets"),
       icon: <MediaAssetsIcon />,
       path: "/assets",
-      visible: true, // Assets should always be shown
+      disabled: false,
+      adminOnly: false,
     },
     {
       text: t("sidebar.menu.collections"),
       icon: <FolderIcon />,
       path: "/collections",
-      visible: true, // Collections should always be shown to authenticated users
+      disabled: false,
+      adminOnly: false,
     },
     {
       text: t("sidebar.menu.pipelines"),
       icon: <PipelineIcon />,
       path: "/pipelines",
-      visible: canViewPipeline,
+      disabled: !canViewPipeline,
+      adminOnly: false,
     },
     {
       text: t("sidebar.menu.pipelineExecutions"),
       icon: <ExecutionsIcon />,
       path: "/executions",
-      visible: canViewPipeline,
+      disabled: !canViewPipeline,
+      adminOnly: false,
     },
     {
       text: t("sidebar.menu.settings"),
@@ -189,45 +197,59 @@ function Sidebar() {
       onClick: () => setSettingsOpen(!settingsOpen),
       isExpandable: true,
       isExpanded: settingsOpen,
+      disabled: false,
+      adminOnly: true, // Hidden entirely for non-admins
       visible: canViewSettings,
       subItems: [
         {
           text: t("sidebar.submenu.connectors"),
           icon: <StorageIcon />,
           path: "/settings/connectors",
-          visible:
+          disabled: !(
             safePermissionCheck("view", "connector") ||
-            safePermissionCheck("view", "settings.connectors"),
+            safePermissionCheck("view", "settings.connectors")
+          ),
         },
         {
           text: t("sidebar.submenu.usersAndGroups", "Users and Groups"),
           icon: <GroupIcon />,
           path: "/settings/users",
-          visible:
+          disabled: !(
             safePermissionCheck("view", "user") ||
             safePermissionCheck("view", "group") ||
-            safePermissionCheck("view", "settings.users"),
+            safePermissionCheck("view", "settings.users")
+          ),
+        },
+        {
+          text: t("sidebar.submenu.permissions", "Permissions"),
+          icon: <SecurityIcon />,
+          path: "/settings/permissions",
+          disabled: !(
+            safePermissionCheck("manage", "permission-set") ||
+            safePermissionCheck("view", "settings.permissions")
+          ),
         },
         {
           text: t("sidebar.submenu.integrations"),
           icon: <IntegrationIcon />,
           path: "/settings/integrations",
-          visible:
+          disabled: !(
             safePermissionCheck("view", "integration") ||
-            safePermissionCheck("view", "settings.integrations"),
+            safePermissionCheck("view", "settings.integrations")
+          ),
         },
-        // { text: t('sidebar.submenu.environments'), icon: <EnvironmentIcon />, path: '/settings/environments' },
         {
           text: t("sidebar.submenu.system"),
           icon: <SettingsIcon />,
           path: "/settings/system",
-          visible:
+          disabled: !(
             safePermissionCheck("view", "settings") ||
-            safePermissionCheck("view", "settings.system"),
+            safePermissionCheck("view", "settings.system")
+          ),
         },
-      ].filter((item) => item.visible !== false),
+      ],
     },
-  ].filter((item) => item.visible !== false);
+  ].filter((item) => !item.adminOnly || item.visible !== false);
 
   const handleNavigation = (path: string) => {
     // Don't navigate if:
@@ -372,128 +394,131 @@ function Sidebar() {
           }}
         >
           {mainMenuItems.map((item) => {
-            // If this is the Settings menu item, wrap it with Can component
-            if (item.text === t("sidebar.menu.settings")) {
-              return (
-                <Can key={item.text} I="view" a="settings">
-                  <React.Fragment>
-                    <ListItem disablePadding>
-                      {isCollapsed ? (
-                        <Tooltip title={item.text} placement="right">
-                          <ListItemButton
-                            onClick={
-                              item.isExpandable
-                                ? item.onClick
-                                : () => handleNavigation(item.path || "/")
-                            }
-                            sx={{
-                              minHeight: 48,
-                              justifyContent: "center",
-                              px: 2.5,
-                              backgroundColor:
-                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                                  ? `${theme.palette.primary.main}08`
-                                  : "transparent",
-                              "&:hover": {
-                                backgroundColor: `${theme.palette.primary.main}15`,
-                              },
-                            }}
-                          >
-                            <ListItemIcon
-                              sx={{
-                                minWidth: 0,
-                                mr: "auto",
-                                justifyContent: "center",
-                                color: getIconColor(
-                                  isActive(item.path || "") ||
-                                    (item.isExpandable && item.isExpanded)
-                                ),
-                              }}
-                            >
-                              {item.icon}
-                            </ListItemIcon>
-                          </ListItemButton>
-                        </Tooltip>
-                      ) : (
+            // Render a single menu item (used for both collapsed and expanded states)
+            const renderMenuItem = (menuItem: typeof item) => {
+              const itemContent = (
+                <React.Fragment key={menuItem.text}>
+                  <ListItem disablePadding>
+                    {isCollapsed ? (
+                      <Tooltip title={menuItem.text} placement="right">
                         <ListItemButton
                           onClick={
-                            item.isExpandable
-                              ? item.onClick
-                              : () => handleNavigation(item.path || "/")
+                            menuItem.isExpandable
+                              ? menuItem.onClick
+                              : () => handleNavigation(menuItem.path || "/")
                           }
                           sx={{
+                            minHeight: 48,
+                            justifyContent: "center",
+                            px: 2.5,
                             backgroundColor:
-                              isActive(item.path || "") || (item.isExpandable && item.isExpanded)
+                              isActive(menuItem.path || "") ||
+                              (menuItem.isExpandable && menuItem.isExpanded)
                                 ? `${theme.palette.primary.main}08`
                                 : "transparent",
                             "&:hover": {
                               backgroundColor: `${theme.palette.primary.main}15`,
                             },
-                            borderRight:
-                              isActive(item.path || "") && !isRTL
-                                ? `3px solid ${theme.palette.primary.main}`
-                                : "none",
-                            borderLeft:
-                              isActive(item.path || "") && isRTL
-                                ? `3px solid ${theme.palette.primary.main}`
-                                : "none",
-                            mx: 1,
-                            borderRadius: "8px",
-                            flexDirection: "row",
-                            justifyContent: isRTL ? "flex-start" : "flex-start",
                           }}
                         >
                           <ListItemIcon
                             sx={{
+                              minWidth: 0,
+                              mr: "auto",
+                              justifyContent: "center",
                               color: getIconColor(
-                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
+                                isActive(menuItem.path || "") ||
+                                  (menuItem.isExpandable && menuItem.isExpanded)
                               ),
-                              minWidth: "40px",
                             }}
                           >
-                            {item.icon}
+                            {menuItem.icon}
                           </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight:
-                                    isActive(item.path || "") ||
-                                    (item.isExpandable && item.isExpanded)
-                                      ? 600
-                                      : 400,
-                                  color:
-                                    isActive(item.path || "") ||
-                                    (item.isExpandable && item.isExpanded)
-                                      ? theme.palette.primary.main
-                                      : customTheme === "dark"
-                                        ? "white"
-                                        : theme.palette.text.primary,
-                                  textAlign: isRTL ? "right" : "left",
-                                }}
-                              >
-                                {item.text}
-                              </Typography>
-                            }
-                            sx={{ textAlign: isRTL ? "right" : "left" }}
-                          />
-                          {item.isExpandable && (
-                            <Box
+                        </ListItemButton>
+                      </Tooltip>
+                    ) : (
+                      <ListItemButton
+                        onClick={
+                          menuItem.isExpandable
+                            ? menuItem.onClick
+                            : () => handleNavigation(menuItem.path || "/")
+                        }
+                        sx={{
+                          backgroundColor:
+                            isActive(menuItem.path || "") ||
+                            (menuItem.isExpandable && menuItem.isExpanded)
+                              ? `${theme.palette.primary.main}08`
+                              : "transparent",
+                          "&:hover": {
+                            backgroundColor: `${theme.palette.primary.main}15`,
+                          },
+                          borderRight:
+                            isActive(menuItem.path || "") && !isRTL
+                              ? `3px solid ${theme.palette.primary.main}`
+                              : "none",
+                          borderLeft:
+                            isActive(menuItem.path || "") && isRTL
+                              ? `3px solid ${theme.palette.primary.main}`
+                              : "none",
+                          mx: 1,
+                          borderRadius: "8px",
+                          flexDirection: "row",
+                          justifyContent: isRTL ? "flex-start" : "flex-start",
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            color: getIconColor(
+                              isActive(menuItem.path || "") ||
+                                (menuItem.isExpandable && menuItem.isExpanded)
+                            ),
+                            minWidth: "40px",
+                          }}
+                        >
+                          {menuItem.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography
+                              variant="body2"
                               sx={{
-                                color: customTheme === "dark" ? "white" : "inherit",
+                                fontWeight:
+                                  isActive(menuItem.path || "") ||
+                                  (menuItem.isExpandable && menuItem.isExpanded)
+                                    ? 600
+                                    : 400,
+                                color:
+                                  isActive(menuItem.path || "") ||
+                                  (menuItem.isExpandable && menuItem.isExpanded)
+                                    ? theme.palette.primary.main
+                                    : customTheme === "dark"
+                                      ? "white"
+                                      : theme.palette.text.primary,
+                                textAlign: isRTL ? "right" : "left",
                               }}
                             >
-                              {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
-                            </Box>
-                          )}
-                        </ListItemButton>
-                      )}
-                    </ListItem>
-                    {!isCollapsed && item.isExpandable && item.subItems && (
-                      <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
-                        <List component="div" disablePadding>
-                          {item.subItems.map((subItem) => (
+                              {menuItem.text}
+                            </Typography>
+                          }
+                          sx={{ textAlign: isRTL ? "right" : "left" }}
+                        />
+                        {menuItem.isExpandable && (
+                          <Box
+                            sx={{
+                              color: customTheme === "dark" ? "white" : "inherit",
+                            }}
+                          >
+                            {menuItem.isExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </Box>
+                        )}
+                      </ListItemButton>
+                    )}
+                  </ListItem>
+                  {!isCollapsed && menuItem.isExpandable && menuItem.subItems && (
+                    <Collapse in={menuItem.isExpanded} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {menuItem.subItems.map((subItem) => {
+                          const subItemContent = (
                             <ListItem key={subItem.text} disablePadding>
                               <ListItemButton
                                 onClick={() => handleNavigation(subItem.path)}
@@ -548,206 +573,50 @@ function Sidebar() {
                                 />
                               </ListItemButton>
                             </ListItem>
-                          ))}
-                        </List>
-                      </Collapse>
-                    )}
-                  </React.Fragment>
-                </Can>
+                          );
+
+                          // Grey out disabled sub-items with tooltip
+                          return subItem.disabled ? (
+                            <DisabledWrapper
+                              key={subItem.text}
+                              disabled
+                              tooltip={t(
+                                "permissions.noPermission",
+                                "You don't have permission to access this section"
+                              )}
+                            >
+                              {subItemContent}
+                            </DisabledWrapper>
+                          ) : (
+                            <React.Fragment key={subItem.text}>{subItemContent}</React.Fragment>
+                          );
+                        })}
+                      </List>
+                    </Collapse>
+                  )}
+                </React.Fragment>
+              );
+
+              return itemContent;
+            };
+
+            // Wrap disabled non-admin items with DisabledWrapper (greyed out + tooltip)
+            if (item.disabled) {
+              return (
+                <DisabledWrapper
+                  key={item.text}
+                  disabled
+                  tooltip={t(
+                    "permissions.noPermission",
+                    "You don't have permission to access this section"
+                  )}
+                >
+                  {renderMenuItem(item)}
+                </DisabledWrapper>
               );
             }
 
-            // For other menu items, render normally
-            return (
-              <React.Fragment key={item.text}>
-                <ListItem disablePadding>
-                  {isCollapsed ? (
-                    <Tooltip title={item.text} placement="right">
-                      <ListItemButton
-                        onClick={
-                          item.isExpandable
-                            ? item.onClick
-                            : () => handleNavigation(item.path || "/")
-                        }
-                        sx={{
-                          minHeight: 48,
-                          justifyContent: "center",
-                          px: 2.5,
-                          backgroundColor:
-                            isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                              ? `${theme.palette.primary.main}08`
-                              : "transparent",
-                          "&:hover": {
-                            backgroundColor: `${theme.palette.primary.main}15`,
-                          },
-                        }}
-                      >
-                        <ListItemIcon
-                          sx={{
-                            minWidth: 0,
-                            mr: "auto",
-                            justifyContent: "center",
-                            color: getIconColor(
-                              isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                            ),
-                          }}
-                        >
-                          {item.icon}
-                        </ListItemIcon>
-                      </ListItemButton>
-                    </Tooltip>
-                  ) : (
-                    <ListItemButton
-                      onClick={
-                        item.isExpandable ? item.onClick : () => handleNavigation(item.path || "/")
-                      }
-                      sx={{
-                        backgroundColor:
-                          isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                            ? `${theme.palette.primary.main}08`
-                            : "transparent",
-                        "&:hover": {
-                          backgroundColor: `${theme.palette.primary.main}15`,
-                        },
-                        borderRight:
-                          isActive(item.path || "") && !isRTL
-                            ? `3px solid ${theme.palette.primary.main}`
-                            : "none",
-                        borderLeft:
-                          isActive(item.path || "") && isRTL
-                            ? `3px solid ${theme.palette.primary.main}`
-                            : "none",
-                        mx: 1,
-                        borderRadius: "8px",
-                        flexDirection: "row",
-                        justifyContent: isRTL ? "flex-start" : "flex-start",
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          color: getIconColor(
-                            isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                          ),
-                          minWidth: "40px",
-                        }}
-                      >
-                        {item.icon}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight:
-                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                                  ? 600
-                                  : 400,
-                              color:
-                                isActive(item.path || "") || (item.isExpandable && item.isExpanded)
-                                  ? theme.palette.primary.main
-                                  : customTheme === "dark"
-                                    ? "white"
-                                    : theme.palette.text.primary,
-                              textAlign: isRTL ? "right" : "left",
-                            }}
-                          >
-                            {item.text}
-                          </Typography>
-                        }
-                        sx={{ textAlign: isRTL ? "right" : "left" }}
-                      />
-                      {item.isExpandable && (
-                        <Box
-                          sx={{
-                            color: customTheme === "dark" ? "white" : "inherit",
-                          }}
-                        >
-                          {item.isExpanded ? <ExpandLess /> : <ExpandMore />}
-                        </Box>
-                      )}
-                    </ListItemButton>
-                  )}
-                </ListItem>
-                {!isCollapsed && item.isExpandable && item.subItems && (
-                  <Collapse in={item.isExpanded} timeout="auto" unmountOnExit>
-                    <List component="div" disablePadding>
-                      {item.subItems.map((subItem) => {
-                        // Check if this is a system settings item that requires permission
-                        const isSystemSettings =
-                          subItem.path === "/settings/system" || subItem.path === "/settings/users";
-
-                        // Wrap system settings items with Can component
-                        const menuItem = (
-                          <ListItem key={subItem.text} disablePadding>
-                            <ListItemButton
-                              onClick={() => handleNavigation(subItem.path)}
-                              sx={{
-                                [isRTL ? "pr" : "pl"]: 6,
-                                backgroundColor: isSettingsActive(subItem.path)
-                                  ? `${theme.palette.primary.main}08`
-                                  : "transparent",
-                                "&:hover": {
-                                  backgroundColor: `${theme.palette.primary.main}15`,
-                                },
-                                borderRight:
-                                  isSettingsActive(subItem.path) && !isRTL
-                                    ? `3px solid ${theme.palette.primary.main}`
-                                    : "none",
-                                borderLeft:
-                                  isSettingsActive(subItem.path) && isRTL
-                                    ? `3px solid ${theme.palette.primary.main}`
-                                    : "none",
-                                mx: 1,
-                                borderRadius: "8px",
-                                flexDirection: "row",
-                                justifyContent: isRTL ? "flex-start" : "flex-start",
-                              }}
-                            >
-                              <ListItemIcon
-                                sx={{
-                                  color: getIconColor(isSettingsActive(subItem.path)),
-                                  minWidth: "40px",
-                                }}
-                              >
-                                {subItem.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
-                                      color: isSettingsActive(subItem.path)
-                                        ? theme.palette.primary.main
-                                        : customTheme === "dark"
-                                          ? "white"
-                                          : theme.palette.text.primary,
-                                      textAlign: isRTL ? "right" : "left",
-                                    }}
-                                  >
-                                    {subItem.text}
-                                  </Typography>
-                                }
-                                sx={{ textAlign: isRTL ? "right" : "left" }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        );
-
-                        // Return the menu item wrapped in Can component if it's a system settings item
-                        return isSystemSettings ? (
-                          <Can key={subItem.text} I="view" a="settings">
-                            {menuItem}
-                          </Can>
-                        ) : (
-                          menuItem
-                        );
-                      })}
-                    </List>
-                  </Collapse>
-                )}
-              </React.Fragment>
-            );
+            return <React.Fragment key={item.text}>{renderMenuItem(item)}</React.Fragment>;
           })}
         </List>
 

@@ -13,6 +13,7 @@ import {
   isClipAsset,
 } from "@/utils/clipTransformation";
 import { useSemanticMode } from "@/stores/searchStore";
+import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -313,15 +314,15 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
     return filtered;
   }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);
 
-  // Detect model version from the first clip in results for threshold calculation
+  // Detect model version from system settings (provider type) for threshold calculation
+  const { providerData } = useSemanticSearchStatus();
   const detectedModelVersion = React.useMemo(() => {
-    for (const asset of transformedResults) {
-      if (isClipAsset(asset) && asset.clipData?.model_version) {
-        return asset.clipData.model_version;
-      }
+    const providerType = providerData?.data?.searchProvider?.type;
+    if (providerType === "twelvelabs-bedrock-3-0") {
+      return "3.0";
     }
-    return undefined; // Default to 2.7 thresholds when no model version found
-  }, [transformedResults]);
+    return "2.7";
+  }, [providerData]);
 
   return (
     <AssetResultsView

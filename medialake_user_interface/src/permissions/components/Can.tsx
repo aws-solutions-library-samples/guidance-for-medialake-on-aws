@@ -4,6 +4,7 @@ import { usePermission } from "../hooks/usePermission";
 import { useAuth } from "../../common/hooks/auth-context";
 import { CanProps } from "../types/permission.types";
 import { Actions, Subjects } from "../types/ability.types";
+import { DisabledWrapper } from "./DisabledWrapper";
 
 /**
  * Component for conditional rendering based on permissions
@@ -11,7 +12,14 @@ import { Actions, Subjects } from "../types/ability.types";
  * @param props Component props
  * @returns React element or null
  */
-export function Can({ I: action, a: subject, field, passThrough = false, children }: CanProps) {
+export function Can({
+  I: action,
+  a: subject,
+  field,
+  passThrough = false,
+  disabledTooltip,
+  children,
+}: CanProps) {
   const { can, loading } = usePermission();
   const { isAuthenticated, isInitialized } = useAuth();
   const [lastKnownResult, setLastKnownResult] = useState<boolean | null>(null);
@@ -54,18 +62,12 @@ export function Can({ I: action, a: subject, field, passThrough = false, childre
     return <>{children}</>;
   }
 
-  // If passThrough is true, render the children with disabled styling
+  // If passThrough is true, render the children greyed out with a tooltip
   if (passThrough) {
     return (
-      <div
-        style={{
-          opacity: 0.5,
-          pointerEvents: "none",
-          cursor: "not-allowed",
-        }}
-      >
+      <DisabledWrapper disabled tooltip={disabledTooltip}>
         {children}
-      </div>
+      </DisabledWrapper>
     );
   }
 

@@ -76,11 +76,12 @@ export const QUERY_KEYS = {
       isSemantic: boolean,
       fields?: string[],
       facetParams?: Record<string, any>,
-      sort?: string
+      sort?: string,
+      searchModes?: string[]
     ) =>
       [
         ...QUERY_KEYS.SEARCH.lists(),
-        { query, page, pageSize, isSemantic, fields, facetParams, sort },
+        { query, page, pageSize, isSemantic, fields, facetParams, sort, searchModes },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
   },
@@ -125,6 +126,12 @@ export const QUERY_KEYS = {
     details: () => [...QUERY_KEYS.GROUPS.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.GROUPS.details(), id] as const,
     members: (id: string) => [...QUERY_KEYS.GROUPS.detail(id), "members"] as const,
+  },
+
+  GROUP_PERMISSIONS: {
+    all: ["group-permissions"] as const,
+    details: () => [...QUERY_KEYS.GROUP_PERMISSIONS.all, "detail"] as const,
+    detail: (groupId: string) => [...QUERY_KEYS.GROUP_PERMISSIONS.details(), groupId] as const,
   },
 
   ENVIRONMENTS: {

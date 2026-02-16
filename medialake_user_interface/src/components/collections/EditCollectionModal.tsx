@@ -30,12 +30,12 @@ import {
 import {
   useUpdateCollection,
   useGetCollections,
-  useGetCollectionTypes,
   useSetCollectionThumbnail,
   useSetCollectionIcon,
   useDeleteCollectionThumbnail,
   type Collection,
 } from "../../api/hooks/useCollections";
+import { useCollectionCollectionTypes } from "../../api/hooks/useCollectionCollectionTypes";
 import { ThumbnailSelector } from "./ThumbnailSelector";
 
 interface EditCollectionModalProps {
@@ -70,7 +70,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
   const setIconMutation = useSetCollectionIcon();
   const deleteThumbnailMutation = useDeleteCollectionThumbnail();
   const { data: collectionsResponse } = useGetCollections();
-  const { data: collectionTypesResponse } = useGetCollectionTypes();
+  const { data: collectionTypesResponse } = useCollectionCollectionTypes();
 
   const collections = collectionsResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];

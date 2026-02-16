@@ -199,9 +199,17 @@ class SettingsApi(Construct):
             cfn_method.authorization_type = "CUSTOM"
             cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /settings/api-keys/{id}/permissions sub-resource
+        api_keys_permissions_resource = api_keys_proxy.add_resource("permissions")
+        m = api_keys_permissions_resource.add_method("PUT", lambda_integration)
+        cfn_method = m.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # Add CORS for api-keys
         add_cors_options_method(api_keys_resource)
         add_cors_options_method(api_keys_proxy)
+        add_cors_options_method(api_keys_permissions_resource)
 
         # ===================================================================
         # /settings/users resource and methods

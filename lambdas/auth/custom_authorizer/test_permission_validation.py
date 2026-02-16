@@ -106,7 +106,7 @@ def test_validate_api_key_permissions():
     """Test API key permission validation."""
     print("\nTesting API key permission validation...")
 
-    # Mock API key with permissions
+    # Mock API key with flat permissions
     api_key_with_permissions = {
         "id": "test-key-1",
         "name": "Test Key",
@@ -124,19 +124,30 @@ def test_validate_api_key_permissions():
         "permissions": {},
     }
 
-    # Test with valid permission
+    # Mock API key with nested permissions (legacy format)
+    api_key_nested_permissions = {
+        "id": "test-key-3",
+        "name": "Test Key Nested",
+        "permissions": {
+            "settings": {
+                "api-keys": {"create": True, "view": True, "edit": True, "delete": True}
+            }
+        },
+    }
+
+    # Test with valid flat permission
     result = validate_api_key_permissions(
         api_key_with_permissions, "assets:view", "test-correlation-id"
     )
     assert result == True
 
-    # Test with denied permission
+    # Test with denied flat permission (value is False)
     result = validate_api_key_permissions(
         api_key_with_permissions, "assets:delete", "test-correlation-id"
     )
     assert result == False
 
-    # Test with missing permission
+    # Test with missing flat permission
     result = validate_api_key_permissions(
         api_key_with_permissions, "api-keys:view", "test-correlation-id"
     )
@@ -148,7 +159,19 @@ def test_validate_api_key_permissions():
     )
     assert result == False
 
-    print("✅ API key permission validation working correctly")
+    # Test nested permissions - should resolve "settings.api-keys:view"
+    result = validate_api_key_permissions(
+        api_key_nested_permissions, "settings.api-keys:view", "test-correlation-id"
+    )
+    assert result == True
+
+    # Test nested permissions - required "api-keys:view" should match "settings.api-keys:view"
+    result = validate_api_key_permissions(
+        api_key_nested_permissions, "api-keys:view", "test-correlation-id"
+    )
+    assert result == True
+
+    print("✅ API key permission validation working correctly (flat + nested)")
 
 
 def test_integration_scenarios():

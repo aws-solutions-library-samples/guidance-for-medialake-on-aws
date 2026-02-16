@@ -36,9 +36,18 @@ export const useGetS3Buckets = () => {
       try {
         const response = await apiClient.get<S3BucketResponse>(`${API_ENDPOINTS.CONNECTORS}/s3`, {
           signal,
-        });
+          skipAccessDeniedRedirect: true,
+        } as any);
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.response?.status === 403) {
+          logger.warn("No permission for connectors S3 buckets, returning empty list");
+          return {
+            status: "200",
+            message: "ok",
+            data: { buckets: [] },
+          } as S3BucketResponse;
+        }
         logger.error("Fetch S3 buckets error:", error);
         showError("Failed to fetch S3 buckets");
         throw error;
@@ -56,9 +65,20 @@ export const useGetConnectors = () => {
       try {
         const response = await apiClient.get<ConnectorListResponse>(API_ENDPOINTS.CONNECTORS, {
           signal,
-        });
+          skipAccessDeniedRedirect: true,
+        } as any);
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
+        // Gracefully degrade on 403 — return empty list instead of
+        // triggering the global access-denied redirect
+        if (error?.response?.status === 403) {
+          logger.warn("No permission for connectors:view, returning empty list");
+          return {
+            status: "200",
+            message: "ok",
+            data: { connectors: [] },
+          } as ConnectorListResponse;
+        }
         logger.error("Fetch connectors error:", error);
         showError("Failed to fetch connectors");
         throw error;

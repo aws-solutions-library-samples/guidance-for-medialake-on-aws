@@ -146,6 +146,10 @@
             "method": "store",
             "parameters": {
               "Index Name": "media",
+              "Asset Embeddings Index": "asset-embeddings",
+              "Model Provider": "twelvelabs",
+              "Model Name": "Marengo-retrieval-3.0",
+              "Model Version": "3.0",
               "Content Type": "audio"
             }
           }

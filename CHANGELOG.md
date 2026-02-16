@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.9.0] - 2026-02-16
+
+### Features
+
+- feat: Custom permissions based off of scope and action
+
+### Bug Fixes
+
+- fix: metadata enrichment node resilience
+
+### Code Refactoring
+
+- refactor: Auth token refresh and lifecycle management
+- refactor: TwelveLabs marengo 3 pipelines, embedding node, confidence score calibration
+- refactor: refactor queries that get collections and sub-collections
+
+### Other Changes
+
+- ci: swap to gitleaks
+- ci: switch to gitleaks vs. detect-secrets
+
 ## [1.8.1] - 2026-02-13
 
 ### Bug Fixes

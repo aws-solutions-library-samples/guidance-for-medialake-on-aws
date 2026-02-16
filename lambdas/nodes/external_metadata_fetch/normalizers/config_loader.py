@@ -113,6 +113,10 @@ def resolve_normalizer_config(node_config: dict[str, Any]) -> dict[str, Any]:
     s3_path = node_config.get("config_s3_path")
 
     if s3_path:
+        # Strip leading slashes so the S3 key is valid regardless of
+        # whether the user entered "/normalizer-configs/..." or "normalizer-configs/..."
+        s3_path = s3_path.lstrip("/")
+
         # Load from S3
         bucket = os.environ.get("IAC_ASSETS_BUCKET")
         if not bucket:

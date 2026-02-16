@@ -162,6 +162,7 @@ def register_route(app):
                 "name": updated_item.get("name"),
                 "description": updated_item.get("description"),
                 "isEnabled": updated_item.get("isEnabled", True),
+                "scope": updated_item.get("scope", "custom"),
                 "createdAt": updated_item.get("createdAt"),
                 "updatedAt": updated_item.get("updatedAt"),
             }

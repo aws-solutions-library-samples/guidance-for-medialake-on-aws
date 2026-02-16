@@ -124,6 +124,9 @@ class SearchParams(BaseModelWithConfig):
     # For asset explorer
     storageIdentifier: Optional[str] = None
 
+    # Semantic search modality (Marengo 3.0): comma-separated visual,audio,transcript
+    searchModality: Optional[str] = Field(default="visual")
+
     @model_validator(mode="before")
     @classmethod
     def parse_sort_parameter(cls, data: Any) -> Any:
@@ -1469,8 +1472,16 @@ def perform_search(params: SearchParams) -> Dict:
                         # Preserve the clips array before processing
                         clips = hit.get("clips", None)
                         processed_hit = process_search_hit(hit)
-                        # Restore the clips array after processing
-                        processed_hit["clips"] = clips
+                        # For images, don't restore clips — they have asset-level embeddings
+                        asset_type = (
+                            hit.get("_source", {})
+                            .get("DigitalSourceAsset", {})
+                            .get("Type", "")
+                            .lower()
+                        )
+                        if asset_type != "image":
+                            # Restore the clips array after processing
+                            processed_hit["clips"] = clips
                         processed_results.append(processed_hit)
                     logger.info(
                         f"[PERF] S3 Vector results processing took: {time.time() - semantic_processing_start:.3f}s"
@@ -1886,6 +1897,72 @@ def handle_provider_status():
             "status": "500",
             "message": "Failed to get provider status",
             "data": None,
+        }
+
+
+@app.get("/search/connectors")
+def handle_search_connectors():
+    """
+    Return connector summaries under search:view permission.
+
+    This endpoint allows the Assets page and File Uploader to fetch
+    connector metadata without requiring the separate connectors:view
+    permission. Only a lightweight summary is returned (id, name, type,
+    storageIdentifier, status).
+    """
+    try:
+        connector_table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
+        if not connector_table_name:
+            logger.warning(
+                "MEDIALAKE_CONNECTOR_TABLE not configured, "
+                "returning empty connectors list"
+            )
+            return {
+                "status": "200",
+                "message": "ok",
+                "data": {"connectors": []},
+            }
+
+        dynamodb_resource = boto3.resource("dynamodb")
+        table = dynamodb_resource.Table(connector_table_name)
+
+        response = table.scan()
+        items = response.get("Items", [])
+
+        while "LastEvaluatedKey" in response:
+            response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+            items.extend(response.get("Items", []))
+
+        connectors = [
+            {
+                "id": item.get("id", ""),
+                "name": item.get("name", ""),
+                "type": item.get("type", ""),
+                "storageIdentifier": item.get("storageIdentifier", ""),
+                "status": item.get("status", ""),
+                "objectPrefix": item.get("objectPrefix", ""),
+                "region": item.get("region", ""),
+                "configuration": {
+                    "objectPrefix": item.get("objectPrefix", ""),
+                    "allowUploads": item.get("allowUploads", False),
+                },
+            }
+            for item in items
+        ]
+
+        logger.info(f"Returned {len(connectors)} connector summaries")
+        return {
+            "status": "200",
+            "message": "ok",
+            "data": {"connectors": connectors},
+        }
+
+    except Exception as e:
+        logger.exception(f"Error fetching connector summaries: {str(e)}")
+        return {
+            "status": "500",
+            "message": "Error fetching connectors",
+            "data": {"connectors": []},
         }
 
 

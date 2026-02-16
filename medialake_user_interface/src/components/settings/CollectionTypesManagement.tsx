@@ -12,7 +12,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
+  alpha,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
@@ -34,6 +36,7 @@ import {
 import CollectionTypeFormDialog from "@/components/settings/CollectionTypeFormDialog";
 import MigrateCollectionTypeDialog from "@/components/settings/MigrateCollectionTypeDialog";
 import { EmptyTableState } from "@/components/common/table";
+import { formatRelativeTime, formatLocalDateTime } from "@/shared/utils/dateUtils";
 
 const ICON_MAP: Record<string, React.ReactElement> = {
   Folder: <FolderIcon />,
@@ -50,7 +53,6 @@ const CollectionTypesManagement: React.FC = () => {
   const [migrateDialogOpen, setMigrateDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CollectionType | null>(null);
 
-  // Fetch collection types
   const { data: typesResponse, isLoading, error } = useGetCollectionTypes();
   const deleteTypeMutation = useDeleteCollectionType();
 
@@ -74,7 +76,6 @@ const CollectionTypesManagement: React.FC = () => {
       return;
     }
 
-    // Check if type is in use (you may want to add a usage count API)
     if (
       window.confirm(
         t("collectionTypes.alerts.confirmDelete", `Are you sure you want to delete "{{name}}"?`, {
@@ -84,7 +85,6 @@ const CollectionTypesManagement: React.FC = () => {
     ) {
       deleteTypeMutation.mutate(type.id, {
         onError: (error: any) => {
-          // Handle TYPE_IN_USE error
           if (error.response?.status === 409) {
             setSelectedType(type);
             setMigrateDialogOpen(true);
@@ -106,7 +106,7 @@ const CollectionTypesManagement: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" p={4}>
+      <Box display="flex" justifyContent="center" alignItems="center" p={6}>
         <CircularProgress />
       </Box>
     );
@@ -122,9 +122,10 @@ const CollectionTypesManagement: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      {/* Header — matches ApiKeyManagement layout */}
+      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
         <Box>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
             {t("collectionTypes.title")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -134,26 +135,37 @@ const CollectionTypesManagement: React.FC = () => {
             )}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreateClick}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleCreateClick}
+          sx={{ flexShrink: 0 }}
+        >
           {t("collectionTypes.createType")}
         </Button>
       </Box>
 
-      <TableContainer component={Paper} elevation={1}>
-        <Table>
+      {/* Table */}
+      <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2, overflow: "hidden" }}>
+        <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>{t("common.icon")}</TableCell>
-              <TableCell>{t("common.name")}</TableCell>
-              <TableCell>{t("common.description")}</TableCell>
-              <TableCell>{t("common.labels.status")}</TableCell>
-              <TableCell align="right">{t("common.labels.actions")}</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 56 }}>{t("common.icon")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("common.name")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("common.description")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>{t("common.labels.status")}</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>
+                {t("apiKeys.details.created", "Created")}
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>
+                {t("common.labels.actions")}
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {collectionTypes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
+                <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
                   <EmptyTableState
                     message={t("common.noCollectionTypesFound")}
                     icon={<FolderIcon sx={{ fontSize: 40 }} />}
@@ -171,44 +183,50 @@ const CollectionTypesManagement: React.FC = () => {
               </TableRow>
             ) : (
               collectionTypes.map((type) => (
-                <TableRow key={type.id} hover>
+                <TableRow key={type.id} hover sx={{ "&:last-child td": { border: 0 } }}>
+                  {/* Icon */}
                   <TableCell>
                     <Box
                       sx={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: 40,
-                        height: 40,
+                        width: 36,
+                        height: 36,
                         borderRadius: 1,
-                        backgroundColor: type.color + "20",
+                        backgroundColor: (theme) =>
+                          alpha(type.color || theme.palette.primary.main, 0.12),
                         color: type.color,
                       }}
                     >
                       {ICON_MAP[type.icon] || <FolderIcon />}
                     </Box>
                   </TableCell>
+
+                  {/* Name */}
                   <TableCell>
-                    <Box>
-                      <Typography variant="body1" fontWeight="medium">
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {type.name}
                       </Typography>
                       {type.isSystem && (
                         <Chip
                           label={t("collectionTypes.labels.system")}
                           size="small"
-                          sx={{ mt: 0.5 }}
                           variant="outlined"
+                          sx={{ height: 20, fontSize: "0.7rem" }}
                         />
                       )}
                     </Box>
                   </TableCell>
+
+                  {/* Description */}
                   <TableCell>
                     <Typography
                       variant="body2"
                       color="text.secondary"
                       sx={{
-                        maxWidth: 300,
+                        maxWidth: 260,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -217,6 +235,8 @@ const CollectionTypesManagement: React.FC = () => {
                       {type.description || "—"}
                     </Typography>
                   </TableCell>
+
+                  {/* Status */}
                   <TableCell>
                     <Chip
                       label={
@@ -225,34 +245,67 @@ const CollectionTypesManagement: React.FC = () => {
                       size="small"
                       color={type.isActive ? "success" : "default"}
                       variant="outlined"
+                      sx={{ fontWeight: 500 }}
                     />
                   </TableCell>
+
+                  {/* Created */}
+                  <TableCell>
+                    {type.createdAt ? (
+                      <Tooltip title={formatLocalDateTime(type.createdAt)} arrow>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatRelativeTime(type.createdAt)}
+                        </Typography>
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="body2" color="text.disabled">
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
+
+                  {/* Actions */}
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditClick(type)}
-                      disabled={type.isSystem}
-                      title={
-                        type.isSystem
-                          ? t("common.messages.cannotEditSystemTypes")
-                          : t("common.messages.editType")
-                      }
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDeleteClick(type)}
-                      disabled={type.isSystem}
-                      title={
-                        type.isSystem
-                          ? t("common.messages.cannotDeleteSystemTypes")
-                          : t("common.messages.deleteType")
-                      }
-                      color="error"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                      <Tooltip
+                        title={
+                          type.isSystem
+                            ? t("common.messages.cannotEditSystemTypes")
+                            : t("common.messages.editType")
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditClick(type)}
+                            disabled={type.isSystem}
+                            aria-label={t("common.messages.editType")}
+                            sx={{ color: "info.main" }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          type.isSystem
+                            ? t("common.messages.cannotDeleteSystemTypes")
+                            : t("common.messages.deleteType")
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(type)}
+                            disabled={type.isSystem}
+                            aria-label={t("common.messages.deleteType")}
+                            sx={{ color: "error.main" }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -271,7 +324,7 @@ const CollectionTypesManagement: React.FC = () => {
         open={migrateDialogOpen}
         onClose={handleMigrateClose}
         sourceType={selectedType}
-        availableTypes={collectionTypes.filter((t) => t.id !== selectedType?.id)}
+        availableTypes={collectionTypes.filter((ct) => ct.id !== selectedType?.id)}
       />
     </Box>
   );

@@ -128,17 +128,22 @@ Use the "External Metadata Enrichment" template from the pipeline library, or cr
 
 ### Configuration Options
 
-| Option                    | Type   | Required | Default | Description                                         |
-| ------------------------- | ------ | -------- | ------- | --------------------------------------------------- |
-| `adapter_type`            | string | Yes      | -       | Adapter to use (e.g., `"generic_rest"`)             |
-| `auth_type`               | string | Yes      | -       | Auth strategy (e.g., `"oauth2_client_credentials"`) |
-| `secret_arn`              | string | Yes      | -       | AWS Secrets Manager ARN for credentials             |
-| `auth_endpoint`           | string | Depends  | -       | Auth endpoint URL (required for OAuth2)             |
-| `metadata_endpoint`       | string | Yes      | -       | Metadata API endpoint URL                           |
-| `max_retries`             | int    | No       | `3`     | Maximum retry attempts for transient errors         |
-| `initial_backoff_seconds` | float  | No       | `1.0`   | Initial backoff delay for retries                   |
+| Option                    | Type   | Required | Default     | Description                                         |
+| ------------------------- | ------ | -------- | ----------- | --------------------------------------------------- |
+| `adapter_type`            | string | Yes      | -           | Adapter to use (e.g., `"generic_rest"`)             |
+| `auth_type`               | string | Yes      | -           | Auth strategy (e.g., `"oauth2_client_credentials"`) |
+| `secret_arn`              | string | Yes      | -           | AWS Secrets Manager ARN for credentials             |
+| `auth_endpoint`           | string | Depends  | -           | Auth endpoint URL (required for OAuth2)             |
+| `metadata_endpoint`       | string | Yes      | -           | Metadata API endpoint URL                           |
+| `max_retries`             | int    | No       | `3`         | Maximum retry attempts for transient errors         |
+| `timeout_seconds`         | int    | No       | `30`        | HTTP request timeout in seconds                     |
+| `initial_backoff_seconds` | float  | No       | `1.0`       | Initial backoff delay for retries                   |
+| `correlation_id_param`    | string | No       | `"assetId"` | Query/body parameter name for the correlation ID    |
+| `response_metadata_path`  | string | No       | -           | Dot-notation path to extract metadata               |
 
 ### Adapter Configuration (`adapter_config`)
+
+These options can also be specified in the `adapter_config` object for advanced use cases:
 
 | Option                   | Type   | Default     | Description                                      |
 | ------------------------ | ------ | ----------- | ------------------------------------------------ |
@@ -165,6 +170,27 @@ Use the "External Metadata Enrichment" template from the pipeline library, or cr
 | `header_name`      | string | `"X-API-Key"` | Header name for API key                           |
 | `key_location`     | string | `"header"`    | Where to send key: `"header"` or `"query"`        |
 | `query_param_name` | string | `"api_key"`   | Query param name (if `key_location` is `"query"`) |
+
+### Environment Variables
+
+Configuration can also be provided via environment variables. These are used as fallbacks when not specified in the event payload.
+
+| Variable                    | Description                                       | Default |
+| --------------------------- | ------------------------------------------------- | ------- |
+| `ADAPTER_TYPE`              | Adapter to use (e.g., `generic_rest`)             | -       |
+| `AUTH_TYPE`                 | Auth strategy (e.g., `oauth2_client_credentials`) | -       |
+| `SECRET_ARN`                | AWS Secrets Manager ARN for credentials           | -       |
+| `AUTH_ENDPOINT`             | Auth endpoint URL (required for OAuth2)           | -       |
+| `METADATA_ENDPOINT`         | Metadata API endpoint URL                         | -       |
+| `MAX_RETRIES`               | Maximum retry attempts                            | `3`     |
+| `INITIAL_BACKOFF_SECONDS`   | Initial backoff delay for retries                 | `1.0`   |
+| `CORRELATION_ID_PARAM`      | Query/body parameter name for correlation ID      | -       |
+| `RESPONSE_METADATA_PATH`    | Dot-notation path to extract metadata             | -       |
+| `TIMEOUT_SECONDS`           | HTTP request timeout in seconds                   | `30`    |
+| `RESPONSE_FORMAT`           | Response format: `json`, `xml`, or `auto`         | `auto`  |
+| `SCOPE`                     | OAuth2 scope to request                           | -       |
+| `NORMALIZER_SOURCE_TYPE`    | Normalizer type (e.g., `generic_xml`)             | -       |
+| `NORMALIZER_CONFIG_S3_PATH` | S3 path to normalizer configuration               | -       |
 
 ## Authentication Types
 
