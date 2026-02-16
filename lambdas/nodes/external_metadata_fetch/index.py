@@ -182,6 +182,29 @@ class EnrichmentResult:
     attempt_count: int = 0
 
 
+def _sanitize_config_strings(config: dict[str, Any]) -> dict[str, Any]:
+    """Strip leading/trailing whitespace from all string values in a config dict.
+
+    Recursively processes nested dicts so that sub-configs (auth_config,
+    adapter_config, normalizer_config) are also sanitized.
+
+    Args:
+        config: Configuration dictionary to sanitize
+
+    Returns:
+        New dictionary with all string values stripped of whitespace
+    """
+    sanitized: dict[str, Any] = {}
+    for key, value in config.items():
+        if isinstance(value, str):
+            sanitized[key] = value.strip()
+        elif isinstance(value, dict):
+            sanitized[key] = _sanitize_config_strings(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
 def _get_node_config(event: dict[str, Any]) -> NodeConfig:
     """Extract node configuration from the event.
 
@@ -215,12 +238,38 @@ def _get_node_config(event: dict[str, Any]) -> NodeConfig:
     adapter_config = node_config.get("adapter_config")
     if not adapter_config:
         adapter_config = {}
-        correlation_id_param = os.environ.get("CORRELATION_ID_PARAM", "")
+
+    # Add correlation_id_param from node config or environment variable
+    if "correlation_id_param" not in adapter_config:
+        correlation_id_param = node_config.get(
+            "correlation_id_param"
+        ) or os.environ.get("CORRELATION_ID_PARAM", "")
         if correlation_id_param:
             adapter_config["correlation_id_param"] = correlation_id_param
-        response_metadata_path = os.environ.get("RESPONSE_METADATA_PATH", "")
+
+    # Add response_metadata_path from node config or environment variable
+    if "response_metadata_path" not in adapter_config:
+        response_metadata_path = node_config.get(
+            "response_metadata_path"
+        ) or os.environ.get("RESPONSE_METADATA_PATH", "")
         if response_metadata_path:
             adapter_config["response_metadata_path"] = response_metadata_path
+
+    # Add timeout_seconds from node config or environment variable
+    if "timeout_seconds" not in adapter_config:
+        timeout_seconds = node_config.get("timeout_seconds") or os.environ.get(
+            "TIMEOUT_SECONDS", ""
+        )
+        if timeout_seconds:
+            adapter_config["timeout_seconds"] = int(timeout_seconds)
+
+    # Add response_format from node config or environment variable
+    if "response_format" not in adapter_config:
+        response_format = node_config.get("response_format") or os.environ.get(
+            "RESPONSE_FORMAT", ""
+        )
+        if response_format:
+            adapter_config["response_format"] = response_format
 
     # Get normalizer_config from event or environment variables
     normalizer_config = node_config.get("normalizer_config")
@@ -253,6 +302,10 @@ def _get_node_config(event: dict[str, Any]) -> NodeConfig:
         "adapter_config": adapter_config if adapter_config else None,
         "normalizer_config": normalizer_config if normalizer_config else None,
     }
+
+    # Sanitize whitespace from all string configuration values to prevent
+    # errors caused by accidental leading/trailing spaces in node field inputs
+    config = _sanitize_config_strings(config)
 
     return NodeConfig.from_dict(config)
 

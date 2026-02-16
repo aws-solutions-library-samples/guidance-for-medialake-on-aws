@@ -10,6 +10,7 @@ MediaLake's External Metadata Enrichment feature enables automatic retrieval and
 - [Documentation Map](#documentation-map)
 - [Feature Capabilities](#feature-capabilities)
 - [Enrichment Status](#enrichment-status)
+- [Manually Calling the Pipeline](#manually-calling-the-pipeline)
 - [Troubleshooting](#troubleshooting)
 - [Related Specifications](#related-specifications)
 - [External References](#external-references)
@@ -207,6 +208,90 @@ After enrichment, assets have an `ExternalMetadataStatus` field:
 | `pending` | Enrichment in progress |
 | `success` | Completed successfully |
 | `failed`  | Failed after retries   |
+
+## Manually Calling the Pipeline
+
+You can trigger enrichment on-demand for specific assets via the pipeline trigger API.
+
+### Endpoint
+
+```text
+POST /pipelines/{pipelineId}/trigger
+Content-Type: application/json
+```
+
+### Request Body
+
+```json
+{
+  "assets": [
+    {
+      "inventory_id": "asset:uuid:your-asset-id",
+      "params": {
+        "correlation_id": "L12345"
+      }
+    }
+  ]
+}
+```
+
+| Field                   | Required | Description                                                                                                |
+| ----------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `assets`                | Yes      | Array of assets to enrich (max 50 per request)                                                             |
+| `assets[].inventory_id` | Yes      | The asset's `InventoryID` from DynamoDB (`asset:uuid:...` format)                                          |
+| `assets[].params`       | No       | Per-asset parameters passed to the pipeline node. Defaults to `{}` if omitted                              |
+| `params.correlation_id` | No       | Override for the external system lookup ID. If omitted, the node resolves the ID from the asset's filename |
+
+### Correlation ID Resolution Order
+
+When the pipeline runs, the correlation ID used for the external API lookup is resolved in this order:
+
+1. `correlation_id` provided in `params` (always wins)
+2. `ExternalAssetId` stored on the asset from a previous successful enrichment
+3. Asset filename without extension (fallback)
+
+This means if you manually correct an asset's correlation ID and the enrichment succeeds, future runs will automatically reuse that corrected ID without needing to specify it again.
+
+### Example: Single Asset with L-Number Override
+
+```bash
+curl -X POST "https://{api-domain}/pipelines/{pipelineId}/trigger" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "assets": [
+      {
+        "inventory_id": "asset:uuid:abc123-def456",
+        "params": {
+          "correlation_id": "L00042"
+        }
+      }
+    ]
+  }'
+```
+
+### Example: Multiple Assets
+
+```json
+{
+  "assets": [
+    {
+      "inventory_id": "asset:uuid:aaaa-bbbb-cccc",
+      "params": { "correlation_id": "L00001" }
+    },
+    {
+      "inventory_id": "asset:uuid:dddd-eeee-ffff",
+      "params": { "correlation_id": "L00002" }
+    },
+    {
+      "inventory_id": "asset:uuid:gggg-hhhh-iiii",
+      "params": {}
+    }
+  ]
+}
+```
+
+The third asset above has no `correlation_id` override, so the node will resolve it from the asset's existing `ExternalAssetId` or filename.
 
 ## Troubleshooting
 
