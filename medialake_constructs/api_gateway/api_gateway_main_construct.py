@@ -202,19 +202,19 @@ class ApiGatewayConstruct(Construct):
             },
         )
 
-        # Add custom response for authorization failures (403)
-        # This provides a more user-friendly message than the default AWS message
+        # Add custom response for authorization failures (401)
+        # When the Lambda authorizer raises an exception (e.g., expired token),
+        # API Gateway triggers this response. Returns 401 so the frontend can
+        # distinguish it from permission denials (403) and trigger token refresh.
         self.api_gateway_rest_api.add_gateway_response(
             "UNAUTHORIZED",
             type=apigateway.ResponseType.UNAUTHORIZED,
-            status_code="403",
+            status_code="401",
             response_headers={
                 "Access-Control-Allow-Origin": "'*'",
                 "Access-Control-Allow-Headers": "'*'",
             },
-            templates={
-                "application/json": '{"message": "Access denied: You don\'t have permission to perform this action"}'
-            },
+            templates={"application/json": '{"message": "Authentication failed"}'},
         )
 
         # Add custom response for explicit policy denials (403)

@@ -8,7 +8,7 @@ import { useAuth } from "../common/hooks/auth-context";
  */
 export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { checkAndRefreshToken } = useTokenRefresh();
-  const { checkAuthStatus, isAuthenticated } = useAuth();
+  const { silentAuthCheck, isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -16,14 +16,11 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
     // Handle page visibility changes specifically for token refresh
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("Page became visible, refreshing auth status and checking token...");
-        // When user returns to page, check auth status first, then token
-        checkAuthStatus()
+        console.log("Page became visible, silently refreshing auth and checking token...");
+        // Use silent check so the UI doesn't flash a loading spinner
+        silentAuthCheck()
           .then(() => {
-            // Small delay to ensure auth status check completes
-            setTimeout(() => {
-              checkAndRefreshToken();
-            }, 500);
+            checkAndRefreshToken();
           })
           .catch((error) => {
             console.error("Error checking auth status on visibility change:", error);
@@ -36,7 +33,7 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isAuthenticated, checkAuthStatus, checkAndRefreshToken]);
+  }, [isAuthenticated, silentAuthCheck, checkAndRefreshToken]);
 
   return <>{children}</>;
 };

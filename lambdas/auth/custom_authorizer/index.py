@@ -2362,13 +2362,42 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             return policy
 
         except Exception as e:
+            error_str = str(e)
             logger.error(
-                f"Error processing token: {str(e)}",
+                f"Error processing token: {error_str}",
                 extra={"correlation_id": correlation_id},
             )
             metrics.add_metric(
                 name="request.token_error", unit=MetricUnit.Count, value=1
             )
+
+            # Check if this is a token expiration error
+            # Raise Unauthorized so API Gateway returns 401 (not 403 Deny policy)
+            # This allows the frontend to distinguish expired tokens from
+            # genuine permission denials and trigger a token refresh
+            is_expired = any(
+                phrase in error_str.lower()
+                for phrase in ["expired", "token has expired", "exp claim"]
+            )
+
+            if is_expired:
+                logger.info(
+                    "Token expired - raising Unauthorized for 401 response",
+                    extra={"correlation_id": correlation_id},
+                )
+                metrics.add_metric(
+                    name="request.token_expired", unit=MetricUnit.Count, value=1
+                )
+
+                # Record execution time
+                execution_time = (time.time() - start_time) * 1000
+                metrics.add_metric(
+                    name="request.latency",
+                    unit=MetricUnit.Milliseconds,
+                    value=execution_time,
+                )
+
+                raise Exception("Unauthorized: The incoming token has expired")
 
             policy = {
                 "principalId": "denied_user",
@@ -2382,7 +2411,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                         }
                     ],
                 },
-                "context": {"authError": str(e), "requestId": str(correlation_id)},
+                "context": {"authError": error_str, "requestId": str(correlation_id)},
             }
 
             # Record execution time
@@ -2398,7 +2427,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
             # Log the error policy response before returning
             logger.info(
-                f"Returning JWT error policy response: {str(e)}",
+                f"Returning JWT error policy response: {error_str}",
                 extra={"correlation_id": correlation_id},
             )
 

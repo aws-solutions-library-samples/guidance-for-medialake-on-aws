@@ -95,29 +95,35 @@ const configureAmplify = (config: AwsConfig) => {
 
 export const AwsConfigProvider = ({ children }: AwsConfigProviderProps) => {
   const { t } = useTranslation();
-  const [awsConfig, setAwsConfig] = useState<AwsConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Synchronous fast-path: read config from localStorage before first render
+  // so we never flash a loading screen when the config is already cached.
+  const [awsConfig, setAwsConfig] = useState<AwsConfig | null>(() => {
+    const stored = StorageHelper.getAwsConfig();
+    if (stored) {
+      configureAmplify(stored);
+      return stored;
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(awsConfig === null);
 
   useEffect(() => {
-    const storedConfig = StorageHelper.getAwsConfig();
-    if (storedConfig) {
-      configureAmplify(storedConfig);
-      setAwsConfig(storedConfig);
-      setIsLoading(false);
-    } else {
-      fetch("/aws-exports.json")
-        .then((response) => response.json())
-        .then((data) => {
-          configureAmplify(data);
-          StorageHelper.setAwsConfig(data);
-          setAwsConfig(data);
-          setIsLoading(false);
-        })
-        .catch((error) => {
-          console.error("Error fetching AWS config:", error);
-          setIsLoading(false);
-        });
-    }
+    // If we already loaded from localStorage synchronously, nothing to do
+    if (awsConfig) return;
+
+    fetch("/aws-exports.json")
+      .then((response) => response.json())
+      .then((data) => {
+        configureAmplify(data);
+        StorageHelper.setAwsConfig(data);
+        setAwsConfig(data);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching AWS config:", error);
+        setIsLoading(false);
+      });
   }, []);
 
   if (isLoading) {

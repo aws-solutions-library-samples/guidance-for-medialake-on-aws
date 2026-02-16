@@ -21,9 +21,75 @@ const PermissionContext = createContext<PermissionContextType>({
  */
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
-  const [ability, setAbility] = useState<AppAbility>(() => createAppAbility());
-  const [permissionsInitialized, setPermissionsInitialized] = useState(false);
+
+  // Synchronous fast-path: if we have a valid token and cached permissions,
+  // initialize immediately so the UI never shows a loading spinner.
+  const initFromCache = (): {
+    user: User | null;
+    ability: AppAbility;
+    initialized: boolean;
+  } => {
+    try {
+      const token = StorageHelper.getToken();
+      if (!token) return { user: null, ability: createAppAbility(), initialized: false };
+
+      const globalCache = globalPermissionCache.getGlobalCache(token);
+      if (globalCache) {
+        const cachedUser = {
+          ...globalCache.user,
+          customPermissions: globalCache.customPermissions,
+        };
+        return { user: cachedUser, ability: globalCache.ability, initialized: true };
+      }
+
+      // No cache but we have a token — parse it synchronously
+      const parts = token.split(".");
+      if (parts.length !== 3)
+        return { user: null, ability: createAppAbility(), initialized: false };
+
+      const payload = JSON.parse(atob(parts[1]));
+      if (!payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) {
+        return { user: null, ability: createAppAbility(), initialized: false };
+      }
+
+      const extractedUser = extractUserFromClaims(payload);
+      if (payload["custom:permissions"]) {
+        try {
+          extractedUser.customPermissions = JSON.parse(payload["custom:permissions"]);
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      const newAbility = defineAbilityFor(extractedUser, []);
+
+      // Populate the global cache for future reads
+      const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
+      if (expiresIn > 0) {
+        globalPermissionCache.setGlobalCache(
+          extractedUser,
+          extractedUser.customPermissions || [],
+          newAbility,
+          [],
+          token,
+          expiresIn
+        );
+      }
+
+      return { user: extractedUser, ability: newAbility, initialized: true };
+    } catch {
+      return { user: null, ability: createAppAbility(), initialized: false };
+    }
+  };
+
+  const cachedRef = React.useRef<ReturnType<typeof initFromCache> | null>(null);
+  if (!cachedRef.current) {
+    cachedRef.current = initFromCache();
+  }
+  const cached = cachedRef.current;
+  const [user, setUser] = useState<User | null>(cached.user);
+  const [ability, setAbility] = useState<AppAbility>(() => cached.ability);
+  const [permissionsInitialized, setPermissionsInitialized] = useState(cached.initialized);
 
   // Extract user information from JWT token and check global cache
   useEffect(() => {
@@ -100,63 +166,82 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthenticated, isInitialized]);
 
-  // Listen for storage changes (token updates) to refresh permissions
+  // Listen for storage changes (token updates) to refresh permissions.
+  // StorageEvent only fires for cross-tab changes, so we also patch
+  // StorageHelper.setToken to detect same-tab token refreshes.
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const handleStorageChange = (e: StorageEvent) => {
-      // Handle token changes in storage
-      if (e.key === "medialake-auth-token" && e.newValue !== e.oldValue) {
-        console.log("Token changed in storage, refreshing permissions...");
+    const handleTokenChange = (newToken: string | null) => {
+      if (newToken) {
+        try {
+          const tokenParts = newToken.split(".");
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            const extractedUser = extractUserFromClaims(payload);
 
-        const newToken = e.newValue;
-        if (newToken) {
-          try {
-            // Parse the JWT token to get user claims
-            const tokenParts = newToken.split(".");
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
-              const extractedUser = extractUserFromClaims(payload);
-
-              // Parse custom:permissions from JWT
-              if (payload["custom:permissions"]) {
-                try {
-                  const customPermissions = JSON.parse(payload["custom:permissions"]);
-                  console.log("Parsed custom permissions from refreshed token:", customPermissions);
-                  // Store permissions in user object
-                  extractedUser.customPermissions = customPermissions;
-                } catch (e) {
-                  console.error("Failed to parse custom:permissions from refreshed token:", e);
-                }
-              }
-
-              console.log("Extracted user from new token:", extractedUser);
-              setUser(extractedUser);
-
-              // Update token in global cache instead of clearing everything
-              const exp = payload.exp;
-              if (exp) {
-                const expiresIn = exp - Math.floor(Date.now() / 1000);
-                if (expiresIn > 0) {
-                  globalPermissionCache.updateToken(newToken, expiresIn);
-                }
+            if (payload["custom:permissions"]) {
+              try {
+                const customPermissions = JSON.parse(payload["custom:permissions"]);
+                console.log("Parsed custom permissions from refreshed token:", customPermissions);
+                extractedUser.customPermissions = customPermissions;
+              } catch (e) {
+                console.error("Failed to parse custom:permissions from refreshed token:", e);
               }
             }
-          } catch (error) {
-            console.error("Error extracting user from refreshed token:", error);
+
+            console.log("Extracted user from new token:", extractedUser);
+            setUser(extractedUser);
+
+            const exp = payload.exp;
+            if (exp) {
+              const expiresIn = exp - Math.floor(Date.now() / 1000);
+              if (expiresIn > 0) {
+                globalPermissionCache.updateToken(newToken, expiresIn);
+              }
+            }
           }
-        } else {
-          // Token was cleared, reset user and ability
-          console.log("Token was cleared, resetting permissions");
-          setUser(null);
-          setAbility(createAppAbility());
-          globalPermissionCache.clear();
+        } catch (error) {
+          console.error("Error extracting user from refreshed token:", error);
         }
+      } else {
+        console.log("Token was cleared, resetting permissions");
+        setUser(null);
+        setAbility(createAppAbility());
+        globalPermissionCache.clear();
+      }
+    };
+
+    // Cross-tab changes via StorageEvent
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "medialake-auth-token" && e.newValue !== e.oldValue) {
+        console.log("Token changed in storage (cross-tab), refreshing permissions...");
+        handleTokenChange(e.newValue);
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+
+    // Same-tab changes: monkey-patch localStorage.setItem to detect token writes
+    // StorageEvent does NOT fire for same-tab writes, so this is necessary
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const currentToken = StorageHelper.getToken();
+    let lastKnownToken = currentToken;
+
+    localStorage.setItem = function (key: string, value: string) {
+      originalSetItem(key, value);
+      if (key === "medialake-auth-token" && value !== lastKnownToken) {
+        console.log("Token changed in storage (same-tab), refreshing permissions...");
+        lastKnownToken = value;
+        handleTokenChange(value);
+      }
+    };
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      // Restore original setItem
+      localStorage.setItem = originalSetItem;
+    };
   }, [isAuthenticated]);
 
   // Update ability when user changes
