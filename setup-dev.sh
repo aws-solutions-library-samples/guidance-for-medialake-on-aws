@@ -174,7 +174,7 @@ if ! pip install pre-commit; then
     exit 1
 fi
 
-# Install gitleaks for secret scanning
+# Install gitleaks for secret scanning, updated from detect secrets
 echo "Installing gitleaks..."
 if [[ "$OS" == "Darwin" ]]; then
     if command_exists brew; then
