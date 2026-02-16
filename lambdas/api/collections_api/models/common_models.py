@@ -67,9 +67,11 @@ class ListCollectionsQueryParams(BaseModel):
     """Query parameters for listing collections."""
 
     cursor: Optional[str] = Field(
-        None, description="Pagination cursor (unused, kept for API compatibility)"
+        None, description="Pagination cursor for fetching the next page of results"
     )
-    limit: int = Field(default=1000, ge=1, le=1000, description="Number of results")
+    limit: int = Field(
+        default=1000, ge=1, le=1000, description="Number of results per page"
+    )
     filter_type: Optional[str] = Field(None, alias="filter[type]")
     filter_ownerId: Optional[str] = Field(None, alias="filter[ownerId]")
     filter_parentId: Optional[str] = Field(None, alias="filter[parentId]")

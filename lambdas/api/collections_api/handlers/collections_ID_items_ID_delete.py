@@ -7,12 +7,13 @@ from urllib.parse import unquote
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from collections_utils import (
     COLLECTION_PK_PREFIX,
+    COLLECTIONS_GSI5_PK,
     METADATA_SK,
     create_error_response,
     create_success_response,
 )
 from db_models import CollectionItemModel, CollectionModel
-from pynamodb.exceptions import DeleteError, DoesNotExist
+from pynamodb.exceptions import DeleteError, DoesNotExist, UpdateError
 from utils.item_utils import ASSET_SK_PREFIX, ITEM_SK_PREFIX
 
 logger = Logger(
@@ -66,17 +67,38 @@ def register_route(app):
                 logger.error(f"[DELETE] Error deleting item: {e}")
                 raise
 
-            # Update collection updatedAt timestamp
-            # Note: itemCount is no longer maintained here - it's computed dynamically
+            # Update collection: decrement itemCount atomically and refresh timestamps
+            # Note: itemCount is maintained as a stored counter for efficient listing.
             try:
                 collection = CollectionModel.get(
                     f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
                 )
-                collection.update(
-                    actions=[
-                        CollectionModel.updatedAt.set(current_timestamp),
-                    ]
-                )
+                # Decrement itemCount only when it's > 0 to prevent negatives.
+                try:
+                    collection.update(
+                        actions=[
+                            CollectionModel.updatedAt.set(current_timestamp),
+                            CollectionModel.itemCount.set(
+                                (CollectionModel.itemCount - 1)
+                            ),
+                            CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
+                            CollectionModel.GSI5_SK.set(current_timestamp),
+                        ],
+                        condition=(CollectionModel.itemCount > 0),
+                    )
+                except UpdateError:
+                    # itemCount is already 0 — still update timestamps.
+                    logger.warning(
+                        f"[DELETE] itemCount already 0 for collection {collection_id}, "
+                        "skipping decrement"
+                    )
+                    collection.update(
+                        actions=[
+                            CollectionModel.updatedAt.set(current_timestamp),
+                            CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
+                            CollectionModel.GSI5_SK.set(current_timestamp),
+                        ]
+                    )
                 logger.info(f"[DELETE] Updated collection updatedAt timestamp")
             except Exception as e:
                 logger.warning(f"[DELETE] Failed to update collection timestamp: {e}")

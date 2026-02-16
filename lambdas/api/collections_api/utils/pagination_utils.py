@@ -22,7 +22,11 @@ def parse_cursor(cursor_str: Optional[str]) -> Optional[dict]:
 
 
 def create_cursor(
-    pk: str, sk: str, gsi_pk: Optional[str] = None, gsi_sk: Optional[str] = None
+    pk: str,
+    sk: str,
+    gsi_pk: Optional[str] = None,
+    gsi_sk: Optional[str] = None,
+    gsi_name: Optional[str] = None,
 ) -> str:
     """Create base64-encoded cursor"""
     cursor_data = {"pk": pk, "sk": sk}
@@ -30,6 +34,8 @@ def create_cursor(
         cursor_data["gsi_pk"] = gsi_pk
     if gsi_sk:
         cursor_data["gsi_sk"] = gsi_sk
+    if gsi_name:
+        cursor_data["gsi_name"] = gsi_name
     json_str = json.dumps(cursor_data)
     return base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
 
