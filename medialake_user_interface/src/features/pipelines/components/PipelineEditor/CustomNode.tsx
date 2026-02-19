@@ -301,8 +301,6 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
   };
 
   // Debug logging
-  // console.log('[CustomNode] Input types:', data.inputTypes);
-  // console.log('[CustomNode] Output types:', data.outputTypes);
 
   // Helper function to check if node has configurable parameters
   const hasConfigurableParameters = () => {

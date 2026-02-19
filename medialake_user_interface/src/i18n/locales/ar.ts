@@ -364,7 +364,7 @@ export default {
     },
     bar: {
       label: "بحث",
-      placeholder: "بحث (مثال: sunset type:image)",
+      placeholder: "بحث (مثال: sunset)",
       placeholderSemantic: "بحث (مثال: مكان هادئ)",
       helperText: "استخدم كلمات مثل type:, format:, size:, date:, metadata: لتصفية النتائج",
     },
@@ -901,6 +901,7 @@ export default {
     clickToEdit: "انقر للتحرير",
     downloadVersion: "تنزيل هذا الإصدار",
     resetMarker: "إعادة تعيين العلامة إلى الموضع الأصلي",
+    addMarker: "إضافة علامة",
     postComment: "نشر تعليقك",
     runPipeline: "تشغيل خط الأنابيب هذا على الأصل الحالي",
     browsePipelines: "تصفح جميع خطوط الأنابيب المتاحة",

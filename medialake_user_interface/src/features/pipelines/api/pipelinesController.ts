@@ -115,8 +115,6 @@ export const useDeletePipeline = (
 ) => {
   return useMutation({
     mutationFn: async (id: string) => {
-      console.log(`[pipelinesController] Starting delete mutation for pipeline ID: ${id}`);
-
       // Create a timeout promise to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
@@ -130,10 +128,6 @@ export const useDeletePipeline = (
       try {
         // Race the deletion against the timeout
         await Promise.race([PipelinesService.deletePipeline(id), timeoutPromise]);
-
-        console.log(
-          `[pipelinesController] Delete mutation completed successfully for pipeline ID: ${id}`
-        );
       } catch (error) {
         console.error(`[pipelinesController] Delete mutation failed for pipeline ID: ${id}`, error);
 
@@ -155,9 +149,6 @@ export const useDeletePipeline = (
       }
     },
     onSuccess: (_, id) => {
-      console.log(
-        `[pipelinesController] Invalidating queries after successful deletion of pipeline: ${id}`
-      );
       queryClient.invalidateQueries({ queryKey: PIPELINES_QUERY_KEYS.list() });
       queryClient.invalidateQueries({
         queryKey: PIPELINES_QUERY_KEYS.detail(id),

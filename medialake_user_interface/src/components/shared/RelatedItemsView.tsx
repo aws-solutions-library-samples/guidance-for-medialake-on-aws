@@ -36,8 +36,6 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   onItemClick,
 }) => {
   const { t } = useTranslation();
-  console.log("RelatedItemsView - Received items:", items);
-  console.log("RelatedItemsView - isLoading:", isLoading);
 
   const defaultFields = [
     { id: "name", label: "Name", visible: true },
@@ -65,7 +63,6 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   };
 
   if (isLoading && items.length === 0) {
-    console.log("RelatedItemsView - Showing loading state");
     return (
       <TabContentContainer>
         <Box sx={{ display: "flex", justifyContent: "center", p: 1 }}>
@@ -76,7 +73,6 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
   }
 
   if (items.length === 0) {
-    console.log("RelatedItemsView - No items to display");
     return (
       <TabContentContainer>
         <Box sx={{ textAlign: "center" }}>
@@ -86,7 +82,6 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
     );
   }
 
-  console.log("RelatedItemsView - Rendering grid with items:", items);
   return (
     <TabContentContainer>
       <Box>
@@ -109,9 +104,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                 thumbnailScale="fill"
                 showMetadata={true}
                 isFavorite={false} // Default to false since we don't have favorite info here
-                onFavoriteToggle={() =>
-                  console.log("Favorite toggle not implemented in RelatedItemsView")
-                }
+                onFavoriteToggle={() => {}}
               />
             </Grid>
           ))}

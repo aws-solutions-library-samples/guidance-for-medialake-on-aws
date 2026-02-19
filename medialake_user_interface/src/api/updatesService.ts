@@ -86,18 +86,12 @@ export interface UpgradeHistoryResponse {
  * Get available versions (branches and tags) from GitHub
  */
 export const getVersions = async (): Promise<VersionsResponse> => {
-  console.log("📡 getVersions: Making API call...");
   const response = await apiClient.get<{ body: string }>("/updates/versions");
-  console.log("📡 getVersions: Raw response:", response);
-  console.log("📡 getVersions: response.data:", response.data);
 
   // Parse the body string to get the actual data
   const parsedBody = JSON.parse(response.data.body);
-  console.log("📡 getVersions: Parsed body:", parsedBody);
-  console.log("📡 getVersions: parsedBody.data:", parsedBody.data);
 
   const result = parsedBody.data;
-  console.log("📡 getVersions: Returning:", result);
   return result;
 };
 

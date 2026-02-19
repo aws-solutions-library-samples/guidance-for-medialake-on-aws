@@ -45,12 +45,6 @@ const AssetsPage: React.FC = () => {
   const connectors = connectorsResponse?.data.connectors || [];
 
   // For debugging
-  console.log("AssetsPage connectors:", connectors);
-  console.log("Selected connector:", selectedConnector);
-  console.log(
-    "Selected bucket:",
-    selectedConnector ? connectors.find((c) => c.id === selectedConnector)?.storageIdentifier : null
-  );
 
   // Filter connectors based on search text
   const filteredConnectors = connectors.filter(

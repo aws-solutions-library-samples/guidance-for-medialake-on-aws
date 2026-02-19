@@ -235,8 +235,6 @@ export function useAssetSelection<T>({
   // Handle selection toggle
   const handleSelectToggle = useCallback(
     (asset: T) => {
-      console.log("handleSelectToggle called with asset:", getAssetId(asset));
-
       const assetId = getAssetId(asset);
       const selectedAsset: SelectedAsset = {
         id: assetId,
@@ -271,7 +269,6 @@ export function useAssetSelection<T>({
   // Handle removing a single asset from selection
   const handleRemoveAsset = useCallback(
     (assetId: string) => {
-      console.log("Removing single asset from selection:", assetId);
       setSelectedAssets((prev) => {
         const newSelectedAssets = prev.filter((item) => item.id !== assetId);
 
@@ -367,12 +364,9 @@ export function useAssetSelection<T>({
 
   // Handle batch operations
   const handleBatchDelete = useCallback(() => {
-    console.log("handleBatchDelete called, selectedAssets:", selectedAssets.length);
     if (selectedAssets.length === 0) {
-      console.log("No assets selected, returning");
       return;
     }
-    console.log("Setting isDeleteDialogOpen to true");
     setIsDeleteDialogOpen(true);
   }, [selectedAssets]);
 
@@ -400,8 +394,6 @@ export function useAssetSelection<T>({
     });
 
     try {
-      console.log("Starting batch delete for:", selectedAssets);
-
       // Extract actual inventory IDs, removing any collection-specific suffixes
       // (e.g., "asset:uuid:xxx#FULL#timestamp" -> "asset:uuid:xxx")
       const assetIds = selectedAssets.map((asset) => {
@@ -411,16 +403,12 @@ export function useAssetSelection<T>({
         return actualId;
       });
 
-      console.log("Cleaned asset IDs for deletion:", assetIds);
-
       const response = await batchDeleteMutation.mutateAsync({
         assetIds,
         confirmationToken: "DELETE",
       });
 
       if (response.data?.jobId) {
-        console.log("Bulk delete job started:", response.data.jobId);
-
         // Store job ID to track progress
         setBatchDeleteJobId(response.data.jobId);
 
@@ -493,8 +481,6 @@ export function useAssetSelection<T>({
     });
 
     try {
-      console.log("Starting batch download for:", selectedAssets);
-
       // Transform asset IDs into the required object format
       // Empty clipBoundary {} indicates whole file download (not a subclip)
       const assetIds = selectedAssets.map((asset) => ({
@@ -513,7 +499,6 @@ export function useAssetSelection<T>({
 
       if (response.data?.jobId) {
         setBulkDownloadJobId(response.data.jobId);
-        console.log("Bulk download job started:", response.data.jobId);
 
         // Success: Clear selection and close side panel
         handleClearSelection();
@@ -558,7 +543,6 @@ export function useAssetSelection<T>({
   ]);
 
   const handleBatchShare = useCallback(() => {
-    console.log("Batch share:", selectedAssets);
     // Implement batch share functionality
   }, [selectedAssets]);
 

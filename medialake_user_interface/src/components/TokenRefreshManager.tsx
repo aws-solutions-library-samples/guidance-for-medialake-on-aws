@@ -16,7 +16,6 @@ export const TokenRefreshManager: React.FC<{ children: React.ReactNode }> = ({ c
     // Handle page visibility changes specifically for token refresh
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("Page became visible, silently refreshing auth and checking token...");
         // Use silent check so the UI doesn't flash a loading spinner
         silentAuthCheck()
           .then(() => {

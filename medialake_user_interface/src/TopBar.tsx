@@ -400,7 +400,6 @@ function TopBar() {
   };
 
   const handleUploadComplete = (files: any[]) => {
-    console.log("Upload completed:", files);
     handleCloseUploadModal();
   };
 

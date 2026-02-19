@@ -12,10 +12,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Show loading state while authentication is being checked
   if (isLoading || !isInitialized) {
-    console.log("ProtectedRoute: Showing loading state", {
-      isLoading,
-      isInitialized,
-    });
     return (
       <Box
         sx={{
@@ -37,10 +33,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Only redirect to sign-in after we've confirmed the user is not authenticated
   if (isInitialized && !isAuthenticated) {
-    console.log("ProtectedRoute: User not authenticated, redirecting to sign-in");
     return <Navigate to="/sign-in" replace />;
   }
 
-  console.log("ProtectedRoute: User authenticated, rendering protected content");
   return <>{children}</>;
 };

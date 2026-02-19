@@ -252,19 +252,11 @@ const CollectionViewPage: React.FC = () => {
   // Handle Remove from Collection click
   const handleRemoveFromCollectionClick = useCallback(
     (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-      console.log("CollectionViewPage: Remove from Collection clicked!", asset);
       event.stopPropagation();
 
       // Use the collectionItemId (SK) if available, otherwise fall back to InventoryID
       // The collectionItemId is the SK from DynamoDB (e.g., "ITEM#uuid" or "ASSET#uuid")
       const itemId = (asset as any).collectionItemId || asset.InventoryID;
-
-      console.log("CollectionViewPage: Attempting to delete", {
-        collectionId: id,
-        itemId,
-        hasCollectionItemId: !!(asset as any).collectionItemId,
-        inventoryID: asset.InventoryID,
-      });
 
       if (id && itemId) {
         deleteItemMutation.mutate({ collectionId: id, itemId });

@@ -44,9 +44,7 @@ const sampleCollections: Collection[] = [
 ];
 
 export const Collections: React.FC = () => {
-  const handleOpenCollection = (id: string) => {
-    console.log(`Opening collection ${id}`);
-  };
+  const handleOpenCollection = (id: string) => {};
 
   return (
     <Box>

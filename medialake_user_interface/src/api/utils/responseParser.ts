@@ -139,7 +139,6 @@ export const parseStringBodyResponse = <T>(axiosResponseData: any): T => {
  */
 export const handleApiKeysError = (error: any): ApiKey[] => {
   if (error?.response?.status === 403) {
-    console.log("API keys API returned 403 Forbidden - User likely does not have permission");
     return [];
   }
   // Re-throw other errors to maintain existing error handling

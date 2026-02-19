@@ -58,9 +58,7 @@ const useNotificationWithFallback = () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useNotification } = require("@/shared/context/NotificationContext");
     globalNotification = useNotification();
-  } catch {
-    console.log("NotificationContext not available, using fallback");
-  }
+  } catch {}
 
   const showNotification = (
     msg: string,

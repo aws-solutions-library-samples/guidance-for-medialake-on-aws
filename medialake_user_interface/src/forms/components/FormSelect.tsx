@@ -99,7 +99,6 @@ export const FormSelect = <T extends FieldValues>({
       control={control}
       render={({ field, fieldState: { error } }) => {
         // Debug: Log the current field value
-        console.log(`[FormSelect] Field "${name}" value:`, field.value, typeof field.value);
 
         return (
           <FormControl fullWidth={fullWidth} error={!!error} required={required} variant="outlined">

@@ -85,12 +85,6 @@ const useS3Upload = (): UseS3UploadReturn => {
       setError(null);
 
       try {
-        console.log("Completing multipart upload:", {
-          upload_id: request.upload_id,
-          key: request.key,
-          parts: request.parts.length,
-        });
-
         const response = await apiClient.post<{
           status: string;
           message: string;
@@ -143,11 +137,6 @@ const useS3Upload = (): UseS3UploadReturn => {
       setError(null);
 
       try {
-        console.log("Aborting multipart upload:", {
-          upload_id: request.upload_id,
-          key: request.key,
-        });
-
         await apiClient.post<{
           status: string;
           message: string;

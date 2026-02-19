@@ -67,14 +67,10 @@ const SidebarContent: React.FC = () => {
   };
 
   const onDragStart = (event: React.DragEvent, node: NodeType, methodName: string) => {
-    console.log("[Sidebar] onDragStart for node:", node.nodeId, "method:", methodName);
-    console.log("[Sidebar] Node methods:", node.methods);
-
     // For trigger nodes, we need to use "trigger" as the method name
     let actualMethodName = methodName;
     if (node.info.nodeType === "TRIGGER") {
       actualMethodName = "trigger";
-      console.log('[Sidebar] Using "trigger" as method name for trigger node');
     } else if (node.info.nodeType === "INTEGRATION") {
       // For integration nodes, we need to use the actual method name (post, get, etc.)
       // The methodName parameter might be an index, so we need to get the actual method name
@@ -82,7 +78,6 @@ const SidebarContent: React.FC = () => {
         const methodObj = node.methods[parseInt(methodName)] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log("[Sidebar] Using method name from array:", actualMethodName);
         }
       } else if (typeof node.methods === "object") {
         // If methods is an object, the keys might be the method names
@@ -90,7 +85,6 @@ const SidebarContent: React.FC = () => {
         const methodObj = node.methods[methodName] as any;
         if (methodObj && methodObj.name) {
           actualMethodName = methodObj.name;
-          console.log("[Sidebar] Using method name from object:", actualMethodName);
         }
       }
     }
@@ -101,7 +95,6 @@ const SidebarContent: React.FC = () => {
       const parts = methodName.split(":");
       actualMethodName = parts[0];
       targetOperationId = parts[1];
-      console.log("[Sidebar] Extracted operationId from methodName:", targetOperationId);
     }
 
     // Find the method in the methods array or object
@@ -112,23 +105,16 @@ const SidebarContent: React.FC = () => {
         method = node.methods.find(
           (m: any) => m.name === actualMethodName && m.config?.operationId === targetOperationId
         );
-        console.log(
-          "[Sidebar] Finding method by name and operationId:",
-          actualMethodName,
-          targetOperationId
-        );
       }
 
       // If no method found with operationId or no operationId provided, fall back to name only
       if (!method) {
         method = node.methods.find((m: any) => m.name === actualMethodName);
-        console.log("[Sidebar] Finding method by name only:", actualMethodName);
       }
 
       // If still not found and methodName is a number, use it as an index
       if (!method && !isNaN(parseInt(methodName))) {
         method = node.methods[parseInt(methodName)];
-        console.log("[Sidebar] Using method at index:", methodName);
       }
     } else if (typeof node.methods === "object") {
       method = node.methods[methodName];
@@ -149,7 +135,6 @@ const SidebarContent: React.FC = () => {
 
     // Use type assertion to access the config property
     const methodWithConfig = method as any;
-    console.log("[Sidebar] Method found:", methodWithConfig);
 
     // Set methodConfig based on node type
     let methodConfig;
@@ -168,7 +153,6 @@ const SidebarContent: React.FC = () => {
         path: "",
         operationId: "",
       };
-      console.log("[Sidebar] Trigger node methodConfig:", methodConfig);
     } else {
       // For integration nodes, use the method name (post, get, etc.)
       methodConfig = {
@@ -179,25 +163,16 @@ const SidebarContent: React.FC = () => {
         path: methodWithConfig?.config?.path,
         operationId: methodWithConfig?.config?.operationId,
       };
-      // console.log('[Sidebar] Integration node methodConfig:', methodConfig);
     }
 
     // Check if this node has multiple output types in its connections
     let outputTypes = node.info.outputTypes || [];
     let inputTypes = node.info.inputTypes || [];
 
-    // console.log('[Sidebar] Node ID:', node.nodeId);
-    // console.log('[Sidebar] Node type:', node.info.nodeType);
-    // console.log('[Sidebar] Initial outputTypes:', outputTypes);
-    // console.log('[Sidebar] Initial inputTypes:', inputTypes);
-    // console.log('[Sidebar] Node connections:', node.connections);
-
     // // For nodes with multiple outputs like Choice, extract the output types from connections
-    // console.log('[Sidebar] Checking for multiple outputs in node:', node.nodeId);
 
     // Log all connections for debugging
     // if (node.connections) {
-    //     console.log('[Sidebar] Node connections structure:', JSON.stringify(node.connections, null, 2));
     // }
 
     // Try to find the output types in different possible locations
@@ -207,7 +182,6 @@ const SidebarContent: React.FC = () => {
     // Check for output types in the standard location first
     if (node.connections?.outgoing?.[actualMethodName]?.[0]?.connectionConfig?.type) {
       outputTypesConfig = node.connections.outgoing[actualMethodName][0].connectionConfig.type;
-      console.log("[Sidebar] Found output types in standard location:", outputTypesConfig);
     }
     // If not found, try to look in all outgoing connections
     else if (node.connections?.outgoing) {
@@ -217,7 +191,6 @@ const SidebarContent: React.FC = () => {
           connections.forEach((connection: any) => {
             if (connection.connectionConfig?.type) {
               outputTypesConfig = connection.connectionConfig.type;
-              console.log("[Sidebar] Found output types in method:", method, outputTypesConfig);
             }
           });
         }
@@ -227,7 +200,6 @@ const SidebarContent: React.FC = () => {
     // Check for input types in the standard location first
     if (node.connections?.incoming?.[actualMethodName]?.[0]?.connectionConfig?.type) {
       inputTypesConfig = node.connections.incoming[actualMethodName][0].connectionConfig.type;
-      console.log("[Sidebar] Found input types in standard location:", inputTypesConfig);
     }
     // If not found, try to look in all incoming connections
     else if (node.connections?.incoming) {
@@ -237,7 +209,6 @@ const SidebarContent: React.FC = () => {
           connections.forEach((connection: any) => {
             if (connection.connectionConfig?.type) {
               inputTypesConfig = connection.connectionConfig.type;
-              console.log("[Sidebar] Found input types in method:", method, inputTypesConfig);
             }
           });
         }
@@ -273,7 +244,6 @@ const SidebarContent: React.FC = () => {
           });
         }
       }
-      console.log("[Sidebar] Node has multiple output types:", outputTypes);
     }
 
     // If we found input types, use them
@@ -294,7 +264,6 @@ const SidebarContent: React.FC = () => {
           });
         }
       }
-      console.log("[Sidebar] Node has multiple input types:", inputTypes);
     }
 
     const nodeData = {
@@ -309,10 +278,6 @@ const SidebarContent: React.FC = () => {
       selectedMethod: actualMethodName,
       methodConfig: methodConfig,
     };
-
-    console.log("[Sidebar] Final node data for drag:", nodeData);
-
-    console.log("[Sidebar] Node data for drag:", nodeData);
 
     event.dataTransfer.setData("application/reactflow", JSON.stringify(nodeData));
     event.dataTransfer.effectAllowed = "move";

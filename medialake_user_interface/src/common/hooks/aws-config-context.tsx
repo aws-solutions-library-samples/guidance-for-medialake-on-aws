@@ -68,10 +68,6 @@ const configureAmplify = (config: AwsConfig) => {
 
   // Add SAML configuration if any SAML providers are configured
   if (samlProviders.length > 0) {
-    console.log(
-      "Configuring SAML providers:",
-      samlProviders.map((p) => p.identity_provider_name)
-    );
     amplifyConfig.Auth.Cognito.loginWith.oauth = {
       ...amplifyConfig.Auth.Cognito.loginWith.oauth,
       providers: ["SAML"],

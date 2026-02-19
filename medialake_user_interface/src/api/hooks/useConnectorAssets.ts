@@ -73,7 +73,6 @@ export const useConnectorAssets = ({
   const sort = sortBy ? `${sortDirection === "desc" ? "-" : ""}${sortBy}` : undefined;
 
   // For debugging
-  console.log("useConnectorAssets called with:", { bucketName, query, filters });
 
   return useQuery<ConnectorAssetsResponse, ConnectorAssetsError>({
     // Use the existing search list query key with our bucket filter

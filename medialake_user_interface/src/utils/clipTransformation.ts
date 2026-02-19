@@ -65,7 +65,6 @@ export function transformResultsToClipMode(
   let allClipAssets = transformationCache.get(fullCacheKey) as ClipAssetItem[] | undefined;
 
   if (!allClipAssets) {
-    console.log("🎬 Starting clip transformation for", results.length, "assets");
     const startTime = performance.now();
 
     allClipAssets = [];
@@ -75,34 +74,6 @@ export function transformResultsToClipMode(
       const clips = (asset as any).clips as ClipData[] | undefined;
       const assetType = asset.DigitalSourceAsset?.Type || "Unknown";
 
-      // Debug: Log asset types and clip availability
-      console.log(
-        `🎬 Processing asset ${assetIndex + 1}/${
-          results.length
-        }: Type=${assetType}, HasClips=${!!clips}, ClipCount=${clips?.length || 0}`
-      );
-
-      // Debug: Log all clips for this asset to see if the 00:00:00 clip is present
-      if (clips && clips.length > 0) {
-        console.log(
-          `🎬 Clips for asset ${assetIndex + 1}:`,
-          clips.map((clip) => ({
-            start_timecode: clip.start_timecode,
-            end_timecode: clip.end_timecode,
-            score: clip.score,
-          }))
-        );
-
-        // Check specifically for clips starting at 00:00:00
-        const zeroStartClips = clips.filter((clip) => clip.start_timecode === "00:00:00:00");
-        if (zeroStartClips.length > 0) {
-          console.log(
-            `🔍 Found ${zeroStartClips.length} clips starting at 00:00:00:00:`,
-            zeroStartClips
-          );
-        }
-      }
-
       // For video and audio assets, process individual clips if available
       if (
         (assetType === "Video" || assetType === "Audio") &&
@@ -111,17 +82,6 @@ export function transformResultsToClipMode(
         clips.length > 0
       ) {
         clips.forEach((clip, clipIndex) => {
-          // Debug logging for clips starting at 00:00:00
-          if (clip.start_timecode === "00:00:00:00") {
-            console.log(`🔍 Found clip starting at 00:00:00:00:`, {
-              clipIndex,
-              score: clip.score,
-              start_timecode: clip.start_timecode,
-              end_timecode: clip.end_timecode,
-              hasValidScore: clip.score !== undefined && clip.score !== null,
-            });
-          }
-
           // Only process clips that have a valid score for semantic search
           if (clip.score !== undefined && clip.score !== null) {
             // Create a new asset item for each clip
@@ -139,20 +99,7 @@ export function transformResultsToClipMode(
               clips: [clip],
             };
 
-            // Debug logging for clips starting at 00:00:00 that are being added
-            if (clip.start_timecode === "00:00:00:00") {
-              console.log(`✅ Adding clip starting at 00:00:00:00 to results:`, {
-                clipAssetId: clipAsset.InventoryID,
-                score: clipAsset.score,
-              });
-            }
-
             allClipAssets!.push(clipAsset);
-          } else if (clip.start_timecode === "00:00:00:00") {
-            console.log(`❌ Skipping clip starting at 00:00:00:00 due to invalid score:`, {
-              score: clip.score,
-              scoreType: typeof clip.score,
-            });
           }
         });
       }
@@ -212,9 +159,6 @@ export function transformResultsToClipMode(
     );
 
     const endTime = performance.now();
-    console.log(`🎬 Clip transformation completed in ${(endTime - startTime).toFixed(2)}ms`);
-    console.log(`📊 Transformed ${results.length} assets into ${allClipAssets.length} clips`);
-    console.log("📈 Asset type summary:", assetTypeSummary);
 
     // Cache the result for future use
     transformationCache.set(fullCacheKey, allClipAssets);
@@ -225,7 +169,6 @@ export function transformResultsToClipMode(
       transformationCache.delete(firstKey);
     }
   } else {
-    console.log("🚀 Using cached clip transformation result");
   }
 
   const totalClips = allClipAssets.length;
@@ -236,10 +179,6 @@ export function transformResultsToClipMode(
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     const paginatedClips = allClipAssets.slice(startIndex, endIndex);
-
-    console.log(
-      `📄 Applied pagination: page ${page}, pageSize ${pageSize}, showing ${paginatedClips.length} of ${totalClips} clips`
-    );
 
     return { results: paginatedClips, totalClips };
   }
@@ -314,7 +253,6 @@ export function getOriginalAssetId(asset: any): string {
  */
 export function clearTransformationCache(): void {
   transformationCache.clear();
-  console.log("🧹 Transformation cache cleared");
 }
 
 /**

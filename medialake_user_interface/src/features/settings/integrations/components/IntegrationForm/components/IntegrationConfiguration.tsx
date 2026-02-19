@@ -51,7 +51,6 @@ export const IntegrationConfiguration: React.FC<
 
   // Ensure form data matches schema structure exactly
   const initialFormData = React.useMemo(() => {
-    console.log("[IntegrationConfiguration] Received form data:", formData);
     const cleanData = {
       nodeId: formData.nodeId || "",
       description: formData.description || "",
@@ -63,7 +62,6 @@ export const IntegrationConfiguration: React.FC<
         },
       },
     };
-    console.log("[IntegrationConfiguration] Cleaned form data:", cleanData);
     return cleanData;
   }, [formData]);
 
@@ -81,7 +79,6 @@ export const IntegrationConfiguration: React.FC<
   React.useEffect(() => {
     // Reset if we have a new nodeId (different integration) or haven't initialized yet
     if ((!hasInitialized || lastNodeId !== initialFormData.nodeId) && initialFormData.nodeId) {
-      console.log("[IntegrationConfiguration] Initial form setup:", initialFormData);
       form.reset(initialFormData);
       setHasInitialized(true);
       setLastNodeId(initialFormData.nodeId);
@@ -102,26 +99,15 @@ export const IntegrationConfiguration: React.FC<
 
   React.useEffect(() => {
     // Log form state changes
-    const subscription = form.watch((value) => {
-      console.log("[IntegrationConfiguration] Form values changed:", value);
-    });
+    const subscription = form.watch((value) => {});
     return () => subscription.unsubscribe();
   }, [form]);
-
-  console.log("[IntegrationConfiguration] Current form state:", {
-    values: form.getValues(),
-    isValid: form.formState.isValid,
-    isDirty: form.formState.isDirty,
-    errors: form.formState.errors,
-    errorDetails: JSON.stringify(form.formState.errors, null, 2),
-  });
 
   const handleSubmit = React.useCallback(
     async (data: IntegrationFormData) => {
       // Close the form immediately before any validation or submission
       onClose();
 
-      console.log("[IntegrationConfiguration] Starting submission with data:", data);
       try {
         // Handle the case where API key is the placeholder (not changed in edit mode)
         const submissionData = { ...data };
@@ -136,10 +122,7 @@ export const IntegrationConfiguration: React.FC<
           };
         }
 
-        console.log("[IntegrationConfiguration] Prepared submission data:", submissionData);
-
         await onSubmit(submissionData);
-        console.log("[IntegrationConfiguration] Submission completed");
       } catch (error) {
         console.error("[IntegrationConfiguration] Error during submission:", error);
         throw error; // Re-throw to allow parent component to handle the error

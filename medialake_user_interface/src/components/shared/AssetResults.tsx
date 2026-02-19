@@ -247,19 +247,10 @@ function AssetResults<T extends AssetBase>({
         editedName={editedName}
         onEditNameChange={handleNameChange}
         onEditNameComplete={(save, value) => {
-          console.log("🎯 AssetResults onEditNameComplete - save:", save, "value:", value);
-          console.log(
-            "🎯 AssetResults calling handleNameEditComplete with asset:",
-            asset.InventoryID,
-            "save:",
-            save,
-            "value:",
-            value
-          );
           handleNameEditComplete(asset, save, value);
         }}
         isFavorite={false} // Default to false since we don't have favorite info here
-        onFavoriteToggle={() => console.log("Favorite toggle not implemented in AssetResults")}
+        onFavoriteToggle={() => {}}
         isSemantic={isSemantic}
         confidenceThreshold={confidenceThreshold}
       />

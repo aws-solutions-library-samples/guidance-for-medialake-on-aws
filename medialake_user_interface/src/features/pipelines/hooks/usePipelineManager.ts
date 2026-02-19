@@ -163,7 +163,6 @@ export const usePipelineManager = () => {
     // Non-blocking function that handles errors and timeouts
     deletePipeline: (id: string) => {
       const startTime = performance.now();
-      console.log(`[usePipelineManager] Starting delete operation for pipeline ID: ${id}`);
 
       // Create a timeout promise to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -180,12 +179,6 @@ export const usePipelineManager = () => {
         // Race the deletion against the timeout
         Promise.race([deletePipelineMutation.mutateAsync(id), timeoutPromise])
           .then(() => {
-            console.log(
-              `[usePipelineManager] Delete operation completed successfully for pipeline ID: ${id} in ${
-                performance.now() - startTime
-              }ms`
-            );
-
             // Refresh the pipeline list in the background
             refetch().catch((refetchError) => {
               console.error(
@@ -223,8 +216,6 @@ export const usePipelineManager = () => {
 
     // Enhanced toggleActive with optimistic updates
     toggleActive: (id: string, active: boolean) => {
-      console.log(`[usePipelineManager] Toggling pipeline ${id} active state to ${active}`);
-
       // Mark this pipeline as currently toggling
       setTogglingPipelines((prev) => ({ ...prev, [id]: true }));
 
@@ -248,9 +239,6 @@ export const usePipelineManager = () => {
           data: { active },
         })
         .then(() => {
-          console.log(
-            `[usePipelineManager] Successfully toggled pipeline ${id} active state to ${active}`
-          );
           // Remove from toggling state
           setTogglingPipelines((prev) => {
             const updated = { ...prev };

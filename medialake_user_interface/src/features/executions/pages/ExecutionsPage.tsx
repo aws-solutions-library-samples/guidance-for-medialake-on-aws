@@ -182,21 +182,13 @@ const ExecutionsPage: React.FC = () => {
   // }, [navigate]);
 
   const handleViewDetails = useCallback((execution: PipelineExecution) => {
-    console.log("handleViewDetails:", execution);
-
-    console.log("Found execution:", execution); // Add this log
     if (execution) {
-      console.log("Setting execution:", execution);
-      console.log("Opening panel");
       setSelectedExecution(execution);
       setIsSidePanelOpen(true);
     }
   }, []);
 
-  useEffect(() => {
-    console.log("isSidePanelOpen changed:", isSidePanelOpen);
-    console.log("selectedExecution:", selectedExecution);
-  }, [isSidePanelOpen, selectedExecution]);
+  useEffect(() => {}, [isSidePanelOpen, selectedExecution]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);

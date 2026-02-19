@@ -38,11 +38,9 @@ export const useCreateIntegration = () => {
 
   return useMutation({
     mutationFn: (data: IntegrationFormData) => {
-      console.log("[useCreateIntegration] Starting mutation with data:", data);
       return integrationsController
         .createIntegration(data)
         .then((result) => {
-          console.log("[useCreateIntegration] Mutation completed successfully:", result);
           return result;
         })
         .catch((error) => {
@@ -51,7 +49,6 @@ export const useCreateIntegration = () => {
         });
     },
     onSuccess: () => {
-      console.log("[useCreateIntegration] Running onSuccess callback");
       queryClient.invalidateQueries({
         queryKey: INTEGRATIONS_QUERY_KEYS.list(),
       });

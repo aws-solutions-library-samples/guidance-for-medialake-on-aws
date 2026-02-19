@@ -76,7 +76,6 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         setFlags(transformedFlags);
         setIsLoading(false);
-        console.log("FeatureFlagsContext: Successfully loaded feature flags");
         return; // Success, exit the retry loop
       } catch (err) {
         retries++;

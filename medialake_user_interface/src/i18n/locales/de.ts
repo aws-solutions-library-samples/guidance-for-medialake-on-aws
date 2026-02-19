@@ -371,7 +371,7 @@ export default {
     },
     bar: {
       label: "Suchen",
-      placeholder: "Suchen (z.B. Sonnenuntergang type:image)",
+      placeholder: "Suchen (z.B. Sonnenuntergang)",
       placeholderSemantic: "Suchen (z.B. ein friedlicher Ort)",
       helperText:
         "Verwenden Sie Schlüsselwörter wie type:, format:, size:, date:, metadata: zum Filtern",
@@ -917,6 +917,7 @@ export default {
     clickToEdit: "Klicken zum Bearbeiten",
     downloadVersion: "Diese Version herunterladen",
     resetMarker: "Markierung auf Originalposition zurücksetzen",
+    addMarker: "Markierung hinzufügen",
     postComment: "Kommentar veröffentlichen",
     runPipeline: "Dieses Pipeline auf dem aktuellen Asset ausführen",
     browsePipelines: "Alle verfügbaren Pipelines durchsuchen",

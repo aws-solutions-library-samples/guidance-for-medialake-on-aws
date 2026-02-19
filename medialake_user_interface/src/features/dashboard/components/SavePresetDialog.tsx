@@ -92,7 +92,6 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       return;
     }
 
-    console.log("[SavePresetDialog] Starting save...");
     try {
       const result = await createPresetMutation.mutateAsync({
         name: name.trim(),
@@ -101,15 +100,12 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
         layouts: layout.layouts,
       });
 
-      console.log("[SavePresetDialog] Preset created:", result);
-
       // Set the newly created preset as active
       setActivePreset(result.presetId, result.name);
 
       // Clear pending changes since layout is now saved
       setHasPendingChanges(false);
 
-      console.log("[SavePresetDialog] Closing dialog...");
       // Close the dialog
       onClose();
     } catch (error) {

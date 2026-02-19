@@ -414,20 +414,16 @@ export function AssetTable<T>({
                             onMouseDown={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log("💾 AssetTable Save mousedown");
                               // Set flag to prevent blur from canceling
                               preventCommitRef.current = true;
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              console.log("💾 AssetTable Save clicked");
-                              console.log("💾 AssetTable commitRef.current:", commitRef.current);
                               // Reset the prevent flag
                               preventCommitRef.current = false;
                               // Call the commit function directly via ref
                               if (commitRef.current) {
-                                console.log("💾 AssetTable calling commitRef.current()");
                                 commitRef.current();
                               } else {
                                 console.error("💾 AssetTable commitRef.current is null!");
@@ -440,7 +436,6 @@ export function AssetTable<T>({
                             size="small"
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              console.log("🚫 AssetTable Cancel clicked");
                               // Set flag to prevent InlineTextEditor commit from being called
                               // Use onMouseDown instead of onClick to set the flag before onBlur
                               preventCommitRef.current = true;

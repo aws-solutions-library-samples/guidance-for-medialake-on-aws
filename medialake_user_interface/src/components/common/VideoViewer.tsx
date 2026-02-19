@@ -130,7 +130,6 @@ const useOmakasePlayer = (
         zoomWheelEnabled: false,
       })
       .subscribe((timelineApi) => {
-        console.log("Timeline created");
         const scrubberLane = timelineApi.getScrubberLane();
         scrubberLane.style = { ...SCRUBBER_LANE_STYLE_DARK };
 
@@ -143,46 +142,36 @@ const useOmakasePlayer = (
         .loadVideo(videoSrc, protocol === "audio" ? { protocol: "audio" as const } : undefined)
         .subscribe({
           next: (video) => {
-            console.log(`Video loaded. Duration: ${video.duration}`);
             setDuration(video.duration);
           },
           error: (error) => {
             console.error("Error loading video:", error);
             callbacksRef.current.onError?.(error);
           },
-          complete: () => {
-            console.log("Video loading completed");
-          },
+          complete: () => {},
         }),
       player.video.onPlay$.subscribe({
         next: (event) => {
-          console.log(`Video play. Timestamp: ${event.currentTime}`);
           callbacksRef.current.onPlay?.();
         },
       }),
       player.video.onPause$.subscribe({
         next: (event) => {
-          console.log(
-            `Video pause. Timestamp: ${playerRef.current.video.formatToTimecode(event.currentTime)}`
-          );
           callbacksRef.current.onPause?.();
         },
       }),
       player.video.onSeeked$.subscribe({
         next: (event) => {
-          console.log(`Video seeked. Timestamp: ${event.currentTime}`);
           callbacksRef.current.onSeek?.(event.currentTime);
         },
       }),
       player.video.onBuffering$.subscribe({
         next: () => {
-          console.log("Video buffering");
           callbacksRef.current.onBuffering?.();
         },
       }),
       player.video.onEnded$.subscribe({
         next: () => {
-          console.log("Video ended");
           callbacksRef.current.onEnded?.();
         },
       }),
@@ -194,7 +183,6 @@ const useOmakasePlayer = (
       player.video.onVolumeChange$.subscribe({
         next: (event) => {
           const newVolume = Math.round(event.volume * 100);
-          console.log(`Volume changed: ${newVolume}`);
           setPlayerVolume(event.volume);
           callbacksRef.current.onVolumeChange?.(newVolume);
         },
@@ -218,18 +206,13 @@ const useOmakasePlayer = (
     };
 
     const markerLane1 = (retryCount = 0) => {
-      const maxRetries = 3;
-      const retryDelay = 1000; // 1 second
+      const maxRetries = 10;
+      const retryDelay = 200; // 200ms fast retry
 
       try {
         if (!player.timeline) {
           console.warn("Timeline not available for marker lane creation");
           if (retryCount < maxRetries) {
-            console.log(
-              `Retrying marker lane creation in ${retryDelay}ms (attempt ${
-                retryCount + 1
-              }/${maxRetries})`
-            );
             retryTimeoutRef.current = setTimeout(() => {
               markerLane1(retryCount + 1);
             }, retryDelay);
@@ -245,18 +228,11 @@ const useOmakasePlayer = (
         });
         const lane = player.timeline.addTimelineLane(markerLane);
         markerLaneRef.current = lane;
-
-        console.log("Marker lane created successfully");
       } catch (error) {
         console.error("Error creating marker lane:", error);
         markerLaneRef.current = null;
 
         if (retryCount < maxRetries) {
-          console.log(
-            `Retrying marker lane creation in ${retryDelay}ms (attempt ${
-              retryCount + 1
-            }/${maxRetries})`
-          );
           retryTimeoutRef.current = setTimeout(() => {
             markerLane1(retryCount + 1);
           }, retryDelay);
@@ -295,7 +271,6 @@ const useOmakasePlayer = (
   //       typeof playerRef.current.timeline.resize === 'function'
   //     ) {
   //       playerRef.current.timeline.resize();
-  //       console.log('Timeline resized');
   //     }
   //   };
   //   window.addEventListener('resize', handleResize);
@@ -315,7 +290,6 @@ const useOmakasePlayer = (
         if (playerRef.current.timeline.getZoomPercent() !== 100) {
           playerRef.current.timeline.zoomTo(100);
         }
-        console.log("Timeline layout settled via ResizeObserver");
       }
     });
     resizeObserver.observe(timelineContainer);
@@ -362,7 +336,6 @@ const useOmakasePlayer = (
   const removeSafeZone = useCallback((id: string) => {
     playerRef.current?.video.removeSafeZone(id).subscribe({
       next: () => {
-        console.log("Safe zone removed:", id);
         callbacksRef.current.onRemoveSafeZone?.(id);
       },
       error: (error) => {
@@ -374,7 +347,6 @@ const useOmakasePlayer = (
   const clearSafeZones = useCallback(() => {
     playerRef.current?.video.clearSafeZones().subscribe({
       next: () => {
-        console.log("All safe zones cleared");
         callbacksRef.current.onClearSafeZones?.();
       },
       error: (error) => {
@@ -648,7 +620,6 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
       () => ({
         hello: () => {
           if (!markerLaneRef.current) {
-            console.warn("Marker lane is not available yet. Video may still be loading.");
             return null;
           }
 
@@ -664,7 +635,6 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
             markerLaneRef.current.addMarker(periodMarker);
             customCallbacks.onMarkerAdd?.(currentTime);
 
-            console.log("playeref", playerRef);
             return periodMarker;
           } catch (error) {
             console.error("Error adding marker:", error);
@@ -675,7 +645,6 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           if (markerLaneRef.current) {
             return markerLaneRef.current;
           }
-          console.warn("Marker lane is not available yet. Video may still be loading.");
           return null;
         },
         getCurrentTime: () => currentTime,

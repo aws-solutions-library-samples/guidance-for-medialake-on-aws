@@ -369,7 +369,7 @@ export default {
     },
     bar: {
       label: "Pesquisar",
-      placeholder: "Pesquisar (ex: pôr do sol type:image)",
+      placeholder: "Pesquisar (ex: pôr do sol)",
       placeholderSemantic: "Pesquisar (ex: um lugar tranquilo)",
       helperText:
         "Use palavras-chave como type:, format:, size:, date:, metadata: para filtrar resultados",
@@ -955,6 +955,7 @@ export default {
     clickToEdit: "Clique para editar",
     downloadVersion: "Baixar esta versão",
     resetMarker: "Redefinir marcador para posição original",
+    addMarker: "Adicionar marcador",
     postComment: "Postar seu comentário",
     runPipeline: "Executar este pipeline no ativo atual",
     browsePipelines: "Navegar por todos os pipelines disponíveis",

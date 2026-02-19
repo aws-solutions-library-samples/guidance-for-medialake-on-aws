@@ -74,7 +74,6 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     // Make sure to stop propagation to prevent the card click
     event.stopPropagation();
     event.preventDefault();
-    console.log("Menu opened for asset:", asset.InventoryID);
     setMenuAnchorEl(event.currentTarget);
     setSelectedAsset(asset);
   };
@@ -100,11 +99,6 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
         setIsRenameDialogOpen(true);
         break;
       case "share":
-        console.log(
-          "Share:",
-          selectedAsset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-            .Name
-        );
         break;
       case "download":
         try {
@@ -179,7 +173,6 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
     // Make sure to stop propagation to prevent the card click
     event.stopPropagation();
     event.preventDefault();
-    console.log("Delete clicked for asset:", asset.InventoryID);
     setAssetToDelete(asset);
     setIsDeleteModalOpen(true);
   };
@@ -238,32 +231,16 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
   };
 
   const handleNameEditComplete = (asset: T, save: boolean, value?: string) => {
-    console.log(
-      "🔍 handleNameEditComplete - save:",
-      save,
-      "value:",
-      value,
-      "editedName:",
-      editedName
-    );
-    console.log(
-      "🔍 Original name:",
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
-    );
-
     // Use the passed value if available, otherwise fall back to editedName
     const nameToUse = value || editedName;
-    console.log("🔍 Name to use:", nameToUse);
 
     if (
       save &&
       nameToUse !==
         asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name
     ) {
-      console.log("🔍 Names different - calling API");
       handleRenameConfirm(nameToUse);
     } else if (save) {
-      console.log("🔍 Names same - NOT calling API");
     }
 
     setEditingAssetId(null);

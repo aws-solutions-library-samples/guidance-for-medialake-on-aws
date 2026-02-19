@@ -24,7 +24,6 @@ class PermissionTokenCache {
 
     try {
       localStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheData));
-      console.log("Cached permissions until:", new Date(cacheData.expiresAt).toISOString());
     } catch (error) {
       console.error("Failed to cache permissions:", error);
     }
@@ -42,22 +41,16 @@ class PermissionTokenCache {
 
       // Check if cache is expired
       if (Date.now() >= cacheData.expiresAt) {
-        console.log("Permission cache expired");
         this.clear();
         return null;
       }
 
       // Check if token matches
       if (cacheData.token !== currentToken) {
-        console.log("Token mismatch, clearing permission cache");
         this.clear();
         return null;
       }
 
-      console.log(
-        "Using cached permissions, expires at:",
-        new Date(cacheData.expiresAt).toISOString()
-      );
       return {
         user: cacheData.user,
         customPermissions: cacheData.customPermissions,
@@ -75,7 +68,6 @@ class PermissionTokenCache {
   static clear(): void {
     try {
       localStorage.removeItem(this.CACHE_KEY);
-      console.log("Permission cache cleared");
     } catch (error) {
       console.error("Failed to clear permission cache:", error);
     }

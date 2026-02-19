@@ -93,12 +93,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   // Extract user information from JWT token and check global cache
   useEffect(() => {
-    console.log("PermissionProvider: Auth state changed", {
-      isAuthenticated,
-      isInitialized,
-      authLoading,
-    });
-
     if (isAuthenticated && isInitialized) {
       try {
         const token = StorageHelper.getToken();
@@ -106,7 +100,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           // Check global cache first
           const globalCache = globalPermissionCache.getGlobalCache(token);
           if (globalCache) {
-            console.log("Using global cached user and permissions");
             const cachedUser = {
               ...globalCache.user,
               customPermissions: globalCache.customPermissions,
@@ -121,14 +114,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           const tokenParts = token.split(".");
           if (tokenParts.length === 3) {
             const payload = JSON.parse(atob(tokenParts[1]));
-            console.log("=== JWT Token Claims ===");
-            console.log("Full token payload:", JSON.stringify(payload, null, 2));
-            console.log("cognito:groups claim:", payload["cognito:groups"]);
-            console.log("custom:permissions claim:", payload["custom:permissions"]);
-            console.log("cognito:username claim:", payload["cognito:username"]);
-            console.log("sub claim:", payload.sub);
-            console.log("email claim:", payload.email);
-            console.log("======================");
 
             const extractedUser = extractUserFromClaims(payload);
             let customPermissions: string[] = [];
@@ -137,7 +122,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
             if (payload["custom:permissions"]) {
               try {
                 customPermissions = JSON.parse(payload["custom:permissions"]);
-                console.log("Parsed custom permissions:", customPermissions);
                 // Store permissions in user object
                 extractedUser.customPermissions = customPermissions;
               } catch (e) {
@@ -145,14 +129,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
               }
             }
 
-            console.log("Extracted user from claims:", extractedUser);
             setUser(extractedUser);
           } else {
             console.error("Invalid JWT token format");
             setUser(null);
           }
         } else {
-          console.log("No token found");
           setUser(null);
         }
       } catch (error) {
@@ -183,14 +165,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
             if (payload["custom:permissions"]) {
               try {
                 const customPermissions = JSON.parse(payload["custom:permissions"]);
-                console.log("Parsed custom permissions from refreshed token:", customPermissions);
                 extractedUser.customPermissions = customPermissions;
               } catch (e) {
                 console.error("Failed to parse custom:permissions from refreshed token:", e);
               }
             }
 
-            console.log("Extracted user from new token:", extractedUser);
             setUser(extractedUser);
 
             const exp = payload.exp;
@@ -205,7 +185,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
           console.error("Error extracting user from refreshed token:", error);
         }
       } else {
-        console.log("Token was cleared, resetting permissions");
         setUser(null);
         setAbility(createAppAbility());
         globalPermissionCache.clear();
@@ -215,7 +194,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     // Cross-tab changes via StorageEvent
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "medialake-auth-token" && e.newValue !== e.oldValue) {
-        console.log("Token changed in storage (cross-tab), refreshing permissions...");
         handleTokenChange(e.newValue);
       }
     };
@@ -231,7 +209,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem = function (key: string, value: string) {
       originalSetItem(key, value);
       if (key === "medialake-auth-token" && value !== lastKnownToken) {
-        console.log("Token changed in storage (same-tab), refreshing permissions...");
         lastKnownToken = value;
         handleTokenChange(value);
       }
@@ -246,11 +223,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   // Update ability when user changes
   useEffect(() => {
-    console.log("Permission context effect triggered");
-    console.log("isAuthenticated:", isAuthenticated);
-    console.log("user:", user);
-    console.log("user.customPermissions:", (user as any)?.customPermissions);
-
     if (isAuthenticated && isInitialized && user) {
       try {
         const token = StorageHelper.getToken();
@@ -259,7 +231,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
         // Check if we already have this in global cache
         const globalCache = globalPermissionCache.getGlobalCache(token);
         if (globalCache && globalCache.user.id === user.id) {
-          console.log("Using existing global cache for ability");
           setAbility(globalCache.ability);
           setPermissionsInitialized(true);
           return;
@@ -267,7 +238,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
         // Create ability using custom permissions from JWT (or empty if none)
         const newAbility = defineAbilityFor(user, []);
-        console.log("New ability created:", newAbility);
         setAbility(newAbility);
         setPermissionsInitialized(true);
 
@@ -292,7 +262,6 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       }
     } else if (!isAuthenticated) {
       // Reset ability when not authenticated
-      console.log("Resetting ability - not authenticated or no user");
       setAbility(createAppAbility());
       setPermissionsInitialized(false);
     }
