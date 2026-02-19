@@ -176,27 +176,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  // Debug: Check if we're receiving the onAddToCollectionClick prop
-  console.log(
-    "MasterResultsView: onAddToCollectionClick prop is:",
-    typeof onAddToCollectionClick,
-    onAddToCollectionClick
-  );
-
   // Get semantic mode from store
   const semanticMode = useSemanticMode();
 
   // Pre-compute and store the transformed results (expensive operation)
   // This only recalculates when results, isSemantic, semanticMode, or pagination change
   const { transformedResults, adjustedSearchMetadata } = React.useMemo(() => {
-    console.log("🔄 Transforming results to clip mode...", {
-      resultsCount: results.length,
-      isSemantic,
-      semanticMode,
-      page: searchMetadata.page,
-      pageSize: searchMetadata.pageSize,
-    });
-
     const transformation = transformResultsToClipMode(
       results,
       isSemantic,
@@ -228,8 +213,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Function to render card fields - memoized to prevent unnecessary re-renders
   const renderCardField = React.useCallback(
     (fieldId: string, asset: AssetItem): React.ReactNode => {
-      // console.log('Rendering field:', fieldId, 'for asset:', asset.InventoryID);
-
       switch (fieldId) {
         case "name":
           // Use clip display name for clip assets
@@ -256,7 +239,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
           return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
             .FullPath;
         default:
-          console.log("Unknown field ID:", fieldId);
           return "";
       }
     },
@@ -283,7 +265,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       debouncedConfidenceThreshold === undefined ||
       debouncedConfidenceThreshold === 0
     ) {
-      console.log("🔍 No filtering needed - returning all transformed results");
       return transformedResults;
     }
 
@@ -291,25 +272,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       const score = asset.score ?? 1; // Default to 1 if no score (non-semantic results)
       const passesThreshold = score >= debouncedConfidenceThreshold;
 
-      // Debug logging for clips starting at 00:00:00
-      if (isClipAsset(asset) && asset.clipData.start_timecode === "00:00:00:00") {
-        console.log(`🔍 Confidence filtering clip starting at 00:00:00:00:`, {
-          assetId: asset.InventoryID,
-          score,
-          threshold: debouncedConfidenceThreshold,
-          passesThreshold,
-        });
-      }
-
       return passesThreshold;
     });
 
     const endTime = performance.now();
-    console.log(`🔍 Confidence filtering completed in ${(endTime - startTime).toFixed(2)}ms`, {
-      originalCount: transformedResults.length,
-      filteredCount: filtered.length,
-      threshold: debouncedConfidenceThreshold,
-    });
 
     return filtered;
   }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);

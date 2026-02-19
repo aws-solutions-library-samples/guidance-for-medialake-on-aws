@@ -26,12 +26,6 @@ export function PermissionGuard({
 
   // Show loading state if authentication or permissions are still loading/initializing
   if (authLoading || !isInitialized || loading) {
-    console.log("PermissionGuard: Showing loading state", {
-      authLoading,
-      isInitialized,
-      permissionLoading: loading,
-      currentPath: location.pathname,
-    });
     return (
       <Box
         sx={{
@@ -53,39 +47,23 @@ export function PermissionGuard({
 
   // If not authenticated after initialization, redirect to sign-in
   if (isInitialized && !isAuthenticated) {
-    console.log("PermissionGuard: User not authenticated, redirecting to sign-in");
     return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 
   // Check if the user has permission
-  console.log("🔒 PermissionGuard: Starting permission check for route:", location.pathname);
-  console.log("🔒 Required permission:", { action, subject, field });
-  console.log("🔒 Auth state:", {
-    isAuthenticated,
-    isInitialized,
-    authLoading,
-  });
-  console.log("🔒 Permission loading:", loading);
-
   const allowed = can(action, subject, field);
-  console.log("🔒 PermissionGuard: Final permission result:", allowed);
 
   // If allowed, render the children
   if (allowed) {
-    console.log("🔒 PermissionGuard: Access GRANTED for", location.pathname);
     return <>{children}</>;
   }
 
   // If fallback is provided, render it
   if (fallback) {
-    console.log("🔒 PermissionGuard: Using fallback component for", location.pathname);
     return <>{fallback}</>;
   }
 
   // Otherwise, redirect to the login page or access denied page
-  console.log("🔒 PermissionGuard: Access DENIED for", location.pathname);
-  console.log("🔒 Required permission was:", { action, subject, field });
-  console.log("🔒 Redirecting to /access-denied");
   return <Navigate to="/access-denied" state={{ from: location }} replace />;
 }
 
@@ -123,13 +101,6 @@ export function RoutePermissionGuard({
   element: React.ReactNode;
 }) {
   const location = useLocation();
-
-  console.log(
-    "🛡️  RoutePermissionGuard: Protecting route",
-    location.pathname,
-    "with permission:",
-    permission
-  );
 
   return (
     <PermissionGuard

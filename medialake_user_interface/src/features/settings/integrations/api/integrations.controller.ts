@@ -56,12 +56,9 @@ export const useGetIntegration = (id: string) => {
 export const useCreateIntegration = () => {
   return useMutation({
     mutationFn: (data: IntegrationFormData) => {
-      console.log("[useCreateIntegration] Starting mutation with form data:", data);
       const dto = transformFormDataToDto(data);
-      console.log("[useCreateIntegration] Transformed to DTO:", dto);
       return IntegrationsService.createIntegration(dto)
         .then((result) => {
-          console.log("[useCreateIntegration] Mutation completed successfully:", result);
           return result;
         })
         .catch((error) => {
@@ -70,7 +67,6 @@ export const useCreateIntegration = () => {
         });
     },
     onSuccess: () => {
-      console.log("[useCreateIntegration] Running onSuccess callback");
       queryClient.invalidateQueries({
         queryKey: INTEGRATIONS_QUERY_KEYS.list(),
       });

@@ -24,7 +24,6 @@ export function getPermissionDebugInfo(): PermissionDebugInfo {
     const token = StorageHelper.getToken();
 
     if (!token) {
-      console.log("Debug: No token found in storage");
       return info;
     }
 
@@ -65,21 +64,10 @@ export function getPermissionDebugInfo(): PermissionDebugInfo {
 export function logPermissionDebugInfo(): void {
   const info = getPermissionDebugInfo();
 
-  console.log("=== Permission Debug Info ===");
-  console.log("Has token:", info.hasToken);
-
   if (info.hasToken) {
-    console.log("Token expired:", info.tokenExpired);
     if (info.timeUntilExpiry !== undefined) {
-      console.log("Time until expiry (seconds):", info.timeUntilExpiry);
-      console.log("Time until expiry (minutes):", Math.round(info.timeUntilExpiry / 60));
     }
-    console.log("User groups:", info.userGroups);
-    console.log("Custom permissions:", info.customPermissions);
   }
-
-  console.log("Current time (unix):", info.currentTime);
-  console.log("=============================");
 }
 
 /**

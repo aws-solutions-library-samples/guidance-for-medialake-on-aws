@@ -369,7 +369,7 @@ export default {
     },
     bar: {
       label: "खोजें",
-      placeholder: "खोजें (उदा: sunset type:image)",
+      placeholder: "खोजें (उदा: sunset)",
       placeholderSemantic: "खोजें (उदा: एक शांत जगह)",
       helperText:
         "परिणाम फ़िल्टर करने के लिए type:, format:, size:, date:, metadata: जैसे कीवर्ड का उपयोग करें",
@@ -910,6 +910,7 @@ export default {
     clickToEdit: "संपादित करने के लिए क्लिक करें",
     downloadVersion: "इस संस्करण को डाउनलोड करें",
     resetMarker: "मार्कर को मूल स्थिति में रीसेट करें",
+    addMarker: "मार्कर जोड़ें",
     postComment: "अपनी टिप्पणी पोस्ट करें",
     runPipeline: "वर्तमान एसेट पर यह पाइपलाइन चलाएं",
     browsePipelines: "सभी उपलब्ध पाइपलाइन ब्राउज़ करें",

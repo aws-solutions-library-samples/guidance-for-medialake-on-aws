@@ -206,13 +206,11 @@ const SearchPageContainer: React.FC = () => {
       typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value;
 
     // Future implementation: use newFields with field actions in the store
-    console.log("Fields changed:", newFields);
   };
 
   // Handle Add to Collection click
   const handleAddToCollectionClick = useCallback(
     (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-      console.log("SearchPageContainer: Add to Collection clicked!", asset);
       event.stopPropagation();
       setSelectedAssetForCollection(asset);
       setAddToCollectionModalOpen(true);

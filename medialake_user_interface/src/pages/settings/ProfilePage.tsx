@@ -55,7 +55,6 @@ const ProfilePage: React.FC = () => {
       localStorage.getItem("i18next");
 
     if (savedLanguage) {
-      console.log("Loading saved language:", savedLanguage);
       i18n.changeLanguage(savedLanguage);
     }
   }, [i18n]);
@@ -75,7 +74,6 @@ const ProfilePage: React.FC = () => {
   const { data: userProfile, isLoading, error } = useGetUser(userId || "");
 
   // Debug logging to see the actual structure of userProfile
-  console.log("User Profile Data Structure:", JSON.stringify(userProfile, null, 2));
 
   if (isLoading) {
     return (
@@ -252,7 +250,6 @@ const ProfilePage: React.FC = () => {
                           }}
                           onChange={(e: SelectChangeEvent) => {
                             const newLanguage = e.target.value;
-                            console.log("Changing language to:", newLanguage);
 
                             // Save language in multiple places to ensure it persists
                             localStorage.setItem("userLanguage", newLanguage);
@@ -264,12 +261,6 @@ const ProfilePage: React.FC = () => {
 
                             // Log for debugging
                             const isRtlLanguage = ["ar", "he"].includes(newLanguage);
-                            console.log(
-                              "Language changed to:",
-                              newLanguage,
-                              "isRTL:",
-                              isRtlLanguage
-                            );
                           }}
                         >
                           <MenuItem

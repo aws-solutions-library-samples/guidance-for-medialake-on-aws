@@ -93,10 +93,6 @@ const AuthPage = () => {
                   <Button
                     key={provider.identity_provider_name}
                     onClick={() => {
-                      console.log(
-                        "Initiating SAML login with provider:",
-                        provider.identity_provider_name
-                      );
                       signInWithRedirect({
                         provider: { custom: provider.identity_provider_name },
                       }).catch((error) => {

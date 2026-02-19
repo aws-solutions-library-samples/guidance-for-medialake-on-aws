@@ -37,9 +37,7 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
   const { t } = useTranslation();
   const isConfirmDisabled = confirmationText !== "DELETE" || isLoading;
 
-  useEffect(() => {
-    console.log("BulkDeleteDialog - open prop changed:", open, "selectedCount:", selectedCount);
-  }, [open, selectedCount]);
+  useEffect(() => {}, [open, selectedCount]);
 
   return (
     <Dialog

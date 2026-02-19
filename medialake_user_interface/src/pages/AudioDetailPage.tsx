@@ -300,11 +300,8 @@ const RelatedItemsTab: React.FC<{
   isLoading: boolean;
   onLoadMore: () => void;
 }> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
-  console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
-
   const items = useMemo(() => {
     if (!relatedVersionsData?.data?.results) {
-      console.log("No results found in relatedVersionsData");
       return [];
     }
 
@@ -321,23 +318,19 @@ const RelatedItemsTab: React.FC<{
         result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
-    console.log("Mapped items:", mappedItems);
     return mappedItems;
   }, [relatedVersionsData]);
 
   const hasMore = useMemo(() => {
     if (!relatedVersionsData?.data?.searchMetadata) {
-      console.log("No searchMetadata found for hasMore calculation");
       return false;
     }
 
     const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     const hasMoreItems = totalResults > page * pageSize;
-    console.log("Has more items:", hasMoreItems);
     return hasMoreItems;
   }, [relatedVersionsData]);
 
-  console.log("Rendering RelatedItemsView with items:", items);
   return (
     <RelatedItemsView
       items={items}
@@ -450,7 +443,6 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         audioViewerRef.current.getCurrentTime();
         // If we can get current time, audio is ready
         audioViewerRef.current.seek(startTime!);
-        console.log(`Seeked to clip start time: ${startTime}s for audio asset ${id}`);
         // Success - clear any pending timeouts
         if (seekTimeoutRef.current) {
           clearTimeout(seekTimeoutRef.current);

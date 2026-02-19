@@ -8,13 +8,11 @@ import type {
 
 export const IntegrationsService = {
   createIntegration: async (data: CreateIntegrationDto): Promise<IntegrationsResponse> => {
-    console.log("[IntegrationsService] Making create integration API call with data:", data);
     try {
       const response = await apiClient.post<IntegrationsResponse>(
         INTEGRATIONS_API.endpoints.CREATE_INTEGRATION,
         data
       );
-      console.log("[IntegrationsService] API call successful:", response.data);
       return response.data;
     } catch (error) {
       console.error("[IntegrationsService] API call failed:", error);

@@ -15,7 +15,6 @@ export const useUserPool = () => {
         ClientId: config.Auth.Cognito.userPoolClientId,
       });
       setUserPool(pool);
-      console.log("User Pool created successfully");
     } else {
       console.error("AWS Config is missing required User Pool information");
     }

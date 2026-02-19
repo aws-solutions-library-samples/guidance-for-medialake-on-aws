@@ -69,14 +69,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       const nodeId =
         config.nodeId || `node-${editingIntegration.type}-api` || editingIntegration.type || "";
 
-      console.log("[IntegrationForm] Edit mode - extracting data:", {
-        editingIntegration,
-        config,
-        authType,
-        credentials,
-        constructedNodeId: nodeId,
-      });
-
       return {
         nodeId: nodeId,
         description: editingIntegration.description || config.description || "",
@@ -150,13 +142,11 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       try {
         // If onSubmit prop is provided, use it (new approach)
         if (onSubmit) {
-          console.log("Using new onSubmit approach with data:", data);
           await onSubmit(data);
           return;
         }
 
         // Otherwise, fall back to old approach for backward compatibility
-        console.log("Using legacy onSubmitSuccess approach with data:", data);
 
         // Close the form immediately when the user clicks the button
         onClose();
@@ -164,21 +154,16 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
         let result;
 
         if (isEditMode && editingIntegration) {
-          console.log("Starting integration update with data:", data);
           result = await updateIntegration.mutateAsync({
             id: editingIntegration.id,
             data,
           });
-          console.log("Integration updated successfully:", result);
         } else {
-          console.log("Starting integration creation with data:", data);
           result = await createIntegration.mutateAsync(data);
-          console.log("Integration created successfully:", result);
         }
 
         // Notify parent component of successful submission if callback exists
         if (onSubmitSuccess) {
-          console.log("Calling onSubmitSuccess with result:", result);
           // Convert the result to match IntegrationFormResult type
           // The result might be a single Integration object or an IntegrationsResponse
           const formResult: IntegrationFormResult = {
@@ -193,7 +178,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
             type: data.nodeId.replace("node-", "").replace("-api", ""),
             description: data.description,
           };
-          console.log("Created form result for callback:", formResult);
 
           // Call onSubmitSuccess after API call completes
           onSubmitSuccess(formResult);
@@ -274,14 +258,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       // Try to construct nodeId from the integration type
       const nodeId =
         config.nodeId || `node-${editingIntegration.type}-api` || editingIntegration.type || "";
-
-      console.log("[IntegrationForm] Initializing edit mode:", {
-        editingIntegration,
-        config,
-        authType,
-        credentials,
-        constructedNodeId: nodeId,
-      });
 
       setSelectedNodeId(nodeId);
       form.reset({

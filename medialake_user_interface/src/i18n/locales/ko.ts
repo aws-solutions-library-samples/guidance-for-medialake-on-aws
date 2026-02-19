@@ -364,7 +364,7 @@ export default {
     },
     bar: {
       label: "검색",
-      placeholder: "검색 (예: sunset type:image)",
+      placeholder: "검색 (예: sunset)",
       placeholderSemantic: "검색 (예: 평화로운 장소)",
       helperText: "type:, format:, size:, date:, metadata: 등의 키워드를 사용하여 결과 필터링",
     },
@@ -904,6 +904,7 @@ export default {
     clickToEdit: "클릭하여 편집",
     downloadVersion: "이 버전 다운로드",
     resetMarker: "마커를 원래 위치로 재설정",
+    addMarker: "마커 추가",
     postComment: "댓글 게시",
     runPipeline: "현재 자산에서 이 파이프라인 실행",
     browsePipelines: "사용 가능한 모든 파이프라인 찾아보기",

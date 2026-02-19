@@ -143,6 +143,11 @@ export const useSearch = (query: string, params?: SearchParams) => {
 
         return response.data;
       } catch (error) {
+        // Silently ignore canceled requests (expected during debounce/re-renders)
+        if (axios.isCancel(error)) {
+          throw error;
+        }
+
         logger.error("Search error:", error);
 
         // Handle axios errors

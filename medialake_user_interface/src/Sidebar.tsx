@@ -256,16 +256,10 @@ function Sidebar() {
     // 1. We're already on this exact path, or
     // 2. We're on a sub-route of this path (except for root path '/')
     if (location.pathname === path || (path !== "/" && location.pathname.startsWith(path))) {
-      console.log(
-        `${t("app.navigation.preventedDuplicate", "Prevented duplicate navigation to")} ${path}`
-      );
       return;
     }
 
     // Log navigation for debugging
-    console.log(
-      `${t("app.navigation.navigating", "Navigating from")} ${location.pathname} to ${path}`
-    );
     navigate(path);
   };
 

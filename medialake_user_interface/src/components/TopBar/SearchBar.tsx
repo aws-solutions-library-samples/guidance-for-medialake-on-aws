@@ -18,9 +18,8 @@ Search Tips:
 • Use metadata: to filter by metadata (e.g., metadata:resolution:1080p)
 
 Examples:
-• "sunset type:image format:jpg"
-• "presentation type:video size:>1GB"
-• "metadata:resolution:1080p type:video"
+• "sunset"
+• "presentation"
 `;
 
 const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, onSearchChange, onSearchSubmit }) => {

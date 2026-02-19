@@ -139,7 +139,6 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   // Automatically navigate to last valid page when page is out of range
   React.useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
-      console.log(`Page ${page} is out of range. Navigating to last valid page: ${totalPages}`);
       handlePageChange(totalPages);
     }
   }, [totalPages, page]);
@@ -170,18 +169,14 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   // Handle favorite toggle
   const handleFavoriteToggle = (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
-    console.log("handleFavoriteToggle called with asset:", asset.InventoryID);
 
     const assetId = asset.InventoryID;
     const isFavorited = isAssetFavorited(assetId);
-    console.log("Current favorite status:", isFavorited);
 
     try {
       if (isFavorited) {
-        console.log("Removing favorite:", assetId);
         removeFavorite({ itemId: assetId, itemType: "ASSET" });
       } else {
-        console.log("Adding favorite:", assetId);
         addFavorite({
           itemId: assetId,
           itemType: "ASSET",

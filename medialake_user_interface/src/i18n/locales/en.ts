@@ -365,7 +365,7 @@ export default {
     },
     bar: {
       label: "Search",
-      placeholder: "Search (e.g., sunset type:image)",
+      placeholder: "Search (e.g., sunset)",
       placeholderSemantic: "Search (e.g., a peaceful place)",
       helperText: "Use keywords like type:, format:, size:, date:, metadata: to filter results",
     },
@@ -905,6 +905,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "Add Marker",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",

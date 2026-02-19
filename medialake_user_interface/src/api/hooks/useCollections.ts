@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import axios from "axios";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { QUERY_KEYS } from "@/api/queryKeys";
@@ -283,6 +284,10 @@ export const useGetCollectionsSharedWithMe = () => {
         );
         return response.data;
       } catch (error) {
+        // Silently ignore canceled requests (expected during auth redirects/re-renders)
+        if (axios.isCancel(error)) {
+          throw error;
+        }
         logger.error("Fetch collections shared with me error:", error);
         showError("Failed to fetch shared collections");
         throw error;
@@ -305,6 +310,9 @@ export const useGetCollectionsSharedByMe = () => {
         );
         return response.data;
       } catch (error) {
+        if (axios.isCancel(error)) {
+          throw error;
+        }
         logger.error("Fetch collections shared by me error:", error);
         showError("Failed to fetch collections you've shared");
         throw error;
@@ -689,6 +697,10 @@ export const useGetCollectionTypes = (filters?: Record<string, any>) => {
         );
         return response.data;
       } catch (error) {
+        // Silently ignore canceled requests (expected during auth redirects/re-renders)
+        if (axios.isCancel(error)) {
+          throw error;
+        }
         logger.error("Fetch collection types error:", error);
         showError("Failed to fetch collection types");
         throw error;

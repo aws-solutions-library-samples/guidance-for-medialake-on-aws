@@ -677,6 +677,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         onClose={onClose}
         maxWidth="sm"
         fullWidth
+        // When the ApiStatusModal (a nested Dialog) is visible, disable the
+        // focus-enforcement and aria-hidden management of this parent Dialog
+        // so the browser doesn't warn about aria-hidden on a focused element.
+        disableEnforceFocus={apiStatus.status !== "idle"}
         PaperProps={{
           sx: {
             borderRadius: "12px",

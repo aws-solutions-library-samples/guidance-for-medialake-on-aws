@@ -367,7 +367,7 @@ export default {
     },
     bar: {
       label: "検索",
-      placeholder: "検索（例：sunset type:image）",
+      placeholder: "検索（例：sunset）",
       placeholderSemantic: "検索（例：穏やかな場所）",
       helperText:
         "type:、format:、size:、date:、metadata:などのキーワードを使用して結果をフィルタリング",
@@ -1043,6 +1043,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "マーカーを追加",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",

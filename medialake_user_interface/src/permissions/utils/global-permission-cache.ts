@@ -76,10 +76,6 @@ class GlobalPermissionCache {
     try {
       // Store in localStorage for persistence across page reloads
       localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(cacheData));
-      console.log(
-        "Global permission cache updated, expires at:",
-        new Date(cacheData.expiresAt).toISOString()
-      );
     } catch (error) {
       console.error("Failed to store global permission cache:", error);
     }
@@ -174,7 +170,6 @@ class GlobalPermissionCache {
     try {
       localStorage.removeItem(GlobalPermissionCache.CACHE_KEY);
       localStorage.removeItem(GlobalPermissionCache.CHECK_CACHE_KEY);
-      console.log("Global permission cache cleared");
     } catch (error) {
       console.error("Failed to clear global permission cache:", error);
     }
@@ -187,7 +182,6 @@ class GlobalPermissionCache {
     this.checkCache = {};
     try {
       localStorage.removeItem(GlobalPermissionCache.CHECK_CACHE_KEY);
-      console.log("Permission check cache cleared");
     } catch (error) {
       console.error("Failed to clear permission check cache:", error);
     }
@@ -204,7 +198,6 @@ class GlobalPermissionCache {
 
       try {
         localStorage.setItem(GlobalPermissionCache.CACHE_KEY, JSON.stringify(this.memoryCache));
-        console.log("Token updated in global cache");
       } catch (error) {
         console.error("Failed to update token in cache:", error);
       }
@@ -232,13 +225,11 @@ class GlobalPermissionCache {
   private isValidCache(cache: GlobalCacheData, currentToken: string): boolean {
     // Check if cache is expired
     if (Date.now() >= cache.expiresAt) {
-      console.log("Global permission cache expired");
       return false;
     }
 
     // Check if token matches
     if (cache.token !== currentToken) {
-      console.log("Token mismatch in global cache");
       return false;
     }
 

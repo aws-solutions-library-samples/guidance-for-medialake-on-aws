@@ -328,7 +328,6 @@ const SearchPage: React.FC = () => {
   // Handle Add to Collection click
   const handleAddToCollectionClick = useCallback(
     (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-      console.log("SearchPage: Add to Collection clicked!", asset);
       event.stopPropagation();
       setSelectedAssetForCollection(asset);
       setAddToCollectionModalOpen(true);

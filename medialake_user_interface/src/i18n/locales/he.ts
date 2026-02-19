@@ -363,7 +363,7 @@ export default {
     },
     bar: {
       label: "חיפוש",
-      placeholder: "חפש (לדוגמה: sunset type:image)",
+      placeholder: "חפש (לדוגמה: sunset)",
       placeholderSemantic: "חפש (לדוגמה: מקום שליו)",
       helperText: "השתמש במילות מפתח כמו type:, format:, size:, date:, metadata: לסינון תוצאות",
     },
@@ -1037,6 +1037,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "הוסף סמן",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",

@@ -170,11 +170,6 @@ function AssetResultsView<T>({
   const { t } = useTranslation();
 
   // Debug: Check if we're receiving the onAddToCollectionClick prop
-  console.log(
-    "AssetResultsView: onAddToCollectionClick prop is:",
-    typeof onAddToCollectionClick,
-    onAddToCollectionClick
-  );
 
   // Local state for slider value during dragging (to prevent constant re-filtering)
   const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);

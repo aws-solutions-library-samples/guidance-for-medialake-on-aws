@@ -362,7 +362,7 @@ export default {
     },
     bar: {
       label: "搜索",
-      placeholder: "搜索（例如：sunset type:image）",
+      placeholder: "搜索（例如：sunset）",
       placeholderSemantic: "搜索（例如：一个宁静的地方）",
       helperText: "使用关键字如 type:、format:、size:、date:、metadata: 来筛选结果",
     },
@@ -1047,6 +1047,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "添加标记",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",
