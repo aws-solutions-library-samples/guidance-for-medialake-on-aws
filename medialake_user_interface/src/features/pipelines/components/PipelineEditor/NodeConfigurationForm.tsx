@@ -349,7 +349,13 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
               }));
 
               field.options = options;
-              field.type = "select";
+
+              // Use multiselect when schema.multiple is true
+              if (param.schema?.multiple || param.multiple) {
+                field.type = "multiselect";
+              } else {
+                field.type = "select";
+              }
 
               if (field.required) {
                 field.validation = {

@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   useBulkDownload,
   useBatchDelete,
   useUserBatchDeleteJobs,
   useCancelBatchDelete,
 } from "@/api/hooks/useAssets";
+import { PipelinesService } from "@/features/pipelines/api/pipelinesService";
 
 /**
  * Hook for managing asset selection and bulk operations.
@@ -45,10 +47,18 @@ export function useAssetSelection<T>({
   const [isDownloadLoading, setIsDownloadLoading] = useState(false);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isPipelineExecutionLoading, setIsPipelineExecutionLoading] = useState(false);
 
   // Delete dialog state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+
+  // Pipeline execution dialog state
+  const [isPipelineExecutionDialogOpen, setIsPipelineExecutionDialogOpen] = useState(false);
+  const [selectedPipelineForExecution, setSelectedPipelineForExecution] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Modal state for API status
   const [modalState, setModalState] = useState<{
@@ -60,6 +70,7 @@ export function useAssetSelection<T>({
     jobId?: string;
     onCancel?: () => void;
     cancelDisabled?: boolean;
+    link?: { text: string; url: string };
   }>({
     open: false,
     status: "loading",
@@ -68,6 +79,8 @@ export function useAssetSelection<T>({
     progress: undefined,
     jobId: undefined,
   });
+
+  const { t } = useTranslation();
 
   // Hooks
   const bulkDownloadMutation = useBulkDownload();
@@ -549,6 +562,127 @@ export function useAssetSelection<T>({
     // Implement batch share functionality
   }, [selectedAssets]);
 
+  const handleBatchPipelineExecution = useCallback(
+    async (pipelineId: string) => {
+      if (selectedAssets.length === 0) {
+        setModalState({
+          open: true,
+          status: "error",
+          action: t("common.batchOperations.pipelineExecution.failed"),
+          message: t("common.batchOperations.pipelineExecution.noAssetsSelected"),
+        });
+        return;
+      }
+
+      if (isPipelineExecutionLoading) {
+        return;
+      }
+
+      setIsPipelineExecutionLoading(true);
+      setIsPipelineExecutionDialogOpen(false);
+
+      const pipelineName = selectedPipelineForExecution?.name || "";
+
+      setModalState({
+        open: true,
+        status: "loading",
+        action: t("common.batchOperations.pipelineExecution.executing"),
+        message: t("common.batchOperations.pipelineExecution.executingMessage", {
+          count: selectedAssets.length,
+          plural: selectedAssets.length > 1 ? "s" : "",
+        }),
+      });
+
+      try {
+        const assets = selectedAssets.map((asset) => ({
+          inventory_id: asset.inventoryID,
+          params: {},
+        }));
+
+        const response = await PipelinesService.triggerPipeline(pipelineId, assets);
+
+        const { successful_executions, failed_executions, total_assets, message } = response;
+
+        if (successful_executions > 0) {
+          const isFullSuccess = successful_executions === total_assets;
+          const statusMessage = isFullSuccess
+            ? t("common.batchOperations.pipelineExecution.successMessage", {
+                successCount: successful_executions,
+                totalCount: total_assets,
+                plural: total_assets > 1 ? "s" : "",
+              })
+            : t("common.batchOperations.pipelineExecution.partialSuccessMessage", {
+                successCount: successful_executions,
+                totalCount: total_assets,
+                failedCount: failed_executions,
+              });
+
+          setModalState({
+            open: true,
+            status: "success",
+            action: isFullSuccess
+              ? t("common.batchOperations.pipelineExecution.success")
+              : t("common.batchOperations.pipelineExecution.partialSuccess"),
+            message: statusMessage,
+            link: {
+              text: t("common.batchOperations.pipelineExecution.viewExecutions"),
+              url: "/executions",
+            },
+          });
+
+          handleClearSelection();
+
+          if (onDownloadSuccess) {
+            onDownloadSuccess();
+          }
+        } else {
+          throw new Error(message || t("common.batchOperations.pipelineExecution.failedMessage"));
+        }
+      } catch (error: any) {
+        let errorMessage = t("common.batchOperations.pipelineExecution.failedMessage");
+
+        if (error?.response?.status === 404) {
+          errorMessage = t("common.batchOperations.pipelineExecution.pipelineNotFound");
+        } else if (error?.response?.status === 403) {
+          errorMessage = t("common.batchOperations.pipelineExecution.insufficientPermissions");
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+
+        setModalState({
+          open: true,
+          status: "error",
+          action: t("common.batchOperations.pipelineExecution.failed"),
+          message: errorMessage,
+        });
+      } finally {
+        setIsPipelineExecutionLoading(false);
+        setSelectedPipelineForExecution(null);
+      }
+    },
+    [
+      selectedAssets,
+      isPipelineExecutionLoading,
+      handleClearSelection,
+      onDownloadSuccess,
+      selectedPipelineForExecution,
+      t,
+    ]
+  );
+
+  const handleBatchPipelineExecutionRequest = useCallback(
+    (pipelineId: string, pipelineName: string) => {
+      setSelectedPipelineForExecution({ id: pipelineId, name: pipelineName });
+      setIsPipelineExecutionDialogOpen(true);
+    },
+    []
+  );
+
+  const handlePipelineExecutionDialogClose = useCallback(() => {
+    setIsPipelineExecutionDialogOpen(false);
+    setSelectedPipelineForExecution(null);
+  }, []);
+
   const handleModalClose = useCallback(() => {
     setModalState((prev) => ({ ...prev, open: false }));
     // Clear job ID when manually closing
@@ -581,5 +715,13 @@ export function useAssetSelection<T>({
     // Modal state
     modalState,
     handleModalClose,
+    // Pipeline execution
+    handleBatchPipelineExecution,
+    isPipelineExecutionLoading,
+    // Pipeline execution dialog
+    isPipelineExecutionDialogOpen,
+    selectedPipelineForExecution,
+    handleBatchPipelineExecutionRequest,
+    handlePipelineExecutionDialogClose,
   };
 }

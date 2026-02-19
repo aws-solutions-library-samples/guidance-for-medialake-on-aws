@@ -814,6 +814,32 @@ export default {
     subCollections: "subcoleções",
     batchOperations: {
       deleteSelected: "Excluir selecionados",
+      runPipeline: "Executar Pipeline",
+      runPipelineTooltip: "Executar pipeline para os ativos selecionados",
+      noPipelinesAvailable:
+        "Nenhum pipeline manual disponível para os tipos de ativos selecionados",
+      selectPipeline: "Selecione um pipeline para executar",
+      pipelineLoading: "Carregando pipelines...",
+      pipelineExecution: {
+        confirmTitle: "Executar Pipeline",
+        confirmMessage: "Isso executará o pipeline para {{count}} ativo{{plural}} selecionado(s).",
+        confirmInfo:
+          "Cada ativo será processado individualmente. Você pode acompanhar o progresso na página de Execuções.",
+        executing: "Executando Pipeline",
+        executingMessage: "Executando pipeline para {{count}} ativo{{plural}}...",
+        success: "Execução do Pipeline Iniciada",
+        successMessage:
+          "Pipeline iniciado com sucesso para {{successCount}} de {{totalCount}} ativo{{plural}}",
+        partialSuccess: "Execução do Pipeline Parcialmente Iniciada",
+        partialSuccessMessage:
+          "Pipeline iniciado para {{successCount}} de {{totalCount}} ativos ({{failedCount}} falharam)",
+        failed: "Falha na Execução do Pipeline",
+        failedMessage: "Falha ao iniciar a execução do pipeline. Por favor, tente novamente.",
+        viewExecutions: "Ver Execuções",
+        pipelineNotFound: "Pipeline não encontrado",
+        insufficientPermissions: "Você não tem permissão para executar este pipeline",
+        noAssetsSelected: "Nenhum ativo selecionado para execução do pipeline",
+      },
     },
     confirmBulkDelete: "Confirmar exclusão em massa",
     typeDeleteToConfirm: "Digite DELETE para confirmar",
@@ -963,6 +989,7 @@ export default {
       update: "Atualizar",
       create: "Criar",
       copied: "Copiado!",
+      executePipeline: "Executar Pipeline",
     },
     pipelineEditor: {
       triggers: "Acionadores",

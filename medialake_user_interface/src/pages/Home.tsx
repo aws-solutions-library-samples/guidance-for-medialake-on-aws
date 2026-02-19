@@ -30,6 +30,7 @@ import {
 import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
+import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import ApiStatusModal from "../components/ApiStatusModal";
 
 // Inner component that uses the selection context
@@ -178,6 +179,8 @@ const HomeContent: React.FC = () => {
             onBatchShare={assetSelection.handleBatchShare}
             onClearSelection={assetSelection.handleClearSelection}
             onRemoveItem={assetSelection.handleRemoveAsset}
+            onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
+            isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
           />
         </RightSidebar>
 
@@ -204,6 +207,22 @@ const HomeContent: React.FC = () => {
         action={assetSelection.modalState.action}
         message={assetSelection.modalState.message}
         progress={assetSelection.modalState.progress}
+        link={assetSelection.modalState.link}
+      />
+
+      {/* Pipeline Execution Confirmation Dialog */}
+      <PipelineExecutionConfirmDialog
+        open={assetSelection.isPipelineExecutionDialogOpen}
+        onClose={assetSelection.handlePipelineExecutionDialogClose}
+        onConfirm={() =>
+          assetSelection.selectedPipelineForExecution &&
+          assetSelection.handleBatchPipelineExecution(
+            assetSelection.selectedPipelineForExecution.id
+          )
+        }
+        pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}
+        selectedCount={assetSelection.selectedAssets.length}
+        isLoading={assetSelection.isPipelineExecutionLoading}
       />
     </>
   );

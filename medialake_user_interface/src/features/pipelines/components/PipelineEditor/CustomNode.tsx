@@ -529,7 +529,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         </Box>
         {/* Expandable description with see more/less functionality */}
         <ExpandableDescription text={data.description} />
-        {/* Check if we have multiple output types or a single output */}
+        {/* Output handles */}
         {Array.isArray(outputTypes) &&
         outputTypes.length > 0 &&
         typeof outputTypes[0] === "object" &&
@@ -566,8 +566,29 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
               </Box>
             ))}
           </Box>
-        ) : // Single output handle (default behavior)
-        null}
+        ) : // Single output handle for trigger nodes, no handle for others
+        isTriggerNode ? (
+          <Box sx={getHandleContainerStyles(false, currentRotation)}>
+            <Box sx={getHandleItemStyles(currentRotation)}>
+              <Handle
+                type="source"
+                position={outputPos}
+                id="output-default"
+                isConnectable={isConnectable}
+                style={{
+                  background: "#2B6CB0",
+                  width: "12px",
+                  height: "12px",
+                  border: "1px solid #fff",
+                  borderRadius: "5px",
+                  transform: `rotate(${-currentRotation}deg)`,
+                  transformOrigin: "center center",
+                  ...edgeNudge(outputPos),
+                }}
+              />
+            </Box>
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );
