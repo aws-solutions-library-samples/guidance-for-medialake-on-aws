@@ -802,6 +802,30 @@ export default {
     subCollections: "תת-אוספים",
     batchOperations: {
       deleteSelected: "מחק נבחרים",
+      runPipeline: "הפעל צינור",
+      runPipelineTooltip: "הפעל צינור עבור הנכסים שנבחרו",
+      noPipelinesAvailable: "אין צינורות ידניים זמינים עבור סוגי הנכסים שנבחרו",
+      selectPipeline: "בחר צינור להפעלה",
+      pipelineLoading: "טוען צינורות...",
+      pipelineExecution: {
+        confirmTitle: "הפעל צינור",
+        confirmMessage: "פעולה זו תפעיל את הצינור עבור {{count}} נכס{{plural}} שנבחרו.",
+        confirmInfo: "כל נכס יעובד בנפרד. ניתן לעקוב אחר ההתקדמות בדף ההפעלות.",
+        executing: "מפעיל צינור",
+        executingMessage: "מפעיל צינור עבור {{count}} נכס{{plural}}...",
+        success: "הפעלת הצינור החלה",
+        successMessage:
+          "הצינור הופעל בהצלחה עבור {{successCount}} מתוך {{totalCount}} נכס{{plural}}",
+        partialSuccess: "הפעלת הצינור החלה חלקית",
+        partialSuccessMessage:
+          "הצינור הופעל עבור {{successCount}} מתוך {{totalCount}} נכסים ({{failedCount}} נכשלו)",
+        failed: "הפעלת הצינור נכשלה",
+        failedMessage: "לא ניתן להפעיל את הצינור. אנא נסה שוב.",
+        viewExecutions: "צפה בהפעלות",
+        pipelineNotFound: "הצינור לא נמצא",
+        insufficientPermissions: "אין לך הרשאה להפעיל צינור זה",
+        noAssetsSelected: "לא נבחרו נכסים להפעלת הצינור",
+      },
     },
     confirmBulkDelete: "אשר מחיקה המונית",
     typeDeleteToConfirm: "הקלד DELETE לאישור",
@@ -894,6 +918,7 @@ export default {
       update: "עדכן",
       create: "צור",
       copied: "Copied!",
+      executePipeline: "הפעל צינור",
     },
     dialogs: {
       cancel: "ביטול",

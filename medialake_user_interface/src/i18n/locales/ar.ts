@@ -803,6 +803,30 @@ export default {
     subCollections: "مجموعات فرعية",
     batchOperations: {
       deleteSelected: "حذف المحدد",
+      runPipeline: "تشغيل خط الأنابيب",
+      runPipelineTooltip: "تنفيذ خط الأنابيب للأصول المحددة",
+      noPipelinesAvailable: "لا توجد خطوط أنابيب يدوية متاحة لأنواع الأصول المحددة",
+      selectPipeline: "اختر خط أنابيب للتنفيذ",
+      pipelineLoading: "جارٍ تحميل خطوط الأنابيب...",
+      pipelineExecution: {
+        confirmTitle: "تنفيذ خط الأنابيب",
+        confirmMessage: "سيؤدي هذا إلى تنفيذ خط الأنابيب لـ {{count}} أصل محدد{{plural}}.",
+        confirmInfo: "سيتم معالجة كل أصل على حدة. يمكنك تتبع التقدم في صفحة التنفيذات.",
+        executing: "جارٍ تنفيذ خط الأنابيب",
+        executingMessage: "جارٍ تنفيذ خط الأنابيب لـ {{count}} أصل{{plural}}...",
+        success: "بدأ تنفيذ خط الأنابيب",
+        successMessage:
+          "تم بدء خط الأنابيب بنجاح لـ {{successCount}} من {{totalCount}} أصل{{plural}}",
+        partialSuccess: "بدأ تنفيذ خط الأنابيب جزئياً",
+        partialSuccessMessage:
+          "تم بدء خط الأنابيب لـ {{successCount}} من {{totalCount}} أصل ({{failedCount}} فشل)",
+        failed: "فشل تنفيذ خط الأنابيب",
+        failedMessage: "فشل في بدء تنفيذ خط الأنابيب. يرجى المحاولة مرة أخرى.",
+        viewExecutions: "عرض التنفيذات",
+        pipelineNotFound: "خط الأنابيب غير موجود",
+        insufficientPermissions: "ليس لديك إذن لتنفيذ خط الأنابيب هذا",
+        noAssetsSelected: "لم يتم تحديد أصول لتنفيذ خط الأنابيب",
+      },
     },
     confirmBulkDelete: "تأكيد الحذف الجماعي",
     typeDeleteToConfirm: "اكتب DELETE للتأكيد",
@@ -913,6 +937,7 @@ export default {
       update: "تحديث",
       create: "إنشاء",
       copied: "Copied!",
+      executePipeline: "تنفيذ خط الأنابيب",
     },
     views: {
       cardView: "عرض البطاقة",

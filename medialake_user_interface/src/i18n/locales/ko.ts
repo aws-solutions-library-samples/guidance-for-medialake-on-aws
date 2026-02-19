@@ -803,6 +803,31 @@ export default {
     subCollections: "하위 컬렉션",
     batchOperations: {
       deleteSelected: "선택 항목 삭제",
+      runPipeline: "파이프라인 실행",
+      runPipelineTooltip: "선택한 자산에 대해 파이프라인 실행",
+      noPipelinesAvailable: "선택한 자산 유형에 사용 가능한 수동 파이프라인이 없습니다",
+      selectPipeline: "실행할 파이프라인을 선택하세요",
+      pipelineLoading: "파이프라인 로딩 중...",
+      pipelineExecution: {
+        confirmTitle: "파이프라인 실행",
+        confirmMessage: "선택한 {{count}}개의 자산{{plural}}에 대해 파이프라인을 실행합니다.",
+        confirmInfo:
+          "각 자산은 개별적으로 처리됩니다. 실행 페이지에서 진행 상황을 추적할 수 있습니다.",
+        executing: "파이프라인 실행 중",
+        executingMessage: "{{count}}개의 자산{{plural}}에 대해 파이프라인 실행 중...",
+        success: "파이프라인 실행 시작됨",
+        successMessage:
+          "{{totalCount}}개 중 {{successCount}}개의 자산{{plural}}에 대해 파이프라인이 성공적으로 시작되었습니다",
+        partialSuccess: "파이프라인 실행 부분적으로 시작됨",
+        partialSuccessMessage:
+          "{{totalCount}}개 중 {{successCount}}개의 자산에 대해 파이프라인이 시작되었습니다 ({{failedCount}}개 실패)",
+        failed: "파이프라인 실행 실패",
+        failedMessage: "파이프라인 실행을 시작하지 못했습니다. 다시 시도해 주세요.",
+        viewExecutions: "실행 보기",
+        pipelineNotFound: "파이프라인을 찾을 수 없습니다",
+        insufficientPermissions: "이 파이프라인을 실행할 권한이 없습니다",
+        noAssetsSelected: "파이프라인 실행을 위해 선택된 자산이 없습니다",
+      },
     },
     confirmBulkDelete: "일괄 삭제 확인",
     typeDeleteToConfirm: "확인하려면 DELETE를 입력하세요",
@@ -913,6 +938,7 @@ export default {
       update: "업데이트",
       create: "생성",
       copied: "Copied!",
+      executePipeline: "파이프라인 실행",
     },
     views: {
       cardView: "카드 보기",

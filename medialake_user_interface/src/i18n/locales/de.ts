@@ -815,6 +815,32 @@ export default {
     subCollections: "Untersammlungen",
     batchOperations: {
       deleteSelected: "Ausgewählte löschen",
+      runPipeline: "Pipeline ausführen",
+      runPipelineTooltip: "Pipeline für ausgewählte Assets ausführen",
+      noPipelinesAvailable: "Keine manuellen Pipelines für ausgewählte Asset-Typen verfügbar",
+      selectPipeline: "Pipeline zur Ausführung auswählen",
+      pipelineLoading: "Pipelines werden geladen...",
+      pipelineExecution: {
+        confirmTitle: "Pipeline ausführen",
+        confirmMessage: "Dies führt die Pipeline für {{count}} ausgewählte(s) Asset{{plural}} aus.",
+        confirmInfo:
+          "Jedes Asset wird einzeln verarbeitet. Sie können den Fortschritt auf der Ausführungsseite verfolgen.",
+        executing: "Pipeline wird ausgeführt",
+        executingMessage: "Pipeline wird für {{count}} Asset{{plural}} ausgeführt...",
+        success: "Pipeline-Ausführung gestartet",
+        successMessage:
+          "Pipeline erfolgreich für {{successCount}} von {{totalCount}} Asset{{plural}} gestartet",
+        partialSuccess: "Pipeline-Ausführung teilweise gestartet",
+        partialSuccessMessage:
+          "Pipeline für {{successCount}} von {{totalCount}} Assets gestartet ({{failedCount}} fehlgeschlagen)",
+        failed: "Pipeline-Ausführung fehlgeschlagen",
+        failedMessage:
+          "Pipeline-Ausführung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
+        viewExecutions: "Ausführungen anzeigen",
+        pipelineNotFound: "Pipeline nicht gefunden",
+        insufficientPermissions: "Sie haben keine Berechtigung, diese Pipeline auszuführen",
+        noAssetsSelected: "Keine Assets für die Pipeline-Ausführung ausgewählt",
+      },
     },
     confirmBulkDelete: "Massenlöschung bestätigen",
     typeDeleteToConfirm: "Geben Sie DELETE ein, um zu bestätigen",
@@ -924,6 +950,7 @@ export default {
       update: "Aktualisieren",
       create: "Erstellen",
       copied: "Copied!",
+      executePipeline: "Pipeline ausführen",
     },
     views: {
       cardView: "Kartenansicht",

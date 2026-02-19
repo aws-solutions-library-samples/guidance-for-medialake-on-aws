@@ -19,6 +19,9 @@ interface TabbedSidebarProps {
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
   filterComponent?: React.ReactNode;
+  onBatchPipelineExecution?: (pipelineId: string) => void;
+  onBatchPipelineExecutionRequest?: (pipelineId: string, pipelineName: string) => void;
+  isPipelineExecutionLoading?: boolean;
 }
 
 const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
@@ -31,6 +34,9 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   onClearSelection,
   onRemoveItem,
   filterComponent,
+  onBatchPipelineExecution,
+  onBatchPipelineExecutionRequest,
+  isPipelineExecutionLoading,
 }) => {
   const { t } = useTranslation();
   const { setHasSelectedItems, closeSidebar } = useRightSidebar();
@@ -83,8 +89,12 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
             variant="fullWidth"
             sx={{
               "& .MuiTab-root": {
-                py: 1.5,
+                py: 1.25,
                 fontWeight: 500,
+                fontSize: "0.8125rem",
+                textTransform: "none",
+                letterSpacing: "0.01em",
+                minHeight: 42,
               },
               "& .Mui-selected": {
                 fontWeight: 600,
@@ -98,7 +108,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
               aria-controls="filter-panel"
             />
             <Tab
-              label={`BATCH OPERATIONS (${selectedAssets.length})`}
+              label={`${selectedAssets.length} Selected`}
               value="batch"
               id="batch-tab"
               aria-controls="batch-panel"
@@ -143,6 +153,9 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
                 isDeleteLoading={isDeleteLoading}
                 onClearSelection={handleClearSelection}
                 onRemoveItem={onRemoveItem}
+                onBatchPipelineExecution={onBatchPipelineExecution}
+                onBatchPipelineExecutionRequest={onBatchPipelineExecutionRequest}
+                isPipelineExecutionLoading={isPipelineExecutionLoading}
               />
             </Box>
           </>

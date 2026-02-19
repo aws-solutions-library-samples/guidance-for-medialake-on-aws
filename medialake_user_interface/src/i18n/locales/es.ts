@@ -813,6 +813,34 @@ export default {
     subCollections: "subcolecciones",
     batchOperations: {
       deleteSelected: "Eliminar seleccionados",
+      runPipeline: "Ejecutar Pipeline",
+      runPipelineTooltip: "Ejecutar pipeline para los activos seleccionados",
+      noPipelinesAvailable:
+        "No hay pipelines manuales disponibles para los tipos de activos seleccionados",
+      selectPipeline: "Seleccione un pipeline para ejecutar",
+      pipelineLoading: "Cargando pipelines...",
+      pipelineExecution: {
+        confirmTitle: "Ejecutar Pipeline",
+        confirmMessage:
+          "Esto ejecutará el pipeline para {{count}} activo{{plural}} seleccionado(s).",
+        confirmInfo:
+          "Cada activo se procesará individualmente. Puede seguir el progreso en la página de Ejecuciones.",
+        executing: "Ejecutando Pipeline",
+        executingMessage: "Ejecutando pipeline para {{count}} activo{{plural}}...",
+        success: "Ejecución de Pipeline Iniciada",
+        successMessage:
+          "Pipeline iniciado exitosamente para {{successCount}} de {{totalCount}} activo{{plural}}",
+        partialSuccess: "Ejecución de Pipeline Parcialmente Iniciada",
+        partialSuccessMessage:
+          "Pipeline iniciado para {{successCount}} de {{totalCount}} activos ({{failedCount}} fallidos)",
+        failed: "Ejecución de Pipeline Fallida",
+        failedMessage:
+          "No se pudo iniciar la ejecución del pipeline. Por favor, inténtelo de nuevo.",
+        viewExecutions: "Ver Ejecuciones",
+        pipelineNotFound: "Pipeline no encontrado",
+        insufficientPermissions: "No tiene permiso para ejecutar este pipeline",
+        noAssetsSelected: "No se seleccionaron activos para la ejecución del pipeline",
+      },
     },
     confirmBulkDelete: "Confirmar eliminación masiva",
     typeDeleteToConfirm: "Escriba DELETE para confirmar",
@@ -923,6 +951,7 @@ export default {
       copied: "¡Copiado!",
       back: "Back",
       next: "Next",
+      executePipeline: "Ejecutar Pipeline",
     },
     status: {
       active: "Activo",

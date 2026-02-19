@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ interface ApiStatusModalProps {
   onCancel?: () => void;
   cancelDisabled?: boolean;
   cancelLabel?: string;
+  link?: { text: string; url: string };
 }
 
 const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
@@ -38,13 +40,14 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
   onCancel,
   cancelDisabled = false,
   cancelLabel = "Cancel",
+  link,
 }) => {
   const theme = useTheme();
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
     // Only auto-close on success if there's no job ID (not a tracked job)
-    if (open && status === "success" && onClose && !jobId) {
+    if (open && status === "success" && onClose && !jobId && !link) {
       timeoutId = setTimeout(() => {
         onClose();
       }, 3000);
@@ -54,7 +57,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
         clearTimeout(timeoutId);
       }
     };
-  }, [open, status, onClose, jobId]);
+  }, [open, status, onClose, jobId, link]);
 
   const getStatusContent = () => {
     switch (status) {
@@ -148,6 +151,18 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
               <Typography variant="body1" sx={{ mt: 1, color: theme.palette.text.secondary }}>
                 {message}
               </Typography>
+            )}
+            {link && (
+              <Button
+                component={Link}
+                to={link.url}
+                variant="text"
+                color="primary"
+                sx={{ mt: 2 }}
+                onClick={onClose}
+              >
+                {link.text}
+              </Button>
             )}
           </>
         );

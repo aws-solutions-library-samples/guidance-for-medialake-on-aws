@@ -771,6 +771,31 @@ export default {
     subCollections: "sous-collections",
     batchOperations: {
       deleteSelected: "Supprimer la sélection",
+      runPipeline: "Exécuter le pipeline",
+      runPipelineTooltip: "Exécuter le pipeline pour les actifs sélectionnés",
+      noPipelinesAvailable: "Aucun pipeline manuel disponible pour les types d'actifs sélectionnés",
+      selectPipeline: "Sélectionnez un pipeline à exécuter",
+      pipelineLoading: "Chargement des pipelines...",
+      pipelineExecution: {
+        confirmTitle: "Exécuter le pipeline",
+        confirmMessage: "Cela exécutera le pipeline pour {{count}} actif{{plural}} sélectionné(s).",
+        confirmInfo:
+          "Chaque actif sera traité individuellement. Vous pouvez suivre la progression dans la page Exécutions.",
+        executing: "Exécution du pipeline",
+        executingMessage: "Exécution du pipeline pour {{count}} actif{{plural}}...",
+        success: "Exécution du pipeline démarrée",
+        successMessage:
+          "Pipeline démarré avec succès pour {{successCount}} sur {{totalCount}} actif{{plural}}",
+        partialSuccess: "Exécution du pipeline partiellement démarrée",
+        partialSuccessMessage:
+          "Pipeline démarré pour {{successCount}} sur {{totalCount}} actifs ({{failedCount}} échoué(s))",
+        failed: "Échec de l'exécution du pipeline",
+        failedMessage: "Impossible de démarrer l'exécution du pipeline. Veuillez réessayer.",
+        viewExecutions: "Voir les exécutions",
+        pipelineNotFound: "Pipeline introuvable",
+        insufficientPermissions: "Vous n'avez pas la permission d'exécuter ce pipeline",
+        noAssetsSelected: "Aucun actif sélectionné pour l'exécution du pipeline",
+      },
     },
     confirmBulkDelete: "Confirmer la suppression en masse",
     typeDeleteToConfirm: "Tapez DELETE pour confirmer",
@@ -922,6 +947,7 @@ export default {
       update: "Mettre à jour",
       create: "Créer",
       copied: "Copié !",
+      executePipeline: "Exécuter le pipeline",
     },
     pipelineEditor: {
       triggers: "Déclencheurs",

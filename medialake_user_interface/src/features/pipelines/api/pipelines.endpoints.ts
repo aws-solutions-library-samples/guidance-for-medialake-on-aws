@@ -10,5 +10,6 @@ export const PIPELINES_API = {
     GET_PIPELINE_RUNS: (id: string) => `/pipelines/${id}/runs`,
     START_PIPELINE: (id: string) => `/pipelines/${id}/start`,
     STOP_PIPELINE: (id: string) => `/pipelines/${id}/stop`,
+    TRIGGER_PIPELINE: (id: string) => `/pipelines/${id}/trigger`,
   },
 } as const;

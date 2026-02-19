@@ -454,7 +454,8 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
     // Flatten all types found in all incoming connections
 
     const typesFromConnections = Object.values(nodeData.connections.incoming).flatMap(
-      (conns: any) => conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
+      (conns: any) =>
+        Array.isArray(conns) ? conns.flatMap((conn: any) => conn.connectionConfig?.type || []) : []
     );
     inputTypes = Array.from(new Set(typesFromConnections));
   }
@@ -469,7 +470,8 @@ const convertApiResponseToNode = (response: NodesResponse): NodeType | null => {
     // Flatten all types found in all outgoing connections
 
     const typesFromConnections = Object.values(nodeData.connections.outgoing).flatMap(
-      (conns: any) => conns.flatMap((conn: any) => conn.connectionConfig?.type || [])
+      (conns: any) =>
+        Array.isArray(conns) ? conns.flatMap((conn: any) => conn.connectionConfig?.type || []) : []
     );
     outputTypes = Array.from(new Set(typesFromConnections));
   }

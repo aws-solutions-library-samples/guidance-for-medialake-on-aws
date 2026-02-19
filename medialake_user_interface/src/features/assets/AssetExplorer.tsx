@@ -39,6 +39,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { RightSidebarProvider, RightSidebar } from "@/components/common/RightSidebar";
 import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
+import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
@@ -826,6 +827,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
             onRemoveItem={assetSelection.handleRemoveAsset}
             isDownloadLoading={assetSelection.isDownloadLoading}
             isDeleteLoading={assetSelection.isDeleteLoading}
+            onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
+            isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
           />
         </RightSidebar>
       </Box>
@@ -852,6 +855,22 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         jobId={assetSelection.modalState.jobId}
         onCancel={assetSelection.modalState.onCancel}
         cancelDisabled={assetSelection.modalState.cancelDisabled}
+        link={assetSelection.modalState.link}
+      />
+
+      {/* Pipeline Execution Confirmation Dialog */}
+      <PipelineExecutionConfirmDialog
+        open={assetSelection.isPipelineExecutionDialogOpen}
+        onClose={assetSelection.handlePipelineExecutionDialogClose}
+        onConfirm={() =>
+          assetSelection.selectedPipelineForExecution &&
+          assetSelection.handleBatchPipelineExecution(
+            assetSelection.selectedPipelineForExecution.id
+          )
+        }
+        pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}
+        selectedCount={assetSelection.selectedAssets.length}
+        isLoading={assetSelection.isPipelineExecutionLoading}
       />
     </RightSidebarProvider>
   );

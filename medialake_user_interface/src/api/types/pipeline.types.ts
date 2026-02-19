@@ -180,3 +180,31 @@ export interface PipelineSearchMetadata {
   pageSize: number;
   nextToken?: string;
 }
+
+// Pipeline trigger types
+export interface TriggerPipelineAsset {
+  inventory_id: string;
+  params?: Record<string, any>;
+}
+
+export interface TriggerPipelineRequest {
+  assets: TriggerPipelineAsset[];
+}
+
+export interface TriggerPipelineExecution {
+  inventory_id: string;
+  execution_id: string;
+  execution_arn: string;
+  status: "started" | "failed";
+  error?: string;
+  params?: Record<string, any>;
+}
+
+export interface TriggerPipelineResponse {
+  pipeline_id: string;
+  total_assets: number;
+  successful_executions: number;
+  failed_executions: number;
+  executions: TriggerPipelineExecution[];
+  message: string;
+}

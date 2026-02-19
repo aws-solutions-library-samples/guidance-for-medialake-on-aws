@@ -34,6 +34,7 @@ import { CreateCollectionModal } from "@/components/collections/CreateCollection
 import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
+import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import {
   useAddItemToCollection,
   useGetCollection,
@@ -998,6 +999,8 @@ const CollectionViewPage: React.FC = () => {
               onRemoveItem={assetSelection.handleRemoveAsset}
               isDownloadLoading={assetSelection.isDownloadLoading}
               isDeleteLoading={assetSelection.isDeleteLoading}
+              onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
+              isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
               filterComponent={
                 <SearchFilters
                   filters={filters}
@@ -1094,6 +1097,22 @@ const CollectionViewPage: React.FC = () => {
           status={assetSelection.modalState.status}
           action={assetSelection.modalState.action}
           message={assetSelection.modalState.message}
+          link={assetSelection.modalState.link}
+        />
+
+        {/* Pipeline Execution Confirmation Dialog */}
+        <PipelineExecutionConfirmDialog
+          open={assetSelection.isPipelineExecutionDialogOpen}
+          onClose={assetSelection.handlePipelineExecutionDialogClose}
+          onConfirm={() =>
+            assetSelection.selectedPipelineForExecution &&
+            assetSelection.handleBatchPipelineExecution(
+              assetSelection.selectedPipelineForExecution.id
+            )
+          }
+          pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}
+          selectedCount={assetSelection.selectedAssets.length}
+          isLoading={assetSelection.isPipelineExecutionLoading}
         />
 
         {/* API Status Modal for single asset delete operation */}
