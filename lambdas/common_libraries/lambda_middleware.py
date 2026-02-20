@@ -111,6 +111,39 @@ class LambdaMiddleware:
         return cur
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Chunk proxy injection
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def _inject_chunk_proxy(
+        asset_rec: Optional[Dict[str, Any]], item_obj: Dict[str, Any]
+    ) -> None:
+        if not asset_rec:
+            return
+        if item_obj.get("is_chunk") is not True or item_obj.get("mediaType") != "Video":
+            return
+
+        url = item_obj.get("url", "")
+        if url.startswith("s3://"):
+            parts = url[5:].split("/", 1)
+            chunk_bucket, chunk_key = parts[0], parts[1] if len(parts) > 1 else ""
+        else:
+            chunk_bucket = item_obj.get("bucket", "")
+            chunk_key = item_obj.get("key", "")
+
+        if not chunk_bucket or not chunk_key:
+            return
+
+        for rep in asset_rec.get("DerivedRepresentations", []):
+            if isinstance(rep, dict) and rep.get("Purpose") == "proxy":
+                loc = rep.setdefault("StorageInfo", {}).setdefault(
+                    "PrimaryLocation", {}
+                )
+                loc["Bucket"] = chunk_bucket
+                loc.setdefault("ObjectKey", {})["FullPath"] = chunk_key
+                loc["Key"] = chunk_key
+                break
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # DDB asset fetch
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def _fetch_asset_record(self, inventory_id: str) -> Optional[Dict[str, Any]]:
@@ -250,16 +283,24 @@ class LambdaMiddleware:
                     "stepExternalPayload": "True",
                     "stepExternalPayloadLocation": step_ext_loc,
                 }
+                asset_rec_ext = self._fetch_asset_record(inventory_id)
+                if isinstance(data, dict):
+                    self._inject_chunk_proxy(asset_rec_ext, data)
                 return {
                     "metadata": meta,
                     "payload": {
                         "data": {"item": data},
-                        "assets": ev.get("payload", {}).get("assets", []),
+                        "assets": (
+                            [asset_rec_ext]
+                            if asset_rec_ext
+                            else ev.get("payload", {}).get("assets", [])
+                        ),
                     },
                 }
 
             # ---- normal Map/Task path ----
             asset_rec = self._fetch_asset_record(inventory_id)
+            self._inject_chunk_proxy(asset_rec, item_obj)
             exec_id, pipe_id = _pick_pipeline_ids(ev)
 
             meta = {
@@ -721,6 +762,17 @@ class LambdaMiddleware:
                 resp = self.s3.get_object(Bucket=loc["bucket"], Key=loc["key"])
                 body_text = resp["Body"].read().decode("utf-8")
                 external_json = json.loads(body_text)
+
+                # Auto-set distributedMapConfig for list payloads (enables Distributed Map ItemReader)
+                # Only set if not already provided by the node (preserve explicit node config)
+                if (
+                    isinstance(external_json, list)
+                    and "distributedMapConfig" not in meta
+                ):
+                    meta["distributedMapConfig"] = {
+                        "s3_bucket": loc["bucket"],
+                        "s3_key": loc["key"],
+                    }
 
                 payload["data"] = [
                     {

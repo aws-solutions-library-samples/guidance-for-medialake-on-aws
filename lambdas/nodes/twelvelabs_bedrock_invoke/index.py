@@ -16,6 +16,29 @@ tracer = Tracer()
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
 
 
+def _detect_chunk_item(event: Dict[str, Any]):
+    """Return the chunk item dict if the event represents a video chunk, else None."""
+    payload = event.get("payload", {})
+    candidates = [
+        payload.get("map", {}).get("item"),
+        payload.get("data"),
+        (
+            payload.get("data", {}).get("item")
+            if isinstance(payload.get("data"), dict)
+            else None
+        ),
+    ]
+    for c in candidates:
+        if (
+            isinstance(c, dict)
+            and c.get("is_chunk") is True
+            and c.get("mediaType") == "Video"
+            and (c.get("url") or (c.get("bucket") and c.get("key")))
+        ):
+            return c
+    return None
+
+
 @lambda_middleware(event_bus_name=EVENT_BUS_NAME)
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -37,10 +60,18 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
         # Get input type from environment variable set during pipeline deployment
         input_type = os.environ.get("CONNECTION_INPUT_TYPE")
+        chunk_item = None
         if not input_type:
-            raise RuntimeError(
-                "CONNECTION_INPUT_TYPE environment variable not set. This should be configured during pipeline deployment based on the incoming connection type."
-            )
+            chunk_item = _detect_chunk_item(event)
+            if chunk_item is not None:
+                input_type = "video"
+                logger.info(
+                    "CONNECTION_INPUT_TYPE not set; inferred 'video' from chunk item"
+                )
+            else:
+                raise RuntimeError(
+                    "CONNECTION_INPUT_TYPE environment variable not set. This should be configured during pipeline deployment based on the incoming connection type."
+                )
 
         # Detect model version - 3.0 uses different schema than 2.7
         is_marengo_3 = "3-0" in model_id or "3.0" in model_id
@@ -137,6 +168,21 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     data = payload["data"]
                     if "bucket" in data and "key" in data:
                         video_uri = f"s3://{data['bucket']}/{data['key']}"
+
+            # Chunk mode safety net
+            if not video_uri:
+                if chunk_item is None:
+                    chunk_item = _detect_chunk_item(event)
+                if chunk_item is not None:
+                    url = chunk_item.get("url", "")
+                    if url.startswith("s3://"):
+                        video_uri = url
+                    elif chunk_item.get("bucket") and chunk_item.get("key"):
+                        video_uri = f"s3://{chunk_item['bucket']}/{chunk_item['key']}"
+                    if video_uri:
+                        logger.info(
+                            f"Using chunk URI directly as safety net: {video_uri}"
+                        )
 
             if not video_uri:
                 logger.error(
