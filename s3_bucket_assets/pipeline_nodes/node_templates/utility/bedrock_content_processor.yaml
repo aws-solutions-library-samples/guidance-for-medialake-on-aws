@@ -10,6 +10,7 @@ node:
       lambda:
         handler: utility/BedrockContentProcessorLambdaDeployment
         runtime: python3.12
+        timeout: 900
         iam_policy:
           statements:
             - effect: Allow

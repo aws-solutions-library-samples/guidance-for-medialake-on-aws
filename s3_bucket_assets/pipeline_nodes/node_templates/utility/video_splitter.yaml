@@ -48,6 +48,16 @@ actions:
         default: 7200
         schema:
           type: number
+      - in: body
+        name: Overlap Duration
+        label: Overlap Duration (seconds)
+        description: >
+          Seconds of overlap on each side of a chunk. First chunk gets trailing
+          overlap only; last chunk gets leading overlap only. Set to 0 to disable.
+        required: false
+        default: 0
+        schema:
+          type: number
     connections:
       incoming:
         type: [video]

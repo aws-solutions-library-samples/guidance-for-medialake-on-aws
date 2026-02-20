@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
@@ -15,6 +15,28 @@ tracer = Tracer()
 # Environment
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
 EXTERNAL_PAYLOAD_BUCKET = os.getenv("EXTERNAL_PAYLOAD_BUCKET")
+
+
+def _detect_chunk_item(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the chunk item dict from the event if this is a chunk-mode invocation, else None."""
+    payload = event.get("payload", {})
+    candidates = [
+        payload.get("map", {}).get("item"),
+        payload.get("data"),
+    ]
+    data_val = payload.get("data")
+    if isinstance(data_val, dict):
+        candidates.append(data_val.get("item"))
+
+    for c in candidates:
+        if (
+            isinstance(c, dict)
+            and c.get("is_chunk") is True
+            and c.get("mediaType") == "Video"
+            and (c.get("url") or (c.get("bucket") and c.get("key")))
+        ):
+            return c
+    return None
 
 
 @lambda_middleware(event_bus_name=EVENT_BUS_NAME)
@@ -34,6 +56,21 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Extract payload and metadata from event
         payload = event.get("payload", {})
         metadata = event.get("metadata", {})
+
+        # Detect chunk mode
+        chunk_item = _detect_chunk_item(event)
+        chunk_start_time = (
+            float(chunk_item.get("start_time", 0.0)) if chunk_item is not None else 0.0
+        )
+        is_chunk_mode = chunk_item is not None
+        if is_chunk_mode:
+            logger.info(
+                "Chunk mode detected",
+                extra={
+                    "chunk_index": chunk_item.get("chunk_index"),
+                    "chunk_start_time": chunk_start_time,
+                },
+            )
 
         # Check if we need to manually download external payload
         # Sometimes middleware doesn't populate payload.data, so we handle it here
@@ -361,10 +398,12 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     processed_embedding = {
                         "float": embedding_float32,  # embedding store expects "float" field
                         "dimension": len(embedding_float32),
-                        "start_offset_sec": start_sec,  # embedding store expects "start_offset_sec"
-                        "end_offset_sec": end_sec,  # embedding store expects "end_offset_sec"
+                        "start_offset_sec": chunk_start_time
+                        + start_sec,  # embedding store expects "start_offset_sec"
+                        "end_offset_sec": chunk_start_time
+                        + end_sec,  # embedding store expects "end_offset_sec"
                         "segment_index": i,
-                        "embedding_scope": embedding_scope,
+                        "embedding_scope": "clip" if is_chunk_mode else embedding_scope,
                         "input_type": input_type,
                     }
 
@@ -383,8 +422,14 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                         extra={
                             "start_sec": start_sec,
                             "end_sec": end_sec,
-                            "embedding_scope": embedding_scope,
+                            "global_start_offset_sec": chunk_start_time + start_sec,
+                            "global_end_offset_sec": chunk_start_time + end_sec,
+                            "embedding_scope": (
+                                "clip" if is_chunk_mode else embedding_scope
+                            ),
                             "embedding_option": embedding_option,
+                            "chunk_start_time": chunk_start_time,
+                            "is_chunk_mode": is_chunk_mode,
                         },
                     )
 
