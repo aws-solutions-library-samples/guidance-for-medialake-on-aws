@@ -407,13 +407,16 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
     [onSelectIcon]
   );
 
+  const PREVIEW_WIDTH = 200;
+  const PREVIEW_HEIGHT = 120;
+
   const renderCurrentThumbnail = () => {
     if (isLoading) {
       return (
         <Box
           sx={{
-            width: 120,
-            height: 120,
+            width: PREVIEW_WIDTH,
+            height: PREVIEW_HEIGHT,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -429,14 +432,15 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
     if (currentThumbnailType === "icon" && CurrentIconComponent) {
       return (
         <Avatar
+          variant="rounded"
           sx={{
-            width: 120,
-            height: 120,
+            width: PREVIEW_WIDTH,
+            height: PREVIEW_HEIGHT,
             bgcolor: "primary.main",
             borderRadius: 2,
           }}
         >
-          <CurrentIconComponent sx={{ fontSize: 64 }} />
+          <CurrentIconComponent sx={{ fontSize: 56 }} />
         </Avatar>
       );
     }
@@ -448,8 +452,8 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
           src={currentThumbnailUrl}
           alt="Collection thumbnail"
           sx={{
-            width: 120,
-            height: 120,
+            width: PREVIEW_WIDTH,
+            height: PREVIEW_HEIGHT,
             objectFit: "cover",
             borderRadius: 2,
             border: "1px solid",
@@ -462,14 +466,15 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
     // Default placeholder
     return (
       <Avatar
+        variant="rounded"
         sx={{
-          width: 120,
-          height: 120,
+          width: PREVIEW_WIDTH,
+          height: PREVIEW_HEIGHT,
           bgcolor: "action.hover",
           borderRadius: 2,
         }}
       >
-        <FolderIcon sx={{ fontSize: 64, color: "text.secondary" }} />
+        <FolderIcon sx={{ fontSize: 56, color: "text.secondary" }} />
       </Avatar>
     );
   };
