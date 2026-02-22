@@ -174,6 +174,20 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
     setUploadPreviewUrl(null);
   };
 
+  const extractCollectionId = (result: any): string | undefined => {
+    if (result?.data?.id) return result.data.id;
+    if (result?.id) return result.id;
+    if (typeof result?.body === "string") {
+      try {
+        const parsed = JSON.parse(result.body);
+        return parsed?.data?.id;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
     try {
@@ -185,7 +199,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
         collectionTypeId: formData.collectionTypeId || undefined,
       };
       const result = await createCollectionMutation.mutateAsync(createData);
-      const newCollectionId = result?.data?.id || (result as any)?.id;
+      const newCollectionId = extractCollectionId(result);
       if (newCollectionId && pendingThumbnail) {
         try {
           if (pendingThumbnail.type === "icon") {
@@ -199,8 +213,8 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
               data: { source: "upload", data: pendingThumbnail.value },
             });
           }
-        } catch {
-          // Thumbnail failed but collection was created
+        } catch (thumbnailError) {
+          console.error("Failed to set thumbnail after collection creation:", thumbnailError);
         }
       }
       resetAndClose();

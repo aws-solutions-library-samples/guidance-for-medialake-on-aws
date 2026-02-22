@@ -64,6 +64,14 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
   const [showParentPicker, setShowParentPicker] = useState(false);
   const [parentSearch, setParentSearch] = useState("");
 
+  // Local thumbnail state for deferred save — changes are stored locally
+  // and only sent to the API when the user clicks Save
+  const [pendingThumbnail, setPendingThumbnail] = useState<{
+    type: "icon" | "upload" | "remove";
+    value: string; // icon name or base64 data
+  } | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+
   // API hooks
   const updateCollectionMutation = useUpdateCollection();
   const setThumbnailMutation = useSetCollectionThumbnail();
@@ -75,14 +83,13 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
   const collections = collectionsResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
 
-  const isThumbnailLoading =
+  const isSaving =
+    updateCollectionMutation.isPending ||
     setThumbnailMutation.isPending ||
     setIconMutation.isPending ||
     deleteThumbnailMutation.isPending;
 
-  const isPending = updateCollectionMutation.isPending || isThumbnailLoading;
-
-  // Populate form when collection changes
+  // Reset form when modal opens for a collection
   useEffect(() => {
     if (collection && open) {
       setFormData({
@@ -95,9 +102,10 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
       setErrors({});
       setShowParentPicker(false);
       setParentSearch("");
-      // Auto-expand advanced if collection has type or is public
+      setPendingThumbnail(null);
+      setUploadPreviewUrl(null);
     }
-  }, [collection, open]);
+  }, [collection?.id, open]);
 
   // Build breadcrumb path for a collection
   const getCollectionPath = useCallback(
@@ -176,43 +184,45 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Thumbnail handlers — applied immediately for edit (collection already exists)
-  const handleSelectIcon = async (iconName: string) => {
-    if (!collection) return;
-    try {
-      await setIconMutation.mutateAsync({
-        collectionId: collection.id,
-        iconName,
-      });
-    } catch {
-      // Error handled by hook
-    }
+  // Thumbnail handlers — store locally, apply on save
+  const handleSelectIcon = (iconName: string) => {
+    setPendingThumbnail({ type: "icon", value: iconName });
+    setUploadPreviewUrl(null);
   };
 
-  const handleUploadImage = async (base64Data: string) => {
-    if (!collection) return;
-    try {
-      await setThumbnailMutation.mutateAsync({
-        collectionId: collection.id,
-        data: { source: "upload", data: base64Data },
-      });
-    } catch {
-      // Error handled by hook
-    }
+  const handleUploadImage = (base64Data: string) => {
+    setPendingThumbnail({ type: "upload", value: base64Data });
+    setUploadPreviewUrl(`data:image/png;base64,${base64Data}`);
   };
 
-  const handleRemoveThumbnail = async () => {
-    if (!collection) return;
-    try {
-      await deleteThumbnailMutation.mutateAsync(collection.id);
-    } catch {
-      // Error handled by hook
-    }
+  const handleRemoveThumbnail = () => {
+    setPendingThumbnail({ type: "remove", value: "" });
+    setUploadPreviewUrl(null);
   };
+
+  // Resolve what the ThumbnailSelector should display
+  const displayThumbnailType = pendingThumbnail
+    ? pendingThumbnail.type === "remove"
+      ? undefined
+      : pendingThumbnail.type
+    : collection?.thumbnailType;
+
+  const displayThumbnailValue = pendingThumbnail
+    ? pendingThumbnail.type === "icon"
+      ? pendingThumbnail.value
+      : undefined
+    : collection?.thumbnailValue;
+
+  const displayThumbnailUrl = pendingThumbnail
+    ? pendingThumbnail.type === "upload"
+      ? uploadPreviewUrl || undefined
+      : undefined
+    : collection?.thumbnailUrl || undefined;
 
   const handleSubmit = async () => {
     if (!collection || !validateForm()) return;
     try {
+      // Save form data changes
       const updateData = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
@@ -220,7 +230,28 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
         isPublic: formData.isPublic,
         collectionTypeId: formData.collectionTypeId || undefined,
       };
-      await updateCollectionMutation.mutateAsync({ id: collection.id, data: updateData });
+
+      if (hasFormChanges) {
+        await updateCollectionMutation.mutateAsync({ id: collection.id, data: updateData });
+      }
+
+      // Apply pending thumbnail change
+      if (pendingThumbnail) {
+        if (pendingThumbnail.type === "icon") {
+          await setIconMutation.mutateAsync({
+            collectionId: collection.id,
+            iconName: pendingThumbnail.value,
+          });
+        } else if (pendingThumbnail.type === "upload") {
+          await setThumbnailMutation.mutateAsync({
+            collectionId: collection.id,
+            data: { source: "upload", data: pendingThumbnail.value },
+          });
+        } else if (pendingThumbnail.type === "remove") {
+          await deleteThumbnailMutation.mutateAsync(collection.id);
+        }
+      }
+
       onClose();
     } catch {
       // Error surfaced via mutation state
@@ -228,22 +259,26 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
   };
 
   const handleClose = () => {
-    if (!updateCollectionMutation.isPending) {
+    if (!isSaving) {
       setErrors({});
       setShowParentPicker(false);
       setParentSearch("");
+      setPendingThumbnail(null);
+      setUploadPreviewUrl(null);
       onClose();
     }
   };
 
   // Detect if form has changes
-  const hasChanges = collection
+  const hasFormChanges = collection
     ? formData.name !== (collection.name || "") ||
       formData.description !== (collection.description || "") ||
       formData.parentId !== (collection.parentId || "") ||
       formData.isPublic !== (collection.isPublic || false) ||
       formData.collectionTypeId !== (collection.collectionTypeId || "")
     : false;
+
+  const hasChanges = hasFormChanges || pendingThumbnail !== null;
 
   return (
     <Dialog
@@ -320,7 +355,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
         </Box>
         <IconButton
           onClick={handleClose}
-          disabled={updateCollectionMutation.isPending}
+          disabled={isSaving}
           size="small"
           sx={{
             color: "text.secondary",
@@ -338,14 +373,14 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
         <Box sx={{ px: 3, pt: 2.5, pb: 2, display: "flex", flexDirection: "column", gap: 2.5 }}>
           {/* Thumbnail */}
           <ThumbnailSelector
-            currentThumbnailType={collection?.thumbnailType}
-            currentThumbnailValue={collection?.thumbnailValue}
-            currentThumbnailUrl={collection?.thumbnailUrl}
+            currentThumbnailType={displayThumbnailType}
+            currentThumbnailValue={displayThumbnailValue}
+            currentThumbnailUrl={displayThumbnailUrl}
             onSelectIcon={handleSelectIcon}
             onUploadImage={handleUploadImage}
             onRemoveThumbnail={handleRemoveThumbnail}
-            isLoading={isThumbnailLoading}
-            disabled={updateCollectionMutation.isPending}
+            isLoading={false}
+            disabled={isSaving}
           />
 
           {/* Name */}
@@ -358,7 +393,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
             error={Boolean(errors.name)}
             helperText={errors.name}
             required
-            disabled={updateCollectionMutation.isPending}
+            disabled={isSaving}
             size="small"
             sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
           />
@@ -377,7 +412,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
             helperText={errors.description}
             multiline
             rows={2}
-            disabled={updateCollectionMutation.isPending}
+            disabled={isSaving}
             size="small"
             sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
           />
@@ -399,9 +434,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
               {t("collectionsPage.form.parentCollection", "Parent Collection")}
             </Typography>
             <Box
-              onClick={() =>
-                !updateCollectionMutation.isPending && setShowParentPicker(!showParentPicker)
-              }
+              onClick={() => !isSaving && setShowParentPicker(!showParentPicker)}
               sx={{
                 display: "flex",
                 alignItems: "center",
@@ -410,9 +443,9 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
                 py: 1,
                 borderRadius: 1.5,
                 border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-                cursor: updateCollectionMutation.isPending ? "default" : "pointer",
+                cursor: isSaving ? "default" : "pointer",
                 transition: "all 0.15s",
-                "&:hover": updateCollectionMutation.isPending
+                "&:hover": isSaving
                   ? {}
                   : {
                       borderColor: alpha(theme.palette.primary.main, 0.4),
@@ -717,7 +750,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
             <Switch
               checked={formData.isPublic}
               onChange={handleInputChange("isPublic")}
-              disabled={updateCollectionMutation.isPending}
+              disabled={isSaving}
               size="small"
             />
           </Box>
@@ -778,7 +811,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
             <Box
               component="button"
               onClick={handleClose}
-              disabled={updateCollectionMutation.isPending}
+              disabled={isSaving}
               sx={{
                 px: 2.5,
                 py: 0.9,
@@ -799,7 +832,7 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
             <Box
               component="button"
               onClick={handleSubmit}
-              disabled={updateCollectionMutation.isPending || !formData.name.trim() || !hasChanges}
+              disabled={isSaving || !formData.name.trim() || !hasChanges}
               sx={{
                 px: 3,
                 py: 0.9,
@@ -819,14 +852,12 @@ export const EditCollectionModal: React.FC<EditCollectionModalProps> = ({
                 "&:disabled": { opacity: 0.4, cursor: "default" },
               }}
             >
-              {updateCollectionMutation.isPending ? (
+              {isSaving ? (
                 <CircularProgress size={16} color="inherit" />
               ) : (
                 <SaveIcon sx={{ fontSize: 16 }} />
               )}
-              {updateCollectionMutation.isPending
-                ? t("common.saving", "Saving...")
-                : t("common.save", "Save Changes")}
+              {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save Changes")}
             </Box>
           </Box>
         </Box>

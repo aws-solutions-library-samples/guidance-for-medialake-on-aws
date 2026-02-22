@@ -91,16 +91,24 @@ class ApiClient extends ApiClientBase {
         }
 
         // Unwrap Lambda proxy integration response format
-        // API returns: {statusCode, body: {success, data}}
+        // API returns: {statusCode, body: ...}
         // We need: {success, data}
-        // Only unwrap if body is an object, not a string (some APIs return stringified JSON)
         if (
           response.data &&
           typeof response.data === "object" &&
           "body" in response.data &&
-          typeof response.data.body === "object"
+          "statusCode" in response.data
         ) {
-          response.data = response.data.body;
+          const body = response.data.body;
+          if (typeof body === "object") {
+            response.data = body;
+          } else if (typeof body === "string") {
+            try {
+              response.data = JSON.parse(body);
+            } catch {
+              // Leave response.data as-is if body isn't valid JSON
+            }
+          }
         }
 
         return response;
