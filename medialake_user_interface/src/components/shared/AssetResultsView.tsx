@@ -34,6 +34,7 @@ export interface AssetResultsViewProps<T> {
   confidenceThreshold?: number;
   onConfidenceThresholdChange?: (threshold: number) => void;
   detectedModelVersion?: string; // Model version detected from search results for threshold calculation
+  hideConfidenceSlider?: boolean; // Hide the confidence slider (e.g. for Coactive provider)
 
   // Search fields
   selectedFields?: string[];
@@ -115,6 +116,7 @@ function AssetResultsView<T>({
   confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
   detectedModelVersion,
+  hideConfidenceSlider = false,
 
   // Search fields
   selectedFields,
@@ -303,6 +305,7 @@ function AssetResultsView<T>({
               >
                 Found{" "}
                 {isSemantic &&
+                !hideConfidenceSlider &&
                 confidenceThreshold > 0 &&
                 originalResults &&
                 results.length !== originalResults.length
@@ -313,8 +316,9 @@ function AssetResultsView<T>({
             )}
           </Box>
 
-          {/* Confidence Slider - Only show for semantic search */}
+          {/* Confidence Slider - Only show for semantic search, hidden for Coactive provider */}
           {isSemantic &&
+            !hideConfidenceSlider &&
             (() => {
               // Use detected model version for thresholds, defaults to 2.7 if not available
               const thresholds = getThresholdsForModel(detectedModelVersion);
@@ -640,6 +644,7 @@ function AssetResultsView<T>({
         pageSize={searchMetadata.pageSize}
         totalResults={
           isSemantic &&
+          !hideConfidenceSlider &&
           confidenceThreshold > 0 &&
           originalResults &&
           results.length !== originalResults.length
@@ -650,6 +655,7 @@ function AssetResultsView<T>({
         onPageSizeChange={onPageSizeChange}
         isFiltered={
           isSemantic &&
+          !hideConfidenceSlider &&
           confidenceThreshold > 0 &&
           originalResults &&
           results.length !== originalResults.length

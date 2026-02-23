@@ -255,12 +255,23 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Reduced debounce time for more responsive UI
   const debouncedConfidenceThreshold = useDebounce(confidenceThreshold || 0, 100);
 
+  // Detect model version and provider type from system settings for threshold calculation
+  const { providerData } = useSemanticSearchStatus();
+  const providerType = providerData?.data?.searchProvider?.type;
+  const isCoactiveProvider = providerType === "coactive";
+  const detectedModelVersion = React.useMemo(() => {
+    if (providerType === "twelvelabs-bedrock-3-0") {
+      return "3.0";
+    }
+    return "2.7";
+  }, [providerType]);
+
   // Filter results based on confidence threshold for semantic search
+  // Coactive provider does not support confidence scoring, so skip filtering
   // This is a lightweight operation that only filters the pre-computed results
   const filteredResults = React.useMemo(() => {
-    const startTime = performance.now();
-
     if (
+      isCoactiveProvider ||
       !isSemantic ||
       debouncedConfidenceThreshold === undefined ||
       debouncedConfidenceThreshold === 0
@@ -275,20 +286,8 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       return passesThreshold;
     });
 
-    const endTime = performance.now();
-
     return filtered;
-  }, [transformedResults, isSemantic, debouncedConfidenceThreshold]);
-
-  // Detect model version from system settings (provider type) for threshold calculation
-  const { providerData } = useSemanticSearchStatus();
-  const detectedModelVersion = React.useMemo(() => {
-    const providerType = providerData?.data?.searchProvider?.type;
-    if (providerType === "twelvelabs-bedrock-3-0") {
-      return "3.0";
-    }
-    return "2.7";
-  }, [providerData]);
+  }, [transformedResults, isSemantic, isCoactiveProvider, debouncedConfidenceThreshold]);
 
   return (
     <AssetResultsView
@@ -298,6 +297,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       confidenceThreshold={confidenceThreshold}
       onConfidenceThresholdChange={onConfidenceThresholdChange}
       detectedModelVersion={detectedModelVersion}
+      hideConfidenceSlider={isCoactiveProvider}
       searchMetadata={adjustedSearchMetadata}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
