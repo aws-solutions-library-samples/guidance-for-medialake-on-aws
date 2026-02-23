@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
@@ -392,31 +393,43 @@ export const useRenameAsset = (onError?: (message: string) => void) => {
 };
 
 export const useRelatedVersions = (assetId: string, page: number = 1, pageSize: number = 20) => {
-  console.log("useRelatedVersions - Called with assetId:", assetId, "page:", page);
-
   return useQuery<RelatedVersionsResponse, Error>({
     queryKey: ["relatedVersions", assetId, page, pageSize],
-    queryFn: async (): Promise<RelatedVersionsResponse> => {
-      console.log("useRelatedVersions - Fetching data for assetId:", assetId);
-      const response = await apiClient.get<RelatedVersionsResponse>(
-        `/assets/${assetId}/relatedversions`,
-        {
-          params: {
-            page,
-            pageSize,
-            min_score: 0.6,
-          },
+    queryFn: async ({ signal }): Promise<RelatedVersionsResponse> => {
+      try {
+        const response = await apiClient.get<RelatedVersionsResponse>(
+          `/assets/${assetId}/relatedversions`,
+          {
+            params: {
+              page,
+              pageSize,
+              min_score: 0.6,
+            },
+            signal,
+          }
+        );
+        return response.data;
+      } catch (error) {
+        // Silently handle 422 — asset may not support related versions
+        if (axios.isAxiosError(error) && error.response?.status === 422) {
+          return {
+            status: "success",
+            message: "No related versions",
+            data: {
+              searchMetadata: { totalResults: 0, page: 1, pageSize, searchTerm: "" },
+              results: [],
+            },
+          };
         }
-      );
-      console.log("useRelatedVersions - Received response:", response.data);
-      return response.data;
+        throw error;
+      }
     },
     enabled: !!assetId,
-    staleTime: 1000 * 60 * 30, // Keep fresh for 30 minutes - related versions don't change frequently
-    gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
-    refetchOnMount: false, // Don't refetch when component remounts
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnReconnect: false, // Don't refetch on network reconnect
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 
@@ -431,7 +444,6 @@ export const useTranscription = (inventoryId: string) => {
         const response = await apiClient.get<TranscriptionResponse>(
           `assets/${inventoryId}/transcript`
         );
-        console.log("Transcription API response:", response.data);
         return response.data;
       } catch (error) {
         logger.error("Error fetching asset transcript:", error);

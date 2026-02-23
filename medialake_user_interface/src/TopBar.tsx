@@ -51,6 +51,7 @@ interface SearchTag {
 function TopBar() {
   const muiTheme = useMuiTheme();
   const { theme } = useTheme();
+  const isDark = theme === "dark";
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -400,7 +401,6 @@ function TopBar() {
   };
 
   const handleUploadComplete = (files: any[]) => {
-    console.log("Upload completed:", files);
     handleCloseUploadModal();
   };
 
@@ -472,20 +472,23 @@ function TopBar() {
               minHeight: 46,
               width: "100%",
               flexDirection: isRTL ? "row-reverse" : "row",
-              border: `1px solid ${
-                theme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"
-              }`,
-              boxShadow:
-                theme === "dark"
-                  ? "0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)"
-                  : "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
+              border: `1px solid ${alpha(muiTheme.palette.divider, isDark ? 0.12 : 0.1)}`,
+              boxShadow: isDark
+                ? `0 1px 3px ${alpha(muiTheme.palette.common.black, 0.4)}, 0 1px 2px ${alpha(
+                    muiTheme.palette.common.black,
+                    0.3
+                  )}`
+                : `0 1px 3px ${alpha(muiTheme.palette.common.black, 0.08)}, 0 1px 2px ${alpha(
+                    muiTheme.palette.common.black,
+                    0.06
+                  )}`,
               transition: "border-color 0.2s, box-shadow 0.2s",
               "&:focus-within": {
                 borderColor: alpha(muiTheme.palette.primary.main, 0.5),
-                boxShadow:
-                  theme === "dark"
-                    ? `0 0 0 2px ${alpha(muiTheme.palette.primary.main, 0.25)}`
-                    : `0 0 0 2px ${alpha(muiTheme.palette.primary.main, 0.15)}`,
+                boxShadow: `0 0 0 2px ${alpha(
+                  muiTheme.palette.primary.main,
+                  isDark ? 0.25 : 0.15
+                )}`,
               },
             }}
           >
@@ -506,12 +509,12 @@ function TopBar() {
               sx={{
                 textAlign: isRTL ? "right" : "left",
                 fontSize: "14px",
-                color: theme === "dark" ? "#fff" : muiTheme.palette.text.primary,
+                color: muiTheme.palette.text.primary,
                 [isRTL ? "mr" : "ml"]: storeIsSemantic ? 0 : 1.5,
                 "& input": {
                   padding: "8px 0",
                   "&::placeholder": {
-                    color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.38)",
+                    color: muiTheme.palette.text.disabled,
                     opacity: 1,
                   },
                 },
@@ -524,12 +527,12 @@ function TopBar() {
                 size="small"
                 onClick={handleClearSearch}
                 sx={{
-                  color: theme === "dark" ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.3)",
+                  color: alpha(muiTheme.palette.text.secondary, 0.6),
                   padding: "4px",
                   flexShrink: 0,
                   "&:hover": {
                     backgroundColor: "transparent",
-                    color: theme === "dark" ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)",
+                    color: muiTheme.palette.text.secondary,
                   },
                 }}
                 title={t("search.clear", "Clear search")}
@@ -562,7 +565,7 @@ function TopBar() {
                   sx={{
                     fontSize: "12px",
                     fontWeight: 500,
-                    color: theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)",
+                    color: alpha(muiTheme.palette.text.secondary, 0.7),
                     userSelect: "none",
                     lineHeight: 1,
                     whiteSpace: "nowrap",
@@ -592,9 +595,7 @@ function TopBar() {
                     borderRadius: "10px",
                     backgroundColor: storeIsSemantic
                       ? muiTheme.palette.primary.main
-                      : theme === "dark"
-                        ? "rgba(255,255,255,0.18)"
-                        : "rgba(0,0,0,0.14)",
+                      : alpha(muiTheme.palette.action.active, isDark ? 0.18 : 0.14),
                     position: "relative",
                     cursor: "pointer",
                     transition: "background-color 0.2s",
@@ -602,9 +603,7 @@ function TopBar() {
                     "&:hover": {
                       backgroundColor: storeIsSemantic
                         ? muiTheme.palette.primary.dark
-                        : theme === "dark"
-                          ? "rgba(255,255,255,0.25)"
-                          : "rgba(0,0,0,0.2)",
+                        : alpha(muiTheme.palette.action.active, isDark ? 0.25 : 0.2),
                     },
                     "&:focus-visible": {
                       outline: `2px solid ${muiTheme.palette.primary.main}`,
@@ -619,7 +618,7 @@ function TopBar() {
                       height: 15,
                       borderRadius: "50%",
                       backgroundColor: "#fff",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                      boxShadow: `0 1px 2px ${alpha(muiTheme.palette.common.black, 0.2)}`,
                       transition: "left 0.2s ease",
                     },
                   }}
@@ -631,7 +630,7 @@ function TopBar() {
                 sx={{
                   width: "1px",
                   height: 16,
-                  backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.09)",
+                  backgroundColor: alpha(muiTheme.palette.divider, isDark ? 0.15 : 0.12),
                   flexShrink: 0,
                 }}
               />
@@ -643,20 +642,15 @@ function TopBar() {
                 sx={{
                   color: hasActiveFilters
                     ? muiTheme.palette.primary.main
-                    : theme === "dark"
-                      ? "rgba(255,255,255,0.45)"
-                      : "rgba(0,0,0,0.35)",
+                    : alpha(muiTheme.palette.text.secondary, 0.7),
                   padding: "5px",
                   flexShrink: 0,
                   position: "relative",
                   "&:hover": {
-                    backgroundColor:
-                      theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
+                    backgroundColor: alpha(muiTheme.palette.action.active, 0.06),
                     color: hasActiveFilters
                       ? muiTheme.palette.primary.dark
-                      : theme === "dark"
-                        ? "rgba(255,255,255,0.7)"
-                        : "rgba(0,0,0,0.55)",
+                      : muiTheme.palette.text.secondary,
                   },
                 }}
                 title={t("search.filters.title", "Filter Results")}
@@ -679,11 +673,7 @@ function TopBar() {
                       fontSize: "0.55rem",
                       fontWeight: 700,
                       lineHeight: 1,
-                      border: `2px solid ${
-                        theme === "dark"
-                          ? muiTheme.palette.background.paper
-                          : muiTheme.palette.background.paper
-                      }`,
+                      border: `2px solid ${muiTheme.palette.background.paper}`,
                       boxSizing: "content-box",
                     }}
                   >
@@ -700,7 +690,7 @@ function TopBar() {
                 onClick={handleSearchSubmit}
                 sx={{
                   backgroundColor: muiTheme.palette.primary.main,
-                  color: "#fff",
+                  color: muiTheme.palette.primary.contrastText,
                   width: 34,
                   height: 34,
                   flexShrink: 0,
@@ -735,12 +725,12 @@ function TopBar() {
           size="small"
           onClick={handleOpenUploadModal}
           sx={{
-            color: theme === "dark" ? "rgba(255,255,255,0.7)" : "text.secondary",
-            backgroundColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.04)",
+            color: muiTheme.palette.text.secondary,
+            backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.1 : 0.04),
             borderRadius: "8px",
             padding: "8px",
             "&:hover": {
-              backgroundColor: theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+              backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.2 : 0.08),
             },
           }}
         >
@@ -756,16 +746,10 @@ function TopBar() {
             size="small"
             onClick={toggleChat}
             sx={{
-              color: isChatOpen
-                ? muiTheme.palette.primary.main
-                : theme === "dark"
-                  ? "rgba(255,255,255,0.7)"
-                  : "text.secondary",
+              color: isChatOpen ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
               backgroundColor: isChatOpen
                 ? alpha(muiTheme.palette.primary.main, 0.1)
-                : theme === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.04)",
+                : alpha(muiTheme.palette.action.active, isDark ? 0.1 : 0.04),
               borderRadius: "8px",
               padding: "8px",
               transition: (theme) =>
@@ -775,9 +759,7 @@ function TopBar() {
               "&:hover": {
                 backgroundColor: isChatOpen
                   ? alpha(muiTheme.palette.primary.main, 0.2)
-                  : theme === "dark"
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(0,0,0,0.08)",
+                  : alpha(muiTheme.palette.action.active, isDark ? 0.2 : 0.08),
               },
             }}
           >

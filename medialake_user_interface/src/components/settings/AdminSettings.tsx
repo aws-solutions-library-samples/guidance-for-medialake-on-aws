@@ -20,6 +20,7 @@ import {
   CardContent,
   Tooltip,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   PersonAdd as PersonAddIcon,
   Edit as EditIcon,
@@ -143,7 +144,7 @@ const AdminSettings: React.FC = () => {
                     sx={{
                       p: 1,
                       borderRadius: "8px",
-                      backgroundColor: `${metric.color}15`,
+                      backgroundColor: alpha(metric.color, 0.08),
                       color: metric.color,
                       mr: 1,
                     }}
@@ -235,8 +236,8 @@ const AdminSettings: React.FC = () => {
                       sx={{
                         backgroundColor:
                           user.role === "Admin"
-                            ? `${theme.palette.error.main}15`
-                            : `${theme.palette.primary.main}15`,
+                            ? alpha(theme.palette.error.main, 0.08)
+                            : alpha(theme.palette.primary.main, 0.08),
                         color:
                           user.role === "Admin"
                             ? theme.palette.error.main
@@ -251,8 +252,8 @@ const AdminSettings: React.FC = () => {
                       sx={{
                         backgroundColor:
                           user.status === "Active"
-                            ? `${theme.palette.success.main}15`
-                            : `${theme.palette.grey[500]}15`,
+                            ? alpha(theme.palette.success.main, 0.08)
+                            : alpha(theme.palette.grey[500], 0.08),
                         color:
                           user.status === "Active"
                             ? theme.palette.success.main

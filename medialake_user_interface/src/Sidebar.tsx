@@ -23,6 +23,7 @@ import {
   MenuItem,
   Avatar,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   AccountTree as PipelineIcon,
   Settings as SettingsIcon,
@@ -45,7 +46,7 @@ import { useTheme as useCustomTheme } from "./hooks/useTheme";
 import { useSidebar } from "./contexts/SidebarContext";
 import { ThemeToggle } from "./components/ThemeToggle";
 
-import { drawerWidth, collapsedDrawerWidth } from "@/constants";
+import { drawerWidth, collapsedDrawerWidth, springEasing } from "@/constants";
 
 function Sidebar() {
   const { t } = useTranslation();
@@ -109,7 +110,7 @@ function Sidebar() {
     if (isItemActive) {
       return theme.palette.primary.main;
     }
-    return customTheme === "dark" ? "white" : theme.palette.text.secondary;
+    return theme.palette.text.secondary;
   };
 
   const { ability } = usePermission();
@@ -256,16 +257,10 @@ function Sidebar() {
     // 1. We're already on this exact path, or
     // 2. We're on a sub-route of this path (except for root path '/')
     if (location.pathname === path || (path !== "/" && location.pathname.startsWith(path))) {
-      console.log(
-        `${t("app.navigation.preventedDuplicate", "Prevented duplicate navigation to")} ${path}`
-      );
       return;
     }
 
     // Log navigation for debugging
-    console.log(
-      `${t("app.navigation.navigating", "Navigating from")} ${location.pathname} to ${path}`
-    );
     navigate(path);
   };
 
@@ -282,27 +277,19 @@ function Sidebar() {
         position: "fixed",
         zIndex: theme.zIndex.drawer + 1,
         height: "100vh",
-        transition: (theme) =>
-          theme.transitions.create(["width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+        transition: `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         "& .MuiDrawer-paper": {
           width: isCollapsed ? collapsedDrawerWidth : drawerWidth,
           boxSizing: "border-box",
-          borderRight: isRTL ? "none" : "1px solid rgba(0,0,0,0.08)",
-          borderLeft: isRTL ? "1px solid rgba(0,0,0,0.08)" : "none",
+          borderRight: isRTL ? "none" : `1px solid ${alpha(theme.palette.divider, 0.12)}`,
+          borderLeft: isRTL ? `1px solid ${alpha(theme.palette.divider, 0.12)}` : "none",
           backgroundColor: theme.palette.background.paper,
           position: "fixed",
           height: "100vh",
           top: 0,
           [isRTL ? "right" : "left"]: 0,
           overflow: "visible",
-          transition: (theme) =>
-            theme.transitions.create(["width"], {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
+          transition: `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         },
       }}
     >
@@ -359,7 +346,7 @@ function Sidebar() {
             height: "32px",
             bgcolor: "background.paper",
             borderRadius: "8px",
-            boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+            boxShadow: (theme) => `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -369,7 +356,7 @@ function Sidebar() {
             padding: 0,
             "&:hover": {
               bgcolor: "background.paper",
-              boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+              boxShadow: (theme) => `0 4px 8px ${alpha(theme.palette.common.black, 0.12)}`,
             },
           }}
         >
@@ -414,10 +401,10 @@ function Sidebar() {
                             backgroundColor:
                               isActive(menuItem.path || "") ||
                               (menuItem.isExpandable && menuItem.isExpanded)
-                                ? `${theme.palette.primary.main}08`
+                                ? alpha(theme.palette.primary.main, 0.03)
                                 : "transparent",
                             "&:hover": {
-                              backgroundColor: `${theme.palette.primary.main}15`,
+                              backgroundColor: alpha(theme.palette.primary.main, 0.08),
                             },
                           }}
                         >
@@ -447,10 +434,10 @@ function Sidebar() {
                           backgroundColor:
                             isActive(menuItem.path || "") ||
                             (menuItem.isExpandable && menuItem.isExpanded)
-                              ? `${theme.palette.primary.main}08`
+                              ? alpha(theme.palette.primary.main, 0.03)
                               : "transparent",
                           "&:hover": {
-                            backgroundColor: `${theme.palette.primary.main}15`,
+                            backgroundColor: alpha(theme.palette.primary.main, 0.08),
                           },
                           borderRight:
                             isActive(menuItem.path || "") && !isRTL
@@ -491,9 +478,7 @@ function Sidebar() {
                                   isActive(menuItem.path || "") ||
                                   (menuItem.isExpandable && menuItem.isExpanded)
                                     ? theme.palette.primary.main
-                                    : customTheme === "dark"
-                                      ? "white"
-                                      : theme.palette.text.primary,
+                                    : theme.palette.text.primary,
                                 textAlign: isRTL ? "right" : "left",
                               }}
                             >
@@ -505,7 +490,7 @@ function Sidebar() {
                         {menuItem.isExpandable && (
                           <Box
                             sx={{
-                              color: customTheme === "dark" ? "white" : "inherit",
+                              color: "text.primary",
                             }}
                           >
                             {menuItem.isExpanded ? <ExpandLess /> : <ExpandMore />}
@@ -525,10 +510,10 @@ function Sidebar() {
                                 sx={{
                                   [isRTL ? "pr" : "pl"]: 6,
                                   backgroundColor: isSettingsActive(subItem.path)
-                                    ? `${theme.palette.primary.main}08`
+                                    ? alpha(theme.palette.primary.main, 0.03)
                                     : "transparent",
                                   "&:hover": {
-                                    backgroundColor: `${theme.palette.primary.main}15`,
+                                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
                                   },
                                   borderRight:
                                     isSettingsActive(subItem.path) && !isRTL
@@ -560,9 +545,7 @@ function Sidebar() {
                                         fontWeight: isSettingsActive(subItem.path) ? 600 : 400,
                                         color: isSettingsActive(subItem.path)
                                           ? theme.palette.primary.main
-                                          : customTheme === "dark"
-                                            ? "white"
-                                            : theme.palette.text.primary,
+                                          : theme.palette.text.primary,
                                         textAlign: isRTL ? "right" : "left",
                                       }}
                                     >
@@ -646,7 +629,7 @@ function Sidebar() {
                     height: 40,
                     borderRadius: "8px",
                     "&:hover": {
-                      backgroundColor: `${theme.palette.primary.main}15`,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
                     },
                   }}
                 >
@@ -675,7 +658,7 @@ function Sidebar() {
                   borderRadius: "8px",
                   px: 1.5,
                   "&:hover": {
-                    backgroundColor: `${theme.palette.primary.main}15`,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
                   },
                 }}
               >
@@ -692,7 +675,7 @@ function Sidebar() {
                 <Typography
                   variant="body2"
                   sx={{
-                    color: customTheme === "dark" ? "white" : theme.palette.text.primary,
+                    color: theme.palette.text.primary,
                     fontWeight: 500,
                   }}
                 >
@@ -718,7 +701,7 @@ function Sidebar() {
                   sx: {
                     width: "200px",
                     mt: -1,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
                   },
                 },
               }}

@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, useReactFlow } from "reactflow";
 import { Box, Typography, IconButton } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
 import { CustomNodeData } from "./CustomNode";
+import { colorTokens } from "@/theme/tokens";
 
 const HANDLE_CONNECT_RADIUS = 50;
 
@@ -170,7 +171,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
             id="completed"
             isConnectable={isConnectable}
             style={{
-              background: "#4CAF50", // Green for completed
+              background: colorTokens.success.main, // Green for completed
               width: "10px",
               height: "10px",
               border: "2px solid #fff",
@@ -198,7 +199,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
             id="in-progress"
             isConnectable={isConnectable}
             style={{
-              background: "#2196F3", // Blue for in progress
+              background: colorTokens.info.main, // Blue for in progress
               width: "10px",
               height: "10px",
               border: "2px solid #fff",
@@ -226,7 +227,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
             id="fail"
             isConnectable={isConnectable}
             style={{
-              background: "#F44336", // Red for fail
+              background: colorTokens.error.main, // Red for fail
               width: "10px",
               height: "10px",
               border: "2px solid #fff",

@@ -114,8 +114,6 @@ const ConnectorsPage: React.FC = () => {
       if (connectorData.type === "s3") {
         const response = await createS3Connector(connectorData);
 
-        // console.log('API Response:', response);
-
         if (Number(response.status) >= 400) {
           throw new Error(response.message || "Failed to create connector");
         }
@@ -152,7 +150,7 @@ const ConnectorsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title={t("connectors.title")}
         description={t("connectors.description")}

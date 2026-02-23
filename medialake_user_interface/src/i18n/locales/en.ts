@@ -365,7 +365,7 @@ export default {
     },
     bar: {
       label: "Search",
-      placeholder: "Search (e.g., sunset type:image)",
+      placeholder: "Search (e.g., sunset)",
       placeholderSemantic: "Search (e.g., a peaceful place)",
       helperText: "Use keywords like type:, format:, size:, date:, metadata: to filter results",
     },
@@ -761,6 +761,31 @@ export default {
     subCollections: "sub-collections",
     batchOperations: {
       deleteSelected: "Delete selected",
+      runPipeline: "Run Pipeline",
+      runPipelineTooltip: "Execute pipeline for selected assets",
+      noPipelinesAvailable: "No manual pipelines available for selected asset types",
+      selectPipeline: "Select a pipeline to execute",
+      pipelineLoading: "Loading pipelines...",
+      pipelineExecution: {
+        confirmTitle: "Execute Pipeline",
+        confirmMessage: "This will execute the pipeline for {{count}} selected asset{{plural}}.",
+        confirmInfo:
+          "Each asset will be processed individually. You can track progress in the Executions page.",
+        executing: "Executing Pipeline",
+        executingMessage: "Executing pipeline for {{count}} asset{{plural}}...",
+        success: "Pipeline Execution Started",
+        successMessage:
+          "Successfully started pipeline for {{successCount}} of {{totalCount}} asset{{plural}}",
+        partialSuccess: "Pipeline Execution Partially Started",
+        partialSuccessMessage:
+          "Started pipeline for {{successCount}} of {{totalCount}} assets ({{failedCount}} failed)",
+        failed: "Pipeline Execution Failed",
+        failedMessage: "Failed to start pipeline execution. Please try again.",
+        viewExecutions: "View Executions",
+        pipelineNotFound: "Pipeline not found",
+        insufficientPermissions: "You don't have permission to execute this pipeline",
+        noAssetsSelected: "No assets selected for pipeline execution",
+      },
     },
     confirmBulkDelete: "Confirm Bulk Delete",
     typeDeleteToConfirm: "Type DELETE to confirm",
@@ -880,6 +905,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "Add Marker",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",
@@ -916,6 +942,7 @@ export default {
       update: "Update",
       create: "Create",
       copied: "Copied!",
+      executePipeline: "Execute Pipeline",
     },
     pipelineEditor: {
       triggers: "Triggers",

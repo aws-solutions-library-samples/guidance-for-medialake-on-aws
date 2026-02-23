@@ -34,6 +34,7 @@ export interface AssetResultsViewProps<T> {
   confidenceThreshold?: number;
   onConfidenceThresholdChange?: (threshold: number) => void;
   detectedModelVersion?: string; // Model version detected from search results for threshold calculation
+  hideConfidenceSlider?: boolean; // Hide the confidence slider (e.g. for Coactive provider)
 
   // Search fields
   selectedFields?: string[];
@@ -115,6 +116,7 @@ function AssetResultsView<T>({
   confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
   detectedModelVersion,
+  hideConfidenceSlider = false,
 
   // Search fields
   selectedFields,
@@ -170,11 +172,6 @@ function AssetResultsView<T>({
   const { t } = useTranslation();
 
   // Debug: Check if we're receiving the onAddToCollectionClick prop
-  console.log(
-    "AssetResultsView: onAddToCollectionClick prop is:",
-    typeof onAddToCollectionClick,
-    onAddToCollectionClick
-  );
 
   // Local state for slider value during dragging (to prevent constant re-filtering)
   const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
@@ -263,9 +260,7 @@ function AssetResultsView<T>({
   }
 
   return (
-    <Box sx={{ mt: 1 }}>
-      {" "}
-      {/* Changed from -2 to 1 to move the view controller down */}
+    <Box>
       {isLoading && (
         <LinearProgress
           sx={{
@@ -277,58 +272,53 @@ function AssetResultsView<T>({
           }}
         />
       )}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 3 }}>
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
-            mb: 1,
+            mb: 2,
             flexWrap: "wrap",
             gap: 2,
           }}
         >
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 700,
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-              display: "block",
-              visibility: "visible",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {title}{" "}
+          {/* Left side — title + results count */}
+          <Box>
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                color: "primary.main",
+              }}
+            >
+              {title}
+            </Typography>
             {searchMetadata?.totalResults > 0 && searchTerm && (
               <Typography
-                component="span"
+                variant="body1"
                 sx={{
-                  fontWeight: 300,
-                  fontSize: "0.5em",
                   color: "text.secondary",
-                  opacity: 0.75,
+                  mt: 0.5,
                 }}
               >
-                (Found{" "}
+                Found{" "}
                 {isSemantic &&
+                !hideConfidenceSlider &&
                 confidenceThreshold > 0 &&
                 originalResults &&
                 results.length !== originalResults.length
                   ? results.length
                   : searchMetadata.totalResults}{" "}
-                results for "{searchTerm}")
+                results for &ldquo;{searchTerm}&rdquo;
               </Typography>
             )}
-          </Typography>
+          </Box>
 
-          {/* Confidence Slider - Only show for semantic search */}
+          {/* Confidence Slider - Only show for semantic search, hidden for Coactive provider */}
           {isSemantic &&
+            !hideConfidenceSlider &&
             (() => {
               // Use detected model version for thresholds, defaults to 2.7 if not available
               const thresholds = getThresholdsForModel(detectedModelVersion);
@@ -654,6 +644,7 @@ function AssetResultsView<T>({
         pageSize={searchMetadata.pageSize}
         totalResults={
           isSemantic &&
+          !hideConfidenceSlider &&
           confidenceThreshold > 0 &&
           originalResults &&
           results.length !== originalResults.length
@@ -664,6 +655,7 @@ function AssetResultsView<T>({
         onPageSizeChange={onPageSizeChange}
         isFiltered={
           isSemantic &&
+          !hideConfidenceSlider &&
           confidenceThreshold > 0 &&
           originalResults &&
           results.length !== originalResults.length

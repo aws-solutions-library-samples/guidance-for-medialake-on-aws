@@ -167,7 +167,6 @@ const FilterModal: React.FC<FilterModalProps> = () => {
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           maxHeight: "80vh",
         },
       }}
@@ -225,10 +224,10 @@ const FilterModal: React.FC<FilterModalProps> = () => {
                       borderRadius: "4px",
                       mr: 1,
                       "&.Mui-selected": {
-                        backgroundColor: "#1a4971",
-                        color: "#ffffff",
+                        backgroundColor: "primary.dark",
+                        color: "primary.contrastText",
                         "&:hover": {
-                          backgroundColor: "#153d61",
+                          backgroundColor: "primary.dark",
                         },
                       },
                     }}

@@ -369,7 +369,7 @@ export default {
     },
     bar: {
       label: "खोजें",
-      placeholder: "खोजें (उदा: sunset type:image)",
+      placeholder: "खोजें (उदा: sunset)",
       placeholderSemantic: "खोजें (उदा: एक शांत जगह)",
       helperText:
         "परिणाम फ़िल्टर करने के लिए type:, format:, size:, date:, metadata: जैसे कीवर्ड का उपयोग करें",
@@ -811,6 +811,31 @@ export default {
     subCollections: "उप-संग्रह",
     batchOperations: {
       deleteSelected: "चयनित हटाएं",
+      runPipeline: "पाइपलाइन चलाएं",
+      runPipelineTooltip: "चयनित एसेट्स के लिए पाइपलाइन निष्पादित करें",
+      noPipelinesAvailable: "चयनित एसेट प्रकारों के लिए कोई मैनुअल पाइपलाइन उपलब्ध नहीं",
+      selectPipeline: "निष्पादित करने के लिए एक पाइपलाइन चुनें",
+      pipelineLoading: "पाइपलाइन लोड हो रही हैं...",
+      pipelineExecution: {
+        confirmTitle: "पाइपलाइन निष्पादित करें",
+        confirmMessage: "यह {{count}} चयनित एसेट{{plural}} के लिए पाइपलाइन निष्पादित करेगा।",
+        confirmInfo:
+          "प्रत्येक एसेट को अलग-अलग संसाधित किया जाएगा। आप निष्पादन पृष्ठ पर प्रगति ट्रैक कर सकते हैं।",
+        executing: "पाइपलाइन निष्पादित हो रही है",
+        executingMessage: "{{count}} एसेट{{plural}} के लिए पाइपलाइन निष्पादित हो रही है...",
+        success: "पाइपलाइन निष्पादन शुरू हुआ",
+        successMessage:
+          "{{totalCount}} में से {{successCount}} एसेट{{plural}} के लिए पाइपलाइन सफलतापूर्वक शुरू हुई",
+        partialSuccess: "पाइपलाइन निष्पादन आंशिक रूप से शुरू हुआ",
+        partialSuccessMessage:
+          "{{totalCount}} में से {{successCount}} एसेट्स के लिए पाइपलाइन शुरू हुई ({{failedCount}} विफल)",
+        failed: "पाइपलाइन निष्पादन विफल",
+        failedMessage: "पाइपलाइन निष्पादन शुरू करने में विफल। कृपया पुनः प्रयास करें।",
+        viewExecutions: "निष्पादन देखें",
+        pipelineNotFound: "पाइपलाइन नहीं मिली",
+        insufficientPermissions: "आपके पास इस पाइपलाइन को निष्पादित करने की अनुमति नहीं है",
+        noAssetsSelected: "पाइपलाइन निष्पादन के लिए कोई एसेट चयनित नहीं",
+      },
     },
     confirmBulkDelete: "बल्क डिलीट की पुष्टि करें",
     typeDeleteToConfirm: "पुष्टि करने के लिए DELETE टाइप करें",
@@ -885,6 +910,7 @@ export default {
     clickToEdit: "संपादित करने के लिए क्लिक करें",
     downloadVersion: "इस संस्करण को डाउनलोड करें",
     resetMarker: "मार्कर को मूल स्थिति में रीसेट करें",
+    addMarker: "मार्कर जोड़ें",
     postComment: "अपनी टिप्पणी पोस्ट करें",
     runPipeline: "वर्तमान एसेट पर यह पाइपलाइन चलाएं",
     browsePipelines: "सभी उपलब्ध पाइपलाइन ब्राउज़ करें",
@@ -921,6 +947,7 @@ export default {
       update: "अपडेट करें",
       create: "बनाएं",
       copied: "Copied!",
+      executePipeline: "पाइपलाइन निष्पादित करें",
     },
     views: {
       cardView: "कार्ड दृश्य",

@@ -1,16 +1,16 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { createColumnHelper } from "@tanstack/react-table";
-import { Box, Tooltip, IconButton, Typography, FormControlLabel } from "@mui/material";
-import { IconSwitch } from "@/components/common";
+import { Box, Tooltip, IconButton, Typography, Chip, Switch } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { colorTokens } from "@/theme/tokens";
 import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
+  EditOutlined as EditIcon,
+  DeleteOutlineRounded as DeleteIcon,
+  CircleRounded as CircleIcon,
 } from "@mui/icons-material";
 import { TableCellContent } from "@/components/common/table";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { Pipeline } from "../types/pipelines.types";
 import { TriggerTypeChips } from "../components";
 
@@ -21,6 +21,19 @@ interface UsePipelineColumnsProps {
 }
 
 const columnHelper = createColumnHelper<Pipeline>();
+
+/** Ensure UTC timestamps without a Z suffix are parsed as UTC */
+const parseUtcDate = (value: string): Date => {
+  if (
+    value &&
+    !value.endsWith("Z") &&
+    !value.includes("+") &&
+    !/\d{2}:\d{2}$/.test(value.slice(-6))
+  ) {
+    return new Date(value + "Z");
+  }
+  return new Date(value);
+};
 
 export const usePipelineColumns = ({
   onEdit,
@@ -33,28 +46,48 @@ export const usePipelineColumns = ({
     () => [
       columnHelper.accessor("name", {
         header: t("common.columns.name"),
-        size: 200,
+        size: 220,
         enableSorting: true,
-        cell: ({ getValue }) => <TableCellContent variant="primary">{getValue()}</TableCellContent>,
+        cell: ({ getValue }) => {
+          const name = getValue();
+          return (
+            <TableCellContent variant="primary">
+              <Tooltip title={name} enterDelay={400} arrow>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    wordBreak: "break-word",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {name}
+                </Typography>
+              </Tooltip>
+            </TableCellContent>
+          );
+        },
       }),
       columnHelper.accessor("type", {
         header: t("common.columns.type"),
-        size: 150,
+        size: 220,
         enableSorting: true,
         cell: (info) => {
-          // Get the pipeline object
           const pipeline = info.row.original;
-
-          // Parse the comma-separated list into an array
-          const triggerTypes = info.getValue().split(",");
-
-          // Always display as "Event Triggered" regardless of the original value
-          const displayTypes = triggerTypes.map(() => "Event Triggered");
+          const triggerTypes = info
+            .getValue()
+            .split(",")
+            .map((t: string) => t.trim());
 
           return (
             <TableCellContent variant="secondary">
               <TriggerTypeChips
-                triggerTypes={displayTypes}
+                triggerTypes={triggerTypes}
                 eventRuleInfo={pipeline.eventRuleInfo}
                 pipeline={pipeline}
               />
@@ -62,170 +95,223 @@ export const usePipelineColumns = ({
           );
         },
       }),
-      // columnHelper.accessor('system', {
-      //     header: 'System',
-      //     size: 100,
-      //     enableSorting: true,
-      //     cell: info => (
-      //         <TableCellContent variant="secondary">
-      //             <Chip
-      //                 label={info.getValue() ? 'Yes' : 'No'}
-      //                 size="small"
-      //                 color={info.getValue() ? 'success' : 'default'}
-      //             />
-      //         </TableCellContent>
-      //     ),
-      // }),
+
       columnHelper.accessor("deploymentStatus", {
         header: t("common.columns.status"),
-        size: 150, // Increased size to accommodate the switch
+        size: 120,
         enableSorting: true,
         cell: (info) => {
           const status = info.getValue();
           const pipeline = info.row.original;
-          let color: "text.secondary" | "success.main" | "info.main" | "error.main" =
-            "text.secondary";
+          const isActive = pipeline.active !== false;
 
           if (status === "DEPLOYED") {
-            color = "success.main";
-          } else if (status === "CREATING") {
-            color = "info.main";
-          } else if (status === "FAILED") {
-            color = "error.main";
+            return (
+              <TableCellContent variant="secondary">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Switch
+                    size="small"
+                    checked={isActive}
+                    onChange={() => onToggleActive(pipeline.id, !isActive)}
+                    disabled={pipeline.system}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": {
+                        color: "success.main",
+                      },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        backgroundColor: "success.main",
+                      },
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      color: isActive ? "#2F855A" : "text.disabled",
+                    }}
+                  >
+                    {isActive ? "Active" : "Inactive"}
+                  </Typography>
+                </Box>
+              </TableCellContent>
+            );
           }
+
+          const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
+            CREATING: {
+              color: colorTokens.info.main,
+              bg: `rgba(49, 130, 206, 0.08)`,
+              border: `rgba(49, 130, 206, 0.2)`,
+            },
+            FAILED: {
+              color: colorTokens.error.main,
+              bg: `rgba(229, 62, 62, 0.08)`,
+              border: `rgba(229, 62, 62, 0.2)`,
+            },
+            DELETING: {
+              color: colorTokens.warning.main,
+              bg: `rgba(221, 107, 32, 0.08)`,
+              border: `rgba(221, 107, 32, 0.2)`,
+            },
+          };
+
+          const config = statusConfig[status || ""] || {
+            color: "text.secondary",
+            bg: "transparent",
+            border: "divider",
+          };
 
           return (
             <TableCellContent variant="secondary">
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                }}
-              >
-                {status !== "DEPLOYED" && (
-                  <Typography
-                    variant="body2"
+              <Chip
+                icon={
+                  <CircleIcon
                     sx={{
-                      color: color,
-                      fontWeight: "medium",
+                      fontSize: "8px !important",
+                      color: `${config.color} !important`,
                     }}
-                  >
-                    {status || "N/A"}
-                  </Typography>
-                )}
-
-                {status === "DEPLOYED" && (
-                  <FormControlLabel
-                    control={
-                      <IconSwitch
-                        size="small"
-                        checked={pipeline.active !== false}
-                        onChange={(e) => onToggleActive(pipeline.id, e.target.checked)}
-                        disabled={pipeline.system}
-                        onIcon={<CheckCircleIcon />}
-                        offIcon={<CancelIcon />}
-                        onColor="#2b6cb0"
-                        offColor="#757575"
-                        trackOnColor="#b2ebf2"
-                        trackOffColor="#cfd8dc"
-                      />
-                    }
-                    // label={pipeline.active !== false ? "Active" : "Inactive"}
-                    label=""
-                    sx={{ mt: 0, ml: 0 }}
                   />
-                )}
-              </Box>
+                }
+                label={status || "N/A"}
+                size="small"
+                sx={{
+                  height: 26,
+                  fontSize: "0.75rem",
+                  fontWeight: 500,
+                  color: config.color,
+                  bgcolor: config.bg,
+                  border: "1px solid",
+                  borderColor: config.border,
+                  "& .MuiChip-icon": { ml: 0.5 },
+                  "& .MuiChip-label": { px: 0.75 },
+                }}
+              />
             </TableCellContent>
           );
         },
       }),
+
       columnHelper.accessor("createdAt", {
         header: t("common.columns.created"),
-        size: 180,
+        size: 150,
         enableSorting: true,
         cell: ({ getValue }) => {
           const dateValue = getValue();
+          const date = parseUtcDate(dateValue);
+          const relative = formatDistanceToNow(date, { addSuffix: true });
+          const absolute = format(date, "MMM dd, yyyy 'at' h:mm a");
+
           return (
-            <Tooltip title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")} placement="top">
+            <Tooltip title={absolute} placement="top" arrow>
               <Box>
                 <TableCellContent variant="secondary">
-                  {format(new Date(dateValue), "MMM dd, yyyy")}
+                  <Typography
+                    variant="body2"
+                    sx={{ fontSize: "0.8125rem", color: "text.secondary" }}
+                  >
+                    {relative}
+                  </Typography>
                 </TableCellContent>
               </Box>
             </Tooltip>
           );
         },
       }),
+
       columnHelper.accessor("updatedAt", {
         header: t("common.columns.updated"),
-        size: 180,
+        size: 150,
         enableSorting: true,
         cell: ({ getValue }) => {
           const dateValue = getValue();
+          const date = parseUtcDate(dateValue);
+          const relative = formatDistanceToNow(date, { addSuffix: true });
+          const absolute = format(date, "MMM dd, yyyy 'at' h:mm a");
+
           return (
-            <Tooltip title={format(new Date(dateValue), "MMM dd, yyyy HH:mm")} placement="top">
+            <Tooltip title={absolute} placement="top" arrow>
               <Box>
                 <TableCellContent variant="secondary">
-                  {format(new Date(dateValue), "MMM dd, yyyy")}
+                  <Typography
+                    variant="body2"
+                    sx={{ fontSize: "0.8125rem", color: "text.secondary" }}
+                  >
+                    {relative}
+                  </Typography>
                 </TableCellContent>
               </Box>
             </Tooltip>
           );
         },
       }),
+
       columnHelper.display({
         id: "actions",
         header: t("common.columns.actions"),
-        size: 120,
-        cell: (info) => (
-          <Box sx={{ display: "flex", gap: 1 }} className="action-buttons">
-            <Tooltip
-              title={
-                info.row.original.deploymentStatus &&
-                !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
-                  ? "Cannot edit pipeline while it's being created"
-                  : "Edit Pipeline"
-              }
+        size: 100,
+        cell: (info) => {
+          const pipeline = info.row.original;
+          const isDeploying =
+            pipeline.deploymentStatus &&
+            !["DEPLOYED", "FAILED"].includes(pipeline.deploymentStatus);
+
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                gap: 0.5,
+                opacity: 0.6,
+                transition: "opacity 0.15s ease",
+                "tr:hover &": { opacity: 1 },
+              }}
+              className="action-buttons"
             >
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={() => onEdit(info.row.original.id)}
-                  disabled={
-                    info.row.original.deploymentStatus &&
-                    !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
-                  }
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip
-              title={
-                info.row.original.deploymentStatus &&
-                !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus)
-                  ? "Cannot delete pipeline while it's being created"
-                  : "Delete Pipeline"
-              }
-            >
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={() => onDelete(info.row.original.id, info.row.original.name)}
-                  disabled={
-                    info.row.original.system ||
-                    (info.row.original.deploymentStatus &&
-                      !["DEPLOYED", "FAILED"].includes(info.row.original.deploymentStatus))
-                  }
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Box>
-        ),
+              <Tooltip
+                title={isDeploying ? "Cannot edit while deploying" : t("common.editPipeline")}
+                arrow
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => onEdit(pipeline.id)}
+                    disabled={isDeploying}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": {
+                        color: "primary.main",
+                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                      },
+                    }}
+                  >
+                    <EditIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip
+                title={isDeploying ? "Cannot delete while deploying" : t("common.deletePipeline")}
+                arrow
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => onDelete(pipeline.id, pipeline.name)}
+                    disabled={pipeline.system || isDeploying}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": {
+                        color: "error.main",
+                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                      },
+                    }}
+                  >
+                    <DeleteIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
+          );
+        },
       }),
     ],
     [onEdit, onDelete, onToggleActive, t]

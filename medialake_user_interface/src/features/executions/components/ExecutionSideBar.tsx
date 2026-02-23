@@ -3,6 +3,7 @@ import { Box, Typography, IconButton, Divider, Paper, Stack, Slide, Link } from 
 import CloseIcon from "@mui/icons-material/Close";
 import { Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { typography } from "@/theme/tokens";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import type { PipelineExecution } from "../types/pipelineExecutions.types";
 
@@ -154,7 +155,9 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       <Typography variant="caption" color="text.secondary">
                         Asset ID
                       </Typography>
-                      <Typography sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
+                      <Typography
+                        sx={{ fontFamily: typography.monoFontFamily, fontSize: "0.875rem" }}
+                      >
                         {execution.inventory_id}
                       </Typography>
                     </Box>
@@ -180,7 +183,9 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                       <Typography variant="caption" color="text.secondary">
                         Pipeline Trace ID
                       </Typography>
-                      <Typography sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
+                      <Typography
+                        sx={{ fontFamily: typography.monoFontFamily, fontSize: "0.875rem" }}
+                      >
                         {execution.pipeline_trace_id}
                       </Typography>
                     </Box>
@@ -250,7 +255,7 @@ export const ExecutionSideBar: React.FC<ExecutionSideBarProps> = ({
                           color="error"
                           sx={{
                             whiteSpace: "pre-wrap",
-                            fontFamily: "monospace",
+                            fontFamily: typography.monoFontFamily,
                             fontSize: "0.75rem",
                             wordBreak: "break-word",
                           }}

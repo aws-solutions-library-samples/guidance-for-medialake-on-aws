@@ -15,7 +15,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSubmit, onClos
   const { t } = useTranslation();
 
   return (
-    <Box sx={{ p: 2, borderTop: "1px solid rgba(0, 0, 0, 0.12)" }}>
+    <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
       <Box sx={{ display: "flex", alignItems: "center" }}>
         <TextField
           variant="outlined"

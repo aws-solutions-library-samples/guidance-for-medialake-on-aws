@@ -31,6 +31,7 @@ import {
 import { EmptyTableState } from "@/components/common/table";
 import { useTranslation } from "react-i18next";
 import { getUpgradeHistory, type UpgradeRecord } from "@/api/updatesService";
+import { typography } from "@/theme/tokens";
 
 export const UpgradeHistoryView: React.FC = () => {
   const { t } = useTranslation();
@@ -150,7 +151,7 @@ export const UpgradeHistoryView: React.FC = () => {
                   <TableCell>
                     <Typography
                       variant="body2"
-                      sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                      sx={{ fontFamily: typography.monoFontFamily, fontSize: "0.875rem" }}
                     >
                       {record.from_version}
                     </Typography>
@@ -158,7 +159,7 @@ export const UpgradeHistoryView: React.FC = () => {
                   <TableCell>
                     <Typography
                       variant="body2"
-                      sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}
+                      sx={{ fontFamily: typography.monoFontFamily, fontSize: "0.875rem" }}
                     >
                       {record.to_version}
                     </Typography>

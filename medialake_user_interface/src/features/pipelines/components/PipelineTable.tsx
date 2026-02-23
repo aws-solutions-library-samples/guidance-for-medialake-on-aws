@@ -73,15 +73,15 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
           const pipeline = info.row.original;
 
           // Parse the comma-separated list into an array
-          const triggerTypes = info.getValue().split(",");
-
-          // Always display as "Event Triggered" regardless of the original value
-          const displayTypes = triggerTypes.map(() => "Event Triggered");
+          const triggerTypes = info
+            .getValue()
+            .split(",")
+            .map((t: string) => t.trim());
 
           return (
             <TableCellContent variant="secondary">
               <TriggerTypeChips
-                triggerTypes={displayTypes}
+                triggerTypes={triggerTypes}
                 eventRuleInfo={pipeline.eventRuleInfo}
                 pipeline={pipeline}
               />
@@ -89,7 +89,7 @@ export const PipelineTable: React.FC<PipelineTableProps> = ({
           );
         },
         enableSorting: true,
-        size: 150,
+        size: 220,
       }),
       // columnHelper.accessor('system', {
       //     header: 'System',

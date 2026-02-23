@@ -1,5 +1,6 @@
 import React, { ReactNode } from "react";
-import { Paper, Typography, Box, useTheme } from "@mui/material";
+import { Paper, Typography, Box, useTheme, alpha } from "@mui/material";
+import { motion } from "@/constants";
 
 interface StatCardProps {
   icon: ReactNode;
@@ -19,14 +20,14 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle
         height: "100%",
         display: "flex",
         alignItems: "center",
-        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        backgroundColor: alpha(theme.palette.background.paper, 0.8),
         backdropFilter: "blur(10px)",
         border: "1px solid",
         borderColor: "divider",
         borderRadius: 2,
-        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        transition: motion.cardHoverSubtle.transition,
         "&:hover": {
-          transform: "translateY(-2px)",
+          transform: motion.cardHoverSubtle.transform,
           boxShadow: theme.shadows[2],
         },
       }}

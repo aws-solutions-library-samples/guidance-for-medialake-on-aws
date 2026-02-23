@@ -22,28 +22,17 @@ import {
 } from "../utils/responseParser";
 
 export const useGetApiKeys = (enabled = false) => {
-  // Add a unique identifier to track each hook instance
-  const hookId = React.useId();
-  console.log(`useGetApiKeys hook instance created: ${hookId}`);
-
   return useQuery<ApiKey[], Error>({
     queryKey: QUERY_KEYS.API_KEYS.all,
     enabled: enabled,
     queryFn: async ({ signal }) => {
       try {
-        console.log(
-          `Fetching API keys... [${new Date().toISOString()}] from hook instance: ${hookId}`
-        );
         const { data } = await apiClient.get<any>(API_ENDPOINTS.API_KEYS.BASE, {
           signal,
         });
-        console.log(
-          `API keys API response [${new Date().toISOString()}] for hook instance: ${hookId}`
-        );
 
         // Use robust parser to handle all response formats
         const apiKeys = parseApiKeysList(data);
-        console.log(`Parsed ${apiKeys.length} API keys for hook instance: ${hookId}`);
         return apiKeys;
       } catch (error: any) {
         // Use centralized error handling for 403 errors
@@ -58,17 +47,14 @@ export const useGetApiKey = (id: string, enabled = true) => {
     queryKey: QUERY_KEYS.API_KEYS.detail(id),
     enabled: enabled && !!id,
     queryFn: async ({ signal }) => {
-      console.log(`Fetching API key with id: ${id}`);
       const { data } = await apiClient.get<ApiKeyListResponse>(
         // const { data } = await apiClient.get<any>(
         API_ENDPOINTS.API_KEYS.GET(id),
         { signal }
       );
-      console.log("API key API response:", data);
 
       // Use robust parser to handle all response formats
       const apiKey = parseApiKey(data);
-      console.log("Parsed API key:", apiKey);
       return apiKey;
     },
   });

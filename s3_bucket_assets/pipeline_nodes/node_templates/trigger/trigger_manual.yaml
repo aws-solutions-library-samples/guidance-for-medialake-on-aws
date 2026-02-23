@@ -1,0 +1,47 @@
+spec: v1.0.0
+
+node:
+  id: trigger_manual
+  title: Manual Trigger
+  description: Trigger pipeline manually via API for on-demand execution
+  version: 1.0.0
+  type: trigger
+
+integration:
+  config:
+    aws_eventbridge:
+      aws_eventbridge_rule: manual_trigger
+      event_pattern: {}
+
+actions:
+  trigger:
+    summary: Trigger pipeline manually via API
+    description: Enable manual triggering of this pipeline through the trigger API endpoint for on-demand execution
+    operationId: triggerManual
+    parameters:
+      - name: "Supported Content Types"
+        label: "Supported Content Types"
+        required: false
+        description: Filters which asset types can trigger the pipeline in batch operations
+        schema:
+          type: select
+          multiple: true
+          default:
+            - Video
+            - Audio
+            - Image
+          options:
+            - label: Video
+              value: Video
+            - label: Audio
+              value: Audio
+            - label: Image
+              value: Image
+
+connections:
+  incoming:
+    type:
+      - any
+  outgoing:
+    type:
+      - any

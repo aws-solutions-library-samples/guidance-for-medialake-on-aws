@@ -9,6 +9,7 @@ ENV
 ───
 MAX_CHUNK_SIZE_MB           default 50.0
 CHUNK_DURATION              default 7200 s
+OVERLAP_DURATION            default 0 s
 MEDIA_ASSETS_BUCKET_NAME    default source bucket
 EVENT_BUS_NAME              optional (for @lambda_middleware)
 """
@@ -147,6 +148,31 @@ def _error(code: int, msg: str) -> Dict[str, Any]:
     return {"statusCode": code, "body": json.dumps({"error": msg})}
 
 
+def _compute_chunk_bounds(
+    current_start: float,
+    max_chunk_dur: float,
+    overlap_dur: float,
+    total_duration: float,
+    is_first: bool,
+) -> Tuple[float, float]:
+    """Return (actual_start, actual_max_dur) for a chunk, accounting for overlap."""
+    logical_end = current_start + max_chunk_dur
+    is_last = logical_end >= total_duration
+
+    actual_start = current_start if is_first else max(0.0, current_start - overlap_dur)
+    remaining = total_duration - actual_start
+
+    if is_last:
+        actual_max_dur = remaining
+    elif is_first:
+        actual_max_dur = max_chunk_dur + overlap_dur
+    else:
+        actual_max_dur = max_chunk_dur + 2 * overlap_dur
+
+    actual_max_dur = min(actual_max_dur, remaining)
+    return actual_start, actual_max_dur
+
+
 # ────────────────────────────────────────────────────────── handler ──
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
@@ -196,6 +222,21 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:
             max_chunk_dur = 7200
             logger.warning("Invalid CHUNK_DURATION – defaulting to 7200 s")
 
+        raw_overlap = os.getenv("OVERLAP_DURATION") or str(
+            data.get("overlapDuration", "0")
+        )
+        try:
+            overlap_dur = max(0, int(raw_overlap))
+        except ValueError:
+            overlap_dur = 0
+        if overlap_dur >= max_chunk_dur:
+            return _bad_request(
+                f"Overlap duration ({overlap_dur}s) must be less than chunk duration ({max_chunk_dur}s)"
+            )
+        logger.info(
+            f"Splitting with chunk_duration={max_chunk_dur}s, overlap={overlap_dur}s"
+        )
+
         # Download source
         # Two download paths:
         # 1. Direct S3 download: Used when accessing proxy representations stored
@@ -228,27 +269,50 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:
 
         while current_start < total_duration:
             seg_idx += 1
+            is_first = seg_idx == 1
+
+            actual_start, actual_max_dur = _compute_chunk_bounds(
+                current_start, max_chunk_dur, overlap_dur, total_duration, is_first
+            )
+
             seg_name = f"{base_name}_segment_{seg_idx:03d}.mp4"
             seg_path = os.path.join(output_dir, seg_name)
 
-            logger.info(f"Creating segment {seg_idx} @ {current_start:.2f}s")
+            logger.info(f"Creating segment {seg_idx} @ {actual_start:.2f}s")
 
             ok, actual_dur = create_size_constrained_segment_copy(
-                input_path, seg_path, current_start, max_chunk_dur
+                input_path, seg_path, actual_start, actual_max_dur
             )
             if not ok:
                 return _error(500, f"Failed to create segment {seg_idx}")
+
+            overlap_before = current_start - actual_start
+            this_chunk_end = actual_start + actual_dur
+            logical_end = current_start + max_chunk_dur
+            overlap_after = max(0.0, this_chunk_end - min(logical_end, total_duration))
 
             segments.append(
                 {
                     "filename": seg_name,
                     "path": seg_path,
-                    "start_time": current_start,
+                    "start_time": actual_start,
+                    "logical_start_time": current_start,
                     "duration": actual_dur,
+                    "overlap_before": overlap_before,
+                    "overlap_after": overlap_after,
                     "size_mb": os.path.getsize(seg_path) / (1024 * 1024),
                 }
             )
-            current_start += actual_dur
+
+            if overlap_dur == 0:
+                current_start += actual_dur
+            else:
+                next_current_start = current_start + max_chunk_dur
+                next_planned_actual_start = max(0.0, next_current_start - overlap_dur)
+                if this_chunk_end < next_planned_actual_start:
+                    current_start = this_chunk_end
+                else:
+                    current_start = next_current_start
 
         # Upload & build response
         upload_bucket = os.getenv("MEDIA_ASSETS_BUCKET_NAME", source_bucket)
@@ -278,6 +342,10 @@ def lambda_handler(event: Dict[str, Any], context) -> Any:
                     "mediaType": "Video",
                     "asset_id": asset_id,
                     "inventory_id": inventory_id,
+                    "logical_start_time": seg["logical_start_time"],
+                    "overlap_before": seg["overlap_before"],
+                    "overlap_after": seg["overlap_after"],
+                    "is_chunk": True,
                 }
             )
 

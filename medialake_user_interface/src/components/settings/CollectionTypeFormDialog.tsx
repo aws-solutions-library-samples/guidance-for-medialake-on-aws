@@ -58,16 +58,16 @@ const AVAILABLE_ICONS = [
 ];
 
 const PRESET_COLORS = [
-  "#1976d2", // Blue
+  "#2B6CB0", // Blue (primary)
   "#388e3c", // Green
   "#d32f2f", // Red
-  "#f57c00", // Orange
+  "#6366F1", // Indigo (accent)
   "#7b1fa2", // Purple
-  "#0288d1", // Light Blue
+  "#14B8A6", // Teal (accent)
   "#c2185b", // Pink
   "#5d4037", // Brown
   "#616161", // Grey
-  "#00796b", // Teal
+  "#00796b", // Deep Teal
 ];
 
 interface CollectionTypeFormDialogProps {
@@ -211,8 +211,9 @@ const CollectionTypeFormDialog: React.FC<CollectionTypeFormDialogProps> = ({
                     backgroundColor: presetColor,
                     borderRadius: 1,
                     cursor: "pointer",
-                    border: color === presetColor ? "3px solid #000" : "1px solid #ddd",
-                    transition: "all 0.2s",
+                    border: color === presetColor ? "3px solid" : "1px solid",
+                    borderColor: color === presetColor ? "text.primary" : "divider",
+                    transition: "border-color 0.2s, transform 0.2s",
                     "&:hover": {
                       transform: "scale(1.1)",
                     },

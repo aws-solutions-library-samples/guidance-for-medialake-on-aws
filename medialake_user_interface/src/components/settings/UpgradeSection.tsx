@@ -42,6 +42,7 @@ import {
   type UpgradeStatusResponse,
 } from "@/api/updatesService";
 import { UpgradeHistoryView } from "@/components/settings/UpgradeHistoryView";
+import { typography } from "@/theme/tokens";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,8 +59,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => (
 export const UpgradeSection: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
-
-  console.log("🔧 UpgradeSection component mounted");
 
   const [tabValue, setTabValue] = useState(0);
   const [status, setStatus] = useState<UpgradeStatusResponse | null>(null);
@@ -90,9 +89,7 @@ export const UpgradeSection: React.FC = () => {
 
   const fetchStatus = async () => {
     try {
-      console.log("🔧 Calling getUpgradeStatus API...");
       const statusData = await getUpgradeStatus();
-      console.log("🔧 Status data received:", statusData);
       setStatus(statusData);
     } catch (err) {
       console.error("🔧 Failed to fetch status:", err);
@@ -102,20 +99,13 @@ export const UpgradeSection: React.FC = () => {
 
   const fetchVersions = async () => {
     try {
-      console.log("🔧 Calling getVersions API...");
       const versionsData = await getVersions();
-      console.log("🔧 Versions data received:", versionsData);
-      console.log("🔧 Versions data type:", typeof versionsData);
-      console.log("🔧 Versions data keys:", Object.keys(versionsData || {}));
-      console.log("🔧 Branches:", versionsData?.branches);
-      console.log("🔧 Tags:", versionsData?.tags);
 
       if (versionsData && versionsData.branches && versionsData.tags) {
         setVersions({
           branches: versionsData.branches,
           tags: versionsData.tags,
         });
-        console.log("🔧 ✓ Versions state updated successfully");
       } else {
         console.error("🔧 ✗ Invalid versions data structure:", versionsData);
         throw new Error("Invalid versions data structure");
@@ -127,14 +117,11 @@ export const UpgradeSection: React.FC = () => {
   };
 
   const loadData = async () => {
-    console.log("🔧 loadData called");
     setLoading(true);
     setError(null);
 
     try {
-      console.log("🔧 Fetching status and versions...");
       await Promise.all([fetchStatus(), fetchVersions()]);
-      console.log("🔧 Data loaded successfully");
     } catch (err: any) {
       console.error("🔧 Error loading data:", err);
       setError(err.message || "Failed to load upgrade information");
@@ -239,7 +226,7 @@ export const UpgradeSection: React.FC = () => {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-            <Typography variant="h5" sx={{ fontFamily: "monospace" }}>
+            <Typography variant="h5" sx={{ fontFamily: typography.monoFontFamily }}>
               {status?.current_version || "unknown"}
             </Typography>
             <Chip
@@ -352,7 +339,7 @@ export const UpgradeSection: React.FC = () => {
                                   gap: 1,
                                 }}
                               >
-                                <Typography sx={{ fontFamily: "monospace" }}>
+                                <Typography sx={{ fontFamily: typography.monoFontFamily }}>
                                   {version.name}
                                 </Typography>
                                 {version.is_latest && (
@@ -414,7 +401,7 @@ export const UpgradeSection: React.FC = () => {
                                   gap: 1,
                                 }}
                               >
-                                <Typography sx={{ fontFamily: "monospace" }}>
+                                <Typography sx={{ fontFamily: typography.monoFontFamily }}>
                                   {version.name}
                                 </Typography>
                                 {version.is_default && (

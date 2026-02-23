@@ -367,7 +367,7 @@ export default {
     },
     bar: {
       label: "検索",
-      placeholder: "検索（例：sunset type:image）",
+      placeholder: "検索（例：sunset）",
       placeholderSemantic: "検索（例：穏やかな場所）",
       helperText:
         "type:、format:、size:、date:、metadata:などのキーワードを使用して結果をフィルタリング",
@@ -808,6 +808,30 @@ export default {
     subCollections: "サブコレクション",
     batchOperations: {
       deleteSelected: "選択項目を削除",
+      runPipeline: "パイプラインを実行",
+      runPipelineTooltip: "選択したアセットに対してパイプラインを実行",
+      noPipelinesAvailable: "選択したアセットタイプに対応する手動パイプラインがありません",
+      selectPipeline: "実行するパイプラインを選択",
+      pipelineLoading: "パイプラインを読み込み中...",
+      pipelineExecution: {
+        confirmTitle: "パイプラインを実行",
+        confirmMessage: "{{count}}件の選択したアセット{{plural}}に対してパイプラインを実行します。",
+        confirmInfo: "各アセットは個別に処理されます。進捗は実行ページで確認できます。",
+        executing: "パイプラインを実行中",
+        executingMessage: "{{count}}件のアセット{{plural}}に対してパイプラインを実行中...",
+        success: "パイプラインの実行を開始しました",
+        successMessage:
+          "{{totalCount}}件中{{successCount}}件のアセット{{plural}}に対してパイプラインを正常に開始しました",
+        partialSuccess: "パイプラインの実行が部分的に開始されました",
+        partialSuccessMessage:
+          "{{totalCount}}件中{{successCount}}件のアセットに対してパイプラインを開始しました（{{failedCount}}件失敗）",
+        failed: "パイプラインの実行に失敗しました",
+        failedMessage: "パイプラインの実行を開始できませんでした。もう一度お試しください。",
+        viewExecutions: "実行を表示",
+        pipelineNotFound: "パイプラインが見つかりません",
+        insufficientPermissions: "このパイプラインを実行する権限がありません",
+        noAssetsSelected: "パイプライン実行用のアセットが選択されていません",
+      },
     },
     confirmBulkDelete: "一括削除の確認",
     typeDeleteToConfirm: "確認するには DELETE と入力してください",
@@ -900,6 +924,7 @@ export default {
       update: "更新",
       create: "作成",
       copied: "Copied!",
+      executePipeline: "パイプラインを実行",
     },
     dialogs: {
       cancel: "キャンセル",
@@ -1018,6 +1043,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    addMarker: "マーカーを追加",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
     browsePipelines: "Browse all available pipelines",

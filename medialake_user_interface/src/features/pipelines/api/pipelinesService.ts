@@ -8,6 +8,7 @@ import type {
   PipelineStatus,
   PipelineRun,
 } from "../types/pipelines.types";
+import type { TriggerPipelineResponse } from "@/api/types/pipeline.types";
 
 export class PipelinesService {
   static async getPipelines(): Promise<PipelinesResponse> {
@@ -105,14 +106,8 @@ export class PipelinesService {
   }
 
   static async deletePipeline(id: string): Promise<void> {
-    console.log(`[PipelinesService] Deleting pipeline with ID: ${id}`);
-    console.log(
-      `[PipelinesService] Using endpoint: ${PIPELINES_API.endpoints.DELETE_PIPELINE(id)}`
-    );
-
     // Simple, direct approach - let the controller handle timeouts and retries
     await apiClient.delete(PIPELINES_API.endpoints.DELETE_PIPELINE(id));
-    console.log(`[PipelinesService] Delete request sent for pipeline ID: ${id}`);
   }
 
   static async updateStatus(id: string, status: Partial<PipelineStatus>): Promise<Pipeline> {
@@ -135,5 +130,16 @@ export class PipelinesService {
 
   static async stopPipeline(id: string): Promise<void> {
     await apiClient.post(PIPELINES_API.endpoints.STOP_PIPELINE(id));
+  }
+
+  static async triggerPipeline(
+    pipelineId: string,
+    assets: { inventory_id: string; params?: Record<string, any> }[]
+  ): Promise<TriggerPipelineResponse> {
+    const response = await apiClient.post<TriggerPipelineResponse>(
+      PIPELINES_API.endpoints.TRIGGER_PIPELINE(pipelineId),
+      { assets }
+    );
+    return response.data;
   }
 }

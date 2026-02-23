@@ -16,12 +16,10 @@ export const useTokenRefresh = () => {
     try {
       // Check if token is expiring soon (5 minutes before expiry)
       if (isTokenExpiringSoon(token, 300)) {
-        console.log("Token is expiring soon, refreshing...");
         refreshInProgress.current = true;
 
         try {
           await refreshSession();
-          console.log("Token refreshed successfully");
         } catch (error) {
           console.error("Failed to refresh token:", error);
           // Silent check — don't flash a loading spinner

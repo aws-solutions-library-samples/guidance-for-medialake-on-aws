@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0] - 2026-02-23
+
+### Features
+
+- feat: add manual pipelines trigger node
+
+### Bug Fixes
+
+- fix: remove confidence slider for coactive search provider
+- fix: thumbnails being added to collections during creation and editing, on edit, user needs to save for thumbnail to take affect
+
+### Code Refactoring
+
+- refactor: user interface refactor to unify tokens, font, and spacing
+- refactor: modified video splitter and added a TwelveLabs Pegasus pipeline with video splitter
+- refactor: video and audio asset player, asset side bar, removal of excessive console logs
+
+### Other Changes
+
+- ci: update CloudFormation template to have 3 hr duration and explicitly block public access
+
 ## [1.9.0] - 2026-02-16
 
 ### Features

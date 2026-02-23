@@ -15,6 +15,9 @@ interface BatchOperationsWrapperProps {
   isDeleteLoading?: boolean;
   onClearSelection?: () => void;
   onRemoveItem?: (assetId: string) => void;
+  onBatchPipelineExecution?: (pipelineId: string) => void;
+  onBatchPipelineExecutionRequest?: (pipelineId: string, pipelineName: string) => void;
+  isPipelineExecutionLoading?: boolean;
 }
 
 const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
@@ -26,6 +29,9 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
   isDeleteLoading,
   onClearSelection,
   onRemoveItem,
+  onBatchPipelineExecution,
+  onBatchPipelineExecutionRequest,
+  isPipelineExecutionLoading,
 }) => {
   return (
     <Box sx={{ height: "100%" }}>
@@ -39,6 +45,9 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
           isDeleteLoading={isDeleteLoading}
           onClearSelection={onClearSelection}
           onRemoveItem={onRemoveItem}
+          onBatchPipelineExecution={onBatchPipelineExecution}
+          onBatchPipelineExecutionRequest={onBatchPipelineExecutionRequest}
+          isPipelineExecutionLoading={isPipelineExecutionLoading}
         />
       )}
     </Box>

@@ -5,7 +5,6 @@ export const notifyError = (message: string) => {
 };
 
 export const notifySuccess = (message: string) => {
-  console.log(message);
   // You can replace this with a proper notification system like react-toastify
   alert(message);
 };

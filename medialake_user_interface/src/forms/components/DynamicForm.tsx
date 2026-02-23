@@ -20,14 +20,6 @@ interface DynamicFormProps {
 
 export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
   ({ definition, defaultValues, onSubmit, onCancel, showButtons = true }) => {
-    // Only log initial mount
-    React.useEffect(() => {
-      console.log("[DynamicForm] Mounted:", {
-        formId: definition.id,
-        hasDefaultValues: !!defaultValues,
-      });
-    }, []);
-
     // Create a stable reference for fields
     const fields = React.useMemo(
       () => definition.fields,
@@ -50,24 +42,9 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
       if (field.showWhen) {
         const dependentValue = form.watch(field.showWhen.field);
 
-        // DEBUG: Log conditional field evaluation
-        console.log(`[DynamicForm] Conditional field evaluation:`, {
-          fieldName: field.name,
-          fieldLabel: field.label,
-          showWhenField: field.showWhen.field,
-          showWhenValue: field.showWhen.value,
-          currentValue: dependentValue,
-          shouldShow: dependentValue === field.showWhen.value,
-          allFormValues: form.getValues(),
-        });
-
         if (dependentValue !== field.showWhen.value) {
-          console.log(
-            `[DynamicForm] Hiding field ${field.name} because ${dependentValue} !== ${field.showWhen.value}`
-          );
           return null;
         }
-        console.log(`[DynamicForm] Showing field ${field.name} because condition matched`);
       }
 
       // Common props for all field types
@@ -106,7 +83,6 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
 
     const handleSubmit = React.useCallback(
       async (data: any) => {
-        console.log("[DynamicForm] Submitting form with data:", data);
         try {
           // Parse and validate
           const validatedData = schema.safeParse(data);
@@ -122,7 +98,6 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
             );
             try {
               await onSubmit(data);
-              console.log("[DynamicForm] Submit successful despite validation errors");
               return;
             } catch (submitError) {
               console.error("[DynamicForm] Submit failed with original data:", submitError);
@@ -130,7 +105,6 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
             }
           }
 
-          console.log("[DynamicForm] Validation successful, submitting data:", validatedData.data);
           await onSubmit(validatedData.data);
         } catch (error) {
           console.error("[DynamicForm] Submit error:", error);
@@ -143,7 +117,6 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
     // Only log errors and submission state
     React.useEffect(() => {
       if (form.formState.errors && Object.keys(form.formState.errors).length > 0) {
-        console.log("[DynamicForm] Form errors:", form.formState.errors);
       }
     }, [form.formState.errors]);
 

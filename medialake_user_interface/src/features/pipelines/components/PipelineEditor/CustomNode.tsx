@@ -4,6 +4,7 @@ import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from 
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
 import { RotateRight } from "@mui/icons-material";
+import { colorTokens } from "@/theme/tokens";
 
 const HANDLE_CONNECT_RADIUS = 50;
 
@@ -301,8 +302,6 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
   };
 
   // Debug logging
-  // console.log('[CustomNode] Input types:', data.inputTypes);
-  // console.log('[CustomNode] Output types:', data.outputTypes);
 
   // Helper function to check if node has configurable parameters
   const hasConfigurableParameters = () => {
@@ -453,13 +452,13 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                     style={{
                       background:
                         typeof inputType === "string"
-                          ? "#2B6CB0"
+                          ? colorTokens.primary.main
                           : (inputType as InputType).name === "Completed"
-                            ? "#4CAF50"
+                            ? colorTokens.success.main
                             : (inputType as InputType).name === "In Progress"
-                              ? "#2196F3"
+                              ? colorTokens.info.main
                               : (inputType as InputType).name === "Fail"
-                                ? "#F44336"
+                                ? colorTokens.error.main
                                 : "#555",
                       width: "12px",
                       height: "16px",
@@ -529,7 +528,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         </Box>
         {/* Expandable description with see more/less functionality */}
         <ExpandableDescription text={data.description} />
-        {/* Check if we have multiple output types or a single output */}
+        {/* Output handles */}
         {Array.isArray(outputTypes) &&
         outputTypes.length > 0 &&
         typeof outputTypes[0] === "object" &&
@@ -547,12 +546,12 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                     style={{
                       background:
                         output.name === "Completed"
-                          ? "#4CAF50"
+                          ? colorTokens.success.main
                           : output.name === "In Progress"
-                            ? "#2196F3"
+                            ? colorTokens.info.main
                             : output.name === "Fail"
-                              ? "#F44336"
-                              : "#2B6CB0",
+                              ? colorTokens.error.main
+                              : colorTokens.primary.main,
                       width: "12px",
                       height: "12px",
                       border: "1px solid #fff",
@@ -566,8 +565,29 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
               </Box>
             ))}
           </Box>
-        ) : // Single output handle (default behavior)
-        null}
+        ) : // Single output handle for trigger nodes, no handle for others
+        isTriggerNode ? (
+          <Box sx={getHandleContainerStyles(false, currentRotation)}>
+            <Box sx={getHandleItemStyles(currentRotation)}>
+              <Handle
+                type="source"
+                position={outputPos}
+                id="output-default"
+                isConnectable={isConnectable}
+                style={{
+                  background: colorTokens.primary.main,
+                  width: "12px",
+                  height: "12px",
+                  border: "1px solid #fff",
+                  borderRadius: "5px",
+                  transform: `rotate(${-currentRotation}deg)`,
+                  transformOrigin: "center center",
+                  ...edgeNudge(outputPos),
+                }}
+              />
+            </Box>
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );

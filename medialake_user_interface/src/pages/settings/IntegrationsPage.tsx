@@ -109,7 +109,6 @@ const IntegrationsPage: React.FC = () => {
   };
 
   const handleCloseApiStatus = () => {
-    console.log("Closing API status modal");
     setApiStatus((prev) => ({ ...prev, show: false }));
   };
 
@@ -127,16 +126,12 @@ const IntegrationsPage: React.FC = () => {
 
       // 2) Do the create/update API call
       if (editingIntegration) {
-        console.log("Starting integration update with data:", values);
         result = await updateIntegrationMutation.mutateAsync({
           id: editingIntegration.id,
           data: values,
         });
-        console.log("Integration updated successfully:", result);
       } else {
-        console.log("Starting integration creation with data:", values);
         result = await createIntegrationMutation.mutateAsync(values);
-        console.log("Integration created successfully:", result);
       }
 
       // 3) Show success
@@ -223,7 +218,6 @@ const IntegrationsPage: React.FC = () => {
   };
 
   // Log the current apiStatus state for debugging
-  console.log("Current apiStatus state:", apiStatus);
 
   return (
     <Box
@@ -236,7 +230,6 @@ const IntegrationsPage: React.FC = () => {
         width: "100%",
         position: "relative",
         maxWidth: "100%",
-        p: 3,
       }}
     >
       <PageHeader

@@ -57,7 +57,6 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           p: 1,
         },
       }}

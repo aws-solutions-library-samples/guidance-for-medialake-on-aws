@@ -341,6 +341,11 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       VersioningConfiguration:
         Status: Enabled
       LifecycleConfiguration:
@@ -641,7 +646,7 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
-      TimeoutInMinutes: 120
+      TimeoutInMinutes: 180
 
   DeployProject:
     Type: 'AWS::CodeBuild::Project'
@@ -693,7 +698,7 @@ Resources:
             files:
               - "**/*"
             base-directory: '.'
-      TimeoutInMinutes: 120
+      TimeoutInMinutes: 180
 
   # Pipeline with Git Source
   GitSourcePipeline:

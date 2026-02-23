@@ -39,6 +39,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { RightSidebarProvider, RightSidebar } from "@/components/common/RightSidebar";
 import TabbedSidebar from "@/components/common/RightSidebar/TabbedSidebar";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
+import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
@@ -138,7 +139,6 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   // Automatically navigate to last valid page when page is out of range
   React.useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
-      console.log(`Page ${page} is out of range. Navigating to last valid page: ${totalPages}`);
       handlePageChange(totalPages);
     }
   }, [totalPages, page]);
@@ -169,18 +169,14 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   // Handle favorite toggle
   const handleFavoriteToggle = (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
-    console.log("handleFavoriteToggle called with asset:", asset.InventoryID);
 
     const assetId = asset.InventoryID;
     const isFavorited = isAssetFavorited(assetId);
-    console.log("Current favorite status:", isFavorited);
 
     try {
       if (isFavorited) {
-        console.log("Removing favorite:", assetId);
         removeFavorite({ itemId: assetId, itemType: "ASSET" });
       } else {
-        console.log("Adding favorite:", assetId);
         addFavorite({
           itemId: assetId,
           itemType: "ASSET",
@@ -826,6 +822,8 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
             onRemoveItem={assetSelection.handleRemoveAsset}
             isDownloadLoading={assetSelection.isDownloadLoading}
             isDeleteLoading={assetSelection.isDeleteLoading}
+            onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
+            isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
           />
         </RightSidebar>
       </Box>
@@ -852,6 +850,22 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
         jobId={assetSelection.modalState.jobId}
         onCancel={assetSelection.modalState.onCancel}
         cancelDisabled={assetSelection.modalState.cancelDisabled}
+        link={assetSelection.modalState.link}
+      />
+
+      {/* Pipeline Execution Confirmation Dialog */}
+      <PipelineExecutionConfirmDialog
+        open={assetSelection.isPipelineExecutionDialogOpen}
+        onClose={assetSelection.handlePipelineExecutionDialogClose}
+        onConfirm={() =>
+          assetSelection.selectedPipelineForExecution &&
+          assetSelection.handleBatchPipelineExecution(
+            assetSelection.selectedPipelineForExecution.id
+          )
+        }
+        pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}
+        selectedCount={assetSelection.selectedAssets.length}
+        isLoading={assetSelection.isPipelineExecutionLoading}
       />
     </RightSidebarProvider>
   );

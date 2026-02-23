@@ -6,8 +6,15 @@ interface PageHeaderProps {
   title: string;
   description: string;
   action?: React.ReactNode;
+  /** When true, renders the title with a gradient instead of solid primary color. */
+  gradientTitle?: boolean;
 }
-const PageHeader: React.FC<PageHeaderProps> = ({ title, description, action }) => {
+const PageHeader: React.FC<PageHeaderProps> = ({
+  title,
+  description,
+  action,
+  gradientTitle = false,
+}) => {
   const theme = useTheme();
   const { direction } = useDirection();
   const isRTL = direction === "rtl";
@@ -28,8 +35,17 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, description, action }) =
             sx={{
               fontWeight: 700,
               mb: 1,
-              color: theme.palette.primary.main,
               textAlign: isRTL ? "right" : "left",
+              ...(gradientTitle
+                ? {
+                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    color: "transparent",
+                  }
+                : {
+                    color: theme.palette.primary.main,
+                  }),
             }}
           >
             {title}

@@ -59,7 +59,6 @@ const ExampleWithErrorHandling: React.FC = () => {
           onReset={handleReset}
           onError={(error, info) => {
             // You could log errors to your error reporting service here
-            console.log("Captured error:", error, info);
           }}
         >
           <BuggyCounter />

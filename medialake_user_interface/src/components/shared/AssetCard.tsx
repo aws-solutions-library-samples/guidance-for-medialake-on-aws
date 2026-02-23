@@ -160,8 +160,29 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
     const currentProxyUrlRef = useRef<string | undefined>(proxyUrl);
     const markerIdsRef = useRef<string[]>([]);
     const [videoLoadError, setVideoLoadError] = useState(false);
+    // Track whether the component is still mounted to guard deferred callbacks
+    const isMountedRef = useRef<boolean>(true);
+    const idleCallbackIdRef = useRef<number | null>(null);
+    const markerTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // IntersectionObserver for lazy loading videos and audio
+    useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+        isMountedRef.current = false;
+        // Cancel any pending idle callbacks or timeouts
+        if (idleCallbackIdRef.current !== null && "cancelIdleCallback" in window) {
+          cancelIdleCallback(idleCallbackIdRef.current);
+          idleCallbackIdRef.current = null;
+        }
+        if (markerTimeoutIdRef.current !== null) {
+          clearTimeout(markerTimeoutIdRef.current);
+          markerTimeoutIdRef.current = null;
+        }
+      };
+    }, []);
+
+    // IntersectionObserver for lazy loading videos and audio (separate effect)
     useEffect(() => {
       // Only observe if this is a video or audio asset
       if ((assetType !== "Video" && assetType !== "Audio") || !cardContainerRef.current) return;
@@ -260,6 +281,11 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               // Defer marker creation to idle time to avoid blocking video playback
               const scheduleMarkerCreation = () => {
                 const callback = () => {
+                  idleCallbackIdRef.current = null;
+                  // Guard: skip if component unmounted or player destroyed
+                  if (!isMountedRef.current || !omakasePlayerRef.current) {
+                    return;
+                  }
                   try {
                     // Clear any default markers that might have been created by the player
                     try {
@@ -373,10 +399,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
 
                 // Use requestIdleCallback to defer marker creation, with fallback to setTimeout
                 if ("requestIdleCallback" in window) {
-                  requestIdleCallback(callback, { timeout: 2000 });
+                  idleCallbackIdRef.current = requestIdleCallback(callback, { timeout: 2000 });
                 } else {
                   // Fallback for browsers without requestIdleCallback
-                  setTimeout(callback, 100);
+                  markerTimeoutIdRef.current = setTimeout(callback, 100);
                 }
               };
 
@@ -443,6 +469,10 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
       ) {
         // Defer marker updates to idle time to avoid blocking interactions
         const updateMarkers = () => {
+          // Guard: skip if component unmounted or player destroyed
+          if (!isMountedRef.current || !omakasePlayerRef.current) {
+            return;
+          }
           try {
             // Clear ALL existing markers
             try {
@@ -549,12 +579,23 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
         };
 
         // Use requestIdleCallback to defer marker updates, with fallback to setTimeout
+        let updateIdleId: number | null = null;
+        let updateTimeoutId: ReturnType<typeof setTimeout> | null = null;
         if ("requestIdleCallback" in window) {
-          requestIdleCallback(updateMarkers, { timeout: 1000 });
+          updateIdleId = requestIdleCallback(updateMarkers, { timeout: 1000 });
         } else {
           // Fallback for browsers without requestIdleCallback
-          setTimeout(updateMarkers, 50);
+          updateTimeoutId = setTimeout(updateMarkers, 50);
         }
+
+        return () => {
+          if (updateIdleId !== null && "cancelIdleCallback" in window) {
+            cancelIdleCallback(updateIdleId);
+          }
+          if (updateTimeoutId !== null) {
+            clearTimeout(updateTimeoutId);
+          }
+        };
       }
     }, [clips, isSemantic, confidenceThreshold, assetType, id]); // Update markers when clips or confidence threshold changes
 
@@ -974,7 +1015,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               width: 26,
               height: 26,
               backdropFilter: "blur(4px)",
-              transition: "all 0.2s ease-in-out",
+              transition: "background-color 0.2s ease-in-out, opacity 0.2s ease-in-out",
               "&:hover": {
                 bgcolor: alpha(theme.palette.background.default, 0.95),
               },

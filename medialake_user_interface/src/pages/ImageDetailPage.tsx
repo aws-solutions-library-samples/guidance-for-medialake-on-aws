@@ -14,11 +14,13 @@ import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TabContentContainer from "../components/common/TabContentContainer";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { springEasing } from "@/constants";
+import { colorTokens } from "@/theme/tokens";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
   const asset = assetData?.data?.asset;
-  const fileInfoColor = "#4299E1";
-  const techDetailsColor = "#68D391";
+  const fileInfoColor = colorTokens.primary.main;
+  const techDetailsColor = colorTokens.accent.main;
 
   // Extract metadata from API response
   const metadata = asset?.Metadata?.EmbeddedMetadata || {};
@@ -133,11 +135,8 @@ const RelatedItemsTab: React.FC<{
   isLoading: boolean;
   onLoadMore: () => void;
 }> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
-  console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
-
   const items = useMemo(() => {
     if (!relatedVersionsData?.data?.results) {
-      console.log("No results found in relatedVersionsData");
       return [];
     }
 
@@ -154,23 +153,19 @@ const RelatedItemsTab: React.FC<{
         result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
-    console.log("Mapped items:", mappedItems);
     return mappedItems;
   }, [relatedVersionsData]);
 
   const hasMore = useMemo(() => {
     if (!relatedVersionsData?.data?.searchMetadata) {
-      console.log("No searchMetadata found for hasMore calculation");
       return false;
     }
 
     const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     const hasMoreItems = totalResults > page * pageSize;
-    console.log("Has more items:", hasMoreItems);
     return hasMoreItems;
   }, [relatedVersionsData]);
 
-  console.log("Rendering RelatedItemsView with items:", items);
   return (
     <RelatedItemsView
       items={items}
@@ -434,12 +429,7 @@ const ImageDetailContent: React.FC = () => {
     setComments((prev) => [...prev, newCommentObj]);
   }, []);
 
-  console.log("ImageDetailContent - activeTab:", activeTab);
-  console.log("ImageDetailContent - relatedVersionsData:", relatedVersionsData);
-  console.log("ImageDetailContent - isLoadingRelated:", isLoadingRelated);
-
   const renderTabContent = () => {
-    console.log("renderTabContent - activeTab:", activeTab);
     switch (activeTab) {
       case "summary":
         return <SummaryTab assetData={assetData} />;
@@ -452,7 +442,6 @@ const ImageDetailContent: React.FC = () => {
           />
         );
       case "related":
-        console.log("Rendering RelatedItemsTab");
         return (
           <RelatedItemsTab
             relatedVersionsData={relatedVersionsData}
@@ -500,10 +489,7 @@ const ImageDetailContent: React.FC = () => {
         flexDirection: "column",
         maxWidth: isExpanded ? "calc(100% - 300px)" : "100%",
         transition: (theme) =>
-          theme.transitions.create(["max-width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          `max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         bgcolor: "transparent",
       }}
     >
@@ -574,7 +560,7 @@ const ImageDetailContent: React.FC = () => {
                 px: 2,
                 py: 1.5,
                 fontWeight: 500,
-                transition: "all 0.2s",
+                transition: "background-color 0.2s, color 0.2s",
                 "&:hover": {
                   backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                 },

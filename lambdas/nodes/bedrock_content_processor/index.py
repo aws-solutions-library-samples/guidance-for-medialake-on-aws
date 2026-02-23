@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 import time
 from decimal import Decimal
 from typing import Any, Callable, Dict, Optional, Union
@@ -434,6 +435,17 @@ def _strip_decimals(obj):
         return {k: _strip_decimals(v) for k, v in obj.items()}
     if isinstance(obj, Decimal):
         return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
+
+
+def _floats_to_decimals(obj):
+    """Recursively convert float values to Decimal for DynamoDB compatibility."""
+    if isinstance(obj, list):
+        return [_floats_to_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _floats_to_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, float):
+        return Decimal(str(obj))
     return obj
 
 
@@ -924,12 +936,49 @@ def extract_prompt_configuration(env_vars: Dict[str, str]) -> Dict[str, Any]:
 
 
 # ────────────────────────────────────────────────────────────
+def _detect_chunk_mode(event):
+    """Return (True, chunk_item) if the event carries a video chunk, else (False, None)."""
+    candidate = event.get("payload", {}).get("map", {}).get("item")
+    if candidate is None or not isinstance(candidate, dict):
+        candidate = event.get("payload", {}).get("data")
+    if (
+        isinstance(candidate, dict)
+        and candidate.get("is_chunk") is True
+        and "url" in candidate
+        and candidate.get("mediaType") == "Video"
+    ):
+        return True, candidate
+    return False, None
+
+
+def _format_chunk_time(seconds):
+    """Format seconds as H:MM:SS, always including the hours component."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
+def _build_chunk_label(base_label, run_timestamp, chunk_index, start_time, end_time):
+    """Build a human-readable label for a chunk result."""
+    return f"{base_label} – Run {run_timestamp} – Chunk {chunk_index:03d} ({_format_chunk_time(start_time)} – {_format_chunk_time(end_time)})"
+
+
+# ────────────────────────────────────────────────────────────
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
 def lambda_handler(event, context):
     try:
         logger.info("Event received", extra={"event": event})
+
+        is_chunk_mode, chunk_item = _detect_chunk_mode(event)
+        if is_chunk_mode:
+            logger.info(
+                f"Chunk mode: processing chunk {chunk_item.get('index')} from {chunk_item.get('url')}"
+            )
+
+        result_data = {}
 
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 1: EARLY VALIDATION (Fast, No Cost)
@@ -991,6 +1040,20 @@ def lambda_handler(event, context):
             logger.error(f"Invalid prompt configuration: {e}")
             raise
 
+        # Derive a user-friendly display label once, for use in both
+        # failure and success paths (chunk labels, stored metadata, etc.)
+        if prompt_source == "custom":
+            display_prompt_label = os.getenv("CUSTOM_PROMPT_LABEL", "") or prompt_label
+        elif prompt_source in ["saved", "default"]:
+            if prompt_name == "summary_100":
+                display_prompt_label = "Summary 100"
+            elif prompt_name:
+                display_prompt_label = prompt_name.replace("_", " ").title()
+            else:
+                display_prompt_label = prompt_label
+        else:
+            display_prompt_label = prompt_label
+
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 3: LABEL VALIDATION (Fast DynamoDB Read, Minimal Cost)
         # Must happen BEFORE content processing and Bedrock invocation!
@@ -1001,57 +1064,65 @@ def lambda_handler(event, context):
         if prompt_source == "custom":
             dynamo_key = f"BedrockPrompt_{prompt_label}"
 
-            # CHECK IF KEY EXISTS - Critical validation before expensive operations!
-            exists, existing_data = check_key_exists(table, asset_id, dynamo_key)
+            if not is_chunk_mode:
+                # CHECK IF KEY EXISTS - Critical validation before expensive operations!
+                exists, existing_data = check_key_exists(table, asset_id, dynamo_key)
 
-            if exists:
-                # Fail fast with detailed error - BEFORE spending money on Bedrock
-                pipeline_name = (
-                    event.get("metadata", {})
-                    .get("execution", {})
-                    .get("Name", "Unknown")
-                )
-                previous_pipeline = (
-                    existing_data.get("pipeline_name", "Unknown")
-                    if isinstance(existing_data, dict)
-                    else "Unknown"
-                )
-                previous_timestamp = (
-                    existing_data.get("timestamp", "Unknown")
-                    if isinstance(existing_data, dict)
-                    else "Unknown"
-                )
-                previous_model = (
-                    existing_data.get("model_id", "Unknown")
-                    if isinstance(existing_data, dict)
-                    else "Unknown"
-                )
+                if exists:
+                    # Fail fast with detailed error - BEFORE spending money on Bedrock
+                    pipeline_name = (
+                        event.get("metadata", {})
+                        .get("execution", {})
+                        .get("Name", "Unknown")
+                    )
+                    previous_pipeline = (
+                        existing_data.get("pipeline_name", "Unknown")
+                        if isinstance(existing_data, dict)
+                        else "Unknown"
+                    )
+                    previous_timestamp = (
+                        existing_data.get("timestamp", "Unknown")
+                        if isinstance(existing_data, dict)
+                        else "Unknown"
+                    )
+                    previous_model = (
+                        existing_data.get("model_id", "Unknown")
+                        if isinstance(existing_data, dict)
+                        else "Unknown"
+                    )
 
-                error_msg = (
-                    f"Label Conflict: A Bedrock result with label '{prompt_label}' already exists on this asset.\n\n"
-                    f"Existing Result Details:\n"
-                    f"  - Created by pipeline: {previous_pipeline}\n"
-                    f"  - Timestamp: {previous_timestamp}\n"
-                    f"  - Model: {previous_model}\n\n"
-                    f"Current Pipeline: {pipeline_name}\n\n"
-                    f"Solutions:\n"
-                    f"  1. Use a more specific label (e.g., '{prompt_label} - {pipeline_name}')\n"
-                    f"  2. Delete the existing result if it should be replaced\n"
-                    f"  3. Choose a different prompt label\n\n"
-                    f"Note: This validation prevented wasting costs on a Bedrock API call that would not be stored."
-                )
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                    error_msg = (
+                        f"Label Conflict: A Bedrock result with label '{prompt_label}' already exists on this asset.\n\n"
+                        f"Existing Result Details:\n"
+                        f"  - Created by pipeline: {previous_pipeline}\n"
+                        f"  - Timestamp: {previous_timestamp}\n"
+                        f"  - Model: {previous_model}\n\n"
+                        f"Current Pipeline: {pipeline_name}\n\n"
+                        f"Solutions:\n"
+                        f"  1. Use a more specific label (e.g., '{prompt_label} - {pipeline_name}')\n"
+                        f"  2. Delete the existing result if it should be replaced\n"
+                        f"  3. Choose a different prompt label\n\n"
+                        f"Note: This validation prevented wasting costs on a Bedrock API call that would not be stored."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
 
-            logger.info(
-                f"Label validation passed: '{prompt_label}' is available for asset {asset_id}"
-            )
+                logger.info(
+                    f"Label validation passed: '{prompt_label}' is available for asset {asset_id}"
+                )
+            else:
+                logger.info("Chunk mode: skipping label conflict check")
         else:
             # Saved or default prompts use standard key format
             dynamo_key = f"{prompt_label}Result"
             logger.info(f"Using standard DynamoDB key: {dynamo_key}")
-            dynamo_key = "Summary100Result"
-            logger.info("Using default prompt: summary_100")
+
+        if is_chunk_mode:
+            exec_id = event.get("metadata", {}).get("pipelineExecutionId", "unknown")
+            safe_exec_id = re.sub(r"[^a-zA-Z0-9\-]", "", exec_id)[:12]
+            chunk_index = chunk_item.get("index", 1)
+            dynamo_key = f"{dynamo_key}_{safe_exec_id}_chunk_{chunk_index:03d}"
+            logger.info(f"Chunk mode: DynamoDB key = {dynamo_key}")
 
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 3: CONTENT PROCESSING (Expensive - S3 reads, processing)
@@ -1083,38 +1154,25 @@ def lambda_handler(event, context):
                 body_json = None
 
         elif content_src == "proxy":
-            rep = next(
-                r
-                for r in asset_detail["DerivedRepresentations"]
-                if r["Purpose"] == "proxy"
-            )
-            loc = rep["StorageInfo"]["PrimaryLocation"]
-            fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
+            if is_chunk_mode:
+                fetched_uri = chunk_item["url"]
+                logger.info(f"Chunk mode: using chunk URI {fetched_uri}")
+            else:
+                rep = next(
+                    r
+                    for r in asset_detail["DerivedRepresentations"]
+                    if r["Purpose"] == "proxy"
+                )
+                loc = rep["StorageInfo"]["PrimaryLocation"]
+                fetched_uri = f"s3://{loc['Bucket']}/{loc['ObjectKey']['FullPath']}"
 
-            # For TwelveLabs models, pass S3 URI directly instead of base64
             body_json = build_bedrock_body(
                 model_id, instr, {"s3_uri": fetched_uri}
             ).encode("utf-8")
             use_chunking = False
 
-        elif file_uri:
-            text = get_file_content(file_uri)
-            fetched_uri = file_uri
-            logger.info(f"Loaded file from {file_uri}, length: {len(text)} chars")
-
-            try:
-                estimated_tokens = validate_input_size(
-                    text, model_id, max_tokens=100000
-                )
-                body_json = build_bedrock_body(model_id, instr, text).encode("utf-8")
-                use_chunking = False
-            except ValueError as e:
-                logger.warning(f"Input too large: {e}. Using chunking strategy.")
-                use_chunking = True
-                body_json = None
-
         else:
-            raise ValueError(f"Unsupported content source '{content_src}'")
+            raise ValueError(f"Unsupported content_source: {content_src!r}")
 
         try:
             profile_id = get_inference_profile_for_model(
@@ -1127,94 +1185,143 @@ def lambda_handler(event, context):
         # ── Invoke Bedrock ────────────────────────────────────────────────
         logger.info(f"Invoking {model_id} with payload from {fetched_uri}")
 
-        if use_chunking:
-            logger.info("Using chunking strategy for large content")
-            chunks = chunk_text(text, max_tokens=50000)
-            result = summarize_chunks(chunks, model_id, instr, bedrock_rt, profile_id)
-            logger.info(
-                f"Chunked processing complete. Final result length: {len(result)}"
-            )
-
-            data = {"result": result, "chunked": True, "num_chunks": len(chunks)}
-        else:
-            try:
-                resp = invoke_bedrock_with_retry(
-                    bedrock_rt, profile_id, body_json, "application/json"
+        try:
+            if use_chunking:
+                logger.info("Using chunking strategy for large content")
+                chunks = chunk_text(text, max_tokens=50000)
+                result = summarize_chunks(
+                    chunks, model_id, instr, bedrock_rt, profile_id
                 )
-            except ClientError as e:
-                error_code = e.response.get("Error", {}).get("Code", "")
-                if error_code == "ValidationException" and "token" in str(e).lower():
-                    logger.warning(
-                        "Token limit exceeded despite validation. Falling back to chunking."
-                    )
-                    chunks = chunk_text(text, max_tokens=50000)
-                    result = summarize_chunks(
-                        chunks, model_id, instr, bedrock_rt, profile_id
-                    )
-                    logger.info(
-                        f"Fallback chunking complete. Final result length: {len(result)}"
-                    )
-                    data = {
-                        "result": result,
-                        "chunked": True,
-                        "num_chunks": len(chunks),
-                    }
-                else:
-                    logger.error(f"Bedrock invoke failed after retries. Error: {e}")
-                    raise
-
-            if not use_chunking:
-                data = json.loads(resp["body"].read())
-                logger.info(f"Bedrock response structure: {list(data.keys())}")
-
-                # Extract result from Bedrock response
-                if "anthropic" in model_id.lower():
-                    result = data["content"][0]["text"]
-                elif "twelvelabs" in model_id.lower() and "pegasus" in model_id.lower():
-                    # TwelveLabs Pegasus returns message as a direct string
-                    result = data.get("message", "")
-                    logger.info(
-                        f"TwelveLabs Pegasus result extraction: {result[:100]}..."
-                        if result
-                        else "TwelveLabs Pegasus result is empty"
-                    )
-                elif "nova" in model_id.lower():
-                    result = (
-                        data.get("output", {})
-                        .get("message", {})
-                        .get("content", [{}])[0]
-                        .get("text", "")
-                    )
-                    logger.info(
-                        f"Nova result extraction: {result[:100]}..."
-                        if result
-                        else "Nova result is empty"
-                    )
-                elif "images" in data:
-                    result = data["images"][0]
-                else:
-                    result = data.get("completion", data.get("generated_text", ""))
-
                 logger.info(
-                    f"Final extracted result length: {len(result) if result else 0}"
+                    f"Chunked processing complete. Final result length: {len(result)}"
                 )
+
+                data = {"result": result, "chunked": True, "num_chunks": len(chunks)}
+            else:
+                try:
+                    resp = invoke_bedrock_with_retry(
+                        bedrock_rt, profile_id, body_json, "application/json"
+                    )
+                except ClientError as e:
+                    error_code = e.response.get("Error", {}).get("Code", "")
+                    if (
+                        error_code == "ValidationException"
+                        and "token" in str(e).lower()
+                    ):
+                        logger.warning(
+                            "Token limit exceeded despite validation. Falling back to chunking."
+                        )
+                        chunks = chunk_text(text, max_tokens=50000)
+                        result = summarize_chunks(
+                            chunks, model_id, instr, bedrock_rt, profile_id
+                        )
+                        logger.info(
+                            f"Fallback chunking complete. Final result length: {len(result)}"
+                        )
+                        data = {
+                            "result": result,
+                            "chunked": True,
+                            "num_chunks": len(chunks),
+                        }
+                    else:
+                        logger.error(f"Bedrock invoke failed after retries. Error: {e}")
+                        raise
+
+                if not use_chunking:
+                    data = json.loads(resp["body"].read())
+                    logger.info(f"Bedrock response structure: {list(data.keys())}")
+
+                    # Extract result from Bedrock response
+                    if "anthropic" in model_id.lower():
+                        result = data["content"][0]["text"]
+                    elif (
+                        "twelvelabs" in model_id.lower()
+                        and "pegasus" in model_id.lower()
+                    ):
+                        # TwelveLabs Pegasus returns message as a direct string
+                        result = data.get("message", "")
+                        logger.info(
+                            f"TwelveLabs Pegasus result extraction: {result[:100]}..."
+                            if result
+                            else "TwelveLabs Pegasus result is empty"
+                        )
+                    elif "nova" in model_id.lower():
+                        result = (
+                            data.get("output", {})
+                            .get("message", {})
+                            .get("content", [{}])[0]
+                            .get("text", "")
+                        )
+                        logger.info(
+                            f"Nova result extraction: {result[:100]}..."
+                            if result
+                            else "Nova result is empty"
+                        )
+                    elif "images" in data:
+                        result = data["images"][0]
+                    else:
+                        result = data.get("completion", data.get("generated_text", ""))
+
+                    logger.info(
+                        f"Final extracted result length: {len(result) if result else 0}"
+                    )
+        except Exception as bedrock_exc:
+            if is_chunk_mode:
+                run_timestamp = event.get("metadata", {}).get(
+                    "pipelineExecutionStartTime", ""
+                )
+                failed_label = (
+                    _build_chunk_label(
+                        display_prompt_label,
+                        run_timestamp,
+                        chunk_item.get("index", 1),
+                        chunk_item.get("start_time", 0),
+                        chunk_item.get("end_time", 0),
+                    )
+                    + " — FAILED"
+                )
+                failure_data = _floats_to_decimals(
+                    {
+                        "prompt_label": failed_label,
+                        "chunk_status": "failed",
+                        "chunk_index": chunk_item.get("index"),
+                        "chunk_start_time": chunk_item.get("start_time"),
+                        "chunk_end_time": chunk_item.get("end_time"),
+                        "error_summary": f"{type(bedrock_exc).__name__}: {str(bedrock_exc)[:200]}",
+                        "pipeline_execution_id": event.get("metadata", {}).get(
+                            "pipelineExecutionId", "unknown"
+                        ),
+                        "run_timestamp": run_timestamp,
+                    }
+                )
+                logger.error(
+                    f"Chunk {chunk_item.get('index')} failed, writing placeholder: {bedrock_exc}"
+                )
+                try:
+                    table.update_item(
+                        Key={"InventoryID": asset_id},
+                        UpdateExpression="SET Metadata.Descriptive.#k = :v",
+                        ExpressionAttributeNames={"#k": dynamo_key},
+                        ExpressionAttributeValues={":v": failure_data},
+                    )
+                except ClientError as ddb_e:
+                    if "document path" in str(ddb_e).lower():
+                        table.update_item(
+                            Key={"InventoryID": asset_id},
+                            UpdateExpression="SET Metadata.Descriptive = :desc",
+                            ExpressionAttributeValues={
+                                ":desc": {dynamo_key: failure_data}
+                            },
+                        )
+                    else:
+                        raise
+            raise  # always re-raise
 
         # ── Persist back to DynamoDB ──────────────────────────────────────
         from datetime import datetime
 
         # Get original prompt label (before sanitization) from environment
-        original_prompt_label = os.getenv("CUSTOM_PROMPT_LABEL", "")
-        if not original_prompt_label and prompt_source == "custom":
-            original_prompt_label = prompt_label
-        elif prompt_source in ["saved", "default"]:
-            # For saved prompts, create a user-friendly label
-            if prompt_name == "summary_100":
-                original_prompt_label = "Summary 100"
-            elif prompt_name:
-                # Convert snake_case to Title Case
-                original_prompt_label = prompt_name.replace("_", " ").title()
-            else:
-                original_prompt_label = prompt_label
+        original_prompt_label = display_prompt_label
 
         # Build result data with metadata
         result_data = {
@@ -1244,9 +1351,42 @@ def lambda_handler(event, context):
                 result_data["prompt_name"] = prompt_name
             logger.info(f"Storing {prompt_source} prompt result: {prompt_name}")
 
+        if is_chunk_mode:
+            run_timestamp = event.get("metadata", {}).get(
+                "pipelineExecutionStartTime", ""
+            )
+            exec_id = event.get("metadata", {}).get("pipelineExecutionId", "unknown")
+            result_data["chunk_index"] = chunk_item.get("index")
+            result_data["chunk_start_time"] = chunk_item.get("start_time")
+            result_data["chunk_end_time"] = chunk_item.get("end_time")
+            result_data["chunk_logical_start_time"] = chunk_item.get(
+                "logical_start_time"
+            )
+            result_data["chunk_overlap_before"] = chunk_item.get("overlap_before", 0)
+            result_data["chunk_overlap_after"] = chunk_item.get("overlap_after", 0)
+            result_data["chunk_duration"] = chunk_item.get("duration")
+            result_data["pipeline_execution_id"] = exec_id
+            result_data["run_timestamp"] = run_timestamp
+            result_data["chunk_status"] = "success"
+            result_data["prompt_label"] = _build_chunk_label(
+                display_prompt_label,
+                run_timestamp,
+                chunk_item.get("index", 1),
+                chunk_item.get("start_time", 0),
+                chunk_item.get("end_time", 0),
+            )
+
         # Store in Metadata.Descriptive.[PROMPTKEY] structure
         descriptive_key = prompt_label  # Use sanitized version for key
+        if is_chunk_mode:
+            descriptive_key = (
+                dynamo_key  # use the execution-scoped key for the DynamoDB write
+            )
         logger.info(f"Storing result at Metadata.Descriptive.{descriptive_key}")
+
+        # Convert any float values to Decimal for DynamoDB compatibility
+        # (video splitter outputs floats for start_time, end_time, duration, etc.)
+        result_data = _floats_to_decimals(result_data)
 
         # Try to set the nested value directly
         # If parent paths don't exist, DynamoDB will fail with ValidationException

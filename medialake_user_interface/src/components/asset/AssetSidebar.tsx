@@ -7,8 +7,6 @@ import { UserAvatar } from "../common/UserAvatar";
 import {
   Box,
   Typography,
-  Tabs,
-  Tab,
   List,
   ListItem,
   ListItemIcon,
@@ -102,10 +100,8 @@ const loadSemanticModificationsFromStorage = (
 ): Record<string, Partial<MarkerInfo>> => {
   try {
     const key = getSemanticModificationsStorageKey(assetId);
-    console.log("LOADING from localStorage:", { key });
     const stored = localStorage.getItem(key);
     const result = stored ? JSON.parse(stored) : {};
-    console.log("LOADED from localStorage:", result);
     return result;
   } catch (error) {
     console.warn("Failed to load semantic modifications from localStorage:", error);
@@ -119,9 +115,7 @@ const saveSemanticModificationsToStorage = (
 ): void => {
   try {
     const key = getSemanticModificationsStorageKey(assetId);
-    console.log("SAVING to localStorage:", { key, modifications });
     localStorage.setItem(key, JSON.stringify(modifications));
-    console.log("SAVED successfully to localStorage");
   } catch (error) {
     console.error("Failed to save semantic modifications to localStorage:", error);
   }
@@ -150,8 +144,6 @@ const saveConfidenceLevelToStorage = (confidenceLevel: number): void => {
 
 // Utility functions for timecode editing
 const parseTimecodeToSeconds = (timecode: string): number | null => {
-  console.log("parseTimecodeToSeconds called with:", timecode);
-
   // Support formats: HH:MM:SS:FF, HH:MM:SS.mmm, MM:SS.mmm, SS.mmm, or just seconds
   const patterns = [
     /^(\d{1,2}):(\d{2}):(\d{2}):(\d{2})$/, // HH:MM:SS:FF (frames)
@@ -163,7 +155,6 @@ const parseTimecodeToSeconds = (timecode: string): number | null => {
 
   for (let i = 0; i < patterns.length; i++) {
     const match = timecode.match(patterns[i]);
-    console.log(`Pattern ${i} (${patterns[i]}) match:`, match);
 
     if (match) {
       let result: number;
@@ -194,12 +185,10 @@ const parseTimecodeToSeconds = (timecode: string): number | null => {
         default:
           result = 0;
       }
-      console.log("Parsed result:", result);
       return result;
     }
   }
 
-  console.log("No pattern matched, returning null");
   return null;
 };
 
@@ -248,16 +237,9 @@ const EditableTimecode: React.FC<{
   };
 
   const handleSaveEdit = () => {
-    console.log("handleSaveEdit called with editValue:", editValue);
     const newTimeSeconds = parseTimecodeToSeconds(editValue);
-    console.log("Parsed time seconds:", newTimeSeconds);
 
     if (newTimeSeconds !== null) {
-      console.log("Calling onUpdate with:", {
-        markerId,
-        field,
-        newTimeSeconds,
-      });
       onUpdate(markerId, field, newTimeSeconds);
     } else {
       console.warn("Failed to parse timecode:", editValue);
@@ -432,17 +414,20 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
   };
 
   return (
-    <List disablePadding sx={{ p: 1 }}>
+    <List disablePadding sx={{ p: 1.5 }}>
       {versions.length === 0 ? (
         <Box
           sx={{
             p: 3,
             textAlign: "center",
-            bgcolor: alpha(theme.palette.background.paper, 0.4),
-            borderRadius: 1,
+            bgcolor: (theme) => alpha(theme.palette.background.default, 0.4),
+            borderRadius: "10px",
+            border: "1px dashed",
+            borderColor: (theme) => alpha(theme.palette.divider, 0.3),
           }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <HistoryIcon sx={{ fontSize: 28, opacity: 0.2, mb: 0.5, display: "block", mx: "auto" }} />
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
             No versions available
           </Typography>
         </Box>
@@ -452,41 +437,73 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
             <ListItem
               alignItems="flex-start"
               sx={{
-                py: 2,
-                px: 1,
-                borderRadius: 1,
+                py: 1.5,
+                px: 1.5,
+                borderRadius: "10px",
+                border: "1px solid",
+                borderColor: (theme) => alpha(theme.palette.divider, 0.08),
+                bgcolor: (theme) => alpha(theme.palette.background.default, 0.3),
+                mb: 1,
+                transition:
+                  "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                 "&:hover": {
-                  bgcolor: alpha(theme.palette.primary.main, 0.04),
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
+                  borderColor: (theme) => alpha(theme.palette.primary.main, 0.15),
+                  boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette.common.black, 0.04)}`,
                 },
               }}
             >
               <Box sx={{ width: "100%" }}>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   {getVersionIcon(version)}
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.825rem" }}>
                     {version.type.charAt(0).toUpperCase() + version.type.slice(1).toLowerCase()}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                  <Box
+                    component="span"
+                    sx={{
+                      ml: "auto",
+                      display: "inline-flex",
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: "6px",
+                      bgcolor: (theme) => alpha(theme.palette.text.secondary, 0.08),
+                      fontSize: "0.7rem",
+                      color: "text.secondary",
+                      fontWeight: 500,
+                    }}
+                  >
                     {version.format}
-                  </Typography>
+                  </Box>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
                   <strong>{t("assets.fields.size")}:</strong>{" "}
                   {version.size || t("common.notAvailable")}
                 </Typography>
-                <Box sx={{ display: "flex", mt: 1 }}>
+                <Box sx={{ display: "flex", mt: 1.5 }}>
                   <Tooltip title={t("common.downloadVersion")}>
                     <Button
                       variant="outlined"
                       size="small"
-                      sx={{ mr: 1, textTransform: "none" }}
+                      sx={{
+                        mr: 1,
+                        textTransform: "none",
+                        borderRadius: "8px",
+                        fontSize: "0.775rem",
+                        fontWeight: 500,
+                        borderColor: (theme) => alpha(theme.palette.divider, 0.3),
+                        "&:hover": {
+                          borderColor: "primary.main",
+                          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
+                        },
+                      }}
                       onClick={() => handleDownload(version)}
                       disabled={downloadingVersionId === version.id}
                       startIcon={
                         downloadingVersionId === version.id ? (
-                          <CircularProgress size={16} />
+                          <CircularProgress size={14} />
                         ) : (
-                          <DownloadIcon fontSize="small" />
+                          <DownloadIcon sx={{ fontSize: 16 }} />
                         )
                       }
                     >
@@ -508,7 +525,6 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                 </Box>
               </Box>
             </ListItem>
-            {index < versions.length - 1 && <Divider component="li" sx={{ my: 0.5 }} />}
           </React.Fragment>
         ))
       )}
@@ -559,6 +575,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
   // Flag to prevent subscription events during reset operations
   const isResettingMarker = useRef<Set<string>>(new Set());
+  // Track retry timeouts for marker creation so they can be cleaned up on unmount
+  const markerRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch user information
   useEffect(() => {
@@ -592,28 +610,17 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   // Function to get the display name of the current search provider
   const getSearchProviderName = useCallback(() => {
     // Debug logging to see what we're getting
-    console.log("=== SEARCH PROVIDER DEBUG ===");
-    console.log("Full providerData:", providerData);
-    console.log("providerData?.data:", providerData?.data);
 
     const provider = providerData?.data?.searchProvider;
-    console.log("Extracted provider:", provider);
 
     if (!provider) {
-      console.log("No provider found, returning default");
       return "semantic search";
     }
 
-    console.log("Provider type:", provider.type);
-    console.log("Provider name:", provider.name);
-
     // Use provider name first, fallback to type, then sanitize
     const rawName = provider.name || provider.type || "semantic search";
-    console.log("Raw name before sanitization:", rawName);
 
     const sanitizedName = sanitizeProviderName(rawName);
-    console.log("Final sanitized name:", sanitizedName);
-    console.log("=== END SEARCH PROVIDER DEBUG ===");
 
     return sanitizedName;
   }, [providerData]);
@@ -626,7 +633,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     // First, try to load from localStorage
     const storedThreshold = loadConfidenceLevelFromStorage();
     if (storedThreshold !== null) {
-      console.log("Loading confidence level from localStorage:", storedThreshold);
       setScoreThreshold(storedThreshold);
       setScoreThresholdInitialized(true);
       return;
@@ -645,11 +651,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       // Set threshold slightly below the minimum score to show all clips by default
       const minScore = Math.min(...visualTextClips.map((clip) => clip.score || 0));
       const defaultThreshold = Math.max(0, minScore - 0.1); // 0.1 below minimum score
-      console.log(
-        "Available clip scores:",
-        visualTextClips.map((c) => c.score)
-      );
-      console.log("Setting default score threshold to:", defaultThreshold);
       setScoreThreshold(defaultThreshold);
       // Save the initial threshold to localStorage
       saveConfidenceLevelToStorage(defaultThreshold);
@@ -659,15 +660,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
   // Load user markers from localStorage on component mount (state only)
   useEffect(() => {
-    console.log("User marker loading useEffect triggered. AssetId:", assetId);
-
     if (!assetId) {
-      console.log("No assetId, skipping user marker loading");
       return;
     }
 
     const storedMarkers = loadUserMarkersFromStorage(assetId);
-    console.log("Loading stored user markers:", storedMarkers);
 
     // Load semantic modifications
     const storedModifications = loadSemanticModificationsFromStorage(assetId);
@@ -703,12 +700,23 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       return;
     }
 
-    console.log("Creating timeline markers for user markers:", userMarkers.length);
+    // Get existing markers in the lane to avoid duplicate additions
+    const existingLaneMarkers = lane.getMarkers();
+    const existingLaneMarkerIds = new Set(existingLaneMarkers.map((m) => m.id));
 
     userMarkers.forEach((marker) => {
-      // Skip if marker already exists in timeline
+      // Skip if marker already exists in our ref map
       if (markerRefsMap.current.has(marker.id)) {
-        console.log(`User marker ${marker.id} already exists in timeline`);
+        return;
+      }
+
+      // Skip if marker already exists in the lane (e.g. player persisted across navigation)
+      if (existingLaneMarkerIds.has(marker.id)) {
+        // Re-populate the ref map so other logic (subscriptions, delete, etc.) still works
+        const existingMarker = existingLaneMarkers.find((m) => m.id === marker.id);
+        if (existingMarker) {
+          markerRefsMap.current.set(marker.id, existingMarker as PeriodMarker);
+        }
         return;
       }
 
@@ -722,7 +730,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         },
       });
 
-      console.log(`Adding user marker ${marker.id} to timeline and markerRefsMap`);
       markerRefsMap.current.set(marker.id, periodMarker);
       lane.addMarker(periodMarker);
     });
@@ -765,56 +772,28 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
     const userMarkers = markers.filter((m) => m.type === "user");
     if (userMarkers.length > 0) {
-      console.log("Saving user markers to localStorage:", userMarkers);
       saveUserMarkersToStorage(assetId, userMarkers);
     }
   }, [markers, assetId]);
 
   // Set up subscriptions for all markers
   useEffect(() => {
-    console.log("SUBSCRIPTION USEEFFECT TRIGGERED");
-    console.log("Dependencies:", {
-      videoViewerRef: !!videoViewerRef?.current,
-      markersLength: markers.length,
-      assetId: !!assetId,
-      markerRefsMapSize: markerRefsMap.current.size,
-    });
-
     const subscriptions: any[] = [];
 
     // Get all markers from the lane
     if (videoViewerRef?.current) {
       const lane = videoViewerRef.current.getMarkerLane();
       if (lane) {
-        console.log(
-          "Setting up subscriptions for markers:",
-          Array.from(markerRefsMap.current.keys())
-        );
-        console.log(
-          "Current markers in state:",
-          markers.map((m) => ({ id: m.id, type: m.type }))
-        );
-
         markerRefsMap.current.forEach((periodMarker, id) => {
-          console.log(`Setting up subscription for marker ${id}`);
-
           try {
             const subscription = periodMarker.onChange$.subscribe({
               next: (event) => {
                 // Skip processing if this marker is being reset
                 if (isResettingMarker.current.has(id)) {
-                  console.log("IGNORING marker change during reset:", id);
                   return;
                 }
 
-                console.log("MARKER CHANGED EVENT:", {
-                  id,
-                  type: markers.find((m) => m.id === id)?.type,
-                  newTimeObservation: event.timeObservation,
-                });
-
                 setMarkers((prevMarkers) => {
-                  console.log("Updating markers state for:", id);
                   const updatedMarkers = prevMarkers.map((marker) =>
                     marker.id === id
                       ? {
@@ -830,7 +809,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   // If this is a semantic marker and we have an assetId, save the modification
                   const changedMarker = updatedMarkers.find((m) => m.id === id);
                   if (changedMarker?.type === "semantic" && assetId) {
-                    console.log("Saving semantic marker modification for:", id);
                     const currentModifications = loadSemanticModificationsFromStorage(assetId);
                     const newModifications = {
                       ...currentModifications,
@@ -843,16 +821,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     };
                     saveSemanticModificationsToStorage(assetId, newModifications);
                     setSemanticModifications(newModifications);
-                    console.log("Saved semantic marker modification:", {
-                      id,
-                      timeObservation: event.timeObservation,
-                    });
                   }
 
-                  console.log(
-                    "Returning updated markers:",
-                    updatedMarkers.filter((m) => m.id === id)
-                  );
                   return updatedMarkers;
                 });
               },
@@ -861,15 +831,12 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               },
             });
             subscriptions.push(subscription);
-            console.log(`Successfully subscribed to marker ${id}`);
           } catch (error) {
             console.error(`Failed to subscribe to marker ${id}:`, error);
           }
         });
-
-        console.log(`Set up ${subscriptions.length} subscriptions total`);
       } else {
-        console.warn("No marker lane available for subscriptions");
+        // Marker lane not initialized yet — subscriptions will be set up on next render
       }
     } else {
       console.warn("No videoViewerRef available for subscriptions");
@@ -877,7 +844,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
     // Cleanup subscriptions
     return () => {
-      console.log(`Cleaning up ${subscriptions.length} subscriptions`);
       subscriptions.forEach((sub) => {
         try {
           if (sub && !sub.closed) {
@@ -902,7 +868,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         name: markerNames[marker.id] || marker.name,
       }));
 
-      console.log("Saving marker names to localStorage:", markersWithNames);
       saveUserMarkersToStorage(assetId, markersWithNames);
     }
   }, [markerNames, assetId, markers]);
@@ -941,16 +906,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           if (assetId) {
             const remainingUserMarkers = updatedMarkers.filter((m) => m.type === "user");
 
-            console.log(
-              "Deleting marker:",
-              markerId,
-              "Remaining user markers:",
-              remainingUserMarkers.length
-            );
-
             if (remainingUserMarkers.length === 0) {
               // If no user markers left, clear storage
-              console.log("No user markers left, clearing storage");
               clearMarkersFromStorage(assetId);
             } else {
               // Save remaining user markers with current names
@@ -958,7 +915,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 ...marker,
                 name: markerNames[marker.id] || marker.name,
               }));
-              console.log("Saving remaining user markers:", markersWithCurrentNames);
               saveUserMarkersToStorage(assetId, markersWithCurrentNames);
             }
           }
@@ -1015,24 +971,13 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
       // Remove this marker's modification from localStorage
       const storedModifications = loadSemanticModificationsFromStorage(assetId);
-      console.log("Current stored modifications before reset:", storedModifications);
-      console.log(
-        "Checking if marker exists in modifications:",
-        markerId,
-        "exists:",
-        !!storedModifications[markerId]
-      );
 
       if (storedModifications[markerId]) {
         const updatedModifications = { ...storedModifications };
         delete updatedModifications[markerId];
         saveSemanticModificationsToStorage(assetId, updatedModifications);
-        console.log("Updated modifications after deletion:", updatedModifications);
         setSemanticModifications(updatedModifications);
-        console.log("Set semantic modifications state to:", updatedModifications);
-        console.log("Removed semantic modification for marker:", markerId);
       } else {
-        console.log("No modification found for marker:", markerId, "in stored modifications");
         // Force update the state anyway to ensure consistency
         setSemanticModifications(storedModifications);
       }
@@ -1043,7 +988,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       if (lane && markerRef) {
         // Set flag to prevent subscription from firing during reset
         isResettingMarker.current.add(markerId);
-        console.log("Setting reset flag for marker:", markerId);
 
         // Update the timeline marker position
         markerRef.timeObservation = {
@@ -1054,7 +998,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         // Clear flag after a short delay to allow the change to propagate
         setTimeout(() => {
           isResettingMarker.current.delete(markerId);
-          console.log("Cleared reset flag for marker:", markerId);
         }, 100);
       }
 
@@ -1072,12 +1015,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             : m
         )
       );
-
-      console.log("Reset semantic marker to original position:", {
-        markerId,
-        start: startSeconds,
-        end: endSeconds,
-      });
     } catch (error) {
       console.error("Error resetting semantic marker:", error);
     }
@@ -1085,12 +1022,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
   // Function to update marker time (start or end) for both user and semantic markers
   const updateMarkerTime = (markerId: string, field: "start" | "end", newTimeSeconds: number) => {
-    console.log("updateMarkerTime called:", {
-      markerId,
-      field,
-      newTimeSeconds,
-    });
-
     if (!videoViewerRef?.current || !assetId) {
       console.warn("Missing videoViewerRef or assetId:", {
         videoViewerRef: !!videoViewerRef?.current,
@@ -1118,8 +1049,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         return;
       }
 
-      console.log("Found marker:", marker);
-
       // Get the marker reference from timeline
       const markerRef = markerRefsMap.current.get(markerId);
       if (!markerRef) {
@@ -1132,21 +1061,12 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         return;
       }
 
-      console.log("Found marker reference:", markerRef);
-
       // Calculate new time observation
       const currentTimeObservation = marker.timeObservation;
       const newTimeObservation = {
         start: field === "start" ? newTimeSeconds : currentTimeObservation.start,
         end: field === "end" ? newTimeSeconds : currentTimeObservation.end,
       };
-
-      console.log("Time observation update:", {
-        current: currentTimeObservation,
-        new: newTimeObservation,
-        field,
-        newTimeSeconds,
-      });
 
       // Validate that start < end
       if (newTimeObservation.start >= newTimeObservation.end) {
@@ -1155,26 +1075,18 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       }
 
       // Update the marker in the timeline
-      console.log("Updating marker reference timeObservation...");
       markerRef.timeObservation = newTimeObservation;
-      console.log("Marker reference updated:", markerRef.timeObservation);
 
       // Update the marker in our state
-      console.log("Updating markers state...");
       setMarkers((prevMarkers) => {
         const updatedMarkers = prevMarkers.map((m) =>
           m.id === markerId ? { ...m, timeObservation: newTimeObservation } : m
-        );
-        console.log(
-          "Markers state updated:",
-          updatedMarkers.find((m) => m.id === markerId)
         );
         return updatedMarkers;
       });
 
       // Handle persistence based on marker type
       if (marker.type === "user") {
-        console.log("Updating user marker persistence...");
         // For user markers, update localStorage
         const userMarkers = markers.filter((m) => m.type === "user");
         const updatedUserMarkers = userMarkers.map((m) =>
@@ -1187,9 +1099,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             : { ...m, name: markerNames[m.id] || m.name }
         );
         saveUserMarkersToStorage(assetId, updatedUserMarkers);
-        console.log("User marker saved to localStorage");
       } else if (marker.type === "semantic") {
-        console.log("Updating semantic marker modifications...");
         // For semantic markers, track as modification
         const currentModifications = loadSemanticModificationsFromStorage(assetId);
         const newModifications = {
@@ -1201,13 +1111,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         };
         saveSemanticModificationsToStorage(assetId, newModifications);
         setSemanticModifications(newModifications);
-        console.log("Semantic marker modifications saved");
       }
-
-      console.log(
-        `Successfully updated ${marker.type} marker ${markerId} ${field} time to:`,
-        newTimeSeconds
-      );
     } catch (error) {
       console.error("Error updating marker time:", error);
     }
@@ -1310,8 +1214,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           }
         }
       }
-
-      console.log(`Using frame rate: ${framesPerSecond} FPS for timecode conversion`);
     } catch (error) {
       console.warn("Could not extract frame rate from asset metadata, using default 25 FPS", error);
     }
@@ -1341,20 +1243,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           return;
         }
 
-        console.log("Updating timeline marker visibility for threshold:", newThreshold);
-        console.log("Total markers to process:", markers.length);
-        console.log("Markers by type:", {
-          user: markers.filter((m) => m.type === "user").length,
-          semantic: markers.filter((m) => m.type === "semantic").length,
-        });
-
-        // Debug: Show all marker IDs in state vs markerRefsMap
-        console.log(
-          "Marker IDs in state:",
-          markers.map((m) => m.id)
-        );
-        console.log("Marker IDs in markerRefsMap:", Array.from(markerRefsMap.current.keys()));
-
         // Iterate through all markers and show/hide based on threshold
         markers.forEach((marker) => {
           const markerRef = markerRefsMap.current.get(marker.id);
@@ -1364,52 +1252,42 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             return;
           }
 
-          console.log(
-            `✅ Processing marker ${marker.id}: type=${marker.type}, score=${marker.score}`
-          );
-
           // Always show user markers
           if (marker.type === "user") {
-            console.log(`Ensuring user marker ${marker.id} is visible`);
             // Ensure user markers are visible (add if not already added)
             try {
-              lane.addMarker(markerRef);
-              console.log(`✓ User marker ${marker.id} added/ensured visible`);
+              const existingMarkers = lane.getMarkers();
+              if (!existingMarkers.some((m) => m.id === marker.id)) {
+                lane.addMarker(markerRef);
+              }
             } catch (error) {
               // Marker might already be added, which is fine
-              console.log(`User marker ${marker.id} already visible:`, error.message);
             }
             return;
           }
 
           // For semantic markers, check score threshold
           const shouldShow = (marker.score || 0) >= newThreshold;
-          console.log(
-            `Semantic marker ${marker.id}: shouldShow=${shouldShow} (score: ${marker.score} >= ${newThreshold})`
-          );
 
           if (shouldShow) {
             // Show marker by adding it to the lane
             try {
-              lane.addMarker(markerRef);
-              console.log(`✓ Showing semantic marker ${marker.id} (score: ${marker.score})`);
+              const existingMarkers = lane.getMarkers();
+              if (!existingMarkers.some((m) => m.id === marker.id)) {
+                lane.addMarker(markerRef);
+              }
             } catch (error) {
               // Marker might already be added, which is fine
-              console.log(`Semantic marker ${marker.id} already visible:`, error.message);
             }
           } else {
             // Hide marker by removing it from the lane
             try {
               lane.removeMarker(marker.id);
-              console.log(`✗ Hiding semantic marker ${marker.id} (score: ${marker.score})`);
             } catch (error) {
               // Marker might already be removed, which is fine
-              console.log(`Semantic marker ${marker.id} already hidden:`, error.message);
             }
           }
         });
-
-        console.log("Timeline marker visibility update completed");
       } catch (error) {
         console.error("Error updating timeline marker visibility:", error);
       }
@@ -1419,55 +1297,25 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   // Retry mechanism for marker creation
   const createMarkersWithRetry = useCallback(
     (retryCount = 0) => {
-      const maxRetries = 15;
-      const retryDelay = 1000; // 1 second
+      const maxRetries = 50;
+      const retryDelay = 100; // 100ms — fast poll instead of 1s
 
       try {
         const lane = videoViewerRef.current?.getMarkerLane();
         if (!lane) {
           if (retryCount < maxRetries) {
-            console.log(
-              `Marker lane not available, retrying in ${retryDelay}ms (attempt ${
-                retryCount + 1
-              }/${maxRetries})`
-            );
-
-            // Try to force timeline settlement on every few attempts
-            if (retryCount % 3 === 2) {
-              console.log("Attempting to trigger timeline layout settlement...");
-              try {
-                // Force timeline resize/settlement
-                const timelineElement = document.getElementById("omakase-timeline");
-                if (timelineElement) {
-                  // Trigger multiple events that might cause timeline settlement
-                  const resizeEvent = new Event("resize");
-                  window.dispatchEvent(resizeEvent);
-
-                  // Also try to trigger a resize observer manually
-                  setTimeout(() => {
-                    const rect = timelineElement.getBoundingClientRect();
-                    console.log(`Timeline element dimensions: ${rect.width}x${rect.height}`);
-                  }, 100);
-                }
-              } catch (error) {
-                console.warn("Error triggering timeline settlement:", error);
-              }
-            }
-
-            setTimeout(() => {
+            markerRetryTimeoutRef.current = setTimeout(() => {
               createMarkersWithRetry(retryCount + 1);
             }, retryDelay);
             return;
           } else {
             console.error("Failed to get marker lane after maximum retries");
+            setIsLoadingSemanticMarkers(false);
             return;
           }
         }
 
         // Get all visual-text clips first
-        // console.log("=== FILTERING CLIPS DEBUG ===");
-        // console.log("Total clips in asset:", asset.clips.length);
-        // console.log("Sample clip structure:", asset.clips[0]);
 
         const allVisualTextClips = asset.clips
           .filter((clip) => {
@@ -1488,8 +1336,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           })
           .sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        // console.log("Filtered visual-text clips count:", allVisualTextClips.length);
-        // console.log(
         //   "All visual-text clips:",
         //   allVisualTextClips.map((c) => ({
         //     score: c.score,
@@ -1499,30 +1345,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         //     end: c.end_timecode || c.end_time,
         //   })),
         // );
-        // console.log("Current score threshold:", scoreThreshold);
-        // console.log("=== END FILTERING CLIPS DEBUG ===");
 
         // Create markers for all clips (filtering will be done at render time)
         const selectedClips = allVisualTextClips;
-
-        console.log(
-          "All visual-text clips with scores:",
-          allVisualTextClips.map((clip) => ({
-            start: clip.start_timecode || clip.start_time,
-            end: clip.end_timecode || clip.end_time,
-            score: clip.score,
-            embedding_option: clip.embedding_option,
-          }))
-        );
-        console.log(
-          `Selected ${selectedClips.length} visual-text clips:`,
-          selectedClips.map((clip) => ({
-            start: clip.start_timecode || clip.start_time,
-            end: clip.end_timecode || clip.end_time,
-            score: clip.score,
-            embedding_option: clip.embedding_option,
-          }))
-        );
 
         selectedClips.forEach((clip, index) => {
           // Handle both timecode formats - fallback to start_time if start_timecode is not available
@@ -1532,17 +1357,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           // Convert timecodes to seconds
           const startSeconds = timecodeToSeconds(startTime);
           const endSeconds = timecodeToSeconds(endTime);
-
-          console.log(`Clip ${index + 1} times:`, {
-            original: {
-              start: startTime,
-              end: endTime,
-            },
-            converted: {
-              start: startSeconds,
-              end: endSeconds,
-            },
-          });
 
           // Extract score from clip if available
           const clipScore = clip.score !== undefined ? clip.score : null;
@@ -1608,14 +1422,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         // Mark that we've created markers from clips and stop loading
         setClipsMarkersCreated(true);
         setIsLoadingSemanticMarkers(false);
-        console.log("Clips markers created successfully");
 
         // Load and apply stored semantic modifications
         if (assetId) {
           const storedModifications = loadSemanticModificationsFromStorage(assetId);
           if (storedModifications && Object.keys(storedModifications).length > 0) {
-            console.log("Applying stored semantic modifications:", storedModifications);
-
             // Apply modifications to both state and timeline markers
             setMarkers((prevMarkers) =>
               prevMarkers.map((marker) => {
@@ -1649,17 +1460,13 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
         // Force subscription setup for newly created semantic markers
         setTimeout(() => {
-          console.log("Triggering subscription setup for semantic markers");
           // This will trigger the subscription useEffect by updating markers length
           setMarkers((prevMarkers) => [...prevMarkers]);
         }, 200); // Slightly longer delay to ensure everything is settled
       } catch (error) {
         console.error("Error creating markers from clips:", error);
         if (retryCount < maxRetries) {
-          console.log(
-            `Retrying marker creation in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`
-          );
-          setTimeout(() => {
+          markerRetryTimeoutRef.current = setTimeout(() => {
             createMarkersWithRetry(retryCount + 1);
           }, retryDelay);
         }
@@ -1680,16 +1487,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
   useEffect(() => {
     // Debug logging for asset and clips
-    // console.log("=== CLIP MARKERS DEBUG - START ===");
-    // console.log("Asset object:", asset);
-    // console.log("Asset clips:", asset?.clips);
-    // console.log("Has clips?", !!asset?.clips);
-    // console.log("Is clips array?", Array.isArray(asset?.clips));
-    // console.log("Clips length:", asset?.clips?.length);
-    // console.log("First clip sample:", asset?.clips?.[0]);
-    // console.log("VideoViewerRef available?", !!videoViewerRef?.current);
-    // console.log("Clips markers already created?", clipsMarkersCreated);
-    // console.log("=== CLIP MARKERS DEBUG - END ===");
 
     if (!videoViewerRef?.current || !asset?.clips || !Array.isArray(asset.clips)) {
       // console.warn("Skipping marker creation - missing requirements:", {
@@ -1702,18 +1499,20 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 
     // Skip if markers have already been created from clips
     if (clipsMarkersCreated) {
-      console.log("Clips markers already created, skipping");
       return;
     }
 
-    // Set loading state and start marker creation with retry mechanism after a short delay
+    // Set loading state and start marker creation immediately with fast polling
     setIsLoadingSemanticMarkers(true);
-    const timer = setTimeout(() => {
-      createMarkersWithRetry();
-    }, 2000); // Wait 2 seconds for the video player to initialize
+    // Start immediately — createMarkersWithRetry will fast-poll (100ms) for the lane
+    createMarkersWithRetry();
 
     return () => {
-      clearTimeout(timer);
+      // Clear any in-progress retry timeouts
+      if (markerRetryTimeoutRef.current) {
+        clearTimeout(markerRetryTimeoutRef.current);
+        markerRetryTimeoutRef.current = null;
+      }
     };
   }, [asset?.clips, videoViewerRef, clipsMarkersCreated, createMarkersWithRetry, scoreThreshold]);
 
@@ -1724,15 +1523,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     const lane = videoViewerRef.current.getMarkerLane();
     if (!lane) return;
 
-    console.log(
-      "Updating marker visibility. Markers:",
-      markers.length,
-      "User markers visible:",
-      showUserMarkers,
-      "Semantic markers visible:",
-      showSemanticMarkers
-    );
-
     markers.forEach((marker) => {
       let markerRef = markerRefsMap.current.get(marker.id);
 
@@ -1742,13 +1532,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           showSemanticMarkers &&
           (marker.score || 0) >= scoreThreshold);
 
-      console.log(`Marker ${marker.id} (${marker.type}): shouldShow=${shouldShow}`);
-
       if (shouldShow) {
         // Create marker reference if it doesn't exist
         if (!markerRef) {
-          console.log(`Creating new markerRef for ${marker.id}`);
-
           // Determine the color - always use score from payload for semantic markers
           let markerColor;
           if (marker.type === "user") {
@@ -1775,12 +1561,10 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
         // Add marker to timeline if not already there
         const existingMarkers = lane.getMarkers();
         if (!existingMarkers.some((m) => m.id === marker.id)) {
-          console.log(`Adding marker ${marker.id} to timeline`);
           lane.addMarker(markerRef);
         }
       } else if (markerRef) {
         // Remove marker from timeline
-        console.log(`Removing marker ${marker.id} from timeline`);
         lane.removeMarker(marker.id);
         // Remove from markerRefsMap to prevent subscription cleanup issues
         markerRefsMap.current.delete(marker.id);
@@ -1793,90 +1577,218 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     updateMarkerVisibility();
   }, [updateMarkerVisibility]);
 
+  const userMarkerCount = markers?.filter((m) => m.type === "user").length || 0;
+  const aiMarkerCount =
+    markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold).length || 0;
+
   return (
-    <Box sx={{ p: 2 }}>
-      {/* Show/Hide Controls */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-          Marker Visibility
-        </Typography>
-        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showUserMarkers}
-                onChange={(e) => setShowUserMarkers(e.target.checked)}
-                size="small"
-              />
+    <Box sx={{ p: 1.5, pt: 1 }}>
+      {/* Compact toolbar: visibility toggles + add button in one row */}
+      <Box
+        sx={{
+          mb: 2,
+          display: "flex",
+          alignItems: "center",
+          gap: 0.75,
+        }}
+      >
+        {/* User toggle chip */}
+        <Box
+          onClick={() => setShowUserMarkers(!showUserMarkers)}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 1.375,
+            py: 0.75,
+            borderRadius: "7px",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            letterSpacing: "0.01em",
+            userSelect: "none",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+            bgcolor: (theme) =>
+              showUserMarkers
+                ? alpha(theme.palette.primary.main, 0.1)
+                : alpha(theme.palette.action.hover, theme.palette.mode === "dark" ? 0.12 : 0.6),
+            color: (theme) =>
+              showUserMarkers ? theme.palette.primary.main : theme.palette.text.secondary,
+            border: "1px solid",
+            borderColor: (theme) =>
+              showUserMarkers
+                ? alpha(theme.palette.primary.main, 0.25)
+                : alpha(theme.palette.divider, 0.12),
+            "&:hover": {
+              bgcolor: (theme) =>
+                showUserMarkers
+                  ? alpha(theme.palette.primary.main, 0.15)
+                  : alpha(theme.palette.action.hover, theme.palette.mode === "dark" ? 0.2 : 0.8),
+            },
+          }}
+        >
+          <PersonIcon sx={{ fontSize: 16 }} />
+          <span>User</span>
+          <Box
+            component="span"
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 18,
+              height: 18,
+              borderRadius: "4px",
+              fontSize: "0.675rem",
+              fontWeight: 700,
+              bgcolor: (theme) =>
+                showUserMarkers
+                  ? alpha(theme.palette.primary.main, 0.15)
+                  : alpha(theme.palette.text.secondary, 0.1),
+              lineHeight: 1,
+              px: 0.5,
+            }}
+          >
+            {userMarkerCount}
+          </Box>
+        </Box>
+
+        {/* AI toggle chip */}
+        <Box
+          onClick={() => setShowSemanticMarkers(!showSemanticMarkers)}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 1.375,
+            py: 0.75,
+            borderRadius: "7px",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            letterSpacing: "0.01em",
+            userSelect: "none",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+            bgcolor: (theme) =>
+              showSemanticMarkers
+                ? alpha(theme.palette.info.main, 0.1)
+                : alpha(theme.palette.action.hover, theme.palette.mode === "dark" ? 0.12 : 0.6),
+            color: (theme) =>
+              showSemanticMarkers ? theme.palette.info.main : theme.palette.text.secondary,
+            border: "1px solid",
+            borderColor: (theme) =>
+              showSemanticMarkers
+                ? alpha(theme.palette.info.main, 0.25)
+                : alpha(theme.palette.divider, 0.12),
+            "&:hover": {
+              bgcolor: (theme) =>
+                showSemanticMarkers
+                  ? alpha(theme.palette.info.main, 0.15)
+                  : alpha(theme.palette.action.hover, theme.palette.mode === "dark" ? 0.2 : 0.8),
+            },
+          }}
+        >
+          <SmartToyIcon sx={{ fontSize: 16 }} />
+          <span>AI</span>
+          <Box
+            component="span"
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 18,
+              height: 18,
+              borderRadius: "4px",
+              fontSize: "0.675rem",
+              fontWeight: 700,
+              bgcolor: (theme) =>
+                showSemanticMarkers
+                  ? alpha(theme.palette.info.main, 0.15)
+                  : alpha(theme.palette.text.secondary, 0.1),
+              lineHeight: 1,
+              px: 0.5,
+            }}
+          >
+            {aiMarkerCount}
+          </Box>
+        </Box>
+
+        {/* Spacer */}
+        <Box sx={{ flex: 1 }} />
+
+        {/* Add marker button — compact icon+text */}
+        <Box
+          onClick={addMarker}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              addMarker();
             }
-            label={
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <PersonIcon fontSize="small" />
-                <Typography variant="body2">
-                  User Markers ({markers?.filter((m) => m.type === "user").length || 0})
-                </Typography>
-              </Box>
-            }
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showSemanticMarkers}
-                onChange={(e) => setShowSemanticMarkers(e.target.checked)}
-                size="small"
-              />
-            }
-            label={
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <SmartToyIcon fontSize="small" />
-                <Typography variant="body2">
-                  Semantic Markers (
-                  {markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
-                    .length || 0}
-                  )
-                </Typography>
-              </Box>
-            }
-          />
+          }}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 1.625,
+            py: 0.75,
+            borderRadius: "7px",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            userSelect: "none",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+            bgcolor: (theme) => theme.palette.primary.main,
+            color: (theme) => theme.palette.primary.contrastText,
+            "&:hover": {
+              bgcolor: (theme) => theme.palette.primary.dark,
+              boxShadow: (theme) => `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
+            },
+            "&:active": {
+              transform: "scale(0.97)",
+            },
+          }}
+        >
+          <BookmarkIcon sx={{ fontSize: 16 }} />
+          <span>{t("common.addMarker")}</span>
         </Box>
       </Box>
-
-      <Button
-        variant="contained"
-        fullWidth
-        sx={{ mb: 2 }}
-        startIcon={<BookmarkIcon />}
-        onClick={addMarker}
-      >
-        Add User Marker
-      </Button>
 
       {/* User Markers Section */}
       {showUserMarkers && (
         <Box sx={{ mb: 3 }}>
           <Typography
-            variant="subtitle2"
+            variant="caption"
             sx={{
-              mb: 1,
-              fontWeight: 600,
+              mb: 1.5,
+              fontWeight: 700,
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              gap: 0.75,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              fontSize: "0.65rem",
+              color: "text.secondary",
             }}
           >
-            <PersonIcon fontSize="small" />
+            <PersonIcon sx={{ fontSize: 14 }} />
             User Markers ({markers?.filter((m) => m.type === "user").length || 0})
           </Typography>
           {markers?.filter((m) => m.type === "user").length === 0 ? (
             <Box
               sx={{
-                p: 2,
+                p: 2.5,
                 textAlign: "center",
-                bgcolor: alpha(theme.palette.background.paper, 0.4),
-                borderRadius: 1,
+                bgcolor: (theme) => alpha(theme.palette.background.default, 0.4),
+                borderRadius: "10px",
+                border: "1px dashed",
+                borderColor: (theme) => alpha(theme.palette.divider, 0.3),
               }}
             >
-              <Typography variant="body2" color="text.secondary">
+              <BookmarkIcon
+                sx={{ fontSize: 28, opacity: 0.2, mb: 0.5, display: "block", mx: "auto" }}
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
                 No user markers yet. Click "Add User Marker" to create one.
               </Typography>
             </Box>
@@ -1890,27 +1802,26 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   onClick={() => {
                     if (videoViewerRef?.current?.seek) {
                       videoViewerRef.current.seek(marker.timeObservation.start);
-                      console.log(
-                        `Seeking to user marker start time: ${marker.timeObservation.start}s`
-                      );
                     }
                   }}
                   sx={{
                     mt: 1,
-                    p: 1,
+                    p: 1.25,
                     pr: 4,
                     position: "relative",
-                    bgcolor: alpha(marker.style.color, 0.08),
-                    borderRadius: 1,
-                    border: `1px solid ${alpha(marker.style.color, 0.25)}`,
-                    borderLeft: `4px solid ${marker.style.color}`,
+                    bgcolor: (theme) => alpha(marker.style.color, 0.05),
+                    borderRadius: "10px",
+                    border: `1px solid ${alpha(marker.style.color, 0.15)}`,
+                    borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
-                    transition: "all 0.2s ease-in-out",
+                    transition:
+                      "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
-                      bgcolor: alpha(marker.style.color, 0.12),
-                      border: `1px solid ${alpha(marker.style.color, 0.4)}`,
-                      borderLeft: `4px solid ${marker.style.color}`,
+                      bgcolor: alpha(marker.style.color, 0.1),
+                      border: `1px solid ${alpha(marker.style.color, 0.3)}`,
+                      borderLeft: `3px solid ${marker.style.color}`,
                       transform: "translateX(2px)",
+                      boxShadow: `0 2px 8px ${alpha(marker.style.color, 0.12)}`,
                     },
                     "& .marker-delete": { opacity: 0, pointerEvents: "none" },
                     "&:hover .marker-delete": {
@@ -1930,13 +1841,16 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       }}
                     >
                       <UserAvatar size={16} fontSize="0.6rem" />
-                      <Typography
-                        variant="body2"
-                        component="span"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onInput={(e) => {
-                          const newName = e.currentTarget.textContent || "";
+                      <Box
+                        component="input"
+                        type="text"
+                        value={
+                          marker.id in markerNames
+                            ? markerNames[marker.id]
+                            : marker.name || `User Marker ${index + 1}`
+                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const newName = e.target.value;
                           setMarkerNames((prev) => ({
                             ...prev,
                             [marker.id]: newName,
@@ -1947,9 +1861,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                             )
                           );
                         }}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          // Prevent video player keyboard shortcuts when editing marker title
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        onKeyDown={(e: React.KeyboardEvent) => {
                           e.stopPropagation();
                         }}
                         sx={{
@@ -1963,16 +1876,21 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           lineHeight: 1.4,
                           outline: "none",
                           cursor: "text",
+                          border: "none",
+                          background: "transparent",
+                          p: 0,
+                          m: 0,
+                          font: "inherit",
+                          fontSize: "0.875rem",
+                          color: "inherit",
+                          width: "100%",
                           "&:focus": {
                             outline: `2px solid ${marker.style.color}`,
                             outlineOffset: "1px",
+                            borderRadius: "2px",
                           },
                         }}
-                      >
-                        {marker.id in markerNames
-                          ? markerNames[marker.id]
-                          : marker.name || `User Marker ${index + 1}`}
-                      </Typography>
+                      />
                     </Box>
                     <Box
                       sx={{
@@ -2022,20 +1940,23 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     }}
                     sx={{
                       position: "absolute",
-                      top: 6,
-                      right: 6,
+                      top: 8,
+                      right: 8,
                       p: 0.25,
-                      width: 24,
-                      height: 24,
+                      width: 22,
+                      height: 22,
                       color: "text.secondary",
+                      borderRadius: "6px",
+                      transition:
+                        "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                       "&:hover": {
                         color: "error.main",
-                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.1),
                       },
                     }}
                     aria-label={t("common.breadcrumb.ariaLabels.deleteMarker")}
                   >
-                    <CloseIcon sx={{ fontSize: 16 }} />
+                    <CloseIcon sx={{ fontSize: 14 }} />
                   </IconButton>
                 </Box>
               ))
@@ -2047,45 +1968,72 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
       {showSemanticMarkers && (
         <Box sx={{ mb: 2 }}>
           <Typography
-            variant="subtitle2"
+            variant="caption"
             sx={{
-              mb: 1,
-              fontWeight: 600,
+              mb: 1.5,
+              fontWeight: 700,
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              gap: 0.75,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              fontSize: "0.65rem",
+              color: "text.secondary",
             }}
           >
-            <SmartToyIcon fontSize="small" />
+            <SmartToyIcon sx={{ fontSize: 14 }} />
             Semantic Markers (
             {markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
               .length || 0}
             )
           </Typography>
 
-          {/* Confidence Level Slider - moved above semantic markers */}
+          {/* Confidence Level Slider - refined card */}
           <Box
             sx={{
               mb: 2,
-              p: 2,
-              bgcolor: alpha(theme.palette.background.paper, 0.4),
-              borderRadius: 1,
+              p: 1.5,
+              bgcolor: (theme) => alpha(theme.palette.background.default, 0.5),
+              borderRadius: "10px",
+              border: "1px solid",
+              borderColor: (theme) => alpha(theme.palette.divider, 0.08),
             }}
           >
-            <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
-              Confidence Level: {getConfidenceLabel(scoreThreshold)} ({scoreThreshold.toFixed(3)})
-            </Typography>
-            <Box sx={{ position: "relative" }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                mb: 0.5,
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.65rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "text.secondary",
+                }}
+              >
+                Confidence Level
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ fontWeight: 600, fontSize: "0.75rem", color: "primary.main" }}
+              >
+                {getConfidenceLabel(scoreThreshold)} ({scoreThreshold.toFixed(3)})
+              </Typography>
+            </Box>
+            <Box sx={{ position: "relative", px: 0.5 }}>
               <Slider
                 value={scoreThreshold}
                 onChange={(_, newValue) => {
                   const newThreshold = newValue as number;
-                  console.log("Slider changed to:", newThreshold);
                   setScoreThreshold(newThreshold);
                   // Save to localStorage for persistence
                   saveConfidenceLevelToStorage(newThreshold);
-                  console.log("Saved confidence level to localStorage:", newThreshold);
-                  console.log("Calling updateTimelineMarkerVisibility with:", newThreshold);
                   updateTimelineMarkerVisibility(newThreshold);
                 }}
                 min={0}
@@ -2095,18 +2043,27 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
                 sx={{
                   "& .MuiSlider-thumb": {
-                    width: 20,
-                    height: 20,
+                    width: 16,
+                    height: 16,
+                    boxShadow: (theme) => `0 1px 4px ${alpha(theme.palette.common.black, 0.2)}`,
+                    "&:hover, &.Mui-focusVisible": {
+                      boxShadow: (theme) => `0 0 0 6px ${alpha(theme.palette.primary.main, 0.15)}`,
+                    },
                   },
                   "& .MuiSlider-track": {
-                    height: 6,
+                    height: 4,
+                    borderRadius: 2,
                   },
                   "& .MuiSlider-rail": {
-                    height: 6,
+                    height: 4,
+                    borderRadius: 2,
+                    opacity: 0.2,
                   },
                   "& .MuiSlider-valueLabel": {
-                    fontSize: "0.75rem",
+                    fontSize: "0.7rem",
                     fontWeight: 600,
+                    borderRadius: "6px",
+                    padding: "2px 6px",
                   },
                 }}
               />
@@ -2132,10 +2089,12 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           {isLoadingSemanticMarkers ? (
             <Box
               sx={{
-                p: 2,
+                p: 2.5,
                 textAlign: "center",
-                bgcolor: alpha(theme.palette.background.paper, 0.4),
-                borderRadius: 1,
+                bgcolor: (theme) => alpha(theme.palette.background.default, 0.4),
+                borderRadius: "10px",
+                border: "1px dashed",
+                borderColor: (theme) => alpha(theme.palette.divider, 0.3),
               }}
             >
               <Box
@@ -2146,8 +2105,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   gap: 1,
                 }}
               >
-                <CircularProgress size={16} />
-                <Typography variant="body2" color="text.secondary">
+                <CircularProgress size={14} thickness={5} />
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
                   Creating semantic markers...
                 </Typography>
               </Box>
@@ -2156,13 +2115,18 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
               .length === 0 ? (
             <Box
               sx={{
-                p: 2,
+                p: 2.5,
                 textAlign: "center",
-                bgcolor: alpha(theme.palette.background.paper, 0.4),
-                borderRadius: 1,
+                bgcolor: (theme) => alpha(theme.palette.background.default, 0.4),
+                borderRadius: "10px",
+                border: "1px dashed",
+                borderColor: (theme) => alpha(theme.palette.divider, 0.3),
               }}
             >
-              <Typography variant="body2" color="text.secondary">
+              <SmartToyIcon
+                sx={{ fontSize: 28, opacity: 0.2, mb: 0.5, display: "block", mx: "auto" }}
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
                 No semantic markers match the current confidence threshold.
               </Typography>
             </Box>
@@ -2176,27 +2140,26 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                   onClick={() => {
                     if (videoViewerRef?.current?.seek) {
                       videoViewerRef.current.seek(marker.timeObservation.start);
-                      console.log(
-                        `Seeking to semantic marker start time: ${marker.timeObservation.start}s`
-                      );
                     }
                   }}
                   sx={{
                     mt: 1,
-                    p: 1,
+                    p: 1.25,
                     pr: 4, // Add padding-right to make space for reset button
                     position: "relative",
-                    bgcolor: alpha(marker.style.color, 0.08),
-                    borderRadius: 1,
-                    border: `1px solid ${alpha(marker.style.color, 0.25)}`,
-                    borderLeft: `4px solid ${marker.style.color}`,
+                    bgcolor: alpha(marker.style.color, 0.05),
+                    borderRadius: "10px",
+                    border: `1px solid ${alpha(marker.style.color, 0.15)}`,
+                    borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
-                    transition: "all 0.2s ease-in-out",
+                    transition:
+                      "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
-                      bgcolor: alpha(marker.style.color, 0.12),
-                      border: `1px solid ${alpha(marker.style.color, 0.4)}`,
-                      borderLeft: `4px solid ${marker.style.color}`,
+                      bgcolor: alpha(marker.style.color, 0.1),
+                      border: `1px solid ${alpha(marker.style.color, 0.3)}`,
+                      borderLeft: `3px solid ${marker.style.color}`,
                       transform: "translateX(2px)",
+                      boxShadow: `0 2px 8px ${alpha(marker.style.color, 0.12)}`,
                     },
                     "& .marker-reset": { opacity: 0, pointerEvents: "none" },
                     "&:hover .marker-reset": {
@@ -2287,26 +2250,35 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       Created by {getSearchProviderName()}
                     </Typography>
                     {marker.score !== undefined && (
-                      <Typography
-                        variant="caption"
+                      <Box
+                        component="span"
                         sx={{
-                          color: "primary.main",
-                          fontWeight: 600,
-                          fontSize: "0.65rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          px: 0.75,
+                          py: 0.25,
+                          borderRadius: "6px",
+                          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                          border: "1px solid",
+                          borderColor: (theme) => alpha(theme.palette.primary.main, 0.15),
                         }}
                       >
-                        Score: {Number(marker.score).toFixed(3)}
-                      </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "primary.main",
+                            fontWeight: 700,
+                            fontSize: "0.625rem",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {Number(marker.score).toFixed(3)}
+                        </Typography>
+                      </Box>
                     )}
                   </Box>
                   {(() => {
                     const shouldShow = assetId && semanticModifications[marker.id];
-                    console.log(`Reset button visibility for ${marker.id}:`, {
-                      assetId: !!assetId,
-                      hasModification: !!semanticModifications[marker.id],
-                      shouldShow,
-                      allModifications: semanticModifications,
-                    });
                     return shouldShow;
                   })() && (
                     <Tooltip title={t("common.resetMarker")}>
@@ -2319,20 +2291,23 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                         }}
                         sx={{
                           position: "absolute",
-                          top: 6,
-                          right: 6,
+                          top: 8,
+                          right: 8,
                           p: 0.25,
-                          width: 24,
-                          height: 24,
+                          width: 22,
+                          height: 22,
                           color: "text.secondary",
+                          borderRadius: "6px",
+                          transition:
+                            "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                           "&:hover": {
                             color: "primary.main",
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
                           },
                         }}
                         aria-label={t("common.breadcrumb.ariaLabels.resetMarker")}
                       >
-                        <RestoreIcon sx={{ fontSize: 16 }} />
+                        <RestoreIcon sx={{ fontSize: 14 }} />
                       </IconButton>
                     </Tooltip>
                   )}
@@ -2492,7 +2467,7 @@ const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
           p: 2,
           mb: 2,
           borderColor: alpha(theme.palette.info.main, 0.2),
-          transition: "all 0.2s ease",
+          transition: "border-color 0.2s ease, background-color 0.2s ease",
           "&:hover": {
             borderColor: theme.palette.info.main,
             boxShadow: `0 4px 8px ${alpha(theme.palette.info.main, 0.15)}`,
@@ -2519,7 +2494,7 @@ const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
           p: 2,
           mb: 2,
           borderColor: alpha(theme.palette.warning.main, 0.2),
-          transition: "all 0.2s ease",
+          transition: "border-color 0.2s ease, background-color 0.2s ease",
           "&:hover": {
             borderColor: theme.palette.warning.main,
             boxShadow: `0 4px 8px ${alpha(theme.palette.warning.main, 0.15)}`,
@@ -2654,81 +2629,104 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
   };
-  useEffect(() => {
-    console.log("Parent markers state:", markers);
-  }, [markers]);
 
   return (
-    <RightSidebar>
+    <RightSidebar alwaysVisible>
       <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        {/* Tabs navigation - now with fixed height and no scroll */}
+        {/* Tabs navigation - refined segmented control style */}
         <Box
           sx={{
-            borderBottom: 1,
-            borderColor: "divider",
-            bgcolor: alpha(theme.palette.background.default, 0.4),
+            px: 1.5,
+            pt: 1,
+            pb: 0,
           }}
         >
-          <Tabs
-            value={currentTab}
-            onChange={handleTabChange}
-            variant="fullWidth"
-            aria-label="asset sidebar tabs"
+          <Box
             sx={{
-              minHeight: 40,
-              "& .MuiTab-root": {
-                minHeight: 40,
-                textTransform: "none",
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                opacity: 0.7,
-                transition: "all 0.2s",
-                padding: "6px 8px",
-                minWidth: "auto",
-                "&.Mui-selected": {
-                  opacity: 1,
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                },
-              },
-              "& .MuiTabs-indicator": {
-                height: 2,
-                borderTopLeftRadius: 2,
-                borderTopRightRadius: 2,
-              },
+              display: "flex",
+              gap: 0,
+              borderBottom: "1px solid",
+              borderColor: (theme) => alpha(theme.palette.divider, 0.1),
             }}
           >
-            <Tab
-              icon={<BookmarkIcon fontSize="small" />}
-              label={t("assetSidebar.tabs.markers")}
-              id="sidebar-tab-0"
-              aria-controls="sidebar-tabpanel-0"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<HistoryIcon fontSize="small" />}
-              label={
-                <Badge
-                  badgeContent={versions.length}
-                  color="primary"
-                  sx={{
-                    pr: 1,
-                    "& .MuiBadge-badge": {
-                      fontSize: "0.65rem",
-                      height: 16,
-                      minWidth: 16,
-                      padding: "0 4px",
-                    },
-                  }}
-                >
-                  <span>{t("common.versions")}</span>
-                </Badge>
-              }
-              id="sidebar-tab-1"
-              aria-controls="sidebar-tabpanel-1"
-              iconPosition="start"
-            />
-          </Tabs>
+            {[
+              {
+                icon: <BookmarkIcon sx={{ fontSize: 16 }} />,
+                label: t("assetSidebar.tabs.markers"),
+                index: 0,
+              },
+              {
+                icon: <HistoryIcon sx={{ fontSize: 16 }} />,
+                label: t("common.versions"),
+                index: 1,
+                badge: versions.length,
+              },
+            ].map((tab) => (
+              <Box
+                key={tab.index}
+                onClick={() => handleTabChange(null as any, tab.index)}
+                role="tab"
+                id={`sidebar-tab-${tab.index}`}
+                aria-controls={`sidebar-tabpanel-${tab.index}`}
+                aria-selected={currentTab === tab.index}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleTabChange(null as any, tab.index);
+                  }
+                }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.625,
+                  py: 1.125,
+                  px: 1.75,
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                  fontWeight: currentTab === tab.index ? 600 : 500,
+                  color: currentTab === tab.index ? "primary.main" : "text.secondary",
+                  borderBottom: "2px solid",
+                  borderColor: currentTab === tab.index ? "primary.main" : "transparent",
+                  mb: "-1px",
+                  transition:
+                    "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+                  userSelect: "none",
+                  "&:hover": {
+                    color: currentTab === tab.index ? "primary.main" : "text.primary",
+                  },
+                }}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                {tab.badge != null && tab.badge > 0 && (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: "4px",
+                      fontSize: "0.675rem",
+                      fontWeight: 700,
+                      px: 0.5,
+                      bgcolor:
+                        currentTab === tab.index
+                          ? (theme) => alpha(theme.palette.primary.main, 0.12)
+                          : (theme) => alpha(theme.palette.text.secondary, 0.08),
+                      color: currentTab === tab.index ? "primary.main" : "text.secondary",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {tab.badge}
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Box>
         </Box>
 
         {/* Tab content */}

@@ -8,7 +8,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Box,
-  Container,
   Typography,
   Button,
   Card,
@@ -172,28 +171,24 @@ export const CollectionGroupDetailPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="lg">
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
-      </Container>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (error || !groupData) {
     return (
-      <Container maxWidth="lg">
-        <Box py={4}>
-          <Alert severity="error">{t("collectionGroups.detailPage.errorLoading")}</Alert>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate("/collections?filter=groups")}
-            sx={{ mt: 2 }}
-          >
-            {t("collectionGroups.detailPage.backToGroups")}
-          </Button>
-        </Box>
-      </Container>
+      <Box>
+        <Alert severity="error">{t("collectionGroups.detailPage.errorLoading")}</Alert>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/collections?filter=groups")}
+          sx={{ mt: 2 }}
+        >
+          {t("collectionGroups.detailPage.backToGroups")}
+        </Button>
+      </Box>
     );
   }
 
@@ -203,8 +198,8 @@ export const CollectionGroupDetailPage: React.FC = () => {
   );
 
   return (
-    <Container maxWidth="lg">
-      <Box py={4}>
+    <Box>
+      <Box>
         {/* Header */}
         <Box display="flex" alignItems="center" gap={2} mb={3}>
           <IconButton onClick={() => navigate("/collections?filter=groups")}>
@@ -264,13 +259,15 @@ export const CollectionGroupDetailPage: React.FC = () => {
                     icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
                     sx={{
                       height: 22,
-                      color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
-                      bgcolor: group.isPublic ? "#e8f5e8" : alpha(theme.palette.primary.main, 0.1),
+                      color: group.isPublic ? "success.dark" : theme.palette.primary.main,
+                      bgcolor: group.isPublic
+                        ? alpha(theme.palette.success.main, 0.08)
+                        : alpha(theme.palette.primary.main, 0.1),
                       border: `1px solid ${
-                        group.isPublic ? "#2e7d32" : theme.palette.primary.main
+                        group.isPublic ? theme.palette.success.dark : theme.palette.primary.main
                       }`,
                       "& .MuiChip-icon": {
-                        color: group.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                        color: group.isPublic ? "success.dark" : theme.palette.primary.main,
                         fontSize: 14,
                       },
                     }}
@@ -398,15 +395,21 @@ export const CollectionGroupDetailPage: React.FC = () => {
                             icon={collection.isPublic ? <PublicIcon /> : <PrivateIcon />}
                             sx={{
                               height: 22,
-                              color: collection.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                              color: collection.isPublic
+                                ? "success.dark"
+                                : theme.palette.primary.main,
                               bgcolor: collection.isPublic
-                                ? "#e8f5e8"
+                                ? alpha(theme.palette.success.main, 0.08)
                                 : alpha(theme.palette.primary.main, 0.1),
                               border: `1px solid ${
-                                collection.isPublic ? "#2e7d32" : theme.palette.primary.main
+                                collection.isPublic
+                                  ? theme.palette.success.dark
+                                  : theme.palette.primary.main
                               }`,
                               "& .MuiChip-icon": {
-                                color: collection.isPublic ? "#2e7d32" : theme.palette.primary.main,
+                                color: collection.isPublic
+                                  ? "success.dark"
+                                  : theme.palette.primary.main,
                                 fontSize: 14,
                               },
                             }}
@@ -608,6 +611,6 @@ export const CollectionGroupDetailPage: React.FC = () => {
           </DialogActions>
         </Dialog>
       </Box>
-    </Container>
+    </Box>
   );
 };

@@ -48,24 +48,35 @@ export const TriggerTypeChips: React.FC<TriggerTypeChipsProps> = ({
   }, [eventRuleInfo, pipeline]);
 
   return (
-    <Stack direction="row" spacing={0.5} flexWrap="wrap">
+    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ rowGap: 0.75 }}>
       {triggerTypes.map((type, index) => {
         const icon = getTriggerIcon(type);
         const tooltipContent = getTooltipContent(type, derivedEventRuleInfo);
 
         // Translate the trigger type label
         const translatedLabel =
-          type === "Event Triggered"
+          type === "Event Triggered" || type === "Event Trigger"
             ? t("integrations.triggerTypes.eventTriggered")
             : type === "API Triggered"
               ? t("integrations.triggerTypes.apiTriggered")
-              : type === "Manually Triggered"
+              : type === "Manual Trigger" || type === "Manually Triggered"
                 ? t("integrations.triggerTypes.manuallyTriggered")
                 : type;
 
         return (
           <Tooltip key={index} title={tooltipContent} arrow placement="top">
-            <Chip icon={icon} label={translatedLabel} size="small" color={getChipColor(type)} />
+            <Chip
+              icon={icon}
+              label={translatedLabel}
+              size="small"
+              color={getChipColor(type)}
+              sx={{
+                height: 24,
+                fontSize: "0.75rem",
+                "& .MuiChip-icon": { fontSize: 14, ml: 0.5 },
+                "& .MuiChip-label": { px: 0.75 },
+              }}
+            />
           </Tooltip>
         );
       })}
@@ -214,6 +225,13 @@ const getTriggerIcon = (type: string) => {
  * Get the tooltip content for a trigger type
  */
 const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
+  const normalizedType = type.toLowerCase().trim();
+
+  // For manual triggers, show a simple description — no event rules apply
+  if (normalizedType.includes("manual")) {
+    return "Triggered manually via API or batch operations";
+  }
+
   if (!eventRuleInfo || !eventRuleInfo.eventRules || eventRuleInfo.eventRules.length === 0) {
     return type;
   }
@@ -266,14 +284,9 @@ const getTooltipContent = (type: string, eventRuleInfo?: EventRuleInfo) => {
  * Get the appropriate color for a trigger type chip
  */
 const getChipColor = (type: string): "primary" | "secondary" | "success" | "info" => {
-  switch (type) {
-    case "Event Triggered":
-      return "primary";
-    case "API Triggered":
-      return "secondary";
-    case "Manually Triggered":
-      return "success";
-    default:
-      return "info";
-  }
+  const normalized = type.toLowerCase().trim();
+  if (normalized.includes("event")) return "primary";
+  if (normalized.includes("api")) return "secondary";
+  if (normalized.includes("manual")) return "success";
+  return "info";
 };

@@ -8,7 +8,9 @@ import {
   Chip,
   CircularProgress,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
+import { colorTokens } from "@/theme/tokens";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -65,7 +67,7 @@ export function ContextualActionBar({
         sx={{
           borderBottom: 2,
           borderColor: "warning.main",
-          bgcolor: "rgba(237, 108, 2, 0.08)",
+          bgcolor: alpha(colorTokens.warning.main, 0.08),
         }}
       >
         <Box

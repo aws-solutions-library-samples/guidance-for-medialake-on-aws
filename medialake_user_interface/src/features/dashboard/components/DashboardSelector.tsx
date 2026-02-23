@@ -84,14 +84,10 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
   const handlePresetSelect = async (preset: PresetSummary) => {
     handleClose();
     try {
-      console.log("Applying preset:", preset.presetId);
       const result = await applyPresetMutation.mutateAsync(preset.presetId);
-      console.log("Apply preset result:", result);
-      console.log("Result layouts:", result.layouts);
 
       // Update local store with the applied layout
       const frontendLayout = convertApiLayoutToFrontend(result);
-      console.log("Converted frontend layout:", frontendLayout);
 
       initializeLayout(frontendLayout);
       setActivePreset(preset.presetId, preset.name);

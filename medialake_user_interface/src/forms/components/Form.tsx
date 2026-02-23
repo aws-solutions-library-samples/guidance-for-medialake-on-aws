@@ -18,26 +18,12 @@ export const Form: React.FC<FormProps> = React.memo(
     const { t } = useTranslation();
 
     // Only log initial mount
-    React.useEffect(() => {
-      console.log("[Form] Mounted:", {
-        formId: id,
-        isValid: form.formState.isValid,
-      });
-    }, []);
+    React.useEffect(() => {}, []);
 
     const handleSubmit = React.useCallback(
       async (data: any) => {
-        console.log("[Form] Submitting form:", { formId: id });
-        console.log("[Form] Form data to submit:", data);
-        console.log("[Form] Form validation state:", {
-          isValid: form.formState.isValid,
-          isDirty: form.formState.isDirty,
-          errors: form.formState.errors,
-        });
-
         try {
           await onSubmit(data);
-          console.log("[Form] Submit successful");
         } catch (error) {
           console.error("[Form] Submit failed:", error);
           throw error;
@@ -55,7 +41,6 @@ export const Form: React.FC<FormProps> = React.memo(
     );
 
     const handleCancel = React.useCallback(() => {
-      console.log("[Form] Cancelled");
       onCancel?.();
     }, [onCancel]);
 

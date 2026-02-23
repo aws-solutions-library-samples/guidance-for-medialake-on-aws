@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { formatFileSize } from "../../utils/imageUtils";
 import TabContentContainer from "../common/TabContentContainer";
 
-const FILE_INFO_COLOR = "#4299E1";
-const TECH_DETAILS_COLOR = "#68D391";
+import { colorTokens } from "@/theme/tokens";
+
+const FILE_INFO_COLOR = colorTokens.primary.main;
+const TECH_DETAILS_COLOR = colorTokens.accent.main;
 
 interface MetadataFieldProps {
   label: string;

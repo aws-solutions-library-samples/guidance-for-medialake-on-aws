@@ -19,10 +19,12 @@ import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
 import DescriptiveTab from "../components/shared/DescriptiveTab";
 import TabContentContainer from "../components/common/TabContentContainer";
+import { springEasing } from "@/constants";
+import { colorTokens } from "@/theme/tokens";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
-  const fileInfoColor = "#4299E1";
-  const techDetailsColor = "#68D391";
+  const fileInfoColor = colorTokens.primary.main;
+  const techDetailsColor = colorTokens.accent.main;
 
   const s3Bucket =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
@@ -300,11 +302,8 @@ const RelatedItemsTab: React.FC<{
   isLoading: boolean;
   onLoadMore: () => void;
 }> = ({ relatedVersionsData, isLoading, onLoadMore }) => {
-  console.log("RelatedItemsTab - relatedVersionsData:", relatedVersionsData);
-
   const items = useMemo(() => {
     if (!relatedVersionsData?.data?.results) {
-      console.log("No results found in relatedVersionsData");
       return [];
     }
 
@@ -321,23 +320,19 @@ const RelatedItemsTab: React.FC<{
         result.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size,
       createDate: result.DigitalSourceAsset.CreateDate,
     }));
-    console.log("Mapped items:", mappedItems);
     return mappedItems;
   }, [relatedVersionsData]);
 
   const hasMore = useMemo(() => {
     if (!relatedVersionsData?.data?.searchMetadata) {
-      console.log("No searchMetadata found for hasMore calculation");
       return false;
     }
 
     const { totalResults, page, pageSize } = relatedVersionsData.data.searchMetadata;
     const hasMoreItems = totalResults > page * pageSize;
-    console.log("Has more items:", hasMoreItems);
     return hasMoreItems;
   }, [relatedVersionsData]);
 
-  console.log("Rendering RelatedItemsView with items:", items);
   return (
     <RelatedItemsView
       items={items}
@@ -450,7 +445,6 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         audioViewerRef.current.getCurrentTime();
         // If we can get current time, audio is ready
         audioViewerRef.current.seek(startTime!);
-        console.log(`Seeked to clip start time: ${startTime}s for audio asset ${id}`);
         // Success - clear any pending timeouts
         if (seekTimeoutRef.current) {
           clearTimeout(seekTimeoutRef.current);
@@ -712,10 +706,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         maxWidth: isExpanded ? "calc(100% - 300px)" : "100%",
         width: "100%",
         transition: (theme) =>
-          theme.transitions.create(["max-width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          `max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         bgcolor: "transparent",
       }}
     >
@@ -772,10 +763,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
             width: "100%",
             maxWidth: isExpanded ? "calc(100% - 10px)" : "100%",
             transition: (theme) =>
-              theme.transitions.create(["width", "max-width"], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           }}
         >
           <AssetVideo
@@ -820,7 +808,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
                   px: 2,
                   py: 1.5,
                   fontWeight: 500,
-                  transition: "all 0.2s",
+                  transition: "background-color 0.2s, color 0.2s",
                   "&:hover": {
                     backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                   },

@@ -1,6 +1,7 @@
 import React from "react";
 import { Switch, SwitchProps } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import { colorTokens } from "@/theme/tokens";
 
 export interface IconSwitchProps extends SwitchProps {
   onIcon?: React.ReactNode | string;
@@ -48,15 +49,15 @@ const IconSwitch = styled(Switch)<IconSwitchProps>(
         },
         "& + .MuiSwitch-track": {
           opacity: 1,
-          backgroundColor: trackOnColor || "#aab4be",
+          backgroundColor: trackOnColor || colorTokens.accent.light,
           ...theme.applyStyles("dark", {
-            backgroundColor: trackOnColor || "#8796A5",
+            backgroundColor: trackOnColor || colorTokens.accent.dark,
           }),
         },
       },
     },
     "& .MuiSwitch-thumb": {
-      backgroundColor: offColor || "#001e3c",
+      backgroundColor: offColor || colorTokens.primary.dark,
       width: 32,
       height: 32,
       borderRadius: "25%",
@@ -80,24 +81,24 @@ const IconSwitch = styled(Switch)<IconSwitchProps>(
               )}"><path d="M0 0h24v24H0z" fill="none"/><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>')`,
       },
       ...theme.applyStyles("dark", {
-        backgroundColor: offColor || "#003892",
+        backgroundColor: offColor || colorTokens.primary.main,
       }),
     },
     "& .MuiSwitch-switchBase.Mui-checked .MuiSwitch-thumb": {
-      backgroundColor: onColor || "#001e3c",
+      backgroundColor: onColor || colorTokens.primary.dark,
       width: 32,
       height: 32,
       borderRadius: "25%",
       ...theme.applyStyles("dark", {
-        backgroundColor: onColor || "#003892",
+        backgroundColor: onColor || colorTokens.primary.main,
       }),
     },
     "& .MuiSwitch-track": {
       opacity: 1,
-      backgroundColor: trackOffColor || "#aab4be",
+      backgroundColor: trackOffColor || colorTokens.text.secondary.light,
       borderRadius: 20 / 2,
       ...theme.applyStyles("dark", {
-        backgroundColor: trackOffColor || "#8796A5",
+        backgroundColor: trackOffColor || colorTokens.text.secondary.dark,
       }),
     },
   })

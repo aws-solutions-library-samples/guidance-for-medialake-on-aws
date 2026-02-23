@@ -78,12 +78,10 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
             position: "relative",
             color: open
               ? muiTheme.palette.primary.main
-              : isDark
-                ? "rgba(255,255,255,0.45)"
-                : "rgba(0,0,0,0.35)",
+              : alpha(muiTheme.palette.text.secondary, 0.7),
             "&:hover": {
-              backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
-              color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.55)",
+              backgroundColor: alpha(muiTheme.palette.action.active, 0.06),
+              color: muiTheme.palette.text.secondary,
             },
           }}
           aria-label="Select search modes"
@@ -135,11 +133,12 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                     mt: 1,
                     borderRadius: "12px",
                     overflow: "hidden",
-                    backgroundColor: isDark ? muiTheme.palette.background.paper : "#fff",
-                    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-                    boxShadow: isDark
-                      ? "0 8px 24px rgba(0,0,0,0.5)"
-                      : "0 8px 24px rgba(0,0,0,0.12)",
+                    backgroundColor: muiTheme.palette.background.paper,
+                    border: `1px solid ${alpha(muiTheme.palette.divider, isDark ? 0.1 : 0.08)}`,
+                    boxShadow: `0 8px 24px ${alpha(
+                      muiTheme.palette.common.black,
+                      isDark ? 0.5 : 0.12
+                    )}`,
                     minWidth: 200,
                   }}
                 >
@@ -148,9 +147,7 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                     sx={{
                       px: 1.5,
                       py: 1,
-                      borderBottom: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
-                      }`,
+                      borderBottom: `1px solid ${alpha(muiTheme.palette.divider, 0.08)}`,
                     }}
                   >
                     <Box
@@ -160,7 +157,7 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                         fontWeight: 600,
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
-                        color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
+                        color: alpha(muiTheme.palette.text.secondary, 0.6),
                       }}
                     >
                       Search by
@@ -196,9 +193,10 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                             transition: "background-color 0.1s",
                             backgroundColor: "transparent",
                             "&:hover": {
-                              backgroundColor: isDark
-                                ? "rgba(255,255,255,0.05)"
-                                : "rgba(0,0,0,0.03)",
+                              backgroundColor: alpha(
+                                muiTheme.palette.action.active,
+                                isDark ? 0.05 : 0.03
+                              ),
                             },
                             "&:focus-visible": {
                               outline: `2px solid ${muiTheme.palette.primary.main}`,
@@ -217,15 +215,11 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                               borderRadius: "8px",
                               backgroundColor: isSelected
                                 ? alpha(muiTheme.palette.primary.main, isDark ? 0.2 : 0.1)
-                                : isDark
-                                  ? "rgba(255,255,255,0.06)"
-                                  : "rgba(0,0,0,0.04)",
+                                : alpha(muiTheme.palette.action.active, isDark ? 0.06 : 0.04),
                               color: isSelected
                                 ? muiTheme.palette.primary.main
-                                : isDark
-                                  ? "rgba(255,255,255,0.4)"
-                                  : "rgba(0,0,0,0.35)",
-                              transition: "all 0.15s",
+                                : alpha(muiTheme.palette.text.secondary, 0.6),
+                              transition: "background-color 0.15s, color 0.15s",
                             }}
                           >
                             {mode.icon}
@@ -242,9 +236,7 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                                 ? isDark
                                   ? "#fff"
                                   : muiTheme.palette.text.primary
-                                : isDark
-                                  ? "rgba(255,255,255,0.55)"
-                                  : "rgba(0,0,0,0.5)",
+                                : muiTheme.palette.text.secondary,
                               transition: "color 0.15s",
                             }}
                           >
@@ -265,13 +257,15 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                                 : "transparent",
                               border: isSelected
                                 ? "none"
-                                : `1.5px solid ${
-                                    isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)"
-                                  }`,
-                              transition: "all 0.15s",
+                                : `1.5px solid ${alpha(muiTheme.palette.divider, 0.2)}`,
+                              transition: "background-color 0.15s, border-color 0.15s",
                             }}
                           >
-                            {isSelected && <CheckIcon sx={{ fontSize: 13, color: "#fff" }} />}
+                            {isSelected && (
+                              <CheckIcon
+                                sx={{ fontSize: 13, color: muiTheme.palette.primary.contrastText }}
+                              />
+                            )}
                           </Box>
                         </Box>
                       </Tooltip>
@@ -283,16 +277,14 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                     sx={{
                       px: 1.5,
                       py: 0.75,
-                      borderTop: `1px solid ${
-                        isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"
-                      }`,
+                      borderTop: `1px solid ${alpha(muiTheme.palette.divider, 0.08)}`,
                     }}
                   >
                     <Box
                       component="span"
                       sx={{
                         fontSize: "10.5px",
-                        color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.35)",
+                        color: alpha(muiTheme.palette.text.secondary, 0.5),
                         lineHeight: 1.4,
                       }}
                     >

@@ -169,7 +169,6 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
       onExport();
     } else {
       // Default export functionality
-      console.log("Exporting permission matrix:", permissions);
       // Implement actual export functionality here
     }
   };
@@ -271,7 +270,7 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                           ? {
                               cursor: "pointer",
                               "&:hover": {
-                                backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                backgroundColor: "action.hover",
                                 transition: "background-color 0.2s",
                               },
                             }

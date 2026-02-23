@@ -96,18 +96,10 @@ export const useVideoKeyboardShortcuts = ({
   // Keep refs for toggle logic used inside the keydown listener.
   // Wrap play and pause with logging
   const play = useCallback(() => {
-    console.log(
-      `PLAY() called from keyboard shortcuts - Stack:`,
-      new Error().stack?.split("\n").slice(1, 4).join("\n")
-    );
     originalPlay();
   }, [originalPlay]);
 
   const pause = useCallback(() => {
-    console.log(
-      `PAUSE() called from keyboard shortcuts - Stack:`,
-      new Error().stack?.split("\n").slice(1, 4).join("\n")
-    );
     originalPause();
   }, [originalPause]);
 
@@ -119,12 +111,10 @@ export const useVideoKeyboardShortcuts = ({
     const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
 
     if (htmlVideoElement) {
-      console.log(`INITIALIZING video element to prevent focus conflicts`);
       // Disable tabindex to prevent focus
       htmlVideoElement.setAttribute("tabindex", "-1");
       // Remove any existing focus
       htmlVideoElement.blur();
-      console.log(`VIDEO ELEMENT configured to prevent native keyboard controls`);
     }
   }, [omakaseRef]);
   useEffect(() => {
@@ -228,14 +218,8 @@ export const useVideoKeyboardShortcuts = ({
     const timeSinceLastToggle = now - lastToggleTimeRef.current;
     const callCount = ++toggleCallCountRef.current;
 
-    console.log(
-      `TOGGLE TRANSPORT CALLED #${callCount} - Time since last: ${timeSinceLastToggle}ms`
-    );
-    console.log(`Call stack:`, new Error().stack?.split("\n").slice(1, 4).join("\n"));
-
     // Prevent rapid toggles within 150ms
     if (timeSinceLastToggle < 150) {
-      console.log(`Ignoring rapid toggle #${callCount}, time since last: ${timeSinceLastToggle}ms`);
       return;
     }
 
@@ -243,7 +227,6 @@ export const useVideoKeyboardShortcuts = ({
 
     // Check if we're in shuttle mode first
     if (isShuttlingReverseRef.current) {
-      console.log(`Stopping shuttle mode (call #${callCount})`);
       applyShuttleSpeed(0);
       return;
     }
@@ -252,20 +235,11 @@ export const useVideoKeyboardShortcuts = ({
     const videoElement = omakaseRef?.current?.video?.htmlVideoElement;
     const actuallyPlaying = videoElement ? !videoElement.paused : isPlaying;
 
-    console.log(` TOGGLE STATE CHECK #${callCount}:`);
-    console.log(`  - isPlaying prop: ${isPlaying}`);
-    console.log(`  - isPlayingRef: ${isPlayingRef.current}`);
-    console.log(`  - video.paused: ${videoElement?.paused}`);
-    console.log(`  - actuallyPlaying: ${actuallyPlaying}`);
-    console.log(`  - timeSinceLastToggle: ${timeSinceLastToggle}ms`);
-
     if (actuallyPlaying) {
-      console.log(`PAUSING video (call #${callCount})`);
       pause();
 
       // Prevent focus-related issues by removing focus from video element
       const preventFocusIssues = () => {
-        console.log(`PREVENTING focus-related keyboard conflicts`);
         const omakasePlayer = omakaseRef?.current;
         const htmlVideoElement = omakasePlayer?.video?.htmlVideoElement;
 
@@ -274,12 +248,10 @@ export const useVideoKeyboardShortcuts = ({
           htmlVideoElement.blur();
           // Disable tabindex to prevent future focus
           htmlVideoElement.setAttribute("tabindex", "-1");
-          console.log(`REMOVED focus from video element`);
         }
       };
       preventFocusIssues();
     } else {
-      console.log(`PLAYING video (call #${callCount})`);
       play();
     }
   }, [play, pause, applyShuttleSpeed, isPlaying]);
@@ -375,14 +347,12 @@ export const useVideoKeyboardShortcuts = ({
   // Marker navigation functions
   const navigateToNextMarker = useCallback(() => {
     if (!markerLaneRef.current) {
-      console.warn("Marker lane is not available yet. Video may still be loading.");
       return;
     }
 
     try {
       const markers = markerLaneRef.current.getMarkers();
       if (!markers || markers.length === 0) {
-        console.log("No markers available to navigate to.");
         return;
       }
 
@@ -412,7 +382,6 @@ export const useVideoKeyboardShortcuts = ({
         if (timeObservation && timeObservation.start !== undefined) {
           seek(timeObservation.start);
         }
-        console.log("Navigated to next marker:", nextMarker.id, "at time:", timeObservation?.start);
       }
     } catch (error) {
       console.error("Error navigating to next marker:", error);
@@ -421,14 +390,12 @@ export const useVideoKeyboardShortcuts = ({
 
   const navigateToPreviousMarker = useCallback(() => {
     if (!markerLaneRef.current) {
-      console.warn("Marker lane is not available yet. Video may still be loading.");
       return;
     }
 
     try {
       const markers = markerLaneRef.current.getMarkers();
       if (!markers || markers.length === 0) {
-        console.log("No markers available to navigate to.");
         return;
       }
 
@@ -458,12 +425,6 @@ export const useVideoKeyboardShortcuts = ({
         if (timeObservation && timeObservation.start !== undefined) {
           seek(timeObservation.start);
         }
-        console.log(
-          "Navigated to previous marker:",
-          prevMarker.id,
-          "at time:",
-          timeObservation?.start
-        );
       }
     } catch (error) {
       console.error("Error navigating to previous marker:", error);
@@ -624,12 +585,11 @@ export const useVideoKeyboardShortcuts = ({
               });
               markerLaneRef.current.addMarker(periodMarker);
               customCallbacks.onMarkerAdd?.(currentTime);
-              console.log("Marker added at time:", currentTime);
             } catch (error) {
               console.error("Error adding marker:", error);
             }
           } else {
-            console.warn("Marker lane is not available yet. Video may still be loading.");
+            // Marker lane not ready yet — no-op
           }
           break;
         case ",": // frame backward
@@ -737,7 +697,6 @@ export const useVideoKeyboardShortcuts = ({
     const blurAfterPointer = () => {
       setTimeout(() => {
         htmlVideoElement.blur();
-        console.log("🎯 BLURRED video element after pointer interaction");
       }, 0);
     };
 
@@ -745,8 +704,6 @@ export const useVideoKeyboardShortcuts = ({
     htmlVideoElement.setAttribute("tabindex", "-1");
     htmlVideoElement.addEventListener("pointerdown", blurAfterPointer);
     htmlVideoElement.addEventListener("click", blurAfterPointer);
-
-    console.log("✅ VIDEO ELEMENT configured to prevent focus after mouse interactions");
 
     return () => {
       htmlVideoElement.removeEventListener("pointerdown", blurAfterPointer);
@@ -827,7 +784,6 @@ export const useVideoKeyboardShortcuts = ({
             });
             markerLaneRef.current.addMarker(periodMarker);
             customCallbacks.onMarkerAdd?.(currentTime);
-            console.log("Marker added at time:", currentTime);
           } catch (error) {
             console.error("Error adding marker:", error);
           }

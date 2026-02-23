@@ -99,10 +99,16 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                     # Check for "Supported Content Types" parameter
                     content_types_param = parameters.get("Supported Content Types", "")
                     if content_types_param:
-                        # Convert from "Video,Audio,Image" format to array
-                        supported_content_types = [
-                            ct.strip().lower() for ct in content_types_param.split(",")
-                        ]
+                        # Handle both list format (from multiselect) and comma-separated string
+                        if isinstance(content_types_param, list):
+                            supported_content_types = [
+                                ct.strip().lower() for ct in content_types_param
+                            ]
+                        else:
+                            supported_content_types = [
+                                ct.strip().lower()
+                                for ct in content_types_param.split(",")
+                            ]
                     break
 
         # Set supported content types for frontend

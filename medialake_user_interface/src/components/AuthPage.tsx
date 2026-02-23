@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, CircularProgress, Button, Typography, Stack, Divider } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { Terrain as LogoIcon } from "@mui/icons-material";
 import { Authenticator, ThemeProvider as AmplifyThemeProvider } from "@aws-amplify/ui-react";
 import { fetchAuthSession, signIn, confirmSignIn, signInWithRedirect } from "aws-amplify/auth";
@@ -8,6 +9,7 @@ import { useAuth } from "../common/hooks/auth-context";
 import { useAwsConfig } from "../common/hooks/aws-config-context";
 import { StorageHelper } from "../common/helpers/storage-helper";
 import { theme, components } from "./auth/theme";
+import { colorTokens } from "../theme/tokens";
 
 const AuthPage = () => {
   const { completeLogin, isAuthenticated } = useAuth();
@@ -39,17 +41,19 @@ const AuthPage = () => {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
-        bgcolor: "#f0f2f5",
-        backgroundImage: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+        bgcolor: "background.default",
+        backgroundImage: `linear-gradient(135deg, ${
+          colorTokens.background.default.light
+        } 0%, ${alpha(colorTokens.primary.main, 0.08)} 100%)`,
         padding: "20px",
         gap: "20px",
       }}
     >
       <Box
         sx={{
-          background: "linear-gradient(135deg, #0050b3 0%, #002766 100%)",
+          background: `linear-gradient(135deg, ${colorTokens.primary.main} 0%, ${colorTokens.primary.dark} 100%)`,
           borderRadius: "8px",
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+          boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.common.black, 0.15)}`,
           padding: "2.5rem",
           textAlign: "center",
           color: "white",
@@ -93,10 +97,6 @@ const AuthPage = () => {
                   <Button
                     key={provider.identity_provider_name}
                     onClick={() => {
-                      console.log(
-                        "Initiating SAML login with provider:",
-                        provider.identity_provider_name
-                      );
                       signInWithRedirect({
                         provider: { custom: provider.identity_provider_name },
                       }).catch((error) => {

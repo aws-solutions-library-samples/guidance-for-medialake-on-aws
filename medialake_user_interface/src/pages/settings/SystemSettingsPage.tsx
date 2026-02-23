@@ -58,9 +58,7 @@ const useNotificationWithFallback = () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useNotification } = require("@/shared/context/NotificationContext");
     globalNotification = useNotification();
-  } catch {
-    console.log("NotificationContext not available, using fallback");
-  }
+  } catch {}
 
   const showNotification = (
     msg: string,
@@ -278,7 +276,6 @@ const SystemSettingsPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "calc(100vh - 120px)",
-        p: 3,
       }}
     >
       {/* Local fallback notification */}

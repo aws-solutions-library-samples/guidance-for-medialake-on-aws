@@ -117,11 +117,11 @@ export const Favorites: React.FC = () => {
             height: "8px",
           },
           "&::-webkit-scrollbar-track": {
-            backgroundColor: "rgba(0,0,0,0.05)",
+            backgroundColor: "action.hover",
             borderRadius: "4px",
           },
           "&::-webkit-scrollbar-thumb": {
-            backgroundColor: "rgba(0,0,0,0.2)",
+            backgroundColor: "text.disabled",
             borderRadius: "4px",
           },
         }}

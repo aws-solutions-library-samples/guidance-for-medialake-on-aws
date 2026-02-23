@@ -78,11 +78,6 @@ function AssetGridView<T>({
   confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
   // Debug: Check if we're receiving the onAddToCollectionClick prop
-  console.log(
-    "AssetGridView: onAddToCollectionClick prop is:",
-    typeof onAddToCollectionClick,
-    onAddToCollectionClick
-  );
 
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {

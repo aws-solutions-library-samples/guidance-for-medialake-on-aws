@@ -18,7 +18,7 @@ const StyledButton = styled(MuiButton)(({ theme }) => ({
   borderRadius: "4px",
   "&.MuiButton-contained": {
     backgroundColor: theme.palette.primary.main,
-    color: "#fff",
+    color: theme.palette.primary.contrastText,
     "&:hover": {
       backgroundColor: theme.palette.primary.dark,
     },

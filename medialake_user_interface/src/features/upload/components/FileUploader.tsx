@@ -21,6 +21,7 @@ import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
 import useS3Upload from "../hooks/useS3Upload";
 import { MultipartUploadMetadata } from "../types/upload.types";
 import PathBrowser from "./PathBrowser";
+import { typography } from "@/theme/tokens";
 
 // Define meta type to make typings clearer
 type Meta = Record<string, any>;
@@ -192,9 +193,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       setIsUploading(true);
     };
 
-    const handleUploadSuccess = (file: any, response: any) => {
-      console.log("Upload complete:", file.name, response);
-    };
+    const handleUploadSuccess = (file: any, response: any) => {};
 
     const handleUploadError = (file: any, error: Error) => {
       const isMultipart = file.size > 100 * 1024 * 1024;
@@ -211,7 +210,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     };
 
     const handleComplete = (result: { successful: any[] }) => {
-      console.log("Upload complete:", result.successful);
       setIsUploading(false);
       if (onUploadComplete) {
         onUploadComplete(result.successful);
@@ -320,11 +318,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 connector_id: selectedConnector,
               });
 
-              console.log(`Creating multipart upload for ${file.name}:`, {
-                uploadId: result.upload_id,
-                key: result.key,
-              });
-
               return {
                 uploadId: result.upload_id,
                 key: result.key,
@@ -346,8 +339,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
             const partNumber = partData.partNumber;
 
-            console.log(`Requesting presigned URL for part ${partNumber} of ${file.name}`);
-
             try {
               // Call backend to sign this specific part on-demand
               const signResponse = await signPartBackend({
@@ -356,8 +347,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 key: data.key,
                 part_number: partNumber,
               });
-
-              console.log(`Part ${partNumber} signed successfully for ${file.name}`);
 
               return {
                 url: signResponse.presigned_url,
@@ -385,8 +374,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 parts: data.parts,
               });
 
-              console.log(`Multipart upload completed for ${file.name}:`, result);
-
               // Clean up stored metadata
               multipartDataRef.current.delete(file.id);
 
@@ -410,7 +397,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                   upload_id: multipartData.uploadId,
                   key: multipartData.key,
                 });
-                console.log(`Multipart upload aborted for ${file.name}`);
               } catch (error) {
                 console.error(`Error aborting multipart upload for ${file.name}:`, error);
               }
@@ -501,7 +487,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               <Typography
                 variant="body2"
                 sx={{
-                  fontFamily: "monospace",
+                  fontFamily: typography.monoFontFamily,
                   fontWeight: 500,
                   color: uploadPath ? "primary.main" : "text.secondary",
                 }}

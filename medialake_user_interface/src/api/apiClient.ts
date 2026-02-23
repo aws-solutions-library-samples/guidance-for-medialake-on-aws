@@ -33,14 +33,6 @@ class ApiClient extends ApiClientBase {
   private getBaseURL() {
     const awsConfig = StorageHelper.getAwsConfig();
     const baseURL = awsConfig?.API?.REST?.RestApi?.endpoint || "";
-    console.log("🌐 Base URL Configuration:", {
-      hasConfig: !!awsConfig,
-      hasAPI: !!awsConfig?.API,
-      hasREST: !!awsConfig?.API?.REST,
-      hasRestApi: !!awsConfig?.API?.REST?.RestApi,
-      endpoint: baseURL,
-      fullConfig: awsConfig,
-    });
     return baseURL;
   }
 
@@ -58,25 +50,15 @@ class ApiClient extends ApiClientBase {
   private setupInterceptors() {
     this.axiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
-        console.log("🚀 API Request:", {
-          method: config.method?.toUpperCase(),
-          url: config.url,
-          baseURL: config.baseURL,
-          fullURL: `${config.baseURL}${config.url}`,
-          hasAuthHeader: !!config.headers?.Authorization,
-        });
-
         // Proactively refresh the token if it's expiring within 60 seconds
         // so we never send an almost-expired token to the API
         const currentToken = StorageHelper.getToken();
         if (currentToken) {
           const { isTokenExpiringSoon } = await import("@/common/helpers/token-helper");
           if (isTokenExpiringSoon(currentToken, 60)) {
-            console.log("🔄 Token expiring soon, refreshing before request...");
             try {
               const newToken = await authService.refreshToken();
               if (newToken) {
-                console.log("✅ Proactive token refresh succeeded");
               }
             } catch (e) {
               console.warn("⚠️ Proactive token refresh failed, using current token", e);
@@ -90,11 +72,9 @@ class ApiClient extends ApiClientBase {
           ...headers,
         } as AxiosRequestHeaders;
 
-        console.log("🔑 Auth Header Added:", !!config.headers?.Authorization);
         return config;
       },
       (error) => {
-        console.error("❌ Request Interceptor Error:", error);
         return Promise.reject(error);
       }
     );
@@ -106,55 +86,39 @@ class ApiClient extends ApiClientBase {
           typeof response.data === "string" && response.data.includes("<!DOCTYPE html>");
 
         if (isHtmlResponse) {
-          console.log("⚠️ API Response returned HTML (endpoint likely doesn't exist):", {
-            status: response.status,
-            url: response.config.url,
-            method: response.config.method?.toUpperCase(),
-          });
           // Return response as-is, let the calling code handle it
           return response;
         }
 
-        console.log("✅ API Response Success:", {
-          status: response.status,
-          url: response.config.url,
-          method: response.config.method?.toUpperCase(),
-        });
-
         // Unwrap Lambda proxy integration response format
-        // API returns: {statusCode, body: {success, data}}
+        // API returns: {statusCode, body: ...}
         // We need: {success, data}
-        // Only unwrap if body is an object, not a string (some APIs return stringified JSON)
         if (
           response.data &&
           typeof response.data === "object" &&
           "body" in response.data &&
-          typeof response.data.body === "object"
+          "statusCode" in response.data
         ) {
-          console.log("🔄 Unwrapping Lambda proxy response format");
-          response.data = response.data.body;
+          const body = response.data.body;
+          if (typeof body === "object") {
+            response.data = body;
+          } else if (typeof body === "string") {
+            try {
+              response.data = JSON.parse(body);
+            } catch {
+              // Leave response.data as-is if body isn't valid JSON
+            }
+          }
         }
 
         return response;
       },
       async (error) => {
-        console.error("❌ API Response Error:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          url: error.config?.url,
-          method: error.config?.method?.toUpperCase(),
-          message: error.response?.data?.message || error.message,
-          headers: error.response?.headers,
-        });
-
         const originalRequest = error.config;
 
         // Handle 401 Unauthorized (expired token from API Gateway UNAUTHORIZED response)
         if (error.response?.status === 401 && !originalRequest._retry) {
-          console.log("🔄 Token expired (401), attempting refresh...");
-
           if (this.isRefreshing) {
-            console.log("⏳ Token refresh already in progress, queuing request...");
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
             })
@@ -170,12 +134,10 @@ class ApiClient extends ApiClientBase {
           try {
             const newToken = await authService.refreshToken();
             if (!newToken) {
-              console.error("❌ Failed to refresh token");
               this.processQueue(new Error("Failed to refresh token"));
               return Promise.reject(error);
             }
 
-            console.log("✅ Token refreshed successfully");
             // Update the failed request with new token
             originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
 
@@ -185,7 +147,6 @@ class ApiClient extends ApiClientBase {
             // Retry the original request
             return this.axiosInstance(originalRequest);
           } catch (refreshError) {
-            console.error("❌ Token refresh failed:", refreshError);
             this.processQueue(refreshError);
             return Promise.reject(refreshError);
           } finally {
@@ -213,17 +174,11 @@ class ApiClient extends ApiClientBase {
               const { isTokenExpiringSoon } = await import("@/common/helpers/token-helper");
               const token = StorageHelper.getToken();
               if (token && isTokenExpiringSoon(token, 30)) {
-                console.log(
-                  "🔄 403 received but token is expired/expiring — attempting refresh before redirect"
-                );
                 originalRequest._retry = true;
 
                 // Use the same isRefreshing guard as the 401 handler to avoid
                 // duplicate concurrent refresh calls
                 if (this.isRefreshing) {
-                  console.log(
-                    "⏳ Token refresh already in progress (403 path), queuing request..."
-                  );
                   return new Promise((resolve, reject) => {
                     this.failedQueue.push({ resolve, reject });
                   })
@@ -238,7 +193,6 @@ class ApiClient extends ApiClientBase {
                 try {
                   const newToken = await authService.refreshToken();
                   if (newToken) {
-                    console.log("✅ Token refreshed on 403 recovery, retrying request");
                     originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
                     this.processQueue();
                     return this.axiosInstance(originalRequest);
@@ -246,7 +200,6 @@ class ApiClient extends ApiClientBase {
                     this.processQueue(new Error("Failed to refresh token"));
                   }
                 } catch (refreshError) {
-                  console.error("❌ Token refresh on 403 recovery failed:", refreshError);
                   this.processQueue(refreshError);
                 } finally {
                   this.isRefreshing = false;
@@ -257,13 +210,8 @@ class ApiClient extends ApiClientBase {
             const skipRedirect = originalRequest?.skipAccessDeniedRedirect === true;
 
             if (skipRedirect) {
-              console.log(
-                "🚫 403 Forbidden from API - Skipping redirect (skipAccessDeniedRedirect)"
-              );
               return Promise.reject(error);
             }
-
-            console.log("🚫 403 Forbidden from API - Redirecting to access-denied page");
 
             // Extract error details from response
             const authError =
@@ -271,12 +219,6 @@ class ApiClient extends ApiClientBase {
               error.response?.data?.message ||
               "You don't have permission to perform this action";
             const requiredPermission = error.response?.data?.requiredPermission;
-
-            console.log("Permission Error Details:", {
-              authError,
-              requiredPermission,
-              fullResponse: error.response?.data,
-            });
 
             // Use dynamic import to avoid circular dependency issues
             import("@/utils/navigation").then(({ navigateToAccessDenied }) => {
@@ -291,9 +233,6 @@ class ApiClient extends ApiClientBase {
             // Still reject the promise so calling code can handle it if needed
             return Promise.reject(error);
           } else {
-            console.log(
-              "🗂️ 403 Forbidden from S3 - Letting CloudFront handle it (will serve index.html)"
-            );
             // Let S3 403 errors pass through - CloudFront will convert to index.html
           }
         }

@@ -482,7 +482,7 @@ export const EventBridgePatternEditor: React.FC<EventBridgePatternEditorProps> =
             fontSize: "0.813rem !important",
             fontWeight: "500 !important",
             cursor: "pointer",
-            transition: "all 0.2s ease",
+            transition: "background-color 0.2s ease, color 0.2s ease",
             color: "inherit !important",
           },
           "& .jse-message.jse-info .jse-button": {

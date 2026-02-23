@@ -360,7 +360,7 @@ const PipelinesPage: React.FC = () => {
   });
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title={t("pipelines.title")}
         description={t("pipelines.description")}
@@ -464,9 +464,6 @@ const PipelinesPage: React.FC = () => {
                           processedFlow.configuration.nodes &&
                           processedFlow.configuration.edges
                         ) {
-                          console.log(
-                            "[PipelinesPage] Found nodes and edges under configuration property"
-                          );
                           // Move nodes and edges to the top level
                           processedFlow.nodes = processedFlow.configuration.nodes;
                           processedFlow.edges = processedFlow.configuration.edges;
@@ -504,8 +501,6 @@ const PipelinesPage: React.FC = () => {
                           ...processedFlow,
                           active: processedFlow.active !== undefined ? processedFlow.active : true,
                         };
-
-                        console.log("[PipelinesPage] Processed imported flow:", importedFlow);
 
                         // Navigate to new pipeline page with the imported flow and name
                         // Pass showImporting flag to indicate the editor should show the importing state

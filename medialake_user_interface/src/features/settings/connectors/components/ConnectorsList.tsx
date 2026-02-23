@@ -48,7 +48,6 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
 
   const handleEdit = (connector: ConnectorResponse) => {
     // TODO: Implement edit functionality
-    console.log("Edit connector:", connector);
   };
 
   const handleDelete = async (id: string) => {
