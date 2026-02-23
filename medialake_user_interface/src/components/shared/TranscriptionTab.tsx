@@ -309,7 +309,7 @@ const TranscriptWord: React.FC<{
           fontWeight: isHighlighted ? 600 : "normal",
           fontStyle: isLowConfidence ? "italic" : "normal",
           textDecoration: isVeryLowConfidence ? "underline dotted" : "none",
-          transition: "all 0.2s ease-in-out",
+          transition: "background-color 0.2s ease-in-out, color 0.2s ease-in-out",
           display: "inline-block",
           position: "relative",
         }}

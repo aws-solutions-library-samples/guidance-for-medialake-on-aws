@@ -39,7 +39,6 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           p: 1,
         },
       }}

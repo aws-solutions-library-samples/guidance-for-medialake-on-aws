@@ -16,6 +16,7 @@ import {
   Autocomplete,
   Checkbox,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -565,7 +566,6 @@ const PermissionsPage: React.FC = () => {
         width: "100%",
         position: "relative",
         maxWidth: "100%",
-        p: 3,
       }}
     >
       <PageHeader
@@ -801,7 +801,7 @@ const PermissionsPage: React.FC = () => {
                 sx={{
                   position: "absolute",
                   inset: 0,
-                  bgcolor: "rgba(255, 255, 255, 0.8)",
+                  bgcolor: (theme) => alpha(theme.palette.background.paper, 0.8),
                   zIndex: 10,
                   display: "flex",
                   alignItems: "center",

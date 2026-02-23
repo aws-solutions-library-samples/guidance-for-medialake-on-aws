@@ -541,7 +541,7 @@ media-controller.media-controller-stamp .omakase-timecode-wrapper {
   min-width: 90px;
   background-color: #000;
   color: #fff;
-  font-family: Consolas, monospace;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
   height: 19px;
   font-size: 12px;
   line-height: 19px;
@@ -849,7 +849,7 @@ media-controller .timecode-container {
 }
 
 media-controller .timecode-container omakase-time-display {
-  font-family: Consolas, monospace;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
   color: #fff;
   line-height: var(--timecode-line-height, var(--timecode-line-height-default));
   font-size: var(--timecode-font-size, var(--timecode-font-size-default));

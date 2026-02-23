@@ -48,13 +48,15 @@ const AccessDeniedPage: React.FC = () => {
   return (
     <Container maxWidth="md" sx={{ mt: 8 }}>
       <Paper
-        elevation={3}
+        elevation={0}
         sx={{
           p: 4,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          borderRadius: 2,
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
         }}
       >
         <LockIcon color="error" sx={{ fontSize: 64, mb: 2 }} />

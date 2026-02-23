@@ -12,8 +12,6 @@ import {
 import { Add as AddIcon, RestartAlt as ResetIcon, Edit as EditIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useDirection } from "../contexts/DirectionContext";
-import { useSidebar } from "../contexts/SidebarContext";
-import { drawerWidth, collapsedDrawerWidth } from "../constants";
 import {
   DashboardGrid,
   ExpandedWidgetModal,
@@ -40,7 +38,6 @@ const HomeContent: React.FC = () => {
   const { t } = useTranslation();
   const { direction } = useDirection();
   const isRTL = direction === "rtl";
-  const { isCollapsed } = useSidebar();
 
   const setWidgetSelectorOpen = useDashboardStore((state) => state.setWidgetSelectorOpen);
   const availableWidgets = useAvailableWidgets();
@@ -62,28 +59,18 @@ const HomeContent: React.FC = () => {
 
   return (
     <>
+      {/* Normal document flow — no fixed positioning.
+          AppLayout already handles the topbar offset and consistent padding. */}
       <Box
         component="main"
         sx={{
-          position: "fixed",
-          top: 64,
-          ...(isRTL
-            ? { left: 0, right: isCollapsed ? collapsedDrawerWidth : drawerWidth }
-            : {
-                left: isCollapsed ? collapsedDrawerWidth : drawerWidth,
-                right: 0,
-              }),
-          bottom: 0,
-          backgroundColor: "transparent",
-          overflowY: "auto",
-          overflowX: "hidden",
-          transition: theme.transitions.create(["left", "right"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          flex: 1,
         }}
       >
-        <Box sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 }, width: "100%" }}>
+        <Box sx={{ width: "100%" }}>
           <Fade in={true} timeout={800}>
             <Box sx={{ mb: 4 }}>
               {/* Header Section */}

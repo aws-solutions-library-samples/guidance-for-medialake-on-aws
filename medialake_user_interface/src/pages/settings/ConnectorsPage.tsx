@@ -150,7 +150,7 @@ const ConnectorsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title={t("connectors.title")}
         description={t("connectors.description")}

@@ -63,7 +63,7 @@ const StyledPopperDiv = styled("div")(
     padding: 0.75rem;
     color: ${theme.palette.mode === "dark" ? grey[100] : grey[700]};
     font-size: 0.875rem;
-    font-family: "IBM Plex Sans", sans-serif;
+    font-family: inherit;
     font-weight: 500;
     opacity: 1;
     margin: 0.25rem 0;

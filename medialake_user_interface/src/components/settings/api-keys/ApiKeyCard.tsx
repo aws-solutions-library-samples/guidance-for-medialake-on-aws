@@ -38,7 +38,8 @@ const ApiKeyCard: React.FC<ApiKeyCardProps> = ({ apiKey, onView, onEdit, onDelet
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        transition: "all 0.2s ease-in-out",
+        transition:
+          "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out",
         border: (theme) =>
           `1px solid ${
             apiKey.isEnabled

@@ -34,6 +34,7 @@ import {
   Divider,
   Button,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import KeyboardAltIcon from "@mui/icons-material/KeyboardAlt";
@@ -771,9 +772,9 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
           }}
           PaperProps={{
             sx: {
-              borderRadius: 2,
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: 3,
+              boxShadow: (theme) => `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+              border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
               backdropFilter: "blur(10px)",
               maxWidth: 500,
             },
@@ -786,7 +787,7 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
               sx={{
                 fontWeight: 600,
                 mb: 2,
-                background: "linear-gradient(45deg, #2196F3, #21CBF3)",
+                background: "linear-gradient(45deg, #2B6CB0, #14B8A6)",
                 backgroundClip: "text",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -880,9 +881,11 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                           "&:hover": {
                             backgroundColor: "action.hover",
                             transform: "translateY(-1px)",
-                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+                            boxShadow: (theme) =>
+                              `0 2px 8px ${alpha(theme.palette.common.black, 0.1)}`,
                           },
-                          transition: "all 0.2s ease-in-out",
+                          transition:
+                            "background-color 0.2s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
                         }}
                       >
                         <Typography
@@ -911,7 +914,8 @@ export const VideoViewer = forwardRef<VideoViewerRef, VideoViewerProps>(
                                   color: "grey.800",
                                   border: "1px solid",
                                   borderColor: "grey.300",
-                                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
+                                  boxShadow: (theme) =>
+                                    `0 1px 2px ${alpha(theme.palette.common.black, 0.1)}`,
                                   "& .MuiChip-label": {
                                     px: 1,
                                   },

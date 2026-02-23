@@ -63,6 +63,7 @@ import {
   RightSidebarProvider,
   useRightSidebar,
 } from "@/components/common/RightSidebar/SidebarContext";
+import { springEasing } from "@/constants";
 
 const EDGE_ANIMATION_SPEED_SEC = 2;
 const edgeStyle = (speed = EDGE_ANIMATION_SPEED_SEC) => ({
@@ -1728,10 +1729,7 @@ const PipelineEditorContent = () => {
             bottom: 0,
             width: isExpanded ? "300px" : "0px",
             transition: (theme) =>
-              theme.transitions.create(["width"], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
             zIndex: 2,
           }}
         >
@@ -1746,10 +1744,7 @@ const PipelineEditorContent = () => {
             right: isExpanded ? "300px" : 0,
             bottom: 0,
             transition: (theme) =>
-              theme.transitions.create(["right"], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              `right ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
             zIndex: 1,
           }}
         >

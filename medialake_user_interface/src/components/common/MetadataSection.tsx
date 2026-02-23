@@ -2,25 +2,25 @@ import React from "react";
 import { Box, Tab, Tabs } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
-const StyledTabs = styled(Tabs)({
+const StyledTabs = styled(Tabs)(({ theme }) => ({
   "& .MuiTabs-indicator": {
-    backgroundColor: "#2563eb",
+    backgroundColor: theme.palette.primary.main,
     height: "2px",
   },
-});
+}));
 
-const StyledTab = styled(Tab)({
+const StyledTab = styled(Tab)(({ theme }) => ({
   textTransform: "none",
   fontSize: "16px",
   fontWeight: 400,
-  color: "#6b7280",
+  color: theme.palette.text.secondary,
   padding: "12px 0",
   marginRight: "32px",
   minWidth: "unset",
   "&.Mui-selected": {
-    color: "#2563eb",
+    color: theme.palette.primary.main,
   },
-});
+}));
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -70,7 +70,7 @@ const MetadataSection: React.FC<MetadataSectionProps> = ({ tabs, defaultTab = 0,
 
   return (
     <Box>
-      <Box sx={{ borderBottom: 1, borderColor: "#e5e7eb" }}>
+      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
         <StyledTabs value={value} onChange={handleChange} aria-label="metadata tabs">
           {tabs.map((tab, index) => (
             <StyledTab

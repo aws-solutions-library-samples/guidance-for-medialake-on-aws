@@ -158,14 +158,14 @@ export function AssetCarousel<T>({
             display: "block",
           },
           "&::-webkit-scrollbar-track": {
-            backgroundColor: "rgba(0,0,0,0.05)",
+            backgroundColor: "action.hover",
             borderRadius: "4px",
           },
           "&::-webkit-scrollbar-thumb": {
-            backgroundColor: "rgba(0,0,0,0.2)",
+            backgroundColor: "text.disabled",
             borderRadius: "4px",
             "&:hover": {
-              backgroundColor: "rgba(0,0,0,0.3)",
+              backgroundColor: "text.secondary",
             },
           },
           scrollbarWidth: "thin",

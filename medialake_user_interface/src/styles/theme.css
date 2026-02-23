@@ -1,6 +1,6 @@
 :root {
-  /* Light theme variables */
-  --light-background: #f0f2f5;
+  /* Light theme variables — unified with tokens.ts */
+  --light-background: #F4F6FA;
   --light-surface: #ffffff;
   --light-text-primary: rgba(0, 0, 0, 0.87);
   --light-text-secondary: rgba(0, 0, 0, 0.6);
@@ -18,8 +18,9 @@
 }
 
 :root[data-theme='dark'] {
-  --background: #121212;
-  --surface: #1e1e1e;
+  /* Unified with tokens.ts dark mode values */
+  --background: #161D26;
+  --surface: #1E2732;
   --text-primary: rgba(255, 255, 255, 0.87);
   --text-secondary: rgba(255, 255, 255, 0.6);
   --border: rgba(255, 255, 255, 0.12);

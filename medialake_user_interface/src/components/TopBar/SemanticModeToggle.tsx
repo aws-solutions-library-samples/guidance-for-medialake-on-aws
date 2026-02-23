@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Box, Tooltip } from "@mui/material";
-import { useTheme as useMuiTheme } from "@mui/material/styles";
+import { useTheme as useMuiTheme, alpha } from "@mui/material/styles";
 import { useTheme } from "../../hooks/useTheme";
 import { useSemanticMode, useDomainActions } from "../../stores/searchStore";
 
@@ -37,7 +37,7 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({ isVisible }) =>
         display: "flex",
         alignItems: "center",
         borderRadius: "9999px",
-        backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)",
+        backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.07 : 0.05),
         padding: "2px",
         flexShrink: 0,
       }}
@@ -65,30 +65,22 @@ const SemanticModeToggle: React.FC<SemanticModeToggleProps> = ({ isVisible }) =>
                 lineHeight: 1,
                 borderRadius: "9999px",
                 textTransform: "capitalize",
-                transition: "all 0.15s ease",
+                transition: "background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
                 backgroundColor: isSelected
                   ? isDark
-                    ? "rgba(255,255,255,0.14)"
-                    : "#fff"
+                    ? alpha(muiTheme.palette.common.white, 0.14)
+                    : muiTheme.palette.background.paper
                   : "transparent",
                 color: isSelected
-                  ? isDark
-                    ? "#fff"
-                    : muiTheme.palette.text.primary
-                  : isDark
-                    ? "rgba(255,255,255,0.45)"
-                    : "rgba(0,0,0,0.42)",
+                  ? muiTheme.palette.text.primary
+                  : alpha(muiTheme.palette.text.secondary, 0.7),
                 boxShadow: isSelected
-                  ? isDark
-                    ? "0 1px 2px rgba(0,0,0,0.3)"
-                    : "0 1px 2px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.06)"
+                  ? `0 1px 2px ${alpha(muiTheme.palette.common.black, isDark ? 0.3 : 0.1)}${
+                      isDark ? "" : `, 0 0 0 1px ${alpha(muiTheme.palette.common.black, 0.06)}`
+                    }`
                   : "none",
                 "&:hover": {
-                  color: isSelected
-                    ? undefined
-                    : isDark
-                      ? "rgba(255,255,255,0.65)"
-                      : "rgba(0,0,0,0.6)",
+                  color: isSelected ? undefined : muiTheme.palette.text.secondary,
                 },
                 "&:focus-visible": {
                   outline: `2px solid ${muiTheme.palette.primary.main}`,

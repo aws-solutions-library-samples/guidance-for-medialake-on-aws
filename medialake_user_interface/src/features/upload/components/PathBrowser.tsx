@@ -20,6 +20,7 @@ import {
   alpha,
 } from "@mui/material";
 import { S3Explorer } from "../../home/S3Explorer";
+import { typography } from "@/theme/tokens";
 
 interface PathBrowserProps {
   open: boolean;
@@ -305,7 +306,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
             sx={{
               fontWeight: 500,
               color: theme.palette.primary.main,
-              fontFamily: "monospace",
+              fontFamily: typography.monoFontFamily,
               wordBreak: "break-all",
             }}
           >

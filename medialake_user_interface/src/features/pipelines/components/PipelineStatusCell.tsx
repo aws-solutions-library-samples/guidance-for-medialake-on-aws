@@ -4,6 +4,7 @@ import { PowerSettingsNew as PowerOnIcon, PowerOff as PowerOffIcon } from "@mui/
 import { IconSwitch } from "@/components/common";
 import { TableCellContent } from "@/components/common/table/TableCellContent";
 import type { Pipeline } from "../types/pipelines.types";
+import { colorTokens, typography } from "@/theme/tokens";
 
 interface PipelineStatusCellProps {
   pipeline: Pipeline;
@@ -62,10 +63,10 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
                   disabled={pipeline.system || isToggling}
                   onIcon={<PowerOnIcon />}
                   offIcon={<PowerOffIcon />}
-                  onColor="#2b6cb0"
-                  offColor="#757575"
-                  trackOnColor="#b2ebf2"
-                  trackOffColor="#cfd8dc"
+                  onColor={colorTokens.primary.main}
+                  offColor={typography.colors.disabled.light}
+                  trackOnColor={colorTokens.accent.light}
+                  trackOffColor={colorTokens.text.secondary.light}
                 />
                 {isToggling && (
                   <CircularProgress
@@ -76,7 +77,7 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
                       left: "50%",
                       marginTop: "-12px",
                       marginLeft: "-12px",
-                      color: pipeline.active !== false ? "#2e7d32" : "#757575",
+                      color: pipeline.active !== false ? "success.dark" : "text.disabled",
                     }}
                   />
                 )}

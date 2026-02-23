@@ -444,7 +444,8 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                 borderColor: (theme) => alpha(theme.palette.divider, 0.08),
                 bgcolor: (theme) => alpha(theme.palette.background.default, 0.3),
                 mb: 1,
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition:
+                  "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                 "&:hover": {
                   bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
                   borderColor: (theme) => alpha(theme.palette.primary.main, 0.15),
@@ -1606,7 +1607,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             fontWeight: 600,
             letterSpacing: "0.01em",
             userSelect: "none",
-            transition: "all 0.15s ease",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
             bgcolor: (theme) =>
               showUserMarkers
                 ? alpha(theme.palette.primary.main, 0.1)
@@ -1666,7 +1667,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             fontWeight: 600,
             letterSpacing: "0.01em",
             userSelect: "none",
-            transition: "all 0.15s ease",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
             bgcolor: (theme) =>
               showSemanticMarkers
                 ? alpha(theme.palette.info.main, 0.1)
@@ -1736,7 +1737,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             fontSize: "0.85rem",
             fontWeight: 600,
             userSelect: "none",
-            transition: "all 0.15s ease",
+            transition: "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
             bgcolor: (theme) => theme.palette.primary.main,
             color: (theme) => theme.palette.primary.contrastText,
             "&:hover": {
@@ -1813,7 +1814,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     border: `1px solid ${alpha(marker.style.color, 0.15)}`,
                     borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition:
+                      "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
                       bgcolor: alpha(marker.style.color, 0.1),
                       border: `1px solid ${alpha(marker.style.color, 0.3)}`,
@@ -1945,7 +1947,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       height: 22,
                       color: "text.secondary",
                       borderRadius: "6px",
-                      transition: "all 0.15s ease",
+                      transition:
+                        "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                       "&:hover": {
                         color: "error.main",
                         bgcolor: (theme) => alpha(theme.palette.error.main, 0.1),
@@ -2149,7 +2152,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     border: `1px solid ${alpha(marker.style.color, 0.15)}`,
                     borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transition:
+                      "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
                       bgcolor: alpha(marker.style.color, 0.1),
                       border: `1px solid ${alpha(marker.style.color, 0.3)}`,
@@ -2294,7 +2298,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                           height: 22,
                           color: "text.secondary",
                           borderRadius: "6px",
-                          transition: "all 0.15s ease",
+                          transition:
+                            "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                           "&:hover": {
                             color: "primary.main",
                             bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
@@ -2462,7 +2467,7 @@ const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
           p: 2,
           mb: 2,
           borderColor: alpha(theme.palette.info.main, 0.2),
-          transition: "all 0.2s ease",
+          transition: "border-color 0.2s ease, background-color 0.2s ease",
           "&:hover": {
             borderColor: theme.palette.info.main,
             boxShadow: `0 4px 8px ${alpha(theme.palette.info.main, 0.15)}`,
@@ -2489,7 +2494,7 @@ const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
           p: 2,
           mb: 2,
           borderColor: alpha(theme.palette.warning.main, 0.2),
-          transition: "all 0.2s ease",
+          transition: "border-color 0.2s ease, background-color 0.2s ease",
           "&:hover": {
             borderColor: theme.palette.warning.main,
             boxShadow: `0 4px 8px ${alpha(theme.palette.warning.main, 0.15)}`,
@@ -2685,7 +2690,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
                   borderBottom: "2px solid",
                   borderColor: currentTab === tab.index ? "primary.main" : "transparent",
                   mb: "-1px",
-                  transition: "all 0.15s ease",
+                  transition:
+                    "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                   userSelect: "none",
                   "&:hover": {
                     color: currentTab === tab.index ? "primary.main" : "text.primary",

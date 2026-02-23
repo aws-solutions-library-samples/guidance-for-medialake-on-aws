@@ -396,7 +396,6 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           sx={{
             display: "flex",
             minHeight: "100%",
-            bgcolor: "background.default",
             position: "relative",
             overflow: "auto",
           }}
@@ -417,14 +416,9 @@ const SearchPagePresentation: React.FC<SearchPagePresentationProps> = ({
           <Box
             sx={{
               flexGrow: 1,
-              px: 4,
-              pt: 1,
-              pb: 2,
               display: "flex",
               flexDirection: "column",
-              gap: 6,
               minHeight: 0,
-              marginBottom: 4,
             }}
           >
             {searchMetadata?.totalResults === 0 && query && (

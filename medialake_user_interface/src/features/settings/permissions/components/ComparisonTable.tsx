@@ -12,7 +12,9 @@ import {
   Chip,
   Tooltip,
   Box,
+  useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -37,14 +39,18 @@ interface ComparisonTableProps {
 }
 
 function ComparisonLegend({ selectedGroups }: { selectedGroups: Group[] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Box
       sx={{
         px: 2.5,
         py: 1.5,
-        bgcolor: "action.hover",
-        borderBottom: 1,
-        borderColor: "divider",
+        backgroundColor: isDark
+          ? alpha(theme.palette.background.default, 0.5)
+          : alpha(theme.palette.background.default, 0.6),
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
@@ -52,8 +58,15 @@ function ComparisonLegend({ selectedGroups }: { selectedGroups: Group[] }) {
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-        <InfoOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-        <Typography variant="caption" fontWeight="medium" color="text.secondary">
+        <InfoOutlinedIcon sx={{ fontSize: 14, color: theme.palette.text.secondary }} />
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 600,
+            color: theme.palette.text.secondary,
+            letterSpacing: "0.02em",
+          }}
+        >
           Legend:
         </Typography>
       </Box>
@@ -64,32 +77,43 @@ function ComparisonLegend({ selectedGroups }: { selectedGroups: Group[] }) {
             sx={{
               width: 16,
               height: 16,
-              borderRadius: 0.5,
-              border: 1,
+              borderRadius: "4px",
+              border: `1px solid ${GROUP_COLORS[idx % GROUP_COLORS.length].headerHex}`,
               backgroundColor: GROUP_COLORS[idx % GROUP_COLORS.length].headerHex,
-              borderColor: GROUP_COLORS[idx % GROUP_COLORS.length].headerHex,
             }}
           />
-          <Typography variant="caption" color={GROUP_COLORS[idx % GROUP_COLORS.length].text}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: GROUP_COLORS[idx % GROUP_COLORS.length].text,
+              fontWeight: 500,
+            }}
+          >
             {group.name}
           </Typography>
         </Box>
       ))}
 
-      <Box sx={{ width: 1, height: 16, bgcolor: "divider", mx: 0.5 }} />
+      <Box
+        sx={{
+          width: 1,
+          height: 16,
+          bgcolor: alpha(theme.palette.divider, 0.2),
+          mx: 0.5,
+        }}
+      />
 
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
         <Box
           sx={{
             width: 16,
             height: 16,
-            borderRadius: 0.5,
-            border: 1,
-            backgroundColor: "#fef3c7",
-            borderColor: "#fcd34d",
+            borderRadius: "4px",
+            border: `1px solid ${theme.palette.warning.main}`,
+            backgroundColor: alpha(theme.palette.warning.main, 0.12),
           }}
         />
-        <Typography variant="caption" color="warning.dark">
+        <Typography variant="caption" sx={{ color: theme.palette.warning.dark, fontWeight: 500 }}>
           Differs between groups
         </Typography>
       </Box>
@@ -106,7 +130,14 @@ export function ComparisonTable({
   onTogglePermission,
 }: ComparisonTableProps) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const selectedGroups = groups.filter((g) => selectedGroupIds.includes(g.id));
+
+  // Consistent header background matching ResizableTable
+  const headerBg = isDark
+    ? alpha(theme.palette.background.default, 0.95)
+    : alpha(theme.palette.background.paper, 0.95);
 
   const hasPermissionDifference = (areaId: string, typeId: PermissionType): boolean => {
     if (selectedGroupIds.length < 2) return false;
@@ -135,34 +166,77 @@ export function ComparisonTable({
 
   if (selectedGroupIds.length === 0) {
     return (
-      <Box sx={{ p: 4, textAlign: "center" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 4,
+          textAlign: "center",
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          borderRadius: "12px",
+          backgroundColor: isDark
+            ? alpha(theme.palette.background.paper, 0.2)
+            : theme.palette.background.paper,
+        }}
+      >
         <Typography color="text.secondary">
           {t("permissions.selectOneGroup", "Select at least one group to compare.")}
         </Typography>
-      </Box>
+      </Paper>
     );
   }
 
   return (
-    <Box>
+    <Paper
+      elevation={0}
+      sx={{
+        overflow: "hidden",
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        borderRadius: "12px",
+        backgroundColor: isDark
+          ? alpha(theme.palette.background.paper, 0.2)
+          : theme.palette.background.paper,
+      }}
+    >
       <ComparisonLegend selectedGroups={selectedGroups} />
 
-      <TableContainer component={Paper} elevation={0} sx={{ overflow: "auto", border: 0 }}>
-        <Table stickyHeader aria-label="group comparison table" size="small">
+      <TableContainer sx={{ overflow: "auto" }}>
+        <Table
+          stickyHeader
+          aria-label="group comparison table"
+          size="small"
+          sx={{
+            borderSpacing: 0,
+            "& .MuiTableCell-root": {
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              fontSize: "0.8125rem",
+              backgroundColor: "transparent",
+            },
+          }}
+        >
           <TableHead>
             <TableRow>
               <TableCell
                 rowSpan={2}
                 sx={{
-                  bgcolor: "action.hover",
-                  fontWeight: "bold",
+                  backgroundColor: `${headerBg} !important`,
+                  fontWeight: 600,
                   minWidth: 180,
-                  borderRight: 1,
-                  borderColor: "divider",
+                  borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                   verticalAlign: "bottom",
+                  color: theme.palette.text.primary,
                 }}
               >
-                Area / Module
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  Area / Module
+                </Typography>
               </TableCell>
               {selectedGroups.map((group, idx) => (
                 <TableCell
@@ -170,9 +244,9 @@ export function ComparisonTable({
                   colSpan={PERMISSION_TYPES.length}
                   align="center"
                   sx={{
-                    bgcolor: GROUP_COLORS[idx % GROUP_COLORS.length].header,
-                    borderRight: 1,
-                    borderColor: "divider",
+                    backgroundColor: `${GROUP_COLORS[idx % GROUP_COLORS.length].header} !important`,
+                    borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                     "&:last-child": { borderRight: 0 },
                   }}
                 >
@@ -187,8 +261,11 @@ export function ComparisonTable({
                   >
                     <Typography
                       variant="subtitle2"
-                      fontWeight="bold"
-                      color={GROUP_COLORS[idx % GROUP_COLORS.length].text}
+                      sx={{
+                        fontWeight: 600,
+                        color: GROUP_COLORS[idx % GROUP_COLORS.length].text,
+                        letterSpacing: "0.01em",
+                      }}
                     >
                       {group.name}
                     </Typography>
@@ -204,17 +281,29 @@ export function ComparisonTable({
                     key={`${group.id}-${type.id}`}
                     align="center"
                     sx={{
-                      bgcolor: GROUP_COLORS[groupIdx % GROUP_COLORS.length].bg,
-                      fontSize: "0.7rem",
+                      backgroundColor: `${
+                        GROUP_COLORS[groupIdx % GROUP_COLORS.length].bg
+                      } !important`,
+                      fontSize: "0.6875rem",
                       px: 0.5,
                       minWidth: 60,
-                      borderRight: typeIdx === PERMISSION_TYPES.length - 1 ? 1 : 0,
-                      borderColor: "divider",
+                      borderRight:
+                        typeIdx === PERMISSION_TYPES.length - 1
+                          ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                          : 0,
+                      borderBottom: `2px solid ${alpha(theme.palette.divider, 0.1)}`,
                       "&:last-child": { borderRight: 0 },
                     }}
                   >
                     <Tooltip title={type.label} placement="top">
-                      <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: theme.palette.text.secondary,
+                          fontWeight: 500,
+                          fontSize: "0.6875rem",
+                        }}
+                      >
                         {type.label.substring(0, 3)}
                       </Typography>
                     </Tooltip>
@@ -232,16 +321,34 @@ export function ComparisonTable({
               return (
                 <TableRow
                   key={area.id}
-                  hover
-                  sx={{ bgcolor: hasDiff ? "rgba(255, 152, 0, 0.04)" : "inherit" }}
+                  sx={{
+                    backgroundColor: hasDiff ? alpha(theme.palette.warning.main, 0.04) : "inherit",
+                    transition: "background-color 0.2s ease",
+                    "&:hover": {
+                      backgroundColor: hasDiff
+                        ? alpha(theme.palette.warning.main, 0.08)
+                        : alpha(theme.palette.primary.main, 0.04),
+                    },
+                  }}
                 >
                   <TableCell
                     component="th"
                     scope="row"
-                    sx={{ borderRight: 1, borderColor: "divider", bgcolor: "background.paper" }}
+                    sx={{
+                      borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      backgroundColor: isDark
+                        ? alpha(theme.palette.background.paper, 0.3)
+                        : theme.palette.background.paper,
+                    }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body2" fontWeight="medium">
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 500,
+                          color: theme.palette.text.primary,
+                        }}
+                      >
                         {area.label}
                       </Typography>
                       {hasDiff && (
@@ -256,7 +363,16 @@ export function ComparisonTable({
                             size="small"
                             color="warning"
                             variant="outlined"
-                            sx={{ height: 20, "& .MuiChip-label": { fontSize: "10px" } }}
+                            sx={{
+                              height: 22,
+                              borderRadius: "6px",
+                              "& .MuiChip-label": {
+                                fontSize: "0.625rem",
+                                fontWeight: 600,
+                                px: 0.75,
+                              },
+                              "& .MuiChip-icon": { ml: 0.5 },
+                            }}
                           />
                         </Tooltip>
                       )}
@@ -276,9 +392,13 @@ export function ComparisonTable({
                             key={`${group.id}-${area.id}-${type.id}`}
                             align="center"
                             sx={{
-                              bgcolor: "action.disabledBackground",
-                              borderRight: typeIdx === PERMISSION_TYPES.length - 1 ? 1 : 0,
-                              borderColor: "divider",
+                              backgroundColor: isDark
+                                ? alpha(theme.palette.background.default, 0.3)
+                                : alpha(theme.palette.action.disabledBackground, 0.4),
+                              borderRight:
+                                typeIdx === PERMISSION_TYPES.length - 1
+                                  ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                                  : 0,
                               "&:last-child": { borderRight: 0 },
                             }}
                           >
@@ -290,7 +410,12 @@ export function ComparisonTable({
                                   justifyContent: "center",
                                 }}
                               >
-                                <RemoveIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+                                <RemoveIcon
+                                  sx={{
+                                    fontSize: 14,
+                                    color: alpha(theme.palette.text.disabled, 0.5),
+                                  }}
+                                />
                               </Box>
                             </Tooltip>
                           </TableCell>
@@ -303,11 +428,13 @@ export function ComparisonTable({
                           align="center"
                           padding="checkbox"
                           sx={{
-                            bgcolor: isDifferent
-                              ? "rgba(255, 152, 0, 0.12)"
+                            backgroundColor: isDifferent
+                              ? alpha(theme.palette.warning.main, 0.12)
                               : GROUP_COLORS[groupIdx % GROUP_COLORS.length].bg,
-                            borderRight: typeIdx === PERMISSION_TYPES.length - 1 ? 1 : 0,
-                            borderColor: "divider",
+                            borderRight:
+                              typeIdx === PERMISSION_TYPES.length - 1
+                                ? `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                                : 0,
                             "&:last-child": { borderRight: 0 },
                           }}
                         >
@@ -332,19 +459,42 @@ export function ComparisonTable({
                 <TableCell
                   colSpan={1 + selectedGroups.length * PERMISSION_TYPES.length}
                   align="center"
-                  sx={{ py: 4 }}
+                  sx={{ py: 6 }}
                 >
-                  <Typography variant="body2" color="text.secondary">
-                    {showDifferencesOnly
-                      ? "No differences found between selected groups."
-                      : "No areas found matching your search."}
-                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: "50%",
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mb: 1,
+                      }}
+                    >
+                      <RemoveIcon sx={{ fontSize: 28, color: theme.palette.primary.main }} />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {showDifferencesOnly
+                        ? "No differences found between selected groups."
+                        : "No areas found matching your search."}
+                    </Typography>
+                  </Box>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
-    </Box>
+    </Paper>
   );
 }

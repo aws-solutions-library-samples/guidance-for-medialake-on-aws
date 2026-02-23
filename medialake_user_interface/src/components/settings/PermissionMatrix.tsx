@@ -270,7 +270,7 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                           ? {
                               cursor: "pointer",
                               "&:hover": {
-                                backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                backgroundColor: "action.hover",
                                 transition: "background-color 0.2s",
                               },
                             }

@@ -3,6 +3,7 @@ import { Box, Button } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { useRightSidebar, COLLAPSED_WIDTH } from "./SidebarContext";
 import { alpha } from "@mui/material/styles";
+import { springEasing } from "@/constants";
 
 interface RightSidebarProps {
   children: ReactNode;
@@ -74,10 +75,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
           transition: isResizing
             ? "none"
             : (theme) =>
-                theme.transitions.create(["width", "border-radius"], {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.enteringScreen,
-                }),
+                `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, border-radius ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           bgcolor: "background.paper",
           position: "fixed",
           top: 72,
@@ -146,7 +144,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
           height: "32px",
           bgcolor: "background.paper",
           borderRadius: "8px",
-          boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+          boxShadow: (theme) => `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -156,14 +154,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
           padding: 0,
           transition: isResizing
             ? "none"
-            : (theme) =>
-                theme.transitions.create(["right"], {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.enteringScreen,
-                }),
+            : (theme) => `right ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           "&:hover": {
             bgcolor: "background.paper",
-            boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+            boxShadow: (theme) => `0 4px 8px ${alpha(theme.palette.common.black, 0.12)}`,
           },
         }}
       >

@@ -44,7 +44,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           backgroundColor: alpha(theme.palette.background.paper, 0.95),
           backdropFilter: "blur(10px)",
         },

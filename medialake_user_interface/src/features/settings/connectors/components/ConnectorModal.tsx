@@ -24,6 +24,7 @@ import {
   ToggleButtonGroup,
   ToggleButton,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   Close as CloseIcon,
   CloudUpload as CloudUploadIcon,
@@ -46,20 +47,23 @@ interface ConnectorModalProps {
   isCreating: boolean;
 }
 
+/** AWS brand orange — used for S3/FSx connector icons and accents. */
+const AWS_BRAND_ORANGE = "#FF9900";
+
 const CONNECTOR_TYPES = [
   {
     value: "s3",
     label: "Amazon S3",
     icon: CloudUploadIcon,
-    colorHex: "#FF9900",
+    colorHex: AWS_BRAND_ORANGE,
   },
   {
     value: "fsx",
     label: "Amazon FSx",
     icon: CloudUploadIcon,
-    colorHex: "#FF9900",
+    colorHex: AWS_BRAND_ORANGE,
   },
-  { value: "empty", label: "", icon: CloudUploadIcon, colorHex: "#FF9900" },
+  { value: "empty", label: "", icon: CloudUploadIcon, colorHex: AWS_BRAND_ORANGE },
 ];
 
 const getS3BucketTypes = (t: (key: string) => string) => [
@@ -323,10 +327,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: "8px",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "border-color 0.2s, background-color 0.2s",
             "&:hover": {
               borderColor: theme.palette.primary.main,
-              backgroundColor: `${theme.palette.primary.main}08`,
+              backgroundColor: alpha(theme.palette.primary.main, 0.03),
             },
           }}
         >
@@ -645,10 +649,10 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     cursor: connectorType.value === "fsx" ? "not-allowed" : "pointer",
                     opacity: connectorType.value === "fsx" ? 0.5 : 1,
                     pointerEvents: connectorType.value === "fsx" ? "none" : "auto",
-                    transition: "all 0.2s",
+                    transition: "border-color 0.2s, background-color 0.2s",
                     "&:hover": {
                       borderColor: connectorType.colorHex,
-                      backgroundColor: `${connectorType.colorHex}08`,
+                      backgroundColor: alpha(connectorType.colorHex, 0.03),
                     },
                   }}
                 >
@@ -681,11 +685,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         // focus-enforcement and aria-hidden management of this parent Dialog
         // so the browser doesn't warn about aria-hidden on a focused element.
         disableEnforceFocus={apiStatus.status !== "idle"}
-        PaperProps={{
-          sx: {
-            borderRadius: "12px",
-          },
-        }}
       >
         <DialogTitle
           sx={{

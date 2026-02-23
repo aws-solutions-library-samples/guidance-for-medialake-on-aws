@@ -30,6 +30,9 @@ import ConnectorEditModal from "@/features/settings/connectors/components/Connec
 import { useDateFormat } from "@/shared/hooks/useDateFormat";
 import { Warning as WarningIcon } from "@mui/icons-material";
 
+/** AWS brand orange — used for S3 connector icons. */
+const AWS_BRAND_ORANGE = "#FF9900";
+
 interface ConnectorCardProps {
   connector: ConnectorResponse;
   onEdit: (connector: ConnectorResponse) => void;
@@ -90,7 +93,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 
   const getConnectorIcon = (type: string) => {
     if (type === "s3") {
-      return <CloudUploadIcon sx={{ color: "#FF9900" }} />;
+      return <CloudUploadIcon sx={{ color: AWS_BRAND_ORANGE }} />;
     }
     return null;
   };

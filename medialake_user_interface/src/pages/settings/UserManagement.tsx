@@ -185,7 +185,6 @@ const UserManagement: React.FC = () => {
         width: "100%",
         position: "relative",
         maxWidth: "100%",
-        p: 3,
       }}
     >
       <PageHeader

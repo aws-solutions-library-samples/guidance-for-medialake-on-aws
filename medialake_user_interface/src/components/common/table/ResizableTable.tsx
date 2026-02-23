@@ -136,7 +136,7 @@ const useTableStyles = (
       },
       tableRow: {
         backgroundColor: "inherit",
-        transition: "all 0.2s ease",
+        transition: "background-color 0.2s ease",
         cursor: hasRowClick ? "pointer" : "default",
         "&:hover": hasRowClick
           ? {

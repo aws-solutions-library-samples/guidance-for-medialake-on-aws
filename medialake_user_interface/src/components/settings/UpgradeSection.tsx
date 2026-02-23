@@ -42,6 +42,7 @@ import {
   type UpgradeStatusResponse,
 } from "@/api/updatesService";
 import { UpgradeHistoryView } from "@/components/settings/UpgradeHistoryView";
+import { typography } from "@/theme/tokens";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -225,7 +226,7 @@ export const UpgradeSection: React.FC = () => {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-            <Typography variant="h5" sx={{ fontFamily: "monospace" }}>
+            <Typography variant="h5" sx={{ fontFamily: typography.monoFontFamily }}>
               {status?.current_version || "unknown"}
             </Typography>
             <Chip
@@ -338,7 +339,7 @@ export const UpgradeSection: React.FC = () => {
                                   gap: 1,
                                 }}
                               >
-                                <Typography sx={{ fontFamily: "monospace" }}>
+                                <Typography sx={{ fontFamily: typography.monoFontFamily }}>
                                   {version.name}
                                 </Typography>
                                 {version.is_latest && (
@@ -400,7 +401,7 @@ export const UpgradeSection: React.FC = () => {
                                   gap: 1,
                                 }}
                               >
-                                <Typography sx={{ fontFamily: "monospace" }}>
+                                <Typography sx={{ fontFamily: typography.monoFontFamily }}>
                                   {version.name}
                                 </Typography>
                                 {version.is_default && (
