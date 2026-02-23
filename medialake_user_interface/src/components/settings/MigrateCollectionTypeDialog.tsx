@@ -104,9 +104,10 @@ const MigrateCollectionTypeDialog: React.FC<MigrateCollectionTypeDialogProps> = 
                   alignItems: "center",
                   gap: 2,
                   p: 2,
-                  border: "1px solid #ddd",
+                  border: "1px solid",
+                  borderColor: "divider",
                   borderRadius: 1,
-                  backgroundColor: "#f5f5f5",
+                  backgroundColor: "action.hover",
                 }}
               >
                 <Box

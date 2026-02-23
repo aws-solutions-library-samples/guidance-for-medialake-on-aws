@@ -39,17 +39,7 @@ const SelectNodeModal: React.FC<SelectNodeModalProps> = ({
   const theme = useTheme();
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: "12px",
-        },
-      }}
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle
         sx={{
           borderBottom: `1px solid ${theme.palette.divider}`,

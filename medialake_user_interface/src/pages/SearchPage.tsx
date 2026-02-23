@@ -610,14 +610,9 @@ const SearchPage: React.FC = () => {
           <Box
             sx={{
               flexGrow: 1,
-              px: 4,
-              pt: 1,
-              pb: 2,
               display: "flex",
               flexDirection: "column",
-              gap: 6,
               minHeight: 0,
-              marginBottom: 4,
             }}
           >
             {searchMetadata?.totalResults === 0 && currentQuery && (

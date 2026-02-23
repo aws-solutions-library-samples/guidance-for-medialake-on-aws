@@ -12,6 +12,7 @@ import {
   LinearProgress,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { colorTokens, typography } from "@/theme/tokens";
 import {
   Notifications as NotificationsIcon,
   Close as CloseIcon,
@@ -60,19 +61,19 @@ const formatDate = (dateString: string, t: (key: string) => string): string => {
 const getStatusIconColor = (jobStatus?: string) => {
   switch (jobStatus) {
     case "INITIATED":
-      return "#1976d2"; // Blue
+      return colorTokens.info.main;
     case "ASSESSED":
-      return "#1976d2"; // Orange
+      return colorTokens.info.main;
     case "STAGING":
-      return "#1976d2"; // Purple
+      return colorTokens.info.main;
     case "PROCESSING":
-      return "#1976d2"; // Blue
+      return colorTokens.info.main;
     case "COMPLETED":
-      return "#2e7d32"; // Green
+      return colorTokens.success.dark;
     case "FAILED":
-      return "#d32f2f"; // Red
+      return colorTokens.error.main;
     default:
-      return "#757575"; // Gray
+      return typography.colors.disabled.light; // Gray
   }
 };
 
@@ -487,7 +488,7 @@ export const NotificationCenter: React.FC = () => {
                             animation: "flash-red 0.5s ease-in-out 3",
                             "@keyframes flash-red": {
                               "0%": { color: iconColor },
-                              "50%": { color: "#d32f2f" },
+                              "50%": { color: colorTokens.error.main },
                               "100%": { color: iconColor },
                             },
                           }),

@@ -134,7 +134,6 @@ export const SavePresetDialog: React.FC<SavePresetDialogProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 1.5,
           backgroundColor: alpha(theme.palette.background.paper, 0.98),
           backdropFilter: "blur(10px)",
         },

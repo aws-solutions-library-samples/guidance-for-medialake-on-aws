@@ -400,13 +400,15 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
                       height: 22,
                       fontSize: "0.68rem",
                       fontWeight: 500,
-                      color: group.isPublic ? "#38A169" : "text.secondary",
+                      color: group.isPublic ? "success.main" : "text.secondary",
                       borderColor: group.isPublic
-                        ? alpha("#38A169", 0.35)
+                        ? alpha(theme.palette.success.main, 0.35)
                         : alpha(theme.palette.text.secondary, 0.15),
-                      bgcolor: group.isPublic ? alpha("#38A169", 0.06) : "transparent",
+                      bgcolor: group.isPublic
+                        ? alpha(theme.palette.success.main, 0.06)
+                        : "transparent",
                       "& .MuiChip-icon": {
-                        color: group.isPublic ? "#38A169" : "text.secondary",
+                        color: group.isPublic ? "success.main" : "text.secondary",
                         fontSize: 13,
                       },
                     }}

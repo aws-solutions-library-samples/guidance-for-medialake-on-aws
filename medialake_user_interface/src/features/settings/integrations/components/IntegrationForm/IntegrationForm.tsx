@@ -408,7 +408,6 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: "12px",
           minHeight: 400,
         },
       }}

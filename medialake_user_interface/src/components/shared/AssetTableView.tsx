@@ -126,7 +126,7 @@ function AssetTableView<T>({
             <h3
               style={{
                 marginBottom: "1rem",
-                background: "linear-gradient(45deg, #1976d2, #9c27b0)",
+                background: "linear-gradient(45deg, #2B6CB0, #14B8A6)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 fontWeight: 600,

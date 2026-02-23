@@ -505,7 +505,6 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                       fontSize: "0.8rem",
                       fontWeight: 500,
                       cursor: "pointer",
-                      fontFamily: "inherit",
                       "&:hover": {
                         bgcolor: alpha(theme.palette.text.primary, 0.06),
                       },
@@ -528,7 +527,6 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                       fontSize: "0.8rem",
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: "inherit",
                       display: "flex",
                       alignItems: "center",
                       gap: 0.5,
@@ -636,7 +634,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                       py: 1.2,
                       borderRadius: 2,
                       cursor: "pointer",
-                      transition: "all 0.15s ease",
+                      transition: "background-color 0.15s ease, opacity 0.15s ease",
                       border: `1.5px solid ${
                         isSelected ? alpha(theme.palette.primary.main, 0.5) : "transparent"
                       }`,
@@ -847,7 +845,6 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                 fontSize: "0.82rem",
                 fontWeight: 500,
                 cursor: "pointer",
-                fontFamily: "inherit",
                 "&:hover": {
                   bgcolor: alpha(theme.palette.text.primary, 0.06),
                 },
@@ -870,11 +867,10 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
                 fontSize: "0.82rem",
                 fontWeight: 600,
                 cursor: "pointer",
-                fontFamily: "inherit",
                 display: "flex",
                 alignItems: "center",
                 gap: 0.7,
-                transition: "all 0.15s ease",
+                transition: "background-color 0.15s ease, opacity 0.15s ease",
                 "&:hover": { bgcolor: "primary.dark" },
                 "&:disabled": {
                   opacity: 0.4,

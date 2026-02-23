@@ -287,7 +287,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -303,7 +304,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -341,7 +343,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -357,7 +360,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -395,7 +399,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -411,7 +416,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -449,7 +455,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -465,7 +472,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -503,7 +511,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -519,7 +528,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -557,7 +567,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -573,7 +584,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -611,7 +623,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -627,7 +640,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -665,7 +679,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
@@ -681,7 +696,8 @@ const ProfilePage: React.FC = () => {
                                     sx={{
                                       width: 24,
                                       height: 16,
-                                      border: "1px solid #ccc",
+                                      border: "1px solid",
+                                      borderColor: "divider",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",

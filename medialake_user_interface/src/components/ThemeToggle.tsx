@@ -8,6 +8,7 @@ import {
   Typography,
   useTheme as useMuiTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   LightMode as LightIcon,
   DarkMode as DarkIcon,
@@ -83,7 +84,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor: mode === "light" ? `${muiTheme.palette.primary.main}15` : "transparent",
+              bgcolor:
+                mode === "light" ? alpha(muiTheme.palette.primary.main, 0.08) : "transparent",
               color:
                 mode === "light" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}
@@ -95,7 +97,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor: mode === "dark" ? `${muiTheme.palette.primary.main}15` : "transparent",
+              bgcolor: mode === "dark" ? alpha(muiTheme.palette.primary.main, 0.08) : "transparent",
               color:
                 mode === "dark" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}
@@ -107,7 +109,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
             sx={{
               flex: 1,
               borderRadius: 1,
-              bgcolor: mode === "system" ? `${muiTheme.palette.primary.main}15` : "transparent",
+              bgcolor:
+                mode === "system" ? alpha(muiTheme.palette.primary.main, 0.08) : "transparent",
               color:
                 mode === "system" ? muiTheme.palette.primary.main : muiTheme.palette.text.secondary,
             }}

@@ -157,7 +157,6 @@ export const PresetManagementDialog: React.FC<PresetManagementDialogProps> = ({
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 2,
             backgroundColor: alpha(theme.palette.background.paper, 0.95),
             backdropFilter: "blur(10px)",
             minHeight: 400,
@@ -249,7 +248,7 @@ export const PresetManagementDialog: React.FC<PresetManagementDialogProps> = ({
                         backgroundColor: isActive
                           ? alpha(theme.palette.primary.main, 0.05)
                           : "transparent",
-                        transition: "all 0.2s",
+                        transition: "border-color 0.2s, background-color 0.2s",
                         "&:hover": {
                           borderColor: isActive ? "primary.main" : "primary.light",
                         },

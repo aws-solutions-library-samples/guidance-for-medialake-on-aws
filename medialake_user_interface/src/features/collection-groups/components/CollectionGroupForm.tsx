@@ -363,7 +363,6 @@ export const CollectionGroupForm: React.FC<CollectionGroupFormProps> = ({
                 fontSize: "0.82rem",
                 fontWeight: 500,
                 cursor: "pointer",
-                fontFamily: "inherit",
                 "&:hover": { bgcolor: alpha(theme.palette.text.primary, 0.06) },
                 "&:disabled": { opacity: 0.5, cursor: "default" },
               }}
@@ -384,11 +383,10 @@ export const CollectionGroupForm: React.FC<CollectionGroupFormProps> = ({
                 fontSize: "0.82rem",
                 fontWeight: 600,
                 cursor: "pointer",
-                fontFamily: "inherit",
                 display: "flex",
                 alignItems: "center",
                 gap: 0.7,
-                transition: "all 0.15s ease",
+                transition: "background-color 0.15s ease, opacity 0.15s ease",
                 "&:hover": { bgcolor: "primary.dark" },
                 "&:disabled": { opacity: 0.4, cursor: "default" },
               }}

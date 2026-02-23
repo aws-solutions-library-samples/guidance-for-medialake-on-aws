@@ -644,7 +644,7 @@ export const S3Explorer: React.FC<S3ExplorerProps> = ({
             backgroundColor: alpha(theme.palette.primary.main, 0.04),
             transform: "scale(1.01)",
           },
-          transition: "all 0.2s ease",
+          transition: "background-color 0.2s ease, transform 0.2s ease",
         }}
       >
         <ListItemIcon>

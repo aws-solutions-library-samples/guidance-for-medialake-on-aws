@@ -54,7 +54,6 @@ export const WidgetSelector: React.FC<WidgetSelectorProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           backgroundColor: alpha(theme.palette.background.paper, 0.95),
           backdropFilter: "blur(10px)",
         },

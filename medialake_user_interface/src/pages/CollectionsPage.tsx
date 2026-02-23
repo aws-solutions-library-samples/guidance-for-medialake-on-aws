@@ -424,15 +424,15 @@ const CollectionsPage: React.FC = () => {
   const isGroupsTab = activeTab === "groups";
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Page header — title row with action buttons */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 4 }}>
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            mb: 2,
+            mb: 3,
           }}
         >
           <Box>
@@ -440,13 +440,13 @@ const CollectionsPage: React.FC = () => {
               variant="h4"
               sx={{
                 fontWeight: 700,
-                mb: 0.5,
+                mb: 1,
                 color: theme.palette.primary.main,
               }}
             >
               {t("collectionsPage.title")}
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 480 }}>
+            <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 600 }}>
               {t("collectionsPage.description")}
             </Typography>
           </Box>
@@ -537,7 +537,8 @@ const CollectionsPage: React.FC = () => {
                         ? theme.palette.primary.dark
                         : alpha(theme.palette.action.hover, 0.12),
                     },
-                    transition: "all 0.15s ease",
+                    transition:
+                      "background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease",
                   }}
                   endIcon={
                     badgeCount ? (
@@ -966,13 +967,15 @@ const CollectionsPage: React.FC = () => {
                           height: 22,
                           fontSize: "0.68rem",
                           fontWeight: 500,
-                          color: collection.isPublic ? "#38A169" : "text.secondary",
+                          color: collection.isPublic ? "success.main" : "text.secondary",
                           borderColor: collection.isPublic
-                            ? alpha("#38A169", 0.35)
+                            ? alpha(theme.palette.success.main, 0.35)
                             : alpha(theme.palette.text.secondary, 0.15),
-                          bgcolor: collection.isPublic ? alpha("#38A169", 0.06) : "transparent",
+                          bgcolor: collection.isPublic
+                            ? alpha(theme.palette.success.main, 0.06)
+                            : "transparent",
                           "& .MuiChip-icon": {
-                            color: collection.isPublic ? "#38A169" : "text.secondary",
+                            color: collection.isPublic ? "success.main" : "text.secondary",
                             fontSize: 13,
                           },
                         }}

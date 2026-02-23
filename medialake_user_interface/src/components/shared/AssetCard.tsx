@@ -1015,7 +1015,7 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
               width: 26,
               height: 26,
               backdropFilter: "blur(4px)",
-              transition: "all 0.2s ease-in-out",
+              transition: "background-color 0.2s ease-in-out, opacity 0.2s ease-in-out",
               "&:hover": {
                 bgcolor: alpha(theme.palette.background.default, 0.95),
               },

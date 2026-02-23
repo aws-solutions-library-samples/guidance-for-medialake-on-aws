@@ -191,7 +191,6 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 2,
           p: 2,
         },
       }}

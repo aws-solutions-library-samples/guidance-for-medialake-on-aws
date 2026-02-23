@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Card, CardContent, Typography, Chip, alpha, useTheme } from "@mui/material";
+import { colorTokens } from "@/theme/tokens";
 import {
   Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
@@ -195,13 +196,13 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
               height: 20,
               fontSize: "0.65rem",
               fontWeight: 500,
-              color: isPublic ? "#38A169" : "text.secondary",
+              color: isPublic ? "success.main" : "text.secondary",
               borderColor: isPublic
-                ? alpha("#38A169", 0.35)
+                ? alpha(colorTokens.success.main, 0.35)
                 : alpha(theme.palette.text.secondary, 0.15),
-              bgcolor: isPublic ? alpha("#38A169", 0.06) : "transparent",
+              bgcolor: isPublic ? alpha(colorTokens.success.main, 0.06) : "transparent",
               "& .MuiChip-icon": {
-                color: isPublic ? "#38A169" : "text.secondary",
+                color: isPublic ? "success.main" : "text.secondary",
                 fontSize: 12,
               },
             }}

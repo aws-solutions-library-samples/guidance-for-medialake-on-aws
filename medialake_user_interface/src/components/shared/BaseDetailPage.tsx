@@ -13,6 +13,7 @@ import type { RelatedVersionsResponse } from "../../api/hooks/useAssets";
 import { formatFileSize } from "../../utils/imageUtils";
 import TechnicalMetadataTab from "../TechnicalMetadataTab";
 import TranscriptionTab from "./TranscriptionTab";
+import { springEasing } from "@/constants";
 // import TabContentContainer from "../common/TabContentContainer";
 
 interface TabConfig {
@@ -332,10 +333,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
         flexDirection: "column",
         maxWidth: isExpanded ? "calc(100% - 300px)" : "100%",
         transition: (theme) =>
-          theme.transitions.create(["max-width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          `max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         bgcolor: "transparent",
       }}
     >
@@ -417,7 +415,7 @@ export const BaseDetailPage: React.FC<BaseDetailPageProps> = ({
                   px: 2,
                   py: 1.5,
                   fontWeight: 500,
-                  transition: "all 0.2s",
+                  transition: "background-color 0.2s, color 0.2s",
                   "&:hover": {
                     backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                   },

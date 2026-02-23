@@ -4,6 +4,7 @@ import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from 
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { FaCog, FaTrash } from "react-icons/fa";
 import { RotateRight } from "@mui/icons-material";
+import { colorTokens } from "@/theme/tokens";
 
 const HANDLE_CONNECT_RADIUS = 50;
 
@@ -451,13 +452,13 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                     style={{
                       background:
                         typeof inputType === "string"
-                          ? "#2B6CB0"
+                          ? colorTokens.primary.main
                           : (inputType as InputType).name === "Completed"
-                            ? "#4CAF50"
+                            ? colorTokens.success.main
                             : (inputType as InputType).name === "In Progress"
-                              ? "#2196F3"
+                              ? colorTokens.info.main
                               : (inputType as InputType).name === "Fail"
-                                ? "#F44336"
+                                ? colorTokens.error.main
                                 : "#555",
                       width: "12px",
                       height: "16px",
@@ -545,12 +546,12 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                     style={{
                       background:
                         output.name === "Completed"
-                          ? "#4CAF50"
+                          ? colorTokens.success.main
                           : output.name === "In Progress"
-                            ? "#2196F3"
+                            ? colorTokens.info.main
                             : output.name === "Fail"
-                              ? "#F44336"
-                              : "#2B6CB0",
+                              ? colorTokens.error.main
+                              : colorTokens.primary.main,
                       width: "12px",
                       height: "12px",
                       border: "1px solid #fff",
@@ -574,7 +575,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                 id="output-default"
                 isConnectable={isConnectable}
                 style={{
-                  background: "#2B6CB0",
+                  background: colorTokens.primary.main,
                   width: "12px",
                   height: "12px",
                   border: "1px solid #fff",

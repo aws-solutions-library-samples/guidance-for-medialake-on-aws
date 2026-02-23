@@ -28,6 +28,7 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOn";
 import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { colorTokens, typography } from "@/theme/tokens";
 import { FaFileVideo } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -1193,8 +1194,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
           borderRadius: 2,
           boxShadow: (t) =>
             t.palette.mode === "dark"
-              ? "0 4px 12px rgba(0, 0, 0, 0.3)"
-              : "0 2px 8px rgba(0, 0, 0, 0.1)",
+              ? `0 4px 12px ${alpha(t.palette.common.black, 0.3)}`
+              : `0 2px 8px ${alpha(t.palette.common.black, 0.1)}`,
         }}
       >
         {isCompactMode ? (
@@ -1216,13 +1217,13 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                     bgcolor: "transparent",
                     "& input": {
                       backdropFilter: "blur(8px)",
-                      bgcolor: (t) => `${t.palette.background.paper}CC`,
+                      bgcolor: (t) => alpha(t.palette.background.paper, 0.8),
                       px: 1,
                       py: 0.5,
                       borderRadius: 1,
                       fontSize: "0.875rem",
                       "&:hover": {
-                        bgcolor: (t) => `${t.palette.background.paper}EE`,
+                        bgcolor: (t) => alpha(t.palette.background.paper, 0.93),
                       },
                     },
                   },
@@ -1341,8 +1342,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                                 color="primary"
                                 onIcon={<ToggleOnIcon fontSize="medium" />}
                                 offIcon={<ToggleOffIcon fontSize="medium" />}
-                                onColor="#2b6cb0"
-                                offColor="#757575"
+                                onColor={colorTokens.primary.main}
+                                offColor={typography.colors.disabled.light}
                               />
                               <span>
                                 {active ? t("common.labels.active") : t("common.labels.inactive")}
@@ -1405,12 +1406,12 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                     bgcolor: "transparent",
                     "& input": {
                       backdropFilter: "blur(8px)",
-                      bgcolor: (t) => `${t.palette.background.paper}CC`,
+                      bgcolor: (t) => alpha(t.palette.background.paper, 0.8),
                       px: 2,
                       py: 1,
                       borderRadius: 1,
                       "&:hover": {
-                        bgcolor: (t) => `${t.palette.background.paper}EE`,
+                        bgcolor: (t) => alpha(t.palette.background.paper, 0.93),
                       },
                     },
                   },
@@ -1502,8 +1503,8 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                     color="primary"
                     onIcon={<ToggleOnIcon fontSize="large" />}
                     offIcon={<ToggleOffIcon fontSize="large" />}
-                    onColor="#2b6cb0"
-                    offColor="#757575"
+                    onColor={colorTokens.primary.main}
+                    offColor={typography.colors.disabled.light}
                   />
                 }
                 label={active ? t("common.labels.active") : t("common.labels.inactive")}

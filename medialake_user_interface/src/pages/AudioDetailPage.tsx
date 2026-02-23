@@ -19,10 +19,12 @@ import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
 import DescriptiveTab from "../components/shared/DescriptiveTab";
 import TabContentContainer from "../components/common/TabContentContainer";
+import { springEasing } from "@/constants";
+import { colorTokens } from "@/theme/tokens";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
-  const fileInfoColor = "#4299E1";
-  const techDetailsColor = "#68D391";
+  const fileInfoColor = colorTokens.primary.main;
+  const techDetailsColor = colorTokens.accent.main;
 
   const s3Bucket =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
@@ -704,10 +706,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         maxWidth: isExpanded ? "calc(100% - 300px)" : "100%",
         width: "100%",
         transition: (theme) =>
-          theme.transitions.create(["max-width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
+          `max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
         bgcolor: "transparent",
       }}
     >
@@ -764,10 +763,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
             width: "100%",
             maxWidth: isExpanded ? "calc(100% - 10px)" : "100%",
             transition: (theme) =>
-              theme.transitions.create(["width", "max-width"], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           }}
         >
           <AssetVideo
@@ -812,7 +808,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
                   px: 2,
                   py: 1.5,
                   fontWeight: 500,
-                  transition: "all 0.2s",
+                  transition: "background-color 0.2s, color 0.2s",
                   "&:hover": {
                     backgroundColor: (theme) => alpha(theme.palette.secondary.main, 0.05),
                   },

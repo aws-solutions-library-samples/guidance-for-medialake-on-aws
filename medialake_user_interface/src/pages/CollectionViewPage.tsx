@@ -19,6 +19,7 @@ import {
   Link,
   useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   Home as HomeIcon,
   Folder as FolderIcon,
@@ -60,6 +61,7 @@ import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
+import { springEasing } from "@/constants";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -585,7 +587,6 @@ const CollectionViewPage: React.FC = () => {
           sx={{
             display: "flex",
             minHeight: "100%",
-            bgcolor: "background.default",
             position: "relative",
             overflow: "auto",
           }}
@@ -616,10 +617,7 @@ const CollectionViewPage: React.FC = () => {
               flexDirection: "column",
               backgroundColor: "background.paper",
               borderRadius: 2,
-              transition: theme.transitions.create(["width", "min-width"], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
+              transition: `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, min-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
               overflow: "visible",
               zIndex: 1,
               mr: 3,
@@ -638,7 +636,7 @@ const CollectionViewPage: React.FC = () => {
                 height: "32px",
                 bgcolor: "background.paper",
                 borderRadius: "8px",
-                boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.15)",
+                boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.12)}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -648,7 +646,7 @@ const CollectionViewPage: React.FC = () => {
                 padding: 0,
                 "&:hover": {
                   bgcolor: "background.paper",
-                  boxShadow: "0px 6px 12px rgba(0, 0, 0, 0.2)",
+                  boxShadow: `0 6px 12px ${alpha(theme.palette.common.black, 0.16)}`,
                 },
               }}
             >
@@ -700,14 +698,9 @@ const CollectionViewPage: React.FC = () => {
           <Box
             sx={{
               flexGrow: 1,
-              px: 4,
-              pt: 1,
-              pb: 2,
               display: "flex",
               flexDirection: "column",
-              gap: 6,
               minHeight: 0,
-              marginBottom: 4,
             }}
           >
             {/* Breadcrumbs with Action Buttons */}

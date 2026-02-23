@@ -61,7 +61,7 @@ const useHeaderStyles = (theme: Theme) => {
             ? alpha(theme.palette.text.primary, 0.7)
             : alpha(theme.palette.text.secondary, 0.7),
         opacity: isActive ? 1 : 0.8,
-        transition: "all 0.2s ease",
+        transition: "color 0.2s ease, opacity 0.2s ease, transform 0.2s ease",
         "&:hover": {
           color: theme.palette.primary.main,
           opacity: 1,
@@ -70,7 +70,7 @@ const useHeaderStyles = (theme: Theme) => {
       }),
       columnResizer: {
         opacity: 0,
-        transition: "all 0.2s ease",
+        transition: "opacity 0.2s ease, background-color 0.2s ease",
         backgroundColor: alpha(theme.palette.text.secondary, 0.3),
         "&:hover": {
           backgroundColor: theme.palette.primary.main,

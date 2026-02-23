@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 import { EdgeLabelRenderer, EdgeProps, Position, useReactFlow } from "reactflow";
 import { Box, Typography } from "@mui/material";
 import { FlashOn } from "@mui/icons-material";
+import { colorTokens } from "@/theme/tokens";
 
 type Nudge = { along?: number; perp?: number };
 
@@ -208,13 +209,13 @@ const CustomEdge: React.FC<EdgeProps> = ({
     // Use the same colors as the handles in CustomNode
     switch (label) {
       case "Completed":
-        return "#4CAF50"; // Green
+        return colorTokens.success.main; // Green
       case "In Progress":
-        return "#2196F3"; // Blue
+        return colorTokens.info.main; // Blue
       case "Fail":
-        return "#F44336"; // Red
+        return colorTokens.error.main; // Red
       default:
-        return "#2B6CB0"; // Default blue
+        return colorTokens.primary.main; // Default blue
     }
   }, [getChoiceLabel]);
 
@@ -269,7 +270,7 @@ const CustomEdge: React.FC<EdgeProps> = ({
               top: labelY,
               padding: "2px 6px 2px 2px",
               fontWeight: 600,
-              backgroundColor: "#2B6CB0",
+              backgroundColor: colorTokens.primary.main,
               color: "#fff",
               userSelect: "none",
               borderRadius: "6px",

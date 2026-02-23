@@ -33,6 +33,7 @@ import {
   UpdateApiKeyRequest,
 } from "@/api/types/apiKey.types";
 import ApiKeyPermissionsEditor from "./ApiKeyPermissionsEditor";
+import { typography } from "@/theme/tokens";
 
 interface ApiKeyFormDialogProps {
   open: boolean;
@@ -254,7 +255,7 @@ const ApiKeyFormDialog: React.FC<ApiKeyFormDialogProps> = ({
               InputProps={{
                 readOnly: true,
                 sx: {
-                  fontFamily: "monospace",
+                  fontFamily: typography.monoFontFamily,
                   fontSize: "0.875rem",
                 },
               }}

@@ -29,6 +29,7 @@ import { Can } from "@/permissions/components/Can";
 import { useGetApiKey } from "@/api/hooks/useApiKeys";
 import { ApiKey } from "@/api/types/apiKey.types";
 import { formatLocalDateTime, formatRelativeTime } from "@/shared/utils/dateUtils";
+import { typography } from "@/theme/tokens";
 
 interface ApiKeyDetailsDialogProps {
   open: boolean;
@@ -213,7 +214,7 @@ const ApiKeyDetailsDialog: React.FC<ApiKeyDetailsDialogProps> = ({
                     </InputAdornment>
                   ),
                   sx: {
-                    fontFamily: "monospace",
+                    fontFamily: typography.monoFontFamily,
                     fontSize: "0.85rem",
                   },
                 }}

@@ -276,7 +276,6 @@ const SystemSettingsPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "calc(100vh - 120px)",
-        p: 3,
       }}
     >
       {/* Local fallback notification */}

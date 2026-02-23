@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { createColumnHelper } from "@tanstack/react-table";
 import { Box, Tooltip, IconButton, Typography, Chip, Switch } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { colorTokens } from "@/theme/tokens";
 import {
   EditOutlined as EditIcon,
   DeleteOutlineRounded as DeleteIcon,
@@ -115,10 +116,10 @@ export const usePipelineColumns = ({
                     disabled={pipeline.system}
                     sx={{
                       "& .MuiSwitch-switchBase.Mui-checked": {
-                        color: "#38A169",
+                        color: "success.main",
                       },
                       "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                        backgroundColor: "#38A169",
+                        backgroundColor: "success.main",
                       },
                     }}
                   />
@@ -139,19 +140,19 @@ export const usePipelineColumns = ({
 
           const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
             CREATING: {
-              color: "#1976d2",
-              bg: "rgba(25, 118, 210, 0.08)",
-              border: "rgba(25, 118, 210, 0.2)",
+              color: colorTokens.info.main,
+              bg: `rgba(49, 130, 206, 0.08)`,
+              border: `rgba(49, 130, 206, 0.2)`,
             },
             FAILED: {
-              color: "#d32f2f",
-              bg: "rgba(211, 47, 47, 0.08)",
-              border: "rgba(211, 47, 47, 0.2)",
+              color: colorTokens.error.main,
+              bg: `rgba(229, 62, 62, 0.08)`,
+              border: `rgba(229, 62, 62, 0.2)`,
             },
             DELETING: {
-              color: "#ed6c02",
-              bg: "rgba(237, 108, 2, 0.08)",
-              border: "rgba(237, 108, 2, 0.2)",
+              color: colorTokens.warning.main,
+              bg: `rgba(221, 107, 32, 0.08)`,
+              border: `rgba(221, 107, 32, 0.2)`,
             },
           };
 

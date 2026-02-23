@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { Box, Button, useTheme, alpha, Chip, IconButton } from "@mui/material";
+import { Box, Button, useTheme, alpha, Chip, IconButton, Tooltip } from "@mui/material";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -35,6 +35,7 @@ import type {
 } from "../types/pipelineExecutions.types";
 import ExecutionSideBar from "../components/ExecutionSideBar";
 import { QUERY_KEYS } from "@/api/queryKeys";
+import { springEasing } from "@/constants";
 
 const PAGE_SIZE = 20;
 
@@ -229,13 +230,16 @@ const ExecutionsPage: React.FC = () => {
               label={status}
               size="small"
               sx={{
-                backgroundColor: alpha(color, 0.1),
+                height: 26,
+                fontSize: "0.75rem",
+                fontWeight: 500,
                 color: color,
-                fontWeight: 600,
+                bgcolor: alpha(color, 0.08),
+                border: "1px solid",
+                borderColor: alpha(color, 0.2),
                 borderRadius: "6px",
-                height: "24px",
                 "& .MuiChip-label": {
-                  px: 1.5,
+                  px: 1,
                 },
               }}
             />
@@ -292,70 +296,76 @@ const ExecutionsPage: React.FC = () => {
         enableResizing: true,
         enableSorting: false,
         cell: ({ row }) => (
-          <TableCellContent>
-            <Box sx={{ display: "flex", gap: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 0.5,
+              opacity: 0.6,
+              transition: "opacity 0.15s ease",
+              "tr:hover &": { opacity: 1 },
+            }}
+            className="action-buttons"
+          >
+            <Tooltip title={t("common.actions.viewDetails")} arrow>
               <IconButton
                 size="small"
-                color="primary"
-                title={t("common.actions.viewDetails")}
                 onClick={() => handleViewDetails(row.original)}
                 sx={{
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: "text.secondary",
                   "&:hover": {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                    color: "primary.main",
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
                   },
                 }}
               >
-                <VisibilityIcon fontSize="small" />
+                <VisibilityIcon sx={{ fontSize: 18 }} />
               </IconButton>
-              {row.original.status === "FAILED" && (
-                <>
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    title={t("executions.actions.retryFromCurrent")}
-                    onClick={() => handleRetryFromCurrent(row.original.execution_id)}
-                    disabled={
-                      retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
-                    }
-                    sx={{
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      "&:hover": {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                      },
-                      "&:disabled": {
-                        backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                        color: theme.palette.grey[500],
-                      },
-                    }}
-                  >
-                    <ReplayIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    title={t("executions.actions.retryFromStart")}
-                    onClick={() => handleRetryFromStart(row.original.execution_id)}
-                    disabled={
-                      retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
-                    }
-                    sx={{
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      "&:hover": {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                      },
-                      "&:disabled": {
-                        backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                        color: theme.palette.grey[500],
-                      },
-                    }}
-                  >
-                    <RestartIcon fontSize="small" />
-                  </IconButton>
-                </>
-              )}
-            </Box>
-          </TableCellContent>
+            </Tooltip>
+            {row.original.status === "FAILED" && (
+              <>
+                <Tooltip title={t("executions.actions.retryFromCurrent")} arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRetryFromCurrent(row.original.execution_id)}
+                      disabled={
+                        retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
+                      }
+                      sx={{
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: "primary.main",
+                          bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        },
+                      }}
+                    >
+                      <ReplayIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={t("executions.actions.retryFromStart")} arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRetryFromStart(row.original.execution_id)}
+                      disabled={
+                        retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
+                      }
+                      sx={{
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: "primary.main",
+                          bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        },
+                      }}
+                    >
+                      <RestartIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </>
+            )}
+          </Box>
         ),
       },
     ],
@@ -404,7 +414,7 @@ const ExecutionsPage: React.FC = () => {
   });
 
   return (
-    <Box sx={{ p: 3, height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Main content */}
 
       <PageHeader
@@ -454,10 +464,7 @@ const ExecutionsPage: React.FC = () => {
               flex: 1,
               overflow: "auto",
               transition: (theme) =>
-                theme.transitions.create("width", {
-                  easing: theme.transitions.easing.sharp,
-                  duration: theme.transitions.duration.leavingScreen,
-                }),
+                `width ${theme.transitions.duration.leavingScreen}ms ${springEasing}`,
               ...(isSidePanelOpen && {
                 width: "calc(100% - 500px)",
               }),

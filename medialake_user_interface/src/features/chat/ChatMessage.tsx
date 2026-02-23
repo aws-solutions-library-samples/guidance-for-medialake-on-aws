@@ -159,7 +159,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
@@ -175,7 +175,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       justifyContent: "center",
                       alignItems: "center",
                       p: 2,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
@@ -225,7 +225,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
@@ -241,7 +241,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       justifyContent: "center",
                       alignItems: "center",
                       p: 2,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
@@ -287,7 +287,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       justifyContent: "center",
                       alignItems: "center",
                       p: 2,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
@@ -303,7 +303,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                       justifyContent: "center",
                       alignItems: "center",
                       p: 2,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "action.hover",
                       borderRadius: 1,
                     }}
                   >
