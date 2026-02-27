@@ -4,6 +4,7 @@ import { ChevronLeft, History, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
 import { formatDistanceToNow } from "date-fns";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface BreadcrumbNavigationProps {
   searchTerm: string;
@@ -54,7 +55,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
       sx={{
         position: "sticky",
         top: 64,
-        zIndex: 1100,
+        zIndex: zIndexTokens.appBar,
         bgcolor: "transparent",
         px: 0,
         py: 0,

@@ -86,12 +86,6 @@ export function useViewPreferences({
     );
   }, []);
 
-  // Handle column toggle
-  const handleColumnToggle = useCallback(() => {
-    // This function will be implemented in the component that uses this hook
-    // since columns are typically defined in the component
-  }, []);
-
   return {
     // State
     viewMode,
@@ -112,16 +106,8 @@ export function useViewPreferences({
     handleGroupByTypeChange,
     handleSortChange,
     handleCardFieldToggle,
-    handleColumnToggle,
 
-    // Setters (for direct state updates if needed)
-    setViewMode,
-    setCardSize,
-    setAspectRatio,
-    setThumbnailScale,
-    setShowMetadata,
-    setGroupByType,
-    setSorting,
+    // Direct setters only exposed where handlers aren't sufficient
     setCardFields,
   };
 }

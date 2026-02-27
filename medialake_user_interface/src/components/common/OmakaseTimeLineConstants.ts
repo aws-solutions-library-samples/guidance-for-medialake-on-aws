@@ -5,6 +5,13 @@ import {
   PeriodMarkerStyle,
 } from "@byomakase/omakase-player";
 import { randomHexColor } from "./utils";
+import { colorTokens } from "@/theme/tokens";
+
+/**
+ * Timeline constants — wired to design tokens where possible.
+ * The Omakase player API requires raw color strings, so we reference
+ * colorTokens directly rather than the MUI theme object.
+ */
 
 export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   stageMinHeight: 100,
@@ -12,18 +19,18 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   rightPaneMarginRight: 10,
   rightPaneClipPadding: 10,
 
-  backgroundFill: "#E4E5E5",
+  backgroundFill: colorTokens.background.default.light,
 
   headerHeight: 0,
-  headerBackgroundFill: "#EDEFEE",
+  headerBackgroundFill: colorTokens.background.default.light,
   headerMarginBottom: 0,
 
   footerHeight: 0,
-  footerBackgroundFill: "#EDEFEE",
+  footerBackgroundFill: colorTokens.background.default.light,
   footerMarginTop: 0,
 
   thumbnailHoverWidth: 200,
-  thumbnailHoverStroke: "#ff4991",
+  thumbnailHoverStroke: colorTokens.secondary.main,
   thumbnailHoverStrokeWidth: 5,
   thumbnailHoverYOffset: 0,
 
@@ -38,10 +45,10 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
   playheadTextFill: "rgb(0,0,0, 0)", // opacity 0
   playheadTextYOffset: -15,
 
-  playheadBackgroundFill: "#ffffff",
+  playheadBackgroundFill: colorTokens.background.paper.light,
   playheadBackgroundOpacity: 0,
 
-  playheadPlayProgressFill: "#008cbc",
+  playheadPlayProgressFill: colorTokens.info.main,
   playheadPlayProgressOpacity: 0.5,
 
   playheadBufferedFill: "#a2a2a2",
@@ -58,38 +65,38 @@ export const TIMELINE_STYLE: Partial<TimelineStyle> = {
 
 export const TIMELINE_LANE_STYLE: Partial<TimelineLaneStyle> = {
   marginBottom: 0,
-  backgroundFill: "#edefee",
+  backgroundFill: colorTokens.background.default.light,
 };
 
 export const SCRUBBER_LANE_STYLE: Partial<ScrubberLaneStyle> = {
   ...TIMELINE_LANE_STYLE,
-  tickFill: "#5f6070",
-  timecodeFill: "#5f6070",
+  tickFill: colorTokens.text.secondary.light,
+  timecodeFill: colorTokens.text.secondary.light,
 };
 
 export const TIMELINE_STYLE_DARK: Partial<TimelineStyle> = {
   ...TIMELINE_STYLE,
   stageMinHeight: 30,
-  backgroundFill: "#292d43",
+  backgroundFill: colorTokens.background.default.dark,
 
-  playheadFill: "#43F4FF",
-  playheadBufferedFill: "#989BFF",
-  playheadBackgroundFill: "#83899E",
-  playheadPlayProgressFill: "#3E44FE",
+  playheadFill: colorTokens.accent.light,
+  playheadBufferedFill: colorTokens.secondary.light,
+  playheadBackgroundFill: colorTokens.text.secondary.dark,
+  playheadPlayProgressFill: colorTokens.secondary.dark,
 
   scrubberFill: "#B2BAD6",
-  scrubberSnappedFill: "#9ED78D",
+  scrubberSnappedFill: colorTokens.success.light,
 };
 
 export const TIMELINE_LANE_STYLE_DARK: Partial<TimelineLaneStyle> = {
   ...TIMELINE_LANE_STYLE,
-  backgroundFill: "#292D43",
+  backgroundFill: colorTokens.background.default.dark,
 };
 
 export const SCRUBBER_LANE_STYLE_DARK: Partial<ScrubberLaneStyle> = {
   ...TIMELINE_LANE_STYLE_DARK,
-  tickFill: "#FFFFFF",
-  timecodeFill: "#FFFFFF",
+  tickFill: colorTokens.text.primary.dark,
+  timecodeFill: colorTokens.text.primary.dark,
 };
 
 export const PERIOD_MARKER_STYLE: Partial<PeriodMarkerStyle> = {

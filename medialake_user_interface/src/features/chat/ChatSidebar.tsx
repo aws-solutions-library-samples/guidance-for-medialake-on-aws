@@ -7,6 +7,7 @@ import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
+import { zIndexTokens } from "@/theme/tokens";
 
 const SIDEBAR_WIDTH = 350;
 
@@ -96,7 +97,7 @@ const ChatSidebar: React.FC = () => {
           height: "calc(100vh - 72px)",
           display: "flex",
           flexDirection: "column",
-          zIndex: 1200,
+          zIndex: zIndexTokens.sidebar,
           borderRadius: "16px 0 0 16px",
           boxShadow: (theme) =>
             `0 4px 20px ${alpha(
@@ -124,7 +125,7 @@ const ChatSidebar: React.FC = () => {
             width: "8px",
             height: "100%",
             cursor: "col-resize",
-            zIndex: 1300,
+            zIndex: zIndexTokens.resizeHandle,
             "&:hover": {
               backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
             },
@@ -283,7 +284,7 @@ const ChatSidebar: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              zIndex: 1199,
+              zIndex: zIndexTokens.sidebar - 1,
               cursor: "col-resize",
             }}
           />

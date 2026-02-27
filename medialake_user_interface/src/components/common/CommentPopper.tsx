@@ -13,16 +13,10 @@ interface CommentPopperProps {
     timestamp: string;
     content: string;
   };
-  onClose: () => void; // Add this line
+  onClose: () => void;
 }
 
-const CommentPopper: React.FC<CommentPopperProps> = ({
-  id,
-  open,
-  anchorEl,
-  comment,
-  // onClose,
-}) => {
+const CommentPopper: React.FC<CommentPopperProps> = ({ id, open, anchorEl, comment }) => {
   return (
     <Popper id={id} open={open} anchorEl={anchorEl}>
       <StyledPopperDiv>
@@ -39,29 +33,16 @@ const CommentPopper: React.FC<CommentPopperProps> = ({
   );
 };
 
-const grey = {
-  50: "#F3F6F9",
-  100: "#E5EAF2",
-  200: "#DAE2ED",
-  300: "#C7D0DD",
-  400: "#B0B8C4",
-  500: "#9DA8B7",
-  600: "#6B7A90",
-  700: "#434D5B",
-  800: "#303740",
-  900: "#1C2025",
-};
-
 const StyledPopperDiv = styled("div")(
   ({ theme }) => css`
-    background-color: ${theme.palette.mode === "dark" ? grey[900] : "#fff"};
+    background-color: ${theme.palette.background.paper};
     border-radius: 8px;
-    border: 1px solid ${theme.palette.mode === "dark" ? grey[700] : grey[200]};
+    border: 1px solid ${theme.palette.divider};
     box-shadow: ${theme.palette.mode === "dark"
       ? `0px 4px 8px rgb(0 0 0 / 0.7)`
       : `0px 4px 8px rgb(0 0 0 / 0.1)`};
     padding: 0.75rem;
-    color: ${theme.palette.mode === "dark" ? grey[100] : grey[700]};
+    color: ${theme.palette.text.primary};
     font-size: 0.875rem;
     font-family: inherit;
     font-weight: 500;

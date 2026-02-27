@@ -4,12 +4,12 @@ import {
   Box,
   Typography,
   IconButton,
-  Button,
   TableContainer,
   Checkbox,
   CircularProgress,
 } from "@mui/material";
 import { InlineTextEditor } from "../common/InlineTextEditor";
+import InlineEditActions from "../common/InlineEditActions";
 import {
   useReactTable,
   getCoreRowModel,
@@ -31,6 +31,44 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { AssetAudio } from "../asset";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+
+// Module-scope field mapping between API field IDs and column IDs
+const fieldMapping: Record<string, string> = {
+  // Root level fields (new API structure)
+  id: "id",
+  assetType: "type",
+  format: "format",
+  createdAt: "date",
+  objectName: "name",
+  fileSize: "size",
+  fullPath: "fullPath",
+  bucket: "bucket",
+  FileHash: "hash",
+
+  // Legacy nested fields (for backward compatibility)
+  "DigitalSourceAsset.Type": "type",
+  "DigitalSourceAsset.MainRepresentation.Format": "format",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
+  "DigitalSourceAsset.CreateDate": "date",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
+    "fullPath",
+  "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
+  "Metadata.Consolidated": "metadata",
+  InventoryID: "id",
+};
+
+// Module-scope reverse mapping for easier lookup
+const reverseFieldMapping: Record<string, string[]> = {};
+Object.entries(fieldMapping).forEach(([apiId, colId]) => {
+  if (!reverseFieldMapping[colId]) {
+    reverseFieldMapping[colId] = [];
+  }
+  reverseFieldMapping[colId].push(apiId);
+});
 
 export interface AssetTableProps<T> {
   data: T[];
@@ -98,46 +136,6 @@ export function AssetTable<T>({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const preventCommitRef = useRef<boolean>(false);
   const commitRef = useRef<(() => void) | null>(null);
-
-  // Create a mapping between API field IDs and column IDs
-  const fieldMapping: Record<string, string> = {
-    // Root level fields (new API structure)
-    id: "id",
-    assetType: "type",
-    format: "format",
-    createdAt: "date",
-    objectName: "name",
-    fileSize: "size",
-    fullPath: "fullPath",
-    bucket: "bucket",
-    FileHash: "hash",
-
-    // Legacy nested fields (for backward compatibility)
-    "DigitalSourceAsset.Type": "type",
-    "DigitalSourceAsset.MainRepresentation.Format": "format",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate": "date",
-    "DigitalSourceAsset.CreateDate": "date",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": "name",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size": "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize": "size",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath":
-      "fullPath",
-    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket": "bucket",
-    "Metadata.Consolidated": "metadata",
-    InventoryID: "id",
-  };
-
-  // Create a reverse mapping for easier lookup
-  const reverseFieldMapping: Record<string, string[]> = {};
-  Object.entries(fieldMapping).forEach(([apiId, colId]) => {
-    if (!reverseFieldMapping[colId]) {
-      reverseFieldMapping[colId] = [];
-    }
-    reverseFieldMapping[colId].push(apiId);
-  });
-
-  // Component initialization
 
   // Add state to track if all rows are selected
   const [allSelected, setAllSelected] = useState(false);
@@ -400,54 +398,12 @@ export function AssetTable<T>({
                           multiline
                           fullWidth
                         />
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 1,
-                            justifyContent: "flex-end",
-                            mt: 1,
-                          }}
-                        >
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              // Set flag to prevent blur from canceling
-                              preventCommitRef.current = true;
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              // Reset the prevent flag
-                              preventCommitRef.current = false;
-                              // Call the commit function directly via ref
-                              if (commitRef.current) {
-                                commitRef.current();
-                              } else {
-                                console.error("💾 AssetTable commitRef.current is null!");
-                              }
-                            }}
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            size="small"
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              // Set flag to prevent InlineTextEditor commit from being called
-                              // Use onMouseDown instead of onClick to set the flag before onBlur
-                              preventCommitRef.current = true;
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditNameComplete?.(info.row.original, false, undefined);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </Box>
+                        <InlineEditActions
+                          preventCommitRef={preventCommitRef}
+                          commitRef={commitRef}
+                          onCancel={() => onEditNameComplete?.(info.row.original, false, undefined)}
+                          containerSx={{ mt: 1 }}
+                        />
                       </Box>
                     ) : (
                       <>
@@ -552,7 +508,6 @@ export function AssetTable<T>({
     isFavorite,
     columnHelper,
     selectedSearchFields,
-    reverseFieldMapping,
   ]);
 
   const table = useReactTable({

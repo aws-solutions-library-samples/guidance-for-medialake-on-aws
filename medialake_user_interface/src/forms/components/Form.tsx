@@ -17,9 +17,6 @@ export const Form: React.FC<FormProps> = React.memo(
   ({ form, onSubmit, onCancel, submitLabel = "common.save", children, showButtons = true, id }) => {
     const { t } = useTranslation();
 
-    // Only log initial mount
-    React.useEffect(() => {}, []);
-
     const handleSubmit = React.useCallback(
       async (data: any) => {
         try {

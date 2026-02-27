@@ -430,18 +430,6 @@ export const NotificationCenter: React.FC = () => {
               }}
             >
               <Typography variant="h6">{t("common.notifications")}</Typography>
-              {/* Clear dismissible job notifications */}
-              {/* <Tooltip title={t("notifications.clearJobsTooltip")}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  onClick={clearAllJobNotifications}
-                  sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}
-                >
-                  {t("notifications.clearJobs")}
-                </Button>
-              </Tooltip> */}
             </Box>
           </Box>
 

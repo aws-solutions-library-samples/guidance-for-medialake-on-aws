@@ -920,35 +920,6 @@ const TranscriptionTab: React.FC<TranscriptionTabProps> = ({
                         &lt;60% confidence
                       </Typography>
                     </Box>
-                    {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <span style={{
-                                            padding: '2px 6px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.75rem',
-                                            backgroundColor: 'transparent'
-                                        }}>
-                                            Word
-                                        </span>
-                                        <IconButton
-                                            size="small"
-                                            sx={{
-                                                ml: 0.3,
-                                                p: 0.2,
-                                                minWidth: 'auto',
-                                                width: 16,
-                                                height: 16,
-                                                opacity: 0.6
-                                            }}
-                                            disabled
-                                        >
-                                            <MoreVertIcon sx={{ fontSize: 12 }} />
-                                        </IconButton>
-                                    </Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Click icon for alternatives
-                                    </Typography>
-                                </Box> */}
                   </Box>
                 </Paper>
               )}

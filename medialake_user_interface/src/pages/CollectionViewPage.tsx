@@ -49,10 +49,12 @@ import { CollectionCardSimple } from "@/features/dashboard/components/Collection
 import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import AssetResultsView from "../components/shared/AssetResultsView";
+import { AssetItemProvider } from "@/contexts/AssetItemContext";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { zIndexTokens } from "@/theme/tokens";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
 import { useSearchParams } from "react-router-dom";
 import ApiStatusModal from "../components/ApiStatusModal";
@@ -599,7 +601,7 @@ const CollectionViewPage: React.FC = () => {
                 top: 0,
                 left: 0,
                 right: 0,
-                zIndex: 9999,
+                zIndex: zIndexTokens.overlay,
               }}
             />
           )}
@@ -642,7 +644,7 @@ const CollectionViewPage: React.FC = () => {
                 justifyContent: "center",
                 border: "1px solid",
                 borderColor: "divider",
-                zIndex: 1200,
+                zIndex: zIndexTokens.sidebar,
                 padding: 0,
                 "&:hover": {
                   bgcolor: "background.paper",
@@ -863,75 +865,77 @@ const CollectionViewPage: React.FC = () => {
                 </Typography>
               </Box>
             ) : filteredResults.length > 0 && searchMetadata && !error ? (
-              <AssetResultsView
-                results={filteredResults}
-                searchMetadata={{
-                  totalResults: searchMetadata?.totalResults || 0,
-                  page: currentPage,
-                  pageSize: pageSize,
+              <AssetItemProvider
+                value={{
+                  onAssetClick: handleAssetClick,
+                  onDeleteClick: handleDeleteClick,
+                  onDownloadClick: handleDownloadClick,
+                  onAddToCollectionClick: handleRemoveFromCollectionClick,
+                  showRemoveButton: true,
+                  onEditClick: handleStartEditing,
+                  onEditNameChange: handleNameChange,
+                  onEditNameComplete: handleNameEditComplete,
+                  editingAssetId,
+                  editedName,
+                  isAssetFavorited: assetFavorites.isAssetFavorited,
+                  onFavoriteToggle: assetFavorites.handleFavoriteToggle,
+                  isAssetSelected: (assetId: string) =>
+                    assetSelection.selectedAssetIds.includes(assetId),
+                  onSelectToggle: assetSelection.handleSelectToggle,
+                  isRenaming: assetOperationsLoading.rename,
+                  renamingAssetId,
+                  getAssetId,
+                  getAssetName,
+                  getAssetType,
+                  getAssetThumbnail,
+                  getAssetProxy,
+                  renderCardField,
                 }}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-                searchTerm=""
-                title=""
-                isSemantic={false}
-                groupByType={viewPreferences.groupByType}
-                onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
-                viewMode={viewPreferences.viewMode}
-                onViewModeChange={viewPreferences.handleViewModeChange}
-                cardSize={viewPreferences.cardSize}
-                onCardSizeChange={viewPreferences.handleCardSizeChange}
-                aspectRatio={viewPreferences.aspectRatio}
-                onAspectRatioChange={viewPreferences.handleAspectRatioChange}
-                thumbnailScale={viewPreferences.thumbnailScale}
-                onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
-                showMetadata={viewPreferences.showMetadata}
-                onShowMetadataChange={viewPreferences.handleShowMetadataChange}
-                sorting={viewPreferences.sorting}
-                onSortChange={viewPreferences.handleSortChange}
-                cardFields={viewPreferences.cardFields}
-                onCardFieldToggle={viewPreferences.handleCardFieldToggle}
-                columns={columns}
-                onColumnToggle={handleColumnToggle}
-                onAssetClick={handleAssetClick}
-                onDeleteClick={handleDeleteClick}
-                onDownloadClick={handleDownloadClick}
-                onAddToCollectionClick={handleRemoveFromCollectionClick}
-                showRemoveButton={true}
-                onEditClick={handleStartEditing}
-                onEditNameChange={handleNameChange}
-                onEditNameComplete={handleNameEditComplete}
-                editingAssetId={editingAssetId}
-                editedName={editedName}
-                isAssetFavorited={assetFavorites.isAssetFavorited}
-                onFavoriteToggle={assetFavorites.handleFavoriteToggle}
-                isAssetSelected={(assetId: string) =>
-                  assetSelection.selectedAssetIds.includes(assetId)
-                }
-                onSelectToggle={assetSelection.handleSelectToggle}
-                hasSelectedAssets={assetSelection.selectedAssets.length > 0}
-                selectAllState={assetSelection.getSelectAllState(filteredResults)}
-                onSelectAllToggle={() => {
-                  assetSelection.handleSelectAll(filteredResults);
-                }}
-                isRenaming={assetOperationsLoading.rename}
-                renamingAssetId={renamingAssetId}
-                error={
-                  error
-                    ? {
-                        status: (error as any).apiResponse?.status || error.name,
-                        message: (error as any).apiResponse?.message || error.message,
-                      }
-                    : undefined
-                }
-                isLoading={isLoading || isFetching}
-                getAssetId={getAssetId}
-                getAssetName={getAssetName}
-                getAssetType={getAssetType}
-                getAssetThumbnail={getAssetThumbnail}
-                getAssetProxy={getAssetProxy}
-                renderCardField={renderCardField}
-              />
+              >
+                <AssetResultsView
+                  results={filteredResults}
+                  searchMetadata={{
+                    totalResults: searchMetadata?.totalResults || 0,
+                    page: currentPage,
+                    pageSize: pageSize,
+                  }}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  searchTerm=""
+                  title=""
+                  isSemantic={false}
+                  groupByType={viewPreferences.groupByType}
+                  onGroupByTypeChange={viewPreferences.handleGroupByTypeChange}
+                  viewMode={viewPreferences.viewMode}
+                  onViewModeChange={viewPreferences.handleViewModeChange}
+                  cardSize={viewPreferences.cardSize}
+                  onCardSizeChange={viewPreferences.handleCardSizeChange}
+                  aspectRatio={viewPreferences.aspectRatio}
+                  onAspectRatioChange={viewPreferences.handleAspectRatioChange}
+                  thumbnailScale={viewPreferences.thumbnailScale}
+                  onThumbnailScaleChange={viewPreferences.handleThumbnailScaleChange}
+                  showMetadata={viewPreferences.showMetadata}
+                  onShowMetadataChange={viewPreferences.handleShowMetadataChange}
+                  sorting={viewPreferences.sorting}
+                  onSortChange={viewPreferences.handleSortChange}
+                  cardFields={viewPreferences.cardFields}
+                  onCardFieldToggle={viewPreferences.handleCardFieldToggle}
+                  columns={columns}
+                  onColumnToggle={handleColumnToggle}
+                  hasSelectedAssets={assetSelection.selectedAssets.length > 0}
+                  selectAllState={assetSelection.getSelectAllState(filteredResults)}
+                  onSelectAllToggle={() => assetSelection.handleSelectAll(filteredResults)}
+                  error={
+                    error
+                      ? {
+                          status: (error as any).apiResponse?.status || error.name,
+                          message: (error as any).apiResponse?.message || error.message,
+                        }
+                      : undefined
+                  }
+                  isLoading={isLoading || isFetching}
+                />
+              </AssetItemProvider>
             ) : (
               <Box
                 sx={{

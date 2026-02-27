@@ -28,7 +28,7 @@ import {
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { springEasing } from "@/constants";
-// import { S3Explorer } from "../features/home/S3Explorer";
+import { zIndexTokens } from "@/theme/tokens";
 import AssetExplorer from "../features/assets/AssetExplorer";
 import { useSearchConnectors } from "../api/hooks/useSearchConnectors";
 
@@ -117,7 +117,7 @@ const AssetsPage: React.FC = () => {
                 justifyContent: "center",
                 border: "1px solid",
                 borderColor: "divider",
-                zIndex: 1200, // Much higher z-index to ensure visibility
+                zIndex: zIndexTokens.sidebar, // Much higher z-index to ensure visibility
                 padding: 0,
                 "&:hover": {
                   bgcolor: "background.paper",

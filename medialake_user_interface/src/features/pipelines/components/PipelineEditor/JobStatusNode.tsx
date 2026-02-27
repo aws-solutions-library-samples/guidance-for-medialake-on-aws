@@ -85,10 +85,10 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         position={Position.Left}
         isConnectable={isConnectable}
         style={{
-          background: "#555",
+          background: colorTokens.text.secondary.light,
           width: "12px",
           height: "12px",
-          border: "2px solid #fff",
+          border: `2px solid ${colorTokens.primary.contrastText}`,
           borderRadius: "6px",
         }}
       />
@@ -174,7 +174,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
               background: colorTokens.success.main, // Green for completed
               width: "10px",
               height: "10px",
-              border: "2px solid #fff",
+              border: `2px solid ${colorTokens.primary.contrastText}`,
               borderRadius: "5px",
             }}
           />
@@ -202,7 +202,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
               background: colorTokens.info.main, // Blue for in progress
               width: "10px",
               height: "10px",
-              border: "2px solid #fff",
+              border: `2px solid ${colorTokens.primary.contrastText}`,
               borderRadius: "5px",
             }}
           />
@@ -230,7 +230,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
               background: colorTokens.error.main, // Red for fail
               width: "10px",
               height: "10px",
-              border: "2px solid #fff",
+              border: `2px solid ${colorTokens.primary.contrastText}`,
               borderRadius: "5px",
             }}
           />

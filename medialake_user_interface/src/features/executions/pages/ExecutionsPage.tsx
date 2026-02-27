@@ -189,8 +189,6 @@ const ExecutionsPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {}, [isSidePanelOpen, selectedExecution]);
-
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
     refetch().finally(() => {

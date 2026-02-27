@@ -88,9 +88,9 @@ export function useAssetSelection<T>({
   const cancelBatchDeleteMutation = useCancelBatchDelete();
   const { data: deleteJobsResponse } = useUserBatchDeleteJobs();
 
-  // Load selections from localStorage on component mount
+  // Load selections from sessionStorage on component mount (scoped to current session only)
   useEffect(() => {
-    const savedSelections = localStorage.getItem("selectedAssets");
+    const savedSelections = sessionStorage.getItem("selectedAssets");
     if (savedSelections) {
       try {
         const parsedSelections = JSON.parse(savedSelections) as SelectedAsset[];
@@ -107,12 +107,12 @@ export function useAssetSelection<T>({
     }
   }, []);
 
-  // Save selections to localStorage whenever they change
+  // Save selections to sessionStorage whenever they change
   useEffect(() => {
     if (selectedAssets.length > 0) {
-      localStorage.setItem("selectedAssets", JSON.stringify(selectedAssets));
+      sessionStorage.setItem("selectedAssets", JSON.stringify(selectedAssets));
     } else {
-      localStorage.removeItem("selectedAssets");
+      sessionStorage.removeItem("selectedAssets");
     }
   }, [selectedAssets]);
 
@@ -255,8 +255,8 @@ export function useAssetSelection<T>({
           searchParams.set("selected", "true");
         } else {
           searchParams.delete("selected");
-          // Clear from localStorage when empty
-          localStorage.removeItem("selectedAssets");
+          // Clear from sessionStorage when empty
+          sessionStorage.removeItem("selectedAssets");
         }
         setSearchParams(searchParams);
 
@@ -291,7 +291,7 @@ export function useAssetSelection<T>({
     setSelectedAssets([]);
     searchParams.delete("selected");
     setSearchParams(searchParams);
-    localStorage.removeItem("selectedAssets");
+    sessionStorage.removeItem("selectedAssets");
   }, [searchParams, setSearchParams]);
 
   // Check if an asset is selected

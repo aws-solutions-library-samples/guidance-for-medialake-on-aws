@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate } from "@/utils/dateFormat";
+import { formatFileSize } from "@/utils/fileSize";
 import {
   Box,
-  // Typography,
   LinearProgress,
   Dialog,
   DialogTitle,
@@ -11,7 +11,6 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-  SelectChangeEvent,
   Snackbar,
   Alert,
 } from "@mui/material";
@@ -23,6 +22,7 @@ import { RightSidebar, RightSidebarProvider } from "../components/common/RightSi
 import SearchFilters from "../components/search/SearchFilters";
 import MasterResultsView from "../components/search/MasterResultsView";
 import NoResultsFound from "../components/search/NoResultsFound";
+import { zIndexTokens } from "@/theme/tokens";
 import { useSearch } from "../api/hooks/useSearch";
 import { useSearchFields } from "../api/hooks/useSearchFields";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
@@ -202,7 +202,6 @@ const SearchPage: React.FC = () => {
 
   // Extract fields data
   const defaultFields = fieldsData?.data?.defaultFields || [];
-  const availableFields = fieldsData?.data?.availableFields || [];
 
   // Initialize selected fields with default fields when data is loaded
   useEffect(() => {
@@ -210,31 +209,6 @@ const SearchPage: React.FC = () => {
       setSelectedFields(defaultFields.map((field) => field.name));
     }
   }, [defaultFields, selectedFields.length]);
-
-  // Handle field selection change
-  const handleFieldsChange = (event: SelectChangeEvent<typeof selectedFields>) => {
-    const {
-      target: { value },
-    } = event;
-    const newSelectedFields = typeof value === "string" ? value.split(",") : value;
-
-    // Check if fields were added or removed
-    const fieldsAdded = newSelectedFields.some((field) => !selectedFields.includes(field));
-
-    // Update the selected fields state
-    setSelectedFields(newSelectedFields);
-
-    // Only make a new API request if fields were added
-    if (fieldsAdded) {
-      // Reset to first page when adding fields
-      setSearchParams((prev) => {
-        const newParams = new URLSearchParams(prev);
-        newParams.set("page", "1");
-        return newParams;
-      });
-    }
-    // If fields were only removed, don't make a new API request
-  };
 
   const [filters, setFilters] = useState<Filters>({
     mediaTypes: {
@@ -379,17 +353,6 @@ const SearchPage: React.FC = () => {
     setEditedName(currentEditedName);
   }, [currentEditingAssetId, currentEditedName]);
 
-  const formatFileSize = (sizeInBytes: number) => {
-    const sizes = ["B", "KB", "MB", "GB"];
-    let i = 0;
-    let size = sizeInBytes;
-    while (size >= 1024 && i < sizes.length - 1) {
-      size /= 1024;
-      i++;
-    }
-    return `${Math.round(size * 100) / 100} ${sizes[i]}`;
-  };
-
   const [columns, setColumns] = useState<AssetTableColumn<AssetItem>[]>([
     {
       id: "name",
@@ -488,33 +451,36 @@ const SearchPage: React.FC = () => {
     );
   };
 
-  const filteredResults =
-    searchResults?.filter((item) => {
-      const isImage = item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
-      const isVideo = item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
-      const isAudio = item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
+  const filteredResults = useMemo(
+    () =>
+      searchResults?.filter((item) => {
+        const isImage = item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
+        const isVideo = item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
+        const isAudio = item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
 
-      // Time-based filtering
-      const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
-      const now = new Date();
-      const timeDiff = now.getTime() - createdAt.getTime();
-      const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
-      const isLastWeek = filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
-      const isLastMonth = filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
-      const isLastYear = filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
+        // Time-based filtering
+        const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
+        const now = new Date();
+        const timeDiff = now.getTime() - createdAt.getTime();
+        const isRecent = filters.time.recent && timeDiff <= 24 * 60 * 60 * 1000;
+        const isLastWeek = filters.time.lastWeek && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+        const isLastMonth = filters.time.lastMonth && timeDiff <= 30 * 24 * 60 * 60 * 1000;
+        const isLastYear = filters.time.lastYear && timeDiff <= 365 * 24 * 60 * 60 * 1000;
 
-      const passesTimeFilter =
-        (!filters.time.recent &&
-          !filters.time.lastWeek &&
-          !filters.time.lastMonth &&
-          !filters.time.lastYear) ||
-        isRecent ||
-        isLastWeek ||
-        isLastMonth ||
-        isLastYear;
+        const passesTimeFilter =
+          (!filters.time.recent &&
+            !filters.time.lastWeek &&
+            !filters.time.lastMonth &&
+            !filters.time.lastYear) ||
+          isRecent ||
+          isLastWeek ||
+          isLastMonth ||
+          isLastYear;
 
-      return (isImage || isVideo || isAudio) && passesTimeFilter;
-    }) || [];
+        return (isImage || isVideo || isAudio) && passesTimeFilter;
+      }) ?? [],
+    [searchResults, filters]
+  );
 
   const [expandedSections, setExpandedSections] = useState({
     mediaTypes: true,
@@ -582,6 +548,10 @@ const SearchPage: React.FC = () => {
 
   // No need for this handler as it's now handled in the useAssetSelection hook
 
+  const handleSelectAllToggle = useCallback(() => {
+    assetSelection.handleSelectAll(filteredResults);
+  }, [filteredResults, assetSelection.handleSelectAll]);
+
   return (
     <RightSidebarProvider>
       <>
@@ -601,7 +571,7 @@ const SearchPage: React.FC = () => {
                 top: 0,
                 left: 0,
                 right: 0,
-                zIndex: 9999,
+                zIndex: zIndexTokens.overlay,
               }}
             />
           )}
@@ -630,9 +600,6 @@ const SearchPage: React.FC = () => {
                 onPageChange={(newPage) => handleSearch({ page: newPage })}
                 onPageSizeChange={handlePageSizeChange}
                 searchTerm={currentQuery}
-                selectedFields={selectedFields}
-                availableFields={availableFields}
-                onFieldsChange={handleFieldsChange}
                 isSemantic={currentSemantic}
                 confidenceThreshold={confidenceThreshold}
                 onConfidenceThresholdChange={setConfidenceThreshold}
@@ -669,9 +636,7 @@ const SearchPage: React.FC = () => {
                 onSelectToggle={assetSelection.handleSelectToggle}
                 hasSelectedAssets={assetSelection.selectedAssets.length > 0}
                 selectAllState={assetSelection.getSelectAllState(filteredResults)}
-                onSelectAllToggle={() => {
-                  assetSelection.handleSelectAll(filteredResults);
-                }}
+                onSelectAllToggle={handleSelectAllToggle}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
                 error={

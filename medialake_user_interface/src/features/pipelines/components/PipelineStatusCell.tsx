@@ -1,10 +1,10 @@
 import React from "react";
-import { Box, Typography, FormControlLabel, CircularProgress } from "@mui/material";
+import { Box, Typography, FormControlLabel, CircularProgress, useTheme } from "@mui/material";
 import { PowerSettingsNew as PowerOnIcon, PowerOff as PowerOffIcon } from "@mui/icons-material";
 import { IconSwitch } from "@/components/common";
 import { TableCellContent } from "@/components/common/table/TableCellContent";
 import type { Pipeline } from "../types/pipelines.types";
-import { colorTokens, typography } from "@/theme/tokens";
+import { typography } from "@/theme/tokens";
 
 interface PipelineStatusCellProps {
   pipeline: Pipeline;
@@ -17,6 +17,8 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
   onToggleActive,
   togglingPipelines,
 }) => {
+  const theme = useTheme();
+  const accent = (theme.palette as any).accent ?? theme.palette.primary;
   const status = pipeline.deploymentStatus;
   let color: "text.secondary" | "success.main" | "info.main" | "error.main" = "text.secondary";
 
@@ -63,10 +65,10 @@ export const PipelineStatusCell: React.FC<PipelineStatusCellProps> = ({
                   disabled={pipeline.system || isToggling}
                   onIcon={<PowerOnIcon />}
                   offIcon={<PowerOffIcon />}
-                  onColor={colorTokens.primary.main}
+                  onColor={theme.palette.primary.main}
                   offColor={typography.colors.disabled.light}
-                  trackOnColor={colorTokens.accent.light}
-                  trackOffColor={colorTokens.text.secondary.light}
+                  trackOnColor={accent.light}
+                  trackOffColor={theme.palette.text.secondary}
                 />
                 {isToggling && (
                   <CircularProgress

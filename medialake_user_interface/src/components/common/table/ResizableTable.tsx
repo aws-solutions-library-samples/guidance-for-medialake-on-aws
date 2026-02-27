@@ -173,13 +173,9 @@ const useTableStyles = (
 export function ResizableTable<T>({
   table,
   containerRef,
-  // virtualizer,
   rows,
   onRowClick,
   onFilterClick,
-  // onRemoveFilter,
-  // onRemoveSort,
-  // onToggleActive,
   emptyState,
 }: ResizableTableProps<T>) {
   const { t } = useTranslation();

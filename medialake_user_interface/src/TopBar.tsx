@@ -617,7 +617,7 @@ function TopBar() {
                       width: 15,
                       height: 15,
                       borderRadius: "50%",
-                      backgroundColor: "#fff",
+                      backgroundColor: muiTheme.palette.common.white,
                       boxShadow: `0 1px 2px ${alpha(muiTheme.palette.common.black, 0.2)}`,
                       transition: "left 0.2s ease",
                     },
