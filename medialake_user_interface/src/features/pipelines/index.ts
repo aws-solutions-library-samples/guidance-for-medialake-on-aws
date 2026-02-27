@@ -8,6 +8,3 @@ export * from "./components";
 
 // Re-export existing hooks
 export * from "./hooks/usePipelineManager";
-
-// Re-export data
-export * from "./data/pipelineData";

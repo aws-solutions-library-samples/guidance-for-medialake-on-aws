@@ -146,6 +146,7 @@ aiPrompt.json
 
 # Playwright
 /playwright-report/
+.playwright-cli/
 /blob-report/
 /playwright/.cache/
 1scratch

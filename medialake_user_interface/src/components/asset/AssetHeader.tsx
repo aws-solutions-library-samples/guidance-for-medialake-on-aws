@@ -5,6 +5,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import HomeIcon from "@mui/icons-material/Home";
 import LockIcon from "@mui/icons-material/Lock";
 import RestoreIcon from "@mui/icons-material/Restore";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface AssetHeaderProps {
   onDownload?: () => void;
@@ -32,7 +33,7 @@ const AssetHeader: React.FC<AssetHeaderProps> = ({
         borderRadius: 1,
         position: "sticky",
         top: 64, // Below breadcrumb
-        zIndex: 1000,
+        zIndex: zIndexTokens.stickyHeader,
       }}
     >
       <Tooltip title={t("common.actions.download")}>

@@ -124,6 +124,17 @@ const useOmakasePlayer = (
       },
     });
     playerRef.current = player;
+
+    // Only load metadata initially — full video data loads on play
+    try {
+      const videoEl = player.video.getHTMLVideoElement();
+      if (videoEl) {
+        videoEl.preload = "metadata";
+      }
+    } catch {
+      // video element may not be available yet, that's fine
+    }
+
     player
       .createTimeline({
         timelineHTMLElementId: "omakase-timeline",

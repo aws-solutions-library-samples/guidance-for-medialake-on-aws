@@ -459,10 +459,10 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                               ? colorTokens.info.main
                               : (inputType as InputType).name === "Fail"
                                 ? colorTokens.error.main
-                                : "#555",
+                                : colorTokens.text.secondary.light,
                       width: "12px",
                       height: "16px",
-                      border: "1px solid #fff",
+                      border: `1px solid ${colorTokens.primary.contrastText}`,
                       borderRadius: "2px",
                       transform: `rotate(${-currentRotation}deg)`,
                       transformOrigin: "center center",
@@ -554,7 +554,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                               : colorTokens.primary.main,
                       width: "12px",
                       height: "12px",
-                      border: "1px solid #fff",
+                      border: `1px solid ${colorTokens.primary.contrastText}`,
                       borderRadius: "5px",
                       transform: `rotate(${-currentRotation}deg)`,
                       transformOrigin: "center center",
@@ -578,7 +578,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
                   background: colorTokens.primary.main,
                   width: "12px",
                   height: "12px",
-                  border: "1px solid #fff",
+                  border: `1px solid ${colorTokens.primary.contrastText}`,
                   borderRadius: "5px",
                   transform: `rotate(${-currentRotation}deg)`,
                   transformOrigin: "center center",

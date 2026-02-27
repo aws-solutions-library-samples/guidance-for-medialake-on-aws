@@ -4,6 +4,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import HistoryIcon from "@mui/icons-material/History";
 import { Link } from "react-router-dom";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface BreadcrumbProps {
   searchQuery?: string;
@@ -34,7 +35,7 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
         borderColor: "divider",
         position: "sticky",
         top: 0,
-        zIndex: 1100,
+        zIndex: zIndexTokens.appBar,
       }}
     >
       <Link

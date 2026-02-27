@@ -20,11 +20,13 @@ import TranscriptionTab from "../components/shared/TranscriptionTab";
 import DescriptiveTab from "../components/shared/DescriptiveTab";
 import TabContentContainer from "../components/common/TabContentContainer";
 import { springEasing } from "@/constants";
-import { colorTokens } from "@/theme/tokens";
+import { zIndexTokens } from "@/theme/tokens";
+import { useTheme as useMuiTheme } from "@mui/material/styles";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
-  const fileInfoColor = colorTokens.primary.main;
-  const techDetailsColor = colorTokens.accent.main;
+  const theme = useMuiTheme();
+  const fileInfoColor = theme.palette.primary.main;
+  const techDetailsColor = (theme.palette as any).accent?.main ?? theme.palette.primary.main;
 
   const s3Bucket =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
@@ -475,26 +477,14 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
     };
   }, [asset, audioViewerRef, id]);
 
-  const [comments, setComments] = useState([
-    {
-      user: "John Doe",
-      avatar: "https://mui.com/static/videos/avatar/1.jpg",
-      content: "Great audio quality!",
-      timestamp: "2023-06-15 09:30:22",
-    },
-    {
-      user: "Jane Smith",
-      avatar: "https://mui.com/static/videos/avatar/2.jpg",
-      content: "The mix is perfect",
-      timestamp: "2023-06-15 10:15:43",
-    },
-    {
-      user: "Mike Johnson",
-      avatar: "https://mui.com/static/videos/avatar/3.jpg",
-      content: "Can we adjust the levels?",
-      timestamp: "2023-06-15 11:22:17",
-    },
-  ]);
+  const [comments, setComments] = useState<
+    Array<{
+      user: string;
+      avatar: string;
+      content: string;
+      timestamp: string;
+    }>
+  >([]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -714,7 +704,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         sx={{
           position: "sticky",
           top: 0,
-          zIndex: 1000,
+          zIndex: zIndexTokens.stickyHeader,
           transform: showHeader ? "translateY(0)" : "translateY(-100%)",
           transition: "transform 0.3s ease-in-out",
           visibility: showHeader ? "visible" : "hidden",

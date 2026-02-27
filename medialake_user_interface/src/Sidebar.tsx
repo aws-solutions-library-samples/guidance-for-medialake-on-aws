@@ -47,6 +47,7 @@ import { useSidebar } from "./contexts/SidebarContext";
 import { ThemeToggle } from "./components/ThemeToggle";
 
 import { drawerWidth, collapsedDrawerWidth, springEasing } from "@/constants";
+import { zIndexTokens } from "@/theme/tokens";
 
 function Sidebar() {
   const { t } = useTranslation();
@@ -352,7 +353,7 @@ function Sidebar() {
             justifyContent: "center",
             border: "1px solid",
             borderColor: "divider",
-            zIndex: 9999,
+            zIndex: zIndexTokens.overlay,
             padding: 0,
             "&:hover": {
               bgcolor: "background.paper",

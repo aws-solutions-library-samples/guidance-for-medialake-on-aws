@@ -279,7 +279,7 @@ export function useAssetOperations<T extends AssetBase>(): UseAssetOperationsRet
   const handleRenameCancel = () => {
     setIsRenameDialogOpen(false);
     setSelectedAsset(null);
-    setEditedName(null);
+    setEditedName("");
     setEditingAssetId(null);
   };
 

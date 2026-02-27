@@ -26,12 +26,9 @@ import {
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { ConnectorResponse } from "@/api/types/api.types";
-import ConnectorEditModal from "@/features/settings/connectors/components/ConnectorEditModal";
 import { useDateFormat } from "@/shared/hooks/useDateFormat";
 import { Warning as WarningIcon } from "@mui/icons-material";
-
-/** AWS brand orange — used for S3 connector icons. */
-const AWS_BRAND_ORANGE = "#FF9900";
+import { brandTokens } from "@/theme/tokens";
 
 interface ConnectorCardProps {
   connector: ConnectorResponse;
@@ -45,7 +42,7 @@ interface ConnectorCardProps {
 
 const ConnectorCard: React.FC<ConnectorCardProps> = ({
   connector,
-  onEdit,
+  onEdit: _onEdit,
   onDelete,
   onSync,
   showSeconds: initialShowSeconds = false,
@@ -54,7 +51,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const { t } = useTranslation();
   const theme = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -93,7 +89,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
 
   const getConnectorIcon = (type: string) => {
     if (type === "s3") {
-      return <CloudUploadIcon sx={{ color: AWS_BRAND_ORANGE }} />;
+      return <CloudUploadIcon sx={{ color: brandTokens.aws.orange }} />;
     }
     return null;
   };
@@ -171,65 +167,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           titleTypographyProps={{ marginBottom: 1 }}
           subheaderTypographyProps={{ marginTop: 1 }}
         />
-        {/* <CardHeader
-
-                    action={
-                        <Stack direction="row" spacing={2}>
-                            <IconButton
-                                onClick={() => setEditModalOpen(true)}
-                                size="small"
-                                sx={{
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                    width: 40,
-                                    height: 40,
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                    },
-                                }}
-
-                            > <EditIcon fontSize="small" /></IconButton>
-                            <IconButton
-                                onClick={handleToggleStatus}
-                                size="small"
-                                sx={{
-                                    backgroundColor: alpha(
-                                        connector.status === 'disabled'
-                                            ? theme.palette.success.main
-                                            : theme.palette.warning.main,
-                                        0.1
-                                    ),
-                                    width: 40,
-                                    height: 40,
-                                    '&:hover': {
-                                        backgroundColor: alpha(
-                                            connector.status === 'disabled'
-                                                ? theme.palette.success.main
-                                                : theme.palette.warning.main,
-                                            0.2
-                                        ),
-                                    },
-                                }}
-                            >
-                                <PowerIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                                onClick={handleDeleteClick}
-                                size="small"
-                                sx={{
-                                    backgroundColor: alpha(theme.palette.error.main, 0.1),
-                                    width: 40,
-                                    height: 40,
-                                    '&:hover': {
-                                        backgroundColor: alpha(theme.palette.error.main, 0.2),
-                                    },
-                                }}
-                            >
-                                <DeleteIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    }
-
-                /> */}
         <CardContent sx={{ flexGrow: 1 }}>
           <Typography variant="body2">
             <strong>{t("connectors.fields.bucket")}:</strong>{" "}
@@ -342,43 +279,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           }}
         >
           <Stack direction="row" spacing={2}>
-            {/* <IconButton
-                            onClick={() => setEditModalOpen(true)}
-                            size="small"
-                            sx={{
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                width: 40,
-                                height: 40,
-                                '&:hover': {
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                },
-                            }}
-
-                        > <EditIcon fontSize="small" /></IconButton>
-                        <IconButton
-                            onClick={handleToggleStatus}
-                            size="small"
-                            sx={{
-                                backgroundColor: alpha(
-                                    connector.status === 'disabled'
-                                        ? theme.palette.success.main
-                                        : theme.palette.warning.main,
-                                    0.1
-                                ),
-                                width: 40,
-                                height: 40,
-                                '&:hover': {
-                                    backgroundColor: alpha(
-                                        connector.status === 'disabled'
-                                            ? theme.palette.success.main
-                                            : theme.palette.warning.main,
-                                        0.2
-                                    ),
-                                },
-                            }}
-                        >
-                            <PowerIcon fontSize="small" />
-                        </IconButton> */}
             {onSync && connector.type === "s3" && (
               <Tooltip title={t("connectors.syncConnector")}>
                 <IconButton
@@ -430,13 +330,6 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           </Stack>
         </CardActions>
       </Card>
-
-      <ConnectorEditModal
-        open={editModalOpen}
-        connector={connector}
-        onClose={() => setEditModalOpen(false)}
-        onSave={onEdit}
-      />
 
       <Dialog
         open={deleteDialogOpen}

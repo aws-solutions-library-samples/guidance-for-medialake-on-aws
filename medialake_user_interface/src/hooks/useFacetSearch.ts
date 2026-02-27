@@ -64,11 +64,16 @@ export const useFacetSearch = ({
   });
 
   // Sync filters with URL params when initialFilters change
+  const initialFiltersKey = Object.entries(initialFilters)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+
   useEffect(() => {
     if (Object.keys(initialFilters).length > 0) {
       setFilters(initialFilters);
     }
-  }, [JSON.stringify(initialFilters)]);
+  }, [initialFiltersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update URL when filters change
   const setFilters = useCallback(

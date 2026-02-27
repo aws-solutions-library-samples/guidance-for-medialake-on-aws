@@ -31,12 +31,7 @@ const ConnectorsPage: React.FC = () => {
     severity: "success" | "error";
   } | null>(null);
 
-  const {
-    data: connectorsResponse,
-    isLoading,
-    // isError,
-    error,
-  } = useGetConnectors();
+  const { data: connectorsResponse, isLoading, error } = useGetConnectors();
 
   const { mutateAsync: deleteConnector } = useDeleteConnector();
   const { mutateAsync: toggleConnector } = useToggleConnector();

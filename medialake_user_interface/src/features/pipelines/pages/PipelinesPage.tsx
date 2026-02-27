@@ -11,8 +11,6 @@ import {
   ClickAwayListener,
   MenuList,
   MenuItem,
-  // alpha,
-  // IconButton,
 } from "@mui/material";
 import { Add as AddIcon, FileUpload as FileUploadIcon } from "@mui/icons-material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
@@ -38,6 +36,7 @@ import ApiStatusModal from "@/components/ApiStatusModal";
 import queryClient from "@/api/queryClient";
 import { PipelinesService } from "../api/pipelinesService";
 import { PipelineDeleteDialog } from "../components";
+import { zIndexTokens } from "@/theme/tokens";
 import PipelineList from "../components/PipelineList";
 import { usePipelineManager } from "../hooks/usePipelineManager";
 import { usePipelineColumns, defaultColumnVisibility } from "../hooks/usePipelineColumns";
@@ -533,7 +532,7 @@ const PipelinesPage: React.FC = () => {
             />
 
             <Popper
-              sx={{ zIndex: 1200 }}
+              sx={{ zIndex: zIndexTokens.sidebar }}
               open={addPipelineMenuOpen}
               anchorEl={addPipelineButtonRef.current}
               role={undefined}
