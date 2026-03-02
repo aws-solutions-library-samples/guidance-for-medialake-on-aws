@@ -31,6 +31,7 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { AssetAudio } from "../asset";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+import { Can } from "@/permissions";
 
 export interface AssetTableProps<T> {
   data: T[];
@@ -507,9 +508,11 @@ export function AssetTable<T>({
                 <FavoriteBorderIcon fontSize="small" />
               )}
             </IconButton>
-            <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            <Can I="delete" a="asset">
+              <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Can>
             <IconButton
               size="small"
               onClick={(e) => onDownloadClick(info.row.original, e)}

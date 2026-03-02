@@ -33,6 +33,7 @@ import {
 } from "@byomakase/omakase-player";
 import { useSemanticMode } from "@/stores/searchStore";
 import { getMarkerColorByConfidence } from "../common/utils";
+import { Can } from "@/permissions";
 
 export interface AssetField {
   id: string;
@@ -975,17 +976,19 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
             </IconButton>
 
             {!isClipMode && (
-              <IconButton
-                size="small"
-                onClick={handleDeleteClick}
-                sx={{
-                  color: "primary.main",
-                  "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
-                }}
-                title={t("common.actions.delete")}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+              <Can I="delete" a="asset">
+                <IconButton
+                  size="small"
+                  onClick={handleDeleteClick}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
+                  }}
+                  title={t("common.actions.delete")}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Can>
             )}
           </Box>
         )}
@@ -1283,24 +1286,26 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                     </ListItemText>
                   </MenuItem>
                   {!isClipMode && (
-                    <MenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCompactMenuAnchor(null);
-                        handleDeleteClick(e);
-                      }}
-                      sx={{
-                        color: "error.main",
-                        "&:hover": {
-                          bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                        },
-                      }}
-                    >
-                      <ListItemIcon>
-                        <DeleteIcon fontSize="small" sx={{ color: "error.main" }} />
-                      </ListItemIcon>
-                      <ListItemText>{t("common.actions.delete")}</ListItemText>
-                    </MenuItem>
+                    <Can I="delete" a="asset">
+                      <MenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCompactMenuAnchor(null);
+                          handleDeleteClick(e);
+                        }}
+                        sx={{
+                          color: "error.main",
+                          "&:hover": {
+                            bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                          },
+                        }}
+                      >
+                        <ListItemIcon>
+                          <DeleteIcon fontSize="small" sx={{ color: "error.main" }} />
+                        </ListItemIcon>
+                        <ListItemText>{t("common.actions.delete")}</ListItemText>
+                      </MenuItem>
+                    </Can>
                   )}
                 </Menu>
               </Box>
