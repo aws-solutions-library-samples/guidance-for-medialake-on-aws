@@ -823,24 +823,26 @@ const CollectionViewPage: React.FC = () => {
                     gap: 2,
                   }}
                 >
-                  {childCollections.map((child) => {
-                    const typeInfo = getCollectionTypeInfo(child.collectionTypeId);
-                    return (
-                      <CollectionCardSimple
-                        key={child.id}
-                        name={child.name}
-                        itemCount={child.itemCount}
-                        childCollectionCount={child.childCollectionCount}
-                        isPublic={child.isPublic}
-                        iconName={typeInfo.iconName}
-                        color={typeInfo.color}
-                        thumbnailType={child.thumbnailType}
-                        thumbnailValue={child.thumbnailValue}
-                        thumbnailUrl={child.thumbnailUrl}
-                        onClick={() => navigate(`/collections/${child.id}/view`)}
-                      />
-                    );
-                  })}
+                  {childCollections
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((child) => {
+                      const typeInfo = getCollectionTypeInfo(child.collectionTypeId);
+                      return (
+                        <CollectionCardSimple
+                          key={child.id}
+                          name={child.name}
+                          itemCount={child.itemCount}
+                          childCollectionCount={child.childCollectionCount}
+                          isPublic={child.isPublic}
+                          iconName={typeInfo.iconName}
+                          color={typeInfo.color}
+                          thumbnailType={child.thumbnailType}
+                          thumbnailValue={child.thumbnailValue}
+                          thumbnailUrl={child.thumbnailUrl}
+                          onClick={() => navigate(`/collections/${child.id}/view`)}
+                        />
+                      );
+                    })}
                 </Box>
               </Box>
             )}

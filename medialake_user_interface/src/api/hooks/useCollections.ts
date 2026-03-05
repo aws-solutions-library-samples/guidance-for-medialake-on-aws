@@ -360,6 +360,7 @@ export const useGetChildCollections = (parentId: string, enabled = true) => {
       try {
         const params = new URLSearchParams();
         params.append("filter[parentId]", parentId);
+        params.append("limit", "1000");
 
         const response = await apiClient.get<CollectionsResponse>(
           `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`,
