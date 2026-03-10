@@ -691,18 +691,6 @@ class AssetProcessor:
         else:
             logger.info(message, **context)
 
-    def _decode_s3_event_key(self, encoded_key: str) -> str:
-        """Decode S3 event key by handling URL encoding properly"""
-        # First, decode all URL-encoded sequences (%20, %E2%80%AF, etc.)
-        decoded_key = urllib.parse.unquote(encoded_key)
-
-        # In S3 event notifications, '+' characters typically represent spaces
-        # This is different from general URL encoding where '+' in paths should be literal
-        # But S3 notifications often use '+' to represent spaces in object keys
-        decoded_key = decoded_key.replace("+", " ")
-
-        return decoded_key
-
     def _extract_file_extension(self, key: str) -> str:
         """Extract file extension from key"""
         # The key should already be URL-decoded by the time it reaches this method
@@ -821,13 +809,6 @@ class AssetProcessor:
         self, bucket: str, key: str, version_id: Optional[str] = None
     ) -> Optional[Dict]:
         """Process new asset from S3 with optimized performance and race condition prevention"""
-        original_key = key
-        key = self._decode_s3_event_key(key)
-
-        # Log key transformation for debugging
-        if original_key != key:
-            logger.info(f"Key decoded from '{original_key}' to '{key}'")
-
         try:
             # CRITICAL: Acquire processing lock FIRST to prevent race conditions
             # This MUST be the first operation to ensure only one Lambda processes this object
@@ -2556,9 +2537,9 @@ def extract_s3_details_from_event(
     if "s3" in event_record:
         if "bucket" in event_record["s3"] and "object" in event_record["s3"]:
             bucket = event_record["s3"]["bucket"]["name"]
-            # Decode S3 key properly - handle both URL encoding and '+' as spaces
+            # Direct S3 events use space-to-plus encoding: spaces are +, plus signs are %2B
             raw_key = event_record["s3"]["object"]["key"]
-            key = urllib.parse.unquote(raw_key).replace("+", " ")
+            key = urllib.parse.unquote_plus(raw_key)
             event_name = event_record.get("eventName", "ObjectCreated:")
             version_id = event_record["s3"]["object"].get("versionId")
             # Log the source for debugging
@@ -2589,9 +2570,9 @@ def extract_s3_details_from_event(
                     valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
                     if record.get("eventSource") in valid_sources and "s3" in record:
                         bucket = record["s3"]["bucket"]["name"]
-                        # Decode S3 key properly - handle both URL encoding and '+' as spaces
+                        # Direct S3 events use space-to-plus encoding: spaces are +, plus signs are %2B
                         raw_key = record["s3"]["object"]["key"]
-                        key = urllib.parse.unquote(raw_key).replace("+", " ")
+                        key = urllib.parse.unquote_plus(raw_key)
                         event_name = record.get("eventName", "ObjectCreated:")
                         version_id = record["s3"]["object"].get("versionId")
                         # Log the extracted details for debugging
@@ -2627,15 +2608,6 @@ def extract_s3_details_from_event(
                     version_id = detail["object"].get("version-id") or detail[
                         "object"
                     ].get("versionId")
-
-                # Apply URL decoding to the key if it exists - handle both URL encoding and '+' as spaces
-                if key:
-                    raw_key = key
-                    key = urllib.parse.unquote(key).replace("+", " ")
-                    if raw_key != key:
-                        logger.info(
-                            f"EventBridge key transformation: '{raw_key}' -> '{key}'"
-                        )
 
                 # Determine event type
                 event_name = "ObjectCreated:"
