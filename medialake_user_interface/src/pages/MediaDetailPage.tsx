@@ -1,19 +1,24 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaController } from "../hooks/useMediaController";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography, Paper, Tabs, Tab, alpha } from "@mui/material";
-import { useAsset, useRelatedVersions, useTranscription } from "../api/hooks/useAssets";
+import {
+  useAsset,
+  useRelatedVersions,
+  useTranscription,
+  RelatedVersionsResponse,
+} from "../api/hooks/useAssets";
 import { RightSidebarProvider, useRightSidebar } from "../components/common/RightSidebar";
 import { RecentlyViewedProvider, useTrackRecentlyViewed } from "../contexts/RecentlyViewedContext";
 import AssetSidebar from "../components/asset/AssetSidebar";
 import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
-import AssetVideo from "../components/asset/AssetVideo";
+import { OmakaseDetailPlayer } from "../components/player/OmakaseDetailPlayer";
+import type { UseDetailPlayerResult } from "../components/player/useDetailPlayer";
+import { getPlayerCurrentTime } from "../components/player/playerTimeStore";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
-import { VideoViewerRef } from "../components/common/VideoViewer";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import { AssetResponse } from "../api/types/asset.types";
-import type { RelatedVersionsResponse } from "../api/hooks/useAssets";
 import { formatFileSize } from "../utils/imageUtils";
 import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TranscriptionTab from "../components/shared/TranscriptionTab";
@@ -23,7 +28,7 @@ import { springEasing } from "@/constants";
 import { zIndexTokens } from "@/theme/tokens";
 import { useTheme as useMuiTheme } from "@mui/material/styles";
 
-const SummaryTab = ({ assetData }: { assetData: any }) => {
+const SummaryTab = ({ assetData, mediaType }: { assetData: any; mediaType: "video" | "audio" }) => {
   const theme = useMuiTheme();
   const fileInfoColor = theme.palette.primary.main;
   const techDetailsColor = (theme.palette as any).accent?.main ?? theme.palette.primary.main;
@@ -39,38 +44,53 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
       ?.ObjectKey?.FullPath;
   const s3Uri = s3Bucket && fullPath ? `s3://${s3Bucket}/${fullPath}` : "Unknown";
 
-  // Extract metadata from API response
   const metadata = assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {};
-  const general = metadata.general || {};
-  const audio = Array.isArray(metadata.audio) ? metadata.audio[0] : {};
+  const generalMetadata = metadata.general || {};
 
   const fileSize =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
       ?.FileInfo?.Size || 0;
   const format =
     assetData?.data?.asset?.DigitalSourceAsset?.MainRepresentation?.Format || "Unknown";
-
-  // Audio-specific metadata fields
-  const duration =
-    audio.duration != null
-      ? audio.duration.toFixed(2)
-      : general.Duration
-        ? parseFloat(general.Duration).toFixed(2)
-        : "Unknown";
-  const sampleRate = audio.sample_rate
-    ? (parseInt(audio.sample_rate, 10) / 1000).toFixed(1)
-    : "Unknown";
-  const bitDepth = audio.BitsPerSample || audio.bit_depth || "Unknown";
-
-  const channels = audio.channels || audio.Channels || "Unknown";
-
-  const bitRate = audio.bit_rate ? `${Math.round(audio.bit_rate / 1000)} kbps` : "Unknown";
-
-  const codec = audio.codec_name || general.Format || "Unknown";
-
   const createdDate = assetData?.data?.asset?.DigitalSourceAsset?.CreateDate
     ? new Date(assetData.data.asset.DigitalSourceAsset.CreateDate).toLocaleDateString()
     : "Unknown";
+
+  // Video-specific extraction
+  const videoMetadata = Array.isArray(metadata.video) ? metadata.video[0] : {};
+  const videoDuration = generalMetadata.Duration
+    ? `${parseFloat(generalMetadata.Duration).toFixed(2)}`
+    : "Unknown";
+  const width = videoMetadata.Width ?? "Unknown";
+  const height = videoMetadata.Height ?? "Unknown";
+  const frameRate = videoMetadata.FrameRate ? `${videoMetadata.FrameRate} FPS` : "Unknown";
+  const videoBitRate =
+    videoMetadata.OverallBitRate || videoMetadata.BitRate
+      ? `${Math.round((videoMetadata.OverallBitRate || videoMetadata.BitRate) / 1000)} kbps`
+      : "Unknown";
+  const videoCodec = videoMetadata.codec_name || generalMetadata.Format || "Unknown";
+
+  // Audio-specific extraction
+  const audioMeta = Array.isArray(metadata.audio) ? metadata.audio[0] : {};
+  const audioDuration =
+    audioMeta.duration != null
+      ? parseFloat(String(audioMeta.duration)).toFixed(2)
+      : generalMetadata.Duration
+        ? parseFloat(generalMetadata.Duration).toFixed(2)
+        : "Unknown";
+  const sampleRate = audioMeta.sample_rate
+    ? (parseInt(String(audioMeta.sample_rate), 10) / 1000).toFixed(1)
+    : "Unknown";
+  const bitDepth = audioMeta.BitsPerSample || audioMeta.bit_depth || "Unknown";
+  const channels = audioMeta.channels || audioMeta.Channels || "Unknown";
+  const audioBitRate = audioMeta.bit_rate
+    ? `${Math.round(Number(audioMeta.bit_rate) / 1000)} kbps`
+    : "Unknown";
+  const audioCodec = audioMeta.codec_name || generalMetadata.Format || "Unknown";
+
+  const duration = mediaType === "video" ? videoDuration : audioDuration;
+  const bitRate = mediaType === "video" ? videoBitRate : audioBitRate;
+  const codec = mediaType === "video" ? videoCodec : audioCodec;
 
   return (
     <TabContentContainer>
@@ -96,54 +116,31 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
         />
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Type:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
-            {assetData?.data?.asset?.DigitalSourceAsset?.Type || "Audio"}
+            {assetData?.data?.asset?.DigitalSourceAsset?.Type ||
+              (mediaType === "video" ? "Video" : "Audio")}
           </Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Size:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{formatFileSize(fileSize)}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Format:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{format}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             S3 Bucket:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
@@ -152,13 +149,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Object Name:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
@@ -167,13 +158,7 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             S3 URI:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem", wordBreak: "break-all" }}>
@@ -204,91 +189,70 @@ const SummaryTab = ({ assetData }: { assetData: any }) => {
         />
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Duration:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{duration} seconds</Typography>
         </Box>
 
-        <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
-            Sample Rate:
-          </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{sampleRate} kHz</Typography>
-        </Box>
+        {mediaType === "video" && (
+          <>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
+                Resolution:
+              </Typography>
+              <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>
+                {width}x{height}
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
+                Frame Rate:
+              </Typography>
+              <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{frameRate} FPS</Typography>
+            </Box>
+          </>
+        )}
+
+        {mediaType === "audio" && (
+          <>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
+                Sample Rate:
+              </Typography>
+              <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{sampleRate} kHz</Typography>
+            </Box>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
+                Bit Depth:
+              </Typography>
+              <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{bitDepth} bit</Typography>
+            </Box>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
+                Channels:
+              </Typography>
+              <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{channels}</Typography>
+            </Box>
+          </>
+        )}
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
-            Bit Depth:
-          </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{bitDepth} bit</Typography>
-        </Box>
-
-        <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
-            Channels:
-          </Typography>
-          <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{channels}</Typography>
-        </Box>
-
-        <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Bit Rate:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{bitRate}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Codec:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{codec}</Typography>
         </Box>
 
         <Box sx={{ display: "flex", mb: 1 }}>
-          <Typography
-            sx={{
-              width: "120px",
-              color: "text.secondary",
-              fontSize: "0.875rem",
-            }}
-          >
+          <Typography sx={{ width: "120px", color: "text.secondary", fontSize: "0.875rem" }}>
             Created Date:
           </Typography>
           <Typography sx={{ flex: 1, fontSize: "0.875rem" }}>{createdDate}</Typography>
@@ -345,24 +309,23 @@ const RelatedItemsTab: React.FC<{
   );
 };
 
-interface AudioDetailContentProps {
+interface MediaDetailContentProps {
   asset: any;
-  assetType: string;
   searchTerm?: string;
 }
 
-const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
-  asset,
-  assetType,
-  searchTerm,
-}) => {
+const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTerm }) => {
+  const location = useLocation();
+  const mediaType: "video" | "audio" = location.pathname.startsWith("/audio") ? "audio" : "video";
+
   const { t } = useTranslation();
-  const audioViewerRef = useRef<VideoViewerRef>(null);
-  const seekAttemptsRef = useRef<number>(0);
-  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playerResultRef = useRef<UseDetailPlayerResult | null>(null);
+  const [markerReady, setMarkerReady] = useState(false);
+  const playerSeekRef = useRef<((time: number) => void) | null>(null);
+  // Throttle mediaController time updates to ~10 Hz (transcript highlighting doesn't need 60 Hz)
+  const lastMediaControllerUpdate = useRef(0);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { isExpanded } = useRightSidebar();
   const {
     data: assetData,
@@ -382,100 +345,20 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
   const { data: transcriptionData, isLoading: isLoadingTranscription } = useTranscription(id || "");
   const [showHeader, setShowHeader] = useState(true);
 
-  // Media controller for transcript synchronization
   const mediaController = useMediaController();
 
-  // Register audio element with media controller
-  useEffect(() => {
-    if (audioViewerRef.current) {
-      mediaController.registerVideoElement(audioViewerRef);
-    }
-  }, [mediaController]);
-
-  // Seek to clip start time if this is a clip result from CLIP mode
-  useEffect(() => {
-    // Check if this is a clip result (has clips array with exactly one clip)
-    const clips = asset?.clips;
-    if (!clips || !Array.isArray(clips) || clips.length !== 1) {
-      return;
-    }
-
-    const clip = clips[0];
-    let startTime: number | undefined;
-
-    // Extract start time from either start (number) or start_timecode (string)
-    if (typeof clip.start === "number") {
-      startTime = clip.start;
-    } else if (clip.start_timecode) {
-      // Convert timecode (HH:MM:SS:FF) to seconds
-      const timecodeToSeconds = (tc: string): number => {
-        const [hh, mm, ss, ff] = tc.split(":").map(Number);
-        const fps = 25; // default/fallback; adjust if actual fps available
-        return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+  const handlePlayerReady = useCallback(
+    (result: UseDetailPlayerResult) => {
+      playerResultRef.current = result;
+      setMarkerReady(result.isMarkerReady);
+      playerSeekRef.current = result.seek;
+      const refLike = {
+        current: { seek: result.seek, getCurrentTime: () => getPlayerCurrentTime() },
       };
-      startTime = timecodeToSeconds(clip.start_timecode);
-    }
-
-    // Seek to the clip start time when audio is ready
-    if (startTime === undefined || startTime < 0) {
-      return;
-    }
-
-    // Poll to check if audio is ready, then seek
-    const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
-    const pollInterval = 100; // Check every 100ms
-    seekAttemptsRef.current = 0;
-
-    // Clear any existing timeout
-    if (seekTimeoutRef.current) {
-      clearTimeout(seekTimeoutRef.current);
-      seekTimeoutRef.current = null;
-    }
-
-    const seekToClipStart = () => {
-      seekAttemptsRef.current++;
-
-      if (!audioViewerRef.current) {
-        if (seekAttemptsRef.current < maxAttempts) {
-          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
-        }
-        return;
-      }
-
-      try {
-        // Try to get current time to verify audio is ready
-        audioViewerRef.current.getCurrentTime();
-        // If we can get current time, audio is ready
-        audioViewerRef.current.seek(startTime!);
-        // Success - clear any pending timeouts
-        if (seekTimeoutRef.current) {
-          clearTimeout(seekTimeoutRef.current);
-          seekTimeoutRef.current = null;
-        }
-      } catch (error) {
-        // Audio might not be ready yet, retry
-        if (seekAttemptsRef.current < maxAttempts) {
-          seekTimeoutRef.current = setTimeout(seekToClipStart, pollInterval);
-        } else {
-          console.warn(
-            `Failed to seek to clip start time ${startTime}s after ${maxAttempts} attempts:`,
-            error
-          );
-        }
-      }
-    };
-
-    // Start polling after a small initial delay
-    seekTimeoutRef.current = setTimeout(seekToClipStart, 200);
-
-    return () => {
-      if (seekTimeoutRef.current) {
-        clearTimeout(seekTimeoutRef.current);
-        seekTimeoutRef.current = null;
-      }
-      seekAttemptsRef.current = 0;
-    };
-  }, [asset, audioViewerRef, id]);
+      mediaController.registerVideoElement(refLike as any);
+    },
+    [mediaController.registerVideoElement]
+  );
 
   const [comments, setComments] = useState<
     Array<{
@@ -488,22 +371,19 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
 
   // Scroll to top when component mounts
   useEffect(() => {
-    // Find the scrollable container in the AppLayout
     const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.scrollTo(0, 0);
     } else {
-      // Fallback to window scrolling
       window.scrollTo(0, 0);
     }
-  }, [id]); // Include id in dependencies to ensure scroll reset when navigating between detail pages
+  }, [id]);
 
   // Track scroll position to hide/show header
   useEffect(() => {
     let lastScrollTop = 0;
 
     const handleScroll = () => {
-      // Get scrollTop from the parent scrollable container instead
       const currentScrollTop =
         document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]')?.scrollTop || 0;
 
@@ -518,7 +398,6 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
       lastScrollTop = currentScrollTop;
     };
 
-    // Listen to scroll on the parent container
     const container = document.querySelector('[class*="AppLayout"] [style*="overflow: auto"]');
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
@@ -531,10 +410,8 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
     };
   }, []);
 
-  // Use the searchTerm prop or fallback to URL parameters
   const searchParams = new URLSearchParams(location.search);
   const urlSearchTerm = searchParams.get("q") || searchParams.get("searchTerm") || "";
-  // Use the prop value if available, otherwise use the URL value
   const effectiveSearchTerm = searchTerm || urlSearchTerm;
 
   const versions = useMemo(() => {
@@ -585,6 +462,11 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
     return transformMetadata(assetData.data.asset.Metadata);
   }, [assetData]);
 
+  const availableCategoryKeys = useMemo(() => {
+    const embedded = assetData?.data?.asset?.Metadata?.EmbeddedMetadata ?? {};
+    return Object.keys(embedded);
+  }, [assetData]);
+
   const handleAddComment = (comment: string) => {
     const now = new Date().toISOString();
     const formattedTimestamp = formatLocalDateTime(now, { showSeconds: true });
@@ -606,19 +488,34 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
           title:
             assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
               .ObjectKey.Name,
-          type: assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "audio",
-          path: `/audio/${assetData.data.asset.InventoryID}`,
+          type:
+            mediaType === "audio"
+              ? ("audio" as const)
+              : (assetData.data.asset.DigitalSourceAsset.Type.toLowerCase() as "video"),
+          path:
+            mediaType === "audio"
+              ? `/audio/${assetData.data.asset.InventoryID}`
+              : `/${assetData.data.asset.DigitalSourceAsset.Type.toLowerCase()}s/${
+                  assetData.data.asset.InventoryID
+                }`,
           searchTerm: effectiveSearchTerm,
-          metadata: {
-            duration: "42:18",
-            fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
-            creator: "John Doe",
-          },
+          metadata:
+            mediaType === "audio"
+              ? {
+                  duration: "42:18",
+                  fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
+                  creator: "John Doe",
+                }
+              : {
+                  duration: "00:15",
+                  fileSize: `${assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size} bytes`,
+                  dimensions: "1920x1080",
+                  creator: "John Doe",
+                },
         }
       : null
   );
 
-  // Handle keyboard navigation for tabs
   const handleTabKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       const tabs = ["summary", "technical", "descriptive", "transcription", "related"];
@@ -636,16 +533,14 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
   );
 
   const handleBack = useCallback(() => {
-    // If we came from a specific location with state, go back to that location
     if (location.state && (location.state.searchTerm || location.state.preserveSearch)) {
       navigate(-1);
     } else {
-      // Fallback to search page with search term if available
       navigate(
         `/search${effectiveSearchTerm ? `?q=${encodeURIComponent(effectiveSearchTerm)}` : ""}`
       );
     }
-  }, [navigate, location.state, searchTerm]);
+  }, [navigate, location.state, effectiveSearchTerm]);
 
   if (isLoading) {
     return (
@@ -666,7 +561,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
     return (
       <Box sx={{ p: 3 }}>
         <BreadcrumbNavigation
-          searchTerm={searchTerm}
+          searchTerm={effectiveSearchTerm}
           currentResult={48}
           totalResults={156}
           onBack={handleBack}
@@ -724,7 +619,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
                 .ObjectKey.Name
             }
             assetId={assetData.data.asset.InventoryID}
-            assetType="Audio"
+            assetType={mediaType === "video" ? "Video" : "Audio"}
           />
         </Box>
       </Box>
@@ -756,22 +651,22 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
               `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           }}
         >
-          <AssetVideo
-            ref={audioViewerRef}
+          <OmakaseDetailPlayer
             src={proxyUrl}
-            alt={assetData.data.asset.DigitalSourceAsset.MainRepresentation.ID}
-            protocol="audio"
+            mediaType={mediaType}
+            assetId={id || ""}
             onTimeUpdate={(time) => {
-              mediaController.updateCurrentTime(time);
+              const now = performance.now();
+              if (now - lastMediaControllerUpdate.current > 100) {
+                lastMediaControllerUpdate.current = now;
+                mediaController.updateCurrentTime(time);
+              }
             }}
-            onVideoElementReady={(ref) => {
-              mediaController.registerVideoElement(ref);
-            }}
+            onPlayerReady={handlePlayerReady}
           />
         </Paper>
       </Box>
 
-      {/* Metadata section */}
       <Box sx={{ px: 3, pb: 3 }}>
         <Box sx={{ mt: 1 }}>
           <Paper
@@ -853,14 +748,14 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
               aria-labelledby={`tab-${activeTab}`}
               tabIndex={0}
             >
-              {activeTab === "summary" && <SummaryTab assetData={assetData} />}
+              {activeTab === "summary" && (
+                <SummaryTab assetData={assetData} mediaType={mediaType} />
+              )}
               {activeTab === "technical" && (
                 <TechnicalMetadataTab
                   metadataAccordions={metadataAccordions}
-                  availableCategories={Object.keys(
-                    assetData?.data?.asset?.Metadata?.EmbeddedMetadata || {}
-                  )}
-                  mediaType="audio"
+                  availableCategories={availableCategoryKeys}
+                  mediaType={mediaType}
                 />
               )}
               {activeTab === "descriptive" && <DescriptiveTab assetData={assetData} />}
@@ -870,7 +765,7 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
                   transcriptionData={transcriptionData}
                   isLoading={isLoadingTranscription}
                   assetData={assetData}
-                  mediaType="audio"
+                  mediaType={mediaType}
                   mediaController={mediaController}
                 />
               )}
@@ -891,26 +786,28 @@ const AudioDetailContent: React.FC<AudioDetailContentProps> = ({
         versions={versions}
         comments={comments}
         onAddComment={handleAddComment}
-        videoViewerRef={audioViewerRef}
+        markerAdapter={playerResultRef.current?.markerAdapter}
+        isMarkerReady={markerReady}
+        seek={playerSeekRef.current ?? undefined}
         assetId={assetData?.data?.asset?.InventoryID}
         asset={asset}
-        assetType={assetType}
+        assetType={mediaType === "video" ? "Video" : "Audio"}
         searchTerm={effectiveSearchTerm}
       />
     </Box>
   );
 };
 
-const AudioDetailPage: React.FC = () => {
+const MediaDetailPage: React.FC = () => {
   const location = useLocation();
-  const { assetType, searchTerm, asset } = location.state || {};
+  const { searchTerm, asset } = location.state || {};
   return (
     <RecentlyViewedProvider>
       <RightSidebarProvider>
-        <AudioDetailContent asset={asset} assetType={assetType} searchTerm={searchTerm} />
+        <MediaDetailContent asset={asset} searchTerm={searchTerm} />
       </RightSidebarProvider>
     </RecentlyViewedProvider>
   );
 };
 
-export default AudioDetailPage;
+export default MediaDetailPage;

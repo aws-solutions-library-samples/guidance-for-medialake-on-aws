@@ -53,10 +53,16 @@ export function addMarkersToPlayer(
   const isClip = id.includes("#CLIP#") || id.includes("_clip_");
   const filteredClips = getFilteredClips(id, clips, isSemantic, confidenceThreshold);
 
-  try {
-    player.progressMarkerTrack.removeAllMarkers();
-  } catch {
-    /* ok */
+  // Get the marker track — try chroming API (0.25.x) first, fall back to legacy
+  const markerTrack =
+    player.chroming?.progressMarkerTrack ?? (player as any).progressMarkerTrack ?? null;
+
+  if (markerTrack) {
+    try {
+      markerTrack.removeAllMarkers();
+    } catch {
+      /* ok */
+    }
   }
 
   filteredClips.forEach((clip, index) => {
@@ -83,7 +89,9 @@ export function addMarkersToPlayer(
     });
 
     try {
-      player.progressMarkerTrack.addMarker(marker);
+      if (markerTrack) {
+        markerTrack.addMarker(marker);
+      }
       markerIds.push(marker.id || `${start}-${end}`);
       if (isClip || (filteredClips.length === 1 && index === 0)) {
         // Fire-and-forget seek — don't subscribe synchronously as it blocks the main thread

@@ -956,6 +956,8 @@ export default {
     clickToEdit: "Clique para editar",
     downloadVersion: "Baixar esta versão",
     resetMarker: "Redefinir marcador para posição original",
+    markerRollbackWarning:
+      "Uma alteração de marcador foi revertida devido a um erro de sincronização.",
     addMarker: "Adicionar marcador",
     postComment: "Postar seu comentário",
     runPipeline: "Executar este pipeline no ativo atual",

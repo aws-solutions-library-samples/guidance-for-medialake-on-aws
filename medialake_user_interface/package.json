@@ -19,7 +19,7 @@
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/credential-providers": "^3.797.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@byomakase/omakase-player": "0.22.1",
+    "@byomakase/omakase-player": "0.25.3",
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@emotion/react": "^11.13.3",

@@ -912,6 +912,8 @@ export default {
     clickToEdit: "Cliquez pour modifier",
     downloadVersion: "Télécharger cette version",
     resetMarker: "Réinitialiser le marqueur à la position d'origine",
+    markerRollbackWarning:
+      "Une modification de marqueur a été annulée en raison d'une erreur de synchronisation.",
     addMarker: "Ajouter un marqueur",
     postComment: "Publier votre commentaire",
     runPipeline: "Exécuter ce pipeline sur l'actif actuel",

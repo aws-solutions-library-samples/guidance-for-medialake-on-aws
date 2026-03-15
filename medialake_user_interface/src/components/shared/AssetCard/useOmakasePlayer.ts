@@ -9,7 +9,6 @@
  * - Parks player to an LRU cache when card scrolls out of viewport (preserves video buffer)
  * - Re-attaches cached player instantly when card scrolls back in
  * - LRU cache survives page navigation within the SPA — max 12 parked players
- * - Clip cards skip player init (thumbnail only)
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { OmakasePlayer, PlayerChromingTheme, StampThemeScale } from "@byomakase/omakase-player";
@@ -29,16 +28,61 @@ function yieldToMain(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-// ─── Serialized Init Chain ───
+// ─── Priority Init Queue ───
 // OmakasePlayer constructors are heavy (Konva canvas + layers + event wiring).
-// This chain ensures only one constructor runs per browser task.
+// This queue ensures only one constructor runs per browser task, and processes
+// cards in visual order: top-to-bottom, left-to-right.
 // loadVideo() calls (network I/O) still run fully in parallel.
-let initChain = Promise.resolve();
 
-function serializeInit(): Promise<void> {
-  const ticket = initChain.then(() => yieldToMain());
-  initChain = ticket;
-  return ticket;
+interface QueueEntry {
+  id: string;
+  top: number;
+  left: number;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
+let queue: QueueEntry[] = [];
+let processing = false;
+
+async function processQueue(): Promise<void> {
+  if (processing) return;
+  processing = true;
+  try {
+    while (queue.length > 0) {
+      // Sort by visual position: top first, then left
+      queue.sort((a, b) => a.top - b.top || a.left - b.left);
+      const entry = queue.shift()!;
+      await yieldToMain();
+      entry.resolve();
+    }
+  } finally {
+    processing = false;
+    // If new entries arrived while we were finishing, restart
+    if (queue.length > 0) {
+      processQueue();
+    }
+  }
+}
+
+function enqueueInit(id: string, element: HTMLElement): Promise<void> {
+  // Remove any existing entry for this id (reject it so the old promise settles)
+  dequeueInit(id);
+
+  const rect = element.getBoundingClientRect();
+  return new Promise<void>((resolve, reject) => {
+    queue.push({ id, top: rect.top, left: rect.left, resolve, reject });
+    processQueue();
+  });
+}
+
+function dequeueInit(id: string): void {
+  const removed = queue.filter((e) => e.id === id);
+  queue = queue.filter((e) => e.id !== id);
+  // Reject removed entries so their promises don't hang forever
+  for (const entry of removed) {
+    entry.reject(new Error("dequeued"));
+  }
 }
 
 function scheduleMarkerUpdate(
@@ -214,10 +258,11 @@ export function useOmakasePlayer({
     return () => {
       isMountedRef.current = false;
       abortedRef.current = true;
+      dequeueInit(id);
       // On true unmount, park instead of destroy so the cache can reuse it
       doParkPlayer();
     };
-  }, [doParkPlayer]);
+  }, [doParkPlayer, id]);
 
   // IntersectionObserver — tracks viewport visibility for auto-load AND cleanup
   useEffect(() => {
@@ -229,7 +274,7 @@ export function useOmakasePlayer({
           setIsInViewport(entry.isIntersecting);
         });
       },
-      { rootMargin: "200px", threshold: 0.01 }
+      { rootMargin: "600px 0px", threshold: 0.01 }
     );
     observer.observe(cardContainerRef.current);
     return () => observer.disconnect();
@@ -241,16 +286,16 @@ export function useOmakasePlayer({
       abortedRef.current = true;
       doParkPlayer();
     }
-  }, [isInViewport, doParkPlayer]);
+    if (!isInViewport) {
+      // Remove from init queue if it was waiting
+      dequeueInit(id);
+    }
+  }, [isInViewport, doParkPlayer, id]);
 
   // Auto-initialize player when card enters viewport
   // Checks the LRU cache first for instant re-attach, falls back to fresh init
   useEffect(() => {
     if (!isMediaAsset || !proxyUrl || !isInViewport) return;
-
-    // Skip player init for clip cards — thumbnails only
-    const isClipCard = id.includes("_clip_");
-    if (isClipCard) return;
 
     const playerDiv = document.getElementById(playerId);
 
@@ -278,9 +323,16 @@ export function useOmakasePlayer({
 
       // ─── Fresh init ───
       const initPlayer = async () => {
-        // Wait for previous constructor to finish + yield, so only one
-        // heavy OmakasePlayer constructor runs per browser task.
-        await serializeInit();
+        // Wait in the priority queue — cards are processed in visual order
+        // (top-to-bottom, left-to-right) with one constructor per browser task.
+        const containerEl = cardContainerRef.current;
+        if (!containerEl) return;
+        try {
+          await enqueueInit(id, containerEl);
+        } catch {
+          // Dequeued (card left viewport or unmounted) — abort silently
+          return;
+        }
 
         if (abortedRef.current || !isMountedRef.current) return;
 
@@ -319,13 +371,6 @@ export function useOmakasePlayer({
           // even after React removes the container from the DOM.
           const wrapper = div.querySelector(".omakase-player") as HTMLElement | null;
           playerWrapperRef.current = wrapper;
-
-          try {
-            const videoEl = player.video.getHTMLVideoElement();
-            if (videoEl) videoEl.preload = "none";
-          } catch {
-            /* ok */
-          }
 
           setVideoLoadError(false);
 

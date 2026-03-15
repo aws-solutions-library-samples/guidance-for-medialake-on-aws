@@ -911,6 +911,7 @@ export default {
     clickToEdit: "संपादित करने के लिए क्लिक करें",
     downloadVersion: "इस संस्करण को डाउनलोड करें",
     resetMarker: "मार्कर को मूल स्थिति में रीसेट करें",
+    markerRollbackWarning: "सिंक त्रुटि के कारण मार्कर परिवर्तन वापस कर दिया गया।",
     addMarker: "मार्कर जोड़ें",
     postComment: "अपनी टिप्पणी पोस्ट करें",
     runPipeline: "वर्तमान एसेट पर यह पाइपलाइन चलाएं",

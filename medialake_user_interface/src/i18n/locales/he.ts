@@ -1073,6 +1073,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    markerRollbackWarning: "שינוי סמן בוטל עקב שגיאת סנכרון.",
     addMarker: "הוסף סמן",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",
