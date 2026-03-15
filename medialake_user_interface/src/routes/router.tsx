@@ -16,8 +16,7 @@ import { S3Explorer } from "@/features/home/S3Explorer";
 import { ExecutionsPage } from "@/features/executions";
 import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
 import ImageDetailPage from "@/pages/ImageDetailPage";
-import VideoDetailPage from "@/pages/VideoDetailPage";
-import AudioDetailPage from "@/pages/AudioDetailPage";
+import MediaDetailPage from "@/pages/MediaDetailPage";
 import ConnectorsPage from "@/pages/settings/ConnectorsPage";
 import ProfilePage from "@/pages/settings/ProfilePage";
 import UserManagement from "@/pages/settings/UserManagement";
@@ -153,7 +152,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<VideoDetailPage />}
+            element={<MediaDetailPage />}
           />
         ),
       },
@@ -162,7 +161,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<AudioDetailPage />}
+            element={<MediaDetailPage />}
           />
         ),
       },

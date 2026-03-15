@@ -906,6 +906,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    markerRollbackWarning: "A marker change was rolled back due to a sync error.",
     addMarker: "Add Marker",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",

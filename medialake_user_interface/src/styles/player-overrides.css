@@ -27,3 +27,30 @@ media-theme {
 
 /* Additional Omakase player customizations can be added here */
 /* Example: Hide specific UI elements, adjust colors, etc. */
+
+/* ===== OMAKASE MARKER TRACK STYLING ===== */
+
+/* Chroming marker track (created via createMarkerTrack) */
+omakase-marker-track {
+  min-height: 14px;
+  display: block;
+}
+
+/* Period marker styling within the chroming track */
+omakase-marker-track .omakase-period-marker {
+  border-radius: 2px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+omakase-marker-track .omakase-period-marker:hover {
+  opacity: 1;
+  cursor: grab;
+}
+
+/* Active/selected marker emphasis */
+omakase-marker-track .omakase-period-marker.selected {
+  opacity: 1;
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 1px;
+}

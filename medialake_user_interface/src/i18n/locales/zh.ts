@@ -1083,6 +1083,7 @@ export default {
     clickToEdit: "Click to edit",
     downloadVersion: "Download this version",
     resetMarker: "Reset marker to original position",
+    markerRollbackWarning: "由于同步错误，标记更改已回滚。",
     addMarker: "添加标记",
     postComment: "Post your comment",
     runPipeline: "Run this pipeline on the current asset",

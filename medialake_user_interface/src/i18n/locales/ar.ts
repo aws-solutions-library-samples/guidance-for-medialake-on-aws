@@ -902,6 +902,7 @@ export default {
     clickToEdit: "انقر للتحرير",
     downloadVersion: "تنزيل هذا الإصدار",
     resetMarker: "إعادة تعيين العلامة إلى الموضع الأصلي",
+    markerRollbackWarning: "تم التراجع عن تغيير العلامة بسبب خطأ في المزامنة.",
     addMarker: "إضافة علامة",
     postComment: "نشر تعليقك",
     runPipeline: "تشغيل خط الأنابيب هذا على الأصل الحالي",

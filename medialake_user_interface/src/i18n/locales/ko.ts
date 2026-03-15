@@ -905,6 +905,7 @@ export default {
     clickToEdit: "클릭하여 편집",
     downloadVersion: "이 버전 다운로드",
     resetMarker: "마커를 원래 위치로 재설정",
+    markerRollbackWarning: "동기화 오류로 인해 마커 변경이 롤백되었습니다.",
     addMarker: "마커 추가",
     postComment: "댓글 게시",
     runPipeline: "현재 자산에서 이 파이프라인 실행",

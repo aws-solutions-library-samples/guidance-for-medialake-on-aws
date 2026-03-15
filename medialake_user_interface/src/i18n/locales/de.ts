@@ -918,6 +918,8 @@ export default {
     clickToEdit: "Klicken zum Bearbeiten",
     downloadVersion: "Diese Version herunterladen",
     resetMarker: "Markierung auf Originalposition zurücksetzen",
+    markerRollbackWarning:
+      "Eine Marker-Änderung wurde aufgrund eines Synchronisierungsfehlers zurückgesetzt.",
     addMarker: "Markierung hinzufügen",
     postComment: "Kommentar veröffentlichen",
     runPipeline: "Dieses Pipeline auf dem aktuellen Asset ausführen",
