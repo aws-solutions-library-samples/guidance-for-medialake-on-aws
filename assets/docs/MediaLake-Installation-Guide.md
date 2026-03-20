@@ -28,6 +28,7 @@
        - `small` - Suitable for development and testing environments
        - `medium` - Recommended for moderate production workloads
        - `large` - Designed for high-volume production environments
+     - **External S3 Bucket** (`ExternalS3Bucket`) _(optional)_: Name of an external S3 bucket containing custom pipeline nodes. Leave empty if you don't have custom pipeline nodes. The bucket must already exist and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only).
 
    - **Configure Media Lake Deployment**:
      - **Source Type** (`SourceType`): **Select "Git"** (recommended default) unless specifically instructed to use S3PresignedURL:

@@ -239,6 +239,7 @@ class MediaLakeStack(cdk.Stack):
             "MediaLakeNodes",
             props=NodesStackProps(
                 iac_bucket=props.base_infrastructure.iac_assets_bucket,
+                external_nodes_bucket=config.external_nodes_bucket,
             ),
         )
 

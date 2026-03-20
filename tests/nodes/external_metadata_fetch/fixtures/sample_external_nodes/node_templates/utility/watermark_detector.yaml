@@ -1,0 +1,114 @@
+spec: v1.0.0
+node:
+  id: watermark_detector
+  title: Watermark Detector
+  description: Detect and classify visible watermarks in video frames using an external computer vision API
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/WatermarkDetectorLambdaDeployment
+        runtime: python3.12
+        timeout: 180
+        memory_size: 512
+        lambda_source_path: lambda_source/watermark_detector
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - secretsmanager:GetSecretValue
+              resources:
+                - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:medialake/*
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+actions:
+  detect:
+    summary: Detect Watermarks
+    description: Analyze video frames for visible watermarks and store detection results in the asset record
+    operationId: detectWatermarks
+    parameters:
+      - in: body
+        name: detection_api_url
+        label: Detection API URL
+        description: URL of the computer vision watermark detection endpoint
+        placeholder: "https://cv-api.example.com/v1/watermark/detect"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: secret_arn
+        label: API Credentials Secret ARN
+        description: AWS Secrets Manager ARN for the detection API credentials (must start with medialake/)
+        placeholder: "arn:aws:secretsmanager:us-east-1:123456789012:secret:medialake/cv-api-key"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: auth_type
+        label: Authentication Type
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "API Key"
+              value: "api_key"
+            - label: "Basic Authentication"
+              value: "basic_auth"
+          default: api_key
+      - in: body
+        name: sample_interval_seconds
+        label: Frame Sample Interval (seconds)
+        description: How often to sample frames for watermark detection (lower = more thorough but slower)
+        required: false
+        default: 30
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 300
+      - in: body
+        name: confidence_threshold
+        label: Confidence Threshold
+        description: Minimum confidence score (0.0-1.0) to flag a watermark as detected
+        required: false
+        default: 0.85
+        schema:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+      - in: body
+        name: max_frames
+        label: Maximum Frames to Analyze
+        description: Cap on the number of frames to analyze per asset (0 = no limit)
+        required: false
+        default: 100
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 10000
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

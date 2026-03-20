@@ -56,6 +56,12 @@ Parameters:
       - medium
       - large
 
+  ExternalS3Bucket:
+    Description: (Optional) Name of an external S3 bucket containing custom pipeline nodes. Leave empty to skip.
+    Type: String
+    Default: ''
+    MaxLength: 63
+
   ExistingVPCId:
     Description: ID of the existing VPC (e.g., vpc-0123456789abcdef0)
     Type: String
@@ -92,6 +98,7 @@ Metadata:
         Parameters:
           - MediaLakeEnvironmentName
           - OpenSearchDeploymentSize
+          - ExternalS3Bucket
       -
         Label:
           default: VPC Configuration
@@ -118,6 +125,8 @@ Metadata:
         default: Media Lake Environment Name
       OpenSearchDeploymentSize:
         default: OpenSearch Deployment Size
+      ExternalS3Bucket:
+        default: External S3 Bucket (Optional)
       ExistingVPCId:
         default: VPC ID
       ExistingVPCCIDR:
@@ -137,6 +146,7 @@ Conditions:
   IsGitSource: !Equals [!Ref SourceType, 'Git']
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
   NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
+  HasExternalS3Bucket: !Not [!Equals [!Ref ExternalS3Bucket, '']]
 
 Resources:
   # Add the Service Linked Role Manager resources first
@@ -291,6 +301,34 @@ Resources:
                   - 'kms:DescribeKey'
                   - 'kms:ListKeys'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:ListBucket'
+                  - 's3:GetBucketLocation'
+                Resource:
+                  - !Sub 'arn:aws:s3:::*'
+
+  ExternalS3BucketAccessPolicy:
+    Type: 'AWS::IAM::Policy'
+    Condition: HasExternalS3Bucket
+    Properties:
+      PolicyName: ExternalS3BucketAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ExternalS3Bucket}'
+              - !Sub 'arn:aws:s3:::${ExternalS3Bucket}/*'
+      Roles:
+        - !Ref CodeBuildServiceRole
+        - !Ref CDKDeployRole
 
   CDKDeployRole:
     Type: 'AWS::IAM::Role'
@@ -602,6 +640,7 @@ Resources:
                 - echo "$( jq --arg f "${InitialUserFirstName}" '.initial_user.first_name = $f' config.json )" > config.json
                 - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
                 - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
+                - echo "$( jq --arg b "${ExternalS3Bucket}" '.external_nodes_bucket = $b' config.json )" > config.json
                 - echo "Configuring existing VPC settings"
                 - echo "$( jq '.vpc.use_existing_vpc = true' config.json )" > config.json
                 - echo "$( jq --arg v "${ExistingVPCId}" '.vpc.existing_vpc.vpc_id = $v' config.json )" > config.json
