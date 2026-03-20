@@ -7,7 +7,7 @@ import {
   DialogActions,
   Button,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Schedule as RecentIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useSearch } from "@/api/hooks/useSearch";

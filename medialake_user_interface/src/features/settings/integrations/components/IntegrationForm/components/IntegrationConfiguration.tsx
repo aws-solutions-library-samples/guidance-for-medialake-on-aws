@@ -87,7 +87,8 @@ export const IntegrationConfiguration: React.FC<
         form.trigger();
       }, 0);
     }
-  }, [initialFormData, form, hasInitialized, lastNodeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFormData.nodeId, hasInitialized, lastNodeId]);
 
   // Reset initialization when component unmounts or form closes
   React.useEffect(() => {
@@ -101,7 +102,8 @@ export const IntegrationConfiguration: React.FC<
     // Log form state changes
     const subscription = form.watch((value) => {});
     return () => subscription.unsubscribe();
-  }, [form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = React.useCallback(
     async (data: IntegrationFormData) => {

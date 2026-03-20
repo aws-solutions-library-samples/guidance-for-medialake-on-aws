@@ -1,0 +1,116 @@
+- generic [ref=e3]:
+    - generic [ref=e6]:
+        - generic [ref=e7]:
+            - img [ref=e8]
+            - heading "Media Lake" [level=6] [ref=e10]
+        - button [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+        - list [ref=e14]:
+            - listitem [ref=e15]:
+                - button "Home" [ref=e16] [cursor=pointer]:
+                    - img [ref=e18]
+                    - paragraph [ref=e21]: Home
+            - listitem [ref=e22]:
+                - button "Assets" [active] [ref=e23] [cursor=pointer]:
+                    - img [ref=e25]
+                    - paragraph [ref=e28]: Assets
+            - listitem [ref=e29]:
+                - button "Collections" [ref=e30] [cursor=pointer]:
+                    - img [ref=e32]
+                    - paragraph [ref=e35]: Collections
+            - listitem [ref=e36]:
+                - button "Pipelines" [ref=e37] [cursor=pointer]:
+                    - img [ref=e39]
+                    - paragraph [ref=e42]: Pipelines
+            - listitem [ref=e43]:
+                - button "Pipeline Executions" [ref=e44] [cursor=pointer]:
+                    - img [ref=e46]
+                    - paragraph [ref=e49]: Pipeline Executions
+            - listitem [ref=e50]:
+                - button "Settings" [ref=e51] [cursor=pointer]:
+                    - img [ref=e53]
+                    - paragraph [ref=e56]: Settings
+                    - img [ref=e694]
+            - generic [ref=e699]:
+                - listitem [ref=e700]:
+                    - button "Connectors" [ref=e701] [cursor=pointer]:
+                        - img [ref=e703]
+                        - paragraph [ref=e706]: Connectors
+                - listitem [ref=e707]:
+                    - button "Users and Groups" [ref=e708] [cursor=pointer]:
+                        - img [ref=e710]
+                        - paragraph [ref=e713]: Users and Groups
+                - listitem [ref=e714]:
+                    - button "Permissions" [ref=e715] [cursor=pointer]:
+                        - img [ref=e717]
+                        - paragraph [ref=e720]: Permissions
+                - listitem [ref=e721]:
+                    - button "Integrations" [ref=e722] [cursor=pointer]:
+                        - img [ref=e724]
+                        - paragraph [ref=e727]: Integrations
+                - listitem [ref=e728]:
+                    - button "System Settings" [ref=e729] [cursor=pointer]:
+                        - img [ref=e731]
+                        - paragraph [ref=e734]: System Settings
+        - generic [ref=e60]:
+            - button "M Media" [ref=e62] [cursor=pointer]:
+                - generic [ref=e63]: M
+                - paragraph [ref=e64]: Media
+            - listitem [ref=e66]:
+                - generic [ref=e67]:
+                    - paragraph [ref=e68]: Theme
+                    - generic [ref=e69]:
+                        - button [ref=e70] [cursor=pointer]:
+                            - img [ref=e71]
+                        - button [ref=e73] [cursor=pointer]:
+                            - img [ref=e74]
+                        - button [ref=e76] [cursor=pointer]:
+                            - img [ref=e77]
+    - main [ref=e79]:
+        - generic [ref=e82]:
+            - generic [ref=e85]:
+                - textbox "Search (e.g., sunset)" [ref=e87]
+                - generic [ref=e88]:
+                    - generic [ref=e89]:
+                        - generic [ref=e90]: Semantic
+                        - switch "Enable semantic search" [ref=e91] [cursor=pointer]
+                    - button "Filter Results" [ref=e93] [cursor=pointer]:
+                        - img [ref=e94]
+                    - button "Search" [ref=e96] [cursor=pointer]:
+                        - img [ref=e97]
+            - generic [ref=e99]:
+                - button [ref=e100] [cursor=pointer]:
+                    - img [ref=e101]
+                - button "notifications" [ref=e103] [cursor=pointer]:
+                    - img [ref=e105]
+        - generic [ref=e822]:
+            - generic [ref=e825]:
+                - heading "Assets" [level=4] [ref=e826]
+                - paragraph [ref=e827]: Browse and manage your media assets from connected storage
+            - generic [ref=e829]:
+                - generic [ref=e830]:
+                    - button [ref=e831] [cursor=pointer]:
+                        - img [ref=e832]
+                    - generic [ref=e834]:
+                        - heading "Connectors" [level=6] [ref=e836]
+                        - generic [ref=e838]:
+                            - img [ref=e840]
+                            - textbox "Search" [ref=e842]
+                            - group
+                    - separator [ref=e843]
+                    - list [ref=e845]:
+                        - listitem [ref=e846]:
+                            - button "lne S3" [ref=e847] [cursor=pointer]:
+                                - img [ref=e849]
+                                - generic [ref=e851]:
+                                    - paragraph [ref=e852]: lne
+                                    - generic [ref=e853]: S3
+                        - listitem [ref=e854]:
+                            - button "s1 S3" [ref=e855] [cursor=pointer]:
+                                - img [ref=e857]
+                                - generic [ref=e859]:
+                                    - paragraph [ref=e860]: s1
+                                    - generic [ref=e861]: S3
+                - generic [ref=e863]:
+                    - img [ref=e864]
+                    - heading "Select a connector" [level=6] [ref=e866]

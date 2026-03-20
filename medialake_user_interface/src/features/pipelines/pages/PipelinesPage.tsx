@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, FileUpload as FileUploadIcon } from "@mui/icons-material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {

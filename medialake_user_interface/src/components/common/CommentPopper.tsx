@@ -1,6 +1,6 @@
 import React from "react";
-import { Popper } from "@mui/base/Popper";
-import { styled, css } from "@mui/system";
+import { Popper } from "@mui/material";
+import { styled, css } from "@mui/material/styles";
 import { Box, Typography, Avatar } from "@mui/material";
 
 interface CommentPopperProps {

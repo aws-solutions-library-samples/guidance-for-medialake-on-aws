@@ -606,7 +606,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
           <Box sx={{ maxHeight: 400, overflow: "auto" }}>
             <Grid container spacing={1}>
               {filteredIcons.map(([name, IconComponent]) => (
-                <Grid item key={name}>
+                <Grid key={name}>
                   <Tooltip title={name}>
                     <IconButton
                       onClick={() => handleIconSelect(name)}

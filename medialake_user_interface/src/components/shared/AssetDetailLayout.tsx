@@ -10,7 +10,7 @@
  * - Recently viewed tracking
  */
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router";
 import { Box, Paper, Tabs, Tab, alpha } from "@mui/material";
 import { useRightSidebar } from "../common/RightSidebar";
 import BreadcrumbNavigation from "../common/BreadcrumbNavigation";

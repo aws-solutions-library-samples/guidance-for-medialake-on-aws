@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router";
 import { formatDate } from "@/utils/dateFormat";
 import {
   Box,
@@ -56,7 +56,7 @@ import { type CellContext } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { zIndexTokens } from "@/theme/tokens";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import ApiStatusModal from "../components/ApiStatusModal";
 import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";

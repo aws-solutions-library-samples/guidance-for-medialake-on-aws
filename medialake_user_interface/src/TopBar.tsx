@@ -21,7 +21,7 @@ import {
   Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useChat } from "./contexts/ChatContext";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash/debounce";
 import { useTranslation } from "react-i18next";

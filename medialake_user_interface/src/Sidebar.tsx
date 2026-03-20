@@ -41,7 +41,7 @@ import {
   Folder as FolderIcon,
   Security as SecurityIcon,
 } from "@mui/icons-material";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { useTheme as useCustomTheme } from "./hooks/useTheme";
 import { useSidebar } from "./contexts/SidebarContext";
 import { ThemeToggle } from "./components/ThemeToggle";

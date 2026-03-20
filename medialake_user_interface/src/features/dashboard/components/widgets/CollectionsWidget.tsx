@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { Box } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { FolderOpen as CollectionIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import {

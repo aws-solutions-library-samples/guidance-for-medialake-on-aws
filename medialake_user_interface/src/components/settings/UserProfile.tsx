@@ -117,7 +117,7 @@ const UserProfile: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Profile Information */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper
             elevation={0}
             sx={{
@@ -145,7 +145,7 @@ const UserProfile: React.FC = () => {
             </Box>
 
             <Grid container spacing={2}>
-              <Grid item xs={12} sx={{ mb: 2 }}>
+              <Grid size={12} sx={{ mb: 2 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                   <Avatar
                     sx={{
@@ -171,7 +171,7 @@ const UserProfile: React.FC = () => {
                 </Box>
               </Grid>
 
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label={t("users.form.fields.given_name.label", "First Name")}
@@ -185,7 +185,7 @@ const UserProfile: React.FC = () => {
                   }
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label={t("users.form.fields.family_name.label", "Last Name")}
@@ -199,7 +199,7 @@ const UserProfile: React.FC = () => {
                   }
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={12}>
                 <TextField
                   fullWidth
                   label={t("users.form.fields.email.label", "Email")}
@@ -214,7 +214,7 @@ const UserProfile: React.FC = () => {
                   }
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label={t("profile.jobTitle", "Job Title")}
@@ -228,7 +228,7 @@ const UserProfile: React.FC = () => {
                   }
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label={t("profile.organization", "Organization")}
@@ -247,7 +247,7 @@ const UserProfile: React.FC = () => {
         </Grid>
 
         {/* Preferences */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper
             elevation={0}
             sx={{

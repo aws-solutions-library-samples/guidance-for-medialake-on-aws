@@ -4,11 +4,15 @@ import { Form } from "./Form";
 import { FormField } from "./FormField";
 import { FormSelect } from "./FormSelect";
 import { FormSwitch } from "./FormSwitch";
-import { FormJsonEditor } from "./FormJsonEditor";
 import { useFormWithValidation } from "../hooks/useFormWithValidation";
 import { FormDefinition, FormFieldDefinition } from "../types";
 import { createZodSchema } from "../utils/createZodSchema";
 import "zod";
+
+// Lazy-load the JSON editor to avoid pulling vanilla-jsoneditor (~200KB) into the main bundle
+const FormJsonEditor = React.lazy(() =>
+  import("./FormJsonEditor").then((m) => ({ default: m.FormJsonEditor }))
+);
 
 interface DynamicFormProps {
   definition: FormDefinition;
@@ -74,7 +78,11 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
           return <FormSwitch {...commonProps} />;
 
         case "json_editor":
-          return <FormJsonEditor {...commonProps} />;
+          return (
+            <React.Suspense key={field.name} fallback={<Box sx={{ height: 200 }} />}>
+              <FormJsonEditor {...commonProps} />
+            </React.Suspense>
+          );
 
         default:
           return <FormField {...commonProps} type={field.type} />;
@@ -89,7 +97,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
 
           if (!validatedData.success) {
             console.error("[DynamicForm] Validation failed:", validatedData.error);
-            console.error("[DynamicForm] Validation errors:", validatedData.error.errors);
+            console.error("[DynamicForm] Validation errors:", validatedData.error.issues);
             console.error("[DynamicForm] Form data that failed validation:", data);
 
             // Try to submit anyway with the original data

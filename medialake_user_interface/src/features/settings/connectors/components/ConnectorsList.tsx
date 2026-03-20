@@ -100,7 +100,7 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
       ) : (
         <Grid container spacing={3}>
           {connectors.map((connector) => (
-            <Grid item xs={12} sm={6} md={4} key={connector.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={connector.id}>
               <ConnectorCard
                 connector={connector}
                 onEdit={handleEdit}

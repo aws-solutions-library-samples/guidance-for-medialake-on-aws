@@ -1,8 +1,16 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Handle, Position, NodeProps, useReactFlow, useOnSelectionChange } from "reactflow";
+import {
+  Handle,
+  Position,
+  type NodeProps,
+  useReactFlow,
+  useOnSelectionChange,
+  type Node,
+} from "@xyflow/react";
 import { Box, Typography, IconButton, Tooltip } from "@mui/material";
-import { FaCog, FaTrash } from "react-icons/fa";
+import SettingsIcon from "@mui/icons-material/Settings";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { RotateRight } from "@mui/icons-material";
 import { colorTokens } from "@/theme/tokens";
 
@@ -140,14 +148,17 @@ export interface CustomNodeData {
   onRotate?: (id: string, rotation: number) => void;
   type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
   rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
+  [key: string]: unknown; // Index signature for @xyflow/react v12 compatibility
 }
 
-const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectable }) => {
+export type CustomFlowNode = Node<CustomNodeData, "custom">;
+
+const CustomNode: React.FC<NodeProps<CustomFlowNode>> = ({ id, data, isConnectable }) => {
   const { t } = useTranslation();
 
   // In File 1: track selection state
   const [selected, setSelected] = useState(false);
-  const { project } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
   // File 1 only: track selection using useOnSelectionChange
   const onChange = useCallback(
@@ -370,7 +381,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
         }
       }
     },
-    [id, project]
+    [id, screenToFlowPosition]
   );
 
   const isTriggerNode = data.type?.includes("TRIGGER");
@@ -509,7 +520,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
           >
             {hasConfigurableParameters() && (
               <IconButton size="small" onClick={handleConfigure} sx={{ p: 0.5 }}>
-                <FaCog size={14} />
+                <SettingsIcon sx={{ fontSize: 14 }} />
               </IconButton>
             )}
             <Tooltip
@@ -522,7 +533,7 @@ const CustomNode: React.FC<NodeProps<CustomNodeData>> = ({ id, data, isConnectab
               </IconButton>
             </Tooltip>
             <IconButton size="small" onClick={handleDelete} sx={{ p: 0.5 }}>
-              <FaTrash size={14} />
+              <DeleteOutlineIcon sx={{ fontSize: 14 }} />
             </IconButton>
           </Box>
         </Box>

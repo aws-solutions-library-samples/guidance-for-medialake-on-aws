@@ -216,10 +216,13 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ childr
     };
   }, [notifications, dismiss]);
 
+  const contextValue = React.useMemo(
+    () => ({ notifications, add, markAsSeen, dismiss, update }),
+    [notifications, add, markAsSeen, dismiss, update]
+  );
+
   return (
-    <NotificationContext.Provider value={{ notifications, add, markAsSeen, dismiss, update }}>
-      {children}
-    </NotificationContext.Provider>
+    <NotificationContext.Provider value={contextValue}>{children}</NotificationContext.Provider>
   );
 };
 

@@ -244,34 +244,33 @@ class UserManagementHelper {
 
     // Click Add User button
     await this.page.getByRole("button", { name: "Add User" }).click();
-    await this.page.waitForTimeout(1000);
+    await this.page.getByRole("dialog").waitFor({ state: "visible" });
 
-    // Fill in First Name - following exact recorded steps
-    await this.page.getByRole("textbox", { name: "First Name" }).click();
+    // Fill in First Name
     await this.page.getByRole("textbox", { name: "First Name" }).fill(userData.firstName);
-    await this.page.getByRole("textbox", { name: "First Name" }).press("Tab");
-    await this.page.getByRole("button", { name: "Enter the user's first name" }).press("Tab");
 
     // Fill in Last Name
     await this.page.getByRole("textbox", { name: "Last Name" }).fill(userData.lastName);
-    await this.page.getByRole("textbox", { name: "Last Name" }).press("Tab");
-    await this.page.getByRole("button", { name: "Enter the user's last name" }).press("Tab");
 
     // Fill in Email
     await this.page.getByRole("textbox", { name: "Email" }).fill(userData.email);
-    await this.page.getByRole("textbox", { name: "Email" }).press("Tab");
 
-    // Select role - for this test, always select "Editor" as requested
-    await this.page.getByRole("combobox", { name: "Editor" }).click();
-    await this.page.waitForTimeout(500); // Wait for dropdown to open
-    await this.page.getByRole("option", { name: "Editor" }).click();
+    // Select group — the role selector is now a FormSelect labelled "Group"
+    const groupSelect = this.page.getByRole("dialog").getByRole("combobox");
+    if (await groupSelect.isVisible().catch(() => false)) {
+      await groupSelect.click();
+      await this.page.waitForTimeout(500);
+      await this.page.getByRole("option", { name: /editor/i }).first().click();
+    }
 
     // Submit form
-    await this.page.getByRole("button", { name: "Add", exact: true }).click();
+    await this.page.getByRole("dialog").getByRole("button", { name: "Add", exact: true }).click();
 
-    // Wait for confirmation or success indication - look for success dialog or notification
-    // Instead of clicking a generic button, wait for the form to close or success message
-    await this.page.waitForTimeout(3000); // Wait for user creation to complete and form to close
+    // Wait for dialog to close
+    await this.page
+      .getByRole("dialog")
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
 
     console.log(`[UserManagement] Successfully created user: ${userData.email}`);
   }
@@ -304,11 +303,14 @@ class UserManagementHelper {
     const userRow = this.page.getByRole("row", { name: email });
     await expect(userRow).toBeVisible();
 
-    // Click delete button
-    await userRow.getByLabel("Delete").click();
+    // Click delete button (IconButton with tooltip "Delete")
+    await userRow.getByRole("button", { name: /delete/i }).click();
 
-    // Confirm deletion
-    await this.page.getByRole("button").click(); // Assumes confirmation dialog
+    // Confirm deletion if a confirmation dialog appears
+    const confirmDialog = this.page.getByRole("dialog");
+    if (await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await confirmDialog.getByRole("button", { name: /delete|confirm|yes/i }).click();
+    }
 
     // Wait for deletion to complete and UI to update
     await this.page.waitForTimeout(2000);

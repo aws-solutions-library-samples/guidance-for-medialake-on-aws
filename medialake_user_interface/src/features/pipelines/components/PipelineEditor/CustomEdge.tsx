@@ -1,10 +1,27 @@
 import React, { useCallback } from "react";
-import { EdgeLabelRenderer, EdgeProps, Position, useReactFlow } from "reactflow";
+import {
+  EdgeLabelRenderer,
+  type EdgeProps,
+  type Edge,
+  Position,
+  useReactFlow,
+} from "@xyflow/react";
 import { Box, Typography } from "@mui/material";
 import { FlashOn } from "@mui/icons-material";
 import { colorTokens } from "@/theme/tokens";
 
 type Nudge = { along?: number; perp?: number };
+
+interface CustomEdgeData {
+  sourcePad?: number;
+  sourcePerp?: number;
+  targetPad?: number;
+  targetPerp?: number;
+  text?: string;
+  [key: string]: unknown;
+}
+
+type CustomFlowEdge = Edge<CustomEdgeData, "custom">;
 
 const adjustPoint = (
   x: number,
@@ -72,7 +89,7 @@ const computeControlPoints = (
   return { c1x, c1y, c2x, c2y };
 };
 
-const CustomEdge: React.FC<EdgeProps> = ({
+const CustomEdge: React.FC<EdgeProps<CustomFlowEdge>> = ({
   id,
   source,
   sourceX,

@@ -8,6 +8,8 @@ import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 // Import and initialize i18next configuration
 import "./i18n/i18n";
 
+import "./styles/player-overrides.css";
+
 // Create a loading component that uses translations
 const LoadingFallback = () => {
   const { t } = useTranslation();
@@ -73,4 +75,7 @@ const App = () => {
 };
 
 // Render the app
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<App />);
+}

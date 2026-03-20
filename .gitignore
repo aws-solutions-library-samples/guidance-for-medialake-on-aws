@@ -69,6 +69,8 @@ CLAUDE.md
 # Playwrght testing
 playwright-report/
 test-results/
+blob-report/
+playwright/.cache/
 
 # OS generated files
 .DS_Store

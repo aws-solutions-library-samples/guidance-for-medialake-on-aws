@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 export type FormConfig<T extends FieldValues> = {
   defaultValues?: DefaultValues<T>;
-  validationSchema?: z.Schema<T>;
+  validationSchema?: z.ZodTypeAny;
   mode?: UseFormProps["mode"];
   reValidateMode?: UseFormProps["reValidateMode"];
   translationPrefix?: string;
@@ -24,11 +24,11 @@ export const useFormWithValidation = <T extends FieldValues>(config: FormConfig<
   // Create a custom resolver that translates error messages
   const resolver = validationSchema
     ? zodResolver(validationSchema, {
-        errorMap: (error, ctx) => {
+        errorMap: (error: any, ctx: any) => {
           const message = error.message;
           // If we have a translation prefix, try to find a translated message
           if (translationPrefix) {
-            const fieldPath = (ctx as any).data ? Object.keys(ctx.data)[0] : "";
+            const fieldPath = ctx.data ? Object.keys(ctx.data)[0] : "";
             const errorType = error.code.toLowerCase();
             const translationKey = `${translationPrefix}.errors.${fieldPath}.${errorType}`;
             const translatedMessage = t(translationKey, {
@@ -39,22 +39,17 @@ export const useFormWithValidation = <T extends FieldValues>(config: FormConfig<
           }
           return { message };
         },
-      })
+      } as any)
     : undefined;
 
   const methods = useForm<T>({
     defaultValues,
-    resolver,
+    resolver: resolver as any,
     mode,
     reValidateMode,
   });
 
-  return {
-    ...methods,
-    isValid: methods.formState.isValid,
-    isDirty: methods.formState.isDirty,
-    errors: methods.formState.errors,
-  };
+  return methods;
 };
 
 // Common Zod validators with i18n support
