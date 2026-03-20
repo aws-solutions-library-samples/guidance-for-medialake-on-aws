@@ -501,7 +501,7 @@ Resources:
         Type: CODEPIPELINE
       Environment:
         Type: LINUX_CONTAINER
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: BUILD_GENERAL1_MEDIUM
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         EnvironmentVariables:
           - Name: GIT_REPOSITORY_URL
@@ -513,27 +513,11 @@ Resources:
         BuildSpec: !Sub |
           version: 0.2
           phases:
-            install:
-              runtime-versions:
-                python: 3.12
-              commands:
-                - 'echo "Installing git"'
-                - 'yum update -y'
-                - 'yum install -y git'
             build:
               commands:
-                - 'echo "Cloning repository from $GIT_REPOSITORY_URL"'
-                - 'echo "Branch: $GIT_BRANCH"'
+                - 'echo "Cloning repository from $GIT_REPOSITORY_URL branch $GIT_BRANCH"'
                 - 'git clone --depth 1 --branch $GIT_BRANCH $GIT_REPOSITORY_URL source/'
-                - 'echo "Listing cloned content structure"'
-                - 'find source -type d | sort'
-                - 'echo "Copying files to working directory"'
                 - 'cp -r source/* .'
-                - 'echo "Directory structure after copy"'
-                - 'find . -maxdepth 3 -type d | sort'
-            post_build:
-              commands:
-                - 'echo "Git clone completed"'
           artifacts:
             files:
               - "**/*"
@@ -559,38 +543,30 @@ Resources:
         BuildSpec: !Sub |
           version: 0.2
           phases:
-            install:
-              runtime-versions:
-                python: 3.12
             build:
               commands:
                 - 'echo "Downloading source code from presigned URL"'
                 - 'curl -L "${S3PresignedURL}" -o source-code.zip'
                 - 'mkdir -p source'
                 - 'unzip -o source-code.zip -d source/'
-                - 'echo "Listing downloaded content structure"'
-                - 'find source -type d | sort'
-                - 'echo "Copying files to working directory"'
                 - 'cp -r source/* .'
-                - 'echo "Directory structure after copy"'
-                - 'find . -maxdepth 3 -type d | sort'
-            post_build:
-              commands:
-                - 'echo "Download completed"'
           artifacts:
             files:
               - '**/*'
               - '!source-code.zip'
               - '!source/**/*'
 
-  BuildProject:
+  BuildAndDeployProject:
     Type: 'AWS::CodeBuild::Project'
     DependsOn: ServiceLinkedRoleManager
     Properties:
-      Name: 'MediaLakeCDKPipeline-BuildProject'
-      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Name: 'MediaLakeCDKPipeline-BuildAndDeploy'
+      ServiceRole: !GetAtt CDKDeployRole.Arn
       Artifacts:
         Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/build-cache'
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
@@ -605,6 +581,19 @@ Resources:
               CI: CODEBUILD
               CDK_DEFAULT_ACCOUNT: ${AWS::AccountId}
               CDK_DEFAULT_REGION: ${AWS::Region}
+          cache:
+            paths:
+              # Node.js dependency caches
+              - 'medialake_user_interface/node_modules/**/*'
+              - '/root/.npm/**/*'
+              # Python dependency cache
+              - '/root/.cache/pip/**/*'
+              # Native layer output caches - skip rebuild if output already exists
+              - 'dist/lambdas/layers/ffprobe/**/*'
+              - 'dist/lambdas/layers/ffmpeg/**/*'
+              - 'dist/lambdas/layers/resvg/**/*'
+              - 'dist/lambdas/layers/numpy/**/*'
+              - 'dist/lambdas/layers/openexr/**/*'
           phases:
             install:
               runtime-versions:
@@ -663,76 +652,48 @@ Resources:
                 - echo "Build output directory $BUILD_DIR"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
                 - mkdir -p assets
-                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build from $FRONTEND_DIR/$BUILD_DIR to $CDK_DIR/assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
+                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
+                # Native layers first - skip if cached output exists
+                - echo "Building FFprobe"
+                - if [ -d "dist/lambdas/layers/ffprobe/bin" ]; then echo "FFprobe layer cached, skipping"; else bash .cicd/build_ffprobe.sh; fi
+                - echo "Building FFmpeg"
+                - if [ -d "dist/lambdas/layers/ffmpeg/bin" ]; then echo "FFmpeg layer cached, skipping"; else bash .cicd/build_ffmpeg.sh; fi
+                - echo "Building RSSVG"
+                - if [ -d "dist/lambdas/layers/resvg/bin" ]; then echo "Resvg layer cached, skipping"; else bash .cicd/build_resvg.sh; fi
+                - echo "Building NumPy layer"
+                - if [ -d "dist/lambdas/layers/numpy/python" ]; then echo "NumPy layer cached, skipping"; else bash .cicd/build_numpy.sh; fi
+                - echo "Building OpenEXR layer"
+                - if [ -d "dist/lambdas/layers/openexr/python" ]; then echo "OpenEXR layer cached, skipping"; else bash .cicd/build_openexr.sh; fi
+                # Lambda functions and Python layers (preserves native layers during clean)
                 - echo "Building Lambda functions"
                 - python3 .cicd/build_lambdas.py build
-                - echo "Building FFprobe"
-                - bash .cicd/build_ffprobe.sh
-                - echo "Building FFmpeg"
-                - bash .cicd/build_ffmpeg.sh
-                - echo "Building RSSVG"
-                - bash .cicd/build_resvg.sh
-                - echo "Building NumPy layer"
-                - bash .cicd/build_numpy.sh
-                - echo "Building OpenEXR layer"
-                - bash .cicd/build_openexr.sh
-                - echo "CDK synthesis"
-                - cdk synth || (echo "CDK synth failed" && exit 1)
+                - echo "Checking CDK bootstrap status"
+                - |
+                  # Check bootstrap directly via SSM instead of running cdk bootstrap (which triggers a full synth)
+                  BOOTSTRAP_VERSION=$(aws ssm get-parameter --name "/cdk-bootstrap/hnb659fds/version" --region ${AWS::Region} --query "Parameter.Value" --output text 2>/dev/null || echo "NOT_FOUND")
+                  if [ "$BOOTSTRAP_VERSION" = "NOT_FOUND" ]; then
+                    echo "CDK not bootstrapped in ${AWS::Region}, bootstrapping now"
+                    cdk bootstrap aws://${AWS::AccountId}/${AWS::Region}
+                  else
+                    echo "CDK already bootstrapped in ${AWS::Region} (version $BOOTSTRAP_VERSION)"
+                  fi
+                - |
+                  if [ "${AWS::Region}" != "us-east-1" ]; then
+                    BOOTSTRAP_VERSION_USE1=$(aws ssm get-parameter --name "/cdk-bootstrap/hnb659fds/version" --region us-east-1 --query "Parameter.Value" --output text 2>/dev/null || echo "NOT_FOUND")
+                    if [ "$BOOTSTRAP_VERSION_USE1" = "NOT_FOUND" ]; then
+                      echo "CDK not bootstrapped in us-east-1, bootstrapping for CloudFront WAF"
+                      cdk bootstrap aws://${AWS::AccountId}/us-east-1
+                    else
+                      echo "CDK already bootstrapped in us-east-1 (version $BOOTSTRAP_VERSION_USE1)"
+                    fi
+                  fi
+                - echo "Synthesizing CDK stacks"
+                - cdk synth
+                - echo "Deploying CDK stacks"
+                - cdk deploy --all --app cdk.out --require-approval never --concurrency 3 || (echo "CDK deploy failed" && exit 1)
             post_build:
               commands:
-                - echo "Build completed"
-          artifacts:
-            files:
-              - "**/*"
-            base-directory: '.'
-      TimeoutInMinutes: 180
-
-  DeployProject:
-    Type: 'AWS::CodeBuild::Project'
-    DependsOn: ServiceLinkedRoleManager
-    Properties:
-      Name: 'MediaLakeCDKPipeline-DeployProject'
-      ServiceRole: !GetAtt CDKDeployRole.Arn
-      Artifacts:
-        Type: CODEPIPELINE
-      Environment:
-        Type: LINUX_CONTAINER
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
-      Source:
-        Type: CODEPIPELINE
-        BuildSpec: !Sub |
-          version: 0.2
-          env:
-            variables:
-              CI: CODEBUILD
-              CDK_DEFAULT_ACCOUNT: ${AWS::AccountId}
-              CDK_DEFAULT_REGION: ${AWS::Region}
-          phases:
-            install:
-              runtime-versions:
-                python: 3.12
-                nodejs: 20
-              commands:
-                - echo Installing dependencies
-                - npm install -g aws-cdk
-                - pip install -U pip
-                - echo "Locating CDK directory"
-                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
-                - echo "CDK directory $CDK_DIR"
-                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
-                - cd $CDK_DIR
-                - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-            build:
-              commands:
-                - echo Deploying CDK stacks
-                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                - cdk bootstrap
-                - 'if [ "${AWS::Region}" != "us-east-1" ]; then echo "Also bootstrapping us-east-1 for CloudFront WAF deployment"; cdk bootstrap aws://${AWS::AccountId}/us-east-1; fi'
-                - cdk deploy --all --require-approval never || (echo "CDK deploy failed" && exit 1)
-            post_build:
-              commands:
-                - echo Deployment completed
+                - echo "Build and deploy completed"
           artifacts:
             files:
               - "**/*"
@@ -746,8 +707,7 @@ Resources:
     DependsOn:
       - InitialSourcePackage
       - GitCloneProject
-      - BuildProject
-      - DeployProject
+      - BuildAndDeployProject
     Properties:
       Name: MediaLakeCDKPipeline
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
@@ -785,32 +745,19 @@ Resources:
               OutputArtifacts:
                 - Name: SourceCode
 
-        - Name: Build
+        - Name: BuildAndDeploy
           Actions:
-            - Name: BuildCode
+            - Name: BuildAndDeployCDK
               ActionTypeId:
                 Category: Build
                 Owner: AWS
                 Provider: CodeBuild
                 Version: '1'
               Configuration:
-                ProjectName: !Ref BuildProject
+                ProjectName: !Ref BuildAndDeployProject
               InputArtifacts:
                 - Name: SourceCode
               OutputArtifacts:
-                - Name: BuildOutput
-
-        - Name: Deploy
-          Actions:
-            - Name: DeployCDK
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref DeployProject
-              InputArtifacts:
                 - Name: BuildOutput
 
   # Pipeline with S3 PresignedURL Source
@@ -820,8 +767,7 @@ Resources:
     DependsOn:
       - InitialSourcePackage
       - DownloadSourceProject
-      - BuildProject
-      - DeployProject
+      - BuildAndDeployProject
     Properties:
       Name: MediaLakeCDKPipeline
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
@@ -859,32 +805,19 @@ Resources:
               OutputArtifacts:
                 - Name: SourceCode
 
-        - Name: Build
+        - Name: BuildAndDeploy
           Actions:
-            - Name: BuildCode
+            - Name: BuildAndDeployCDK
               ActionTypeId:
                 Category: Build
                 Owner: AWS
                 Provider: CodeBuild
                 Version: '1'
               Configuration:
-                ProjectName: !Ref BuildProject
+                ProjectName: !Ref BuildAndDeployProject
               InputArtifacts:
                 - Name: SourceCode
               OutputArtifacts:
-                - Name: BuildOutput
-
-        - Name: Deploy
-          Actions:
-            - Name: DeployCDK
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref DeployProject
-              InputArtifacts:
                 - Name: BuildOutput
 
   # Custom resource to empty the S3 bucket on deletion
