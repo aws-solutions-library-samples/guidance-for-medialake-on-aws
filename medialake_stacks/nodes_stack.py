@@ -14,10 +14,13 @@ video processing, audio processing, integrations) is deployed as a separate Lamb
 function with appropriate layers and permissions.
 """
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 import aws_cdk as cdk
+import yaml
 from aws_cdk import CustomResource, RemovalPolicy, Tags
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
@@ -28,6 +31,9 @@ from constructs import Construct
 
 from config import config
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
+from medialake_constructs.shared_constructs.external_nodes_synth_helper import (
+    ExternalNodesSynthHelper,
+)
 from medialake_constructs.shared_constructs.lam_deployment import LambdaDeployment
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.lambda_layers import (
@@ -56,9 +62,11 @@ class NodesStackProps:
 
     Attributes:
         iac_bucket: S3 bucket for infrastructure-as-code assets and Lambda deployments
+        external_nodes_bucket: Optional S3 bucket name containing external node definitions
     """
 
     iac_bucket: s3.IBucket
+    external_nodes_bucket: Optional[str] = None
 
 
 class NodesStack(cdk.NestedStack):
@@ -102,10 +110,27 @@ class NodesStack(cdk.NestedStack):
 
         # Deploy node templates and configurations to S3
         # These templates define the structure and behavior of pipeline nodes
+        bucket_deployment_sources = [
+            s3deploy.Source.asset("s3_bucket_assets/pipeline_nodes")
+        ]
+
+        # If external nodes bucket is configured, stage templates locally during synth
+        # and use Source.asset instead of Source.bucket (which expects a ZIP key, not a prefix)
+        if props.external_nodes_bucket:
+            external_helper = ExternalNodesSynthHelper(
+                bucket_name=props.external_nodes_bucket,
+                built_in_node_ids=set(),  # Populated later before run()
+                built_in_construct_ids=set(),  # Populated later before run()
+            )
+            external_helper.stage_templates()
+            bucket_deployment_sources.append(
+                s3deploy.Source.asset(external_helper.templates_staging_path)
+            )
+
         bucket_deployment = s3deploy.BucketDeployment(
             self,
             "DeployAssets",
-            sources=[s3deploy.Source.asset("s3_bucket_assets/pipeline_nodes")],
+            sources=bucket_deployment_sources,
             destination_bucket=self._pipelines_nodes_bucket.bucket,
             retain_on_delete=config.environment
             == "prod",  # Retain templates in production
@@ -333,6 +358,49 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "external_metadata_fetch"],
         )
 
+        # ========================================
+        # External Nodes Integration
+        # ========================================
+        external_lambda_deployments = []
+        if props.external_nodes_bucket:
+            # Collect built-in node IDs from YAML templates
+            built_in_node_ids = set()
+            templates_dir = "s3_bucket_assets/pipeline_nodes/node_templates"
+            for root, _dirs, files in os.walk(templates_dir):
+                for fname in files:
+                    if not fname.endswith((".yaml", ".yml")):
+                        continue
+                    try:
+                        with open(os.path.join(root, fname), "r") as f:
+                            data = yaml.safe_load(f)
+                        node_id = data.get("node", {}).get("id")
+                        if node_id:
+                            built_in_node_ids.add(node_id)
+                    except (yaml.YAMLError, KeyError, TypeError, AttributeError):
+                        continue
+
+            # Derive built-in construct IDs from actual LambdaDeployment instances
+            built_in_construct_ids = {
+                child.id
+                for child in self.node.children
+                if isinstance(child, LambdaDeployment)
+            }
+
+            # Populate collision-check sets on the helper created earlier for template staging
+            external_helper.built_in_node_ids = built_in_node_ids
+            external_helper.built_in_construct_ids = built_in_construct_ids
+            external_descriptors = external_helper.run()
+
+            for descriptor in external_descriptors:
+                ext_deploy = LambdaDeployment(
+                    self,
+                    descriptor.construct_id,
+                    destination_bucket=props.iac_bucket.bucket,
+                    parent_folder=descriptor.parent_folder,
+                    source_path=descriptor.local_staging_path,
+                )
+                external_lambda_deployments.append(ext_deploy)
+
         # Create DynamoDB table for nodes
         self._pipelines_nodes_table = DynamoDB(
             self,
@@ -458,8 +526,8 @@ class NodesStack(cdk.NestedStack):
         self._pipelines_nodes_bucket.bucket.grant_read(
             self._nodes_processor_lambda.function
         )
-        # Write access to populate node definitions in DynamoDB
-        self._pipelines_nodes_table.table.grant_write_data(
+        # Read+write access for node definitions, registry queries, and stale-node cleanup
+        self._pipelines_nodes_table.table.grant_read_write_data(
             self._nodes_processor_lambda.function
         )
 
@@ -491,6 +559,8 @@ class NodesStack(cdk.NestedStack):
         # 3. Then custom resource can process templates
         self.resource.node.add_dependency(bucket_deployment)
         self.resource.node.add_dependency(self._pipelines_nodes_table.table)
+        for ext_deploy in external_lambda_deployments:
+            self.resource.node.add_dependency(ext_deploy.deployment)
 
         # ========================================
         # MediaConvert Resources

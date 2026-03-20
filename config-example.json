@@ -70,5 +70,6 @@
     },
     "use_existing_vpc": false
   },
-  "video_download_enabled": true
+  "video_download_enabled": true,
+  "external_nodes_bucket": "my-custom-pipeline-nodes"
 }

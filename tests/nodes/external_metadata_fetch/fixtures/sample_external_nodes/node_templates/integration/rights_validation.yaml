@@ -1,0 +1,131 @@
+spec: v1.0.0
+node:
+  id: rights_validation
+  title: Rights Validation
+  description: Validate asset distribution rights against an external rights management system and attach clearance status
+  version: 1.0.0
+  type: integration
+  integration:
+    config:
+      lambda:
+        handler: integration/RightsValidationLambdaDeployment
+        runtime: python3.12
+        timeout: 60
+        lambda_source_path: lambda_source/rights_validation
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - secretsmanager:GetSecretValue
+              resources:
+                - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:medialake/*
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - arn:aws:kms:${AWS_REGION}:${ACCOUNT_ID}:key/*
+            - effect: Allow
+              actions:
+                - events:PutEvents
+              resources:
+                - arn:aws:events:${AWS_REGION}:${ACCOUNT_ID}:event-bus/${PIPELINES_EVENT_BUS_NAME}
+actions:
+  validate_rights:
+    summary: Validate Distribution Rights
+    description: Query an external rights management system to verify distribution clearance for the asset
+    operationId: validateDistributionRights
+    parameters:
+      - in: body
+        name: rights_api_url
+        label: Rights API Base URL
+        description: Base URL of the rights management REST API
+        placeholder: "https://rights.example.com/api/v1"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: auth_type
+        label: Authentication Type
+        description: Authentication method for the rights API
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "OAuth2 Client Credentials"
+              value: "oauth2_client_credentials"
+            - label: "API Key"
+              value: "api_key"
+            - label: "Basic Authentication"
+              value: "basic_auth"
+          default: oauth2_client_credentials
+      - in: body
+        name: secret_arn
+        label: Credentials Secret ARN
+        description: AWS Secrets Manager ARN for rights API credentials (must start with medialake/)
+        placeholder: "arn:aws:secretsmanager:us-east-1:123456789012:secret:medialake/rights-api-creds"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: auth_endpoint
+        label: Authentication Endpoint
+        description: OAuth2 token endpoint URL (required for OAuth2 auth type)
+        placeholder: "https://rights.example.com/oauth/token"
+        required: false
+        schema:
+          type: string
+        showWhen:
+          field: parameters.auth_type
+          value: oauth2_client_credentials
+      - in: body
+        name: territory_codes
+        label: Territory Codes
+        description: Comma-separated ISO 3166-1 alpha-2 territory codes to validate rights for
+        placeholder: "US,CA,GB"
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: platform_ids
+        label: Platform IDs
+        description: Comma-separated platform identifiers to check distribution rights against
+        placeholder: "streaming,broadcast,svod"
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: rights_window_days
+        label: Rights Window (days)
+        description: Number of days into the future to check rights availability
+        required: false
+        default: 90
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 730
+      - in: body
+        name: block_on_failure
+        label: Block Pipeline on Failure
+        description: Whether to halt the pipeline if rights validation fails or rights are not cleared
+        required: false
+        default: true
+        schema:
+          type: boolean
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]
