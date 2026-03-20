@@ -297,13 +297,23 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthenticated]);
 
-  // Context value - ensure we stay in loading state until permissions are fully initialized
-  const value = {
-    ability,
-    loading: authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
-    error: null,
-    refreshPermissions,
-  };
+  // Context value — memoized to prevent unnecessary re-renders of all permission consumers
+  const value = React.useMemo(
+    () => ({
+      ability,
+      loading: authLoading || !isInitialized || (isAuthenticated && !permissionsInitialized),
+      error: null,
+      refreshPermissions,
+    }),
+    [
+      ability,
+      authLoading,
+      isInitialized,
+      isAuthenticated,
+      permissionsInitialized,
+      refreshPermissions,
+    ]
+  );
 
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }

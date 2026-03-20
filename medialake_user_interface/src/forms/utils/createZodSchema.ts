@@ -74,7 +74,7 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
     parameters:
       Object.keys(parametersShape).length > 0
         ? z.object(parametersShape).passthrough()
-        : z.record(z.any()).optional(),
+        : z.record(z.string(), z.any()).optional(),
   };
 
   const schema = z.object(finalShape).passthrough();

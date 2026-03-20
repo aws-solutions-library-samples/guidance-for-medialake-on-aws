@@ -144,7 +144,7 @@ const ProfilePage: React.FC = () => {
 
         <Grid container spacing={3}>
           {/* Profile Overview */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Paper sx={{ p: 3, textAlign: "center" }}>
               <UserAvatar
                 size={120}
@@ -175,7 +175,7 @@ const ProfilePage: React.FC = () => {
           </Grid>
 
           {/* Profile Details */}
-          <Grid item xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ textAlign: isRTL ? "right" : "left" }}>
                 {t("profile.title", "Profile")}

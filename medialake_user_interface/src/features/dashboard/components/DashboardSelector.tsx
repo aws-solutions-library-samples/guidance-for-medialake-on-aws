@@ -270,16 +270,17 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
             />
           </MenuItem>
         ) : presets.length > 0 ? (
-          <>
-            <Divider sx={{ my: 0.5 }} />
+          [
+            <Divider key="presets-divider" sx={{ my: 0.5 }} />,
             <Typography
+              key="presets-label"
               variant="caption"
               color="text.secondary"
               sx={{ px: 1.5, py: 0.25, display: "block", fontSize: "0.7rem" }}
             >
               {t("dashboard.selector.savedDashboards", "Saved Dashboards")}
-            </Typography>
-            {presets.map((preset) => (
+            </Typography>,
+            ...presets.map((preset) => (
               <MenuItem
                 key={preset.presetId}
                 onClick={() => handlePresetSelect(preset)}
@@ -303,8 +304,8 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
                   secondaryTypographyProps={{ variant: "caption" }}
                 />
               </MenuItem>
-            ))}
-          </>
+            )),
+          ]
         ) : null}
 
         <Divider sx={{ my: 0.5 }} />
@@ -349,26 +350,24 @@ export const DashboardSelector: React.FC<DashboardSelectorProps> = ({ className 
         </MenuItem>
 
         {/* Save as Default Dashboard - only visible to users with defaultDashboard:edit permission */}
-        {canEditDefaultDashboard && (
-          <>
-            <Divider sx={{ my: 0.5 }} />
-            <MenuItem onClick={handleSaveAsDefault} disabled={isSavingDefault}>
-              <ListItemIcon sx={{ minWidth: 28 }}>
-                {isSavingDefault ? (
-                  <CircularProgress size={14} />
-                ) : (
-                  <AdminIcon sx={{ fontSize: 16 }} color="primary" />
-                )}
-              </ListItemIcon>
-              <ListItemText
-                primary={t("dashboard.selector.saveAsDefault", "Save as Default Dashboard")}
-                secondary={t("dashboard.selector.saveAsDefaultDescription", "Set for all users")}
-                primaryTypographyProps={{ variant: "body2" }}
-                secondaryTypographyProps={{ variant: "caption", color: "primary" }}
-              />
-            </MenuItem>
-          </>
-        )}
+        {canEditDefaultDashboard && [
+          <Divider key="default-divider" sx={{ my: 0.5 }} />,
+          <MenuItem key="save-as-default" onClick={handleSaveAsDefault} disabled={isSavingDefault}>
+            <ListItemIcon sx={{ minWidth: 28 }}>
+              {isSavingDefault ? (
+                <CircularProgress size={14} />
+              ) : (
+                <AdminIcon sx={{ fontSize: 16 }} color="primary" />
+              )}
+            </ListItemIcon>
+            <ListItemText
+              primary={t("dashboard.selector.saveAsDefault", "Save as Default Dashboard")}
+              secondary={t("dashboard.selector.saveAsDefaultDescription", "Set for all users")}
+              primaryTypographyProps={{ variant: "body2" }}
+              secondaryTypographyProps={{ variant: "caption", color: "primary" }}
+            />
+          </MenuItem>,
+        ]}
 
         {/* Preset count indicator */}
         <Box sx={{ px: 1.5, py: 0.75, display: "flex", justifyContent: "center" }}>

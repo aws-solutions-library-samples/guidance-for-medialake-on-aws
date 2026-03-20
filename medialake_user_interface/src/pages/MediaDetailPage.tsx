@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useMediaController } from "../hooks/useMediaController";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { Box, CircularProgress, Typography, Paper, Tabs, Tab, alpha } from "@mui/material";
 import {
   useAsset,

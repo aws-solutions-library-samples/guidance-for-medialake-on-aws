@@ -209,7 +209,7 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
         <InputLabel id="group-filter-label">
           {t("dashboard.widgets.collections.filterByGroups", "Filter by Groups")}
         </InputLabel>
-        <Select
+        <Select<string[]>
           labelId="group-filter-label"
           id="group-filter-select"
           multiple

@@ -1,6 +1,6 @@
 // src/permissions/components/PermissionGuard.tsx
 import React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router";
 import { usePermission } from "../hooks/usePermission";
 import { useAuth } from "../../common/hooks/auth-context";
 import { Actions, Subjects } from "../types/ability.types";

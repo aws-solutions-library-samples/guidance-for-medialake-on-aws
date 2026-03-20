@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Box, Typography, Paper } from "@mui/material";
 import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
 import { TreeViewBaseItem } from "@mui/x-tree-view/models";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useGetCollections, Collection } from "@/api/hooks/useCollections";
 
 interface CollectionTreeViewProps {

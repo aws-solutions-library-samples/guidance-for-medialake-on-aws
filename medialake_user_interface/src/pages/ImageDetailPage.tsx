@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Box, CircularProgress, Typography, Paper, Button, Tabs, Tab, alpha } from "@mui/material";
 import { useAsset, useRelatedVersions, RelatedVersionsResponse } from "../api/hooks/useAssets";

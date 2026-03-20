@@ -1,7 +1,8 @@
 import React, { useCallback } from "react";
-import { Handle, Position, NodeProps, useReactFlow } from "reactflow";
+import { Handle, Position, type NodeProps, useReactFlow, type Node } from "@xyflow/react";
 import { Box, Typography, IconButton } from "@mui/material";
-import { FaCog, FaTrash } from "react-icons/fa";
+import SettingsIcon from "@mui/icons-material/Settings";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { CustomNodeData } from "./CustomNode";
 import { colorTokens } from "@/theme/tokens";
 
@@ -10,10 +11,13 @@ const HANDLE_CONNECT_RADIUS = 50;
 // We're extending CustomNodeData to ensure compatibility
 export interface JobStatusNodeData extends CustomNodeData {
   // Additional props specific to job status node can be added here
+  [key: string]: unknown;
 }
 
-const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isConnectable }) => {
-  const { project } = useReactFlow();
+export type JobStatusFlowNode = Node<JobStatusNodeData, "jobStatus">;
+
+const JobStatusNode: React.FC<NodeProps<JobStatusFlowNode>> = ({ id, data, isConnectable }) => {
+  const { screenToFlowPosition } = useReactFlow();
 
   const handleDelete = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -58,7 +62,7 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         }
       }
     },
-    [id, project]
+    [id, screenToFlowPosition]
   );
 
   return (
@@ -132,10 +136,10 @@ const JobStatusNode: React.FC<NodeProps<JobStatusNodeData>> = ({ id, data, isCon
         </Box>
         <Box sx={{ display: "flex", gap: 0.5, ml: 0.5 }}>
           <IconButton size="small" onClick={handleConfigure} sx={{ p: 0.5 }}>
-            <FaCog size={14} />
+            <SettingsIcon sx={{ fontSize: 14 }} />
           </IconButton>
           <IconButton size="small" onClick={handleDelete} sx={{ p: 0.5 }}>
-            <FaTrash size={14} />
+            <DeleteIcon sx={{ fontSize: 14 }} />
           </IconButton>
         </Box>
       </Box>

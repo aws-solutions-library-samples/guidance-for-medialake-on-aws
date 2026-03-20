@@ -203,8 +203,18 @@ test.describe("Pipeline Import & Deploy", () => {
       expect(nodeCount).toBeGreaterThan(0);
 
       // 7. Save
+      //    In production builds MUI strips data-testid from icons, so we
+      //    cannot rely on [data-testid="SaveIcon"]. Use a locator that
+      //    works in both compact mode (IconButton inside "Save" tooltip)
+      //    and full mode (Button with "Save" text).
       console.log(`[pipeline] Saving...`);
-      const saveButton = page.locator('button:has([data-testid="SaveIcon"])');
+      const saveButton = page
+        .locator(
+          // Full mode: <Button> with "Save" text
+          // Compact mode: <IconButton> inside a tooltip span labelled "Save"
+          'button:has-text("Save"), [aria-label*="Save" i] button, [data-testid="SaveIcon"]'
+        )
+        .first();
       await saveButton.waitFor({ state: "visible", timeout: 10000 });
       await saveButton.click();
 

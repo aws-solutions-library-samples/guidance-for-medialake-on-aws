@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Box, CircularProgress, Button, Typography, Stack, Divider } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Terrain as LogoIcon } from "@mui/icons-material";

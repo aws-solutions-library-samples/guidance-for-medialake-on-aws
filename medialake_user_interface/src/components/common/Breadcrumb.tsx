@@ -3,7 +3,7 @@ import { Box, Typography, IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import HistoryIcon from "@mui/icons-material/History";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { zIndexTokens } from "@/theme/tokens";
 
 interface BreadcrumbProps {

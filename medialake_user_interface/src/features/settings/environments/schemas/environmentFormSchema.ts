@@ -17,7 +17,7 @@ export const environmentFormSchema = z.object({
       "cost-center": z.string().min(1, "Cost center is required"),
       team: z.string().min(1, "Team is required"),
     })
-    .and(z.record(z.string())),
+    .and(z.record(z.string(), z.string())),
 });
 
 export type EnvironmentFormData = z.infer<typeof environmentFormSchema>;

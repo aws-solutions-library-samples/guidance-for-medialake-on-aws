@@ -6,7 +6,7 @@ const integrationFormSchema = z.object({
   description: z.string().min(1, "Description is required"),
   auth: z.object({
     type: z.enum(["awsIam", "apiKey"]),
-    credentials: z.record(z.string()),
+    credentials: z.record(z.string(), z.string()),
   }),
 }) as z.ZodType<{
   nodeId: string;

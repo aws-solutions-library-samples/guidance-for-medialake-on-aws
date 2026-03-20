@@ -78,10 +78,10 @@ export const useGetFavorites = (itemType?: string) => {
       // Fallback to empty array
       return [];
     },
-    staleTime: Infinity,
+    staleTime: 1000 * 30, // 30 seconds — fresh when navigating back to dashboard
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Refetch when component mounts if data is stale
     refetchOnReconnect: false,
   });
 };

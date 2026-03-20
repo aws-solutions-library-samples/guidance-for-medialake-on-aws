@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { drawerWidth, collapsedDrawerWidth, layoutTokens, springEasing } from "@/constants";
 import { Box, useTheme } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import { Outlet } from "react-router";
 import { SidebarContext } from "../contexts/SidebarContext";
 import { useDirection } from "../contexts/DirectionContext";
 import { ChatProvider } from "../contexts/ChatContext";

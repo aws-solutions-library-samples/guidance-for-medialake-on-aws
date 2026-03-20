@@ -207,10 +207,10 @@ export const useGetDashboardPresets = () => {
       );
       return data.data;
     },
-    staleTime: 0, // Always consider data stale to ensure fresh data
-    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
-    refetchOnMount: true, // Refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 1000 * 30, // 30 seconds — fresh when user is actively on dashboard
+    gcTime: 1000 * 60 * 5,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 };
 

@@ -1,9 +1,10 @@
 import React from "react";
 import { useCallback, useRef, useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { transformParameterSchema, validateSchemaPreservation } from "../utils/schemaTransformer";
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   Controls,
   MiniMap,
@@ -18,8 +19,8 @@ import ReactFlow, {
   reconnectEdge,
   MarkerType,
   useUpdateNodeInternals,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import {
   Box,
   Modal,
@@ -31,7 +32,12 @@ import {
   Backdrop,
 } from "@mui/material";
 import ApiStatusModal from "@/components/ApiStatusModal";
-import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from "react-icons/fa";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import BoltIcon from "@mui/icons-material/Bolt";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import BuildIcon from "@mui/icons-material/Build";
+import PowerIcon from "@mui/icons-material/Power";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { PipelineDeleteDialog } from "../components";
 import { PipelineUpdateConfirmationDialog } from "../components/PipelineUpdateConfirmationDialog";
 import {
@@ -86,15 +92,18 @@ interface CustomNodeData {
   onRotate?: (id: string, rotation: number) => void;
   type?: string; // Node type (e.g., 'TRIGGER', 'INTEGRATION', 'FLOW')
   rotation?: number; // Rotation angle in degrees (0, 90, 180, 270)
+  [key: string]: unknown; // Index signature for @xyflow/react v12
 }
+
+type AppNode = Node<CustomNodeData, "custom">;
 
 const nodeTypes = {
   custom: CustomNode,
-};
+} as const;
 
 const edgeTypes = {
   custom: CustomEdge,
-};
+} as const;
 
 // Track the highest node ID to ensure we generate unique IDs
 let id = 0;
@@ -133,7 +142,7 @@ const updateIdCounter = (existingNodes) => {
   });
 };
 
-const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
+const convertToPipelineNode = (node: AppNode): PipelineNode => ({
   id: node.id,
   type: node.type || "custom",
   position: {
@@ -143,8 +152,8 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
   width: node.width?.toString() || "180",
   height: node.height?.toString() || "40",
   data: {
-    id: node.data.id || node.data.nodeId, // Use id if available, otherwise use nodeId
-    nodeId: node.data.nodeId || node.data.id, // Use nodeId if available, otherwise use id
+    id: node.data.id || node.data.nodeId,
+    nodeId: node.data.nodeId || node.data.id,
     type: node.data.type,
     label: node.data.label,
     description: node.data.description || "",
@@ -157,12 +166,10 @@ const convertToPipelineNode = (node: Node<CustomNodeData>): PipelineNode => ({
     outputTypes: node.data.outputTypes,
     configuration: node.data.configuration,
   },
-  positionAbsolute: node.positionAbsolute
-    ? {
-        x: node.positionAbsolute.x.toString(),
-        y: node.positionAbsolute.y.toString(),
-      }
-    : undefined,
+  positionAbsolute: {
+    x: node.position.x.toString(),
+    y: node.position.y.toString(),
+  },
   selected: node.selected,
   dragging: node.dragging,
 });
@@ -462,7 +469,7 @@ const PipelineEditorContent = () => {
   const location = useLocation();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { id: pipelineId } = useParams();
-  const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   // Track whether the pipeline has been initialized
   const pipelineInitialized = useRef(false);
@@ -477,7 +484,7 @@ const PipelineEditorContent = () => {
 
       // Then update the pipeline configuration with the new node positions
       changes.forEach((change) => {
-        if (change.type === "position" && change.positionAbsolute) {
+        if (change.type === "position" && change.position) {
           // Update the form data with the new node position
           setFormData((prev) => {
             const updatedNodes = prev.configuration.nodes.map((node) => {
@@ -485,12 +492,12 @@ const PipelineEditorContent = () => {
                 return {
                   ...node,
                   position: {
-                    x: change.positionAbsolute.x.toString(),
-                    y: change.positionAbsolute.y.toString(),
+                    x: change.position.x.toString(),
+                    y: change.position.y.toString(),
                   },
                   positionAbsolute: {
-                    x: change.positionAbsolute.x.toString(),
-                    y: change.positionAbsolute.y.toString(),
+                    x: change.position.x.toString(),
+                    y: change.position.y.toString(),
                   },
                 };
               }
@@ -515,7 +522,7 @@ const PipelineEditorContent = () => {
   const updateNodeInternals = useUpdateNodeInternals();
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorType, setErrorType] = useState<"trigger" | "compatibility">("compatibility");
-  const [selectedNode, setSelectedNode] = useState<Node<CustomNodeData> | null>(null);
+  const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
   const [isNodeConfigOpen, setIsNodeConfigOpen] = useState(false);
   const { isExpanded } = useRightSidebar();
 
@@ -757,7 +764,7 @@ const PipelineEditorContent = () => {
           node.position.y !== originalNode.position.y ||
           JSON.stringify(node.data.configuration) !==
             JSON.stringify(originalNode.data.configuration) ||
-          (node as any).rotation !== (originalNode as any).rotation
+          (node.data as any).rotation !== (originalNode.data as any).rotation
         ) {
           return true;
         }
@@ -883,13 +890,14 @@ const PipelineEditorContent = () => {
 
   const onConfigureNode = useCallback(
     (nodeId: string) => {
-      const node = nodes.find((n) => n.id === nodeId);
+      const currentNodes = reactFlowInstance.getNodes();
+      const node = currentNodes.find((n) => n.id === nodeId);
       if (node) {
-        setSelectedNode(node);
+        setSelectedNode(node as AppNode);
         setIsNodeConfigOpen(true);
       }
     },
-    [nodes]
+    [reactFlowInstance]
   );
 
   const onRotateNode = useCallback(
@@ -1359,10 +1367,11 @@ const PipelineEditorContent = () => {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const targetNode = nodes.find((node) => node.id === connection.target);
+      const currentNodes = reactFlowInstance.getNodes();
+      const targetNode = currentNodes.find((node) => node.id === connection.target);
 
       // Prevent connections to trigger nodes
-      if (targetNode?.data.type?.includes("TRIGGER")) {
+      if ((targetNode?.data as any)?.type?.includes("TRIGGER")) {
         setErrorType("trigger");
         setIsErrorModalOpen(true);
         return;
@@ -1415,7 +1424,7 @@ const PipelineEditorContent = () => {
         },
       }));
     },
-    [nodes, setEdges]
+    [reactFlowInstance, setEdges]
   );
 
   const onDrop = useCallback(
@@ -1440,7 +1449,7 @@ const PipelineEditorContent = () => {
 
       // Check if this is our special job status node
 
-      const newReactFlowNode: Node<CustomNodeData> = {
+      const newReactFlowNode: AppNode = {
         id: getId(),
         type: "custom", // Removed jobStatusNode type
         position,
@@ -1595,22 +1604,22 @@ const PipelineEditorContent = () => {
 
   // Function to get the appropriate icon based on node type
   const getNodeIcon = (nodeType: string | undefined) => {
-    if (!nodeType) return <FaFileVideo size={20} />;
+    if (!nodeType) return <VideocamIcon sx={{ fontSize: 20 }} />;
 
     const type = nodeType?.toUpperCase() || "";
 
     if (type.includes("TRIGGER")) {
-      return <FaBolt size={20} />;
+      return <BoltIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("FLOW")) {
-      return <FaCodeBranch size={20} />;
+      return <AccountTreeIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("UTILITY")) {
-      return <FaTools size={20} />;
+      return <BuildIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("INTEGRATION")) {
-      return <FaPlug size={20} />;
+      return <PowerIcon sx={{ fontSize: 20 }} />;
     }
 
     // Default icon for other types
-    return <FaCogs size={20} />;
+    return <SettingsIcon sx={{ fontSize: 20 }} />;
   };
 
   return (
@@ -1655,7 +1664,7 @@ const PipelineEditorContent = () => {
         hasChanges={hasChanges}
         updateFormData={(importedNodes, importedEdges) => {
           // Convert imported React Flow nodes to pipeline nodes
-          const pipelineNodes = importedNodes.map((node) => convertToPipelineNode(node));
+          const pipelineNodes = importedNodes.map((node) => convertToPipelineNode(node as AppNode));
 
           // Convert imported React Flow edges to pipeline edges
           const pipelineEdges = importedEdges.map((edge) => ({
@@ -1670,12 +1679,13 @@ const PipelineEditorContent = () => {
           })) as PipelineEdge[];
 
           // Check if the imported flow has an active property
+          const importedNodeData = (importedNodes[0]?.data ?? {}) as Record<string, any>;
           const importedActive =
             importedNodes.length > 0 &&
-            importedNodes[0].data &&
-            importedNodes[0].data.flow &&
-            importedNodes[0].data.flow.active !== undefined
-              ? importedNodes[0].data.flow.active
+            importedNodeData &&
+            importedNodeData.flow &&
+            importedNodeData.flow.active !== undefined
+              ? importedNodeData.flow.active
               : undefined;
 
           // Update formData with imported nodes and edges
@@ -1819,7 +1829,7 @@ const PipelineEditorContent = () => {
           {selectedNode && !isNodeDetailsLoading && nodeDetails && (
             <NodeConfigurationForm
               node={convertedNodeData}
-              configuration={selectedNode.data.configuration}
+              configuration={selectedNode.data.configuration || {}}
               onSubmit={handleNodeConfigSave}
               onCancel={() => setIsNodeConfigOpen(false)}
             />

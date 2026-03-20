@@ -48,15 +48,6 @@ export const useDashboardSync = () => {
   const saveLayoutMutation = useSaveDashboardLayout();
   const resetLayoutMutation = useResetDashboardLayout();
 
-  // Invalidate widget data queries on mount so data is fresh when returning to the dashboard
-  useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ["favorites"] });
-    queryClient.invalidateQueries({ queryKey: ["search"] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    queryClient.invalidateQueries({ queryKey: ["collection-groups"] });
-    queryClient.invalidateQueries({ queryKey: ["collection-types"] });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Load layout from API on mount
   useEffect(() => {
     if (isLoadSuccess && apiLayout && isInitialLoadRef.current) {

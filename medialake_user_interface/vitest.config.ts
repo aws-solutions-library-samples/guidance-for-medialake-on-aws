@@ -20,8 +20,6 @@ export default defineConfig({
         "src/test/**",
         "src/mocks/**",
         "src/main.tsx",
-        "src/index.tsx",
-        "src/reportWebVitals.tsx",
         "src/vite-env.d.ts",
       ],
     },

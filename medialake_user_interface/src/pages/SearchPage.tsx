@@ -32,7 +32,7 @@ import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import { SearchError } from "@/api/hooks/useSearch";
 import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
-import { useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import { useLocation, useSearchParams, useNavigate } from "react-router";
 import ApiStatusModal from "../components/ApiStatusModal";
 import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";

@@ -1,8 +1,3 @@
-export interface ChatMessage {
-  text: string;
-  sender: "user" | "assistant";
-}
-
 export interface FilterSectionType {
   types: {
     [key: string]: boolean;

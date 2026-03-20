@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   Box,
@@ -59,6 +59,7 @@ import {
   ArrowUpward as AscIcon,
   ArrowDownward as DescIcon,
 } from "@mui/icons-material";
+import type { SvgIconComponent } from "@mui/icons-material";
 import { PageContent } from "@/components/common/layout";
 import { RefreshButton } from "@/components/common";
 import {
@@ -82,23 +83,23 @@ import type { SortBy, SortOrder } from "@/features/dashboard/types";
 type FilterTab = "all" | "myCollections" | "sharedWithMe" | "sharedByMe" | "groups";
 
 // Map of icon names to Material-UI icon components
-const ICON_MAP: Record<string, React.ReactElement> = {
-  Folder: <FolderIcon />,
-  FolderOpen: <FolderOpenIcon />,
-  Work: <Work />,
-  Campaign: <Campaign />,
-  Assignment: <Assignment />,
-  Archive: <Archive />,
-  PhotoLibrary: <PhotoLibraryIcon />,
-  Label: <Label />,
-  Movie: <Movie />,
-  Collections: <CollectionsIcon />,
-  Dashboard: <Dashboard />,
-  Storage: <Storage />,
-  Inventory: <Inventory />,
-  Category: <Category />,
-  BookmarkBorder: <BookmarkBorder />,
-  LocalOffer: <LocalOffer />,
+const ICON_MAP: Record<string, SvgIconComponent> = {
+  Folder: FolderIcon,
+  FolderOpen: FolderOpenIcon,
+  Work: Work,
+  Campaign: Campaign,
+  Assignment: Assignment,
+  Archive: Archive,
+  PhotoLibrary: PhotoLibraryIcon,
+  Label: Label,
+  Movie: Movie,
+  Collections: CollectionsIcon,
+  Dashboard: Dashboard,
+  Storage: Storage,
+  Inventory: Inventory,
+  Category: Category,
+  BookmarkBorder: BookmarkBorder,
+  LocalOffer: LocalOffer,
 };
 
 const TAB_CONFIG: {
@@ -239,6 +240,7 @@ const CollectionsPage: React.FC = () => {
     if (!collection.collectionTypeId || isLoadingTypes) {
       return {
         icon: <FolderIcon sx={{ fontSize: 32, mr: 1.5, color: theme.palette.primary.main }} />,
+        IconComponent: FolderIcon,
         color: theme.palette.primary.main,
         borderColor: "divider",
         thumbnailUrl: null,
@@ -250,23 +252,19 @@ const CollectionsPage: React.FC = () => {
     if (!collectionType) {
       return {
         icon: <FolderIcon sx={{ fontSize: 32, mr: 1.5, color: theme.palette.primary.main }} />,
+        IconComponent: FolderIcon,
         color: theme.palette.primary.main,
         borderColor: "divider",
         thumbnailUrl: null,
       };
     }
 
-    const iconComponent =
-      collectionType.icon && ICON_MAP[collectionType.icon] ? (
-        React.cloneElement(ICON_MAP[collectionType.icon], {
-          sx: { color: collectionType.color, fontSize: 32, mr: 1.5 },
-        })
-      ) : (
-        <FolderIcon sx={{ color: collectionType.color, fontSize: 32, mr: 1.5 }} />
-      );
+    const IconComp = (collectionType.icon && ICON_MAP[collectionType.icon]) || FolderIcon;
+    const iconComponent = <IconComp sx={{ color: collectionType.color, fontSize: 32, mr: 1.5 }} />;
 
     return {
       icon: iconComponent,
+      IconComponent: IconComp,
       color: collectionType.color,
       borderColor: collectionType.color,
       thumbnailUrl: null,
@@ -823,13 +821,13 @@ const CollectionsPage: React.FC = () => {
                             objectFit: "cover",
                           }}
                         />
-                      ) : style.icon ? (
-                        React.cloneElement(style.icon as React.ReactElement, {
-                          sx: {
+                      ) : style.IconComponent ? (
+                        <style.IconComponent
+                          sx={{
                             fontSize: 56,
                             color: alpha(theme.palette.primary.main, 0.18),
-                          },
-                        })
+                          }}
+                        />
                       ) : (
                         <FolderIcon
                           sx={{

@@ -6,19 +6,20 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
-  fallbackRender?: (props: { error: Error; resetErrorBoundary: () => void }) => React.ReactNode;
+  fallbackRender?: (props: { error: unknown; resetErrorBoundary: () => void }) => React.ReactNode;
   onReset?: () => void;
-  onError?: (error: Error, info: { componentStack: string }) => void;
+  onError?: (error: Error, info: { componentStack?: string | null }) => void;
 }
 
 interface FallbackProps {
-  error: Error;
+  error: unknown;
   resetErrorBoundary: () => void;
 }
 
 const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary }) => {
   const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
+  const errorObj = error instanceof Error ? error : new Error(String(error));
 
   return (
     <Paper
@@ -68,8 +69,8 @@ const DefaultFallback: React.FC<FallbackProps> = ({ error, resetErrorBoundary })
                   fontSize: "0.875rem",
                 }}
               >
-                {error.message}
-                {error.stack ? `\n\n${error.stack}` : ""}
+                {errorObj.message}
+                {errorObj.stack ? `\n\n${errorObj.stack}` : ""}
               </pre>
             </Alert>
           )}
@@ -96,7 +97,7 @@ export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
 }) => {
   // Log the error to the console by default
   const handleError = useCallback(
-    (error: Error, info: { componentStack: string }) => {
+    (error: Error, info: { componentStack?: string | null }) => {
       console.error("Caught an error:", error, info);
       onError?.(error, info);
     },

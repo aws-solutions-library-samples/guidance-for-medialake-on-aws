@@ -354,15 +354,22 @@ export const useJobNotifications = () => {
     [notifications, dismiss, markJobAsDismissed]
   );
 
-  // Sync backend jobs with notifications
+  // Sync backend jobs with notifications.
+  // IMPORTANT: We read notifications via a ref to avoid a dependency cycle.
+  // The effect writes to notifications (via add/update/dismiss), so depending
+  // on `notifications` directly would cause an infinite re-render loop.
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
+
   useEffect(() => {
     if (allJobs.length === 0) return;
 
+    const currentNotifications = notificationsRef.current;
     const dismissedJobs = getDismissedJobs();
 
     // First, remove duplicate notifications for the same job
     const jobNotificationMap = new Map<string, Notification[]>();
-    notifications.forEach((notification) => {
+    currentNotifications.forEach((notification) => {
       if (notification.jobId) {
         if (!jobNotificationMap.has(notification.jobId)) {
           jobNotificationMap.set(notification.jobId, []);
@@ -374,14 +381,12 @@ export const useJobNotifications = () => {
     // Remove duplicate notifications (keep the most recent one)
     jobNotificationMap.forEach((notificationsForJob) => {
       if (notificationsForJob.length > 1) {
-        // Sort by updatedAt or createdAt, keep the most recent
         const sortedNotifications = notificationsForJob.sort((a, b) => {
           const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
           const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
           return bTime - aTime;
         });
 
-        // Remove all but the first (most recent) notification
         for (let i = 1; i < sortedNotifications.length; i++) {
           dismiss(sortedNotifications[i].id);
         }
@@ -389,35 +394,29 @@ export const useJobNotifications = () => {
     });
 
     allJobs.forEach((job) => {
-      // Skip creating notifications for jobs that have been manually dismissed
       if (dismissedJobs.has(job.jobId)) {
         return;
       }
 
-      const existingNotifications = notifications.filter((n) => n.jobId === job.jobId);
+      const existingNotifications = currentNotifications.filter((n) => n.jobId === job.jobId);
 
       if (existingNotifications.length === 0) {
-        // Create new notification for new job
         createNotificationForJob(job);
         syncedJobsRef.current.add(job.jobId);
       } else if (existingNotifications.length === 1) {
-        // Update existing notification if status changed
         updateNotificationForJob(existingNotifications[0], job);
       }
-      // If there are multiple notifications, the cleanup above should handle it
     });
 
     // Remove notifications for jobs that no longer exist in backend
     const currentJobIds = new Set(allJobs.map((job) => job.jobId));
-    notifications.forEach((notification) => {
+    currentNotifications.forEach((notification) => {
       if (notification.jobId && !currentJobIds.has(notification.jobId)) {
         dismiss(notification.id);
-        // Also remove from dismissed jobs since the job no longer exists
         const updatedDismissedJobs = getDismissedJobs();
         updatedDismissedJobs.delete(notification.jobId);
         localStorage.setItem("medialake_dismissed_jobs", JSON.stringify([...updatedDismissedJobs]));
 
-        // Clean up seen job notifications for this job
         const seenJobs = getSeenJobNotifications();
         const jobKeysToRemove = [...seenJobs].filter((key) =>
           key.startsWith(`${notification.jobId}:`)
@@ -426,14 +425,7 @@ export const useJobNotifications = () => {
         localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
       }
     });
-  }, [
-    allJobs,
-    notifications,
-    createNotificationForJob,
-    updateNotificationForJob,
-    dismiss,
-    getDismissedJobs,
-  ]);
+  }, [allJobs, createNotificationForJob, updateNotificationForJob, dismiss, getDismissedJobs]);
 
   const markAllAsSeen = useCallback(() => {
     localStorage.removeItem("medialake_unseen_notifications");
