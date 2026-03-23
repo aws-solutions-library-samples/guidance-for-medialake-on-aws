@@ -53,13 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Check if this is a SAML redirect first
-        const hasSamlProvider = awsConfig?.Auth?.identity_providers.some(
-          (provider) => provider.identity_provider_method === "saml"
+        // Check if this is a federated (SAML/OIDC) redirect first
+        const hasFederatedProvider = awsConfig?.Auth?.identity_providers.some(
+          (provider) => provider.identity_provider_method === "saml" || provider.identity_provider_method === "oidc"
         );
 
         if (
-          hasSamlProvider &&
+          hasFederatedProvider &&
           (window.location.hash.includes("id_token") || window.location.search.includes("code="))
         ) {
           // Don't try to get current user yet, just wait for session
@@ -73,12 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setIsAuthenticated(false);
               StorageHelper.clearToken();
             }
-          } catch (samlError) {
+          } catch (federatedError) {
             setIsAuthenticated(false);
             StorageHelper.clearToken();
           }
         } else {
-          // Not a SAML redirect, proceed with normal auth check
+          // Not a federated redirect, proceed with normal auth check
           try {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();

@@ -32,6 +32,10 @@ const AuthPage = () => {
   const hasCognitoProvider = awsConfig.Auth.identity_providers.some(
     (provider) => provider.identity_provider_method === "cognito"
   );
+  const hasOidcProvider = awsConfig.Auth.identity_providers.some(
+    (provider) => provider.identity_provider_method === "oidc"
+  );
+  const hasFederatedProvider = hasSamlProvider || hasOidcProvider;
 
   return (
     <Box
@@ -123,7 +127,40 @@ const AuthPage = () => {
               return null;
             })}
 
-          {hasSamlProvider && hasCognitoProvider && (
+          {hasOidcProvider &&
+            awsConfig.Auth.identity_providers.map((provider) => {
+              if (provider.identity_provider_method === "oidc") {
+                return (
+                  <Button
+                    key={provider.identity_provider_name}
+                    onClick={() => {
+                      signInWithRedirect({
+                        provider: { custom: provider.identity_provider_name },
+                      }).catch((error) => {
+                        console.error("OIDC redirect error:", error);
+                      });
+                    }}
+                    sx={{
+                      padding: "12px 24px",
+                      fontSize: "1rem",
+                      backgroundColor: "rgba(255, 255, 255, 0.2)",
+                      color: "white",
+                      height: "40px",
+                      width: "100%",
+                      textTransform: "none",
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 0.3)",
+                      },
+                    }}
+                  >
+                    Sign in with {provider.identity_provider_name}
+                  </Button>
+                );
+              }
+              return null;
+            })}
+
+          {hasFederatedProvider && hasCognitoProvider && (
             <Divider sx={{ my: 2, borderColor: "rgba(255, 255, 255, 0.2)" }}>
               <Typography sx={{ color: "rgba(255, 255, 255, 0.7)" }}>OR</Typography>
             </Divider>

@@ -261,13 +261,16 @@ class IdentityProviderConfig(BaseModel):
     identity_provider_metadata_url: Optional[str] = None
     identity_provider_metadata_path: Optional[str] = None
     identity_provider_arn: Optional[str] = None
+    identity_provider_oidc_issuer_url: Optional[str] = None
+    identity_provider_oidc_client_id: Optional[str] = None
+    identity_provider_oidc_client_secret: Optional[str] = None
 
     @validator("identity_provider_method")
     @classmethod
     def validate_provider_method(cls, v):
-        if v not in ["cognito", "saml"]:
+        if v not in ["cognito", "saml", "oidc"]:
             raise ValueError(
-                'identity_provider_method must be either "cognito" or "saml"'
+                'identity_provider_method must be "cognito", "saml", or "oidc"'
             )
         return v
 
@@ -277,6 +280,34 @@ class IdentityProviderConfig(BaseModel):
         if values.get("identity_provider_method") == "saml" and not v:
             raise ValueError(
                 "SAML provider requires identity_provider_name and identity_provider_metadata_url"
+            )
+        return v
+
+    @validator("identity_provider_oidc_issuer_url", always=True)
+    @classmethod
+    def validate_oidc_fields(cls, v, values):
+        if values.get("identity_provider_method") != "oidc":
+            return v
+        if not values.get("identity_provider_name"):
+            raise ValueError(
+                "OIDC provider requires identity_provider_name"
+            )
+        if not v:
+            raise ValueError(
+                "OIDC provider requires identity_provider_oidc_issuer_url"
+            )
+        if not v.startswith("https://"):
+            raise ValueError(
+                "OIDC issuer URL must be a valid HTTPS URL"
+            )
+        return v
+
+    @validator("identity_provider_oidc_client_id", always=True)
+    @classmethod
+    def validate_oidc_client_id(cls, v, values):
+        if values.get("identity_provider_method") == "oidc" and not v:
+            raise ValueError(
+                "OIDC provider requires identity_provider_oidc_client_id"
             )
         return v
 
@@ -293,7 +324,7 @@ class AuthConfig(BaseModel):
             raise ValueError("At least one identity provider must be configured")
 
         # Check if at least one provider has valid method
-        valid_methods = ["saml", "cognito"]
+        valid_methods = ["saml", "cognito", "oidc"]
         has_valid_provider = False
 
         for provider in v:
@@ -311,9 +342,24 @@ class AuthConfig(BaseModel):
                             "SAML provider requires identity_provider_metadata_url"
                         )
 
+                # Additional validation for OIDC providers
+                if provider.identity_provider_method == "oidc":
+                    if not provider.identity_provider_name:
+                        raise ValueError(
+                            "OIDC provider requires identity_provider_name"
+                        )
+                    if not provider.identity_provider_oidc_issuer_url:
+                        raise ValueError(
+                            "OIDC provider requires identity_provider_oidc_issuer_url"
+                        )
+                    if not provider.identity_provider_oidc_client_id:
+                        raise ValueError(
+                            "OIDC provider requires identity_provider_oidc_client_id"
+                        )
+
         if not has_valid_provider:
             raise ValueError(
-                "At least one provider must have identity_provider_method of 'saml' or 'cognito'"
+                "At least one provider must have identity_provider_method of 'saml', 'cognito', or 'oidc'"
             )
 
         return v

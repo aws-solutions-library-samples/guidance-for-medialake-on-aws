@@ -4,7 +4,7 @@ import { Amplify } from "aws-amplify";
 import { useTranslation } from "react-i18next";
 
 interface IdentityProvider {
-  identity_provider_method: "cognito" | "saml";
+  identity_provider_method: "cognito" | "saml" | "oidc";
   identity_provider_name?: string;
   identity_provider_metadata_url?: string;
   identity_provider_metadata_path?: string;
@@ -59,6 +59,9 @@ const configureAmplify = (config: AwsConfig) => {
   const samlProviders = config.Auth.identity_providers.filter(
     (provider) => provider.identity_provider_method === "saml"
   );
+  const oidcProviders = config.Auth.identity_providers.filter(
+    (provider) => provider.identity_provider_method === "oidc"
+  );
 
   // Enable username/password login if Cognito is configured
   if (hasCognito) {
@@ -66,21 +69,18 @@ const configureAmplify = (config: AwsConfig) => {
     amplifyConfig.Auth.Cognito.loginWith.email = true;
   }
 
-  // Add SAML configuration if any SAML providers are configured
-  if (samlProviders.length > 0) {
+  // Add federated (SAML/OIDC) configuration if any federated providers are configured
+  if (samlProviders.length > 0 || oidcProviders.length > 0) {
     amplifyConfig.Auth.Cognito.loginWith.oauth = {
       ...amplifyConfig.Auth.Cognito.loginWith.oauth,
       providers: ["SAML"],
       redirectSignIn: [
         window.location.origin,
-        window.location.origin + "/",
-        window.location.origin + "/sign-in",
         `https://${config.Auth.Cognito.domain}/oauth2/idpresponse`,
         `https://${config.Auth.Cognito.domain}/saml2/idpresponse`,
       ],
       redirectSignOut: [
         window.location.origin,
-        window.location.origin + "/",
         window.location.origin + "/sign-in",
       ],
     };

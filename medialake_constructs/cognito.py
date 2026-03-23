@@ -302,6 +302,7 @@ class CognitoConstruct(Construct):
         # Configure identity providers
         supported_providers = []
         saml_providers = []
+        oidc_providers = []
 
         # Process each configured identity provider
         for provider in config.authZ.identity_providers:
@@ -332,6 +333,37 @@ class CognitoConstruct(Construct):
                     )
                 )
                 saml_providers.append(saml_provider)
+            elif provider.identity_provider_method == "oidc":
+                provider_details = {
+                    "client_id": provider.identity_provider_oidc_client_id,
+                    "authorize_scopes": "openid",
+                    "attributes_request_method": "GET",
+                    "oidc_issuer": provider.identity_provider_oidc_issuer_url,
+                }
+                if provider.identity_provider_oidc_client_secret:
+                    provider_details["client_secret"] = provider.identity_provider_oidc_client_secret
+
+                oidc_provider = cognito.CfnUserPoolIdentityProvider(
+                    self,
+                    f"OIDCProvider-{provider.identity_provider_name}",
+                    user_pool_id=cfn_user_pool.ref,
+                    provider_name=provider.identity_provider_name,
+                    provider_type="OIDC",
+                    provider_details=provider_details,
+                    attribute_mapping={
+                        "email": "EMAIL",
+                        "username": "sub",
+                        "given_name": "GIVEN_NAME",
+                        "family_name": "FAMILY_NAME",
+                    },
+                    idp_identifiers=[provider.identity_provider_name],
+                )
+                supported_providers.append(
+                    cognito.UserPoolClientIdentityProvider.custom(
+                        provider.identity_provider_name
+                    )
+                )
+                oidc_providers.append(oidc_provider)
             elif provider.identity_provider_method == "cognito":
                 supported_providers.append(
                     cognito.UserPoolClientIdentityProvider.COGNITO
@@ -371,6 +403,10 @@ class CognitoConstruct(Construct):
 
         # Add dependencies for SAML providers if any
         for provider in saml_providers:
+            self._user_pool_client.node.add_dependency(provider)
+
+        # Add dependencies for OIDC providers if any
+        for provider in oidc_providers:
             self._user_pool_client.node.add_dependency(provider)
 
         # Create Identity Pool
@@ -465,6 +501,7 @@ class CognitoConstruct(Construct):
                         f"https://{cloudfront_domain}",
                         f"https://{cloudfront_domain}/",
                         f"https://{cloudfront_domain}/login",
+                        f"https://{cloudfront_domain}/sign-in",
                     ],
                     "LogoutURLs": [
                         f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com",
@@ -481,7 +518,7 @@ class CognitoConstruct(Construct):
                     + [
                         provider.identity_provider_name
                         for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method == "saml"
+                        if provider.identity_provider_method in ("saml", "oidc")
                     ],
                 },
                 physical_resource_id=cr.PhysicalResourceId.of(

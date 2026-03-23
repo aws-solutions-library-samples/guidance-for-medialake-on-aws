@@ -877,7 +877,7 @@ function handler(event) {
                     + [
                         provider.identity_provider_name
                         for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method == "saml"
+                        if provider.identity_provider_method in ("saml", "oidc")
                     ],
                 },
                 physical_resource_id=cr.PhysicalResourceId.of(
