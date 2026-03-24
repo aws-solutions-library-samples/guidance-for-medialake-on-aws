@@ -1,7 +1,7 @@
 import hashlib
 from dataclasses import dataclass
 
-from aws_cdk import CfnOutput, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import custom_resources as cr
@@ -397,8 +397,28 @@ class CognitoConstruct(Construct):
             )
 
         # Create the client
+        # Collect token validity settings from identity providers
+        token_validity_props = {}
+        for provider in config.authZ.identity_providers:
+            if provider.identity_provider_method in ("oidc", "saml"):
+                if provider.identity_provider_access_token_validity is not None:
+                    token_validity_props["access_token_validity"] = Duration.minutes(
+                        provider.identity_provider_access_token_validity
+                    )
+                if provider.identity_provider_id_token_validity is not None:
+                    token_validity_props["id_token_validity"] = Duration.minutes(
+                        provider.identity_provider_id_token_validity
+                    )
+                if provider.identity_provider_refresh_token_validity is not None:
+                    token_validity_props["refresh_token_validity"] = Duration.minutes(
+                        provider.identity_provider_refresh_token_validity
+                    )
+                break  # Use the first federated provider's settings
+
         self._user_pool_client = self._user_pool.add_client(
-            "MediaLakeUserPoolClient", **user_pool_client_props
+            "MediaLakeUserPoolClient",
+            **token_validity_props,
+            **user_pool_client_props,
         )
 
         # Add dependencies for SAML providers if any
@@ -486,45 +506,48 @@ class CognitoConstruct(Construct):
 
         self._cloudfront_domain = cloudfront_domain
 
+        callback_sdk_call = cr.AwsSdkCall(
+            service="CognitoIdentityServiceProvider",
+            action="updateUserPoolClient",
+            parameters={
+                "UserPoolId": self._user_pool.user_pool_id,
+                "ClientId": self._user_pool_client.user_pool_client_id,
+                "CallbackURLs": [
+                    f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
+                    f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
+                    f"https://{cloudfront_domain}",
+                    f"https://{cloudfront_domain}/",
+                    f"https://{cloudfront_domain}/login",
+                    f"https://{cloudfront_domain}/sign-in",
+                ],
+                "LogoutURLs": [
+                    f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com",
+                    f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/",
+                    f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
+                    f"https://{cloudfront_domain}",
+                    f"https://{cloudfront_domain}/",
+                    f"https://{cloudfront_domain}/sign-in",
+                ],
+                "AllowedOAuthFlows": ["code", "implicit"],
+                "AllowedOAuthScopes": ["email", "openid", "profile"],
+                "AllowedOAuthFlowsUserPoolClient": True,
+                "SupportedIdentityProviders": ["COGNITO"]
+                + [
+                    provider.identity_provider_name
+                    for provider in config.authZ.identity_providers
+                    if provider.identity_provider_method in ("saml", "oidc")
+                ],
+            },
+            physical_resource_id=cr.PhysicalResourceId.of(
+                f"{config.resource_prefix}-cognito-callback-urls-update"
+            ),
+        )
+
         _ = cr.AwsCustomResource(
             self,
             "UpdateUserPoolClientCallbacks",
-            on_update=cr.AwsSdkCall(
-                service="CognitoIdentityServiceProvider",
-                action="updateUserPoolClient",
-                parameters={
-                    "UserPoolId": self._user_pool.user_pool_id,
-                    "ClientId": self._user_pool_client.user_pool_client_id,
-                    "CallbackURLs": [
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
-                        f"https://{cloudfront_domain}",
-                        f"https://{cloudfront_domain}/",
-                        f"https://{cloudfront_domain}/login",
-                        f"https://{cloudfront_domain}/sign-in",
-                    ],
-                    "LogoutURLs": [
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
-                        f"https://{cloudfront_domain}",
-                        f"https://{cloudfront_domain}/",
-                        f"https://{cloudfront_domain}/sign-in",
-                    ],
-                    "AllowedOAuthFlows": ["code", "implicit"],
-                    "AllowedOAuthScopes": ["email", "openid", "profile"],
-                    "AllowedOAuthFlowsUserPoolClient": True,
-                    "SupportedIdentityProviders": ["COGNITO"]
-                    + [
-                        provider.identity_provider_name
-                        for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method in ("saml", "oidc")
-                    ],
-                },
-                physical_resource_id=cr.PhysicalResourceId.of(
-                    f"{config.resource_prefix}-cognito-callback-urls-update"
-                ),
-            ),
+            on_create=callback_sdk_call,
+            on_update=callback_sdk_call,
             policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
                 resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
             ),

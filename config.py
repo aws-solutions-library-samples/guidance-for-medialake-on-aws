@@ -265,6 +265,9 @@ class IdentityProviderConfig(BaseModel):
     identity_provider_oidc_client_id: Optional[str] = None
     identity_provider_oidc_client_secret: Optional[str] = None
     identity_provider_default_group_assignment: Optional[str] = None
+    identity_provider_access_token_validity: Optional[int] = None
+    identity_provider_id_token_validity: Optional[int] = None
+    identity_provider_refresh_token_validity: Optional[int] = None
 
     @validator("identity_provider_method")
     @classmethod
