@@ -78,6 +78,13 @@ def lambda_handler(event, context):
                 "LambdaVersion": "V2_0",
             }
 
+            # Add PostConfirmation trigger if ARN is provided
+            post_confirmation_arn = event["ResourceProperties"].get(
+                "PostConfirmationLambdaArn"
+            )
+            if post_confirmation_arn:
+                lambda_config["PostConfirmation"] = post_confirmation_arn
+
             # Update the user pool with the new Lambda configuration
             # Only include parameters that are valid for update_user_pool API
             update_params = {"UserPoolId": user_pool_id, "LambdaConfig": lambda_config}
@@ -120,10 +127,20 @@ def lambda_handler(event, context):
                 if pre_token_config.get("LambdaArn") == pre_token_generation_lambda_arn:
                     lambda_config.pop("PreTokenGenerationConfig", None)
 
-                    cognito.update_user_pool(
-                        UserPoolId=user_pool_id, LambdaConfig=lambda_config
-                    )
-                    logger.info("Removed Cognito triggers during cleanup")
+                # Remove PostConfirmation trigger if it matches
+                post_confirmation_arn = event["ResourceProperties"].get(
+                    "PostConfirmationLambdaArn"
+                )
+                if (
+                    post_confirmation_arn
+                    and lambda_config.get("PostConfirmation") == post_confirmation_arn
+                ):
+                    lambda_config.pop("PostConfirmation", None)
+
+                cognito.update_user_pool(
+                    UserPoolId=user_pool_id, LambdaConfig=lambda_config
+                )
+                logger.info("Removed Cognito triggers during cleanup")
             except Exception as cleanup_error:
                 logger.warning(f"Error during trigger cleanup: {str(cleanup_error)}")
                 # Don't fail the stack deletion for cleanup errors

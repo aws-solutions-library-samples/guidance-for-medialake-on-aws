@@ -6,14 +6,16 @@
       {
         "identity_provider_metadata_url": "https://example.okta.com/app/abcdef/sso/saml/metadata",
         "identity_provider_method": "saml",
-        "identity_provider_name": "Okta"
+        "identity_provider_name": "Okta",
+        "identity_provider_default_group_assignment": "read-only"
       },
       {
         "identity_provider_method": "oidc",
         "identity_provider_name": "Federate",
         "identity_provider_oidc_issuer_url": "https://idp.federate.example.com",
         "identity_provider_oidc_client_id": "your-oidc-client-id",
-        "identity_provider_oidc_client_secret": "your-oidc-client-secret"
+        "identity_provider_oidc_client_secret": "your-oidc-client-secret",
+        "identity_provider_default_group_assignment": "editors"
       },
       {
         "identity_provider_method": "cognito"

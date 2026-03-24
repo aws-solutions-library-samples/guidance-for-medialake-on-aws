@@ -651,6 +651,7 @@ cognito_update_stack = CognitoUpdateStack(
         cognito_user_pool_id=cognito_stack.user_pool_id,
         cognito_user_pool_arn=cognito_stack.user_pool_arn,
         auth_table_name=authorization_stack._auth_table.table_name,
+        identity_providers=config.authZ.identity_providers,
     ),
     env=env,
 )

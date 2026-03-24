@@ -6,10 +6,13 @@ applied after the core Cognito resources are created. This includes:
 - Pre-signup Lambda trigger configuration
 - Additional Lambda trigger setup
 - User pool updates that might conflict if done during initial creation
+- PostConfirmation Lambda for federated user default group assignment
 """
 
 import datetime
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
+from typing import List
 
 import aws_cdk as cdk
 from aws_cdk import Stack
@@ -18,6 +21,7 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
+from config import IdentityProviderConfig
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -29,6 +33,7 @@ class CognitoUpdateStackProps:
     cognito_user_pool_id: str
     cognito_user_pool_arn: str
     auth_table_name: str
+    identity_providers: List[IdentityProviderConfig] = field(default_factory=list)
 
 
 class CognitoUpdateStack(Stack):
@@ -99,6 +104,49 @@ class CognitoUpdateStack(Stack):
             )
         )
 
+        # Conditionally create PostConfirmation Lambda for federated user default group assignment
+        idp_group_mapping = {}
+        for provider in props.identity_providers:
+            if (
+                provider.identity_provider_method in ("oidc", "saml")
+                and provider.identity_provider_default_group_assignment
+            ):
+                idp_group_mapping[provider.identity_provider_name] = (
+                    provider.identity_provider_default_group_assignment
+                )
+
+        if idp_group_mapping:
+            self._post_confirmation_lambda = Lambda(
+                self,
+                "PostConfirmationGroupAssignmentLambda",
+                config=LambdaConfig(
+                    name="post_confirmation_group_assignment",
+                    entry="lambdas/auth/post_confirmation_group_assignment",
+                    timeout_minutes=1,
+                    lambda_handler="handler",
+                    snap_start=False,
+                    environment_variables={
+                        "USER_POOL_ID": props.cognito_user_pool_id,
+                        "IDP_GROUP_MAPPING": json.dumps(idp_group_mapping),
+                    },
+                ),
+            )
+
+            # IAM: allow AdminAddUserToGroup
+            self._post_confirmation_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=["cognito-idp:AdminAddUserToGroup"],
+                    resources=[props.cognito_user_pool_arn],
+                )
+            )
+
+            # Allow Cognito to invoke the Lambda
+            self._post_confirmation_lambda.function.add_permission(
+                "CognitoInvokePostConfirmation",
+                principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+                source_arn=props.cognito_user_pool_arn,
+            )
+
         # Create a Lambda function for updating Cognito User Pool triggers
         self._cognito_trigger_update_lambda = Lambda(
             self,
@@ -131,18 +179,25 @@ class CognitoUpdateStack(Stack):
         )
 
         # Create a custom resource to update the Cognito triggers
+        custom_resource_properties = {
+            "UserPoolId": props.cognito_user_pool_id,
+            # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
+            "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
+            "Timestamp": str(
+                datetime.datetime.now().timestamp()
+            ),  # Force update on each deployment
+        }
+
+        if idp_group_mapping:
+            custom_resource_properties["PostConfirmationLambdaArn"] = (
+                self._post_confirmation_lambda.function.function_arn
+            )
+
         self._cognito_trigger_update = cdk.CustomResource(
             self,
             "CognitoTriggerUpdate",
             service_token=cognito_update_provider.service_token,
-            properties={
-                "UserPoolId": props.cognito_user_pool_id,
-                # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
-                "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
-                "Timestamp": str(
-                    datetime.datetime.now().timestamp()
-                ),  # Force update on each deployment
-            },
+            properties=custom_resource_properties,
         )
 
         # TODO: Grant permissions for Cognito to invoke pre-signup Lambda (commented out for now)

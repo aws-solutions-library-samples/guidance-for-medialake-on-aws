@@ -264,6 +264,7 @@ class IdentityProviderConfig(BaseModel):
     identity_provider_oidc_issuer_url: Optional[str] = None
     identity_provider_oidc_client_id: Optional[str] = None
     identity_provider_oidc_client_secret: Optional[str] = None
+    identity_provider_default_group_assignment: Optional[str] = None
 
     @validator("identity_provider_method")
     @classmethod
@@ -308,6 +309,20 @@ class IdentityProviderConfig(BaseModel):
         if values.get("identity_provider_method") == "oidc" and not v:
             raise ValueError(
                 "OIDC provider requires identity_provider_oidc_client_id"
+            )
+        return v
+
+    @validator("identity_provider_default_group_assignment", always=True)
+    @classmethod
+    def validate_default_group(cls, v, values):
+        if v is None:
+            return v
+        if values.get("identity_provider_method") == "cognito":
+            return v
+        valid_groups = ["editors", "read-only", "superAdministrators"]
+        if v not in valid_groups:
+            raise ValueError(
+                f"identity_provider_default_group_assignment must be one of {valid_groups}, got '{v}'"
             )
         return v
 
