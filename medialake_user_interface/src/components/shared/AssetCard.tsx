@@ -1255,6 +1255,8 @@ const AssetCard: React.FC<AssetCardProps> = React.memo(
                         setCompactMenuAnchor(null);
                         handleDownloadClick(e);
                       }}
+                      disabled={isRenaming}
+                      sx={{ p: 0.25 }}
                     >
                       <ListItemIcon>
                         <DownloadIcon fontSize="small" />
