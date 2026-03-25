@@ -257,7 +257,7 @@ Key configuration parameters include:
 - **primary_region**: Primary region for deployment
 - **initial_user**: Initial user configuration with email and name
 - **vpc**: VPC configuration for using existing or creating new VPC
-- **authZ**: Identity provider configuration (Cognito, SAML)
+- **authZ**: Identity provider configuration (Cognito, SAML, OIDC)
 - **video_download_enabled** (optional): Enable/disable video download functionality (defaults to `true`)
 - **cloudfront_custom_domain** (optional): Custom domain configuration for CloudFront distribution
   - **domain_name**: Your custom domain name (e.g., "medialake.example.com")
