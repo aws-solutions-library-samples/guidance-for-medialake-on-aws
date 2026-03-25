@@ -64,12 +64,15 @@ class LambdaBuilder:
             self.build_path.mkdir(parents=True, exist_ok=True)
             return
 
-        # Preserve native layer directories that may have been restored from cache
+        # Preserve native layer directories that may have been restored from cache.
+        # Store them *outside* the build_path so rmtree doesn't destroy them.
+        preserve_root = self.build_path.parent / ".preserve_layers"
         preserved: dict[str, Path] = {}
         for name in self.NATIVE_LAYER_NAMES:
             layer_dir = self.layer_build_path / name
             if layer_dir.exists():
-                tmp = self.build_path / f".preserve_{name}"
+                preserve_root.mkdir(parents=True, exist_ok=True)
+                tmp = preserve_root / name
                 shutil.move(str(layer_dir), str(tmp))
                 preserved[name] = tmp
 
@@ -82,6 +85,9 @@ class LambdaBuilder:
             for name, tmp in preserved.items():
                 shutil.move(str(tmp), str(self.layer_build_path / name))
                 print(f"♻️  Preserved cached native layer: {name}")
+            # Clean up the temporary preserve directory
+            if preserve_root.exists():
+                shutil.rmtree(preserve_root)
 
     def build_layer(self, layer_dir: Path):
         """Build layer if it exists"""
