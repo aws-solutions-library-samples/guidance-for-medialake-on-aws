@@ -18,7 +18,13 @@
         "identity_provider_default_group_assignment": "editors",
         "identity_provider_access_token_validity": 10,
         "identity_provider_id_token_validity": 60,
-        "identity_provider_refresh_token_validity": 600
+        "identity_provider_refresh_token_validity": 600,
+        "identity_provider_oidc_attribute_mapping": {
+          "email": "EMAIL",
+          "username": "sub",
+          "given_name": "GIVEN_NAME",
+          "family_name": "FAMILY_NAME"
+        }
       },
       {
         "identity_provider_method": "cognito"

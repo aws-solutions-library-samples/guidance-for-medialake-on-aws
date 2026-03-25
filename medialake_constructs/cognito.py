@@ -350,12 +350,7 @@ class CognitoConstruct(Construct):
                     provider_name=provider.identity_provider_name,
                     provider_type="OIDC",
                     provider_details=provider_details,
-                    attribute_mapping={
-                        "email": "EMAIL",
-                        "username": "sub",
-                        "given_name": "GIVEN_NAME",
-                        "family_name": "FAMILY_NAME",
-                    },
+                    attribute_mapping=provider.identity_provider_oidc_attribute_mapping,
                     idp_identifiers=[provider.identity_provider_name],
                 )
                 supported_providers.append(
