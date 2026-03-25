@@ -223,7 +223,7 @@ If you deployed using the **Git** source type, Media Lake can be updated with th
 
 ## 5. SAML/OIDC Integration
 
-Identity Federation with SAML and OIDC are configured in the config.json file. For example configurations, see ~[config-example.json](../../config-example.json)
+Identity Federation with SAML and OIDC are configured in the config.json file. For example configurations, see [config-example.json](../../config-example.json)
 
 ### SAML Integration
 
@@ -239,13 +239,15 @@ Identity Federation with SAML and OIDC are configured in the config.json file. F
   - `surname` → user.lastName
   - `givenname` → user.firstName
   - `role` → user.role
+- Optionally, configure the identity_provider_default_group_assignment parameter to assign a default group to users as they sign in for the first time.
 
 ### OIDC Integration
 
 1.  Create a Media Lake app in your identity provider
 1.  During the creation, define a Client ID and generate or specify a Client Secret
 1. Obtain the OIDC Issuer URL from your Identity Provider. You are looking for the base domain of a URL similar to https://idp.example.com/.well-known/openid-configuration (ie https://idp.example.com)
-1. Add these values into your config.json file, along with any other optional settings (see below).
+1. Set up or obtain the OIDC attribute mappings in your identity provider. You will need to set up mappings for username, email, first name and given name.
+1. Add these values into your config.json file (see [config-example.json](../../config-example.json) for example values), along with any other optional settings (see below).
 
 ### Optional Settings
 
