@@ -651,8 +651,8 @@ Resources:
                 - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
                 - echo "Build output directory $BUILD_DIR"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                - mkdir -p assets
-                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
+                - mkdir -p assets/dist
+                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
                 # Native layers first - skip if cached output exists
                 - echo "Building FFprobe"
                 - if [ -d "dist/lambdas/layers/ffprobe/bin" ]; then echo "FFprobe layer cached, skipping"; else bash .cicd/build_ffprobe.sh; fi
