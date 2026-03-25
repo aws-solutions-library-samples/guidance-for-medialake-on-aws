@@ -28,16 +28,16 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOn";
 import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { colorTokens, typography } from "@/theme/tokens";
-import { FaFileVideo } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { colorTokens, typography, zIndexTokens } from "@/theme/tokens";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ensureCorrectTypes, normalizeNumericValues } from "../../types";
 import { IconSwitch } from "@/components/common";
 import { PipelineNameInput } from "./";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useRightSidebar, COLLAPSED_WIDTH } from "@/components/common/RightSidebar/SidebarContext";
-import type { Node, Edge, ReactFlowInstance } from "reactflow";
+import type { Node, Edge, ReactFlowInstance } from "@xyflow/react";
 import { IntegrationValidationService } from "../../services/integrationValidation.service";
 import IntegrationValidationDialog from "../../components/IntegrationValidationDialog";
 import type {
@@ -289,7 +289,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   // Check if the icon is an object (serialized React element)
                   icon:
                     node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
-                      <FaFileVideo size={20} />
+                      <VideocamIcon sx={{ fontSize: 20 }} />
                     ) : (
                       node.data.icon
                     ),
@@ -487,7 +487,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
                   // Check if the icon is an object (serialized React element)
                   icon:
                     node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
-                      <FaFileVideo size={20} />
+                      <VideocamIcon sx={{ fontSize: 20 }} />
                     ) : (
                       node.data.icon
                     ),
@@ -694,7 +694,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               // Fix the icon property to ensure it's properly rendered
               icon:
                 node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
-                  <FaFileVideo size={20} />
+                  <VideocamIcon sx={{ fontSize: 20 }} />
                 ) : (
                   node.data.icon
                 ),
@@ -820,7 +820,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               // Fix the icon property to ensure it's properly rendered
               icon:
                 node.data.icon && typeof node.data.icon === "object" && node.data.icon.props ? (
-                  <FaFileVideo size={20} />
+                  <VideocamIcon sx={{ fontSize: 20 }} />
                 ) : (
                   node.data.icon
                 ),
@@ -1153,7 +1153,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
       {/* Loading Backdrop (unchanged) */}
       <Backdrop
         sx={{
-          color: "#fff",
+          color: "common.white",
           zIndex: (t) => t.zIndex.drawer + 1,
           flexDirection: "column",
           gap: 2,
@@ -1168,7 +1168,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
       <Box
         sx={{
           position: "fixed",
-          zIndex: 1100,
+          zIndex: zIndexTokens.appBar,
           left: leftSidebarWidth + 16,
           right: rightSidebarWidth + 16,
           top: 72,
@@ -1274,7 +1274,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
               </Tooltip>
 
               <Popper
-                sx={{ zIndex: 1200 }}
+                sx={{ zIndex: zIndexTokens.sidebar }}
                 open={compactMenuOpen}
                 anchorEl={compactMenuRef.current}
                 role={undefined}
@@ -1532,7 +1532,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
 
               {/* Export menu */}
               <Popper
-                sx={{ zIndex: 1200 }}
+                sx={{ zIndex: zIndexTokens.sidebar }}
                 open={importExportOpen}
                 anchorEl={importExportRef.current as HTMLElement | null}
                 role={undefined}
@@ -1593,7 +1593,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
       <Backdrop
         open={isImporting}
         sx={{
-          color: "#fff",
+          color: "common.white",
           zIndex: (theme) => theme.zIndex.drawer + 1,
         }}
       >

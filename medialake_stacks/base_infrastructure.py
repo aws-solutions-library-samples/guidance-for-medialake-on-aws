@@ -403,6 +403,7 @@ class BaseInfrastructureStack(Stack):
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 removal_policy=RemovalPolicy.DESTROY,
+                ttl_attribute="expiresAt",
             ),
         )
         self._pipeline_table = pipeline_table.table

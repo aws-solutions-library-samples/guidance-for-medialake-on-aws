@@ -234,7 +234,7 @@ const SearchModeSelector: React.FC<SearchModeSelectorProps> = ({ isVisible }) =>
                               fontWeight: isSelected ? 600 : 400,
                               color: isSelected
                                 ? isDark
-                                  ? "#fff"
+                                  ? muiTheme.palette.common.white
                                   : muiTheme.palette.text.primary
                                 : muiTheme.palette.text.secondary,
                               transition: "color 0.15s",

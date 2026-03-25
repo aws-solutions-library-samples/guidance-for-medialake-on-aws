@@ -1,3 +1,53 @@
+/**
+ * Z-index scale — centralized to prevent magic numbers across the codebase.
+ */
+export const zIndexTokens = {
+  stickyContent: 900,
+  stickyHeader: 1000,
+  appBar: 1100,
+  sidebar: 1200,
+  resizeHandle: 1300,
+  modal: 1400,
+  overlay: 1500,
+} as const;
+
+/**
+ * Border radius scale — semantic names for consistent rounding.
+ */
+export const radiusTokens = {
+  xs: "4px",
+  sm: "6px",
+  md: "8px",
+  lg: "12px",
+  xl: "16px",
+  full: "9999px",
+} as const;
+
+/**
+ * Shadow scale — light/dark aware elevation tokens.
+ */
+export const shadowTokens = {
+  sm: {
+    light: "0 1px 3px rgba(0, 0, 0, 0.08)",
+    dark: "0 1px 3px rgba(0, 0, 0, 0.4)",
+  },
+  md: {
+    light: "0 4px 12px rgba(0, 0, 0, 0.1)",
+    dark: "0 4px 12px rgba(0, 0, 0, 0.5)",
+  },
+  lg: {
+    light: "0 8px 24px rgba(0, 0, 0, 0.12)",
+    dark: "0 8px 24px rgba(0, 0, 0, 0.6)",
+  },
+} as const;
+
+/**
+ * Brand colors for third-party services.
+ */
+export const brandTokens = {
+  aws: { orange: "#FF9900" },
+} as const;
+
 export const colorTokens = {
   background: {
     default: {

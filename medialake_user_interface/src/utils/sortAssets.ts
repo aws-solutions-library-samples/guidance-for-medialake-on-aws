@@ -1,8 +1,7 @@
 import { type SortingState } from "@tanstack/react-table";
-import { type AssetBase } from "../types/search/searchResults";
 import { type AssetTableColumn } from "../types/shared/assetComponents";
 
-export function sortAssets<T extends AssetBase>(
+export function sortAssets<T>(
   assets: T[],
   sorting: SortingState,
   columns?: AssetTableColumn<T>[]
@@ -43,18 +42,6 @@ export function sortAssets<T extends AssetBase>(
           return (dateA.getTime() - dateB.getTime()) * (desc ? -1 : 1);
         }
       }
-
-      const comparison = valueA < valueB ? -1 : 1;
-      return desc ? -comparison : comparison;
-    }
-
-    if (column?.accessorFn) {
-      const valueA = column.accessorFn(a);
-      const valueB = column.accessorFn(b);
-
-      if (valueA === valueB) return 0;
-      if (valueA === null || valueA === undefined) return 1;
-      if (valueB === null || valueB === undefined) return -1;
 
       const comparison = valueA < valueB ? -1 : 1;
       return desc ? -comparison : comparison;

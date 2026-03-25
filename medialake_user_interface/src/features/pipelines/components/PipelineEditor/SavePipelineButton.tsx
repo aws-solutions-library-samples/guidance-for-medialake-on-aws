@@ -1,7 +1,7 @@
 import React from "react";
-import { Panel } from "reactflow";
+import { Panel } from "@xyflow/react";
 import { Button } from "@mui/material";
-import { FaSave } from "react-icons/fa";
+import SaveIcon from "@mui/icons-material/Save";
 import { useTranslation } from "react-i18next";
 
 interface SavePipelineButtonProps {
@@ -23,7 +23,7 @@ const SavePipelineButton: React.FC<SavePipelineButtonProps> = ({
         variant="contained"
         color="primary"
         onClick={onClick}
-        startIcon={<FaSave />}
+        startIcon={<SaveIcon />}
         disabled={isEditMode && !hasChanges}
         sx={{
           textTransform: "none",

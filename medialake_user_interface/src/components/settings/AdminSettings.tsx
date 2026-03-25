@@ -129,7 +129,7 @@ const AdminSettings: React.FC = () => {
       {/* System Metrics */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {systemMetrics.map((metric) => (
-          <Grid item xs={12} sm={6} md={3} key={metric.label}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={metric.label}>
             <Card
               elevation={0}
               sx={{
@@ -316,7 +316,7 @@ const AdminSettings: React.FC = () => {
           {t("settings.systemSettings.title", "System Settings")}
         </Typography>
         <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Button
               fullWidth
               variant="outlined"
@@ -333,7 +333,7 @@ const AdminSettings: React.FC = () => {
               {t("admin.buttons.exportAnalytics", "Export Analytics")}
             </Button>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Button
               fullWidth
               variant="outlined"

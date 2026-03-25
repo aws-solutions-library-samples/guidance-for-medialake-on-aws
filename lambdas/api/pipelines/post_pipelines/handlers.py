@@ -1,4 +1,6 @@
 import json
+import os
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 import boto3
@@ -13,15 +15,65 @@ from dynamodb_operations import (
 )
 from eventbridge import create_eventbridge_rule, delete_eventbridge_rule
 from graph_utils import GraphAnalyzer
+from iam_operations import get_events_role_arn
 from lambda_operations import create_lambda_function
 from models import PipelineDefinition
 from s3_loader import load_pipeline_from_s3
 from step_functions_builder import build_step_function_definition, create_step_function
 
+from config import PIPELINES_TABLE, resource_prefix
+
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="PostPipeline")
+
+_cloudfront_domain_cache: str | None = None
+
+
+def _resolve_cloudfront_domain() -> str:
+    """Return the CloudFront domain, falling back to SSM when the env var is empty."""
+    global _cloudfront_domain_cache
+    if _cloudfront_domain_cache:
+        return _cloudfront_domain_cache
+
+    domain = os.environ.get("CLOUDFRONT_DOMAIN", "")
+    if domain:
+        _cloudfront_domain_cache = domain
+        return domain
+
+    # Env var not set (cross-stack ordering) — read from SSM like other Lambdas do.
+    environment = os.environ.get("ENVIRONMENT", "dev")
+    ssm_param = f"/medialake/{environment}/cloudfront-distribution-domain"
+    logger.info(
+        f"CLOUDFRONT_DOMAIN env var is empty, attempting SSM fallback: {ssm_param}"
+    )
+    try:
+        ssm = boto3.client("ssm")
+        resp = ssm.get_parameter(Name=ssm_param)
+        domain = resp["Parameter"]["Value"].strip().strip("/")
+        if domain and not domain.startswith("PENDING"):
+            _cloudfront_domain_cache = domain
+            logger.info(f"Resolved CloudFront domain from SSM: {domain}")
+            return domain
+        else:
+            logger.warning(
+                f"SSM parameter {ssm_param} exists but value is not usable: '{domain}'"
+            )
+    except Exception as e:
+        error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+        if error_code == "ParameterNotFound":
+            logger.error(
+                f"SSM parameter {ssm_param} does not exist. "
+                f"Ensure the MediaLakeUserInterface stack has been deployed."
+            )
+        else:
+            logger.error(
+                f"Failed to read CloudFront domain from SSM ({ssm_param}): "
+                f"{type(e).__name__}: {e}"
+            )
+
+    return ""
 
 
 def transform_pipeline_data(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,6 +183,26 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
         pipeline_name = pipeline.name
         logger.info(f"Processing pipeline: {pipeline_name} - {pipeline.description}")
 
+        # Detect webhook trigger nodes
+        webhook_trigger_nodes = [
+            node
+            for node in pipeline.configuration.nodes
+            if node.data.type.lower() == "trigger" and node.data.id == "trigger_webhook"
+        ]
+        if len(webhook_trigger_nodes) > 1:
+            return {
+                "statusCode": 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps(
+                    {"error": "Only one Webhook Trigger node is allowed per pipeline."}
+                ),
+            }
+
+        has_new_webhook = len(webhook_trigger_nodes) > 0
+
         # Check if pipeline_id is provided in the event
         pipeline_id = event.get("pipeline_id")
 
@@ -158,6 +230,9 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     },
                     "body": json.dumps(error_body),
                 }
+
+            # Determine if old pipeline had a webhook
+            has_old_webhook = bool(existing_pipeline.get("webhookSecretArn"))
 
             # Clean up existing resources before creating new ones
             logger.info(f"Cleaning up existing resources for pipeline: {pipeline_id}")
@@ -265,6 +340,22 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                         logger.error(
                             f"Failed to delete Step Function {state_machine_name}: {e}"
                         )
+
+                if resource_type == "webhook_secret":
+                    # Only delete the secret when the webhook is being removed;
+                    # keep it intact when the new pipeline still has a webhook (rotation reads it)
+                    if has_old_webhook and not has_new_webhook:
+                        try:
+                            boto3.client("secretsmanager").delete_secret(
+                                SecretId=resource_arn, ForceDeleteWithoutRecovery=True
+                            )
+                            logger.info(
+                                f"Deleted existing webhook secret: {resource_arn}"
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to delete webhook secret {resource_arn}: {e}"
+                            )
         # If pipeline_id is not provided, check if a pipeline with this name already exists
         else:
             existing_pipeline = get_pipeline_by_name(pipeline_name)
@@ -286,6 +377,36 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 }
 
         # No execution_uuid generation
+
+        # Validate CLOUDFRONT_DOMAIN early — before any resources are created —
+        # when a new webhook secret/URL will need to be provisioned.
+        needs_new_webhook_secret = has_new_webhook and not (
+            pipeline_id
+            and existing_pipeline
+            and existing_pipeline.get("webhookSecretArn")
+        )
+        if needs_new_webhook_secret:
+            cloudfront_domain = _resolve_cloudfront_domain()
+            if not cloudfront_domain:
+                environment = os.environ.get("ENVIRONMENT", "dev")
+                return {
+                    "statusCode": 503,
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                    "body": json.dumps(
+                        {
+                            "error": (
+                                "CloudFront domain is not available. "
+                                "The CLOUDFRONT_DOMAIN env var is empty and the SSM parameter "
+                                f"/medialake/{environment}/cloudfront-distribution-domain "
+                                "could not be read. Ensure the MediaLakeUserInterface stack "
+                                "has been deployed successfully."
+                            )
+                        }
+                    ),
+                }
 
         # If pipeline_id is not provided, create a new pipeline record
         if not pipeline_id:
@@ -442,6 +563,134 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 f"State machine successfully created for pipeline {pipeline_name}"
             )
 
+            # Provision webhook secret if webhook trigger node exists
+            webhook_secret_arn = None
+            webhook_url = None
+            webhook_auth_method = None
+            webhook_credential_hint = None
+
+            if webhook_trigger_nodes:
+                logger.info("Provisioning webhook secret for webhook trigger node")
+                wh_config = webhook_trigger_nodes[0].data.configuration
+                wh_params = wh_config.get("parameters", {})
+                auth_method = wh_params.get(
+                    "authMethod", wh_config.get("authMethod", "none")
+                )
+                secret_payload = {
+                    "authMethod": auth_method,
+                    "current": {},
+                    "previous": None,
+                    "graceUntil": None,
+                }
+
+                if auth_method == "api_key":
+                    token = wh_params.get("token", wh_config.get("token", ""))
+                    if not token:
+                        return {
+                            "statusCode": 400,
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "Access-Control-Allow-Origin": "*",
+                            },
+                            "body": json.dumps(
+                                {
+                                    "error": "API key token cannot be empty when authMethod is 'api_key'"
+                                }
+                            ),
+                        }
+                    secret_payload["current"] = {"apiKey": token}
+                    webhook_credential_hint = (
+                        f"****{token[-4:]}" if len(token) >= 4 else "****"
+                    )
+                elif auth_method == "basic_auth":
+                    username = wh_params.get("username", wh_config.get("username", ""))
+                    password = wh_params.get("password", wh_config.get("password", ""))
+                    secret_payload["current"] = {
+                        "basicAuthUsername": username,
+                        "basicAuthPassword": password,
+                    }
+                    webhook_credential_hint = (
+                        f"{username[:2]}***" if len(username) >= 2 else "***"
+                    )
+                elif auth_method == "hmac_sha256":
+                    secret = wh_params.get("secret", wh_config.get("secret", ""))
+                    if not secret:
+                        return {
+                            "statusCode": 400,
+                            "headers": {
+                                "Content-Type": "application/json",
+                                "Access-Control-Allow-Origin": "*",
+                            },
+                            "body": json.dumps(
+                                {
+                                    "error": "HMAC secret cannot be empty when authMethod is 'hmac_sha256'"
+                                }
+                            ),
+                        }
+                    sig_header = wh_params.get(
+                        "signatureHeader",
+                        wh_config.get("signatureHeader", "X-Hub-Signature-256"),
+                    )
+                    secret_payload["current"] = {
+                        "hmacSecret": secret,
+                        "signatureHeader": sig_header,
+                    }
+                    webhook_credential_hint = (
+                        f"****{secret[-4:]}" if len(secret) >= 4 else "****"
+                    )
+
+                webhook_auth_method = auth_method
+                sm_client = boto3.client("secretsmanager")
+
+                if (
+                    event.get("pipeline_id")
+                    and existing_pipeline
+                    and existing_pipeline.get("webhookSecretArn")
+                ):
+                    # Update existing secret with rotation
+                    existing_secret_arn = existing_pipeline["webhookSecretArn"]
+                    existing_value = sm_client.get_secret_value(
+                        SecretId=existing_secret_arn
+                    )
+                    existing_payload = json.loads(existing_value["SecretString"])
+                    secret_payload["previous"] = existing_payload.get("current")
+                    secret_payload["graceUntil"] = (
+                        datetime.utcnow() + timedelta(minutes=15)
+                    ).isoformat()
+                    sm_client.update_secret(
+                        SecretId=existing_secret_arn,
+                        SecretString=json.dumps(secret_payload),
+                    )
+                    webhook_secret_arn = existing_secret_arn
+                    webhook_url = existing_pipeline.get("webhookUrl")
+                    logger.info(
+                        f"Updated existing webhook secret: {webhook_secret_arn}"
+                    )
+                else:
+                    # Create new secret
+                    cloudfront_domain = _resolve_cloudfront_domain()
+                    if not cloudfront_domain:
+                        environment = os.environ.get("ENVIRONMENT", "dev")
+                        raise ValueError(
+                            "CloudFront domain is not available. "
+                            "The CLOUDFRONT_DOMAIN env var is empty and the SSM parameter "
+                            f"/medialake/{environment}/cloudfront-distribution-domain "
+                            "could not be read. Ensure the MediaLakeUserInterface stack "
+                            "has been deployed successfully."
+                        )
+                    secret_name = f"{resource_prefix}/webhooks/{pipeline_id}"
+                    create_resp = sm_client.create_secret(
+                        Name=secret_name,
+                        SecretString=json.dumps(secret_payload),
+                        Tags=[
+                            {"Key": "pipelineId", "Value": pipeline_id},
+                            {"Key": "resourcePrefix", "Value": resource_prefix or ""},
+                        ],
+                    )
+                    webhook_secret_arn = create_resp["ARN"]
+                    webhook_url = f"https://{cloudfront_domain}/webhooks/{pipeline_id}"
+                    logger.info(f"Created webhook secret: {webhook_secret_arn}")
+
             # Create EventBridge rules for trigger nodes (excluding manual triggers)
             update_pipeline_status(pipeline_id, "CREATING EVENT RULES")
             logger.info(
@@ -459,6 +708,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 for node in pipeline.configuration.nodes
                 if node.data.type.lower() == "trigger"
                 and node.data.id != "trigger_manual"
+                and node.data.id != "trigger_webhook"
             ]
             manual_trigger_nodes = [
                 node
@@ -532,6 +782,53 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     f"No trigger nodes found in pipeline {pipeline_name}, skipping EventBridge rule creation"
                 )
 
+            # Create dedicated EventBridge rule for webhook trigger
+            if webhook_trigger_nodes and state_machine_arn:
+                logger.info("Creating EventBridge rule for webhook trigger")
+                events_client = boto3.client("events")
+                event_bus_name = os.environ.get("PIPELINES_EVENT_BUS_NAME", "")
+                rule_name = f"{resource_prefix}-webhook-{pipeline_id[:8]}"
+
+                events_client.put_rule(
+                    Name=rule_name,
+                    EventBusName=event_bus_name,
+                    EventPattern=json.dumps(
+                        {
+                            "source": ["medialake.webhook"],
+                            "detail-type": ["WebhookTriggered"],
+                            "detail": {"pipelineId": [pipeline_id]},
+                        }
+                    ),
+                    State="ENABLED" if pipeline.active else "DISABLED",
+                )
+
+                events_role_arn = get_events_role_arn(pipeline_name)
+
+                events_client.put_targets(
+                    Rule=rule_name,
+                    EventBusName=event_bus_name,
+                    Targets=[
+                        {
+                            "Id": "WebhookStepFunctionTarget",
+                            "Arn": state_machine_arn,
+                            "RoleArn": events_role_arn,
+                            "InputTransformer": {
+                                "InputPathsMap": {"detail": "$.detail"},
+                                "InputTemplate": '{"payload": <detail>}',
+                            },
+                        }
+                    ],
+                )
+
+                region = boto3.session.Session().region_name
+                account_id = os.environ.get("ACCOUNT_ID")
+                if not account_id:
+                    account_id = boto3.client("sts").get_caller_identity()["Account"]
+                webhook_rule_arn = f"arn:aws:events:{region}:{account_id}:rule/{event_bus_name}/{rule_name}"
+                eventbridge_rule_arns["trigger_webhook"] = webhook_rule_arn
+                eventbridge_role_arns["trigger_webhook"] = events_role_arn
+                logger.info(f"Created webhook EventBridge rule: {webhook_rule_arn}")
+
             # Update status before final deployment
             update_pipeline_status(pipeline_id, "FINALIZING DEPLOYMENT")
             logger.info(f"Finalizing deployment for pipeline {pipeline_name}")
@@ -558,6 +855,47 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             logger.info(
                 f"Pipeline {pipeline_name} successfully deployed with ID: {pipeline_id}"
             )
+
+            # Post-save DynamoDB update for webhook metadata
+            # If webhook trigger was removed during update, clear webhook metadata
+            if (
+                event.get("pipeline_id")
+                and existing_pipeline
+                and existing_pipeline.get("webhookSecretArn")
+                and len(webhook_trigger_nodes) == 0
+            ):
+                logger.info(
+                    f"Webhook trigger removed from pipeline {pipeline_id}, clearing webhook metadata"
+                )
+                dynamodb = boto3.resource("dynamodb")
+                table = dynamodb.Table(PIPELINES_TABLE)
+                table.update_item(
+                    Key={"id": pipeline_id},
+                    UpdateExpression="REMOVE webhookUrl, webhookAuthMethod, webhookSecretArn, webhookCredentialHint, webhookGraceUntil",
+                )
+
+            if webhook_trigger_nodes and webhook_secret_arn:
+                logger.info("Updating pipeline record with webhook metadata")
+                dynamodb = boto3.resource("dynamodb")
+                table = dynamodb.Table(PIPELINES_TABLE)
+                item_resp = table.get_item(Key={"id": pipeline_id})
+                dependent_resources = item_resp.get("Item", {}).get(
+                    "dependentResources", []
+                )
+                if not any(r[0] == "webhook_secret" for r in dependent_resources):
+                    dependent_resources.append(["webhook_secret", webhook_secret_arn])
+                table.update_item(
+                    Key={"id": pipeline_id},
+                    UpdateExpression="SET webhookUrl = :wu, webhookAuthMethod = :wam, webhookSecretArn = :wsa, webhookCredentialHint = :wch, dependentResources = :dr",
+                    ExpressionAttributeValues={
+                        ":wu": webhook_url,
+                        ":wam": webhook_auth_method,
+                        ":wsa": webhook_secret_arn,
+                        ":wch": webhook_credential_hint,
+                        ":dr": dependent_resources,
+                    },
+                )
+                logger.info("Webhook metadata saved to pipeline record")
 
             # Determine if this was an update or create operation
             operation = "updated" if event.get("pipeline_id") else "created"

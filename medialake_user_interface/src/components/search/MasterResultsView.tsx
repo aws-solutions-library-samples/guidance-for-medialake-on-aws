@@ -7,6 +7,7 @@ import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
 import { useDebounce } from "@/hooks/useDebounce";
 import AssetResultsView from "../shared/AssetResultsView";
+import { AssetItemProvider } from "@/contexts/AssetItemContext";
 import {
   transformResultsToClipMode,
   getClipDisplayName,
@@ -37,17 +38,6 @@ interface MasterResultsViewProps {
   isSemantic?: boolean;
   confidenceThreshold?: number;
   onConfidenceThresholdChange?: (threshold: number) => void;
-
-  // Search fields
-  selectedFields: string[];
-  availableFields: Array<{
-    name: string;
-    displayName: string;
-    description: string;
-    type: string;
-    isDefault: boolean;
-  }>;
-  onFieldsChange: (event: any) => void;
 
   // View preferences
   viewMode: "card" | "table";
@@ -116,11 +106,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   isSemantic = false,
   confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
-
-  // Search fields
-  selectedFields,
-  availableFields,
-  onFieldsChange,
 
   // View preferences
   viewMode,
@@ -246,10 +231,13 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   ); // No dependencies since this function is pure
 
   // Function to check if an asset is selected
-  const isAssetSelected =
-    selectedAssets && selectedAssets.length > 0
-      ? (assetId: string) => selectedAssets.includes(assetId)
-      : undefined;
+  const isAssetSelected = React.useMemo(
+    () =>
+      selectedAssets && selectedAssets.length > 0
+        ? (assetId: string) => selectedAssets.includes(assetId)
+        : undefined,
+    [selectedAssets]
+  );
 
   // Debounce the confidence threshold to reduce rapid filtering during slider interaction
   // Reduced debounce time for more responsive UI
@@ -289,75 +277,112 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
     return filtered;
   }, [transformedResults, isSemantic, isCoactiveProvider, debouncedConfidenceThreshold]);
 
+  // Stable accessor functions
+  const getAssetId = React.useCallback((asset: AssetItem) => asset.InventoryID, []);
+  const getAssetName = React.useCallback(
+    (asset: AssetItem) =>
+      isClipAsset(asset)
+        ? getClipDisplayName(asset)
+        : asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+    []
+  );
+  const getAssetType = React.useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+  const getAssetThumbnail = React.useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
+  const getAssetProxy = React.useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
+
+  const itemActions = React.useMemo(
+    () => ({
+      onAssetClick,
+      onDeleteClick,
+      onDownloadClick: onMenuClick,
+      onAddToCollectionClick,
+      onEditClick,
+      onEditNameChange,
+      onEditNameComplete,
+      editingAssetId,
+      editedName,
+      isAssetFavorited,
+      onFavoriteToggle,
+      isAssetSelected,
+      onSelectToggle,
+      isRenaming,
+      renamingAssetId,
+      isSemantic,
+      confidenceThreshold,
+      getAssetId,
+      getAssetName,
+      getAssetType,
+      getAssetThumbnail,
+      getAssetProxy,
+      renderCardField,
+    }),
+    [
+      onAssetClick,
+      onDeleteClick,
+      onMenuClick,
+      onAddToCollectionClick,
+      onEditClick,
+      onEditNameChange,
+      onEditNameComplete,
+      editingAssetId,
+      editedName,
+      isAssetFavorited,
+      onFavoriteToggle,
+      isAssetSelected,
+      onSelectToggle,
+      isRenaming,
+      renamingAssetId,
+      isSemantic,
+      confidenceThreshold,
+      getAssetId,
+      getAssetName,
+      getAssetType,
+      getAssetThumbnail,
+      getAssetProxy,
+      renderCardField,
+    ]
+  );
+
   return (
-    <AssetResultsView
-      results={filteredResults}
-      originalResults={transformedResults}
-      isSemantic={isSemantic}
-      confidenceThreshold={confidenceThreshold}
-      onConfidenceThresholdChange={onConfidenceThresholdChange}
-      detectedModelVersion={detectedModelVersion}
-      hideConfidenceSlider={isCoactiveProvider}
-      searchMetadata={adjustedSearchMetadata}
-      onPageChange={onPageChange}
-      onPageSizeChange={onPageSizeChange}
-      selectedFields={selectedFields}
-      availableFields={availableFields}
-      onFieldsChange={onFieldsChange}
-      searchTerm={searchTerm}
-      title={t("search.results.title")}
-      groupByType={groupByType}
-      onGroupByTypeChange={onGroupByTypeChange}
-      viewMode={viewMode}
-      onViewModeChange={onViewModeChange}
-      cardSize={cardSize}
-      onCardSizeChange={onCardSizeChange}
-      aspectRatio={aspectRatio}
-      onAspectRatioChange={onAspectRatioChange}
-      thumbnailScale={thumbnailScale}
-      onThumbnailScaleChange={onThumbnailScaleChange}
-      showMetadata={showMetadata}
-      onShowMetadataChange={onShowMetadataChange}
-      sorting={sorting}
-      onSortChange={onSortChange}
-      cardFields={cardFields}
-      onCardFieldToggle={onCardFieldToggle}
-      columns={columns}
-      onColumnToggle={onColumnToggle}
-      onAssetClick={onAssetClick}
-      onDeleteClick={onDeleteClick}
-      onDownloadClick={onMenuClick}
-      onAddToCollectionClick={onAddToCollectionClick}
-      onEditClick={onEditClick}
-      onEditNameChange={onEditNameChange}
-      onEditNameComplete={onEditNameComplete}
-      editingAssetId={editingAssetId}
-      editedName={editedName}
-      isAssetFavorited={isAssetFavorited}
-      onFavoriteToggle={onFavoriteToggle}
-      isAssetSelected={isAssetSelected}
-      onSelectToggle={onSelectToggle}
-      hasSelectedAssets={hasSelectedAssets}
-      selectAllState={selectAllState}
-      onSelectAllToggle={onSelectAllToggle}
-      error={error}
-      isLoading={isLoading}
-      isRenaming={isRenaming}
-      renamingAssetId={renamingAssetId}
-      getAssetId={React.useCallback((asset) => asset.InventoryID, [])}
-      getAssetName={React.useCallback(
-        (asset) =>
-          isClipAsset(asset)
-            ? getClipDisplayName(asset)
-            : asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-                .Name,
-        []
-      )}
-      getAssetType={React.useCallback((asset) => asset.DigitalSourceAsset.Type, [])}
-      getAssetThumbnail={React.useCallback((asset) => asset.thumbnailUrl || "", [])}
-      getAssetProxy={React.useCallback((asset) => asset.proxyUrl || "", [])}
-      renderCardField={renderCardField}
-    />
+    <AssetItemProvider value={itemActions}>
+      <AssetResultsView
+        results={filteredResults}
+        originalResults={transformedResults}
+        isSemantic={isSemantic}
+        confidenceThreshold={confidenceThreshold}
+        onConfidenceThresholdChange={onConfidenceThresholdChange}
+        detectedModelVersion={detectedModelVersion}
+        hideConfidenceSlider={isCoactiveProvider}
+        searchMetadata={adjustedSearchMetadata}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        searchTerm={searchTerm}
+        title={t("search.results.title")}
+        groupByType={groupByType}
+        onGroupByTypeChange={onGroupByTypeChange}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        cardSize={cardSize}
+        onCardSizeChange={onCardSizeChange}
+        aspectRatio={aspectRatio}
+        onAspectRatioChange={onAspectRatioChange}
+        thumbnailScale={thumbnailScale}
+        onThumbnailScaleChange={onThumbnailScaleChange}
+        showMetadata={showMetadata}
+        onShowMetadataChange={onShowMetadataChange}
+        sorting={sorting}
+        onSortChange={onSortChange}
+        cardFields={cardFields}
+        onCardFieldToggle={onCardFieldToggle}
+        columns={columns}
+        onColumnToggle={onColumnToggle}
+        hasSelectedAssets={hasSelectedAssets}
+        selectAllState={selectAllState}
+        onSelectAllToggle={onSelectAllToggle}
+        error={error}
+        isLoading={isLoading}
+      />
+    </AssetItemProvider>
   );
 };
 

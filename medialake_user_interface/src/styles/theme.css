@@ -1,33 +1,4 @@
-:root {
-  /* Light theme variables — unified with tokens.ts */
-  --light-background: #F4F6FA;
-  --light-surface: #ffffff;
-  --light-text-primary: rgba(0, 0, 0, 0.87);
-  --light-text-secondary: rgba(0, 0, 0, 0.6);
-  --light-border: rgba(0, 0, 0, 0.12);
-  --light-hover: rgba(0, 0, 0, 0.04);
-}
-
-:root[data-theme='light'] {
-  --background: var(--light-background);
-  --surface: var(--light-surface);
-  --text-primary: var(--light-text-primary);
-  --text-secondary: var(--light-text-secondary);
-  --border: var(--light-border);
-  --hover: var(--light-hover);
-}
-
-:root[data-theme='dark'] {
-  /* Unified with tokens.ts dark mode values */
-  --background: #161D26;
-  --surface: #1E2732;
-  --text-primary: rgba(255, 255, 255, 0.87);
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --border: rgba(255, 255, 255, 0.12);
-  --hover: rgba(255, 255, 255, 0.04);
-}
-
-body {
-  background-color: var(--background);
-  color: var(--text-primary);
-}
+/* Theme CSS — intentionally minimal.
+ * All design tokens live in tokens.ts and are consumed via the MUI theme.
+ * This file is kept for any future non-MUI CSS variable needs.
+ */

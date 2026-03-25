@@ -1,4 +1,7 @@
-import { NavigationPanelState } from "../types";
+interface NavigationPanelState {
+  collapsed?: boolean;
+  collapsedSections?: Record<number, boolean>;
+}
 
 const PREFIX = "medialake";
 const NAVIGATION_PANEL_STATE_STORAGE_NAME = `${PREFIX}-navigation-panel-state`;

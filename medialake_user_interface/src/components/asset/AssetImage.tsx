@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Paper } from "@mui/material";
 import ImageViewer from "../common/ImageViewer";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface AssetImageProps {
   src: string;
@@ -13,7 +14,7 @@ const AssetImage: React.FC<AssetImageProps> = ({ src, alt }) => {
       sx={{
         position: "sticky",
         top: 120, // Below breadcrumb and header
-        zIndex: 900,
+        zIndex: zIndexTokens.stickyContent,
         mb: 3,
         height: "calc(80vh - 120px)", // Take 80% of viewport height minus top offset
         minHeight: 400, // Increased minimum height

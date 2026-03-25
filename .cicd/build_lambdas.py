@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import json
+import os
 import shutil
 import subprocess  # nosec
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import click
@@ -17,6 +19,10 @@ from config import (
     LAYER_BASE_PATH,
     LAYER_DIST_PATH,
 )
+
+# Number of parallel pip install workers.
+# Kept modest to avoid pip lock contention and memory pressure in CodeBuild.
+PIP_WORKERS = int(os.environ.get("LAMBDA_BUILD_WORKERS", "4"))
 
 
 class LambdaBuilder:
@@ -48,11 +54,40 @@ class LambdaBuilder:
         else:
             return "unknown"
 
+    # Native layer directories that are built by external scripts (not by this builder).
+    # These are cached in CI and should not be wiped during clean.
+    NATIVE_LAYER_NAMES = {"ffprobe", "ffmpeg", "resvg", "numpy", "openexr"}
+
     def clean_build(self):
-        """Remove previous build artifacts"""
-        if self.build_path.exists():
-            shutil.rmtree(self.build_path)
+        """Remove previous build artifacts, preserving cached native layers."""
+        if not self.build_path.exists():
+            self.build_path.mkdir(parents=True, exist_ok=True)
+            return
+
+        # Preserve native layer directories that may have been restored from cache.
+        # Store them *outside* the build_path so rmtree doesn't destroy them.
+        preserve_root = self.build_path.parent / ".preserve_layers"
+        preserved: dict[str, Path] = {}
+        for name in self.NATIVE_LAYER_NAMES:
+            layer_dir = self.layer_build_path / name
+            if layer_dir.exists():
+                preserve_root.mkdir(parents=True, exist_ok=True)
+                tmp = preserve_root / name
+                shutil.move(str(layer_dir), str(tmp))
+                preserved[name] = tmp
+
+        shutil.rmtree(self.build_path)
         self.build_path.mkdir(parents=True, exist_ok=True)
+
+        # Restore preserved native layers
+        if preserved:
+            self.layer_build_path.mkdir(parents=True, exist_ok=True)
+            for name, tmp in preserved.items():
+                shutil.move(str(tmp), str(self.layer_build_path / name))
+                print(f"♻️  Preserved cached native layer: {name}")
+            # Clean up the temporary preserve directory
+            if preserve_root.exists():
+                shutil.rmtree(preserve_root)
 
     def build_layer(self, layer_dir: Path):
         """Build layer if it exists"""
@@ -224,27 +259,122 @@ class LambdaBuilder:
                 str(req_file),
                 "--target",
                 str(target_dir),
-                "--no-cache-dir",
             ],
             check=True,
         )
 
     def build_all(self):
-        """Build all lambda functions"""
+        """Build all lambda functions and layers.
+
+        Layers are built first (sequentially — there are few of them).
+        Lambda file copies happen sequentially (fast, no I/O wait).
+        pip install calls are then run in parallel across all Lambdas
+        that have a requirements.txt, which is the main time sink.
+        """
         print("🏗️  Building Lambda functions...")
 
         self.clean_build()
 
+        # 1. Build layers (sequential — typically only ~8 layers)
         for layer_dir in self.layers_root_path.iterdir():
             self.build_layer(layer_dir)
 
-        # build Lambda functions
-        self.recursive_build(self.lambdas_root_path, self.lambdas_root_path.name)
+        # 2. Collect all Lambda build targets and copy files (fast)
+        pip_jobs: list[tuple[Path, Path]] = []  # (requirements.txt, target_dir)
+        self._collect_and_copy(
+            self.lambdas_root_path, self.lambdas_root_path.name, pip_jobs
+        )
+
+        # 3. Run pip installs in parallel
+        if pip_jobs:
+            print(
+                f"📦 Installing requirements for {len(pip_jobs)} Lambdas ({PIP_WORKERS} workers)..."
+            )
+            errors: list[str] = []
+            with ThreadPoolExecutor(max_workers=PIP_WORKERS) as pool:
+                futures = {
+                    pool.submit(self._install_requirements, req, target): str(req)
+                    for req, target in pip_jobs
+                }
+                for future in as_completed(futures):
+                    req_path = futures[future]
+                    try:
+                        future.result()
+                    except subprocess.CalledProcessError as exc:
+                        errors.append(f"{req_path}: exit code {exc.returncode}")
+            if errors:
+                for err in errors:
+                    print(f"❌ {err}")
+                raise SystemExit("pip install failed for one or more Lambdas")
 
         print("✅ Lambda build complete")
 
+    def _collect_and_copy(
+        self,
+        path: Path,
+        parent_path: str,
+        pip_jobs: list[tuple[Path, Path]],
+    ):
+        """Walk the Lambda tree, copy source files, and collect pip install jobs."""
+        for item in path.iterdir():
+            if item.is_dir() and (item.name == "layers"):
+                continue
+            elif not item.is_dir() or item.name.startswith("."):
+                continue
+
+            lambda_type = self._detect_lambda_type(item)
+            child_path = f"{parent_path}/{item.name}"
+            was_built = False
+
+            if lambda_type == "nodejs":
+                was_built = self.build_lambda_js(item, child_path)
+            elif lambda_type == "python":
+                was_built = self._copy_lambda_files(item, child_path, pip_jobs)
+
+            if not was_built:
+                self._collect_and_copy(item, child_path, pip_jobs)
+
+    def _copy_lambda_files(
+        self,
+        lambda_dir: Path,
+        parent_path: str,
+        pip_jobs: list[tuple[Path, Path]],
+    ) -> bool:
+        """Copy Lambda source files and queue pip install for later parallel execution.
+
+        Returns:
+            bool: True if the directory was built as a Lambda function, False otherwise
+        """
+        if not lambda_dir.is_dir() or lambda_dir.name.startswith("."):
+            return False
+
+        has_files = any(item.is_file() for item in lambda_dir.iterdir())
+        if not has_files:
+            return False
+
+        lambda_build = self.lambda_build_path.parent / parent_path
+        lambda_build.mkdir(parents=True, exist_ok=True)
+
+        print(f"🔨 Copying {lambda_dir.name} → {lambda_build}")
+
+        for item in lambda_dir.iterdir():
+            if item.is_file() and item.suffix == ".py":
+                shutil.copy2(item, lambda_build)
+            elif item.is_dir() and not item.name.startswith("."):
+                target_dir = lambda_build / item.name
+                if target_dir.exists():
+                    shutil.rmtree(target_dir)
+                shutil.copytree(item, target_dir)
+
+        # Queue pip install for parallel execution instead of running inline
+        req_file = lambda_dir / "requirements.txt"
+        if req_file.exists():
+            pip_jobs.append((req_file, lambda_build))
+
+        return True
+
     def recursive_build(self, path: Path, parent_path):
-        """Recursively build lambda functions"""
+        """Recursively build lambda functions (legacy sequential path)"""
         for item in path.iterdir():
             if item.is_dir() and (item.name == "layers"):
                 continue

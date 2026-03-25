@@ -218,7 +218,8 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
     setActiveStep(0);
     setSelectedNodeId("");
     form.reset(defaultFormValues);
-  }, [form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleNodeSelect = React.useCallback(
     (node: IntegrationNode) => {
@@ -242,7 +243,8 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       // Automatically go to next step when node is selected
       setActiveStep(1);
     },
-    [form]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   // Reset form when modal closes or initialize for editing
@@ -275,7 +277,9 @@ export const IntegrationForm: React.FC<IntegrationFormProps> = ({
       // Skip to configuration step for editing
       setActiveStep(1);
     }
-  }, [open, handleReset, isEditMode, editingIntegration, form]);
+  }, [open, handleReset, isEditMode, editingIntegration]);
+  // Note: `form` intentionally excluded from deps - it's a stable ref from useForm
+  // Including it causes infinite re-renders in React 19 since the spread object changes identity each render
 
   const renderContent = () => {
     if (isLoadingNodes) {

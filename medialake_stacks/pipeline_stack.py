@@ -63,6 +63,7 @@ class PipelineStackProps:
     # System Settings table configuration
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
+    cloudfront_domain: str = ""
 
 
 class PipelineStack(cdk.NestedStack):
@@ -130,6 +131,7 @@ class PipelineStack(cdk.NestedStack):
                 # System Settings table configuration
                 system_settings_table_name=props.system_settings_table_name,
                 system_settings_table_arn=props.system_settings_table_arn,
+                cloudfront_domain=props.cloudfront_domain,
             ),
         )
 

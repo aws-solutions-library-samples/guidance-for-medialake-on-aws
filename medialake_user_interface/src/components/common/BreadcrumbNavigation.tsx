@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { Box, Typography, IconButton, Menu, MenuItem, Divider } from "@mui/material";
-import { ChevronLeft, History, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import HistoryIcon from "@mui/icons-material/History";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { useNavigate } from "react-router";
 import { useRecentlyViewed } from "../../contexts/RecentlyViewedContext";
 import { formatDistanceToNow } from "date-fns";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface BreadcrumbNavigationProps {
   searchTerm: string;
@@ -54,7 +57,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
       sx={{
         position: "sticky",
         top: 64,
-        zIndex: 1100,
+        zIndex: zIndexTokens.appBar,
         bgcolor: "transparent",
         px: 0,
         py: 0,
@@ -66,7 +69,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
       {/* Left Section */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         <IconButton onClick={handleBackClick} size="small">
-          <ChevronLeft />
+          <ChevronLeftIcon />
         </IconButton>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Box
@@ -90,7 +93,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
       {/* Right Section - Only History */}
       <Box sx={{ display: "flex", alignItems: "center" }}>
         <IconButton onClick={handleHistoryClick} size="small" aria-label="show history">
-          <History />
+          <HistoryIcon />
         </IconButton>
         <Menu
           anchorEl={anchorEl}
@@ -121,7 +124,7 @@ const BreadcrumbNavigation: React.FC<BreadcrumbNavigationProps> = ({
               Recently Viewed
             </Typography>
             <IconButton size="small" onClick={clearAll} sx={{ color: "text.secondary" }}>
-              <Trash2 size={16} />
+              <DeleteIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Box>
           <Divider />

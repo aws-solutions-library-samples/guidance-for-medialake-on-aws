@@ -128,7 +128,7 @@ export const usePipelineColumns = ({
                     sx={{
                       fontWeight: 500,
                       fontSize: "0.75rem",
-                      color: isActive ? "#2F855A" : "text.disabled",
+                      color: isActive ? colorTokens.success.dark : "text.disabled",
                     }}
                   >
                     {isActive ? "Active" : "Inactive"}
@@ -141,18 +141,18 @@ export const usePipelineColumns = ({
           const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
             CREATING: {
               color: colorTokens.info.main,
-              bg: `rgba(49, 130, 206, 0.08)`,
-              border: `rgba(49, 130, 206, 0.2)`,
+              bg: alpha(colorTokens.info.main, 0.08),
+              border: alpha(colorTokens.info.main, 0.2),
             },
             FAILED: {
               color: colorTokens.error.main,
-              bg: `rgba(229, 62, 62, 0.08)`,
-              border: `rgba(229, 62, 62, 0.2)`,
+              bg: alpha(colorTokens.error.main, 0.08),
+              border: alpha(colorTokens.error.main, 0.2),
             },
             DELETING: {
               color: colorTokens.warning.main,
-              bg: `rgba(221, 107, 32, 0.08)`,
-              border: `rgba(221, 107, 32, 0.2)`,
+              bg: alpha(colorTokens.warning.main, 0.08),
+              border: alpha(colorTokens.warning.main, 0.2),
             },
           };
 

@@ -21,27 +21,28 @@ import {
   BookmarkBorder,
   LocalOffer,
 } from "@mui/icons-material";
+import type { SvgIconComponent } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { ALL_ICONS } from "@/components/collections/ThumbnailSelector";
 
 // Map of icon names to Material-UI icon components
-const ICON_MAP: Record<string, React.ReactElement> = {
-  Folder: <FolderIcon />,
-  FolderOpen: <FolderOpenIcon />,
-  Work: <Work />,
-  Campaign: <Campaign />,
-  Assignment: <Assignment />,
-  Archive: <Archive />,
-  PhotoLibrary: <PhotoLibraryIcon />,
-  Label: <Label />,
-  Movie: <Movie />,
-  Collections: <CollectionsIcon />,
-  Dashboard: <Dashboard />,
-  Storage: <Storage />,
-  Inventory: <Inventory />,
-  Category: <Category />,
-  BookmarkBorder: <BookmarkBorder />,
-  LocalOffer: <LocalOffer />,
+const ICON_MAP: Record<string, SvgIconComponent> = {
+  Folder: FolderIcon,
+  FolderOpen: FolderOpenIcon,
+  Work: Work,
+  Campaign: Campaign,
+  Assignment: Assignment,
+  Archive: Archive,
+  PhotoLibrary: PhotoLibraryIcon,
+  Label: Label,
+  Movie: Movie,
+  Collections: CollectionsIcon,
+  Dashboard: Dashboard,
+  Storage: Storage,
+  Inventory: Inventory,
+  Category: Category,
+  BookmarkBorder: BookmarkBorder,
+  LocalOffer: LocalOffer,
 };
 
 export interface CollectionCardSimpleProps {
@@ -102,12 +103,15 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
 
     // Priority 3: Collection type icon
     if (iconName && ICON_MAP[iconName]) {
-      return React.cloneElement(ICON_MAP[iconName], {
-        sx: {
-          fontSize: 48,
-          color: color ? alpha(color, 0.3) : alpha(theme.palette.primary.main, 0.18),
-        },
-      });
+      const IconComp = ICON_MAP[iconName];
+      return (
+        <IconComp
+          sx={{
+            fontSize: 48,
+            color: color ? alpha(color, 0.3) : alpha(theme.palette.primary.main, 0.18),
+          }}
+        />
+      );
     }
 
     // Fallback
@@ -198,9 +202,9 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
               fontWeight: 500,
               color: isPublic ? "success.main" : "text.secondary",
               borderColor: isPublic
-                ? alpha(colorTokens.success.main, 0.35)
+                ? alpha(theme.palette.success.main, 0.35)
                 : alpha(theme.palette.text.secondary, 0.15),
-              bgcolor: isPublic ? alpha(colorTokens.success.main, 0.06) : "transparent",
+              bgcolor: isPublic ? alpha(theme.palette.success.main, 0.06) : "transparent",
               "& .MuiChip-icon": {
                 color: isPublic ? "success.main" : "text.secondary",
                 fontSize: 12,

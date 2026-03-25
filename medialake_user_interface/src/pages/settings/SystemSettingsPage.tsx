@@ -44,7 +44,7 @@ import { ApiKeyManagement } from "@/components/settings/api-keys";
 import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
 import CollectionTypesManagement from "@/components/settings/CollectionTypesManagement";
-import { useFeatureFlag } from "@/utils/featureFlags";
+import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 
 // Fallback notification hook
 const useNotificationWithFallback = () => {
@@ -331,7 +331,7 @@ const SystemSettingsPage: React.FC = () => {
             <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
             <Tab label={t("settings.systemSettings.tabs.apiKeys", "API Keys")} />
             <Tab label={t("settings.systemSettings.tabs.collections", "Collections")} />
-            {systemUpgradesEnabled.value && (
+            {systemUpgradesEnabled && (
               <Tab label={t("settings.systemSettings.tabs.upgrades", "Upgrades")} />
             )}
           </Tabs>
@@ -809,10 +809,38 @@ const SystemSettingsPage: React.FC = () => {
               }
             </Can>
           </TabPanel>
-          {systemUpgradesEnabled.value && (
+          {systemUpgradesEnabled && (
             <TabPanel value={tabValue} index={2}>
-              {/* Temporarily removed permission check for debugging */}
-              <UpgradeSection />
+              <Can I="manage" a="system-settings">
+                <UpgradeSection />
+              </Can>
+              <Can I="manage" a="system-settings">
+                {(allowed) =>
+                  !allowed && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        textAlign: "center",
+                        py: 8,
+                      }}
+                    >
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        {t("permissions.accessDenied", "Access Denied")}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {t(
+                          "permissions.upgradeAccessDenied",
+                          "You don't have permission to manage system upgrades."
+                        )}
+                      </Typography>
+                    </Box>
+                  )
+                }
+              </Can>
             </TabPanel>
           )}
         </Box>

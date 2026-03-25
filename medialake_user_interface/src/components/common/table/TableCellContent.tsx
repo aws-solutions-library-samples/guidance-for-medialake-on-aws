@@ -49,6 +49,7 @@ const TableCellContentBase = ({
       aria-label={ariaLabel}
     >
       <Typography
+        component="div"
         variant="body2"
         sx={{
           ...styles,

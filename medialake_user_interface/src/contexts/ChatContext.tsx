@@ -34,65 +34,53 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Open the chat sidebar
-  const openChat = () => setIsOpen(true);
+  const openChat = React.useCallback(() => setIsOpen(true), []);
+  const closeChat = React.useCallback(() => setIsOpen(false), []);
+  const toggleChat = React.useCallback(() => setIsOpen((prev) => !prev), []);
 
-  // Close the chat sidebar
-  const closeChat = () => setIsOpen(false);
+  const addMessage = React.useCallback(
+    (content: string, sender: "user" | "system", isThinking: boolean = false) => {
+      const newMessage: ChatMessage = {
+        id: Date.now().toString(),
+        content,
+        sender,
+        timestamp: new Date(),
+        isThinking,
+      };
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
+    },
+    []
+  );
 
-  // Toggle the chat sidebar open/closed state
-  const toggleChat = () => setIsOpen((prev) => !prev);
-
-  // Add a new message to the chat history
-  const addMessage = (content: string, sender: "user" | "system", isThinking: boolean = false) => {
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(), // Simple ID generation
-      content,
-      sender,
-      timestamp: new Date(),
-      isThinking,
-    };
-
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-  };
-
-  // Update the content of the last message (useful for replacing "thinking" messages)
-  const updateLastMessage = (content: string) => {
+  const updateLastMessage = React.useCallback((content: string) => {
     setMessages((prevMessages) => {
       if (prevMessages.length === 0) return prevMessages;
-
       const updatedMessages = [...prevMessages];
       const lastMessage = { ...updatedMessages[updatedMessages.length - 1] };
       lastMessage.content = content;
       lastMessage.isThinking = false;
       updatedMessages[updatedMessages.length - 1] = lastMessage;
-
       return updatedMessages;
     });
-  };
+  }, []);
 
-  // Clear all messages from the chat history
-  const clearHistory = () => {
-    setMessages([]);
-  };
+  const clearHistory = React.useCallback(() => setMessages([]), []);
 
-  // Provide the chat context to children components
-  return (
-    <ChatContext.Provider
-      value={{
-        isOpen,
-        messages,
-        openChat,
-        closeChat,
-        toggleChat,
-        addMessage,
-        updateLastMessage,
-        clearHistory,
-      }}
-    >
-      {children}
-    </ChatContext.Provider>
+  const value = React.useMemo(
+    () => ({
+      isOpen,
+      messages,
+      openChat,
+      closeChat,
+      toggleChat,
+      addMessage,
+      updateLastMessage,
+      clearHistory,
+    }),
+    [isOpen, messages, openChat, closeChat, toggleChat, addMessage, updateLastMessage, clearHistory]
   );
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
 // Custom hook to use the chat context

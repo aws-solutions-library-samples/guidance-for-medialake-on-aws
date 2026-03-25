@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { useRightSidebar, COLLAPSED_WIDTH } from "./SidebarContext";
 import { alpha } from "@mui/material/styles";
 import { springEasing } from "@/constants";
+import { zIndexTokens } from "@/theme/tokens";
 
 interface RightSidebarProps {
   children: ReactNode;
@@ -83,7 +84,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
           height: "calc(100vh - 88px)",
           display: "flex",
           flexDirection: "column",
-          zIndex: 1200,
+          zIndex: zIndexTokens.sidebar,
           borderRadius: "16px 0 0 16px",
           boxShadow: (theme) =>
             isExpanded ? `0 4px 20px ${alpha(theme.palette.common.black, 0.1)}` : "none",
@@ -102,7 +103,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
               width: "8px",
               height: "100%",
               cursor: "col-resize",
-              zIndex: 1300,
+              zIndex: zIndexTokens.resizeHandle,
               "&:hover": {
                 backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
               },
@@ -150,7 +151,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
           justifyContent: "center",
           border: "1px solid",
           borderColor: "divider",
-          zIndex: 1201,
+          zIndex: zIndexTokens.sidebar + 1,
           padding: 0,
           transition: isResizing
             ? "none"
@@ -180,7 +181,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ children, alwaysVisi
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 1199,
+            zIndex: zIndexTokens.sidebar - 1,
             cursor: "col-resize",
           }}
         />

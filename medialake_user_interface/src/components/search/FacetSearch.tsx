@@ -31,14 +31,7 @@ import {
   TextFieldsOutlined as TextIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-
-// File size units for conversion
-const FILE_SIZE_UNITS = [
-  { value: 1, label: "B" },
-  { value: 1024, label: "KB" },
-  { value: 1024 * 1024, label: "MB" },
-  { value: 1024 * 1024 * 1024, label: "GB" },
-];
+import { FILE_SIZE_UNITS } from "@/constants/fileSizeUnits";
 
 export interface FacetSearchProps {
   onApplyFilters: (filters: FacetFilters) => void;
@@ -310,7 +303,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
             {currentTab === 0 && (
               <Grid container spacing={1}>
                 {availableTypes.map((type) => (
-                  <Grid item xs={6} key={type.key}>
+                  <Grid size={6} key={type.key}>
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -336,7 +329,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                 {availableExtensions.length > 0 ? (
                   <Grid container spacing={1}>
                     {availableExtensions.map((ext) => (
-                      <Grid item xs={4} key={ext.key}>
+                      <Grid size={4} key={ext.key}>
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -383,7 +376,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
             {/* File Size Tab */}
             {currentTab === 2 && (
               <Grid container spacing={2}>
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                     {t("search.filters.minSize", "Minimum Size")}
                   </Typography>
@@ -419,7 +412,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                   </Box>
                 </Grid>
 
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                     {t("search.filters.maxSize", "Maximum Size")}
                   </Typography>
@@ -461,7 +454,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
             {currentTab === 3 && (
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                       {t("search.filters.fromDate", "From Date")}
                     </Typography>
@@ -478,7 +471,7 @@ const FacetSearch: React.FC<FacetSearchProps> = ({
                     />
                   </Grid>
 
-                  <Grid item xs={6}>
+                  <Grid size={6}>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
                       {t("search.filters.toDate", "To Date")}
                     </Typography>

@@ -1,24 +1,28 @@
 import React from "react";
-import { Box, Typography, LinearProgress, Slider } from "@mui/material";
+import { Box, Typography, LinearProgress } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { type SortingState } from "@tanstack/react-table";
-import { type AssetTableColumn } from "@/types/shared/assetComponents";
+import { type AssetTableColumn, type AssetField } from "@/types/shared/assetComponents";
+import {
+  useAssetAccessors,
+  useAssetActions,
+  useAssetEditingState,
+} from "@/contexts/AssetItemContext";
 import AssetViewControls from "./AssetViewControls";
 import AssetPagination from "./AssetPagination";
 import AssetGridView from "./AssetGridView";
 import AssetTableView from "./AssetTableView";
 import ErrorDisplay from "./ErrorDisplay";
-import { CONFIDENCE_COLORS, getThresholdsForModel } from "@/components/common/utils";
+import { sortAssets } from "@/utils/sortAssets";
+import ConfidenceSlider from "./ConfidenceSlider";
+import { zIndexTokens } from "@/theme/tokens";
 
-export interface AssetField {
-  id: string;
-  label: string;
-  visible: boolean;
-}
+export type { AssetField };
 
 export interface AssetResultsViewProps<T> {
+  // Data
   results: T[];
-  originalResults?: T[]; // Original unfiltered results for confidence filtering
+  originalResults?: T[];
   searchMetadata: {
     totalResults: number;
     page: number;
@@ -28,25 +32,17 @@ export interface AssetResultsViewProps<T> {
   onPageSizeChange: (newPageSize: number) => void;
   searchTerm?: string;
   title?: string;
+  error?: { status: string; message: string } | null;
+  isLoading?: boolean;
 
   // Semantic search confidence filtering
   isSemantic?: boolean;
   confidenceThreshold?: number;
   onConfidenceThresholdChange?: (threshold: number) => void;
-  detectedModelVersion?: string; // Model version detected from search results for threshold calculation
-  hideConfidenceSlider?: boolean; // Hide the confidence slider (e.g. for Coactive provider)
+  detectedModelVersion?: string;
+  hideConfidenceSlider?: boolean;
 
-  // Search fields
-  selectedFields?: string[];
-  availableFields?: Array<{
-    name: string;
-    displayName: string;
-    description: string;
-    type: string;
-    isDefault: boolean;
-  }>;
-  onFieldsChange?: (event: any) => void;
-
+  // View preferences
   groupByType: boolean;
   onGroupByTypeChange: (checked: boolean) => void;
   viewMode: "card" | "table";
@@ -68,38 +64,11 @@ export interface AssetResultsViewProps<T> {
   onCardFieldToggle: (fieldId: string) => void;
   columns: AssetTableColumn<T>[];
   onColumnToggle: (columnId: string) => void;
-  // Asset action handlers
-  onAssetClick: (asset: T) => void;
-  onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  showRemoveButton?: boolean; // Show - icon instead of + for collection view
-  onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
-  editingAssetId?: string;
-  editedName?: string;
-  // Favorite functionality
-  isAssetFavorited?: (assetId: string) => boolean;
-  onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  // Selection functionality
-  isAssetSelected?: (assetId: string) => boolean;
-  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  // Select all functionality
+
+  // Select all (used by AssetViewControls toolbar)
   hasSelectedAssets?: boolean;
   selectAllState?: "none" | "some" | "all";
   onSelectAllToggle?: () => void;
-  error?: { status: string; message: string } | null;
-  isLoading?: boolean;
-  isRenaming?: boolean; // Add isRenaming prop for loading state
-  renamingAssetId?: string; // ID of the asset currently being renamed
-  // Functions to extract data from asset objects
-  getAssetId: (asset: T) => string;
-  getAssetName: (asset: T) => string;
-  getAssetType: (asset: T) => string;
-  getAssetThumbnail: (asset: T) => string;
-  getAssetProxy?: (asset: T) => string;
-  renderCardField: (fieldId: string, asset: T) => React.ReactNode;
 }
 
 function AssetResultsView<T>({
@@ -110,18 +79,17 @@ function AssetResultsView<T>({
   onPageSizeChange,
   searchTerm,
   title = "Results",
+  error,
+  isLoading,
 
-  // Semantic search confidence filtering
+  // Semantic search
   isSemantic = false,
   confidenceThreshold = 0.57,
   onConfidenceThresholdChange,
   detectedModelVersion,
   hideConfidenceSlider = false,
 
-  // Search fields
-  selectedFields,
-  availableFields,
-  onFieldsChange,
+  // View preferences
   groupByType,
   onGroupByTypeChange,
   viewMode,
@@ -140,51 +108,93 @@ function AssetResultsView<T>({
   onCardFieldToggle,
   columns,
   onColumnToggle,
-  onAssetClick,
-  onDeleteClick,
-  onDownloadClick,
-  onAddToCollectionClick,
-  showRemoveButton = false,
-  onEditClick,
-  onEditNameChange,
-  onEditNameComplete,
-  editingAssetId,
-  editedName,
-  isAssetFavorited,
-  onFavoriteToggle,
-  isAssetSelected,
-  onSelectToggle,
-  // Select all functionality
+
+  // Select all
   hasSelectedAssets,
   selectAllState,
   onSelectAllToggle,
-  error,
-  isLoading,
-  isRenaming,
-  renamingAssetId,
-  getAssetId,
-  getAssetName,
-  getAssetType,
-  getAssetThumbnail,
-  getAssetProxy,
-  renderCardField,
 }: AssetResultsViewProps<T>) {
   const { t } = useTranslation();
 
-  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  // Pull action handlers + accessors from split contexts for better performance
+  const {
+    getAssetId,
+    getAssetName,
+    getAssetType,
+    getAssetThumbnail,
+    getAssetProxy,
+    renderCardField,
+  } = useAssetAccessors<T>();
 
-  // Local state for slider value during dragging (to prevent constant re-filtering)
-  const [sliderValue, setSliderValue] = React.useState(confidenceThreshold);
-  const [isSliderActive, setIsSliderActive] = React.useState(false);
+  const {
+    onAssetClick,
+    onDeleteClick,
+    onDownloadClick,
+    onAddToCollectionClick,
+    showRemoveButton = false,
+    onEditClick,
+    onEditNameChange,
+    onEditNameComplete,
+    onFavoriteToggle,
+    onSelectToggle,
+  } = useAssetActions<T>();
 
-  // Update local slider value when confidence threshold changes from parent
-  React.useEffect(() => {
-    if (!isSliderActive) {
-      setSliderValue(confidenceThreshold);
-    }
-  }, [confidenceThreshold, isSliderActive]);
+  const {
+    editingAssetId,
+    editedName,
+    isAssetFavorited,
+    isAssetSelected,
+    isRenaming,
+    renamingAssetId,
+  } = useAssetEditingState();
 
-  // If there's an error, display the error component
+  // Memoize sorted results to prevent video player unmount/remount
+  const sortedResults = React.useMemo(
+    () => sortAssets(results, sorting, columns),
+    [results, sorting, columns]
+  );
+
+  const isConfidenceFiltered =
+    isSemantic &&
+    !hideConfidenceSlider &&
+    confidenceThreshold > 0 &&
+    !!originalResults &&
+    results.length !== originalResults.length;
+
+  // Shared controls props (used in both error and success paths)
+  const controlsProps = {
+    viewMode,
+    onViewModeChange,
+    title: "" as const,
+    sorting,
+    sortOptions: columns
+      .filter((col) => col.sortable)
+      .map((col) => ({ id: col.id, label: col.label })),
+    onSortChange: (columnId: string) => {
+      const currentSort = sorting[0];
+      const desc = currentSort?.id === columnId ? !currentSort.desc : false;
+      onSortChange([{ id: columnId, desc }]);
+    },
+    fields:
+      viewMode === "card"
+        ? cardFields
+        : columns.map((col) => ({ id: col.id, label: col.label, visible: col.visible })),
+    onFieldToggle: viewMode === "card" ? onCardFieldToggle : onColumnToggle,
+    groupByType,
+    onGroupByTypeChange,
+    cardSize,
+    onCardSizeChange,
+    aspectRatio,
+    onAspectRatioChange,
+    thumbnailScale,
+    onThumbnailScaleChange,
+    showMetadata,
+    onShowMetadataChange,
+    hasSelectedAssets,
+    selectAllState,
+    onSelectAllToggle,
+  };
+
   if (error) {
     return (
       <Box>
@@ -205,51 +215,7 @@ function AssetResultsView<T>({
             {title}
           </Typography>
         </Box>
-
-        <AssetViewControls
-          viewMode={viewMode}
-          onViewModeChange={onViewModeChange}
-          title=""
-          sorting={sorting}
-          sortOptions={columns
-            .filter((col) => col.sortable)
-            .map((col) => ({
-              id: col.id,
-              label: col.label,
-            }))}
-          onSortChange={(columnId) => {
-            const currentSort = sorting[0];
-            const desc = currentSort?.id === columnId ? !currentSort.desc : false;
-            onSortChange([{ id: columnId, desc }]);
-          }}
-          fields={
-            viewMode === "card"
-              ? cardFields
-              : columns.map((col) => ({
-                  id: col.id,
-                  label: col.label,
-                  visible: col.visible,
-                }))
-          }
-          onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
-          selectedFields={selectedFields}
-          availableFields={availableFields}
-          onFieldsChange={onFieldsChange}
-          groupByType={groupByType}
-          onGroupByTypeChange={onGroupByTypeChange}
-          cardSize={cardSize}
-          onCardSizeChange={onCardSizeChange}
-          aspectRatio={aspectRatio}
-          onAspectRatioChange={onAspectRatioChange}
-          thumbnailScale={thumbnailScale}
-          onThumbnailScaleChange={onThumbnailScaleChange}
-          showMetadata={showMetadata}
-          onShowMetadataChange={onShowMetadataChange}
-          hasSelectedAssets={hasSelectedAssets}
-          selectAllState={selectAllState}
-          onSelectAllToggle={onSelectAllToggle}
-        />
-
+        <AssetViewControls {...controlsProps} />
         <ErrorDisplay
           title={t("search.results.error")}
           message={t("search.results.errorMessage")}
@@ -263,13 +229,7 @@ function AssetResultsView<T>({
     <Box>
       {isLoading && (
         <LinearProgress
-          sx={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 9999,
-          }}
+          sx={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: zIndexTokens.overlay }}
         />
       )}
       <Box sx={{ mb: 3 }}>
@@ -283,383 +243,80 @@ function AssetResultsView<T>({
             gap: 2,
           }}
         >
-          {/* Left side — title + results count */}
           <Box>
-            <Typography
-              variant="h4"
-              component="h1"
-              sx={{
-                fontWeight: 700,
-                color: "primary.main",
-              }}
-            >
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: "primary.main" }}>
               {title}
             </Typography>
             {searchMetadata?.totalResults > 0 && searchTerm && (
-              <Typography
-                variant="body1"
-                sx={{
-                  color: "text.secondary",
-                  mt: 0.5,
-                }}
-              >
-                Found{" "}
-                {isSemantic &&
-                !hideConfidenceSlider &&
-                confidenceThreshold > 0 &&
-                originalResults &&
-                results.length !== originalResults.length
-                  ? results.length
-                  : searchMetadata.totalResults}{" "}
-                results for &ldquo;{searchTerm}&rdquo;
+              <Typography variant="body1" sx={{ color: "text.secondary", mt: 0.5 }}>
+                {t("search.results.found", {
+                  count: isConfidenceFiltered ? results.length : searchMetadata.totalResults,
+                  term: searchTerm,
+                })}
               </Typography>
             )}
           </Box>
 
-          {/* Confidence Slider - Only show for semantic search, hidden for Coactive provider */}
-          {isSemantic &&
-            !hideConfidenceSlider &&
-            (() => {
-              // Use detected model version for thresholds, defaults to 2.7 if not available
-              const thresholds = getThresholdsForModel(detectedModelVersion);
-              const confidenceMarks = [
-                {
-                  value: thresholds.MIN,
-                  label: (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: CONFIDENCE_COLORS.LOW,
-                        }}
-                      />
-                      <span>Low</span>
-                    </Box>
-                  ),
-                },
-                {
-                  value: thresholds.MEDIUM,
-                  label: (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: CONFIDENCE_COLORS.MEDIUM,
-                        }}
-                      />
-                      <span>Med</span>
-                    </Box>
-                  ),
-                },
-                {
-                  value: thresholds.HIGH,
-                  label: (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: CONFIDENCE_COLORS.HIGH,
-                        }}
-                      />
-                      <span>High</span>
-                    </Box>
-                  ),
-                },
-              ];
-
-              return (
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1.5,
-                    minWidth: 320,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: "0.875rem",
-                      color: "text.secondary",
-                      whiteSpace: "nowrap",
-                      pr: 0.5,
-                      mt: -3.0,
-                    }}
-                  >
-                    Confidence:
-                  </Typography>
-                  <Slider
-                    value={sliderValue}
-                    onChange={(_, value) => {
-                      setSliderValue(value as number);
-                      setIsSliderActive(true);
-                    }}
-                    onChangeCommitted={(_, value) => {
-                      setIsSliderActive(false);
-                      onConfidenceThresholdChange?.(value as number);
-                    }}
-                    min={thresholds.MIN}
-                    max={thresholds.MAX}
-                    step={0.001}
-                    marks={confidenceMarks}
-                    size="small"
-                    sx={{
-                      width: 200,
-                      mb: 3,
-                      "& .MuiSlider-thumb": {
-                        width: 16,
-                        height: 16,
-                      },
-                      "& .MuiSlider-track": {
-                        height: 3,
-                      },
-                      "& .MuiSlider-rail": {
-                        height: 3,
-                      },
-                      "& .MuiSlider-mark": {
-                        display: "none",
-                      },
-                      "& .MuiSlider-markLabel": {
-                        fontSize: "0.7rem",
-                        color: "text.secondary",
-                        top: 28,
-                      },
-                      // Position Low at left edge (min)
-                      "& .MuiSlider-markLabel[data-index='0']": {
-                        left: "0% !important",
-                        transform: "translateX(0)",
-                      },
-                      // Position Med at center
-                      "& .MuiSlider-markLabel[data-index='1']": {
-                        left: "50% !important",
-                        transform: "translateX(-50%)",
-                      },
-                      // Position High at right edge (max)
-                      "& .MuiSlider-markLabel[data-index='2']": {
-                        left: "100% !important",
-                        transform: "translateX(-100%)",
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      minWidth: 50,
-                      fontSize: "0.875rem",
-                      color: "text.secondary",
-                      textAlign: "center",
-                      fontWeight: 500,
-                      mt: -3.0,
-                    }}
-                  >
-                    {sliderValue.toFixed(3).substring(1)}
-                  </Typography>
-                </Box>
-              );
-            })()}
+          {isSemantic && !hideConfidenceSlider && (
+            <ConfidenceSlider
+              value={confidenceThreshold}
+              modelVersion={detectedModelVersion}
+              onChange={() => {}}
+              onChangeCommitted={(value) => onConfidenceThresholdChange?.(value)}
+            />
+          )}
         </Box>
       </Box>
-      <AssetViewControls
-        viewMode={viewMode}
-        onViewModeChange={onViewModeChange}
-        title=""
-        sorting={sorting}
-        sortOptions={columns
-          .filter((col) => col.sortable)
-          .map((col) => ({
-            id: col.id,
-            label: col.label,
-          }))}
-        onSortChange={(columnId) => {
-          const currentSort = sorting[0];
-          const desc = currentSort?.id === columnId ? !currentSort.desc : false;
-          onSortChange([{ id: columnId, desc }]);
-        }}
-        fields={
-          viewMode === "card"
-            ? cardFields
-            : columns.map((col) => ({
-                id: col.id,
-                label: col.label,
-                visible: col.visible,
-              }))
-        }
-        onFieldToggle={viewMode === "card" ? onCardFieldToggle : onColumnToggle}
-        selectedFields={selectedFields}
-        availableFields={availableFields}
-        onFieldsChange={onFieldsChange}
-        groupByType={groupByType}
-        onGroupByTypeChange={onGroupByTypeChange}
-        cardSize={cardSize}
-        onCardSizeChange={onCardSizeChange}
-        aspectRatio={aspectRatio}
-        onAspectRatioChange={onAspectRatioChange}
-        thumbnailScale={thumbnailScale}
-        onThumbnailScaleChange={onThumbnailScaleChange}
-        showMetadata={showMetadata}
-        onShowMetadataChange={onShowMetadataChange}
-        hasSelectedAssets={hasSelectedAssets}
-        selectAllState={selectAllState}
-        onSelectAllToggle={onSelectAllToggle}
-      />
-      {/* Sort the results based on the current sorting state */}
-      {(() => {
-        // Sort the results if sorting is specified
-        const sortedResults = [...results];
-        if (sorting.length > 0) {
-          const { id: sortField, desc } = sorting[0];
-          sortedResults.sort((a, b) => {
-            let valueA, valueB;
 
-            // Get values based on field ID
-            switch (sortField) {
-              case "name":
-                valueA = getAssetName(a);
-                valueB = getAssetName(b);
-                break;
-              case "type":
-                valueA = getAssetType(a);
-                valueB = getAssetType(b);
-                break;
-              case "size": {
-                // Assuming there's a way to get size from the asset
-                const sizeFieldA = a as any;
-                const sizeFieldB = b as any;
-                valueA =
-                  sizeFieldA?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-                    ?.FileInfo?.Size || 0;
-                valueB =
-                  sizeFieldB?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
-                    ?.FileInfo?.Size || 0;
-                break;
-              }
-              case "date": {
-                // Assuming there's a way to get date from the asset
-                const dateFieldA = a as any;
-                const dateFieldB = b as any;
-                valueA = dateFieldA?.DigitalSourceAsset?.CreateDate
-                  ? new Date(dateFieldA.DigitalSourceAsset.CreateDate).getTime()
-                  : 0;
-                valueB = dateFieldB?.DigitalSourceAsset?.CreateDate
-                  ? new Date(dateFieldB.DigitalSourceAsset.CreateDate).getTime()
-                  : 0;
-                break;
-              }
-              default:
-                valueA = (a as any)[sortField];
-                valueB = (b as any)[sortField];
-            }
+      <AssetViewControls {...controlsProps} />
 
-            // Compare values
-            if (valueA === valueB) return 0;
+      {viewMode === "card" ? (
+        <AssetGridView
+          results={sortedResults}
+          groupByType={groupByType}
+          cardSize={cardSize}
+          aspectRatio={aspectRatio}
+          thumbnailScale={thumbnailScale}
+          showMetadata={showMetadata}
+          cardFields={cardFields.filter((f) => f.visible)}
+        />
+      ) : (
+        <AssetTableView
+          results={sortedResults}
+          columns={columns}
+          sorting={sorting}
+          onSortChange={onSortChange}
+          groupByType={groupByType}
+          onAssetClick={onAssetClick}
+          onDeleteClick={onDeleteClick}
+          onDownloadClick={onDownloadClick}
+          onAddToCollectionClick={onAddToCollectionClick}
+          showRemoveButton={showRemoveButton}
+          onEditClick={onEditClick}
+          onEditNameChange={onEditNameChange}
+          onEditNameComplete={onEditNameComplete}
+          editingAssetId={editingAssetId}
+          editedName={editedName}
+          getAssetId={getAssetId}
+          getAssetName={getAssetName}
+          getAssetType={getAssetType}
+          getAssetThumbnail={getAssetThumbnail}
+          isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
+          onSelectToggle={onSelectToggle}
+          isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
+          onFavoriteToggle={onFavoriteToggle}
+          isRenaming={isRenaming}
+          renamingAssetId={renamingAssetId}
+        />
+      )}
 
-            // Handle string comparison
-            if (typeof valueA === "string" && typeof valueB === "string") {
-              return desc ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
-            }
-
-            // Handle number comparison
-            return desc ? valueB - valueA : valueA - valueB;
-          });
-        }
-
-        // Return the appropriate view based on viewMode
-        return viewMode === "card" ? (
-          <AssetGridView
-            results={sortedResults}
-            groupByType={groupByType}
-            cardSize={cardSize}
-            aspectRatio={aspectRatio}
-            thumbnailScale={thumbnailScale}
-            showMetadata={showMetadata}
-            cardFields={cardFields.filter((f) => f.visible)}
-            onAssetClick={onAssetClick}
-            onDeleteClick={onDeleteClick}
-            onDownloadClick={onDownloadClick}
-            onAddToCollectionClick={onAddToCollectionClick}
-            showRemoveButton={showRemoveButton}
-            onEditClick={onEditClick}
-            onEditNameChange={onEditNameChange}
-            onEditNameComplete={onEditNameComplete}
-            editingAssetId={editingAssetId}
-            editedName={editedName}
-            isAssetFavorited={isAssetFavorited}
-            onFavoriteToggle={onFavoriteToggle}
-            isAssetSelected={isAssetSelected}
-            onSelectToggle={onSelectToggle}
-            getAssetId={getAssetId}
-            getAssetName={getAssetName}
-            getAssetType={getAssetType}
-            getAssetThumbnail={getAssetThumbnail}
-            getAssetProxy={getAssetProxy}
-            renderCardField={renderCardField}
-            selectedSearchFields={selectedFields}
-            isRenaming={isRenaming}
-            renamingAssetId={renamingAssetId}
-            isSemantic={isSemantic}
-            confidenceThreshold={confidenceThreshold}
-          />
-        ) : (
-          <AssetTableView
-            results={sortedResults}
-            columns={columns}
-            sorting={sorting}
-            onSortChange={onSortChange}
-            groupByType={groupByType}
-            onAssetClick={onAssetClick}
-            onDeleteClick={onDeleteClick}
-            onDownloadClick={onDownloadClick}
-            onAddToCollectionClick={onAddToCollectionClick}
-            showRemoveButton={showRemoveButton}
-            onEditClick={onEditClick}
-            onEditNameChange={onEditNameChange}
-            onEditNameComplete={onEditNameComplete}
-            editingAssetId={editingAssetId}
-            editedName={editedName}
-            getAssetId={getAssetId}
-            getAssetName={getAssetName}
-            getAssetType={getAssetType}
-            getAssetThumbnail={getAssetThumbnail}
-            isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
-            onSelectToggle={onSelectToggle}
-            isFavorite={
-              isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined
-            }
-            onFavoriteToggle={onFavoriteToggle}
-            selectedSearchFields={selectedFields}
-            isRenaming={isRenaming}
-            renamingAssetId={renamingAssetId}
-          />
-        );
-      })()}
       <AssetPagination
         page={searchMetadata.page}
         pageSize={searchMetadata.pageSize}
-        totalResults={
-          isSemantic &&
-          !hideConfidenceSlider &&
-          confidenceThreshold > 0 &&
-          originalResults &&
-          results.length !== originalResults.length
-            ? results.length
-            : searchMetadata.totalResults
-        }
+        totalResults={isConfidenceFiltered ? results.length : searchMetadata.totalResults}
         onPageChange={(_, page) => onPageChange(page)}
         onPageSizeChange={onPageSizeChange}
-        isFiltered={
-          isSemantic &&
-          !hideConfidenceSlider &&
-          confidenceThreshold > 0 &&
-          originalResults &&
-          results.length !== originalResults.length
-        }
+        isFiltered={isConfidenceFiltered}
       />
     </Box>
   );

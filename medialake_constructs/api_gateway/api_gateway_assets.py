@@ -2419,6 +2419,8 @@ class AssetsConstruct(Construct):
         # Add CORS support to bulk download API resources
         add_cors_options_method(download_resource)
         add_cors_options_method(bulk_resource)
+        add_cors_options_method(user_resource)
+        add_cors_options_method(job_resource)
 
     def _create_batch_delete_lambda_function(self, props: AssetsProps):
         """Create Lambda function for batch delete operations (consolidated)."""

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { useSearchStore, useDomainActions } from "../stores/searchStore";
 import { FacetFilters } from "../types/facetSearch";
 

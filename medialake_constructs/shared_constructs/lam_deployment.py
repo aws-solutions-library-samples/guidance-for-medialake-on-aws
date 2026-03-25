@@ -54,9 +54,10 @@ class LambdaDeployment(Construct):
         scope: Construct,
         id: str,
         destination_bucket: s3.IBucket,
-        code_path: list,
         runtime: str = "python3.12",
         parent_folder: str = "",
+        source_path: str = None,
+        code_path: list = None,
         **kwargs,
     ):
         """
@@ -76,15 +77,22 @@ class LambdaDeployment(Construct):
             The Lambda runtime (default: "python3.12")
         parent_folder: str
             An optional parent folder for the Lambda code in the S3 bucket
+        source_path: str
+            An absolute path to pre-staged Lambda source (e.g. from external nodes)
 
         """
         super().__init__(scope, id, **kwargs)
         self.id = id
         self.parent_folder = parent_folder
 
-        lambda_source_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", *code_path)
-        )
+        if source_path:
+            lambda_source_path = source_path
+        elif code_path:
+            lambda_source_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", *code_path)
+            )
+        else:
+            raise ValueError("Either source_path or code_path must be provided")
         with tempfile.TemporaryDirectory() as lambda_package_path:
             zip_filename = f"{self.id}_lambda_function.zip"
             zip_path = os.path.join(os.path.dirname(lambda_package_path), zip_filename)

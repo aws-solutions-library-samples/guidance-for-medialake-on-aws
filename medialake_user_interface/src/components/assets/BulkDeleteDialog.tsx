@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -36,8 +36,6 @@ export const BulkDeleteDialog: React.FC<BulkDeleteDialogProps> = ({
 }) => {
   const { t } = useTranslation();
   const isConfirmDisabled = confirmationText !== "DELETE" || isLoading;
-
-  useEffect(() => {}, [open, selectedCount]);
 
   return (
     <Dialog

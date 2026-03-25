@@ -79,7 +79,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     ctx.scale(dpr, dpr);
 
     // background fill
-    const bgColor = theme.palette.mode === "dark" ? theme.palette.background.paper : "#ffffff";
+    const bgColor = theme.palette.background.paper;
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 

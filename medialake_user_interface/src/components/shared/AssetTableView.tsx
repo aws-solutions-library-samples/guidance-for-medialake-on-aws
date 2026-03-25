@@ -1,6 +1,8 @@
 import React from "react";
+import { Box, Typography } from "@mui/material";
 import { type SortingState } from "@tanstack/react-table";
 import { AssetTable } from "./AssetTable";
+import { groupAssetsByType } from "@/utils/groupAssetsByType";
 
 interface AssetTableViewProps<T> {
   results: T[];
@@ -61,26 +63,8 @@ function AssetTableView<T>({
 }: AssetTableViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
-    if (!groupByType) return { all: results };
-
-    return results.reduce(
-      (acc, item) => {
-        const type = getAssetType(item).toLowerCase();
-        const normalizedType =
-          type === "image"
-            ? "Image"
-            : type === "video"
-              ? "Video"
-              : type === "audio"
-                ? "Audio"
-                : "Other";
-
-        if (!acc[normalizedType]) acc[normalizedType] = [];
-        acc[normalizedType].push(item);
-        return acc;
-      },
-      {} as Record<string, T[]>
-    );
+    if (!groupByType) return {};
+    return groupAssetsByType(results, getAssetType);
   }, [results, groupByType, getAssetType]);
 
   if (!groupByType) {
@@ -118,22 +102,24 @@ function AssetTableView<T>({
   return (
     <React.Fragment>
       {Object.entries(groupedResults)
-        .filter(
-          ([type]) => ["Image", "Video", "Audio"].includes(type) && groupedResults[type].length > 0
-        )
+        .filter(([type]) => groupedResults[type].length > 0)
         .map(([type, assets]) => (
-          <div key={type} style={{ marginBottom: "2rem" }}>
-            <h3
-              style={{
-                marginBottom: "1rem",
-                background: "linear-gradient(45deg, #2B6CB0, #14B8A6)",
+          <Box key={type} sx={{ mb: "2rem" }}>
+            <Typography
+              variant="h6"
+              sx={{
+                mb: 2,
+                px: 1,
+                background: (theme) =>
+                  `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundClip: "text",
                 WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                color: "transparent",
                 fontWeight: 600,
               }}
             >
               {type}
-            </h3>
+            </Typography>
             <AssetTable<T>
               data={assets}
               columns={columns}
@@ -161,7 +147,7 @@ function AssetTableView<T>({
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}
             />
-          </div>
+          </Box>
         ))}
     </React.Fragment>
   );

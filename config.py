@@ -619,6 +619,7 @@ class CDKConfig(BaseModel):
     vpc: VpcConfig = Field(default_factory=VpcConfig)
     cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
     video_download_enabled: bool = True
+    external_nodes_bucket: Optional[str] = None
 
     def __init__(self, **data):
         """Initialize CDKConfig and log configuration values for audit trail.
@@ -698,6 +699,7 @@ class CDKConfig(BaseModel):
         # Log the resolved video_download_enabled value with deployment context
         logger.info(
             f"CDK Configuration Audit: video_download_enabled={self.video_download_enabled}, "
+            f"external_nodes_bucket={self.external_nodes_bucket}, "
             f"environment={self.environment}, "
             f"resource_prefix={self.resource_prefix}, "
             f"account_id={self.account_id}, "
@@ -729,6 +731,27 @@ class CDKConfig(BaseModel):
                 f"or using numbers like 1/0 instead of true/false."
             )
             raise ValueError(error_msg)
+        return v
+
+    @field_validator("external_nodes_bucket")
+    @classmethod
+    def validate_external_nodes_bucket(cls, v):
+        """Validate that external_nodes_bucket is a valid S3 bucket name if provided."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        import re
+
+        if not re.match(r"^(?!.*--)[a-z0-9]([a-z0-9-]*[a-z0-9])?$", v) or not (
+            3 <= len(v) <= 63
+        ):
+            raise ValueError(
+                f"external_nodes_bucket must be a valid S3 bucket name: 3-63 characters, "
+                f"lowercase letters, numbers, and hyphens only, cannot start or end with a hyphen, "
+                f"no consecutive hyphens. Received: '{v}'"
+            )
         return v
 
     @property

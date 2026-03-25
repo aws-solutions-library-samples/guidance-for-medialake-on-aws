@@ -1,35 +1,83 @@
-import React from "react";
-import { createBrowserRouter, Navigate, useParams } from "react-router-dom";
-import AuthPage from "@/components/AuthPage";
+import React, { Suspense } from "react";
+import { createBrowserRouter, Navigate, useParams } from "react-router";
+import { Box, CircularProgress } from "@mui/material";
 import AppLayout from "@/components/AppLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RouteErrorBoundary } from "@/shared/ui/errors";
 import { RoutePermissionGuard } from "@/permissions";
+
+// Lightweight loading spinner for lazy route transitions
+const RouteFallback = () => (
+  <Box
+    sx={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "60vh",
+    }}
+  >
+    <CircularProgress size={32} />
+  </Box>
+);
+
+// Helper to wrap a lazy component with Suspense
+function lazyLoad(factory: () => Promise<{ default: React.ComponentType<any> }>) {
+  const Component = React.lazy(factory);
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Component />
+    </Suspense>
+  );
+}
+
+// Auth page is on the critical path for unauthenticated users — keep eager
+import AuthPage from "@/components/AuthPage";
 import AccessDeniedPage from "@/pages/AccessDeniedPage";
-import Home from "@/pages/Home";
-import SearchPage from "@/pages/SearchPage";
-import AssetsPage from "@/pages/AssetsPage";
-import CollectionsPage from "@/pages/CollectionsPage";
-import CollectionViewPage from "@/pages/CollectionViewPage";
-import { CollectionGroupDetailPage } from "@/features/collection-groups";
-import { S3Explorer } from "@/features/home/S3Explorer";
-import { ExecutionsPage } from "@/features/executions";
-import { PipelinesPage, PipelineEditorPage } from "@/features/pipelines/pages";
-import ImageDetailPage from "@/pages/ImageDetailPage";
-import VideoDetailPage from "@/pages/VideoDetailPage";
-import AudioDetailPage from "@/pages/AudioDetailPage";
-import ConnectorsPage from "@/pages/settings/ConnectorsPage";
-import ProfilePage from "@/pages/settings/ProfilePage";
-import UserManagement from "@/pages/settings/UserManagement";
-import RoleManagement from "@/pages/settings/RoleManagement";
-import PermissionsPage from "@/pages/settings/PermissionsPage";
-import IntegrationsPage from "@/pages/settings/IntegrationsPage";
-import EnvironmentsPage from "@/pages/settings/EnvironmentsPage";
-import SystemSettingsPage from "@/pages/settings/SystemSettingsPage";
+// Lazy page elements — each creates its own code-split chunk
+const LazyHome = lazyLoad(() => import("@/pages/Home"));
+const LazySearchPage = lazyLoad(() => import("@/pages/SearchPage"));
+const LazyAssetsPage = lazyLoad(() => import("@/pages/AssetsPage"));
+const LazyCollectionsPage = lazyLoad(() => import("@/pages/CollectionsPage"));
+const LazyCollectionViewPage = lazyLoad(() => import("@/pages/CollectionViewPage"));
+const LazyImageDetailPage = lazyLoad(() => import("@/pages/ImageDetailPage"));
+const LazyMediaDetailPage = lazyLoad(() => import("@/pages/MediaDetailPage"));
+
+// Settings pages — rarely visited
+const LazyConnectorsPage = lazyLoad(() => import("@/pages/settings/ConnectorsPage"));
+const LazyProfilePage = lazyLoad(() => import("@/pages/settings/ProfilePage"));
+const LazyUserManagement = lazyLoad(() => import("@/pages/settings/UserManagement"));
+const LazyRoleManagement = lazyLoad(() => import("@/pages/settings/RoleManagement"));
+const LazyPermissionsPage = lazyLoad(() => import("@/pages/settings/PermissionsPage"));
+const LazyIntegrationsPage = lazyLoad(() => import("@/pages/settings/IntegrationsPage"));
+const LazyEnvironmentsPage = lazyLoad(() => import("@/pages/settings/EnvironmentsPage"));
+const LazySystemSettingsPage = lazyLoad(() => import("@/pages/settings/SystemSettingsPage"));
+
+// Heavy feature pages — pipeline editor pulls in xyflow (~150KB)
+const LazyPipelinesPage = lazyLoad(() => import("@/features/pipelines/pages/PipelinesPage"));
+const LazyPipelineEditorPage = lazyLoad(
+  () => import("@/features/pipelines/pages/PipelineEditorPage")
+);
+const LazyExecutionsPage = lazyLoad(() => import("@/features/executions/pages/ExecutionsPage"));
+
+// Collection groups
+const LazyCollectionGroupDetailPage = lazyLoad(() =>
+  import("@/features/collection-groups/pages/CollectionGroupDetailPage").then((m) => ({
+    default: m.CollectionGroupDetailPage,
+  }))
+);
 
 const S3ExplorerWrapper = () => {
   const { connectorId } = useParams<{ connectorId: string }>();
-  return <S3Explorer connectorId={connectorId!} />;
+  const S3ExplorerLazy = React.lazy(() =>
+    import("@/features/home/S3Explorer").then((m) => ({
+      default: () => <m.S3Explorer connectorId={connectorId!} />,
+    }))
+  );
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <S3ExplorerLazy />
+    </Suspense>
+  );
 };
 
 // Redirect component for old collection-groups detail route
@@ -58,16 +106,13 @@ export const router = createBrowserRouter([
     ),
     errorElement: <RouteErrorBoundary />,
     children: [
-      {
-        index: true,
-        element: <Home />,
-      },
+      { index: true, element: LazyHome },
       {
         path: "search",
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<SearchPage />}
+            element={LazySearchPage}
           />
         ),
       },
@@ -85,30 +130,18 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<AssetsPage />}
+            element={LazyAssetsPage}
           />
         ),
       },
-
+      { path: "collections", element: LazyCollectionsPage },
+      { path: "collections/:id/view", element: LazyCollectionViewPage },
+      { path: "collections/groups/:groupId", element: LazyCollectionGroupDetailPage },
       {
-        path: "collections",
-        element: <CollectionsPage />,
-      },
-      {
-        path: "collections/:id/view",
-        element: <CollectionViewPage />,
-      },
-      {
-        path: "collections/groups/:groupId",
-        element: <CollectionGroupDetailPage />,
-      },
-      {
-        // Redirect old collection-groups route to new location
         path: "collection-groups",
         element: <Navigate to="/collections?filter=groups" replace />,
       },
       {
-        // Redirect old collection-groups detail route to new location
         path: "collection-groups/:groupId",
         element: <CollectionGroupDetailRedirect />,
       },
@@ -117,7 +150,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "pipeline" }}
-            element={<ExecutionsPage />}
+            element={LazyExecutionsPage}
           />
         ),
       },
@@ -126,7 +159,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "pipeline" }}
-            element={<PipelinesPage />}
+            element={LazyPipelinesPage}
           />
         ),
       },
@@ -135,7 +168,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "create", subject: "pipeline" }}
-            element={<PipelineEditorPage />}
+            element={LazyPipelineEditorPage}
           />
         ),
       },
@@ -144,7 +177,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<ImageDetailPage />}
+            element={LazyImageDetailPage}
           />
         ),
       },
@@ -153,7 +186,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<VideoDetailPage />}
+            element={LazyMediaDetailPage}
           />
         ),
       },
@@ -162,20 +195,17 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "asset" }}
-            element={<AudioDetailPage />}
+            element={LazyMediaDetailPage}
           />
         ),
       },
-      {
-        path: "settings/profile",
-        element: <ProfilePage />,
-      },
+      { path: "settings/profile", element: LazyProfilePage },
       {
         path: "settings/connectors",
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "connector" }}
-            element={<ConnectorsPage />}
+            element={LazyConnectorsPage}
           />
         ),
       },
@@ -184,7 +214,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "user" }}
-            element={<UserManagement />}
+            element={LazyUserManagement}
           />
         ),
       },
@@ -193,7 +223,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "manage", subject: "permission-set" }}
-            element={<RoleManagement />}
+            element={LazyRoleManagement}
           />
         ),
       },
@@ -202,7 +232,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "permission-set" }}
-            element={<PermissionsPage />}
+            element={LazyPermissionsPage}
           />
         ),
       },
@@ -211,7 +241,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "integration" }}
-            element={<IntegrationsPage />}
+            element={LazyIntegrationsPage}
           />
         ),
       },
@@ -220,7 +250,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "manage", subject: "settings" }}
-            element={<EnvironmentsPage />}
+            element={LazyEnvironmentsPage}
           />
         ),
       },
@@ -229,7 +259,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "manage", subject: "pipeline" }}
-            element={<PipelinesPage />}
+            element={LazyPipelinesPage}
           />
         ),
       },
@@ -238,7 +268,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "create", subject: "pipeline" }}
-            element={<PipelineEditorPage />}
+            element={LazyPipelineEditorPage}
           />
         ),
       },
@@ -247,7 +277,7 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "edit", subject: "pipeline" }}
-            element={<PipelineEditorPage />}
+            element={LazyPipelineEditorPage}
           />
         ),
       },
@@ -256,15 +286,11 @@ export const router = createBrowserRouter([
         element: (
           <RoutePermissionGuard
             permission={{ action: "view", subject: "settings" }}
-            element={<SystemSettingsPage />}
+            element={LazySystemSettingsPage}
           />
         ),
       },
-
-      {
-        path: "settings",
-        element: <Navigate to="settings/profile" replace />,
-      },
+      { path: "settings", element: <Navigate to="settings/profile" replace /> },
       {
         path: "*",
         element: <Navigate to="/" replace />,

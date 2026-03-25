@@ -291,6 +291,147 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
+        # --- Webhook Lambdas and API Gateway resources ---
+
+        # 1a. Webhook authorizer Lambda (real implementation)
+        self._webhook_authorizer_lambda = Lambda(
+            self,
+            "WebhookAuthorizerLambda",
+            config=LambdaConfig(
+                name="webhook_authorizer",
+                entry="lambdas/auth/webhook_authorizer",
+                memory_size=128,
+                timeout_minutes=1,
+                snap_start=False,
+                environment_variables={
+                    "PIPELINE_TABLE_NAME": props.pipeline_table.table_name,
+                },
+            ),
+        )
+
+        # Grant DynamoDB read access on the pipeline table
+        props.pipeline_table.grant_read_data(self._webhook_authorizer_lambda.function)
+
+        # Grant Secrets Manager GetSecretValue for webhook secrets
+        self._webhook_authorizer_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[
+                    f"arn:aws:secretsmanager:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:secret:{config.resource_prefix}/webhooks/*"
+                ],
+            )
+        )
+
+        # 1b. Webhook ingress Lambda
+        self._webhook_ingress_lambda = Lambda(
+            self,
+            "WebhookIngressLambda",
+            config=LambdaConfig(
+                name="webhook_ingress",
+                entry="lambdas/nodes/webhook_ingress",
+                memory_size=256,
+                timeout_minutes=1,
+                snap_start=False,
+                environment_variables={
+                    "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
+                    "PIPELINE_TABLE_NAME": props.pipeline_table.table_name,
+                },
+            ),
+        )
+
+        # Grant EventBridge and DynamoDB permissions to webhook ingress
+        props.pipelines_event_bus.grant_put_events_to(
+            self._webhook_ingress_lambda.function
+        )
+        props.pipeline_table.grant_read_write_data(
+            self._webhook_ingress_lambda.function
+        )
+
+        # Grant Secrets Manager GetSecretValue for HMAC signature verification
+        self._webhook_ingress_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[
+                    f"arn:aws:secretsmanager:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:secret:{config.resource_prefix}/webhooks/*"
+                ],
+            )
+        )
+
+        # 1c. Grant API Gateway invoke permission on both stub Lambdas
+        wildcard_source_arn = (
+            f"arn:aws:execute-api:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:{api_id}/*"
+        )
+
+        self._webhook_authorizer_lambda.function.add_permission(
+            "ApiGatewayInvokeWebhookAuthorizer",
+            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=wildcard_source_arn,
+        )
+
+        self._webhook_ingress_lambda.function.add_permission(
+            "ApiGatewayInvokeWebhookIngress",
+            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=wildcard_source_arn,
+        )
+
+        # 1d. Webhook REQUEST authorizer
+        self._webhook_authorizer = apigateway.RequestAuthorizer(
+            self,
+            "WebhookRequestAuthorizer",
+            handler=self._webhook_authorizer_lambda.function,
+            identity_sources=[apigateway.IdentitySource.context("requestId")],
+            results_cache_ttl=cdk.Duration.seconds(0),
+        )
+
+        # 1e. /webhooks/{pipelineId} resources
+        webhooks_resource = self._rest_api.root.add_resource("webhooks")
+        pipeline_id_resource = webhooks_resource.add_resource("{pipelineId}")
+
+        # 1f. POST method with webhook authorizer
+        webhook_post_integration = apigateway.LambdaIntegration(
+            self._webhook_ingress_lambda.function, proxy=True
+        )
+        pipeline_id_resource.add_method(
+            "POST",
+            webhook_post_integration,
+            authorizer=self._webhook_authorizer,
+            authorization_type=apigateway.AuthorizationType.CUSTOM,
+        )
+
+        # 1g. OPTIONS method with Idempotency-Key in CORS headers
+        pipeline_id_resource.add_method(
+            "OPTIONS",
+            apigateway.MockIntegration(
+                integration_responses=[
+                    {
+                        "statusCode": "200",
+                        "responseParameters": {
+                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify,Idempotency-Key,X-Hub-Signature-256'",
+                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                            "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
+                        },
+                    }
+                ],
+                passthrough_behavior=apigateway.PassthroughBehavior.NEVER,
+                request_templates={"application/json": '{"statusCode": 200}'},
+            ),
+            method_responses=[
+                {
+                    "statusCode": "200",
+                    "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Headers": True,
+                        "method.response.header.Access-Control-Allow-Methods": True,
+                        "method.response.header.Access-Control-Allow-Origin": True,
+                    },
+                }
+            ],
+            authorization_type=apigateway.AuthorizationType.NONE,
+        )
+
         # Create health endpoint
         self._create_health_endpoint(
             self._rest_api, self._x_origin_verify_secret, self._authorizer
@@ -365,6 +506,14 @@ class ApiGatewayStack(cdk.NestedStack):
     @property
     def authorizer(self) -> apigateway.RequestAuthorizer:
         return self._authorizer
+
+    @property
+    def webhook_authorizer_stub(self) -> lambda_.Function:
+        return self._webhook_authorizer_lambda.function
+
+    @property
+    def webhook_ingress_stub(self) -> lambda_.Function:
+        return self._webhook_ingress_lambda.function
 
     @property
     def api_resources(self):

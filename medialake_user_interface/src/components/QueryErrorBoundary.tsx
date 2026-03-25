@@ -13,7 +13,7 @@ export const QueryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ ch
       fallbackRender={({ error, resetErrorBoundary }) => (
         <div>
           <h2>{t("errors.somethingWentWrong", "Something went wrong!")}</h2>
-          <pre>{error.message}</pre>
+          <pre>{error instanceof Error ? error.message : String(error)}</pre>
           <button onClick={resetErrorBoundary}>{t("errors.tryAgain", "Try Again")}</button>
         </div>
       )}

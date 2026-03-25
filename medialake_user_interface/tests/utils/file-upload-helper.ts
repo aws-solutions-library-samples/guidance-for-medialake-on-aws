@@ -45,11 +45,6 @@ export interface TestFileOptions {
 }
 
 /**
- * Test ID for the upload button icon
- */
-const UPLOAD_BUTTON_TEST_ID = "CloudUploadIcon";
-
-/**
  * Upload progress indicator selectors
  */
 const UPLOAD_PROGRESS_SELECTORS = [
@@ -126,22 +121,35 @@ export function cleanupTestFiles(files: string[], removeDir: boolean = true): vo
 }
 
 /**
- * Find upload button and trigger file chooser
+ * Find upload button and trigger file chooser.
+ * Uses multiple strategies since MUI strips data-testid in production.
  */
 async function findUploadButton(page: Page): Promise<Locator | null> {
-  // Look for the upload button by test ID (CloudUploadIcon)
-  const uploadButton = page.getByTestId(UPLOAD_BUTTON_TEST_ID);
-  const buttonExists = (await uploadButton.count()) > 0;
-
-  if (!buttonExists) {
-    console.warn(
-      `[FileUploadHelper] Upload button not found (data-testid="${UPLOAD_BUTTON_TEST_ID}")`
-    );
-    return null;
+  // Strategy 1: Try data-testid (works in dev builds)
+  const byTestId = page.getByTestId("CloudUploadIcon");
+  if ((await byTestId.count()) > 0) {
+    console.log("[FileUploadHelper] Found upload button via data-testid");
+    return byTestId;
   }
 
-  console.log(`[FileUploadHelper] Found upload button`);
-  return uploadButton;
+  // Strategy 2: Find the upload IconButton via file input association
+  // The upload button triggers a file chooser, so look for the button
+  // near the file input or use the upload modal trigger
+  const uploadBtn = page.locator('button:has(svg path[d*="M19.35"])').first();
+  if ((await uploadBtn.count()) > 0) {
+    console.log("[FileUploadHelper] Found upload button via SVG path");
+    return uploadBtn;
+  }
+
+  // Strategy 3: Look for button with upload-related aria-label
+  const ariaBtn = page.locator('[aria-label*="upload" i]').first();
+  if ((await ariaBtn.count()) > 0) {
+    console.log("[FileUploadHelper] Found upload button via aria-label");
+    return ariaBtn;
+  }
+
+  console.warn("[FileUploadHelper] Upload button not found with any strategy");
+  return null;
 }
 
 /**
@@ -222,7 +230,7 @@ export async function uploadFiles(
 
   if (!uploadButton) {
     console.warn(
-      `[FileUploadHelper] ⚠️  Upload button not found (expected data-testid="${UPLOAD_BUTTON_TEST_ID}")`
+      `[FileUploadHelper] ⚠️  Upload button not found (tried data-testid, SVG path, aria-label strategies)`
     );
 
     if (captureScreenshots) {
@@ -236,7 +244,7 @@ export async function uploadFiles(
       success: false,
       method: "not-found",
       uploadedFiles: [],
-      error: `Upload button not found. Expected element with data-testid="${UPLOAD_BUTTON_TEST_ID}".`,
+      error: `Upload button not found. MUI icon data-testid is stripped in production builds.`,
     };
   }
 

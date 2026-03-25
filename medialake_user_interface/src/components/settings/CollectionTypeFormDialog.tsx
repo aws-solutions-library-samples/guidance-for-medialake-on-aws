@@ -38,6 +38,7 @@ import {
   useUpdateCollectionType,
   type CollectionType,
 } from "@/api/hooks/useCollections";
+import { colorTokens } from "@/theme/tokens";
 
 const AVAILABLE_ICONS = [
   { name: "Folder", icon: <FolderIcon /> },
@@ -58,12 +59,12 @@ const AVAILABLE_ICONS = [
 ];
 
 const PRESET_COLORS = [
-  "#2B6CB0", // Blue (primary)
-  "#388e3c", // Green
-  "#d32f2f", // Red
-  "#6366F1", // Indigo (accent)
+  colorTokens.primary.main, // Blue
+  colorTokens.success.main, // Green
+  colorTokens.error.main, // Red
+  colorTokens.secondary.main, // Indigo
   "#7b1fa2", // Purple
-  "#14B8A6", // Teal (accent)
+  colorTokens.accent.main, // Teal
   "#c2185b", // Pink
   "#5d4037", // Brown
   "#616161", // Grey

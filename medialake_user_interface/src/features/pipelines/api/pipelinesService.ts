@@ -46,6 +46,9 @@ export class PipelinesService {
           updatedAt: pipelineData.updatedAt || new Date().toISOString(),
           deploymentStatus: pipelineData.deploymentStatus,
           executionArn: pipelineData.executionArn,
+          webhookUrl: pipelineData.webhookUrl,
+          webhookAuthMethod: pipelineData.webhookAuthMethod,
+          webhookCredentialHint: pipelineData.webhookCredentialHint,
         } as Pipeline;
       }
 

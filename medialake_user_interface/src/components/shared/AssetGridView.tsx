@@ -1,6 +1,13 @@
-import React from "react";
-import { Box, Grid, Typography } from "@mui/material";
-import AssetCard, { AssetField } from "./AssetCard";
+import React, { useCallback, useRef } from "react";
+import { Box, Typography } from "@mui/material";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import {
+  useAssetAccessors,
+  useAssetActions,
+  useAssetEditingState,
+} from "@/contexts/AssetItemContext";
+import AssetCard, { type AssetField } from "./AssetCard";
+import { groupAssetsByType } from "@/utils/groupAssetsByType";
 
 interface AssetGridViewProps<T> {
   results: T[];
@@ -10,38 +17,323 @@ interface AssetGridViewProps<T> {
   thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
   cardFields: AssetField[];
-  onAssetClick: (asset: T) => void;
-  onDeleteClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onDownloadClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onAddToCollectionClick?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  showRemoveButton?: boolean;
-  onEditClick: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  onEditNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onEditNameComplete: (asset: T, save: boolean, value?: string) => void;
-  editingAssetId?: string;
-  editedName?: string;
-  // Favorite functionality
-  isAssetFavorited?: (assetId: string) => boolean;
-  onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  // Selection functionality
-  isAssetSelected?: (assetId: string) => boolean;
-  onSelectToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
-  // Functions to extract data from asset objects
-  getAssetId: (asset: T) => string;
-  getAssetName: (asset: T) => string;
-  getAssetType: (asset: T) => string;
-  getAssetThumbnail: (asset: T) => string;
-  getAssetProxy?: (asset: T) => string;
-  renderCardField: (fieldId: string, asset: T) => React.ReactNode;
-  // Search fields
-  selectedSearchFields?: string[];
-  isRenaming?: boolean; // Add isRenaming prop for loading state
-  renamingAssetId?: string; // ID of the asset currently being renamed
-  // Semantic search confidence filtering for clips
-  isSemantic?: boolean;
-  confidenceThreshold?: number;
 }
 
+// ─── Column count by card size ───
+function useColumnsForSize(cardSize: "small" | "medium" | "large"): number {
+  switch (cardSize) {
+    case "small":
+      return 5;
+    case "large":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+// ─── Estimate row height ───
+function estimateRowHeight(
+  cardSize: "small" | "medium" | "large",
+  aspectRatio: "vertical" | "square" | "horizontal",
+  showMetadata: boolean
+): number {
+  const baseHeight = aspectRatio === "vertical" ? 300 : aspectRatio === "square" ? 200 : 150;
+  const multiplier = cardSize === "small" ? 0.8 : cardSize === "large" ? 1.4 : 1.1;
+  const thumbnailHeight = baseHeight * multiplier;
+  const actionBarHeight = 40;
+  const metadataHeight = showMetadata ? 140 : 0;
+  const gap = 16;
+  return thumbnailHeight + actionBarHeight + metadataHeight + gap;
+}
+
+/**
+ * AssetGridItem — the actual card renderer, wrapped in React.memo.
+ *
+ * CRITICAL: This component does NOT read from any React context.
+ * All per-card editing state is passed as props so React.memo can
+ * skip re-renders when the editing state doesn't affect this card.
+ * The parent (AssetGridItemWrapper) reads context and passes props.
+ */
+const AssetGridItem = React.memo(function AssetGridItem<T>({
+  asset,
+  cardFields,
+  cardSize,
+  aspectRatio,
+  thumbnailScale,
+  showMetadata,
+  // Per-card editing state (passed as props, not from context)
+  isEditing,
+  editedName,
+  isFavorite,
+  isSelected,
+  isCardRenaming,
+  isSemantic,
+  confidenceThreshold,
+  // Stable accessors and actions (from parent)
+  getAssetId,
+  getAssetName,
+  getAssetType,
+  getAssetThumbnail,
+  getAssetProxy,
+  renderCardField,
+  onAssetClick,
+  onDeleteClick,
+  onDownloadClick,
+  onAddToCollectionClick,
+  showRemoveButton,
+  onEditClick,
+  onEditNameChange,
+  onEditNameComplete,
+  onFavoriteToggle,
+  onSelectToggle,
+}: {
+  asset: T;
+  cardFields: AssetField[];
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
+  showMetadata: boolean;
+  isEditing: boolean;
+  editedName?: string;
+  isFavorite: boolean;
+  isSelected: boolean;
+  isCardRenaming: boolean;
+  isSemantic: boolean;
+  confidenceThreshold: number;
+  getAssetId: (a: T) => string;
+  getAssetName: (a: T) => string;
+  getAssetType: (a: T) => string;
+  getAssetThumbnail: (a: T) => string;
+  getAssetProxy?: (a: T) => string;
+  renderCardField: (fieldId: string, a: T) => React.ReactNode;
+  onAssetClick: (a: T) => void;
+  onDeleteClick: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  onDownloadClick: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  onAddToCollectionClick?: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  showRemoveButton: boolean;
+  onEditClick: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  onEditNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onEditNameComplete: (a: T, save: boolean, value?: string) => void;
+  onFavoriteToggle?: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  onSelectToggle?: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+}) {
+  const assetId = getAssetId(asset);
+
+  const handleClick = useCallback(() => onAssetClick(asset), [onAssetClick, asset]);
+  const handleDelete = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => onDeleteClick(asset, e),
+    [onDeleteClick, asset]
+  );
+  const handleDownload = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => onDownloadClick(asset, e),
+    [onDownloadClick, asset]
+  );
+  const handleAddToCollection = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => onAddToCollectionClick?.(asset, e),
+    [onAddToCollectionClick, asset]
+  );
+  const handleEdit = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => onEditClick(asset, e),
+    [onEditClick, asset]
+  );
+  const handleEditComplete = useCallback(
+    (save: boolean, value?: string) => onEditNameComplete(asset, save, value),
+    [onEditNameComplete, asset]
+  );
+  const handleFavorite = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => onFavoriteToggle?.(asset, e),
+    [onFavoriteToggle, asset]
+  );
+  const handleSelect = useCallback(
+    (_id: string, e: React.MouseEvent<HTMLElement>) => onSelectToggle?.(asset, e),
+    [onSelectToggle, asset]
+  );
+  const handleRenderField = useCallback(
+    (fieldId: string) => renderCardField(fieldId, asset),
+    [renderCardField, asset]
+  );
+
+  return (
+    <AssetCard
+      id={assetId}
+      name={getAssetName(asset)}
+      thumbnailUrl={getAssetThumbnail(asset)}
+      proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
+      assetType={getAssetType(asset)}
+      clips={(asset as any).clips}
+      fields={cardFields}
+      renderField={handleRenderField}
+      onAssetClick={handleClick}
+      onDeleteClick={handleDelete}
+      onDownloadClick={handleDownload}
+      onAddToCollectionClick={onAddToCollectionClick ? handleAddToCollection : undefined}
+      showRemoveButton={showRemoveButton}
+      onEditClick={handleEdit}
+      isEditing={isEditing}
+      editedName={editedName}
+      onEditNameChange={onEditNameChange}
+      onEditNameComplete={handleEditComplete}
+      cardSize={cardSize}
+      aspectRatio={aspectRatio}
+      thumbnailScale={thumbnailScale}
+      showMetadata={showMetadata}
+      isFavorite={isFavorite}
+      onFavoriteToggle={onFavoriteToggle ? handleFavorite : undefined}
+      isSelected={isSelected}
+      onSelectToggle={onSelectToggle ? handleSelect : undefined}
+      isRenaming={isCardRenaming}
+      isSemantic={isSemantic}
+      confidenceThreshold={confidenceThreshold}
+    />
+  );
+}) as <T>(props: any) => React.ReactElement;
+
+/**
+ * AssetGridItemWrapper — thin wrapper that reads context and passes
+ * per-card editing state as props to the memoized AssetGridItem.
+ * This component re-renders on every context change, but the inner
+ * AssetGridItem only re-renders when its specific props change.
+ */
+function AssetGridItemWrapper<T>({
+  asset,
+  cardFields,
+  cardSize,
+  aspectRatio,
+  thumbnailScale,
+  showMetadata,
+}: {
+  asset: T;
+  cardFields: AssetField[];
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
+  showMetadata: boolean;
+}) {
+  const accessors = useAssetAccessors<T>();
+  const actions = useAssetActions<T>();
+  const editing = useAssetEditingState();
+
+  const assetId = accessors.getAssetId(asset);
+
+  // Derive per-card booleans so React.memo on the inner component
+  // can skip re-renders when another card's editing state changes
+  const isEditing = editing.editingAssetId === assetId;
+  const isFavorite = editing.isAssetFavorited ? editing.isAssetFavorited(assetId) : false;
+  const isSelected = editing.isAssetSelected ? editing.isAssetSelected(assetId) : false;
+  const isCardRenaming = !!(editing.isRenaming && editing.renamingAssetId === assetId);
+
+  return (
+    <AssetGridItem
+      asset={asset}
+      cardFields={cardFields}
+      cardSize={cardSize}
+      aspectRatio={aspectRatio}
+      thumbnailScale={thumbnailScale}
+      showMetadata={showMetadata}
+      isEditing={isEditing}
+      editedName={isEditing ? editing.editedName : undefined}
+      isFavorite={isFavorite}
+      isSelected={isSelected}
+      isCardRenaming={isCardRenaming}
+      isSemantic={editing.isSemantic ?? false}
+      confidenceThreshold={editing.confidenceThreshold ?? 0}
+      {...accessors}
+      {...actions}
+      showRemoveButton={actions.showRemoveButton ?? false}
+    />
+  );
+}
+
+// ─── Virtualized Grid ───
+function VirtualizedAssetGrid<T>({
+  assets,
+  cardFields,
+  cardSize,
+  aspectRatio,
+  thumbnailScale,
+  showMetadata,
+  getAssetId,
+}: {
+  assets: T[];
+  cardFields: AssetField[];
+  cardSize: "small" | "medium" | "large";
+  aspectRatio: "vertical" | "square" | "horizontal";
+  thumbnailScale: "fit" | "fill";
+  showMetadata: boolean;
+  getAssetId: (asset: T) => string;
+}) {
+  const columns = useColumnsForSize(cardSize);
+  const rowHeight = estimateRowHeight(cardSize, aspectRatio, showMetadata);
+  const gap = 16;
+
+  const rows = React.useMemo(() => {
+    const result: T[][] = [];
+    for (let i = 0; i < assets.length; i += columns) {
+      result.push(assets.slice(i, i + columns));
+    }
+    return result;
+  }, [assets, columns]);
+
+  const parentRef = useRef<HTMLDivElement>(null);
+  const parentOffsetRef = useRef(0);
+
+  React.useLayoutEffect(() => {
+    parentOffsetRef.current = parentRef.current?.offsetTop ?? 0;
+  }, []);
+
+  const virtualizer = useWindowVirtualizer({
+    count: rows.length,
+    estimateSize: () => rowHeight,
+    overscan: 2,
+    scrollMargin: parentOffsetRef.current,
+    measureElement: (el) => el.getBoundingClientRect().height,
+  });
+
+  const itemProps = { cardFields, cardSize, aspectRatio, thumbnailScale, showMetadata };
+
+  return (
+    <div ref={parentRef} style={{ position: "relative" }}>
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const row = rows[virtualRow.index];
+          return (
+            <div
+              key={virtualRow.index}
+              ref={virtualizer.measureElement}
+              data-index={virtualRow.index}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
+                paddingBottom: `${gap}px`,
+                display: "grid",
+                gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                columnGap: `${gap / 2}px`,
+                alignItems: "start",
+              }}
+            >
+              {row.map((asset) => (
+                <div key={getAssetId(asset)} data-testid={`asset-card-${getAssetId(asset)}`}>
+                  <AssetGridItemWrapper asset={asset} {...itemProps} />
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───
 function AssetGridView<T>({
   results,
   groupByType,
@@ -50,118 +342,18 @@ function AssetGridView<T>({
   thumbnailScale,
   showMetadata,
   cardFields,
-  onAssetClick,
-  onDeleteClick,
-  onDownloadClick,
-  onAddToCollectionClick,
-  showRemoveButton = false,
-  onEditClick,
-  onEditNameChange,
-  onEditNameComplete,
-  editingAssetId,
-  editedName,
-  isAssetFavorited,
-  onFavoriteToggle,
-  isAssetSelected,
-  onSelectToggle,
-  getAssetId,
-  getAssetName,
-  getAssetType,
-  getAssetThumbnail,
-  getAssetProxy,
-  renderCardField,
-  selectedSearchFields,
-  isRenaming,
-  renamingAssetId,
-  // Semantic search confidence filtering for clips
-  isSemantic = false,
-  confidenceThreshold = 0,
 }: AssetGridViewProps<T>) {
-  // Debug: Check if we're receiving the onAddToCollectionClick prop
+  const { getAssetId, getAssetType } = useAssetAccessors<T>();
 
-  // Group results by type if needed
   const groupedResults = React.useMemo(() => {
-    if (!groupByType) return { all: results };
-
-    return results.reduce(
-      (acc, item) => {
-        const type = getAssetType(item).toLowerCase();
-        const normalizedType =
-          type === "image"
-            ? "Image"
-            : type === "video"
-              ? "Video"
-              : type === "audio"
-                ? "Audio"
-                : "Other";
-
-        if (!acc[normalizedType]) acc[normalizedType] = [];
-        acc[normalizedType].push(item);
-        return acc;
-      },
-      {} as Record<string, T[]>
-    );
+    if (!groupByType) return {};
+    return groupAssetsByType(results, getAssetType);
   }, [results, groupByType, getAssetType]);
 
-  const getGridSizes = () => {
-    switch (cardSize) {
-      case "small":
-        return { xs: 12, sm: 6, md: 3, lg: 2.4 };
-      case "large":
-        return { xs: 12, sm: 12, md: 6, lg: 4 };
-      default: // medium
-        return { xs: 12, sm: 6, md: 4, lg: 3 };
-    }
-  };
+  const gridProps = { cardFields, cardSize, aspectRatio, thumbnailScale, showMetadata, getAssetId };
 
   if (!groupByType) {
-    return (
-      <Grid container spacing={3}>
-        {results.map((asset) => (
-          <Grid
-            item
-            {...getGridSizes()}
-            key={getAssetId(asset)}
-            data-testid={`asset-card-${getAssetId(asset)}`}
-          >
-            <AssetCard
-              id={getAssetId(asset)}
-              name={getAssetName(asset)}
-              thumbnailUrl={getAssetThumbnail(asset)}
-              proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
-              assetType={getAssetType(asset)}
-              clips={(asset as any).clips}
-              fields={cardFields}
-              renderField={(fieldId) => renderCardField(fieldId, asset)}
-              onAssetClick={() => onAssetClick(asset)}
-              onDeleteClick={(e) => onDeleteClick(asset, e)}
-              onDownloadClick={(e) => onDownloadClick(asset, e)}
-              onAddToCollectionClick={
-                onAddToCollectionClick ? (e) => onAddToCollectionClick(asset, e) : undefined
-              }
-              showRemoveButton={showRemoveButton}
-              onEditClick={(e) => onEditClick(asset, e)}
-              isEditing={editingAssetId === getAssetId(asset)}
-              editedName={editedName}
-              onEditNameChange={onEditNameChange}
-              onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
-              cardSize={cardSize}
-              aspectRatio={aspectRatio}
-              thumbnailScale={thumbnailScale}
-              showMetadata={showMetadata}
-              isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
-              onFavoriteToggle={onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined}
-              isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
-              onSelectToggle={onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined}
-              selectedSearchFields={selectedSearchFields}
-              isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
-              isSemantic={isSemantic}
-              confidenceThreshold={confidenceThreshold}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    );
+    return <VirtualizedAssetGrid assets={results} {...gridProps} />;
   }
 
   return (
@@ -185,55 +377,7 @@ function AssetGridView<T>({
               >
                 {type}
               </Typography>
-              <Grid container spacing={3}>
-                {assets.map((asset) => (
-                  <Grid
-                    item
-                    {...getGridSizes()}
-                    key={getAssetId(asset)}
-                    data-testid={`asset-card-${getAssetId(asset)}`}
-                  >
-                    <AssetCard
-                      id={getAssetId(asset)}
-                      name={getAssetName(asset)}
-                      thumbnailUrl={getAssetThumbnail(asset)}
-                      proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
-                      assetType={getAssetType(asset)}
-                      clips={(asset as any).clips}
-                      fields={cardFields}
-                      renderField={(fieldId) => renderCardField(fieldId, asset)}
-                      onAssetClick={() => onAssetClick(asset)}
-                      onDeleteClick={(e) => onDeleteClick(asset, e)}
-                      onDownloadClick={(e) => onDownloadClick(asset, e)}
-                      onAddToCollectionClick={
-                        onAddToCollectionClick ? (e) => onAddToCollectionClick(asset, e) : undefined
-                      }
-                      showRemoveButton={showRemoveButton}
-                      onEditClick={(e) => onEditClick(asset, e)}
-                      isEditing={editingAssetId === getAssetId(asset)}
-                      editedName={editedName}
-                      onEditNameChange={onEditNameChange}
-                      onEditNameComplete={(save, value) => onEditNameComplete(asset, save, value)}
-                      cardSize={cardSize}
-                      aspectRatio={aspectRatio}
-                      thumbnailScale={thumbnailScale}
-                      showMetadata={showMetadata}
-                      isFavorite={isAssetFavorited ? isAssetFavorited(getAssetId(asset)) : false}
-                      onFavoriteToggle={
-                        onFavoriteToggle ? (e) => onFavoriteToggle(asset, e) : undefined
-                      }
-                      isSelected={isAssetSelected ? isAssetSelected(getAssetId(asset)) : false}
-                      onSelectToggle={
-                        onSelectToggle ? (id, e) => onSelectToggle(asset, e) : undefined
-                      }
-                      selectedSearchFields={selectedSearchFields}
-                      isRenaming={isRenaming && renamingAssetId === getAssetId(asset)}
-                      isSemantic={isSemantic}
-                      confidenceThreshold={confidenceThreshold}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
+              <VirtualizedAssetGrid assets={assets} {...gridProps} />
             </Box>
           )
       )}

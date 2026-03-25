@@ -10,6 +10,7 @@ from aws_lambda_powertools.utilities.data_classes import (
     CloudFormationCustomResourceEvent,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from boto3.dynamodb.conditions import Key
 from crhelper import CfnResource
 from lambda_utils import logger, metrics
 
@@ -30,6 +31,18 @@ def validate_node_yaml(node_data: dict, key: str) -> None:
 
     if "title" not in node_data["info"]:
         raise ValueError(f"Missing required field 'info.title' in file {key}")
+
+
+def is_external_node(node_data: dict) -> bool:
+    """Return True if the node has an external lambda source path."""
+    path = (
+        node_data.get("node", {})
+        .get("integration", {})
+        .get("config", {})
+        .get("lambda", {})
+        .get("lambda_source_path", "")
+    )
+    return bool(path)
 
 
 def process_node_file(
@@ -591,6 +604,41 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
         raise
 
 
+def cleanup_stale_external_nodes(current_external_ids: set) -> None:
+    """Remove external node records that are no longer present in the templates."""
+    table = dynamodb.Table(NODES_TABLE)
+    prior_external_ids = set()
+
+    response = table.query(
+        KeyConditionExpression=Key("pk").eq("EXTERNAL_NODE_REGISTRY")
+    )
+    prior_external_ids.update(item["nodeId"] for item in response.get("Items", []))
+    while "LastEvaluatedKey" in response:
+        response = table.query(
+            KeyConditionExpression=Key("pk").eq("EXTERNAL_NODE_REGISTRY"),
+            ExclusiveStartKey=response["LastEvaluatedKey"],
+        )
+        prior_external_ids.update(item["nodeId"] for item in response.get("Items", []))
+
+    stale_ids = prior_external_ids - current_external_ids
+    for stale_id in stale_ids:
+        resp = table.query(KeyConditionExpression=Key("pk").eq(f"NODE#{stale_id}"))
+        while True:
+            for item in resp.get("Items", []):
+                table.delete_item(Key={"pk": item["pk"], "sk": item["sk"]})
+            if "LastEvaluatedKey" not in resp:
+                break
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"NODE#{stale_id}"),
+                ExclusiveStartKey=resp["LastEvaluatedKey"],
+            )
+        table.delete_item(
+            Key={"pk": "EXTERNAL_NODE_REGISTRY", "sk": f"NODE#{stale_id}"}
+        )
+
+    logger.info(f"Removed {len(stale_ids)} stale external nodes")
+
+
 @helper.create
 @helper.update
 def handle_create_update(
@@ -599,34 +647,53 @@ def handle_create_update(
     """Handle Create and Update events from CloudFormation"""
     logger.info("Processing nodes for Create/Update event")
 
-    try:
-        template_files = list_node_template_files(NODES_BUCKET)
-        logger.info(f"Found {len(template_files)} template files to process")
+    all_node_payloads: list = []
+    current_external_ids: set = set()
+    external_registry_items: list = []
 
-        for template_file in template_files:
-            try:
-                logger.info(f"Starting to process template: {template_file}")
-                node_items = process_node_template(NODES_BUCKET, template_file)
-                if node_items:
-                    logger.info(
-                        f"Successfully processed template {template_file}, storing in DynamoDB"
-                    )
-                    store_node_in_dynamodb(node_items)
-                else:
-                    logger.warning(f"No items generated for template {template_file}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to process template {template_file}: {str(e)}",
-                    extra={"traceback": traceback.format_exc()},
-                )
-                continue
+    template_files = list_node_template_files(NODES_BUCKET)
+    logger.info(f"Found {len(template_files)} template files to process")
 
-    except Exception as e:
-        logger.error(
-            f"Error in create/update handler: {str(e)}",
-            extra={"traceback": traceback.format_exc()},
-        )
-        raise
+    # Phase 1: Validate and collect all processed results — no DynamoDB writes
+    for template_file in template_files:
+        logger.info(f"Starting to process template: {template_file}")
+
+        raw = s3_client.get_object(Bucket=NODES_BUCKET, Key=template_file)[
+            "Body"
+        ].read()
+        node_data = yaml.safe_load(raw)
+
+        external = is_external_node(node_data)
+        node_id = node_data["node"]["id"]
+
+        node_items = process_node_template(NODES_BUCKET, template_file)
+        if node_items is None:
+            raise RuntimeError(f"Failed to process template: {template_file}")
+
+        all_node_payloads.append(node_items)
+
+        if external:
+            current_external_ids.add(node_id)
+            external_registry_items.append(
+                {
+                    "pk": "EXTERNAL_NODE_REGISTRY",
+                    "sk": f"NODE#{node_id}",
+                    "nodeId": node_id,
+                    "updatedAt": Decimal(str(int(datetime.datetime.now().timestamp()))),
+                }
+            )
+
+    # Phase 2: Write all collected results to DynamoDB
+    table = dynamodb.Table(NODES_TABLE)
+
+    for node_items in all_node_payloads:
+        logger.info("Storing processed node items in DynamoDB")
+        store_node_in_dynamodb(node_items)
+
+    for registry_item in external_registry_items:
+        table.put_item(Item=registry_item)
+
+    cleanup_stale_external_nodes(current_external_ids)
 
 
 @helper.delete
@@ -634,7 +701,35 @@ def handle_delete(
     event: CloudFormationCustomResourceEvent, context: LambdaContext
 ) -> None:
     """Handle Delete events from CloudFormation"""
-    logger.info("Delete event received - no cleanup required")
+    logger.info("Delete event received - cleaning up external nodes")
+    table = dynamodb.Table(NODES_TABLE)
+
+    response = table.query(
+        KeyConditionExpression=Key("pk").eq("EXTERNAL_NODE_REGISTRY")
+    )
+    registry_items = response.get("Items", [])
+    while "LastEvaluatedKey" in response:
+        response = table.query(
+            KeyConditionExpression=Key("pk").eq("EXTERNAL_NODE_REGISTRY"),
+            ExclusiveStartKey=response["LastEvaluatedKey"],
+        )
+        registry_items.extend(response.get("Items", []))
+
+    for item in registry_items:
+        node_id = item["nodeId"]
+        resp = table.query(KeyConditionExpression=Key("pk").eq(f"NODE#{node_id}"))
+        while True:
+            for node_item in resp.get("Items", []):
+                table.delete_item(Key={"pk": node_item["pk"], "sk": node_item["sk"]})
+            if "LastEvaluatedKey" not in resp:
+                break
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"NODE#{node_id}"),
+                ExclusiveStartKey=resp["LastEvaluatedKey"],
+            )
+        table.delete_item(Key={"pk": "EXTERNAL_NODE_REGISTRY", "sk": f"NODE#{node_id}"})
+
+    logger.info(f"Cleaned up {len(registry_items)} external node partitions")
 
 
 @logger.inject_lambda_context

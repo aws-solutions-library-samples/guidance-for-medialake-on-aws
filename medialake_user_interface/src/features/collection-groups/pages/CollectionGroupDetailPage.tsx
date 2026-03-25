@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -242,13 +242,13 @@ export const CollectionGroupDetailPage: React.FC = () => {
         <Card sx={{ mb: 3, borderRadius: 3 }}>
           <CardContent>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("collectionGroups.detailPage.info.collections")}
                 </Typography>
                 <Typography variant="h6">{group.collectionCount || 0}</Typography>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("collectionGroups.detailPage.info.visibility")}
                 </Typography>
@@ -274,7 +274,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
                   />
                 </Box>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("collectionGroups.detailPage.info.created")}
                 </Typography>

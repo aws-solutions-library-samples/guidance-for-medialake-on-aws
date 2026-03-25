@@ -18,6 +18,7 @@
 >   - [Prerequisites](#prerequisites)
 >   - [Operating System](#operating-system)
 > - [Deployment Validation](#deployment-validation)
+> - [External Pipeline Nodes (Optional)](#external-pipeline-nodes-optional)
 > - [Running the Guidance](#running-the-guidance)
 >   - [Login](#1-login)
 >   - [Connect Storage](#2-connect-storage)
@@ -160,6 +161,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
      - `small`: Suitable for development and testing environments
      - `medium`: Recommended for moderate production workloads
      - `large`: Designed for high-volume production environments
+   - **ExternalS3Bucket** _(optional)_: Name of an external S3 bucket containing custom pipeline nodes. Leave empty if not needed. The bucket must already exist and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only).
 
    #### Media Lake Deployment Configuration
 
@@ -259,6 +261,7 @@ Key configuration parameters include:
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML, OIDC)
 - **video_download_enabled** (optional): Enable/disable video download functionality (defaults to `true`)
+- **external_nodes_bucket** (optional): Name of an external S3 bucket containing custom pipeline nodes. The bucket must exist in the same AWS account and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only). Leave empty or omit if not needed.
 - **cloudfront_custom_domain** (optional): Custom domain configuration for CloudFront distribution
   - **domain_name**: Your custom domain name (e.g., "medialake.example.com")
   - **certificate_arn**: ARN of your ACM certificate in us-east-1 region
@@ -392,6 +395,193 @@ After successful deployment with custom domain configuration:
 - **Domain mismatch**: Ensure the certificate covers your domain name
 - **DNS not resolving**: Wait for DNS propagation (up to 48 hours in rare cases)
 - **HTTPS errors**: Verify the certificate is in `ISSUED` status and covers the domain
+
+---
+
+## External Pipeline Nodes (Optional)
+
+You can extend Media Lake with custom pipeline nodes by hosting them in an external S3 bucket. External nodes are deployed alongside built-in nodes and appear in the pipeline builder as first-class peers — indistinguishable to end users.
+
+### How It Works
+
+During `cdk deploy` (or the CloudFormation CodeBuild pipeline), CDK reads the `external_nodes_bucket` configuration, downloads your YAML templates and Lambda source code from the bucket, packages them using the same build process as built-in nodes, and deploys them into the node catalogue. External nodes are validated at synthesis time — invalid templates, missing source code, or duplicate node IDs will fail the deployment with a clear error.
+
+### S3 Bucket Layout
+
+Your external bucket must follow this structure:
+
+```
+my-custom-pipeline-nodes/
+├── node_templates/
+│   └── utility/
+│       └── my_custom_node.yaml        # Node definition template
+└── lambdas/
+    └── nodes/
+        └── my_custom_node/             # Lambda source folder
+            ├── index.py                # Handler code
+            └── requirements.txt        # Python dependencies
+```
+
+- `node_templates/` — YAML node definitions (any subfolder structure is fine)
+- The Lambda source folder path is declared in the YAML template via `lambda_source_path`
+
+### Example: Custom Watermark Node
+
+This example creates a node that adds a text watermark to image metadata.
+
+**1. Node template** (`node_templates/utility/image_watermark.yaml`):
+
+```yaml
+spec: v1.0.0
+node:
+  id: image_watermark
+  title: Image Watermark
+  description: Add a text watermark reference to image assets
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/ImageWatermarkLambdaDeployment
+        lambda_source_path: lambdas/nodes/image_watermark
+        runtime: python3.12
+        memory_size: 256
+        timeout: 60
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+actions:
+  process:
+    summary: Apply watermark
+    description: Add a text watermark reference to the asset metadata
+    operationId: applyWatermark
+    parameters:
+      - in: body
+        name: watermark_text
+        required: false
+        default: "DRAFT"
+        schema:
+          type: string
+          description: Watermark text to apply
+    connections:
+      incoming:
+        type: [image]
+      outgoing:
+        type: [image]
+```
+
+Key differences from built-in templates:
+
+- `lambda_source_path` is required — points to the Lambda source folder in your S3 bucket
+- `handler` still follows the `{type}/{ConstructId}` pattern and is used at runtime for artifact resolution
+- `node.id` must be globally unique across all built-in and external nodes
+
+**2. Lambda source** (`lambdas/nodes/image_watermark/index.py`):
+
+```python
+import json
+import os
+
+import boto3
+from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+
+logger = Logger()
+tracer = Tracer()
+dynamodb = boto3.resource("dynamodb")
+
+
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event, context: LambdaContext):
+    logger.info("Processing watermark request")
+
+    input_payload = event.get("payload", {}).get("event", {}).get("input", {}) or {}
+    watermark_text = os.environ.get(
+        "WATERMARK_TEXT", input_payload.get("watermark_text", "DRAFT")
+    )
+
+    # Add watermark metadata to the asset record
+    asset_id = input_payload.get("assetId")
+    if asset_id:
+        logger.info(f"Applying watermark '{watermark_text}' to asset {asset_id}")
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "message": f"Watermark '{watermark_text}' applied",
+            "assetId": asset_id,
+        }),
+    }
+```
+
+**3. Dependencies** (`lambdas/nodes/image_watermark/requirements.txt`):
+
+```
+aws-lambda-powertools>=2.0.0
+aws-xray-sdk
+```
+
+### Bucket Permissions
+
+Your external S3 bucket must grant read access to the MediaLake deployment role. Add a bucket policy like:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowMediaLakeRead",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::<YOUR_ACCOUNT_ID>:root"
+      },
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::my-custom-pipeline-nodes",
+        "arn:aws:s3:::my-custom-pipeline-nodes/*"
+      ]
+    }
+  ]
+}
+```
+
+### Configuration
+
+Set the bucket name in `config.json`:
+
+```json
+{
+  "external_nodes_bucket": "my-custom-pipeline-nodes"
+}
+```
+
+Or via the CloudFormation `ExternalS3Bucket` parameter when deploying with the template.
+
+Then run `cdk deploy` (or trigger the CodePipeline). Your custom nodes will appear in the pipeline builder after deployment.
+
+### Validation Rules
+
+Deployment will fail fast if any of these conditions are detected:
+
+- External bucket is inaccessible or does not exist
+- No `.yaml`/`.yml` files found under `node_templates/`
+- Missing required YAML fields (`node.id`, `node.title`, `node.type`, `node.integration.config.lambda.handler`, `node.integration.config.lambda.lambda_source_path`)
+- No source files found at the declared `lambda_source_path`
+- Duplicate `node.id` across built-in and external nodes
+- Construct ID naming collisions
 
 ---
 
