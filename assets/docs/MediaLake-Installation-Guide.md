@@ -221,10 +221,14 @@ If you deployed using the **Git** source type, Media Lake can be updated with th
 
 ---
 
-## 5. SAML Integration
+## 5. SAML/OIDC Integration
+
+Identity Federation with SAML and OIDC are configured in the config.json file. For example configurations, see ~[config-example.json](../../config-example.json)
+
+### SAML Integration
 
 - Create the media lake app in your identity provider (Okta, etc.).
-- Use placeholder URLs for SSO endpoints initially.
+- Use placeholder URLs for SSO endpoints initially in the config.json file. Add any optional settings 
 - After deployment, copy your Cognito **User Pool ID** and **domain** from AWS Cognito.
   ![Cognito User Pool](../images/installation-guide/medialake-saml-provider-integration-instructions-2.png)
 - Navigate to the Cognito domain configuration.
@@ -235,6 +239,24 @@ If you deployed using the **Git** source type, Media Lake can be updated with th
   - `surname` → user.lastName
   - `givenname` → user.firstName
   - `role` → user.role
+
+### OIDC Integration
+
+1.  Create a Media Lake app in your identity provider
+1.  During the creation, define a Client ID and generate or specify a Client Secret
+1. Obtain the OIDC Issuer URL from your Identity Provider. You are looking for the base domain of a URL similar to https://idp.example.com/.well-known/openid-configuration (ie https://idp.example.com)
+1. Add these values into your config.json file, along with any other optional settings (see below).
+
+### Optional Settings
+
+You can customize the integration of a Federated Identity integration with these settings in the config.json file:
+
+| Setting | Values | Description |
+| --- | --- | --- |
+| identity_provider_default_group_assignment | "read-only", "editors", "superAdministrator" | New users who sign in with this identity provider will be assigned to this user group by default.
+identity_provider_access_token_validity | minutes | Integer representing number of minutes token should be valid for |
+identity_provider_id_token_validity | minutes | Integer representing number of minutes token should be valid for |
+identity_provider_refresh_token_validity | minutes | Integer representing number of minutes token should be valid for |
 
 ---
 

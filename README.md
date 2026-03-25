@@ -613,7 +613,7 @@ To remove all media lake resources:
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
-- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
+- For SAML/OIDC integration and advanced identity provider setup, refer to the SAML/OIDC instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
 
 ---
 
