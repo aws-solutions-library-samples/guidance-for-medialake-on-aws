@@ -16,7 +16,8 @@ export type FormFieldOption = {
 
 export type FormFieldShowWhen = {
   field: string;
-  value: any;
+  value?: any;
+  operator?: "equals" | "exists";
 };
 
 export interface FormFieldDefinition {
@@ -40,6 +41,7 @@ export interface FormFieldDefinition {
   options?: FormFieldOption[];
   defaultValue?: any;
   showWhen?: FormFieldShowWhen;
+  readOnly?: boolean;
 }
 
 export interface FormDefinition {

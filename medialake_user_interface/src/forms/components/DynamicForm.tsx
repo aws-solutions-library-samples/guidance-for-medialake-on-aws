@@ -46,8 +46,14 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
       if (field.showWhen) {
         const dependentValue = form.watch(field.showWhen.field);
 
-        if (dependentValue !== field.showWhen.value) {
-          return null;
+        if (field.showWhen.operator === "exists") {
+          if (dependentValue === undefined || dependentValue === null || dependentValue === "") {
+            return null;
+          }
+        } else {
+          if (dependentValue !== field.showWhen.value) {
+            return null;
+          }
         }
       }
 
@@ -65,6 +71,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
         }),
         ...(field.multiline !== undefined && { multiline: field.multiline }),
         ...(field.rows !== undefined && { rows: field.rows }),
+        ...(field.readOnly !== undefined && { readOnly: field.readOnly }),
       };
 
       switch (field.type) {

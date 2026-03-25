@@ -575,20 +575,21 @@ const PipelineEditorContent = () => {
   });
 
   // Only fetch node details when the dialog is open and we have a selected node
-  // Store the nodeId in a ref to prevent unnecessary re-renders
-  const nodeIdRef = React.useRef<string>("");
+  // Use state (not a ref) so that updating the nodeId triggers a re-render
+  // and the useGetNode query re-evaluates its `enabled` condition.
+  const [activeNodeId, setActiveNodeId] = React.useState<string>("");
 
   // Only update the nodeId when the dialog opens or closes
   React.useEffect(() => {
     if (isNodeConfigOpen && selectedNode?.data?.nodeId) {
-      nodeIdRef.current = selectedNode.data.nodeId;
+      setActiveNodeId(selectedNode.data.nodeId);
     } else if (!isNodeConfigOpen) {
-      nodeIdRef.current = "";
+      setActiveNodeId("");
     }
   }, [isNodeConfigOpen, selectedNode]);
 
-  const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(nodeIdRef.current, {
-    enabled: isNodeConfigOpen && !!nodeIdRef.current,
+  const { data: nodeDetails, isLoading: isNodeDetailsLoading } = useGetNode(activeNodeId, {
+    enabled: isNodeConfigOpen && !!activeNodeId,
   });
 
   // Add debug logging for node details
@@ -703,19 +704,50 @@ const PipelineEditorContent = () => {
   // Set form data when pipeline data is loaded
   React.useEffect(() => {
     if (pipeline) {
+      const configuration = pipeline.configuration || {
+        nodes: [],
+        edges: [],
+        settings: {
+          autoStart: false,
+          retryAttempts: 3,
+          timeout: 3600,
+        },
+      };
+
+      // Inject webhook metadata into trigger_webhook node parameters
+      if (pipeline.webhookUrl || pipeline.webhookCredentialHint) {
+        configuration.nodes = configuration.nodes.map((node) => {
+          if (
+            (node.data?.nodeId === "trigger_webhook" || node.data?.id === "trigger_webhook") &&
+            node.data.configuration
+          ) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                configuration: {
+                  ...node.data.configuration,
+                  parameters: {
+                    ...node.data.configuration.parameters,
+                    ...(pipeline.webhookUrl && { webhookUrl: pipeline.webhookUrl }),
+                    ...(pipeline.webhookCredentialHint && {
+                      webhookCredentialHint: pipeline.webhookCredentialHint,
+                    }),
+                    ...(pipeline.webhookAuthMethod && { authMethod: pipeline.webhookAuthMethod }),
+                  },
+                },
+              },
+            };
+          }
+          return node;
+        });
+      }
+
       const pipelineData = {
         name: pipeline.name || "",
         description: pipeline.description || "",
         active: pipeline.active !== false,
-        configuration: pipeline.configuration || {
-          nodes: [],
-          edges: [],
-          settings: {
-            autoStart: false,
-            retryAttempts: 3,
-            timeout: 3600,
-          },
-        },
+        configuration,
       };
       setFormData(pipelineData);
       setOriginalPipelineData(JSON.parse(JSON.stringify(pipelineData)));
@@ -1196,6 +1228,27 @@ const PipelineEditorContent = () => {
         // Create a ReactFlow node from the pipeline node
         // Direct call to getNodeIcon instead of using useMemo inside map function
         const nodeIcon = getNodeIcon(node.data.type);
+
+        // Inject webhook metadata into trigger_webhook node configuration
+        let configuration = node.data.configuration;
+        if (
+          (node.data.id === "trigger_webhook" || node.data.nodeId === "trigger_webhook") &&
+          configuration &&
+          (pipeline.webhookUrl || pipeline.webhookCredentialHint)
+        ) {
+          configuration = {
+            ...configuration,
+            parameters: {
+              ...configuration.parameters,
+              ...(pipeline.webhookUrl && { webhookUrl: pipeline.webhookUrl }),
+              ...(pipeline.webhookCredentialHint && {
+                webhookCredentialHint: pipeline.webhookCredentialHint,
+              }),
+              ...(pipeline.webhookAuthMethod && { authMethod: pipeline.webhookAuthMethod }),
+            },
+          };
+        }
+
         return {
           id: node.id,
           type: node.type || "custom",
@@ -1211,7 +1264,7 @@ const PipelineEditorContent = () => {
             inputTypes: node.data.inputTypes || [],
             outputTypes: node.data.outputTypes || [],
             type: node.data.type,
-            configuration: node.data.configuration,
+            configuration: configuration,
             onDelete: onDeleteNode,
             onConfigure: onConfigureNode,
             onRotate: onRotateNode,

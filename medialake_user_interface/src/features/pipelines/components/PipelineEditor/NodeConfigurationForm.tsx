@@ -23,6 +23,8 @@ const mapParameterTypeToFormType = (type: string): FormFieldDefinition["type"] =
       return "number";
     case "select":
       return "select";
+    case "password":
+      return "password";
     case "json_editor":
       return "json_editor";
     default:
@@ -306,6 +308,10 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
                 };
               }
             }
+            if (param.schema?.readOnly === true) {
+              field.readOnly = true;
+            }
+
             fields.push(field);
           });
         }

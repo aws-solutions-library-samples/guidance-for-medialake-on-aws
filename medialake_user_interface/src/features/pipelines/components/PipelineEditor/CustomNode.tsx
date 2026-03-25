@@ -413,6 +413,7 @@ const CustomNode: React.FC<NodeProps<CustomFlowNode>> = ({ id, data, isConnectab
           : "",
         padding: "2px",
         transition: "all 0.3s linear",
+        width: "208px",
         zIndex: currentRotation === 90 || currentRotation === 270 ? 1 : 5, // Lower z-index when handles are on top/bottom
       }}
       onFocus={() => setSelected(true)}
@@ -425,8 +426,8 @@ const CustomNode: React.FC<NodeProps<CustomFlowNode>> = ({ id, data, isConnectab
           backgroundColor: "background.paper",
           border: !selected ? 2 : 0,
           borderColor: data.configuration ? "primary.main" : "divider",
-          width: "200px", // Increased width from 200px to 240px
-          maxWidth: "200px", // Increased max width from 200px to 240px
+          width: "100%",
+          boxSizing: "border-box",
           minHeight: "90px",
           position: "relative",
           boxShadow: 2,
