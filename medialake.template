@@ -663,8 +663,8 @@ Resources:
                   export BUILD_DIR=$(cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR && if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
                   if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p $CODEBUILD_SRC_DIR/$FRONTEND_DIR/build; export BUILD_DIR="build"; fi
                   echo "Build output directory $BUILD_DIR"
-                  mkdir -p assets
-                  if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/" assets/; else echo "No frontend build found to copy"; fi
+                  mkdir -p assets/dist
+                  if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
                 - echo "Checking CDK bootstrap status"
                 - |
                   cleanup_and_bootstrap() {
