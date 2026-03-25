@@ -60,45 +60,42 @@ export interface Asset {
     MainRepresentation: {
       ID: string;
       Format: string;
+      Purpose?: string;
       StorageInfo: {
         PrimaryLocation: {
+          StorageType?: string;
+          Bucket?: string;
           ObjectKey: {
             Name: string;
+            Path?: string;
             FullPath: string;
           };
+          Status?: string;
           FileInfo: {
             Size: number;
+            CreateDate?: string;
+            Hash?: {
+              Algorithm: string;
+              Value: string;
+            };
           };
         };
       };
     };
-    DerivedRepresentations: Array<{
-      ID: string;
-      Format: string;
-      Purpose: string;
-      StorageInfo: {
-        PrimaryLocation: {
-          ObjectKey: {
-            Name: string;
-            FullPath: string;
-          };
-          FileInfo: {
-            Size: number;
-          };
-        };
-      };
-      URL?: string;
-    }>;
-    Metadata?: any;
   };
   DerivedRepresentations: Array<{
     ID: string;
+    Type?: string;
     Format: string;
     Purpose: string;
     StorageInfo: {
       PrimaryLocation: {
+        StorageType?: string;
+        Bucket?: string;
+        Provider?: string;
+        Status?: string;
         ObjectKey: {
-          Name: string;
+          Name?: string;
           FullPath: string;
         };
         FileInfo: {
@@ -107,7 +104,14 @@ export interface Asset {
       };
     };
     URL?: string;
+    ImageSpec?: {
+      Resolution?: {
+        Height: number;
+        Width: number;
+      };
+    };
   }>;
+  Type?: string;
   Metadata?: any;
   relatedVersionsData?: RelatedVersionsResponse;
 }

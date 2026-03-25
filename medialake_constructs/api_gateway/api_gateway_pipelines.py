@@ -73,6 +73,7 @@ class ApiGatewayPipelinesProps:
     s3_vector_bucket_name: Optional[str] = None
     s3_vector_index_name: str = "media-vectors"
     s3_vector_dimension: int = 1024
+    cloudfront_domain: str = ""
 
 
 class ApiGatewayPipelinesConstruct(Construct):
@@ -192,6 +193,28 @@ class ApiGatewayPipelinesConstruct(Construct):
                     ],
                     resources=["*"],
                 ),
+                # Allow reading SSM parameters (e.g. CloudFront domain fallback)
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["ssm:GetParameter"],
+                    resources=[
+                        f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*"
+                    ],
+                ),
+                # Allow Secrets Manager operations for webhook secrets
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "secretsmanager:CreateSecret",
+                        "secretsmanager:UpdateSecret",
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:DeleteSecret",
+                        "secretsmanager:TagResource",
+                    ],
+                    resources=[
+                        f"arn:aws:secretsmanager:{Stack.of(self).region}:{Stack.of(self).account}:secret:{config.resource_prefix}/webhooks/*"
+                    ],
+                ),
             ],
         )
 
@@ -299,6 +322,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "VECTOR_DIMENSION": str(props.s3_vector_dimension),
                 # Marengo 3.0 embeddings index - separate from media index for vector search
                 "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
+                "CLOUDFRONT_DOMAIN": props.cloudfront_domain,
+                "ENVIRONMENT": config.environment,
             },
         )
 
@@ -494,6 +519,30 @@ class ApiGatewayPipelinesConstruct(Construct):
                     "logs:PutLogEvents",
                 ],
                 resources=["*"],
+            )
+        )
+
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "secretsmanager:CreateSecret",
+                    "secretsmanager:UpdateSecret",
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:TagResource",
+                ],
+                resources=[
+                    f"arn:aws:secretsmanager:*:*:secret:{config.resource_prefix}/webhooks/*"
+                ],
+            )
+        )
+
+        # Allow reading CloudFront domain from SSM (fallback when env var is empty)
+        self._post_pipelines_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/{config.environment}/cloudfront-distribution-domain"
+                ],
             )
         )
 
@@ -905,6 +954,15 @@ class ApiGatewayPipelinesConstruct(Construct):
                 actions=["logs:DeleteLogGroup", "logs:DescribeLogGroups"],
                 resources=[
                     f"arn:aws:logs:{self.region}:{self.account_id}:log-group:/aws/vendedlogs/states/{config.resource_prefix}*"
+                ],
+            )
+        )
+
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:DeleteSecret"],
+                resources=[
+                    f"arn:aws:secretsmanager:*:*:secret:{config.resource_prefix}/webhooks/*"
                 ],
             )
         )

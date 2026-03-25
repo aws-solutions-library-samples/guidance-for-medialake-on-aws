@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from "react";
 import { Box, Typography, Alert, CircularProgress } from "@mui/material";
 import { FolderSpecial as FolderSpecialIcon } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { WidgetContainer } from "../WidgetContainer";
 import { CollectionCarousel } from "../CollectionCarousel";

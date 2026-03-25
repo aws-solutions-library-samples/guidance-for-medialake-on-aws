@@ -3,6 +3,7 @@ constructs>=10.0.0,<11.0.0
 aws_cdk.aws_lambda_python_alpha>=2.224.0a0
 # Note: aws_cognito_identitypool_alpha was graduated to stable in aws-cdk-lib.aws_cognito_identitypool
 boto3
+PyYAML
 cdk_nag
 python-dotenv
 pydantic

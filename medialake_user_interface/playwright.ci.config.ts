@@ -35,7 +35,7 @@ export default defineConfig({
   reporter: [
     ["list"], // Console output
     ["junit", { outputFile: "test-results/junit.xml" }], // JUnit XML for GitLab
-    ["html", { outputFolder: "playwright-report", open: "never" }], // HTML report
+    ["html", { outputFolder: "test-results/playwright-report", open: "never" }], // HTML report
   ],
 
   /* Shared settings for all the projects below */

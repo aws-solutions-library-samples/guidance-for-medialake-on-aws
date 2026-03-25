@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Typography, IconButton, Divider, Paper, Stack, Slide, Link } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import { typography } from "@/theme/tokens";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";

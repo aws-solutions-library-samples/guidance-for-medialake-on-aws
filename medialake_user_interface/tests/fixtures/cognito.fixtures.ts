@@ -46,7 +46,10 @@ function generateSecurePassword(passwordPolicy?: any): string {
   const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const lowercase = "abcdefghijklmnopqrstuvwxyz";
   const numbers = "0123456789";
-  const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+  // ONLY use symbols that are safe to pass through bash shell via execSync.
+  // Avoid: $ ` \ ! ( ) { } [ ] | ; < > ^ & * ? # ~ "
+  // Safe symbols that Cognito accepts and bash won't interpret:
+  const symbols = "@%+=._-";
 
   let password = "";
   let availableChars = "";
@@ -62,8 +65,9 @@ function generateSecurePassword(passwordPolicy?: any): string {
   password += numbers.charAt(Math.floor(Math.random() * numbers.length));
   availableChars += numbers;
 
-  // Always add at least one '!' character (guaranteed)
-  password += "!";
+  // Always add at least two symbol characters (guaranteed)
+  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
+  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
   availableChars += symbols;
 
   // Add required character types

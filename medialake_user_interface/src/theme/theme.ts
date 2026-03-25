@@ -1,6 +1,16 @@
 import { createTheme, Theme } from "@mui/material/styles";
-import { colorTokens, typography } from "./tokens";
+import { colorTokens, typography, radiusTokens } from "./tokens";
 import { alpha } from "@mui/material/styles";
+
+// Extend MUI palette to include accent color
+declare module "@mui/material/styles" {
+  interface Palette {
+    accent: Palette["primary"];
+  }
+  interface PaletteOptions {
+    accent?: PaletteOptions["primary"];
+  }
+}
 
 export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
   return createTheme({
@@ -21,6 +31,7 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
       },
       primary: colorTokens.primary,
       secondary: colorTokens.secondary,
+      accent: colorTokens.accent,
       error: colorTokens.error,
       warning: colorTokens.warning,
       success: colorTokens.success,
@@ -125,7 +136,7 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
           root: {
             textTransform: "none",
             fontWeight: 500,
-            borderRadius: "8px",
+            borderRadius: radiusTokens.md,
           },
           contained: ({ theme }) => ({
             backgroundColor: theme.palette.primary.main,
@@ -191,7 +202,7 @@ export const createUnifiedTheme = (mode: "light" | "dark"): Theme => {
       MuiDialog: {
         styleOverrides: {
           paper: {
-            borderRadius: 12,
+            borderRadius: parseInt(radiusTokens.lg),
           },
         },
       },

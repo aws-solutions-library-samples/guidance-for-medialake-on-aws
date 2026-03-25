@@ -31,14 +31,7 @@ import {
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { subDays } from "date-fns";
-
-// File size units for conversion
-const FILE_SIZE_UNITS = [
-  { value: 1, label: "B" },
-  { value: 1024, label: "KB" },
-  { value: 1024 * 1024, label: "MB" },
-  { value: 1024 * 1024 * 1024, label: "GB" },
-];
+import { FILE_SIZE_UNITS } from "@/constants/fileSizeUnits";
 
 // Date range options
 const DATE_RANGE_OPTIONS = [
@@ -157,7 +150,6 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   };
 
   // Get available extensions from facet counts if available
-  // const _availableExtensions = facetCounts?.file_extensions?.buckets || [];
 
   return (
     <Dialog

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { drawerWidth, collapsedDrawerWidth, layoutTokens, springEasing } from "@/constants";
 import { Box, useTheme } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import { Outlet } from "react-router";
 import { SidebarContext } from "../contexts/SidebarContext";
 import { useDirection } from "../contexts/DirectionContext";
 import { ChatProvider } from "../contexts/ChatContext";
@@ -9,6 +9,7 @@ import { alpha } from "@mui/material/styles";
 import TopBar from "../TopBar";
 import Sidebar from "../Sidebar";
 import { ChatSidebar } from "../features/chat";
+import { zIndexTokens } from "@/theme/tokens";
 
 const AppLayout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -90,7 +91,7 @@ const AppLayout: React.FC = () => {
                 left: 0,
                 height: `${layoutTokens.topBarHeight}px`,
                 [isRTL ? "paddingRight" : "paddingLeft"]: `${currentDrawerWidth}px`,
-                zIndex: 1100,
+                zIndex: zIndexTokens.appBar,
                 background: topBarGradient,
                 backgroundColor: alpha(theme.palette.background.default, 0.85),
                 backdropFilter: "blur(10px)",

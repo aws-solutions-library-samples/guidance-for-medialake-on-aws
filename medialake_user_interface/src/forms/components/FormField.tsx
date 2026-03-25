@@ -15,6 +15,7 @@ export type FormFieldProps<T extends FieldValues> = {
   translationPrefix?: string;
   useDirectLabels?: boolean;
   showHelper?: boolean;
+  readOnly?: boolean;
 } & Omit<TextFieldProps, "name">;
 
 export const FormField = <T extends FieldValues>({
@@ -27,6 +28,7 @@ export const FormField = <T extends FieldValues>({
   tooltip,
   translationPrefix,
   useDirectLabels = false,
+  readOnly,
   ...rest
 }: FormFieldProps<T>) => {
   const { t } = useTranslation();
@@ -66,6 +68,7 @@ export const FormField = <T extends FieldValues>({
           }
           InputProps={{
             ...rest.InputProps,
+            readOnly: readOnly,
             endAdornment: tooltip ? (
               <InputAdornment position="end">
                 <Tooltip title={tooltip}>

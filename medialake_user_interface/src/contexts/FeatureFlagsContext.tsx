@@ -110,11 +110,12 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     await fetchFlags();
   }, [fetchFlags]);
 
-  return (
-    <FeatureFlagsContext.Provider value={{ flags, isLoading, error, refreshFlags }}>
-      {children}
-    </FeatureFlagsContext.Provider>
+  const value = React.useMemo(
+    () => ({ flags, isLoading, error, refreshFlags }),
+    [flags, isLoading, error, refreshFlags]
   );
+
+  return <FeatureFlagsContext.Provider value={value}>{children}</FeatureFlagsContext.Provider>;
 };
 
 // Hook for using the feature flags

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Box, CircularProgress, Typography, Paper, Button, Tabs, Tab, alpha } from "@mui/material";
 import { useAsset, useRelatedVersions, RelatedVersionsResponse } from "../api/hooks/useAssets";
@@ -15,12 +15,14 @@ import TechnicalMetadataTab from "../components/TechnicalMetadataTab";
 import TabContentContainer from "../components/common/TabContentContainer";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { springEasing } from "@/constants";
-import { colorTokens } from "@/theme/tokens";
+import { zIndexTokens } from "@/theme/tokens";
+import { useTheme as useMuiTheme } from "@mui/material/styles";
 
 const SummaryTab = ({ assetData }: { assetData: any }) => {
   const asset = assetData?.data?.asset;
-  const fileInfoColor = colorTokens.primary.main;
-  const techDetailsColor = colorTokens.accent.main;
+  const theme = useMuiTheme();
+  const fileInfoColor = theme.palette.primary.main;
+  const techDetailsColor = (theme.palette as any).accent?.main ?? theme.palette.primary.main;
 
   // Extract metadata from API response
   const metadata = asset?.Metadata?.EmbeddedMetadata || {};
@@ -192,26 +194,14 @@ const ImageDetailContent: React.FC = () => {
   const [commentAnchorEl, setCommentAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedComment, setSelectedComment] = useState<number | null>(null);
   const [showHeader, setShowHeader] = useState(true);
-  const [comments, setComments] = useState([
-    {
-      user: "John Doe",
-      avatar: "https://mui.com/static/images/avatar/1.jpg",
-      content: "Great composition!",
-      timestamp: "2023-06-15 09:30:22",
-    },
-    {
-      user: "Jane Smith",
-      avatar: "https://mui.com/static/images/avatar/2.jpg",
-      content: "The lighting is perfect!",
-      timestamp: "2023-06-15 10:15:45",
-    },
-    {
-      user: "Mike Johnson",
-      avatar: "https://mui.com/static/images/avatar/3.jpg",
-      content: "Love the color palette!",
-      timestamp: "2023-06-15 11:00:12",
-    },
-  ]);
+  const [comments, setComments] = useState<
+    Array<{
+      user: string;
+      avatar: string;
+      content: string;
+      timestamp: string;
+    }>
+  >([]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -367,57 +357,14 @@ const ImageDetailContent: React.FC = () => {
   }, [assetData]);
 
   const handleBack = useCallback(() => {
-    // Construct query parameters
-    const queryParams = new URLSearchParams();
-    if (searchTerm) {
-      queryParams.set("q", searchTerm);
+    // If we came from a specific location with state, go back in history
+    if (location.state && (searchTerm || location.state.preserveSearch)) {
+      navigate(-1);
+    } else {
+      // Fallback to search page with search term if available
+      navigate(`/search${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ""}`);
     }
-    if (page > 1) {
-      queryParams.set("page", page.toString());
-    }
-    if (isSemantic) {
-      queryParams.set("semantic", "true");
-    }
-
-    // Navigate back to search with all state preserved
-    const previousPath = location.pathname;
-    navigate({
-      pathname: previousPath,
-      search: queryParams.toString(),
-      state: {
-        preserveSearch: true,
-        searchTerm,
-        page,
-        viewMode,
-        cardSize,
-        aspectRatio,
-        thumbnailScale,
-        showMetadata,
-        groupByType,
-        filters,
-        sorting,
-        isSemantic,
-        currentResult,
-        totalResults,
-      },
-    } as any); // Type assertion needed due to React Router types
-  }, [
-    navigate,
-    searchTerm,
-    page,
-    viewMode,
-    cardSize,
-    aspectRatio,
-    thumbnailScale,
-    showMetadata,
-    groupByType,
-    filters,
-    sorting,
-    isSemantic,
-    currentResult,
-    totalResults,
-    location.pathname,
-  ]);
+  }, [navigate, searchTerm, location.state]);
 
   const handleAddComment = useCallback((content: string) => {
     const newCommentObj = {
@@ -497,7 +444,7 @@ const ImageDetailContent: React.FC = () => {
         sx={{
           position: "sticky",
           top: 0,
-          zIndex: 1000,
+          zIndex: zIndexTokens.stickyHeader,
           transform: showHeader ? "translateY(0)" : "translateY(-100%)",
           transition: "transform 0.3s ease-in-out",
           visibility: showHeader ? "visible" : "hidden",

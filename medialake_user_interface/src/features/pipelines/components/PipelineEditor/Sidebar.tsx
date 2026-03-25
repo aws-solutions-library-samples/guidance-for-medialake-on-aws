@@ -10,7 +10,12 @@ import {
   AccordionDetails,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { FaFileVideo, FaBolt, FaCodeBranch, FaTools, FaPlug, FaCogs } from "react-icons/fa";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import BoltIcon from "@mui/icons-material/Bolt";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import BuildIcon from "@mui/icons-material/Build";
+import PowerIcon from "@mui/icons-material/Power";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { useTranslation } from "react-i18next";
 import { useGetUnconfiguredNodeMethods } from "@/shared/nodes/api/nodesController";
 import { Node as NodeType } from "@/shared/nodes/types/nodes.types";
@@ -32,22 +37,22 @@ const SidebarContent: React.FC = () => {
 
   // Function to get the appropriate icon based on node type
   const getNodeIcon = (nodeType: string | undefined) => {
-    if (!nodeType) return <FaFileVideo size={20} />;
+    if (!nodeType) return <VideocamIcon sx={{ fontSize: 20 }} />;
 
     const type = nodeType?.toUpperCase() || "";
 
     if (type.includes("TRIGGER")) {
-      return <FaBolt size={20} />;
+      return <BoltIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("FLOW")) {
-      return <FaCodeBranch size={20} />;
+      return <AccountTreeIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("UTILITY")) {
-      return <FaTools size={20} />;
+      return <BuildIcon sx={{ fontSize: 20 }} />;
     } else if (type.includes("INTEGRATION")) {
-      return <FaPlug size={20} />;
+      return <PowerIcon sx={{ fontSize: 20 }} />;
     }
 
     // Default icon for other types
-    return <FaCogs size={20} />;
+    return <SettingsIcon sx={{ fontSize: 20 }} />;
   };
 
   const handleSectionToggle = (sectionId: string) => {

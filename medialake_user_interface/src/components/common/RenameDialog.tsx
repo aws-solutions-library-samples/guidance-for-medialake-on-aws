@@ -76,12 +76,6 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
       </DialogTitle>
       <DialogContent sx={{ p: 2 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
-          {/* <TextField
-                        label="Current Name"
-                        value={currentName}
-                        disabled
-                        fullWidth
-                    /> */}
           <TextField
             label={t("rename.newName")}
             value={newName}

@@ -1,6 +1,6 @@
 import React, { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { RouterProvider } from "react-router-dom";
+import { RouterProvider } from "react-router/dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import queryClient from "../api/queryClient";
 import { AwsConfigProvider } from "../common/hooks/aws-config-context";
@@ -33,8 +33,9 @@ const LoadingFallback = () => (
   </Box>
 );
 
-const ErrorFallback = ({ error }: { error: Error }) => {
+const ErrorFallback = ({ error }: { error: unknown }) => {
   const { t } = useTranslation();
+  const message = error instanceof Error ? error.message : String(error);
   return (
     <Box
       sx={{
@@ -47,7 +48,7 @@ const ErrorFallback = ({ error }: { error: Error }) => {
       }}
     >
       <h2>{t("app.errors.somethingWentWrong")}:</h2>
-      <pre style={{ color: "red" }}>{error.message}</pre>
+      <pre style={{ color: "red" }}>{message}</pre>
     </Box>
   );
 };

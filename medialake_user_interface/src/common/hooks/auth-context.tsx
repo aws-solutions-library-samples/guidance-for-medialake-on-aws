@@ -160,16 +160,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [checkAuthStatus, silentAuthCheck]);
 
-  const value = {
-    isAuthenticated,
-    setIsAuthenticated,
-    completeLogin,
-    checkAuthStatus,
-    silentAuthCheck,
-    refreshSession,
-    isLoading,
-    isInitialized,
-  };
+  const value = React.useMemo(
+    () => ({
+      isAuthenticated,
+      setIsAuthenticated,
+      completeLogin,
+      checkAuthStatus,
+      silentAuthCheck,
+      refreshSession,
+      isLoading,
+      isInitialized,
+    }),
+    [
+      isAuthenticated,
+      setIsAuthenticated,
+      completeLogin,
+      checkAuthStatus,
+      silentAuthCheck,
+      refreshSession,
+      isLoading,
+      isInitialized,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

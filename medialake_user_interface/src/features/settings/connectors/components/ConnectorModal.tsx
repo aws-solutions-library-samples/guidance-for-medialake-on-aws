@@ -38,6 +38,7 @@ import ApiStatusModal from "@/components/ApiStatusModal";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
 import { ConnectorResponse, CreateConnectorRequest } from "@/api/types/api.types";
 import { useGetS3Buckets } from "@/api/hooks/useConnectors";
+import { brandTokens } from "@/theme/tokens";
 
 interface ConnectorModalProps {
   open: boolean;
@@ -48,7 +49,7 @@ interface ConnectorModalProps {
 }
 
 /** AWS brand orange — used for S3/FSx connector icons and accents. */
-const AWS_BRAND_ORANGE = "#FF9900";
+const AWS_BRAND_ORANGE = brandTokens.aws.orange;
 
 const CONNECTOR_TYPES = [
   {
@@ -91,7 +92,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
   onClose,
   editingConnector,
   onSave,
-  // isCreating,
 }) => {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -243,13 +243,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
       return; // Stop submission if bucket name is invalid
     }
 
-    // Original validation logic with region requirement (commented out for restoration later)
-    // if (!name || !type || (type === 's3' && (!s3ConnectorType || !configuration.integrationMethod || (bucketType === 'existing' && !configuration.bucket) || (bucketType === 'new' && (!configuration.bucket || !awsRegion))))) {
-    //     alert('Please fill in all required fields, including Bucket Name and Region for new buckets.');
-    //     return;
-    // }
-
-    // Modified validation logic - removed region requirement for new buckets
     if (
       !name ||
       !type ||
@@ -475,23 +468,6 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
                     error={!!bucketNameError}
                     helperText={bucketNameError || t("connectors.form.bucketNameHelper")}
                   />
-                  {/* AWS Region FormControl hidden as requested */}
-                  {/* i18n-ignore - commented out code
-                  <FormControl fullWidth required>
-                                    <InputLabel>AWS Region</InputLabel>
-                                    <Select
-                                        value={awsRegion}
-                                        label="AWS Region"
-                                        onChange={(e) => setAwsRegion(e.target.value)}
-                                    >
-                                        {AWS_REGIONS.map((region) => (
-                                            <MenuItem key={region.value} value={region.value}>
-                                                {region.label} ({region.value})
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                  */}
                 </>
               )}
             </>

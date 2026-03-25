@@ -3,8 +3,11 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import en from "./locales/en";
 import de from "./locales/de";
+import es from "./locales/es";
 import pt from "./locales/pt";
 import fr from "./locales/fr";
+import ja from "./locales/ja";
+import ko from "./locales/ko";
 import zh from "./locales/zh";
 import hi from "./locales/hi";
 import ar from "./locales/ar";
@@ -27,8 +30,11 @@ i18n
     resources: {
       en: { translation: en },
       de: { translation: de },
+      es: { translation: es },
       pt: { translation: pt },
       fr: { translation: fr },
+      ja: { translation: ja },
+      ko: { translation: ko },
       zh: { translation: zh },
       hi: { translation: hi },
       ar: { translation: ar },

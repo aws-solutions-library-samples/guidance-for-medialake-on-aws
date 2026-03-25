@@ -87,7 +87,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
       <Box>
         <Grid container spacing={3}>
           {items.map((item) => (
-            <Grid item xs={12} sm={6} md={4} key={item.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.id}>
               <AssetCard
                 id={item.id}
                 name={item.title}

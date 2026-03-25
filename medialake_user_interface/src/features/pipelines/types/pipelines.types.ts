@@ -31,6 +31,9 @@ export interface Pipeline {
   executionArn?: string;
   active?: boolean; // New field to track if the pipeline is active
   eventRuleInfo?: EventRuleInfo; // New field to store event rule information
+  webhookUrl?: string;
+  webhookAuthMethod?: string;
+  webhookCredentialHint?: string;
   definition: {
     nodes: PipelineNode[];
     edges: PipelineEdge[];

@@ -56,5 +56,6 @@
                 "identity_provider_method": "cognito"
             }
         ]
-    }
+    },
+    "external_nodes_bucket": ""
 }

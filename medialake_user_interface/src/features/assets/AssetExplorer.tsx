@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useState, useCallback, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   Box,
@@ -25,7 +25,8 @@ import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
 import { formatFileSize } from "@/utils/fileSize";
 import { formatDate } from "@/utils/dateFormat";
-import ModularUnifiedResultsView from "@/components/search/ModularUnifiedResultsView";
+import AssetResultsView from "@/components/shared/AssetResultsView";
+import { AssetItemProvider } from "@/contexts/AssetItemContext";
 import {
   useConnectorAssets,
   type AssetItem,
@@ -43,6 +44,7 @@ import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineE
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
+import { zIndexTokens } from "@/theme/tokens";
 import FacetFilterPanel, { type Facet, type SelectedFacets } from "./FacetFilterPanel";
 
 interface AssetExplorerProps {
@@ -161,39 +163,45 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   const { mutate: removeFavorite } = useRemoveFavorite();
 
   // Check if an asset is favorited
-  const isAssetFavorited = (assetId: string) => {
-    if (!favorites) return false;
-    return favorites.some((favorite) => favorite.itemId === assetId);
-  };
+  const isAssetFavorited = useCallback(
+    (assetId: string) => {
+      if (!favorites) return false;
+      return favorites.some((favorite) => favorite.itemId === assetId);
+    },
+    [favorites]
+  );
 
   // Handle favorite toggle
-  const handleFavoriteToggle = (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
-    event.stopPropagation();
+  const handleFavoriteToggle = useCallback(
+    (asset: AssetItem, event: React.MouseEvent<HTMLElement>) => {
+      event.stopPropagation();
 
-    const assetId = asset.InventoryID;
-    const isFavorited = isAssetFavorited(assetId);
+      const assetId = asset.InventoryID;
+      const isFavorited = isAssetFavorited(assetId);
 
-    try {
-      if (isFavorited) {
-        removeFavorite({ itemId: assetId, itemType: "ASSET" });
-      } else {
-        addFavorite({
-          itemId: assetId,
-          itemType: "ASSET",
-          metadata: {
-            name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-              .Name,
-            assetType: asset.DigitalSourceAsset.Type,
-            thumbnailUrl: asset.thumbnailUrl || "",
-            proxyUrl: asset.proxyUrl || "",
-            format: asset.DigitalSourceAsset.MainRepresentation.Format,
-          },
-        });
+      try {
+        if (isFavorited) {
+          removeFavorite({ itemId: assetId, itemType: "ASSET" });
+        } else {
+          addFavorite({
+            itemId: assetId,
+            itemType: "ASSET",
+            metadata: {
+              name: asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
+                .ObjectKey.Name,
+              assetType: asset.DigitalSourceAsset.Type,
+              thumbnailUrl: asset.thumbnailUrl || "",
+              proxyUrl: asset.proxyUrl || "",
+              format: asset.DigitalSourceAsset.MainRepresentation.Format,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error toggling favorite:", error);
       }
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-    }
-  };
+    },
+    [isAssetFavorited, removeFavorite, addFavorite]
+  );
 
   // Add to Collection state
   const [addToCollectionModalOpen, setAddToCollectionModalOpen] = useState(false);
@@ -441,6 +449,54 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     return result;
   }, [searchResponse?.data?.facets, t]);
 
+  // ─── Stable accessor callbacks for AssetItemProvider ───
+  const getAssetId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+  const getAssetName = useCallback(
+    (asset: AssetItem) =>
+      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+    []
+  );
+  const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+  const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
+  const getAssetProxy = useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
+
+  const renderCardField = useCallback((fieldId: string, asset: AssetItem) => {
+    switch (fieldId) {
+      case "name":
+        return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+          .Name;
+      case "type":
+        return asset.DigitalSourceAsset.Type;
+      case "format":
+        return asset.DigitalSourceAsset.MainRepresentation.Format;
+      case "size":
+        return formatFileSize(
+          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
+        );
+      case "createdAt":
+        return formatDate(asset.DigitalSourceAsset.CreateDate);
+      case "modifiedAt":
+        return formatDate(
+          asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
+        );
+      default:
+        return "";
+    }
+  }, []);
+
+  const stableIsAssetSelected = useMemo(
+    () =>
+      assetSelection.selectedAssetIds?.length > 0
+        ? (assetId: string) => assetSelection.selectedAssetIds.includes(assetId)
+        : undefined,
+    [assetSelection.selectedAssetIds]
+  );
+
+  // Stable noop to avoid new `() => {}` references each render
+  const noop = useCallback(() => {}, []);
+  const stableOnDeleteClick = deleteAssetPermission.allowed ? handleDeleteClick : noop;
+  const stableOnEditClick = editAssetPermission.allowed ? handleStartEditing : noop;
+
   // If there's no bucket selected, show a message
   if (!bucketName) {
     return (
@@ -569,7 +625,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
                 top: 0,
                 left: 0,
                 right: 0,
-                zIndex: 9999,
+                zIndex: zIndexTokens.overlay,
               }}
             />
           )}
@@ -597,66 +653,77 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
                 },
               }}
             >
-              <ModularUnifiedResultsView
-                results={searchResponse?.data?.results || []}
-                searchMetadata={{
-                  totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
-                  page,
-                  pageSize,
+              <AssetItemProvider
+                value={{
+                  onAssetClick: handleAssetClick,
+                  onDeleteClick: stableOnDeleteClick,
+                  onDownloadClick: handleMenuOpen,
+                  onAddToCollectionClick: handleAddToCollectionClick,
+                  onEditClick: stableOnEditClick,
+                  onEditNameChange: handleNameChange,
+                  onEditNameComplete: handleNameEditComplete,
+                  editingAssetId,
+                  editedName,
+                  isAssetFavorited,
+                  onFavoriteToggle: handleFavoriteToggle,
+                  isAssetSelected: stableIsAssetSelected,
+                  onSelectToggle: assetSelection.handleSelectToggle,
+                  isRenaming: assetOperationsLoading.rename,
+                  renamingAssetId,
+                  getAssetId,
+                  getAssetName,
+                  getAssetType,
+                  getAssetThumbnail,
+                  getAssetProxy,
+                  renderCardField,
                 }}
-                onPageChange={handlePageChange}
-                onPageSizeChange={handlePageSizeChange}
-                searchTerm=""
-                groupByType={groupByType}
-                onGroupByTypeChange={setGroupByType}
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-                cardSize={cardSize}
-                onCardSizeChange={setCardSize}
-                aspectRatio={aspectRatio}
-                onAspectRatioChange={setAspectRatio}
-                thumbnailScale={thumbnailScale}
-                onThumbnailScaleChange={setThumbnailScale}
-                showMetadata={showMetadata}
-                onShowMetadataChange={setShowMetadata}
-                sorting={sorting}
-                onSortChange={handleSortChange}
-                cardFields={cardFields}
-                onCardFieldToggle={handleCardFieldToggle}
-                columns={columns}
-                onColumnToggle={handleColumnToggle}
-                onAssetClick={handleAssetClick}
-                onDeleteClick={deleteAssetPermission.allowed ? handleDeleteClick : undefined}
-                onMenuClick={handleMenuOpen}
-                onEditClick={editAssetPermission.allowed ? handleStartEditing : undefined}
-                onEditNameChange={handleNameChange}
-                onEditNameComplete={handleNameEditComplete}
-                editingAssetId={editingAssetId}
-                editedName={editedName}
-                isAssetFavorited={isAssetFavorited}
-                onFavoriteToggle={handleFavoriteToggle}
-                selectedAssets={assetSelection.selectedAssetIds}
-                onSelectToggle={assetSelection.handleSelectToggle}
-                hasSelectedAssets={assetSelection.selectedAssets.length > 0}
-                selectAllState={assetSelection.getSelectAllState(
-                  searchResponse?.data?.results || []
-                )}
-                onSelectAllToggle={() => {
-                  assetSelection.handleSelectAll(searchResponse?.data?.results || []);
-                }}
-                error={
-                  error
-                    ? {
-                        status: error.name || "Error",
-                        message: error.message || t("assetExplorer.failedToLoadAssets"),
-                      }
-                    : undefined
-                }
-                isLoading={isLoading || isFavoritesLoading}
-                isRenaming={assetOperationsLoading.rename}
-                renamingAssetId={renamingAssetId}
-                onAddToCollectionClick={handleAddToCollectionClick}
-              />
+              >
+                <AssetResultsView
+                  results={searchResponse?.data?.results || []}
+                  searchMetadata={{
+                    totalResults: searchResponse?.data?.searchMetadata?.totalResults || 0,
+                    page,
+                    pageSize,
+                  }}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  searchTerm=""
+                  groupByType={groupByType}
+                  onGroupByTypeChange={setGroupByType}
+                  viewMode={viewMode}
+                  onViewModeChange={handleViewModeChange}
+                  cardSize={cardSize}
+                  onCardSizeChange={setCardSize}
+                  aspectRatio={aspectRatio}
+                  onAspectRatioChange={setAspectRatio}
+                  thumbnailScale={thumbnailScale}
+                  onThumbnailScaleChange={setThumbnailScale}
+                  showMetadata={showMetadata}
+                  onShowMetadataChange={setShowMetadata}
+                  sorting={sorting}
+                  onSortChange={handleSortChange}
+                  cardFields={cardFields}
+                  onCardFieldToggle={handleCardFieldToggle}
+                  columns={columns}
+                  onColumnToggle={handleColumnToggle}
+                  hasSelectedAssets={assetSelection.selectedAssets.length > 0}
+                  selectAllState={assetSelection.getSelectAllState(
+                    searchResponse?.data?.results || []
+                  )}
+                  onSelectAllToggle={() =>
+                    assetSelection.handleSelectAll(searchResponse?.data?.results || [])
+                  }
+                  error={
+                    error
+                      ? {
+                          status: error.name || "Error",
+                          message: error.message || t("assetExplorer.failedToLoadAssets"),
+                        }
+                      : undefined
+                  }
+                  isLoading={isLoading || isFavoritesLoading}
+                />
+              </AssetItemProvider>
             </Box>
           )}
 
@@ -708,7 +775,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
                 backgroundColor: (theme) => theme.palette.background.paper,
                 overflow: "visible",
                 position: "fixed",
-                zIndex: 1400,
+                zIndex: zIndexTokens.modal,
               },
             }}
             slotProps={{
