@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.11.0] - 2026-03-25
+
+### Features
+
+- feat: add webhook trigger node
+- feat: add external nodes S3 bucket for custom nodes
+
+### Bug Fixes
+
+- fix: Update ffprobe build to handle the layer build if the cache is unavailable and update to clean up CDK resources if left over from prior bootstraps.
+
+### Code Refactoring
+
+- refactor: CloudFormation build and deploy optimization
+- refactor: Update to React 19 and FE packages
+- refactor: Updated the asset detail audio and video pages to use Omakase theme configured player
+- refactor: search results, asset card, video/audio player implementation, orphaned, and unused code
+- refactor: add CORS OPTIONS methods to bulk download user and job resources
+
+### Other Changes
+
+- ci: file clean-up
+
 ## [1.10.0] - 2026-02-23
 
 ### Features
