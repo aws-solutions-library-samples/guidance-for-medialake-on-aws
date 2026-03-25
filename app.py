@@ -457,6 +457,7 @@ class MediaLakeStack(cdk.Stack):
                 # System Settings table configuration
                 system_settings_table_name=settings_stack.system_settings_table_name,
                 system_settings_table_arn=settings_stack.system_settings_table_arn,
+                cloudfront_domain=props.cloudfront_domain,
                 authorizer=api_gateway_stack.authorizer,
                 api_resource=self.shared_rest_api,
             ),

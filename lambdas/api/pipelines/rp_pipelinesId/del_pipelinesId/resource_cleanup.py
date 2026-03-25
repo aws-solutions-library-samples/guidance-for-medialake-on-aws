@@ -255,6 +255,27 @@ def delete_cloudwatch_log_group(log_group_name: str) -> bool:
         return False
 
 
+def delete_webhook_secret(secret_arn: str) -> bool:
+    """
+    Delete a Secrets Manager secret used for webhook authentication.
+
+    Args:
+        secret_arn: ARN of the secret to delete
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    try:
+        logger.info(f"Deleting webhook secret: {secret_arn}")
+        sm_client = boto3.client("secretsmanager")
+        sm_client.delete_secret(SecretId=secret_arn, ForceDeleteWithoutRecovery=True)
+        logger.info(f"Successfully deleted webhook secret: {secret_arn}")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting webhook secret {secret_arn}: {e}")
+        return False
+
+
 def cleanup_pipeline_resources(
     dependent_resources: List[Tuple[str, str]],
 ) -> Dict[str, Any]:
@@ -335,6 +356,13 @@ def cleanup_pipeline_resources(
                     results["cloudwatch_log_groups"]["success"].append(resource_arn)
                 else:
                     results["cloudwatch_log_groups"]["failed"].append(resource_arn)
+
+            elif resource_type == "webhook_secret":
+                success = delete_webhook_secret(resource_arn)
+                if success:
+                    results["other_resources"]["success"].append(resource_arn)
+                else:
+                    results["other_resources"]["failed"].append(resource_arn)
 
             else:
                 logger.warning(

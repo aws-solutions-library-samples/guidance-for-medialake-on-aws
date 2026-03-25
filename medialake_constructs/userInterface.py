@@ -360,6 +360,36 @@ class UIConstruct(Construct):
             ),
         )
 
+        # Webhook response headers policy (no CSP for external callers)
+        webhook_response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "WebhookResponseHeadersPolicy",
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=[
+                    "Authorization",
+                    "X-Api-Key",
+                    "Content-Type",
+                    "Idempotency-Key",
+                ],
+                access_control_allow_methods=["POST", "OPTIONS"],
+                access_control_allow_origins=["*"],
+                origin_override=True,
+            ),
+        )
+
+        # TTL=0 cache policy for webhook behavior
+        webhook_cache_policy = cloudfront.CachePolicy(
+            self,
+            "WebhookBehaviorCachePolicy",
+            default_ttl=Duration.seconds(0),
+            min_ttl=Duration.seconds(0),
+            max_ttl=Duration.seconds(0),
+            cookie_behavior=cloudfront.CacheCookieBehavior.none(),
+            header_behavior=cloudfront.CacheHeaderBehavior.none(),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+        )
+
         # Create a custom cache policy for static assets
         static_assets_cache_policy = cloudfront.CachePolicy(
             self,
@@ -482,6 +512,19 @@ function handler(event) {
                 ],
             ),
             "additional_behaviors": {
+                "/webhooks/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
+                        origin_path=f"/{config.api_path}",
+                        origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
+                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+                    ),
+                    cache_policy=webhook_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    response_headers_policy=webhook_response_headers_policy,
+                ),
                 "*.js": cloudfront.BehaviorOptions(
                     origin=s3_orig,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
