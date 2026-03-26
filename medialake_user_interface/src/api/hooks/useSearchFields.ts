@@ -11,6 +11,7 @@ export interface FieldInfo {
   description: string;
   type: string;
   isDefault: boolean;
+  isFilterable?: boolean;
 }
 
 export interface SearchFieldsData {

@@ -730,6 +730,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "Metadata Fields",
       },
       search: {
         title: "搜索配置",
@@ -756,6 +757,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Search fields...",
       },
       upgrade: {
         noHistory: "No upgrade history available",

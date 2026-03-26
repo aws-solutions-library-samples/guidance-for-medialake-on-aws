@@ -1,18 +1,17 @@
 import json
-from typing import Any, Dict
+import os
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from pydantic import BaseModel, ConfigDict
+from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
 
-# Initialize AWS clients and utilities
 logger = Logger()
 metrics = Metrics()
 
-# Configure CORS
 cors_config = CORSConfig(
     allow_origin="*",
     allow_headers=[
@@ -24,113 +23,172 @@ cors_config = CORSConfig(
     ],
 )
 
-# Initialize API Gateway resolver
 app = APIGatewayRestResolver(
     serializer=lambda x: json.dumps(x, default=str),
     strip_prefixes=["/api"],
     cors=cors_config,
 )
 
+dynamodb = boto3.resource("dynamodb")
 
-class BaseModelWithConfig(BaseModel):
-    """Base model with JSON configuration"""
-
-    model_config = ConfigDict(json_encoders={})
+_opensearch_client = None
 
 
-class FieldInfo(BaseModelWithConfig):
-    """Model for field information"""
+def get_opensearch_client() -> OpenSearch:
+    """Create and return a cached OpenSearch client with IAM SigV4 auth."""
+    global _opensearch_client
 
-    name: str
-    displayName: str
-    description: str
-    type: str
-    isDefault: bool = False
+    if _opensearch_client is None:
+        host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
+        region = os.environ["AWS_REGION"]
+        service_scope = os.environ["SCOPE"]
+
+        auth = RequestsAWSV4SignerAuth(
+            boto3.Session().get_credentials(), region, service_scope
+        )
+
+        _opensearch_client = OpenSearch(
+            hosts=[{"host": host, "port": 443}],
+            http_auth=auth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection,
+            region=region,
+            timeout=30,
+            max_retries=2,
+            retry_on_timeout=True,
+        )
+
+    return _opensearch_client
 
 
-class FieldsResponse(BaseModelWithConfig):
-    """Model for fields response"""
+DISPLAY_TYPE_MAP = {
+    "text": "string",
+    "keyword": "string",
+    "long": "number",
+    "integer": "number",
+    "float": "number",
+    "double": "number",
+    "short": "number",
+    "byte": "number",
+    "half_float": "number",
+    "scaled_float": "number",
+    "date": "date",
+    "boolean": "boolean",
+}
 
-    status: str
-    message: str
-    data: Dict[str, Any]
+DEFAULT_FIELDS = [
+    {
+        "name": "DigitalSourceAsset.Type",
+        "displayName": "Asset Type",
+        "type": "string",
+        "isDefault": True,
+    },
+    {
+        "name": "DigitalSourceAsset.MainRepresentation.Format",
+        "displayName": "File Format",
+        "type": "string",
+        "isDefault": True,
+    },
+    {
+        "name": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+        "displayName": "File Size",
+        "type": "number",
+        "isDefault": True,
+    },
+    {
+        "name": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
+        "displayName": "Created date",
+        "type": "date",
+        "isDefault": True,
+    },
+    {
+        "name": "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
+        "displayName": "File name",
+        "type": "string",
+        "isDefault": True,
+    },
+]
 
 
-def get_search_fields() -> Dict[str, Any]:
-    """
-    Get all available search fields and default fields.
+def traverse_mapping(properties: dict, prefix: str = "") -> list:
+    """Recursively traverse OpenSearch mapping to extract leaf fields."""
+    fields = []
+    for field_name, field_def in properties.items():
+        full_path = f"{prefix}.{field_name}" if prefix else field_name
 
-    Returns:
-        Dict containing default fields and all available fields
-    """
-    # Define all available search fields
-    all_fields = [
-        FieldInfo(
-            name="DigitalSourceAsset.Type",
-            displayName="Asset Type",
-            description="Type of the asset (image, video, audio, document)",
-            type="string",
-            isDefault=True,
-        ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.Format",
-            displayName="File Format",
-            description="Format/extension of the file",
-            type="string",
-            isDefault=True,
-        ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
-            displayName="File Size",
-            description="Size of the file in bytes",
-            type="number",
-            isDefault=True,
-        ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-            displayName="Created date",
-            description="Date when the asset was created",
-            type="date",
-            isDefault=True,
-        ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
-            displayName="File name",
-            description="Name of the file",
-            type="string",
-            isDefault=True,
-        ),
-        FieldInfo(
-            name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-            displayName="Full path",
-            description="Full path to the file",
-            type="string",
-            isDefault=False,
-        ),
-        # FieldInfo(
-        #     name="DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
-        #     displayName="Storage location",
-        #     description="Storage bucket where the asset is stored",
-        #     type="string",
-        #     isDefault=True
-        # ),
-    ]
+        if "properties" in field_def or field_def.get("type") == "nested":
+            fields.extend(traverse_mapping(field_def.get("properties", {}), full_path))
+            continue
 
-    # Extract default fields
-    default_fields = [field for field in all_fields if field.isDefault]
+        raw_type = field_def.get("type", "object")
+        if raw_type == "object":
+            continue
 
-    return {
-        "defaultFields": [field.model_dump(by_alias=True) for field in default_fields],
-        "availableFields": [field.model_dump(by_alias=True) for field in all_fields],
-    }
+        display_type = DISPLAY_TYPE_MAP.get(raw_type, "string")
+        keyword_name = None
+        if raw_type == "text" and "keyword" in field_def.get("fields", {}):
+            keyword_name = f"{full_path}.keyword"
+
+        fields.append(
+            {
+                "name": full_path,
+                "type": raw_type,
+                "displayType": display_type,
+                "keywordName": keyword_name,
+            }
+        )
+
+    return fields
+
+
+@app.get("/search/fields/mapping")
+def handle_get_fields_mapping():
+    """Return all leaf fields from the OpenSearch index mapping."""
+    try:
+        client = get_opensearch_client()
+        index_name = os.environ["OPENSEARCH_INDEX"]
+        response = client.indices.get_mapping(index=index_name)
+        mapping = response.get(index_name) or next(iter(response.values()))
+        properties = mapping["mappings"]["properties"]
+        fields = traverse_mapping(properties)
+        return {"status": "200", "message": "ok", "data": {"fields": fields}}
+    except Exception as e:
+        logger.error(f"Error retrieving fields mapping: {str(e)}")
+        return {
+            "status": "500",
+            "message": f"Error retrieving fields mapping: {str(e)}",
+            "data": None,
+        }
 
 
 @app.get("/search/fields")
 def handle_get_fields():
-    """Handle request to get search fields"""
+    """Return default fields and user-configured displayable fields from DynamoDB."""
     try:
-        fields_data = get_search_fields()
-        return {"status": "200", "message": "ok", "data": fields_data}
+        table_name = os.environ["SYSTEM_SETTINGS_TABLE"]
+        table = dynamodb.Table(table_name)
+        response = table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "METADATA_FIELDS"},
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        available_fields = []
+        if item:
+            available_fields = [
+                f for f in item.get("fields", []) if f.get("isDisplayable") is True
+            ]
+        default_as_available = [
+            {**f, "isDisplayable": True, "isFilterable": True} for f in DEFAULT_FIELDS
+        ]
+        return {
+            "status": "200",
+            "message": "ok",
+            "data": {
+                "defaultFields": DEFAULT_FIELDS,
+                "availableFields": default_as_available + available_fields,
+            },
+        }
     except Exception as e:
         logger.error(f"Error retrieving search fields: {str(e)}")
         return {

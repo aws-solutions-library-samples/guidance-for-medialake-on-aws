@@ -1,5 +1,6 @@
 import { type SortingState } from "@tanstack/react-table";
 import { type AssetTableColumn } from "../types/shared/assetComponents";
+import { resolveDotPath } from "./dotPathResolve";
 
 export function sortAssets<T>(
   assets: T[],
@@ -12,41 +13,53 @@ export function sortAssets<T>(
   const column = columns?.find((col) => col.id === sortField);
 
   return [...assets].sort((a, b) => {
-    // Use accessorFn for all sorting
+    let valueA: unknown;
+    let valueB: unknown;
+
     if (column?.accessorFn) {
-      const valueA = column.accessorFn(a);
-      const valueB = column.accessorFn(b);
-
-      if (valueA === valueB) return 0;
-      if (valueA === null || valueA === undefined) return 1;
-      if (valueB === null || valueB === undefined) return -1;
-
-      if (typeof valueA === "string" && typeof valueB === "string") {
-        return valueA.localeCompare(valueB) * (desc ? -1 : 1);
-      }
-
-      if (typeof valueA === "number" && typeof valueB === "number") {
-        return (valueA - valueB) * (desc ? -1 : 1);
-      }
-
-      // Handle dates
-      if (valueA instanceof Date && valueB instanceof Date) {
-        return (valueA.getTime() - valueB.getTime()) * (desc ? -1 : 1);
-      }
-
-      // Try to convert to dates if they're date strings
-      if (typeof valueA === "string" && typeof valueB === "string") {
-        const dateA = new Date(valueA);
-        const dateB = new Date(valueB);
-        if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
-          return (dateA.getTime() - dateB.getTime()) * (desc ? -1 : 1);
-        }
-      }
-
-      const comparison = valueA < valueB ? -1 : 1;
-      return desc ? -comparison : comparison;
+      valueA = column.accessorFn(a);
+      valueB = column.accessorFn(b);
+    } else {
+      // Fallback: resolve custom metadata dot-path fields
+      valueA = resolveDotPath(a, sortField);
+      valueB = resolveDotPath(b, sortField);
+      // Flatten arrays to first value for comparison
+      if (Array.isArray(valueA)) valueA = valueA[0];
+      if (Array.isArray(valueB)) valueB = valueB[0];
     }
 
-    return 0;
+    if (valueA === valueB) return 0;
+    if (valueA == null) return 1;
+    if (valueB == null) return -1;
+
+    if (typeof valueA === "string" && typeof valueB === "string") {
+      // Try numeric comparison for numeric strings
+      const numA = Number(valueA);
+      const numB = Number(valueB);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return (numA - numB) * (desc ? -1 : 1);
+      }
+      return valueA.localeCompare(valueB) * (desc ? -1 : 1);
+    }
+
+    if (typeof valueA === "number" && typeof valueB === "number") {
+      return (valueA - valueB) * (desc ? -1 : 1);
+    }
+
+    if (valueA instanceof Date && valueB instanceof Date) {
+      return (valueA.getTime() - valueB.getTime()) * (desc ? -1 : 1);
+    }
+
+    // Try to convert to dates if they're date strings
+    if (typeof valueA === "string" && typeof valueB === "string") {
+      const dateA = new Date(valueA);
+      const dateB = new Date(valueB);
+      if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
+        return (dateA.getTime() - dateB.getTime()) * (desc ? -1 : 1);
+      }
+    }
+
+    const comparison = valueA < valueB ? -1 : 1;
+    return desc ? -comparison : comparison;
   });
 }

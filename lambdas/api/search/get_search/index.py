@@ -44,6 +44,25 @@ THUMBNAIL_INDEX = int(os.getenv("THUMBNAIL_INDEX", "2"))
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 500
 
+# Required source fields returned for every search hit
+REQUIRED_SOURCE_FIELDS: List[str] = [
+    "InventoryID",
+    "DigitalSourceAsset.Type",
+    "DigitalSourceAsset.MainRepresentation.Format",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
+    "DigitalSourceAsset.CreateDate",
+    "DerivedRepresentations.Purpose",
+    "DerivedRepresentations.StorageInfo.PrimaryLocation",
+    "FileHash",
+    "Metadata.Consolidated.type",
+]
+
+# Maximum number of dynamic facet fields from metadata config
+MAX_FACET_FIELDS = 25
+
 # Storage identifier field configuration
 STORAGE_IDENTIFIER_FIELD = (
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket"
@@ -126,6 +145,27 @@ class SearchParams(BaseModelWithConfig):
 
     # Semantic search modality (Marengo 3.0): comma-separated visual,audio,transcript
     searchModality: Optional[str] = Field(default="visual")
+
+    @field_validator("filters", mode="before")
+    @classmethod
+    def parse_filters(cls, v: Any) -> Optional[List[Dict]]:
+        """Parse filters from JSON string if needed"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                logger.warning(f"filters JSON parsed to non-list type: {type(parsed)}")
+                return []
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse filters JSON string: {v}")
+                return []
+        logger.warning(f"Unexpected filters type: {type(v)}")
+        return []
 
     @model_validator(mode="before")
     @classmethod
@@ -244,6 +284,7 @@ class SearchMetadata(BaseModelWithConfig):
     searchTerm: str
     facets: Optional[Dict[str, Any]] = None
     suggestions: Optional[Dict[str, Any]] = None
+    facetsInfo: Optional[Dict[str, Any]] = None
 
 
 class SearchResponse(BaseModelWithConfig):
@@ -358,6 +399,55 @@ def verify_opensearch_field_exists(
         return False
 
 
+def fetch_metadata_fields_config() -> Optional[List[Dict]]:
+    """Fetch metadata fields configuration from DynamoDB."""
+    try:
+        table = boto3.resource("dynamodb").Table(os.environ["SYSTEM_SETTINGS_TABLE"])
+        resp = table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "METADATA_FIELDS"},
+            ConsistentRead=True,
+        )
+        item = resp.get("Item")
+        return item.get("fields") if item else None
+    except Exception:
+        return None
+
+
+def build_dynamic_aggregations(
+    fields: List[Dict],
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """Build dynamic aggregations from metadata fields config.
+
+    Returns (aggs_dict, facets_info_or_none).
+    """
+    filterable = sorted(
+        [f for f in fields if f.get("isFilterable")],
+        key=lambda f: f.get("name", ""),
+    )
+    total_filterable = len(filterable)
+    capped = filterable[:MAX_FACET_FIELDS]
+
+    aggs: Dict[str, Any] = {}
+    for field in capped:
+        name = field["name"]
+        ftype = field.get("type", "string")
+        if ftype == "date":
+            aggs[f"{name}__min"] = {"min": {"field": name}}
+            aggs[f"{name}__max"] = {"max": {"field": name}}
+        elif ftype == "number":
+            aggs[name] = {"stats": {"field": name}}
+        else:
+            agg_field = field.get("keywordName") or f"{name}.keyword"
+            aggs[name] = {"terms": {"field": agg_field, "size": 10}}
+
+    facets_info = (
+        {"limited": True, "total": total_filterable}
+        if total_filterable > MAX_FACET_FIELDS
+        else None
+    )
+    return aggs, facets_info
+
+
 def map_sort_field_to_opensearch_path(field_name: str) -> str:
     """
     Map frontend field names to OpenSearch field paths.
@@ -391,7 +481,9 @@ def map_sort_field_to_opensearch_path(field_name: str) -> str:
     return field_mapping.get(field_name, field_name)
 
 
-def build_search_query(params: SearchParams) -> Dict:
+def build_search_query(
+    params: SearchParams, metadata_fields_config: Optional[List[Dict]] = None
+) -> Dict:
     """Build search query from search parameters"""
     start_time = time.time()
     terms = params.q.split() if params.q else []
@@ -644,14 +736,31 @@ def build_search_query(params: SearchParams) -> Dict:
     # Process generic filters
     if params.filters:
         for filter_item in params.filters:
-            if filter_item.get("operator") == "term":
+            operator = filter_item.get("operator")
+            if operator == "term":
                 filters_to_add.append(
                     {"term": {filter_item["field"]: filter_item["value"]}}
                 )
-            elif filter_item.get("operator") == "range":
+            elif operator == "match":
                 filters_to_add.append(
-                    {"range": {filter_item["field"]: filter_item["value"]}}
+                    {"match": {filter_item["field"]: filter_item["value"]}}
                 )
+            elif operator == "range":
+                range_params = {}
+                if filter_item.get("gte") is not None:
+                    range_params["gte"] = filter_item["gte"]
+                if filter_item.get("lte") is not None:
+                    range_params["lte"] = filter_item["lte"]
+                if range_params:
+                    filters_to_add.append(
+                        {"range": {filter_item["field"]: range_params}}
+                    )
+                else:
+                    logger.warning(
+                        f"Range filter missing gte/lte bounds: {filter_item}"
+                    )
+            else:
+                logger.warning(f"Unknown filter operator: {operator}")
 
     # Add all filters at once
     query["bool"]["filter"].extend(filters_to_add)
@@ -702,22 +811,18 @@ def build_search_query(params: SearchParams) -> Dict:
             },
         },
         "_source": {
-            "includes": [
-                "InventoryID",
-                "DigitalSourceAsset.Type",
-                "DigitalSourceAsset.MainRepresentation.Format",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-                "DigitalSourceAsset.CreateDate",
-                "DerivedRepresentations.Purpose",
-                "DerivedRepresentations.StorageInfo.PrimaryLocation",
-                "FileHash",
-                "Metadata.Consolidated.type",
-            ]
+            "includes": list(
+                set(REQUIRED_SOURCE_FIELDS) | set(params.search_fields or [])
+            )
         },
     }
+
+    # Merge dynamic aggregations from metadata fields config
+    facets_info = None
+    if metadata_fields_config is not None:
+        dynamic_aggs, facets_info = build_dynamic_aggregations(metadata_fields_config)
+        query_body["aggs"].update(dynamic_aggs)
+    query_body["_facets_info"] = facets_info
 
     # Add sort clause if sort parameters are present
     if params.sort_by:
@@ -933,6 +1038,20 @@ def process_search_hit_with_cloudfront_urls(
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
+
+    # Merge any extra _source fields not captured by the AssetSearchResult model
+    # (e.g. top-level custom metadata fields like end_seconds requested via fields param)
+    _KNOWN_SOURCE_KEYS = {
+        "InventoryID",
+        "DigitalSourceAsset",
+        "DerivedRepresentations",
+        "FileHash",
+        "Metadata",
+    }
+    for key, value in source.items():
+        if key not in _KNOWN_SOURCE_KEYS and key not in result_dict:
+            result_dict[key] = value
+
     final_result = add_common_fields(result_dict)
 
     logger.info(
@@ -1032,6 +1151,20 @@ def process_search_hit(hit: Dict) -> Dict:
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
+
+    # Merge any extra _source fields not captured by the AssetSearchResult model
+    # (e.g. top-level custom metadata fields like end_seconds requested via fields param)
+    _KNOWN_SOURCE_KEYS = {
+        "InventoryID",
+        "DigitalSourceAsset",
+        "DerivedRepresentations",
+        "FileHash",
+        "Metadata",
+    }
+    for key, value in source.items():
+        if key not in _KNOWN_SOURCE_KEYS and key not in result_dict:
+            result_dict[key] = value
+
     return add_common_fields(result_dict)
 
 
@@ -1284,7 +1417,11 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
 
 def create_search_metadata(
-    total_results: int, params: SearchParams, aggregations=None, suggestions=None
+    total_results: int,
+    params: SearchParams,
+    aggregations=None,
+    suggestions=None,
+    facets_info=None,
 ) -> SearchMetadata:
     """Create search metadata object"""
     return SearchMetadata(
@@ -1294,6 +1431,7 @@ def create_search_metadata(
         searchTerm=params.q,
         facets=aggregations,
         suggestions=suggestions,
+        facetsInfo=facets_info,
     )
 
 
@@ -1333,11 +1471,15 @@ def perform_search(params: SearchParams) -> Dict:
             }
 
     try:
+        metadata_fields_config = fetch_metadata_fields_config()
+
         query_build_start = time.time()
-        search_body = build_search_query(params)
+        search_body = build_search_query(params, metadata_fields_config)
         logger.info(
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
+
+        facets_info = search_body.pop("_facets_info", None)
 
         # For page range validation, we need to know total results first
         # We'll validate after getting the initial response
@@ -1531,6 +1673,7 @@ def perform_search(params: SearchParams) -> Dict:
                     params,
                     aggregations,
                     suggestions,
+                    facets_info=facets_info,
                 )
 
                 logger.info(
@@ -1647,6 +1790,7 @@ def perform_search(params: SearchParams) -> Dict:
                     params,
                     aggregations,
                     suggestions,
+                    facets_info=facets_info,
                 )
 
                 return {
@@ -1740,6 +1884,7 @@ def perform_search(params: SearchParams) -> Dict:
                 params,
                 aggregations,
                 suggestions,
+                facets_info=facets_info,
             )
 
             return {
@@ -1839,7 +1984,16 @@ def handle_search():
         logger.info("[PERF] Starting unified search handler")
 
         param_start = time.time()
-        query_params = app.current_event.get("queryStringParameters") or {}
+        query_params = dict(app.current_event.get("queryStringParameters") or {})
+
+        # API Gateway REST API only keeps the last value for repeated query params
+        # in queryStringParameters. Use multiValueQueryStringParameters to get all
+        # values for repeated params like fields=X&fields=Y.
+        multi_value_params = (
+            app.current_event.get("multiValueQueryStringParameters") or {}
+        )
+        if "fields" in multi_value_params:
+            query_params["fields"] = multi_value_params["fields"]
 
         # Ensure required parameter exists
         if "q" not in query_params:

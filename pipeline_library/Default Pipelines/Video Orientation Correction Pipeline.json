@@ -1,0 +1,274 @@
+{
+  "name": "Video Orientation Correction Pipeline",
+  "description": "Detects video orientation, corrects rotation if needed, then waits for MediaConvert completion",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": { "x": 100, "y": 200 },
+        "data": {
+          "nodeId": "trigger_ingest_completed",
+          "label": "Ingest Completed (trigger)",
+          "description": "Triggers after ingest is completed",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Max Concurrent Executions": 100,
+              "Prefix": "",
+              "Format": "FLV, MP4, MOV, AVI, MKV, WEBM, MXF, MTS"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": { "x": 368, "y": 200 },
+        "data": {
+          "nodeId": "video_metadata_extractor",
+          "label": "Video Metadata Extractor (extract)",
+          "description": "Extract metadata from a video file stored in S3",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["video"],
+          "outputTypes": [{ "name": "metadata", "description": "Output type: metadata" }],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": { "S3 File Location": "" }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": { "x": 636, "y": 200 },
+        "data": {
+          "nodeId": "video_orientation_correction",
+          "label": "Video Orientation Correction (extract)",
+          "description": "Detect and correct video orientation via MediaConvert",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["video"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": { "x": 636, "y": 400 },
+        "data": {
+          "nodeId": "check_media_convert_status",
+          "label": "Check MediaConvert Status (extract)",
+          "description": "Checks MediaConvert Job Status",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "dndnode_5",
+        "type": "custom",
+        "position": { "x": 904, "y": 400 },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "Branch based on MediaConvert job status",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            { "name": "Completed", "description": "Path taken when job is complete" },
+            { "name": "In Progress", "description": "Path taken when job is still running" },
+            { "name": "Fail", "description": "Path taken when job failed" }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_6",
+        "type": "custom",
+        "position": { "x": 636, "y": 560 },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "Wait before re-checking MediaConvert status",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "FLOW",
+          "configuration": {
+            "method": "wait",
+            "parameters": { "Duration": "15" }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_7",
+        "type": "custom",
+        "position": { "x": 1172, "y": 300 },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "Pipeline completed successfully",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_8",
+        "type": "custom",
+        "position": { "x": 1172, "y": 500 },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "Pipeline failed",
+          "icon": { "key": null, "ref": null, "props": { "size": 20 }, "_owner": null },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "OrientationCorrectionFailed",
+              "Cause": "MediaConvert rotation job failed"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": { "text": "Connected" },
+        "sourceHandle": "video",
+        "targetHandle": "input-video"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": { "text": "Connected" },
+        "sourceHandle": "metadata",
+        "targetHandle": "input-video"
+      },
+      {
+        "id": "dndnode_3-dndnode_4",
+        "source": "dndnode_3",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": { "text": "Connected" },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_4-dndnode_5",
+        "source": "dndnode_4",
+        "target": "dndnode_5",
+        "type": "custom",
+        "data": { "text": "Connected" },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_5-dndnode_7",
+        "source": "dndnode_5",
+        "sourceHandle": "Completed",
+        "target": "dndnode_7",
+        "targetHandle": "input-any",
+        "type": "custom",
+        "data": { "text": "Connected" }
+      },
+      {
+        "id": "dndnode_5-dndnode_6",
+        "source": "dndnode_5",
+        "sourceHandle": "In Progress",
+        "target": "dndnode_6",
+        "targetHandle": "input-any",
+        "type": "custom",
+        "data": { "text": "Connected" }
+      },
+      {
+        "id": "dndnode_6-dndnode_4",
+        "source": "dndnode_6",
+        "target": "dndnode_4",
+        "type": "custom",
+        "data": { "text": "Connected" },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_5-dndnode_8",
+        "source": "dndnode_5",
+        "sourceHandle": "Fail",
+        "target": "dndnode_8",
+        "targetHandle": "input-any",
+        "type": "custom",
+        "data": { "text": "Connected" }
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}
