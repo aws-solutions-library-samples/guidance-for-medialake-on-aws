@@ -30,9 +30,6 @@ import { useDateFormat } from "@/shared/hooks/useDateFormat";
 import { Warning as WarningIcon } from "@mui/icons-material";
 import { brandTokens } from "@/theme/tokens";
 
-/** AWS brand orange — used for S3 connector icons. */
-const AWS_BRAND_ORANGE = "#FF9900";
-
 interface ConnectorCardProps {
   connector: ConnectorResponse;
   onEdit: (connector: ConnectorResponse) => void;

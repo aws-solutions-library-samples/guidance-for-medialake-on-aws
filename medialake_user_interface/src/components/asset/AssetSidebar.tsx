@@ -917,10 +917,6 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const aiMarkerCount =
     markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold).length || 0;
 
-  const userMarkerCount = markers?.filter((m) => m.type === "user").length || 0;
-  const aiMarkerCount =
-    markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold).length || 0;
-
   return (
     <Box sx={{ p: 1.5, pt: 1 }}>
       {/* Compact toolbar: visibility toggles + add button in one row */}
