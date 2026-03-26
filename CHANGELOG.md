@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.2] - 2026-03-26
+
+### Code Refactoring
+
+- refactor: Removal of extra code in index.html
+
 ## [1.11.1] - 2026-03-26
 
 ### Bug Fixes
