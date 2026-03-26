@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.11.1] - 2026-03-26
+
+### Bug Fixes
+
+- fix: CF template UI copy issue
+
+### Other Changes
+
+- ci: update to sync to github job
+
 ## [1.11.0] - 2026-03-25
 
 ### Features
