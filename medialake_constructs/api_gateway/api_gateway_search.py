@@ -391,19 +391,37 @@ class SearchConstruct(Construct):
         fields_resource = search_resource.add_resource("fields")
 
         # Create Lambda for search fields endpoint
+        # Requires VPC access to reach the OpenSearch domain
         search_fields_lambda = Lambda(
             self,
             "SearchFieldsLambda",
             config=LambdaConfig(
                 name="get_search_fields",
+                vpc=props.vpc,
+                security_groups=[props.security_group],
                 entry="lambdas/api/search/fields/get_fields",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_INDEX": props.open_search_index,
+                    "SCOPE": "es",
                 },
             ),
+        )
+
+        # VPC ENI management permissions (required for VPC-deployed Lambdas)
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
         )
 
         # Add permissions to access Secrets Manager
@@ -433,6 +451,15 @@ class SearchConstruct(Construct):
             )
         )
 
+        # Add OpenSearch read permissions for fields mapping endpoint
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["es:ESHttpGet"],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
+        )
+
         # Add the GET method to the fields resource
         search_fields_get = fields_resource.add_method(
             "GET",
@@ -440,9 +467,18 @@ class SearchConstruct(Construct):
         )
         apply_custom_authorization(search_fields_get, props.authorizer)
 
+        # Add /search/fields/mapping sub-resource
+        mapping_resource = fields_resource.add_resource("mapping")
+        search_fields_mapping_get = mapping_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(search_fields_lambda.function),
+        )
+        apply_custom_authorization(search_fields_mapping_get, props.authorizer)
+
         add_cors_options_method(search_resource)
         add_cors_options_method(connectors_resource)
         add_cors_options_method(fields_resource)
+        add_cors_options_method(mapping_resource)
 
     def _get_regional_inference_profile_id(self) -> str:
         """

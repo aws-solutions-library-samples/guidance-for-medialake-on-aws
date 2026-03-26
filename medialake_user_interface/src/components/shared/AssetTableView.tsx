@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography } from "@mui/material";
 import { type SortingState } from "@tanstack/react-table";
 import { AssetTable } from "./AssetTable";
+import { type FieldInfo } from "@/api/hooks/useSearchFields";
 import { groupAssetsByType } from "@/utils/groupAssetsByType";
 
 interface AssetTableViewProps<T> {
@@ -29,6 +30,7 @@ interface AssetTableViewProps<T> {
   isFavorite?: (asset: T) => boolean;
   onFavoriteToggle?: (asset: T, event: React.MouseEvent<HTMLElement>) => void;
   selectedSearchFields?: string[];
+  availableFields?: FieldInfo[];
   isRenaming?: boolean;
   renamingAssetId?: string;
 }
@@ -58,6 +60,7 @@ function AssetTableView<T>({
   isFavorite,
   onFavoriteToggle,
   selectedSearchFields,
+  availableFields,
   isRenaming,
   renamingAssetId,
 }: AssetTableViewProps<T>) {
@@ -93,6 +96,7 @@ function AssetTableView<T>({
         isFavorite={isFavorite}
         onFavoriteToggle={onFavoriteToggle}
         selectedSearchFields={selectedSearchFields}
+        availableFields={availableFields}
         isRenaming={isRenaming}
         renamingAssetId={renamingAssetId}
       />
@@ -144,6 +148,7 @@ function AssetTableView<T>({
               isFavorite={isFavorite}
               onFavoriteToggle={onFavoriteToggle}
               selectedSearchFields={selectedSearchFields}
+              availableFields={availableFields}
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}
             />

@@ -1,0 +1,81 @@
+spec: v1.0.0
+node:
+  id: video_orientation_correction
+  title: Video Orientation Correction
+  description: Detect video orientation via FFprobe and auto-rotate using MediaConvert if needed
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/VideoOrientationCorrectionLambdaDeployment
+        runtime: python3.12
+        timeout: 900
+        layers:
+          - FFProbe
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - iam:PassRole
+              resources:
+                - ${MEDIACONVERT_ROLE_ARN}
+            - effect: Allow
+              actions:
+                - mediaconvert:CreateJob
+                - mediaconvert:DescribeEndpoints
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - s3:GetObject
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+            - effect: Allow
+              actions:
+                - kms:GenerateDataKey
+              resources:
+                - "*"
+
+actions:
+  extract:
+    summary: Detect and correct video orientation
+    description: Analyzes video rotation metadata and submits a MediaConvert job to correct orientation if the video is rotated (90, 180, or 270 degrees)
+    operationId: correctVideoOrientation
+    parameters:
+      - in: body
+        name: MediaConvert Queue Arn
+        required: true
+        default: ${MEDIACONVERT_QUEUE_ARN}
+        schema:
+          type: string
+      - in: body
+        name: MediaConvert Role Arn
+        required: true
+        default: ${MEDIACONVERT_ROLE_ARN}
+        schema:
+          type: string
+    connections:
+      incoming:
+        type: [video]
+      outgoing:
+        type: [any]

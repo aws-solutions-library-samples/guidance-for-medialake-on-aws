@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from "@/api/endpoints";
 import { logger } from "@/common/helpers/logger";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import axios from "axios";
+import { CustomMetadataApiFilter } from "@/types/facetSearch";
 
 interface SearchParams {
   page?: number;
@@ -23,6 +24,18 @@ interface SearchParams {
   ingested_date_gte?: string;
   filename?: string;
   fields?: string[];
+  customMetadataFilters?: CustomMetadataApiFilter[];
+}
+
+export interface FacetBucket {
+  key: string;
+  doc_count: number;
+}
+
+export interface FieldAggregation {
+  buckets?: FacetBucket[];
+  min?: number | string;
+  max?: number | string;
 }
 
 interface SearchResponseData {
@@ -37,6 +50,8 @@ interface SearchResponseData {
   totalResults: number;
   facets: any;
   suggestions: any;
+  aggregations?: Record<string, FieldAggregation>;
+  facetsInfo?: { limited: boolean };
 }
 
 export interface SearchResponseType {
@@ -72,6 +87,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
         ingested_date_lte: params.ingested_date_lte,
         ingested_date_gte: params.ingested_date_gte,
         filename: params.filename,
+        customMetadataFilters: params.customMetadataFilters,
       }
     : undefined;
 
@@ -116,6 +132,11 @@ export const useSearch = (query: string, params?: SearchParams) => {
         if (params?.ingested_date_gte)
           queryParams.append("ingested_date_gte", params.ingested_date_gte);
         if (params?.filename) queryParams.append("filename", params.filename);
+
+        // Add custom metadata filters as JSON
+        if (params?.customMetadataFilters && params.customMetadataFilters.length > 0) {
+          queryParams.append("filters", JSON.stringify(params.customMetadataFilters));
+        }
 
         // Add fields to the query parameters
         if (params?.fields && params.fields.length > 0) {
