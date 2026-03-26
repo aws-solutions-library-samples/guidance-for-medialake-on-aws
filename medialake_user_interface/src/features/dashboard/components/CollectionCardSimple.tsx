@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Card, CardContent, Typography, Chip, alpha, useTheme } from "@mui/material";
-import { colorTokens } from "@/theme/tokens";
 import {
   Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,

@@ -1,7 +1,6 @@
 import React from "react";
 import { Switch, SwitchProps } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { colorTokens } from "@/theme/tokens";
 
 export interface IconSwitchProps extends SwitchProps {
   onIcon?: React.ReactNode | string;
