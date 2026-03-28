@@ -234,45 +234,14 @@ class SearchConstruct(Construct):
                     "bedrock:StopAsyncInvoke",
                 ],
                 resources=[
-                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
-                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
-                    f"arn:aws:bedrock:{Stack.of(self).region}:{Stack.of(self).account}:async-invoke/*",
-                ],
-            )
-        )
-
-        # Add S3 permissions for Bedrock async invoke output
-        search_get_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:ListBucket",
-                    "s3:GetBucketLocation",
-                ],
-                resources=[
-                    f"arn:aws:s3:::{props.s3_vector_bucket_name}",
-                    f"arn:aws:s3:::{props.s3_vector_bucket_name}/*",
-                ],
-            )
-        )
-
-        # Add Bedrock permissions for TwelveLabs embedding generation (both 2.7 and 3.0)
-        search_get_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                    "bedrock:StartAsyncInvoke",
-                    "bedrock:GetAsyncInvoke",
-                    "bedrock:ListAsyncInvokes",
-                    "bedrock:StopAsyncInvoke",
-                ],
-                resources=[
-                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
-                    f"arn:aws:bedrock:{Stack.of(self).region}::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-3-0-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-2-7-v1:0",
+                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-3-0-v1:0",
                     f"arn:aws:bedrock:{Stack.of(self).region}:{Stack.of(self).account}:async-invoke/*",
                 ],
             )

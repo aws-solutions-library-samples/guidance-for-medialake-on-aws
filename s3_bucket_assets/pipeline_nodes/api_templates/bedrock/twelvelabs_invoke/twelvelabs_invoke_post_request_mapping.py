@@ -9,7 +9,6 @@ def translate_event_to_request(event):
     # Get configuration parameters
     model_id = parameters.get("Model ID", "twelvelabs.marengo-embed-2-7-v1:0")
     input_type = parameters.get("Input Type", "video")
-    region = parameters.get("Region", "us-east-1")
     s3_output_bucket = parameters.get("S3 Output Bucket")
 
     # Auto-detect input type from MediaLake payload if available
@@ -91,7 +90,6 @@ def translate_event_to_request(event):
     return {
         "model_id": model_id,
         "input_type": detected_input_type,
-        "region": region,
         "s3_output_bucket": s3_output_bucket,
         "video_uri": video_uri,
         "image_uri": image_uri,
