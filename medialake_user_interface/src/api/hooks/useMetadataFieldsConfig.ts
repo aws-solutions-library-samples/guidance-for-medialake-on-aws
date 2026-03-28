@@ -43,6 +43,7 @@ export const useMetadataFieldsConfig = () => {
         throw error;
       }
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 10, // Cache for 10 minutes — invalidated on save
+    gcTime: 1000 * 60 * 30,
   });
 };

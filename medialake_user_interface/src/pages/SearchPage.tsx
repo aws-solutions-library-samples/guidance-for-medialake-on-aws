@@ -156,7 +156,7 @@ const SearchPage: React.FC = () => {
   const facetFilters = searchState.filters;
 
   // State for selected fields — synced with localStorage via hook
-  const { selectedFields } = useMetadataFieldPreferences();
+  const { selectedFields, setSelectedFields } = useMetadataFieldPreferences();
   // Debounce field changes to coalesce rapid toggles into a single search re-fetch
   const debouncedSelectedFields = useDebounce(selectedFields, 200);
 
@@ -630,6 +630,8 @@ const SearchPage: React.FC = () => {
                 onSelectAllToggle={handleSelectAllToggle}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
+                selectedFields={selectedFields}
+                onSelectedFieldsChange={setSelectedFields}
                 error={
                   error
                     ? {

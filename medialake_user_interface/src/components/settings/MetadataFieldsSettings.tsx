@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   Box,
   Typography,
@@ -10,12 +11,18 @@ import {
   Alert,
   Snackbar,
   Chip,
+  Menu,
+  FormControlLabel,
+  Checkbox,
+  Badge,
 } from "@mui/material";
 import {
   Save as SaveIcon,
   Refresh as RefreshIcon,
   ChevronRight as ChevronRightIcon,
   ExpandMore as ExpandMoreIcon,
+  FilterList as FilterListIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
 } from "@mui/icons-material";
 import { useMetadataFieldsMapping } from "@/api/hooks/useMetadataFieldsMapping";
 import { useMetadataFieldsConfig } from "@/api/hooks/useMetadataFieldsConfig";
@@ -81,7 +88,7 @@ interface FieldRowProps {
   onChange?: (name: string, patch: Partial<LocalFieldState>) => void;
 }
 
-const FieldRow: React.FC<FieldRowProps> = ({ field, isDefault, onChange }) => (
+const FieldRow: React.FC<FieldRowProps> = React.memo(({ field, isDefault, onChange }) => (
   <Box
     sx={{
       display: "grid",
@@ -127,7 +134,7 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, isDefault, onChange }) => (
       {isDefault && <Chip label="Default" size="small" color="primary" variant="outlined" />}
     </Box>
   </Box>
-);
+));
 
 const COLUMN_HEADERS = (
   <Box
@@ -166,7 +173,33 @@ const MetadataFieldsSettings: React.FC = () => {
   const [localFields, setLocalFields] = useState<Record<string, LocalFieldState>>({});
   const [savedFields, setSavedFields] = useState<Record<string, LocalFieldState>>({});
   const [searchFilter, setSearchFilter] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string> | null>(null);
+
+  // Initialize all groups as collapsed on first data load
+  const groupKeys = useMemo(
+    () =>
+      Object.keys(localFields).reduce<Set<string>>((acc, name) => {
+        const parts = name.split(".");
+        acc.add(parts.length >= 2 ? `${parts[0]}.${parts[1]}` : parts[0]);
+        return acc;
+      }, new Set()),
+    [localFields]
+  );
+
+  // On first load, collapse all groups
+  useEffect(() => {
+    if (collapsedGroups === null && groupKeys.size > 0) {
+      setCollapsedGroups(new Set(groupKeys));
+    }
+  }, [groupKeys, collapsedGroups]);
+  const [enabledFilter, setEnabledFilter] = useState<{ displayable: boolean; filterable: boolean }>(
+    {
+      displayable: false,
+      filterable: false,
+    }
+  );
+  const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -229,20 +262,27 @@ const MetadataFieldsSettings: React.FC = () => {
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev ?? []);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   }, []);
 
+  const debouncedSearch = useDebounce(searchFilter, 150);
+
   const groupedFields = useMemo(() => {
-    const filter = searchFilter.toLowerCase();
-    const entries = Object.values(localFields).filter(
-      (f) => !filter || f.name.toLowerCase().includes(filter)
-    );
+    const filter = debouncedSearch.toLowerCase();
+    const entries = Object.values(localFields).filter((f) => {
+      if (filter && !f.name.toLowerCase().includes(filter)) return false;
+      if (enabledFilter.displayable && !f.isDisplayable) return false;
+      if (enabledFilter.filterable && !f.isFilterable) return false;
+      return true;
+    });
     const groups: Record<string, LocalFieldState[]> = {};
     for (const f of entries) {
-      const groupKey = f.name.split(".")[0];
+      // Group by the first two segments (e.g., "Metadata.Embedded", "Metadata.Generated")
+      const parts = f.name.split(".");
+      const groupKey = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : parts[0];
       (groups[groupKey] ??= []).push(f);
     }
     // Sort groups and fields alphabetically
@@ -251,39 +291,44 @@ const MetadataFieldsSettings: React.FC = () => {
       sorted[key] = groups[key].sort((a, b) => a.name.localeCompare(b.name));
     }
     return sorted;
-  }, [localFields, searchFilter]);
+  }, [localFields, debouncedSearch, enabledFilter]);
 
   const handleRefreshFields = useCallback(async () => {
-    const result = await mappingQuery.refetch();
-    if (!result.data?.data?.fields) return;
+    setIsRefreshing(true);
+    try {
+      const result = await mappingQuery.refetch();
+      if (!result.data?.data?.fields) return;
 
-    const newNames = new Set(result.data.data.fields.map((f) => f.name));
-    setLocalFields((prev) => {
-      const removedCount = Object.keys(prev).filter((k) => !newNames.has(k)).length;
-      const next: Record<string, LocalFieldState> = {};
-      for (const mf of result.data!.data.fields) {
-        if (DEFAULT_FIELD_NAMES.has(mf.name)) continue;
-        if (prev[mf.name]) {
-          next[mf.name] = prev[mf.name];
-        } else {
-          next[mf.name] = {
-            name: mf.name,
-            type: mf.type,
-            displayType: mf.displayType,
-            displayName: mf.name.split(".").pop() ?? mf.name,
-            isDisplayable: false,
-            isFilterable: false,
-          };
+      const newNames = new Set(result.data.data.fields.map((f) => f.name));
+      setLocalFields((prev) => {
+        const removedCount = Object.keys(prev).filter((k) => !newNames.has(k)).length;
+        const next: Record<string, LocalFieldState> = {};
+        for (const mf of result.data!.data.fields) {
+          if (DEFAULT_FIELD_NAMES.has(mf.name)) continue;
+          if (prev[mf.name]) {
+            next[mf.name] = prev[mf.name];
+          } else {
+            next[mf.name] = {
+              name: mf.name,
+              type: mf.type,
+              displayType: mf.displayType,
+              displayName: mf.name.split(".").pop() ?? mf.name,
+              isDisplayable: false,
+              isFilterable: false,
+            };
+          }
         }
-      }
-      showNotification(
-        removedCount > 0
-          ? `${removedCount} field(s) removed because they no longer exist in the index`
-          : "Fields refreshed — no changes",
-        removedCount > 0 ? "warning" : "info"
-      );
-      return next;
-    });
+        showNotification(
+          removedCount > 0
+            ? `${removedCount} field(s) removed because they no longer exist in the index`
+            : "Fields refreshed — no changes",
+          removedCount > 0 ? "warning" : "info"
+        );
+        return next;
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [mappingQuery, showNotification]);
 
   const handleSave = useCallback(async () => {
@@ -306,10 +351,30 @@ const MetadataFieldsSettings: React.FC = () => {
     }
   }, [localFields, updateMutation, showNotification]);
 
-  if (mappingQuery.isLoading || configQuery.isLoading) {
+  // Show loading on initial load OR when data is cached but localFields hasn't been populated yet
+  const isInitializing =
+    mappingQuery.isLoading ||
+    configQuery.isLoading ||
+    (!!mappingQuery.data?.data?.fields &&
+      Object.keys(localFields).length === 0 &&
+      !hasChangesRef.current);
+
+  if (isInitializing) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <CircularProgress />
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          py: 8,
+          gap: 1.5,
+        }}
+      >
+        <CircularProgress size={32} />
+        <Typography variant="body2" color="text.secondary">
+          Loading metadata fields…
+        </Typography>
       </Box>
     );
   }
@@ -340,7 +405,16 @@ const MetadataFieldsSettings: React.FC = () => {
       </Snackbar>
 
       {/* Toolbar */}
-      <Box sx={{ display: "flex", gap: 1, p: 2, borderBottom: 1, borderColor: "divider" }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1,
+          p: 2,
+          borderBottom: 1,
+          borderColor: "divider",
+          alignItems: "center",
+        }}
+      >
         <TextField
           size="small"
           placeholder={t(
@@ -349,15 +423,115 @@ const MetadataFieldsSettings: React.FC = () => {
           )}
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
-          sx={{ flex: 1 }}
+          sx={{ flex: 1, minWidth: 160 }}
         />
-        <Button variant="outlined" onClick={handleRefreshFields} startIcon={<RefreshIcon />}>
-          Refresh Fields
+        <Badge
+          badgeContent={(enabledFilter.displayable ? 1 : 0) + (enabledFilter.filterable ? 1 : 0)}
+          color="primary"
+          invisible={!enabledFilter.displayable && !enabledFilter.filterable}
+          sx={{ "& .MuiBadge-badge": { fontSize: "0.625rem", height: 16, minWidth: 16 } }}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FilterListIcon />}
+            endIcon={<KeyboardArrowDownIcon />}
+            onClick={(e) => setFilterAnchor(e.currentTarget)}
+          >
+            Filter
+          </Button>
+        </Badge>
+        <Menu
+          open={Boolean(filterAnchor)}
+          anchorEl={filterAnchor}
+          onClose={() => setFilterAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          slotProps={{ paper: { sx: { mt: 0.5, borderRadius: 2, minWidth: 220 } } }}
+        >
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                fontSize: "0.6875rem",
+              }}
+            >
+              Show only enabled
+            </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={enabledFilter.displayable}
+                  onChange={(_, checked) =>
+                    setEnabledFilter((prev) => ({ ...prev, displayable: checked }))
+                  }
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
+                  Show in Dropdown
+                </Typography>
+              }
+              sx={{ display: "flex", mx: 0, mt: 0.5 }}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={enabledFilter.filterable}
+                  onChange={(_, checked) =>
+                    setEnabledFilter((prev) => ({ ...prev, filterable: checked }))
+                  }
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
+                  Allow Filtering
+                </Typography>
+              }
+              sx={{ display: "flex", mx: 0 }}
+            />
+          </Box>
+        </Menu>
+        <Button
+          variant="outlined"
+          onClick={handleRefreshFields}
+          disabled={isRefreshing}
+          startIcon={isRefreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
+        >
+          {isRefreshing ? "Refreshing…" : "Refresh Fields"}
         </Button>
       </Box>
 
       {/* Scrollable field list */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2, position: "relative" }}>
+        {/* Loading overlay while refreshing */}
+        {isRefreshing && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              bgcolor: "rgba(255,255,255,0.7)",
+              zIndex: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1.5,
+              borderRadius: 1,
+            }}
+          >
+            <CircularProgress size={32} />
+            <Typography variant="body2" color="text.secondary">
+              Refreshing fields from OpenSearch index…
+            </Typography>
+          </Box>
+        )}
         {/* Default Fields section */}
         <Box
           sx={{
@@ -393,13 +567,13 @@ const MetadataFieldsSettings: React.FC = () => {
                 borderColor: "divider",
               }}
             >
-              {collapsedGroups.has(groupKey) ? <ChevronRightIcon /> : <ExpandMoreIcon />}
+              {collapsedGroups?.has(groupKey) ? <ChevronRightIcon /> : <ExpandMoreIcon />}
               <Typography variant="subtitle2">{groupKey}</Typography>
               <Typography variant="caption" color="text.secondary">
                 ({fields.length} fields)
               </Typography>
             </Box>
-            {!collapsedGroups.has(groupKey) && (
+            {!collapsedGroups?.has(groupKey) && (
               <Box sx={{ pl: 1 }}>
                 {COLUMN_HEADERS}
                 {fields.map((field) => (
@@ -430,7 +604,7 @@ const MetadataFieldsSettings: React.FC = () => {
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={!hasChanges || updateMutation.isPending}
+          disabled={!hasChanges || updateMutation.isPending || isRefreshing}
           startIcon={updateMutation.isPending ? <CircularProgress size={16} /> : <SaveIcon />}
         >
           Save Changes

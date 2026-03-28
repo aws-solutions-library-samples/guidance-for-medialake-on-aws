@@ -5,9 +5,11 @@ import {
   useUIActions,
   useAggregations,
   useFacetsInfo,
+  useSemanticSearch,
   type CustomMetadataFieldDraft,
 } from "../../stores/searchStore";
 import { useSearchFields } from "@/api/hooks/useSearchFields";
+import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
 import type { FieldInfo } from "@/api/hooks/useSearchFields";
 import type { FieldAggregation } from "@/api/hooks/useSearch";
 import {
@@ -222,7 +224,15 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   const { data: fieldsData } = useSearchFields();
   const aggregations = useAggregations();
   const facetsInfo = useFacetsInfo();
-  const filterableFields = (fieldsData?.data?.availableFields ?? []).filter((f) => f.isFilterable);
+  const isSemantic = useSemanticSearch();
+  const { providerData } = useSemanticSearchStatus();
+  const isCoactiveProvider = providerData?.data?.searchProvider?.type === "coactive";
+
+  // Hide custom metadata filters when Coactive provider is active with semantic/hybrid search
+  const hideCustomFilters = isCoactiveProvider && isSemantic;
+  const filterableFields = hideCustomFilters
+    ? []
+    : (fieldsData?.data?.availableFields ?? []).filter((f) => f.isFilterable && !f.isDefault);
 
   // Destructure draft state for easier access
   const {

@@ -17,7 +17,6 @@ import {
 } from "@/utils/clipTransformation";
 import { useSemanticMode } from "@/stores/searchStore";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
-import { useMetadataFieldPreferences } from "@/hooks/useMetadataFieldPreferences";
 import { useSearchFields } from "@/api/hooks/useSearchFields";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
@@ -97,6 +96,10 @@ interface MasterResultsViewProps {
   // Loading states
   isRenaming?: boolean;
   renamingAssetId?: string;
+
+  // Metadata field preferences (owned by SearchPage)
+  selectedFields?: string[];
+  onSelectedFieldsChange?: (fields: string[]) => void;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -162,6 +165,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Loading states
   isRenaming = false,
   renamingAssetId,
+
+  // Metadata field preferences
+  selectedFields: selectedFieldsProp,
+  onSelectedFieldsChange,
 }) => {
   const { t } = useTranslation();
 
@@ -169,7 +176,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   const semanticMode = useSemanticMode();
 
   // Get selected/available fields for custom card field computation
-  const { selectedFields, setSelectedFields } = useMetadataFieldPreferences();
+  const selectedFields = selectedFieldsProp ?? [];
   const { data: fieldsData } = useSearchFields();
   const availableFields = fieldsData?.data?.availableFields ?? [];
 
@@ -443,7 +450,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         onColumnToggle={onColumnToggle}
         selectedSearchFields={isCoactiveProvider ? undefined : selectedFields}
         availableFields={availableFields}
-        onSelectedFieldsChange={isCoactiveProvider ? undefined : setSelectedFields}
+        onSelectedFieldsChange={isCoactiveProvider ? undefined : onSelectedFieldsChange}
         hasSelectedAssets={hasSelectedAssets}
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}

@@ -37,6 +37,7 @@ export const useMetadataFieldsMapping = () => {
         throw error;
       }
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour — user clicks "Refresh Fields" to update
+    gcTime: 1000 * 60 * 120, // Keep in memory for 2 hours
   });
 };

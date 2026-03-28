@@ -32,6 +32,10 @@ export const useUpdateMetadataFieldsConfig = () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SYSTEM_SETTINGS.metadataFields(),
       });
+      // Also invalidate the search fields query so the dropdown picks up changes immediately
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.fields(),
+      });
     },
   });
 };

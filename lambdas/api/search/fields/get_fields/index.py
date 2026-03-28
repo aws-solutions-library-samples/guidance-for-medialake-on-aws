@@ -144,14 +144,19 @@ def traverse_mapping(properties: dict, prefix: str = "") -> list:
 
 @app.get("/search/fields/mapping")
 def handle_get_fields_mapping():
-    """Return all leaf fields from the OpenSearch index mapping."""
+    """Return all leaf fields under the Metadata namespace from the OpenSearch index mapping."""
     try:
         client = get_opensearch_client()
         index_name = os.environ["OPENSEARCH_INDEX"]
         response = client.indices.get_mapping(index=index_name)
         mapping = response.get(index_name) or next(iter(response.values()))
         properties = mapping["mappings"]["properties"]
-        fields = traverse_mapping(properties)
+
+        # Only traverse the Metadata subtree — other top-level fields
+        # (DigitalSourceAsset, InventoryID, etc.) are handled by the defaults.
+        metadata_props = properties.get("Metadata", {}).get("properties", {})
+        fields = traverse_mapping(metadata_props, prefix="Metadata")
+
         return {"status": "200", "message": "ok", "data": {"fields": fields}}
     except Exception as e:
         logger.error(f"Error retrieving fields mapping: {str(e)}")
