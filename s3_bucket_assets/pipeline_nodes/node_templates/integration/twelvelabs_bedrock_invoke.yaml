@@ -32,6 +32,13 @@ node:
                 - aws-marketplace:Subscribe
               resources:
                 - "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0"
+                - "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-3-0-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-2-7-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-3-0-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-2-7-v1:0"
+                - "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-3-0-v1:0"
               condition:
                 StringEquals:
                   aws:CalledViaLast: lambda.amazonaws.com

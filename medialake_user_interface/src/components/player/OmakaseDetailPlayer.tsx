@@ -7,10 +7,7 @@ import { usePlayerKeyboardShortcutsCore } from "./usePlayerKeyboardShortcutsCore
 import { useMarkerTrackSync } from "./useMarkerTrackSync";
 import { DETAIL_PLAYER_CONTAINER_ID_PREFIX } from "./DetailPlayerConstants";
 
-// Omakase player styles required for PlayerChromingTheme.Omakase
-import "@byomakase/omakase-player/dist/style.css";
-import "@byomakase/omakase-player/style/player-chroming/player-chroming.css";
-import "../../styles/player-overrides.css";
+// Omakase player styles are imported globally in main.tsx
 
 export interface OmakaseDetailPlayerProps {
   src: string;

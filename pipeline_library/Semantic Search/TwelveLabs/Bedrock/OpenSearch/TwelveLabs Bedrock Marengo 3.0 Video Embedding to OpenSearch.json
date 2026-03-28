@@ -387,7 +387,6 @@
             "method": "invoke",
             "parameters": {
               "Model ID": "twelvelabs.marengo-embed-3-0-v1:0",
-              "Region": "us-east-1",
               "S3 Output Bucket": "${EXTERNAL_PAYLOAD_BUCKET}"
             },
             "path": "",

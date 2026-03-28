@@ -289,6 +289,7 @@ aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 ```
 
 - **Note**: If you recive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
+- **Note**: If you are new to IAM: These roles are not user roles nor allow general access to your account. A service-linked role is a special type of IAM role that's directly associated with an AWS service. For more information, see this [AWS re:Post article](https://repost.aws/articles/ARtUa9sqlFR02vngsy1zgmHg/what-s-special-about-aws-service-linked-iam-roles) or the [AWS Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create-service-linked-role.html).
 
 ### 5. **Configure AWS account and region**
 
@@ -297,6 +298,8 @@ Ensure AWS credentials are configured (`aws configure`), and bootstrap your acco
 ```bash
 cdk bootstrap --profile <profile> --region <region>
 ```
+
+- **Note**: Bootstrapping itself is a one-time operation performed by AWS account administrators, and we recommend executing it using `AdministratorAccess` privileges. This makes sure you are safe against future changes, and since the bootstrapping process will—by design—create new Roles with arbitrary policies anyway, there is no real benefit to restricting the permissions. For more information, see the [CDK Security and Safety Dev Guide](https://github.com/aws/aws-cdk/wiki/Security-And-Safety-Dev-Guide).
 
 ### 6. **Deploy using AWS CDK**
 
