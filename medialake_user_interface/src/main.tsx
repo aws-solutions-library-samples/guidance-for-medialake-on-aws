@@ -8,6 +8,10 @@ import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 // Import and initialize i18next configuration
 import "./i18n/i18n";
 
+// Omakase player styles — imported globally so both grid-card (Stamp theme)
+// and detail-view (Omakase theme) players render correctly.
+import "@byomakase/omakase-player/dist/style.css";
+import "@byomakase/omakase-player/style/player-chroming/player-chroming.css";
 import "./styles/player-overrides.css";
 
 // Create a loading component that uses translations
