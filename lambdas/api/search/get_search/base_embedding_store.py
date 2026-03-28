@@ -100,10 +100,11 @@ class BaseEmbeddingStore(ABC):
 
     def _get_regional_inference_profile(self) -> str:
         """
-        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile based on AWS region.
+        Get the appropriate TwelveLabs Marengo Embed inference profile based on AWS region.
+        Supports both v2.7 and v3.0 — defaults to 2.7 for this legacy code path.
 
         Returns:
-            Regional inference profile ID for TwelveLabs Marengo Embed v2.7
+            Regional inference profile ID for TwelveLabs Marengo Embed
         """
         # Allow override via environment variable
         if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
@@ -112,21 +113,17 @@ class BaseEmbeddingStore(ABC):
         # Get current AWS region
         aws_region = os.environ.get("AWS_REGION", "us-east-1")
 
-        # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
+        # Default to 2.7 for this legacy code path
         model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
 
-        # Map regions to regional prefixes based on AWS documentation
+        # Map regions to regional prefixes
         if aws_region.startswith("us-"):
-            # US regions: us-east-1, us-east-2, us-west-1, us-west-2
             regional_prefix = "us"
         elif aws_region.startswith("eu-"):
-            # EU regions: eu-central-1, eu-central-2, eu-north-1, eu-south-1, eu-south-2, eu-west-1, eu-west-2, eu-west-3
             regional_prefix = "eu"
         elif aws_region.startswith("ap-"):
-            # APAC regions: ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-south-1, ap-south-2, ap-southeast-1, ap-southeast-2, ap-southeast-3, ap-southeast-4
             regional_prefix = "apac"
         else:
-            # Default to US profile for unknown regions
             self.logger.warning(
                 f"Unknown AWS region: {aws_region}, defaulting to US inference profile"
             )
@@ -374,9 +371,10 @@ class BaseEmbeddingStore(ABC):
             start_datetime = time.time()
             self.logger.info(f"Starting Bedrock async invoke at: {start_datetime}")
 
-            # Start async invoke for text embedding
+            # Start async invoke for text embedding using inference profile
+            inference_profile_id = self._get_regional_inference_profile()
             response = bedrock_runtime.start_async_invoke(
-                modelId="twelvelabs.marengo-embed-2-7-v1:0",
+                modelId=inference_profile_id,
                 modelInput={"inputType": "text", "inputText": query_text},
                 outputDataConfig={
                     "s3OutputDataConfig": {

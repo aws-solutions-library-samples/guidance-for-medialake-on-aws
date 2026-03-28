@@ -16,6 +16,50 @@ tracer = Tracer()
 EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
 
 
+def _get_regional_inference_profile(model_id: str) -> str:
+    """
+    Resolve a raw model ID to a cross-region inference profile ID.
+
+    Maps the deployment region to the appropriate broader-region prefix
+    (us, eu, apac) so Bedrock routes to the nearest available endpoint
+    instead of being pinned to a single region.
+
+    Args:
+        model_id: Raw model ID, e.g. "twelvelabs.marengo-embed-3-0-v1:0"
+
+    Returns:
+        Inference profile ID, e.g. "us.twelvelabs.marengo-embed-3-0-v1:0"
+    """
+    # Allow explicit override via environment variable
+    if "BEDROCK_INFERENCE_PROFILE_ARN" in os.environ:
+        return os.environ["BEDROCK_INFERENCE_PROFILE_ARN"]
+
+    aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+    if aws_region.startswith("us-"):
+        regional_prefix = "us"
+    elif aws_region.startswith("eu-"):
+        regional_prefix = "eu"
+    elif aws_region.startswith("ap-"):
+        regional_prefix = "apac"
+    else:
+        logger.warning(
+            f"Unknown AWS region: {aws_region}, defaulting to US inference profile"
+        )
+        regional_prefix = "us"
+
+    inference_profile_id = f"{regional_prefix}.{model_id}"
+    logger.info(
+        "Resolved inference profile",
+        extra={
+            "model_id": model_id,
+            "region": aws_region,
+            "inference_profile_id": inference_profile_id,
+        },
+    )
+    return inference_profile_id
+
+
 def _detect_chunk_item(event: Dict[str, Any]):
     """Return the chunk item dict if the event represents a video chunk, else None."""
     payload = event.get("payload", {})
@@ -55,8 +99,10 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
         # Get configuration from environment variables (set during pipeline deployment)
         model_id = os.environ.get("MODEL_ID", "twelvelabs.marengo-embed-2-7-v1:0")
-        region = os.environ.get("AWS_REGION", "us-east-1")
         s3_output_bucket = os.environ.get("EXTERNAL_PAYLOAD_BUCKET")
+
+        # Resolve to cross-region inference profile (e.g. us.twelvelabs.marengo-embed-3-0-v1:0)
+        inference_profile_id = _get_regional_inference_profile(model_id)
 
         # Get input type from environment variable set during pipeline deployment
         input_type = os.environ.get("CONNECTION_INPUT_TYPE")
@@ -80,15 +126,15 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             "Configuration",
             extra={
                 "model_id": model_id,
+                "inference_profile_id": inference_profile_id,
                 "input_type": input_type,
-                "region": region,
                 "s3_output_bucket": s3_output_bucket,
                 "is_marengo_3": is_marengo_3,
             },
         )
 
-        # Initialize clients with region
-        bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
+        # Initialize clients (region is auto-detected from the Lambda execution environment)
+        bedrock_runtime = boto3.client("bedrock-runtime")
         boto3.client("s3")
         sts = boto3.client("sts")
 
@@ -390,7 +436,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         logger.info(
             "Starting Bedrock async invoke with retry protection",
             extra={
-                "model_id": model_id,
+                "inference_profile_id": inference_profile_id,
                 "input_type": input_type,
                 "s3_output_bucket": s3_output_bucket,
                 "output_prefix": output_prefix,
@@ -401,7 +447,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         # Using 'default' config which provides reasonable retry behavior
         response = bedrock_start_async_invoke_with_retry(
             bedrock_client=bedrock_runtime,
-            model_id=model_id,
+            model_id=inference_profile_id,
             model_input=model_input,
             output_data_config={
                 "s3OutputDataConfig": {
