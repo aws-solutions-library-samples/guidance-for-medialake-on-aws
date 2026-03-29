@@ -29,9 +29,6 @@ import AddIcon from "@mui/icons-material/Add";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { type AssetTableColumn } from "@/types/shared/assetComponents";
-import { ChipArrayField } from "@/components/common/ChipArrayField";
-import { resolveDotPath } from "@/utils/dotPathResolve";
-import { type FieldInfo } from "@/api/hooks/useSearchFields";
 import { AssetAudio } from "../asset";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
 
@@ -100,7 +97,6 @@ export interface AssetTableProps<T> {
   isFavorite?: (item: T) => boolean;
   onFavoriteToggle?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   selectedSearchFields?: string[]; // Add selectedSearchFields prop
-  availableFields?: FieldInfo[]; // Available field metadata for custom columns
   isRenaming?: boolean; // Add isRenaming prop for loading state
   renamingAssetId?: string; // ID of the asset currently being renamed
 }
@@ -131,7 +127,6 @@ export function AssetTable<T>({
   isFavorite = () => false,
   onFavoriteToggle,
   selectedSearchFields,
-  availableFields,
   isRenaming = false,
   renamingAssetId,
 }: AssetTableProps<T>): React.ReactElement {
@@ -179,10 +174,7 @@ export function AssetTable<T>({
     // Otherwise, fall back to the column's visible property
     let visibleColumns = columns;
 
-    if (selectedSearchFields && selectedSearchFields.length === 0) {
-      // Explicitly empty: hide all metadata columns
-      visibleColumns = [];
-    } else if (selectedSearchFields && selectedSearchFields.length > 0) {
+    if (selectedSearchFields && selectedSearchFields.length > 0) {
       // Filter by selectedSearchFields
       visibleColumns = visibleColumns.filter((col) => {
         // Special case for name field
@@ -215,11 +207,7 @@ export function AssetTable<T>({
 
         // For other fields, check if any of their mapped API field IDs are in the selectedSearchFields
         const apiFieldIds = reverseFieldMapping[col.id] || [];
-        if (apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId)))
-          return true;
-
-        // Custom metadata fields: col.id IS the dot-path itself
-        return selectedSearchFields.includes(col.id);
+        return apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId));
       });
     } else {
       // No selectedSearchFields - use the visible property
@@ -451,30 +439,6 @@ export function AssetTable<T>({
           }
         )
       ),
-      // Dynamic custom columns for fields not in the standard fieldMapping
-      ...(selectedSearchFields ?? [])
-        .filter((f) => !Object.keys(fieldMapping).includes(f))
-        .map((fieldPath) =>
-          columnHelper.accessor((row) => resolveDotPath(row, fieldPath), {
-            id: fieldPath,
-            header:
-              availableFields?.find((f) => f.name === fieldPath)?.displayName ??
-              fieldPath.split(".").at(-1) ??
-              fieldPath,
-            enableSorting: false,
-            cell: (info) => {
-              const value = info.getValue();
-              if (value == null) return <Box sx={{ p: 1 }}>—</Box>;
-              if (Array.isArray(value))
-                return (
-                  <Box sx={{ p: 1 }}>
-                    <ChipArrayField values={value.map(String)} />
-                  </Box>
-                );
-              return <Box sx={{ p: 1 }}>{String(value)}</Box>;
-            },
-          })
-        ),
       columnHelper.display({
         id: "actions",
         header: t("common.columns.actions"),
@@ -544,7 +508,6 @@ export function AssetTable<T>({
     isFavorite,
     columnHelper,
     selectedSearchFields,
-    availableFields,
   ]);
 
   const table = useReactTable({

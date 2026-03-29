@@ -696,7 +696,6 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
-        metadataFields: "Metadata Fields",
       },
       search: {
         title: "Configuration de la recherche",
@@ -727,9 +726,6 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
-      },
-      metadataFields: {
-        searchPlaceholder: "Search fields...",
       },
       upgrade: {
         noHistory: "No upgrade history available",

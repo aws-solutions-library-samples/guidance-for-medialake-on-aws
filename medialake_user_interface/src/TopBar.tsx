@@ -36,7 +36,6 @@ import {
   useSemanticSearch,
   useDomainActions,
   useUIActions,
-  useActiveFilterCount,
 } from "./stores/searchStore";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
@@ -405,8 +404,7 @@ function TopBar() {
     handleCloseUploadModal();
   };
 
-  const activeFilterCount = useActiveFilterCount();
-  const hasActiveFilters = activeFilterCount > 0;
+  const hasActiveFilters = Object.keys(filters).filter((k) => k !== "date_range_option").length > 0;
 
   return (
     <Box
@@ -679,7 +677,7 @@ function TopBar() {
                       boxSizing: "content-box",
                     }}
                   >
-                    {activeFilterCount}
+                    {Object.keys(filters).filter((k) => k !== "date_range_option").length}
                   </Box>
                 )}
               </IconButton>

@@ -16,7 +16,6 @@ import ErrorDisplay from "./ErrorDisplay";
 import { sortAssets } from "@/utils/sortAssets";
 import ConfidenceSlider from "./ConfidenceSlider";
 import { zIndexTokens } from "@/theme/tokens";
-import { type FieldInfo } from "@/api/hooks/useSearchFields";
 
 export type { AssetField };
 
@@ -66,11 +65,6 @@ export interface AssetResultsViewProps<T> {
   columns: AssetTableColumn<T>[];
   onColumnToggle: (columnId: string) => void;
 
-  // Metadata field filtering
-  selectedSearchFields?: string[];
-  availableFields?: FieldInfo[];
-  onSelectedFieldsChange?: (fields: string[]) => void;
-
   // Select all (used by AssetViewControls toolbar)
   hasSelectedAssets?: boolean;
   selectAllState?: "none" | "some" | "all";
@@ -114,11 +108,6 @@ function AssetResultsView<T>({
   onCardFieldToggle,
   columns,
   onColumnToggle,
-
-  // Metadata field filtering
-  selectedSearchFields,
-  availableFields,
-  onSelectedFieldsChange,
 
   // Select all
   hasSelectedAssets,
@@ -172,56 +161,15 @@ function AssetResultsView<T>({
     !!originalResults &&
     results.length !== originalResults.length;
 
-  // Build sort options: standard sortable columns + selected custom metadata fields
-  const customSortOptions = React.useMemo(() => {
-    if (!selectedSearchFields || !availableFields || selectedSearchFields.length === 0) return [];
-    // IDs already covered by standard columns
-    const standardColumnIds = new Set(columns.map((col) => col.id));
-    // Known API field names that map to standard columns
-    const knownApiFields = new Set([
-      "id",
-      "assetType",
-      "format",
-      "createdAt",
-      "objectName",
-      "fileSize",
-      "fullPath",
-      "bucket",
-      "FileHash",
-      "DigitalSourceAsset.Type",
-      "DigitalSourceAsset.MainRepresentation.Format",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-      "DigitalSourceAsset.CreateDate",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-      "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
-      "Metadata.Consolidated",
-      "InventoryID",
-    ]);
-    return selectedSearchFields
-      .filter((f) => !knownApiFields.has(f) && !standardColumnIds.has(f))
-      .map((fieldPath) => ({
-        id: fieldPath,
-        label:
-          availableFields.find((af) => af.name === fieldPath)?.displayName ??
-          fieldPath.split(".").at(-1) ??
-          fieldPath,
-      }));
-  }, [selectedSearchFields, availableFields, columns]);
-
   // Shared controls props (used in both error and success paths)
   const controlsProps = {
     viewMode,
     onViewModeChange,
     title: "" as const,
     sorting,
-    sortOptions: [
-      ...columns.filter((col) => col.sortable).map((col) => ({ id: col.id, label: col.label })),
-      ...customSortOptions,
-    ],
+    sortOptions: columns
+      .filter((col) => col.sortable)
+      .map((col) => ({ id: col.id, label: col.label })),
     onSortChange: (columnId: string) => {
       const currentSort = sorting[0];
       const desc = currentSort?.id === columnId ? !currentSort.desc : false;
@@ -245,9 +193,6 @@ function AssetResultsView<T>({
     hasSelectedAssets,
     selectAllState,
     onSelectAllToggle,
-    availableFields,
-    selectedSearchFields,
-    onSelectedFieldsChange,
   };
 
   if (error) {
@@ -334,7 +279,6 @@ function AssetResultsView<T>({
           thumbnailScale={thumbnailScale}
           showMetadata={showMetadata}
           cardFields={cardFields.filter((f) => f.visible)}
-          selectedSearchFields={selectedSearchFields}
         />
       ) : (
         <AssetTableView
@@ -361,8 +305,6 @@ function AssetResultsView<T>({
           onSelectToggle={onSelectToggle}
           isFavorite={isAssetFavorited ? (asset) => isAssetFavorited(getAssetId(asset)) : undefined}
           onFavoriteToggle={onFavoriteToggle}
-          selectedSearchFields={selectedSearchFields}
-          availableFields={availableFields}
           isRenaming={isRenaming}
           renamingAssetId={renamingAssetId}
         />

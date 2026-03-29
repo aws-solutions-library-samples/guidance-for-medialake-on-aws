@@ -8,8 +8,6 @@ import { formatDate } from "@/utils/dateFormat";
 import { useDebounce } from "@/hooks/useDebounce";
 import AssetResultsView from "../shared/AssetResultsView";
 import { AssetItemProvider } from "@/contexts/AssetItemContext";
-import { ChipArrayField } from "@/components/common/ChipArrayField";
-import { resolveDotPath } from "@/utils/dotPathResolve";
 import {
   transformResultsToClipMode,
   getClipDisplayName,
@@ -17,7 +15,6 @@ import {
 } from "@/utils/clipTransformation";
 import { useSemanticMode } from "@/stores/searchStore";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
-import { useSearchFields } from "@/api/hooks/useSearchFields";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -96,10 +93,6 @@ interface MasterResultsViewProps {
   // Loading states
   isRenaming?: boolean;
   renamingAssetId?: string;
-
-  // Metadata field preferences (owned by SearchPage)
-  selectedFields?: string[];
-  onSelectedFieldsChange?: (fields: string[]) => void;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -165,20 +158,11 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Loading states
   isRenaming = false,
   renamingAssetId,
-
-  // Metadata field preferences
-  selectedFields: selectedFieldsProp,
-  onSelectedFieldsChange,
 }) => {
   const { t } = useTranslation();
 
   // Get semantic mode from store
   const semanticMode = useSemanticMode();
-
-  // Get selected/available fields for custom card field computation
-  const selectedFields = selectedFieldsProp ?? [];
-  const { data: fieldsData } = useSearchFields();
-  const availableFields = fieldsData?.data?.availableFields ?? [];
 
   // Pre-compute and store the transformed results (expensive operation)
   // This only recalculates when results, isSemantic, semanticMode, or pagination change
@@ -211,35 +195,6 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
     };
   }, [results, isSemantic, semanticMode, searchMetadata]);
 
-  // Known field IDs from the standard fieldMapping (used to identify custom fields)
-  const knownFieldMappingKeys = React.useMemo(
-    () =>
-      new Set([
-        "id",
-        "assetType",
-        "format",
-        "createdAt",
-        "objectName",
-        "fileSize",
-        "fullPath",
-        "bucket",
-        "FileHash",
-        "DigitalSourceAsset.Type",
-        "DigitalSourceAsset.MainRepresentation.Format",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-        "DigitalSourceAsset.CreateDate",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.FullPath",
-        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
-        "Metadata.Consolidated",
-        "InventoryID",
-      ]),
-    []
-  );
-
   // Function to render card fields - memoized to prevent unnecessary re-renders
   const renderCardField = React.useCallback(
     (fieldId: string, asset: AssetItem): React.ReactNode => {
@@ -268,39 +223,12 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         case "fullPath":
           return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
             .FullPath;
-        default: {
-          // Array-aware dot-path traversal for custom fields
-          const value = resolveDotPath(asset, fieldId);
-          if (value == null) return "—";
-          if (Array.isArray(value)) {
-            if (value.length === 0) return "—";
-            return <ChipArrayField values={value.map(String)} />;
-          }
-          return String(value);
-        }
+        default:
+          return "";
       }
     },
     []
-  );
-
-  // Compute custom card fields from selectedFields that aren't in the standard fieldMapping
-  const customCardFields = React.useMemo(() => {
-    return selectedFields
-      .filter((f) => !knownFieldMappingKeys.has(f))
-      .map((fieldPath) => ({
-        id: fieldPath,
-        label:
-          availableFields.find((af) => af.name === fieldPath)?.displayName ??
-          fieldPath.split(".").at(-1) ??
-          fieldPath,
-        visible: true,
-      }));
-  }, [selectedFields, availableFields, knownFieldMappingKeys]);
-
-  const mergedCardFields = React.useMemo(
-    () => [...cardFields, ...customCardFields],
-    [cardFields, customCardFields]
-  );
+  ); // No dependencies since this function is pure
 
   // Function to check if an asset is selected
   const isAssetSelected = React.useMemo(
@@ -444,13 +372,10 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         onShowMetadataChange={onShowMetadataChange}
         sorting={sorting}
         onSortChange={onSortChange}
-        cardFields={mergedCardFields}
+        cardFields={cardFields}
         onCardFieldToggle={onCardFieldToggle}
         columns={columns}
         onColumnToggle={onColumnToggle}
-        selectedSearchFields={isCoactiveProvider ? undefined : selectedFields}
-        availableFields={availableFields}
-        onSelectedFieldsChange={isCoactiveProvider ? undefined : onSelectedFieldsChange}
         hasSelectedAssets={hasSelectedAssets}
         selectAllState={selectAllState}
         onSelectAllToggle={onSelectAllToggle}

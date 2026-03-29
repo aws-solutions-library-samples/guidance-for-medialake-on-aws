@@ -44,24 +44,15 @@ const AssetCardMetadata: React.FC<AssetCardMetadataProps> = React.memo(
               key={field.id}
               sx={{
                 display: "grid",
-                gridTemplateColumns: "minmax(80px, auto) 1fr",
-                alignItems: "baseline",
-                gap: 0.5,
+                gridTemplateColumns: "80px 1fr",
+                alignItems: "center",
                 width: "100%",
               }}
             >
               <Typography
                 variant="caption"
                 color="text.secondary"
-                noWrap
-                sx={{
-                  pr: 0.5,
-                  fontSize: "0.75rem",
-                  maxWidth: 160,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-                title={field.label}
+                sx={{ flexShrink: 0, pr: 1, fontSize: "0.75rem" }}
               >
                 {field.label}:
               </Typography>

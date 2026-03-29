@@ -1,17 +1,5 @@
 import React from "react";
-import {
-  useFilterModalOpen,
-  useFilterModalDraft,
-  useUIActions,
-  useAggregations,
-  useFacetsInfo,
-  useSemanticSearch,
-  type CustomMetadataFieldDraft,
-} from "../../stores/searchStore";
-import { useSearchFields } from "@/api/hooks/useSearchFields";
-import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
-import type { FieldInfo } from "@/api/hooks/useSearchFields";
-import type { FieldAggregation } from "@/api/hooks/useSearch";
+import { useFilterModalOpen, useFilterModalDraft, useUIActions } from "../../stores/searchStore";
 import {
   Box,
   Dialog,
@@ -81,135 +69,6 @@ export interface FilterModalProps {
   };
 }
 
-// Per-field filter control for custom metadata
-const CustomFieldFilter: React.FC<{
-  field: FieldInfo;
-  fieldDraft: CustomMetadataFieldDraft;
-  aggregation?: FieldAggregation;
-  onUpdate: (partial: Partial<CustomMetadataFieldDraft>) => void;
-  theme: ReturnType<typeof useTheme>;
-}> = ({ field, fieldDraft, aggregation, onUpdate, theme }) => {
-  const displayName = field.displayName || field.name;
-
-  if (field.type === "number") {
-    return (
-      <Box sx={{ mb: 1.5 }}>
-        <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
-          {displayName}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <TextField
-            type="number"
-            size="small"
-            value={fieldDraft.rangeMin ?? ""}
-            onChange={(e) => onUpdate({ rangeMin: e.target.value || null })}
-            placeholder="Min"
-            sx={{ width: "100px" }}
-          />
-          <Typography variant="body2">to</Typography>
-          <TextField
-            type="number"
-            size="small"
-            value={fieldDraft.rangeMax ?? ""}
-            onChange={(e) => onUpdate({ rangeMax: e.target.value || null })}
-            placeholder="Max"
-            sx={{ width: "100px" }}
-          />
-        </Box>
-      </Box>
-    );
-  }
-
-  if (field.type === "date") {
-    return (
-      <Box sx={{ mb: 1.5 }}>
-        <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
-          {displayName}
-        </Typography>
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <DateTimePicker
-              value={fieldDraft.rangeMin ? new Date(fieldDraft.rangeMin) : null}
-              onChange={(v) => onUpdate({ rangeMin: v ? v.toISOString() : null })}
-              format="yyyy/MM/dd hh:mm a"
-              ampm
-              closeOnSelect={false}
-              slotProps={{
-                textField: { size: "small", fullWidth: true, placeholder: "From" },
-                actionBar: { actions: ["clear", "today", "accept"] },
-              }}
-            />
-            <DateTimePicker
-              value={fieldDraft.rangeMax ? new Date(fieldDraft.rangeMax) : null}
-              onChange={(v) => onUpdate({ rangeMax: v ? v.toISOString() : null })}
-              format="yyyy/MM/dd hh:mm a"
-              ampm
-              closeOnSelect={false}
-              slotProps={{
-                textField: { size: "small", fullWidth: true, placeholder: "To" },
-                actionBar: { actions: ["clear", "today", "accept"] },
-              }}
-            />
-          </Box>
-        </LocalizationProvider>
-      </Box>
-    );
-  }
-
-  // Default: string type — facet toggles + free-text
-  const buckets = aggregation?.buckets;
-  return (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
-        {displayName}
-      </Typography>
-      {buckets && buckets.length > 0 ? (
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
-          {buckets.map((bucket) => {
-            const isSelected = fieldDraft.selectedFacetValues.includes(bucket.key);
-            return (
-              <Button
-                key={bucket.key}
-                size="small"
-                variant={isSelected ? "contained" : "outlined"}
-                color={isSelected ? "primary" : "inherit"}
-                onClick={() => {
-                  const updated = isSelected
-                    ? fieldDraft.selectedFacetValues.filter((v) => v !== bucket.key)
-                    : [...fieldDraft.selectedFacetValues, bucket.key];
-                  onUpdate({ selectedFacetValues: updated });
-                }}
-                sx={{
-                  minWidth: "60px",
-                  height: "28px",
-                  fontSize: "0.75rem",
-                  textTransform: "none",
-                  py: 0,
-                  px: 1,
-                  borderRadius: "14px",
-                }}
-              >
-                {bucket.key} ({bucket.doc_count})
-              </Button>
-            );
-          })}
-        </Box>
-      ) : (
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-          No values found
-        </Typography>
-      )}
-      <TextField
-        size="small"
-        fullWidth
-        value={fieldDraft.textValue}
-        onChange={(e) => onUpdate({ textValue: e.target.value })}
-        placeholder={`${displayName} contains…`}
-      />
-    </Box>
-  );
-};
-
 const FilterModal: React.FC<FilterModalProps> = () => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -219,20 +78,6 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   const draft = useFilterModalDraft();
   const { closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } =
     useUIActions();
-
-  // Custom metadata data
-  const { data: fieldsData } = useSearchFields();
-  const aggregations = useAggregations();
-  const facetsInfo = useFacetsInfo();
-  const isSemantic = useSemanticSearch();
-  const { providerData } = useSemanticSearchStatus();
-  const isCoactiveProvider = providerData?.data?.searchProvider?.type === "coactive";
-
-  // Hide custom metadata filters when Coactive provider is active with semantic/hybrid search
-  const hideCustomFilters = isCoactiveProvider && isSemantic;
-  const filterableFields = hideCustomFilters
-    ? []
-    : (fieldsData?.data?.availableFields ?? []).filter((f) => f.isFilterable && !f.isDefault);
 
   // Destructure draft state for easier access
   const {
@@ -244,39 +89,7 @@ const FilterModal: React.FC<FilterModalProps> = () => {
     dateRangeOption,
     startDate,
     endDate,
-    customMetadataFilters,
   } = draft;
-
-  // Custom metadata helpers
-  const getFieldDraft = (fieldName: string): CustomMetadataFieldDraft => {
-    return (
-      customMetadataFilters.find((d) => d.fieldName === fieldName) ?? {
-        fieldName,
-        type: "string",
-        selectedFacetValues: [],
-        textValue: "",
-        rangeMin: null,
-        rangeMax: null,
-      }
-    );
-  };
-
-  const updateFieldDraft = (
-    fieldName: string,
-    fieldType: string,
-    partial: Partial<CustomMetadataFieldDraft>
-  ) => {
-    const existing = customMetadataFilters.find((d) => d.fieldName === fieldName);
-    const updated = {
-      ...getFieldDraft(fieldName),
-      type: fieldType as CustomMetadataFieldDraft["type"],
-      ...partial,
-    };
-    const newDrafts = existing
-      ? customMetadataFilters.map((d) => (d.fieldName === fieldName ? updated : d))
-      : [...customMetadataFilters, updated];
-    updateFilterModalDraft({ customMetadataFilters: newDrafts });
-  };
 
   const handleApply = () => {
     applyFilterModalDraft();
@@ -643,46 +456,6 @@ const FilterModal: React.FC<FilterModalProps> = () => {
               </Box>
             </LocalizationProvider>
           </Box>
-
-          {/* Custom Metadata Section */}
-          {filterableFields.length > 0 && (
-            <>
-              <Divider />
-              <Box
-                sx={{
-                  background: "#fafbff",
-                  border: "1px solid #e0e8f5",
-                  borderRadius: 1.5,
-                  p: 1.5,
-                }}
-              >
-                <Typography variant="subtitle2" color="primary" sx={{ mb: 1.5 }}>
-                  ⚙ Custom Metadata
-                </Typography>
-
-                {filterableFields.map((field) => (
-                  <CustomFieldFilter
-                    key={field.name}
-                    field={field}
-                    fieldDraft={getFieldDraft(field.name)}
-                    aggregation={aggregations[field.name]}
-                    onUpdate={(partial) => updateFieldDraft(field.name, field.type, partial)}
-                    theme={theme}
-                  />
-                ))}
-
-                {facetsInfo?.limited && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 1, display: "block" }}
-                  >
-                    Some fields may not show suggested values
-                  </Typography>
-                )}
-              </Box>
-            </>
-          )}
         </Box>
       </DialogContent>
 

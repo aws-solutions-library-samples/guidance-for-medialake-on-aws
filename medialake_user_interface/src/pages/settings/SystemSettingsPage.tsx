@@ -44,7 +44,6 @@ import { ApiKeyManagement } from "@/components/settings/api-keys";
 import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
 import CollectionTypesManagement from "@/components/settings/CollectionTypesManagement";
-import MetadataFieldsSettings from "@/components/settings/MetadataFieldsSettings";
 import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 
 // Fallback notification hook
@@ -330,7 +329,6 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
-            <Tab label={t("settings.systemSettings.tabs.metadataFields", "Metadata Fields")} />
             <Tab label={t("settings.systemSettings.tabs.apiKeys", "API Keys")} />
             <Tab label={t("settings.systemSettings.tabs.collections", "Collections")} />
             {systemUpgradesEnabled && (
@@ -747,10 +745,6 @@ const SystemSettingsPage: React.FC = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
-            <MetadataFieldsSettings />
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={2}>
             <Can I="view" a="api-key">
               <ApiKeyManagement />
             </Can>
@@ -783,7 +777,7 @@ const SystemSettingsPage: React.FC = () => {
             </Can>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={2}>
             <Can I="manage" a="collection-types">
               <CollectionTypesManagement />
             </Can>

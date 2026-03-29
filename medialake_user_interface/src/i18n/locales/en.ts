@@ -685,14 +685,10 @@ export default {
       title: "System Settings",
       tabs: {
         search: "Search",
-        metadataFields: "Metadata Fields",
         security: "Security",
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
-      },
-      metadataFields: {
-        searchPlaceholder: "Search fields...",
       },
       upgrade: {
         title: "System Upgrade",

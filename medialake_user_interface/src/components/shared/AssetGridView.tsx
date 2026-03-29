@@ -17,7 +17,6 @@ interface AssetGridViewProps<T> {
   thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
   cardFields: AssetField[];
-  selectedSearchFields?: string[];
 }
 
 // ─── Column count by card size ───
@@ -62,7 +61,6 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   aspectRatio,
   thumbnailScale,
   showMetadata,
-  selectedSearchFields,
   // Per-card editing state (passed as props, not from context)
   isEditing,
   editedName,
@@ -95,7 +93,6 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   aspectRatio: "vertical" | "square" | "horizontal";
   thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
-  selectedSearchFields?: string[];
   isEditing: boolean;
   editedName?: string;
   isFavorite: boolean;
@@ -165,7 +162,6 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
       assetType={getAssetType(asset)}
       clips={(asset as any).clips}
       fields={cardFields}
-      selectedSearchFields={selectedSearchFields}
       renderField={handleRenderField}
       onAssetClick={handleClick}
       onDeleteClick={handleDelete}
@@ -205,7 +201,6 @@ function AssetGridItemWrapper<T>({
   aspectRatio,
   thumbnailScale,
   showMetadata,
-  selectedSearchFields,
 }: {
   asset: T;
   cardFields: AssetField[];
@@ -213,7 +208,6 @@ function AssetGridItemWrapper<T>({
   aspectRatio: "vertical" | "square" | "horizontal";
   thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
-  selectedSearchFields?: string[];
 }) {
   const accessors = useAssetAccessors<T>();
   const actions = useAssetActions<T>();
@@ -236,7 +230,6 @@ function AssetGridItemWrapper<T>({
       aspectRatio={aspectRatio}
       thumbnailScale={thumbnailScale}
       showMetadata={showMetadata}
-      selectedSearchFields={selectedSearchFields}
       isEditing={isEditing}
       editedName={isEditing ? editing.editedName : undefined}
       isFavorite={isFavorite}
@@ -259,7 +252,6 @@ function VirtualizedAssetGrid<T>({
   aspectRatio,
   thumbnailScale,
   showMetadata,
-  selectedSearchFields,
   getAssetId,
 }: {
   assets: T[];
@@ -268,7 +260,6 @@ function VirtualizedAssetGrid<T>({
   aspectRatio: "vertical" | "square" | "horizontal";
   thumbnailScale: "fit" | "fill";
   showMetadata: boolean;
-  selectedSearchFields?: string[];
   getAssetId: (asset: T) => string;
 }) {
   const columns = useColumnsForSize(cardSize);
@@ -298,14 +289,7 @@ function VirtualizedAssetGrid<T>({
     measureElement: (el) => el.getBoundingClientRect().height,
   });
 
-  const itemProps = {
-    cardFields,
-    cardSize,
-    aspectRatio,
-    thumbnailScale,
-    showMetadata,
-    selectedSearchFields,
-  };
+  const itemProps = { cardFields, cardSize, aspectRatio, thumbnailScale, showMetadata };
 
   return (
     <div ref={parentRef} style={{ position: "relative" }}>
@@ -358,7 +342,6 @@ function AssetGridView<T>({
   thumbnailScale,
   showMetadata,
   cardFields,
-  selectedSearchFields,
 }: AssetGridViewProps<T>) {
   const { getAssetId, getAssetType } = useAssetAccessors<T>();
 
@@ -367,15 +350,7 @@ function AssetGridView<T>({
     return groupAssetsByType(results, getAssetType);
   }, [results, groupByType, getAssetType]);
 
-  const gridProps = {
-    cardFields,
-    cardSize,
-    aspectRatio,
-    thumbnailScale,
-    showMetadata,
-    selectedSearchFields,
-    getAssetId,
-  };
+  const gridProps = { cardFields, cardSize, aspectRatio, thumbnailScale, showMetadata, getAssetId };
 
   if (!groupByType) {
     return <VirtualizedAssetGrid assets={results} {...gridProps} />;
