@@ -359,6 +359,7 @@ export default {
       before: "之前",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "未找到值",
     },
     bar: {
       label: "搜索",
@@ -730,6 +731,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "元数据字段",
       },
       search: {
         title: "搜索配置",
@@ -756,6 +758,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "搜索字段...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -850,6 +855,7 @@ export default {
     adding: "添加中...",
     lessOptions: "更少选项",
     moreOptions: "更多选项",
+    chipMore: "+{{count}} 更多",
     edit: "编辑",
     delete: "删除",
     share: "分享",
@@ -1011,6 +1017,8 @@ export default {
       desc: "降序",
       noSortableFields: "没有可排序的字段。",
       enableMoreFields: "启用更多字段以解锁排序。",
+      customFields: "自定义字段",
+      default: "默认",
       confidence: {
         label: "置信度：",
         low: "低",

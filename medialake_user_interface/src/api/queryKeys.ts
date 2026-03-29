@@ -84,6 +84,9 @@ export const QUERY_KEYS = {
         { query, page, pageSize, isSemantic, fields, facetParams, sort, searchModes },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
+    fieldValues: (fieldNames: string[]) =>
+      [...QUERY_KEYS.SEARCH.all, "fieldValues", fieldNames] as const,
+    mapping: () => [...QUERY_KEYS.SEARCH.all, "mapping"] as const,
   },
   ASSETS: {
     all: ["assets"] as const,
@@ -144,6 +147,7 @@ export const QUERY_KEYS = {
   SYSTEM_SETTINGS: {
     all: ["system-settings"] as const,
     search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "search"] as const,
+    metadataFields: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "metadata-fields"] as const,
   },
   COLLECTIONS: {
     all: ["collections"] as const,

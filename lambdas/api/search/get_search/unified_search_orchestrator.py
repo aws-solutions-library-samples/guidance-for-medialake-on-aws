@@ -707,6 +707,24 @@ class UnifiedSearchOrchestrator:
                 search_params["filters"] = query_params["filters"]
             if "search_fields" in query_params:
                 search_params["search_fields"] = query_params["search_fields"]
+            if "fields" in query_params and "search_fields" not in search_params:
+                fields_val = query_params["fields"]
+                if isinstance(fields_val, list):
+                    parsed_fields = [
+                        token.strip()
+                        for entry in fields_val
+                        if isinstance(entry, str)
+                        for token in entry.split(",")
+                        if token.strip()
+                    ]
+                elif isinstance(fields_val, str):
+                    parsed_fields = [
+                        f.strip() for f in fields_val.split(",") if f.strip()
+                    ]
+                else:
+                    parsed_fields = []
+                if parsed_fields:
+                    search_params["search_fields"] = parsed_fields
             if "type" in query_params:
                 search_params["type"] = query_params["type"]
             if "extension" in query_params:

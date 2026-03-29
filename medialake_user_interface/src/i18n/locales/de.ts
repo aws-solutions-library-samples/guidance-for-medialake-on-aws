@@ -368,6 +368,7 @@ export default {
       before: "Vor",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "Keine Werte gefunden",
     },
     bar: {
       label: "Suchen",
@@ -741,6 +742,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "Metadatenfelder",
       },
       search: {
         title: "Suchkonfiguration",
@@ -770,6 +772,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Felder durchsuchen...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -867,6 +872,7 @@ export default {
     adding: "Hinzufügen...",
     lessOptions: "Weniger Optionen",
     moreOptions: "Mehr Optionen",
+    chipMore: "+{{count}} weitere",
     edit: "Bearbeiten",
     delete: "Löschen",
     share: "Teilen",
@@ -1048,6 +1054,8 @@ export default {
       desc: "Abst.",
       noSortableFields: "Keine sortierbaren Felder verfügbar.",
       enableMoreFields: "Aktivieren Sie weitere Felder zum Sortieren.",
+      customFields: "Benutzerdefinierte Felder",
+      default: "Standard",
       confidence: {
         label: "Konfidenz:",
         low: "Niedrig",

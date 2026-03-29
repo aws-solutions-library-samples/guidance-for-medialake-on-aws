@@ -361,6 +361,7 @@ export default {
       before: "이전",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "값을 찾을 수 없습니다",
     },
     bar: {
       label: "검색",
@@ -732,6 +733,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "메타데이터 필드",
       },
       search: {
         title: "검색 구성",
@@ -758,6 +760,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "필드 검색...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -854,6 +859,7 @@ export default {
     adding: "추가 중...",
     lessOptions: "옵션 줄이기",
     moreOptions: "더 많은 옵션",
+    chipMore: "+{{count}}개 더",
     edit: "편집",
     delete: "삭제",
     share: "공유",
@@ -1035,6 +1041,8 @@ export default {
       desc: "내림차순",
       noSortableFields: "정렬 가능한 필드가 없습니다.",
       enableMoreFields: "정렬을 사용하려면 더 많은 필드를 활성화하세요.",
+      customFields: "사용자 정의 필드",
+      default: "기본값",
       confidence: {
         label: "신뢰도:",
         low: "낮음",

@@ -361,6 +361,7 @@ export default {
       before: "قبل",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "لم يتم العثور على قيم",
     },
     bar: {
       label: "بحث",
@@ -732,6 +733,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "حقول البيانات الوصفية",
       },
       search: {
         title: "إعدادات البحث",
@@ -758,6 +760,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "البحث في الحقول...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -853,6 +858,7 @@ export default {
     adding: "جارٍ الإضافة...",
     lessOptions: "خيارات أقل",
     moreOptions: "خيارات أكثر",
+    chipMore: "+{{count}} المزيد",
     edit: "تعديل",
     delete: "حذف",
     share: "مشاركة",
@@ -1034,6 +1040,8 @@ export default {
       desc: "تنازلي",
       noSortableFields: "لا توجد حقول قابلة للترتيب.",
       enableMoreFields: "قم بتمكين المزيد من الحقول لفتح الترتيب.",
+      customFields: "حقول مخصصة",
+      default: "افتراضي",
       confidence: {
         label: "الثقة:",
         low: "منخفض",

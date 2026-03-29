@@ -367,6 +367,7 @@ export default {
       before: "Avant",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "Aucune valeur trouvée",
     },
     bar: {
       label: "Rechercher",
@@ -693,9 +694,10 @@ export default {
       tabs: {
         search: "Recherche",
         security: "Sécurité",
-        apiKeys: "API Keys",
+        apiKeys: "Clés API",
         collections: "Collections",
-        upgrades: "Upgrades",
+        upgrades: "Mises à jour",
+        metadataFields: "Champs de métadonnées",
       },
       search: {
         title: "Configuration de la recherche",
@@ -726,6 +728,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Rechercher des champs...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -822,6 +827,7 @@ export default {
     adding: "Ajout...",
     lessOptions: "Moins d'options",
     moreOptions: "Plus d'options",
+    chipMore: "+{{count}} de plus",
     edit: "Modifier",
     delete: "Supprimer",
     share: "Partager",
@@ -1051,6 +1057,8 @@ export default {
       desc: "Décroiss.",
       noSortableFields: "Aucun champ triable disponible.",
       enableMoreFields: "Activez plus de champs pour débloquer le tri.",
+      customFields: "Champs personnalisés",
+      default: "par défaut",
       confidence: {
         label: "Confiance :",
         low: "Faible",

@@ -24,7 +24,6 @@ import MasterResultsView from "../components/search/MasterResultsView";
 import NoResultsFound from "../components/search/NoResultsFound";
 import { zIndexTokens } from "@/theme/tokens";
 import { useSearch } from "../api/hooks/useSearch";
-import { useSearchFields } from "../api/hooks/useSearchFields";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type CellContext } from "@tanstack/react-table";
@@ -47,8 +46,11 @@ import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { useSemanticMode, useSearchModes } from "@/stores/searchStore";
+import { useUIActions as useSearchUIActions } from "@/stores/searchStore";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
 import { getThresholdsForModel } from "@/components/common/utils";
+import { useMetadataFieldPreferences } from "@/hooks/useMetadataFieldPreferences";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface LocationState {
   query?: string;
@@ -154,13 +156,16 @@ const SearchPage: React.FC = () => {
   const searchModes = useSearchModes();
   const facetFilters = searchState.filters;
 
-  // State for selected fields
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  // State for selected fields — synced with localStorage via hook
+  const { selectedFields, setSelectedFields } = useMetadataFieldPreferences();
+  // Debounce field changes to coalesce rapid toggles into a single search re-fetch
+  const debouncedSelectedFields = useDebounce(selectedFields, 200);
 
   // State for confidence threshold (semantic search) — default based on configured model
   const { providerData: searchProviderData } = useSemanticSearchStatus();
   const modelVersion =
     searchProviderData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0" ? "3.0" : "2.7";
+  const isCoactiveProvider = searchProviderData?.data?.searchProvider?.type === "coactive";
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(
     getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE
   );
@@ -175,7 +180,7 @@ const SearchPage: React.FC = () => {
     pageSize: pageSize,
     isSemantic: currentSemantic,
     searchModes: searchModes,
-    fields: selectedFields,
+    fields: isCoactiveProvider ? [] : debouncedSelectedFields,
     ...facetFilters, // Include facet filters in the search
   });
 
@@ -183,6 +188,17 @@ const SearchPage: React.FC = () => {
   const searchData = data?.data;
   const searchResults = searchData?.results || [];
   const searchMetadata = searchData?.searchMetadata;
+
+  // Sync aggregations from search response into the Zustand store for FilterModal
+  const { setAggregations, setFacetsInfo } = useSearchUIActions();
+  useEffect(() => {
+    if (searchMetadata?.facets) {
+      setAggregations(searchMetadata.facets);
+    }
+    if (searchData?.facetsInfo) {
+      setFacetsInfo(searchData.facetsInfo);
+    }
+  }, [searchMetadata?.facets, searchData?.facetsInfo, setAggregations, setFacetsInfo]);
 
   // Store search results in sessionStorage for access by other components
   useEffect(() => {
@@ -196,19 +212,6 @@ const SearchPage: React.FC = () => {
       }
     }
   }, [searchResults]);
-
-  // Fetch search fields
-  const { data: fieldsData } = useSearchFields();
-
-  // Extract fields data
-  const defaultFields = fieldsData?.data?.defaultFields || [];
-
-  // Initialize selected fields with default fields when data is loaded
-  useEffect(() => {
-    if (defaultFields.length > 0 && selectedFields.length === 0) {
-      setSelectedFields(defaultFields.map((field) => field.name));
-    }
-  }, [defaultFields, selectedFields.length]);
 
   const [filters, setFilters] = useState<Filters>({
     mediaTypes: {
@@ -639,6 +642,8 @@ const SearchPage: React.FC = () => {
                 onSelectAllToggle={handleSelectAllToggle}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
+                selectedFields={selectedFields}
+                onSelectedFieldsChange={setSelectedFields}
                 error={
                   error
                     ? {

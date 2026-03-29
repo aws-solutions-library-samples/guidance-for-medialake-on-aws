@@ -366,6 +366,7 @@ export default {
       before: "से पहले",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "कोई मान नहीं मिला",
     },
     bar: {
       label: "खोजें",
@@ -738,6 +739,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "मेटाडेटा फ़ील्ड्स",
       },
       search: {
         title: "खोज विन्यास",
@@ -766,6 +768,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "फ़ील्ड्स खोजें...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -862,6 +867,7 @@ export default {
     adding: "जोड़ा जा रहा है...",
     lessOptions: "कम विकल्प",
     moreOptions: "अधिक विकल्प",
+    chipMore: "+{{count}} और",
     edit: "संपादित करें",
     delete: "हटाएं",
     share: "साझा करें",
@@ -1043,6 +1049,8 @@ export default {
       desc: "अवरोही",
       noSortableFields: "कोई क्रमबद्ध करने योग्य फ़ील्ड उपलब्ध नहीं।",
       enableMoreFields: "क्रमबद्ध करने के लिए अधिक फ़ील्ड सक्षम करें।",
+      customFields: "कस्टम फ़ील्ड",
+      default: "डिफ़ॉल्ट",
       confidence: {
         label: "विश्वास:",
         low: "कम",

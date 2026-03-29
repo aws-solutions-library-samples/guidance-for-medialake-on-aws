@@ -1,6 +1,17 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { FacetFilters } from "../types/facetSearch";
+import { FacetFilters, CustomMetadataApiFilter } from "../types/facetSearch";
+import { FieldAggregation } from "../api/hooks/useSearch";
+
+// Custom metadata field draft for the filter modal
+export interface CustomMetadataFieldDraft {
+  fieldName: string;
+  type: "string" | "number" | "date";
+  selectedFacetValues: string[];
+  textValue: string;
+  rangeMin: string | null;
+  rangeMax: string | null;
+}
 
 // Define the filter modal form state interface
 interface FilterModalFormState {
@@ -12,6 +23,7 @@ interface FilterModalFormState {
   dateRangeOption: string | null;
   startDate: Date | null;
   endDate: Date | null;
+  customMetadataFilters: CustomMetadataFieldDraft[];
 }
 
 // Initial state for the filter modal form
@@ -24,6 +36,7 @@ const initialFilterModalState: FilterModalFormState = {
   dateRangeOption: null,
   startDate: null,
   endDate: null,
+  customMetadataFilters: [],
 };
 
 // File size units for conversion
@@ -144,6 +157,45 @@ function convertFiltersToFormState(filters: FacetFilters): FilterModalFormState 
     dateRangeOption: newDateRangeOption,
     startDate: newStartDate,
     endDate: newEndDate,
+    customMetadataFilters: (filters.customMetadataFilters ?? []).reduce<CustomMetadataFieldDraft[]>(
+      (drafts, f) => {
+        let draft = drafts.find((d) => d.fieldName === f.field);
+        if (!draft) {
+          let inferredType: CustomMetadataFieldDraft["type"] = "string";
+          if (f.operator === "range") {
+            if (f.type) {
+              // Prefer the explicit type carried on the filter
+              inferredType = f.type;
+            } else {
+              // Fallback: sniff whether the range values look like ISO-8601 dates
+              const sample = f.gte ?? f.lte;
+              const looksLikeDate =
+                typeof sample === "string" &&
+                !isNaN(Date.parse(sample)) &&
+                /\d{4}-\d{2}/.test(sample);
+              inferredType = looksLikeDate ? "date" : "number";
+            }
+          }
+          draft = {
+            fieldName: f.field,
+            type: inferredType,
+            selectedFacetValues: [],
+            textValue: "",
+            rangeMin: null,
+            rangeMax: null,
+          };
+          drafts.push(draft);
+        }
+        if (f.operator === "term" && f.value) draft.selectedFacetValues.push(f.value);
+        if (f.operator === "match" && f.value) draft.textValue = f.value;
+        if (f.operator === "range") {
+          if (f.gte !== undefined) draft.rangeMin = String(f.gte);
+          if (f.lte !== undefined) draft.rangeMax = String(f.lte);
+        }
+        return drafts;
+      },
+      []
+    ),
   };
 }
 
@@ -184,6 +236,36 @@ function convertFormStateToFilters(formState: FilterModalFormState): FacetFilter
     filters.ingested_date_lte = formState.endDate.toISOString();
   }
 
+  // Build custom metadata filters
+  const customFilters: CustomMetadataApiFilter[] = [];
+  for (const draft of formState.customMetadataFilters) {
+    for (const val of draft.selectedFacetValues) {
+      customFilters.push({ field: draft.fieldName, operator: "term", value: val });
+    }
+    if (draft.textValue.trim()) {
+      customFilters.push({
+        field: draft.fieldName,
+        operator: "match",
+        value: draft.textValue.trim(),
+      });
+    }
+    if (draft.rangeMin !== null || draft.rangeMax !== null) {
+      const isNumber = draft.type === "number";
+      customFilters.push({
+        field: draft.fieldName,
+        operator: "range",
+        type: draft.type,
+        gte:
+          draft.rangeMin != null ? (isNumber ? Number(draft.rangeMin) : draft.rangeMin) : undefined,
+        lte:
+          draft.rangeMax != null ? (isNumber ? Number(draft.rangeMax) : draft.rangeMax) : undefined,
+      });
+    }
+  }
+  if (customFilters.length > 0) {
+    filters.customMetadataFilters = customFilters;
+  }
+
   return filters;
 }
 
@@ -196,6 +278,10 @@ export interface SearchState {
   semanticMode: "full" | "clip";
   searchModes: SearchMode[];
   filters: FacetFilters;
+
+  // Search response data
+  aggregations: Record<string, FieldAggregation>;
+  facetsInfo: { limited: boolean } | null;
 
   // UI state
   ui: {
@@ -216,6 +302,10 @@ export interface SearchState {
     setFilters: (filters: FacetFilters) => void;
     updateFilter: <K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => void;
     clearFilters: () => void;
+
+    // Search data actions
+    setAggregations: (aggregations: Record<string, FieldAggregation>) => void;
+    setFacetsInfo: (facetsInfo: { limited: boolean } | null) => void;
 
     // UI actions
     openFilterModal: () => void;
@@ -241,6 +331,10 @@ export const useSearchStore = create<SearchState>()(
       semanticMode: "full",
       searchModes: ["visual"] as SearchMode[],
       filters: {},
+
+      // Search response data
+      aggregations: {},
+      facetsInfo: null,
 
       // UI state
       ui: {
@@ -307,6 +401,10 @@ export const useSearchStore = create<SearchState>()(
               filterModalDraft: initialFilterModalState,
             },
           }),
+
+        // Search data actions
+        setAggregations: (aggregations) => set({ aggregations }),
+        setFacetsInfo: (facetsInfo) => set({ facetsInfo }),
 
         // UI actions
         openFilterModal: () => {
@@ -376,13 +474,20 @@ export const useSearchStore = create<SearchState>()(
 
         // Computed values
         hasActiveFilters: () => {
-          const filters = get().filters;
-          return Object.values(filters).filter(Boolean).length > 0;
+          return get().actions.activeFilterCount() > 0;
         },
 
         activeFilterCount: () => {
           const filters = get().filters;
-          return Object.values(filters).filter(Boolean).length;
+          const hasDate = Boolean(filters.ingested_date_gte || filters.ingested_date_lte);
+          const hasSize = Boolean(
+            filters.asset_size_gte !== undefined || filters.asset_size_lte !== undefined
+          );
+          const hasType = Boolean(filters.type);
+          const hasExtension = Boolean(filters.extension);
+          const customFilters = filters.customMetadataFilters ?? [];
+          const activeCustomFields = new Set(customFilters.map((f) => f.field)).size;
+          return +hasDate + +hasSize + +hasType + +hasExtension + activeCustomFields;
         },
       },
     }),
@@ -407,6 +512,23 @@ export const useSemanticSearch = () => useSearchStore((state) => state.isSemanti
 export const useSemanticMode = () => useSearchStore((state) => state.semanticMode);
 export const useSearchModes = () => useSearchStore((state) => state.searchModes);
 export const useSearchFilters = () => useSearchStore((state) => state.filters);
+
+// Search data selectors
+export const useAggregations = () => useSearchStore((state) => state.aggregations);
+export const useFacetsInfo = () => useSearchStore((state) => state.facetsInfo);
+export const useActiveFilterCount = () =>
+  useSearchStore((state) => {
+    const filters = state.filters;
+    const hasDate = Boolean(filters.ingested_date_gte || filters.ingested_date_lte);
+    const hasSize = Boolean(
+      filters.asset_size_gte !== undefined || filters.asset_size_lte !== undefined
+    );
+    const hasType = Boolean(filters.type);
+    const hasExtension = Boolean(filters.extension);
+    const customFilters = filters.customMetadataFilters ?? [];
+    const activeCustomFields = new Set(customFilters.map((f) => f.field)).size;
+    return +hasDate + +hasSize + +hasType + +hasExtension + activeCustomFields;
+  });
 
 // UI state selectors
 export const useFilterModalOpen = () => useSearchStore((state) => state.ui.filterModalOpen);
@@ -445,6 +567,8 @@ export const useUIActions = () => {
     resetFilterModalDraft,
     setLoading,
     setError,
+    setAggregations,
+    setFacetsInfo,
   } = useSearchStore((state) => state.actions);
   return {
     openFilterModal,
@@ -454,5 +578,7 @@ export const useUIActions = () => {
     resetFilterModalDraft,
     setLoading,
     setError,
+    setAggregations,
+    setFacetsInfo,
   };
 };

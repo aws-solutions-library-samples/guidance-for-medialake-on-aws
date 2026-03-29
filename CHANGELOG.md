@@ -1,19 +1,5 @@
 # Changelog
 
-## [1.11.3] - 2026-03-29
-
-### Bug Fixes
-
-- fix: import of css file for video player stamp theme
-
-### Code Refactoring
-
-- refactor: Marengo 3 pipelines and search profile switch to geo based inference profiles
-
-### Other Changes
-
-- docs: minor readme updates
-
 ## [1.11.2] - 2026-03-26
 
 ### Code Refactoring

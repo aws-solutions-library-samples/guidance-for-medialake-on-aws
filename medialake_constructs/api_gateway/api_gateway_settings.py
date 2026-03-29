@@ -179,6 +179,17 @@ class SettingsApi(Construct):
         add_cors_options_method(system_resource)
         add_cors_options_method(system_search_resource)
 
+        # /settings/system/metadata-fields resource
+        metadata_fields_resource = system_resource.add_resource("metadata-fields")
+
+        for method in ["GET", "PUT"]:
+            m = metadata_fields_resource.add_method(method, lambda_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        add_cors_options_method(metadata_fields_resource)
+
         # ===================================================================
         # /settings/api-keys resource and methods
         # ===================================================================

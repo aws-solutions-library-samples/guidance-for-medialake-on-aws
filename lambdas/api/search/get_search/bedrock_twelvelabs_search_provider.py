@@ -676,7 +676,9 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 )
 
             # Add filters based on query parameters
-            self._add_filters_to_opensearch_query(opensearch_query, query)
+            deferred_filters = self._add_filters_to_opensearch_query(
+                opensearch_query, query
+            )
 
             self.logger.info(
                 "Executing Bedrock TwelveLabs semantic query via OpenSearch"
@@ -715,6 +717,15 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 self.logger.info(
                     f"[PERF] Marengo 3.0 clip processing took: {time.time() - processing_start:.3f}s"
                 )
+
+                # Apply deferred filters (fields that only exist on parent documents)
+                if deferred_filters:
+                    processed_results = self._apply_deferred_filters(
+                        processed_results, deferred_filters
+                    )
+                    self.logger.info(
+                        f"[FILTER] After deferred filtering: {len(processed_results)} results remain"
+                    )
             else:
                 # Marengo 2.7: Use legacy clip processing (separate clip documents)
                 from index import process_semantic_results_parallel
@@ -1054,12 +1065,152 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
         return processed_results
 
-    def _add_filters_to_opensearch_query(self, query: Dict, search_query: SearchQuery):
-        """Add filters to OpenSearch query based on search parameters"""
+    def _apply_deferred_filters(
+        self, results: List[Dict], deferred_filters: List[Dict]
+    ) -> List[Dict]:
+        """Apply filters that reference parent-document fields after parent docs are fetched.
+
+        For Marengo 3.0, the KNN search runs against the asset-embeddings index which
+        doesn't have parent-level fields like format, fileSize, or createdAt. These
+        filters are deferred and applied here as post-processing against the fetched
+        parent document data.
+        """
+        if not deferred_filters:
+            return results
+
+        filtered = []
+        for result in results:
+            if self._result_matches_deferred_filters(result, deferred_filters):
+                filtered.append(result)
+
+        self.logger.info(
+            f"[FILTER] Deferred filter reduced results from {len(results)} to {len(filtered)}"
+        )
+        return filtered
+
+    def _result_matches_deferred_filters(
+        self, result: Dict, filters: List[Dict]
+    ) -> bool:
+        """Check if a result matches all deferred filters (AND logic)."""
+        for f in filters:
+            field_key = f.get("key", "")
+            operator = f.get("operator")
+            value = f.get("value")
+
+            # Resolve the field value from the result using dot-notation
+            actual = self._resolve_field(result, field_key)
+
+            if operator == "in" and isinstance(value, list):
+                if actual is None:
+                    return False
+                # Normalize filter values for comparison (lowercase strings)
+                normalized_values = [
+                    v.lower() if isinstance(v, str) else v for v in value
+                ]
+                # Also build a string-lowered set so "100" matches 100 and vice-versa
+                normalized_str_values = {str(v).lower() for v in value}
+                if isinstance(actual, str):
+                    if (
+                        actual.lower() not in normalized_values
+                        and actual.lower() not in normalized_str_values
+                    ):
+                        return False
+                elif isinstance(actual, list):
+                    # At least one element in actual must be in the filter values
+                    if not any(
+                        (a.lower() if isinstance(a, str) else a) in normalized_values
+                        or str(a).lower() in normalized_str_values
+                        for a in actual
+                    ):
+                        return False
+                else:
+                    # Scalar non-string (int, float, bool): try native check,
+                    # then fall back to string comparison so 100 matches "100"
+                    if (
+                        actual not in normalized_values
+                        and str(actual).lower() not in normalized_str_values
+                    ):
+                        return False
+            elif operator in ("==", "eq"):
+                if actual is None or actual != value:
+                    return False
+            elif operator == "range" and isinstance(value, dict):
+                if actual is None:
+                    return False
+                try:
+                    actual_num = (
+                        float(actual)
+                        if not isinstance(actual, (int, float))
+                        else actual
+                    )
+                    if "gte" in value and actual_num < float(value["gte"]):
+                        return False
+                    if "lte" in value and actual_num > float(value["lte"]):
+                        return False
+                    if "gt" in value and actual_num <= float(value["gt"]):
+                        return False
+                    if "lt" in value and actual_num >= float(value["lt"]):
+                        return False
+                except (ValueError, TypeError):
+                    # For date strings, fall back to string comparison
+                    actual_str = str(actual)
+                    if "gte" in value and actual_str < str(value["gte"]):
+                        return False
+                    if "lte" in value and actual_str > str(value["lte"]):
+                        return False
+                    if "gt" in value and actual_str <= str(value["gt"]):
+                        return False
+                    if "lt" in value and actual_str >= str(value["lt"]):
+                        return False
+        return True
+
+    @staticmethod
+    def _resolve_field(data: Dict, dotted_key: str):
+        """Resolve a dot-notation field path against a nested dict.
+
+        e.g. 'DigitalSourceAsset.MainRepresentation.Format' resolves through
+        data['DigitalSourceAsset']['MainRepresentation']['Format'].
+        """
+        parts = dotted_key.split(".")
+        current = data
+        for part in parts:
+            if isinstance(current, dict):
+                current = current.get(part)
+            else:
+                return None
+            if current is None:
+                return None
+        return current
+
+    def _add_filters_to_opensearch_query(
+        self, query: Dict, search_query: SearchQuery
+    ) -> List[Dict]:
+        """Add filters to OpenSearch query based on search parameters.
+
+        For Marengo 3.0, the KNN search runs against the asset-embeddings index
+        which only has embedding-level fields (embedding_type, embedding_representation,
+        etc.). Filters that reference parent-document fields (format, fileSize,
+        createdAt, etc.) cannot be applied at query time — they are returned as
+        deferred filters to be applied as post-processing after parent documents
+        are fetched in _process_marengo_30_results.
+
+        Returns:
+            A list of deferred filter dicts that must be applied post-query against
+            parent-document data.
+        """
+        deferred_filters = []
+
         if not search_query.filters:
-            return
+            return deferred_filters
 
         filters_to_add = []
+
+        # Fields that exist on asset-embeddings documents (Marengo 3.0)
+        EMBEDDING_DOC_FIELDS = {
+            "mediaType",
+            "embedding_type",
+            "embedding_representation",
+        }
 
         for filter_item in search_query.filters:
             field_key = filter_item.get("key")
@@ -1077,28 +1228,82 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                         filters_to_add.append(
                             {"terms": {"DigitalSourceAsset.Type": value}}
                         )
+                elif field_key == "DigitalSourceAsset.Type":
+                    if self.model_version == "3.0":
+                        # Legacy 'type' param maps here — translate to embedding_type for query-time filtering
+                        filters_to_add.append(
+                            {"terms": {"embedding_type": [v.lower() for v in value]}}
+                        )
+                    else:
+                        filters_to_add.append(
+                            {"terms": {"DigitalSourceAsset.Type": value}}
+                        )
                 elif field_key == "DigitalSourceAsset.MainRepresentation.Format":
-                    filters_to_add.append({"terms": {field_key: value}})
+                    if self.model_version == "3.0":
+                        # Field only exists on parent docs — defer to post-processing
+                        deferred_filters.append(filter_item)
+                    else:
+                        filters_to_add.append({"terms": {field_key: value}})
+                else:
+                    if (
+                        self.model_version == "3.0"
+                        and field_key not in EMBEDDING_DOC_FIELDS
+                    ):
+                        deferred_filters.append(filter_item)
+                    else:
+                        filters_to_add.append({"terms": {field_key: value}})
             elif operator == "==" or operator == "eq":
-                filters_to_add.append({"term": {field_key: value}})
+                if self.model_version == "3.0":
+                    if field_key in ("mediaType", "DigitalSourceAsset.Type"):
+                        # Single-value type filter — translate to embedding_type
+                        filters_to_add.append(
+                            {
+                                "term": {
+                                    "embedding_type": (
+                                        value.lower()
+                                        if isinstance(value, str)
+                                        else value
+                                    )
+                                }
+                            }
+                        )
+                    elif field_key not in EMBEDDING_DOC_FIELDS:
+                        deferred_filters.append(filter_item)
+                    else:
+                        filters_to_add.append({"term": {field_key: value}})
+                else:
+                    filters_to_add.append({"term": {field_key: value}})
             elif operator == "range" and isinstance(value, dict):
-                range_filter = {"range": {field_key: {}}}
-                if "gte" in value:
-                    range_filter["range"][field_key]["gte"] = value["gte"]
-                if "lte" in value:
-                    range_filter["range"][field_key]["lte"] = value["lte"]
-                if "gt" in value:
-                    range_filter["range"][field_key]["gt"] = value["gt"]
-                if "lt" in value:
-                    range_filter["range"][field_key]["lt"] = value["lt"]
-                filters_to_add.append(range_filter)
+                if self.model_version == "3.0":
+                    # Range filters (fileSize, createdAt) only exist on parent docs
+                    deferred_filters.append(filter_item)
+                else:
+                    range_filter = {"range": {field_key: {}}}
+                    if "gte" in value:
+                        range_filter["range"][field_key]["gte"] = value["gte"]
+                    if "lte" in value:
+                        range_filter["range"][field_key]["lte"] = value["lte"]
+                    if "gt" in value:
+                        range_filter["range"][field_key]["gt"] = value["gt"]
+                    if "lt" in value:
+                        range_filter["range"][field_key]["lt"] = value["lt"]
+                    filters_to_add.append(range_filter)
 
-        # Add all filters to the query
+        if deferred_filters:
+            self.logger.info(
+                f"[FILTER] Deferring {len(deferred_filters)} filters to post-processing "
+                f"(fields only exist on parent docs): "
+                f"{[f.get('key') for f in deferred_filters]}"
+            )
+
+        # Add all applicable filters to the query
         # Ensure the 'must' array exists in the filter bool (Marengo 3.0 queries may only have 'should')
         filter_bool = query["query"]["bool"]["filter"]["bool"]
         if "must" not in filter_bool:
             filter_bool["must"] = []
         filter_bool["must"].extend(filters_to_add)
+
+        return deferred_filters
 
     def search(self, query: SearchQuery) -> SearchResult:
         """Execute the complete search process"""

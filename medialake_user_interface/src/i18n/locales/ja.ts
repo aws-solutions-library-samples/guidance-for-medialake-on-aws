@@ -364,6 +364,7 @@ export default {
       before: "以前",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "値が見つかりません",
     },
     bar: {
       label: "検索",
@@ -736,6 +737,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "メタデータフィールド",
       },
       search: {
         title: "検索設定",
@@ -763,6 +765,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "フィールドを検索...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -858,6 +863,7 @@ export default {
     adding: "追加中...",
     lessOptions: "オプションを減らす",
     moreOptions: "その他のオプション",
+    chipMore: "+{{count}} 件",
     edit: "編集",
     delete: "削除",
     share: "共有",
@@ -1007,6 +1013,8 @@ export default {
       desc: "降順",
       noSortableFields: "並べ替え可能なフィールドがありません。",
       enableMoreFields: "並べ替えを有効にするには、フィールドを追加してください。",
+      customFields: "カスタムフィールド",
+      default: "デフォルト",
       confidence: {
         label: "信頼度：",
         low: "低",

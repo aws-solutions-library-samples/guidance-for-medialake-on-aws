@@ -360,6 +360,7 @@ export default {
       before: "לפני",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "לא נמצאו ערכים",
     },
     bar: {
       label: "חיפוש",
@@ -731,6 +732,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "שדות מטא-נתונים",
       },
       search: {
         title: "הגדרות חיפוש",
@@ -757,6 +759,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "חיפוש שדות...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -852,6 +857,7 @@ export default {
     adding: "מוסיף...",
     lessOptions: "פחות אפשרויות",
     moreOptions: "אפשרויות נוספות",
+    chipMore: "+{{count}} נוספים",
     edit: "ערוך",
     delete: "מחק",
     share: "שתף",
@@ -1001,6 +1007,8 @@ export default {
       desc: "יורד",
       noSortableFields: "אין שדות הניתנים למיון.",
       enableMoreFields: "הפעל שדות נוספים כדי לאפשר מיון.",
+      customFields: "שדות מותאמים אישית",
+      default: "ברירת מחדל",
       confidence: {
         label: "ביטחון:",
         low: "נמוך",

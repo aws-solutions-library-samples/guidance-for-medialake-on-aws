@@ -362,6 +362,7 @@ export default {
       before: "Before",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      noValuesFound: "No values found",
     },
     bar: {
       label: "Search",
@@ -685,10 +686,14 @@ export default {
       title: "System Settings",
       tabs: {
         search: "Search",
+        metadataFields: "Metadata Fields",
         security: "Security",
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+      },
+      metadataFields: {
+        searchPlaceholder: "Search fields...",
       },
       upgrade: {
         title: "System Upgrade",
@@ -812,6 +817,7 @@ export default {
     adding: "Adding...",
     lessOptions: "Less options",
     moreOptions: "More options",
+    chipMore: "+{{count}} more",
     edit: "Edit",
     delete: "Delete",
     share: "Share",
@@ -1044,6 +1050,8 @@ export default {
       desc: "Desc",
       noSortableFields: "No sortable fields available.",
       enableMoreFields: "Enable more fields to unlock sorting.",
+      customFields: "Custom fields",
+      default: "Default",
       confidence: {
         label: "Confidence:",
         low: "Low",

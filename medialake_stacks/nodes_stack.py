@@ -308,6 +308,14 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "audio_splitter"],
         )
 
+        self.video_orientation_correction_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoOrientationCorrectionLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_orientation_correction"],
+        )
+
         self.video_splitter_lambda_deployment = LambdaDeployment(
             self,
             "VideoSplitterLambdaDeployment",

@@ -42,6 +42,7 @@ import {
   type AspectRatio,
   type AssetViewControlsProps as BaseAssetViewControlsProps,
 } from "../../types/shared/assetComponents";
+import { type FieldInfo } from "@/api/hooks/useSearchFields";
 
 // ─── Shared styles ───
 
@@ -59,6 +60,10 @@ interface AssetViewControlsProps extends BaseAssetViewControlsProps {
   hasSelectedAssets?: boolean;
   selectAllState?: "none" | "some" | "all";
   onSelectAllToggle?: () => void;
+  // Metadata field selection (from useMetadataFieldPreferences)
+  availableFields?: FieldInfo[];
+  selectedSearchFields?: string[];
+  onSelectedFieldsChange?: (fields: string[]) => void;
 }
 
 /** Trigger button styling — adapts to open/active state */
@@ -227,6 +232,9 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   onShowMetadataChange,
   selectAllState = "none",
   onSelectAllToggle,
+  availableFields,
+  selectedSearchFields,
+  onSelectedFieldsChange,
 }) => {
   const { t } = useTranslation();
   const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
@@ -248,8 +256,11 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
   }, [sorting, filteredSortOptions]);
 
   const hiddenFieldCount = React.useMemo(() => {
+    if (availableFields && availableFields.length > 0 && selectedSearchFields) {
+      return availableFields.filter((f) => !selectedSearchFields.includes(f.name)).length;
+    }
     return fields.filter((f) => !f.visible).length;
-  }, [fields]);
+  }, [fields, availableFields, selectedSearchFields]);
 
   const appearanceIsModified = React.useMemo(() => {
     if (groupByType) return true;
@@ -433,7 +444,7 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         onClose={handleSortClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: popoverPaperSx(260) } }}
+        slotProps={{ paper: { sx: { ...popoverPaperSx(280), maxHeight: 480 } } }}
       >
         <Box sx={{ p: 2 }}>
           <PanelHeader
@@ -480,12 +491,19 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
               </Typography>
             </Box>
           ) : (
-            <Box
-              role="listbox"
-              aria-label="Sort options"
-              sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}
-            >
-              {filteredSortOptions.map((option) => {
+            (() => {
+              // Split sort options into standard (from columns) and custom (from metadata fields)
+              const standardIds = new Set(
+                (availableFields ?? []).filter((f) => f.isDefault).map((f) => f.name)
+              );
+              const standardOpts = filteredSortOptions.filter(
+                (o) => !availableFields || standardIds.has(o.id) || !o.id.includes(".")
+              );
+              const customOpts = filteredSortOptions.filter(
+                (o) => availableFields && !standardIds.has(o.id) && o.id.includes(".")
+              );
+
+              const renderSortItem = (option: { id: string; label: string }) => {
                 const isActive = sorting[0]?.id === option.id;
                 const isDesc = sorting[0]?.desc;
                 return (
@@ -529,12 +547,15 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                       },
                     }}
                   >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
                       {isActive && (
-                        <CheckCircleIcon sx={{ fontSize: "0.875rem", color: "primary.main" }} />
+                        <CheckCircleIcon
+                          sx={{ fontSize: "0.875rem", color: "primary.main", flexShrink: 0 }}
+                        />
                       )}
                       <Typography
                         variant="body2"
+                        noWrap
                         sx={{
                           fontSize: "0.8125rem",
                           fontWeight: isActive ? 600 : 400,
@@ -561,6 +582,8 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                           height: 22,
                           fontSize: "0.6875rem",
                           fontWeight: 600,
+                          flexShrink: 0,
+                          ml: 1,
                           bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
                           color: "primary.main",
                           "& .MuiChip-icon": { color: "primary.main", ml: 0.5 },
@@ -569,8 +592,42 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
                     )}
                   </Box>
                 );
-              })}
-            </Box>
+              };
+
+              return (
+                <Box
+                  role="listbox"
+                  aria-label="Sort options"
+                  sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}
+                >
+                  {standardOpts.map(renderSortItem)}
+                  {customOpts.length > 0 && (
+                    <>
+                      <Divider
+                        sx={{
+                          my: 1,
+                          borderColor: (theme) => alpha(theme.palette.divider, 0.5),
+                        }}
+                      />
+                      <Typography
+                        variant="overline"
+                        sx={{
+                          fontSize: "0.625rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          color: "text.disabled",
+                          px: 1.25,
+                          mb: 0.25,
+                        }}
+                      >
+                        {t("common.viewControls.customFields")}
+                      </Typography>
+                      {customOpts.map(renderSortItem)}
+                    </>
+                  )}
+                </Box>
+              );
+            })()
           )}
         </Box>
       </Menu>
@@ -582,68 +639,179 @@ const AssetViewControls: React.FC<AssetViewControlsProps> = ({
         onClose={handleFieldsClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { ...popoverPaperSx(240), maxHeight: 420 } } }}
+        slotProps={{ paper: { sx: { ...popoverPaperSx(280), maxHeight: 480 } } }}
       >
         <Box sx={{ p: 2 }}>
-          {/* Display Fields / Columns */}
-          {fields.length > 0 && (
+          {/* When availableFields + selectedSearchFields are provided, show the full metadata field list */}
+          {availableFields &&
+          availableFields.length > 0 &&
+          selectedSearchFields &&
+          onSelectedFieldsChange ? (
             <>
               <PanelHeader
-                title={
-                  viewMode === "card"
-                    ? t("common.viewControls.displayFields")
-                    : t("common.viewControls.tableColumns")
-                }
+                title={t("common.viewControls.displayFields")}
                 action={
                   <TextAction
                     label={
-                      fields.every((f) => f.visible)
+                      availableFields.every((f) => selectedSearchFields.includes(f.name))
                         ? t("common.viewControls.hideAll")
                         : t("common.viewControls.showAll")
                     }
                     onClick={() => {
-                      // Toggle all to the opposite of current majority state
-                      const allVisible = fields.every((f) => f.visible);
-                      fields.forEach((f) => {
-                        if (allVisible === f.visible) onFieldToggle(f.id);
-                      });
+                      const allSelected = availableFields.every((f) =>
+                        selectedSearchFields.includes(f.name)
+                      );
+                      onSelectedFieldsChange(allSelected ? [] : availableFields.map((f) => f.name));
                     }}
                   />
                 }
               />
               <FormGroup sx={{ gap: 0 }}>
-                {fields.map((field) => (
-                  <FormControlLabel
-                    key={field.id}
-                    control={
-                      <Checkbox
-                        checked={field.visible}
-                        onChange={() => onFieldToggle(field.id)}
-                        size="small"
-                        sx={{
-                          py: 0.25,
-                          color: "text.secondary",
-                          "&.Mui-checked": { color: "primary.main" },
-                        }}
+                {(() => {
+                  const defaultFields = availableFields.filter((f) => f.isDefault);
+                  const customFields = availableFields.filter((f) => !f.isDefault);
+
+                  const renderFieldItem = (field: FieldInfo) => {
+                    const isChecked = selectedSearchFields.includes(field.name);
+                    return (
+                      <FormControlLabel
+                        key={field.name}
+                        control={
+                          <Checkbox
+                            checked={isChecked}
+                            onChange={() => {
+                              const updated = isChecked
+                                ? selectedSearchFields.filter((f) => f !== field.name)
+                                : [...selectedSearchFields, field.name];
+                              onSelectedFieldsChange(updated);
+                            }}
+                            size="small"
+                            sx={{
+                              py: 0.25,
+                              color: "text.secondary",
+                              "&.Mui-checked": { color: "primary.main" },
+                            }}
+                          />
+                        }
+                        label={
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontSize: "0.8125rem",
+                                fontWeight: isChecked ? 500 : 400,
+                                color: isChecked ? "text.primary" : "text.secondary",
+                              }}
+                            >
+                              {field.displayName || field.name}
+                            </Typography>
+                            {field.isDefault && (
+                              <Typography
+                                variant="caption"
+                                sx={{ fontSize: "0.625rem", color: "text.disabled" }}
+                              >
+                                {t("common.viewControls.default")}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        sx={{ mx: 0, my: -0.25 }}
                       />
-                    }
-                    label={
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontSize: "0.8125rem",
-                          fontWeight: field.visible ? 500 : 400,
-                          color: field.visible ? "text.primary" : "text.secondary",
-                        }}
-                      >
-                        {field.label}
-                      </Typography>
-                    }
-                    sx={{ mx: 0, my: -0.25 }}
-                  />
-                ))}
+                    );
+                  };
+
+                  return (
+                    <>
+                      {defaultFields.map(renderFieldItem)}
+                      {customFields.length > 0 && (
+                        <>
+                          <Divider
+                            sx={{
+                              my: 1,
+                              borderColor: (theme) => alpha(theme.palette.divider, 0.5),
+                            }}
+                          />
+                          <Typography
+                            variant="overline"
+                            sx={{
+                              fontSize: "0.625rem",
+                              fontWeight: 700,
+                              letterSpacing: "0.08em",
+                              color: "text.disabled",
+                              px: 0.5,
+                              mb: 0.25,
+                            }}
+                          >
+                            {t("common.viewControls.customFields")}
+                          </Typography>
+                          {customFields.map(renderFieldItem)}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </FormGroup>
             </>
+          ) : (
+            /* Fallback: show the legacy cardFields / columns list */
+            fields.length > 0 && (
+              <>
+                <PanelHeader
+                  title={
+                    viewMode === "card"
+                      ? t("common.viewControls.displayFields")
+                      : t("common.viewControls.tableColumns")
+                  }
+                  action={
+                    <TextAction
+                      label={
+                        fields.every((f) => f.visible)
+                          ? t("common.viewControls.hideAll")
+                          : t("common.viewControls.showAll")
+                      }
+                      onClick={() => {
+                        const allVisible = fields.every((f) => f.visible);
+                        fields.forEach((f) => {
+                          if (allVisible === f.visible) onFieldToggle(f.id);
+                        });
+                      }}
+                    />
+                  }
+                />
+                <FormGroup sx={{ gap: 0 }}>
+                  {fields.map((field) => (
+                    <FormControlLabel
+                      key={field.id}
+                      control={
+                        <Checkbox
+                          checked={field.visible}
+                          onChange={() => onFieldToggle(field.id)}
+                          size="small"
+                          sx={{
+                            py: 0.25,
+                            color: "text.secondary",
+                            "&.Mui-checked": { color: "primary.main" },
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: "0.8125rem",
+                            fontWeight: field.visible ? 500 : 400,
+                            color: field.visible ? "text.primary" : "text.secondary",
+                          }}
+                        >
+                          {field.label}
+                        </Typography>
+                      }
+                      sx={{ mx: 0, my: -0.25 }}
+                    />
+                  ))}
+                </FormGroup>
+              </>
+            )
           )}
         </Box>
       </Menu>

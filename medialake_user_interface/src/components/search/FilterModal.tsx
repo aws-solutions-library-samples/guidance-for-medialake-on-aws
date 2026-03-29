@@ -1,5 +1,18 @@
 import React from "react";
-import { useFilterModalOpen, useFilterModalDraft, useUIActions } from "../../stores/searchStore";
+import {
+  useFilterModalOpen,
+  useFilterModalDraft,
+  useUIActions,
+  useAggregations,
+  useFacetsInfo,
+  useSemanticSearch,
+  type CustomMetadataFieldDraft,
+} from "../../stores/searchStore";
+import { useSearchFields } from "@/api/hooks/useSearchFields";
+import { useSearchFieldValues } from "@/api/hooks/useSearchFieldValues";
+import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
+import type { FieldInfo } from "@/api/hooks/useSearchFields";
+import type { FieldAggregation } from "@/api/hooks/useSearch";
 import {
   Box,
   Dialog,
@@ -17,6 +30,8 @@ import {
   useTheme,
   ToggleButton,
   ToggleButtonGroup,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -69,6 +84,178 @@ export interface FilterModalProps {
   };
 }
 
+// Per-field filter control for custom metadata
+const CustomFieldFilter: React.FC<{
+  field: FieldInfo;
+  fieldDraft: CustomMetadataFieldDraft;
+  aggregation?: FieldAggregation;
+  eagerValues?: string[];
+  onUpdate: (partial: Partial<CustomMetadataFieldDraft>) => void;
+  theme: ReturnType<typeof useTheme>;
+}> = ({ field, fieldDraft, aggregation, eagerValues, onUpdate, theme }) => {
+  const { t } = useTranslation();
+  const displayName = field.displayName || field.name;
+
+  if (field.type === "number") {
+    return (
+      <Box sx={{ mb: 1.5 }}>
+        <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
+          {displayName}
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <TextField
+            type="number"
+            size="small"
+            value={fieldDraft.rangeMin ?? ""}
+            onChange={(e) => onUpdate({ rangeMin: e.target.value || null })}
+            placeholder="Min"
+            sx={{ width: "100px" }}
+          />
+          <Typography variant="body2">to</Typography>
+          <TextField
+            type="number"
+            size="small"
+            value={fieldDraft.rangeMax ?? ""}
+            onChange={(e) => onUpdate({ rangeMax: e.target.value || null })}
+            placeholder="Max"
+            sx={{ width: "100px" }}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  if (field.type === "date") {
+    return (
+      <Box sx={{ mb: 1.5 }}>
+        <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
+          {displayName}
+        </Typography>
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <DateTimePicker
+              value={(() => {
+                const d = fieldDraft.rangeMin ? new Date(fieldDraft.rangeMin) : null;
+                return d && !isNaN(d.getTime()) ? d : null;
+              })()}
+              onChange={(v) =>
+                onUpdate({ rangeMin: v && !isNaN(v.getTime()) ? v.toISOString() : null })
+              }
+              format="yyyy/MM/dd hh:mm a"
+              ampm
+              closeOnSelect={false}
+              slotProps={{
+                textField: { size: "small", fullWidth: true, placeholder: "From" },
+                actionBar: { actions: ["clear", "today", "accept"] },
+              }}
+            />
+            <DateTimePicker
+              value={(() => {
+                const d = fieldDraft.rangeMax ? new Date(fieldDraft.rangeMax) : null;
+                return d && !isNaN(d.getTime()) ? d : null;
+              })()}
+              onChange={(v) =>
+                onUpdate({ rangeMax: v && !isNaN(v.getTime()) ? v.toISOString() : null })
+              }
+              format="yyyy/MM/dd hh:mm a"
+              ampm
+              closeOnSelect={false}
+              slotProps={{
+                textField: { size: "small", fullWidth: true, placeholder: "To" },
+                actionBar: { actions: ["clear", "today", "accept"] },
+              }}
+            />
+          </Box>
+        </LocalizationProvider>
+      </Box>
+    );
+  }
+
+  // Default: string type — autocomplete dropdown with doc counts
+  const buckets = aggregation?.buckets;
+  const allValues = React.useMemo(() => {
+    const predefined = field.predefinedValues ?? [];
+    const eager = eagerValues ?? [];
+    const liveBuckets = buckets ?? [];
+
+    // Determine the base set of known values (predefined > eager > empty)
+    const baseValues = predefined.length > 0 ? predefined : eager;
+
+    if (baseValues.length === 0) return liveBuckets;
+
+    const bucketMap = new Map(liveBuckets.map((b) => [b.key, b.doc_count]));
+
+    const merged = baseValues.map((val) => ({
+      key: val,
+      doc_count: bucketMap.get(val) ?? 0,
+    }));
+
+    for (const bucket of liveBuckets) {
+      if (!baseValues.includes(bucket.key)) {
+        merged.push(bucket);
+      }
+    }
+    return merged;
+  }, [buckets, field.predefinedValues, eagerValues]);
+
+  // Selected option objects for the Autocomplete value
+  const selectedOptions = React.useMemo(
+    () => allValues.filter((v) => fieldDraft.selectedFacetValues.includes(v.key)),
+    [allValues, fieldDraft.selectedFacetValues]
+  );
+
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Autocomplete
+        multiple
+        size="small"
+        options={allValues}
+        value={selectedOptions}
+        getOptionLabel={(option) => option.key}
+        isOptionEqualToValue={(option, value) => option.key === value.key}
+        onChange={(_, newValue) => {
+          onUpdate({ selectedFacetValues: newValue.map((v) => v.key) });
+        }}
+        renderOption={(props, option) => {
+          const { key, ...rest } = props;
+          return (
+            <li key={key} {...rest}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <Typography variant="body2">{option.key}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  ({option.doc_count})
+                </Typography>
+              </Box>
+            </li>
+          );
+        }}
+        renderTags={(value, getTagProps) =>
+          value.map((option, index) => {
+            const { key, ...rest } = getTagProps({ index });
+            return (
+              <Chip
+                key={key}
+                label={`${option.key} (${option.doc_count})`}
+                size="small"
+                {...rest}
+              />
+            );
+          })
+        }
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label={displayName}
+            placeholder={selectedOptions.length === 0 ? `Filter by ${displayName}…` : ""}
+          />
+        )}
+        noOptionsText={t("search.filters.noValuesFound", "No values found")}
+        sx={{ minWidth: 200 }}
+      />
+    </Box>
+  );
+};
+
 const FilterModal: React.FC<FilterModalProps> = () => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -78,6 +265,21 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   const draft = useFilterModalDraft();
   const { closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } =
     useUIActions();
+
+  // Custom metadata data
+  const { data: fieldsData } = useSearchFields();
+  const { data: fieldValuesMap } = useSearchFieldValues();
+  const aggregations = useAggregations();
+  const facetsInfo = useFacetsInfo();
+  const isSemantic = useSemanticSearch();
+  const { providerData } = useSemanticSearchStatus();
+  const isCoactiveProvider = providerData?.data?.searchProvider?.type === "coactive";
+
+  // Hide custom metadata filters when Coactive provider is active with semantic/hybrid search
+  const hideCustomFilters = isCoactiveProvider && isSemantic;
+  const filterableFields = hideCustomFilters
+    ? []
+    : (fieldsData?.data?.availableFields ?? []).filter((f) => f.isFilterable && !f.isDefault);
 
   // Destructure draft state for easier access
   const {
@@ -89,7 +291,39 @@ const FilterModal: React.FC<FilterModalProps> = () => {
     dateRangeOption,
     startDate,
     endDate,
+    customMetadataFilters,
   } = draft;
+
+  // Custom metadata helpers
+  const getFieldDraft = (fieldName: string): CustomMetadataFieldDraft => {
+    return (
+      customMetadataFilters.find((d) => d.fieldName === fieldName) ?? {
+        fieldName,
+        type: "string",
+        selectedFacetValues: [],
+        textValue: "",
+        rangeMin: null,
+        rangeMax: null,
+      }
+    );
+  };
+
+  const updateFieldDraft = (
+    fieldName: string,
+    fieldType: string,
+    partial: Partial<CustomMetadataFieldDraft>
+  ) => {
+    const existing = customMetadataFilters.find((d) => d.fieldName === fieldName);
+    const updated = {
+      ...getFieldDraft(fieldName),
+      type: fieldType as CustomMetadataFieldDraft["type"],
+      ...partial,
+    };
+    const newDrafts = existing
+      ? customMetadataFilters.map((d) => (d.fieldName === fieldName ? updated : d))
+      : [...customMetadataFilters, updated];
+    updateFilterModalDraft({ customMetadataFilters: newDrafts });
+  };
 
   const handleApply = () => {
     applyFilterModalDraft();
@@ -456,6 +690,47 @@ const FilterModal: React.FC<FilterModalProps> = () => {
               </Box>
             </LocalizationProvider>
           </Box>
+
+          {/* Custom Metadata Section */}
+          {filterableFields.length > 0 && (
+            <>
+              <Divider />
+              <Box
+                sx={{
+                  background: theme.palette.action.hover,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1.5,
+                  p: 1.5,
+                }}
+              >
+                <Typography variant="subtitle2" color="primary" sx={{ mb: 1.5 }}>
+                  ⚙ Custom Metadata
+                </Typography>
+
+                {filterableFields.map((field) => (
+                  <CustomFieldFilter
+                    key={field.name}
+                    field={field}
+                    fieldDraft={getFieldDraft(field.name)}
+                    aggregation={aggregations[field.name]}
+                    eagerValues={fieldValuesMap?.[field.name]}
+                    onUpdate={(partial) => updateFieldDraft(field.name, field.type, partial)}
+                    theme={theme}
+                  />
+                ))}
+
+                {facetsInfo?.limited && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1, display: "block" }}
+                  >
+                    Some fields may not show suggested values
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
         </Box>
       </DialogContent>
 

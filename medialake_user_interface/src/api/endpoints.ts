@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
     BASE: (id: string) => `/pipelines/executions/${id}/retry`,
   },
   SEARCH: "/search",
+  SEARCH_FIELDS_MAPPING: "/search/fields/mapping",
+  SEARCH_FIELDS_VALUES: "/search/fields/values",
   SEARCH_CONNECTORS: "/search/connectors",
   ASSETS: {
     GET: (id: string) => `/assets/${id}`,
@@ -61,6 +63,7 @@ export const API_ENDPOINTS = {
   SYSTEM_SETTINGS: {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",
+    METADATA_FIELDS: "/settings/system/metadata-fields",
   },
   FAVORITES: {
     BASE: "/users/favorites",
