@@ -5,6 +5,10 @@ from datetime import datetime
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.event_handler.exceptions import (
+    InternalServerError,
+    NotFoundError,
+)
 
 logger = Logger(child=True)
 tracer = Tracer()
@@ -32,11 +36,7 @@ def register_route(app):
             ).get("Item")
 
             if not existing_provider:
-                return {
-                    "status": "error",
-                    "message": "Search provider not found.",
-                    "data": {},
-                }
+                raise NotFoundError("Search provider not found.")
 
             # Delete the secret if it exists
             secret_arn = existing_provider.get("secretArn")
@@ -97,8 +97,4 @@ def register_route(app):
             }
         except Exception as e:
             logger.exception("Error deleting search provider")
-            return {
-                "status": "error",
-                "message": f"Error deleting search provider: {str(e)}",
-                "data": {},
-            }
+            raise InternalServerError(f"Error deleting search provider: {str(e)}")
