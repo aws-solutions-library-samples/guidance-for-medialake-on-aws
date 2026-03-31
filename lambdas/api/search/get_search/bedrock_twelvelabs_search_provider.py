@@ -407,8 +407,14 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                         for filter_item in query_obj.filters:
                             key = filter_item.get("key")
                             value = filter_item.get("value")
-                            if key == "mediaType" and isinstance(value, list):
+                            if (
+                                key == "mediaType" or key == "DigitalSourceAsset.Type"
+                            ) and isinstance(value, list):
                                 self.type = ",".join(value)
+                            elif key == "DigitalSourceAsset.Type" and isinstance(
+                                value, str
+                            ):
+                                self.type = value
                             elif (
                                 key == "DigitalSourceAsset.MainRepresentation.Format"
                                 and isinstance(value, list)
@@ -1067,7 +1073,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             value = filter_item.get("value")
 
             if operator == "in" and isinstance(value, list):
-                if field_key == "mediaType":
+                if field_key == "mediaType" or field_key == "DigitalSourceAsset.Type":
                     if self.model_version == "3.0":
                         # Marengo 3.0 separate documents use embedding_type instead of DigitalSourceAsset.Type
                         filters_to_add.append(
@@ -1080,7 +1086,25 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 elif field_key == "DigitalSourceAsset.MainRepresentation.Format":
                     filters_to_add.append({"terms": {field_key: value}})
             elif operator == "==" or operator == "eq":
-                filters_to_add.append({"term": {field_key: value}})
+                if field_key in ("mediaType", "DigitalSourceAsset.Type"):
+                    if self.model_version == "3.0":
+                        filters_to_add.append(
+                            {
+                                "term": {
+                                    "embedding_type": (
+                                        value.lower()
+                                        if isinstance(value, str)
+                                        else value
+                                    )
+                                }
+                            }
+                        )
+                    else:
+                        filters_to_add.append(
+                            {"term": {"DigitalSourceAsset.Type": value}}
+                        )
+                else:
+                    filters_to_add.append({"term": {field_key: value}})
             elif operator == "range" and isinstance(value, dict):
                 range_filter = {"range": {field_key: {}}}
                 if "gte" in value:
