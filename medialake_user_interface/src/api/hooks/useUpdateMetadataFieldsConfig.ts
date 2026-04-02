@@ -36,6 +36,10 @@ export const useUpdateMetadataFieldsConfig = () => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.SEARCH.fields(),
       });
+      // Invalidate eager field values so newly auto-populated fields get fetched
+      queryClient.invalidateQueries({
+        queryKey: [...QUERY_KEYS.SEARCH.all, "fieldValues"],
+      });
     },
   });
 };

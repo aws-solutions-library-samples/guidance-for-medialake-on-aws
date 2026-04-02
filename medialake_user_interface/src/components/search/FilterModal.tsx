@@ -9,10 +9,10 @@ import {
   type CustomMetadataFieldDraft,
 } from "../../stores/searchStore";
 import { useSearchFields } from "@/api/hooks/useSearchFields";
-import { useSearchFieldValues } from "@/api/hooks/useSearchFieldValues";
+import { useSearchFieldValues, useRefreshFieldValues } from "@/api/hooks/useSearchFieldValues";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
 import type { FieldInfo } from "@/api/hooks/useSearchFields";
-import type { FieldAggregation } from "@/api/hooks/useSearch";
+import type { FieldAggregation, FacetBucket } from "@/api/hooks/useSearch";
 import {
   Box,
   Dialog,
@@ -89,10 +89,10 @@ const CustomFieldFilter: React.FC<{
   field: FieldInfo;
   fieldDraft: CustomMetadataFieldDraft;
   aggregation?: FieldAggregation;
-  eagerValues?: string[];
+  eagerBuckets?: FacetBucket[];
   onUpdate: (partial: Partial<CustomMetadataFieldDraft>) => void;
   theme: ReturnType<typeof useTheme>;
-}> = ({ field, fieldDraft, aggregation, eagerValues, onUpdate, theme }) => {
+}> = ({ field, fieldDraft, aggregation, eagerBuckets, onUpdate, theme }) => {
   const { t } = useTranslation();
   const displayName = field.displayName || field.name;
 
@@ -175,28 +175,41 @@ const CustomFieldFilter: React.FC<{
   const buckets = aggregation?.buckets;
   const allValues = React.useMemo(() => {
     const predefined = field.predefinedValues ?? [];
-    const eager = eagerValues ?? [];
+    const eager = eagerBuckets ?? [];
     const liveBuckets = buckets ?? [];
 
-    // Determine the base set of known values (predefined > eager > empty)
-    const baseValues = predefined.length > 0 ? predefined : eager;
+    // Build a map from eager buckets (already have doc_count from the index)
+    const eagerMap = new Map(eager.map((b) => [b.key, b.doc_count]));
 
-    if (baseValues.length === 0) return liveBuckets;
+    // Build a map from live search aggregation buckets (scoped to current query)
+    const liveMap = new Map(liveBuckets.map((b) => [b.key, b.doc_count]));
 
-    const bucketMap = new Map(liveBuckets.map((b) => [b.key, b.doc_count]));
+    // Determine the base set of known values.
+    // Priority: predefined list > eager buckets > empty.
+    // When we have eager buckets with counts, use those as the baseline so
+    // the filter shows counts even before a search is performed.
+    const baseKeys =
+      predefined.length > 0 ? predefined : eager.length > 0 ? eager.map((b) => b.key) : [];
 
-    const merged = baseValues.map((val) => ({
+    if (baseKeys.length === 0) return liveBuckets;
+
+    // Merge: for each base value, prefer the live count (scoped to current
+    // search) when available, fall back to the eager count (global index
+    // count), then 0.
+    const merged: FacetBucket[] = baseKeys.map((val) => ({
       key: val,
-      doc_count: bucketMap.get(val) ?? 0,
+      doc_count: liveMap.get(val) ?? eagerMap.get(val) ?? 0,
     }));
 
+    // Append any live buckets that aren't already in the base set
+    const baseSet = new Set(baseKeys);
     for (const bucket of liveBuckets) {
-      if (!baseValues.includes(bucket.key)) {
+      if (!baseSet.has(bucket.key)) {
         merged.push(bucket);
       }
     }
     return merged;
-  }, [buckets, field.predefinedValues, eagerValues]);
+  }, [buckets, field.predefinedValues, eagerBuckets]);
 
   // Selected option objects for the Autocomplete value
   const selectedOptions = React.useMemo(
@@ -269,11 +282,20 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   // Custom metadata data
   const { data: fieldsData } = useSearchFields();
   const { data: fieldValuesMap } = useSearchFieldValues();
+  const refreshFieldValues = useRefreshFieldValues();
   const aggregations = useAggregations();
   const facetsInfo = useFacetsInfo();
   const isSemantic = useSemanticSearch();
   const { providerData } = useSemanticSearchStatus();
   const isCoactiveProvider = providerData?.data?.searchProvider?.type === "coactive";
+
+  // Background-refresh the eager field values each time the modal opens so
+  // the user sees fresh counts while the cached data is shown instantly.
+  React.useEffect(() => {
+    if (isOpen) {
+      refreshFieldValues();
+    }
+  }, [isOpen, refreshFieldValues]);
 
   // Hide custom metadata filters when Coactive provider is active with semantic/hybrid search
   const hideCustomFilters = isCoactiveProvider && isSemantic;
@@ -713,7 +735,7 @@ const FilterModal: React.FC<FilterModalProps> = () => {
                     field={field}
                     fieldDraft={getFieldDraft(field.name)}
                     aggregation={aggregations[field.name]}
-                    eagerValues={fieldValuesMap?.[field.name]}
+                    eagerBuckets={fieldValuesMap?.[field.name]}
                     onUpdate={(partial) => updateFieldDraft(field.name, field.type, partial)}
                     theme={theme}
                   />

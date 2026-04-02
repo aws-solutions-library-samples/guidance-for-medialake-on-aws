@@ -181,7 +181,7 @@ const COLUMN_HEADERS = (
       Display Name
     </Typography>
     <Typography variant="caption" color="text.secondary">
-      Show in Dropdown
+      Asset Card Fields
     </Typography>
     <Typography variant="caption" color="text.secondary">
       Allow Filtering
@@ -575,7 +575,7 @@ const MetadataFieldsSettings: React.FC = () => {
               }
               label={
                 <Typography variant="body2" sx={{ fontSize: "0.8125rem" }}>
-                  Show in Dropdown
+                  Asset Card Fields
                 </Typography>
               }
               sx={{ display: "flex", mx: 0, mt: 0.5 }}
@@ -607,6 +607,19 @@ const MetadataFieldsSettings: React.FC = () => {
         >
           {isRefreshing ? "Refreshing…" : "Refresh Fields"}
         </Button>
+      </Box>
+
+      {/* Sticky column headers */}
+      <Box
+        sx={{
+          px: 2,
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          zIndex: 1,
+        }}
+      >
+        {COLUMN_HEADERS}
       </Box>
 
       {/* Scrollable field list */}
@@ -647,7 +660,6 @@ const MetadataFieldsSettings: React.FC = () => {
           <Typography variant="subtitle2" color="primary" sx={{ mb: 1 }}>
             Default Fields (always available)
           </Typography>
-          {COLUMN_HEADERS}
           {DEFAULT_FIELDS.map((field) => (
             <FieldRow key={field.name} field={field} isDefault />
           ))}
@@ -676,7 +688,6 @@ const MetadataFieldsSettings: React.FC = () => {
             </Box>
             {!collapsedGroups?.has(groupKey) && (
               <Box sx={{ pl: 1 }}>
-                {COLUMN_HEADERS}
                 {fields.map((field) => (
                   <FieldRow
                     key={field.name}

@@ -343,7 +343,9 @@ def handle_post_fields_values():
         result = {}
         for name in field_names:
             buckets = response.get("aggregations", {}).get(name, {}).get("buckets", [])
-            result[name] = [b["key"] for b in buckets]
+            result[name] = [
+                {"key": b["key"], "doc_count": b.get("doc_count", 0)} for b in buckets
+            ]
 
         return {"status": "200", "message": "ok", "data": result}
     except Exception as e:
