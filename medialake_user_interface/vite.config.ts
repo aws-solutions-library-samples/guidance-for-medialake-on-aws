@@ -20,15 +20,23 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Core React runtime — must load first, everything depends on it
+          // React + AWS Amplify bundled together to guarantee initialization order.
+          // @aws-amplify/ui-react and @xstate/react have deep runtime deps on React
+          // internals — splitting them across chunks causes cross-chunk init races.
           if (
             id.includes("node_modules/react/") ||
             id.includes("node_modules/react-dom/") ||
             id.includes("node_modules/react-router/") ||
             id.includes("node_modules/react-i18next/") ||
-            id.includes("node_modules/react-error-boundary/")
+            id.includes("node_modules/react-error-boundary/") ||
+            id.includes("node_modules/aws-amplify/") ||
+            id.includes("node_modules/@aws-amplify/") ||
+            id.includes("node_modules/amazon-cognito-identity-js/") ||
+            id.includes("node_modules/xstate/") ||
+            id.includes("node_modules/@xstate/") ||
+            id.includes("node_modules/@radix-ui/")
           ) {
-            return "vendor-react";
+            return "vendor-core";
           }
           // MUI — heaviest dep, cached long-term
           if (id.includes("node_modules/@mui/")) {
@@ -37,14 +45,6 @@ export default defineConfig({
           // Data layer
           if (id.includes("node_modules/@tanstack/")) {
             return "vendor-data";
-          }
-          // AWS Amplify + Cognito
-          if (
-            id.includes("node_modules/aws-amplify/") ||
-            id.includes("node_modules/@aws-amplify/") ||
-            id.includes("node_modules/amazon-cognito-identity-js/")
-          ) {
-            return "vendor-aws";
           }
           // Pipeline editor
           if (id.includes("node_modules/@xyflow/")) {

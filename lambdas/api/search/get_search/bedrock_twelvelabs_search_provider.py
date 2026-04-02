@@ -407,8 +407,14 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                         for filter_item in query_obj.filters:
                             key = filter_item.get("key")
                             value = filter_item.get("value")
-                            if key == "mediaType" and isinstance(value, list):
+                            if (
+                                key == "mediaType" or key == "DigitalSourceAsset.Type"
+                            ) and isinstance(value, list):
                                 self.type = ",".join(value)
+                            elif key == "DigitalSourceAsset.Type" and isinstance(
+                                value, str
+                            ):
+                                self.type = value
                             elif (
                                 key == "DigitalSourceAsset.MainRepresentation.Format"
                                 and isinstance(value, list)
@@ -1218,7 +1224,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             value = filter_item.get("value")
 
             if operator == "in" and isinstance(value, list):
-                if field_key == "mediaType":
+                if field_key == "mediaType" or field_key == "DigitalSourceAsset.Type":
                     if self.model_version == "3.0":
                         # Marengo 3.0 separate documents use embedding_type instead of DigitalSourceAsset.Type
                         filters_to_add.append(

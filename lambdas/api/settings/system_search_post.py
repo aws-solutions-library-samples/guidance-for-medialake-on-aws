@@ -8,6 +8,10 @@ from datetime import datetime
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    InternalServerError,
+)
 
 logger = Logger(child=True)
 tracer = Tracer()
@@ -159,11 +163,7 @@ def register_route(app):
             required_fields = ["name", "type"]
             for field in required_fields:
                 if field not in body:
-                    return {
-                        "status": "error",
-                        "message": f"Missing required field: {field}",
-                        "data": {},
-                    }
+                    raise BadRequestError(f"Missing required field: {field}")
 
             # Validate dimensions if provided
             if "dimensions" in body:
@@ -177,18 +177,12 @@ def register_route(app):
 
             # API key is required for certain providers
             if body.get("type") == "twelvelabs-api" and "apiKey" not in body:
-                return {
-                    "status": "error",
-                    "message": "API key is required for Twelve Labs API provider",
-                    "data": {},
-                }
+                raise BadRequestError(
+                    "API key is required for Twelve Labs API provider"
+                )
 
             if body.get("type") == "coactive" and "apiKey" not in body:
-                return {
-                    "status": "error",
-                    "message": "API key is required for Coactive provider",
-                    "data": {},
-                }
+                raise BadRequestError("API key is required for Coactive provider")
 
             # Validate inference_provider if provided
             if "inference_provider" in body and not isinstance(
@@ -206,11 +200,9 @@ def register_route(app):
             ).get("Item")
 
             if existing_provider:
-                return {
-                    "status": "error",
-                    "message": "Search provider already exists. Use PUT to update.",
-                    "data": {},
-                }
+                raise BadRequestError(
+                    "Search provider already exists. Use PUT to update."
+                )
 
             # Create a unique identifier for the provider
             provider_id = str(uuid.uuid4())
@@ -279,11 +271,9 @@ def register_route(app):
                     )
                 except Exception as e:
                     logger.error(f"Failed to create Coactive dataset: {str(e)}")
-                    return {
-                        "status": "error",
-                        "message": f"Failed to create Coactive dataset: {str(e)}",
-                        "data": {},
-                    }
+                    raise InternalServerError(
+                        f"Failed to create Coactive dataset: {str(e)}"
+                    )
 
             # Only add secretArn if we created a secret
             if secret_arn:
@@ -361,8 +351,4 @@ def register_route(app):
             }
         except Exception as e:
             logger.exception("Error creating search provider")
-            return {
-                "status": "error",
-                "message": f"Error creating search provider: {str(e)}",
-                "data": {},
-            }
+            raise InternalServerError(f"Error creating search provider: {str(e)}")

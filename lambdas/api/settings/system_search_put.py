@@ -8,6 +8,10 @@ from datetime import datetime
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    InternalServerError,
+)
 
 logger = Logger(child=True)
 tracer = Tracer()
@@ -196,11 +200,9 @@ def register_route(app):
             ]
             for field in body:
                 if field not in allowed_fields:
-                    return {
-                        "status": "error",
-                        "message": f"Invalid field: {field}. Allowed fields are: {', '.join(allowed_fields)}",
-                        "data": {},
-                    }
+                    raise BadRequestError(
+                        f"Invalid field: {field}. Allowed fields are: {', '.join(allowed_fields)}"
+                    )
 
             # Validate dimensions if provided
             if "dimensions" in body:
@@ -226,22 +228,16 @@ def register_route(app):
             if "embeddingStore" in body:
                 embedding_store = body["embeddingStore"]
                 if not isinstance(embedding_store, dict):
-                    return {
-                        "status": "error",
-                        "message": "embeddingStore must be an object",
-                        "data": {},
-                    }
+                    raise BadRequestError("embeddingStore must be an object")
 
                 allowed_embedding_types = ["opensearch", "s3-vector"]
                 if (
                     "type" in embedding_store
                     and embedding_store["type"] not in allowed_embedding_types
                 ):
-                    return {
-                        "status": "error",
-                        "message": f"Invalid embedding store type. Allowed types are: {', '.join(allowed_embedding_types)}",
-                        "data": {},
-                    }
+                    raise BadRequestError(
+                        f"Invalid embedding store type. Allowed types are: {', '.join(allowed_embedding_types)}"
+                    )
 
             # Check if search provider exists
             existing_provider = system_settings_table.get_item(
@@ -256,11 +252,9 @@ def register_route(app):
                 required_fields = ["name", "type", "apiKey"]
                 for field in required_fields:
                     if field not in body:
-                        return {
-                            "status": "error",
-                            "message": f"Missing required field for creation: {field}",
-                            "data": {},
-                        }
+                        raise BadRequestError(
+                            f"Missing required field for creation: {field}"
+                        )
 
                 provider_id = str(uuid.uuid4())
                 logger.info(f"Creating new search provider with ID: {provider_id}")
@@ -287,11 +281,9 @@ def register_route(app):
                     )
                 except Exception as e:
                     logger.error(f"Failed to create Coactive dataset: {str(e)}")
-                    return {
-                        "status": "error",
-                        "message": f"Failed to create Coactive dataset: {str(e)}",
-                        "data": {},
-                    }
+                    raise InternalServerError(
+                        f"Failed to create Coactive dataset: {str(e)}"
+                    )
 
             # Handle secret creation/update if API key is provided
             secret_arn = None
@@ -511,8 +503,4 @@ def register_route(app):
             }
         except Exception as e:
             logger.exception("Error updating search provider")
-            return {
-                "status": "error",
-                "message": f"Error updating search provider: {str(e)}",
-                "data": {},
-            }
+            raise InternalServerError(f"Error updating search provider: {str(e)}")
