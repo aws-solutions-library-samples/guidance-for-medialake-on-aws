@@ -170,10 +170,10 @@ class UIConstruct(Construct):
                     "content_security_policy": (
                         "default-src 'self'; "
                         f"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: 'wasm-unsafe-eval' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
-                        "style-src 'self' 'unsafe-inline' chrome: resource:; "
+                        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                         "style-src-attr 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
-                        "font-src 'self' data:; "
+                        "font-src 'self' data: https://fonts.gstatic.com; "
                         "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
                         f"connect-src 'self' data: blob: https://*.amazonaws.com https://*.amazoncognito.com https://*.cloudfront.net{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "frame-ancestors 'none'; "

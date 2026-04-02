@@ -5,7 +5,7 @@ import {
   signInWithRedirect,
   signIn,
 } from "aws-amplify/auth";
-import { Hub, HubCapsule } from "@aws-amplify/core";
+import { Hub, type HubCapsule } from "aws-amplify/utils";
 import { StorageHelper } from "../common/helpers/storage-helper";
 import PermissionTokenCache from "../permissions/utils/permission-token-cache";
 
