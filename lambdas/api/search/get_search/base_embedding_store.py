@@ -371,10 +371,12 @@ class BaseEmbeddingStore(ABC):
             start_datetime = time.time()
             self.logger.info(f"Starting Bedrock async invoke at: {start_datetime}")
 
-            # Start async invoke for text embedding using inference profile
-            inference_profile_id = self._get_regional_inference_profile()
+            # NOTE: StartAsyncInvoke does NOT support cross-region inference profiles.
+            # Use the raw model ID instead of the geo-prefixed inference profile.
+            # See: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-use.html
+            model_id = "twelvelabs.marengo-embed-2-7-v1:0"
             response = bedrock_runtime.start_async_invoke(
-                modelId=inference_profile_id,
+                modelId=model_id,
                 modelInput={"inputType": "text", "inputText": query_text},
                 outputDataConfig={
                     "s3OutputDataConfig": {
