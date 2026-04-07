@@ -84,15 +84,15 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
       { i: "collections-1", x: 5, y: 6, w: 5, h: 6, minW: 3, minH: 2, maxW: 10, maxH: 8 },
     ],
     sm: [
-      { i: "recent-assets-1", x: 0, y: 0, w: 1, h: 6, minW: 1, minH: 4, maxW: 1, maxH: 12 },
-      { i: "favorites-1", x: 0, y: 6, w: 1, h: 6, minW: 1, minH: 4, maxW: 1, maxH: 12 },
-      { i: "collections-1", x: 0, y: 12, w: 1, h: 6, minW: 1, minH: 2, maxW: 1, maxH: 8 },
+      { i: "recent-assets-1", x: 0, y: 0, w: 6, h: 6, minW: 4, minH: 4, maxW: 6, maxH: 12 },
+      { i: "favorites-1", x: 0, y: 6, w: 6, h: 6, minW: 3, minH: 4, maxW: 6, maxH: 12 },
+      { i: "collections-1", x: 0, y: 12, w: 6, h: 6, minW: 3, minH: 2, maxW: 6, maxH: 8 },
     ],
   },
 };
 
 const STORAGE_KEY = "dashboard-layout";
-const CURRENT_VERSION = 7; // Bumped version for widget height changes
+const CURRENT_VERSION = 8; // Fixed sm breakpoint widget widths to match 6-column grid
 
 // Helper to generate unique widget ID
 const generateWidgetId = (type: WidgetType): string => {
@@ -270,13 +270,13 @@ export const useDashboardStore = create<DashboardStore>()(
 
         // Create layout items for each breakpoint
         const newLayouts = { ...layout.layouts };
-        const breakpointCols = { lg: 12, md: 10, sm: 1 };
+        const breakpointCols = { lg: 12, md: 10, sm: 6 };
 
         (["lg", "md", "sm"] as const).forEach((breakpoint) => {
           const cols = breakpointCols[breakpoint];
           const position = findAvailablePosition(newLayouts[breakpoint], widgetDef, cols);
           const size =
-            breakpoint === "sm" ? { w: 1, h: widgetDef.defaultSize.h } : widgetDef.defaultSize;
+            breakpoint === "sm" ? { w: cols, h: widgetDef.defaultSize.h } : widgetDef.defaultSize;
 
           newLayouts[breakpoint] = [
             ...newLayouts[breakpoint],
@@ -284,9 +284,9 @@ export const useDashboardStore = create<DashboardStore>()(
               i: widgetId,
               ...position,
               ...size,
-              minW: breakpoint === "sm" ? 1 : widgetDef.minSize.w,
+              minW: breakpoint === "sm" ? Math.min(widgetDef.minSize.w, cols) : widgetDef.minSize.w,
               minH: widgetDef.minSize.h,
-              maxW: breakpoint === "sm" ? 1 : widgetDef.maxSize.w,
+              maxW: breakpoint === "sm" ? cols : widgetDef.maxSize.w,
               maxH: widgetDef.maxSize.h,
             },
           ];

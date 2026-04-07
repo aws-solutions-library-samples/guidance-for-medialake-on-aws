@@ -51,16 +51,15 @@ def validate_widget_sizes(
     Size constraints are applied per breakpoint:
     - lg (large): Full constraints apply (12-column grid)
     - md (medium): Relaxed minimum width (10-column grid)
-    - sm (small): Minimal constraints (1-2 column grid, widgets can be full width)
+    - sm (small): 6-column grid, widgets stack full-width
     """
     result = ValidationResult()
 
     widget_types = {w["id"]: w.get("type") for w in widgets}
 
     # Breakpoint-specific minimum width multipliers
-    # sm breakpoint typically has 1-2 columns, so min width of 1 is valid
     breakpoint_min_width_override = {
-        "sm": 1,  # Small screens: allow width of 1 (full width on mobile)
+        "sm": 2,  # Small screens (6-column grid): allow smaller widgets
         "md": 2,  # Medium screens: allow smaller widgets
         # "lg" uses the default constraints
     }

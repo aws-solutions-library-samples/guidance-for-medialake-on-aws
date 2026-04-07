@@ -85,9 +85,9 @@ DEFAULT_LAYOUT = {
             {"i": "default-all-collections", "x": 5, "y": 6, "w": 5, "h": 6},
         ],
         "sm": [
-            {"i": "recent-assets-default", "x": 0, "y": 0, "w": 1, "h": 6},
-            {"i": "favorites-default", "x": 0, "y": 6, "w": 1, "h": 6},
-            {"i": "default-all-collections", "x": 0, "y": 12, "w": 1, "h": 6},
+            {"i": "recent-assets-default", "x": 0, "y": 0, "w": 6, "h": 6},
+            {"i": "favorites-default", "x": 0, "y": 6, "w": 6, "h": 6},
+            {"i": "default-all-collections", "x": 0, "y": 12, "w": 6, "h": 6},
         ],
     },
 }
