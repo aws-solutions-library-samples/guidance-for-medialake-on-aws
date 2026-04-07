@@ -91,11 +91,14 @@ def extract_api_key_from_header(headers: Dict[str, str]) -> Optional[str]:
     Returns:
         API key value or None if not found
     """
-    # Check for X-API-Key header (case-insensitive)
-    api_key = headers.get("X-API-Key") or headers.get("x-api-key")
-    if api_key:
-        logger.info("Found API key in X-API-Key header")
-        return api_key
+    # Truly case-insensitive header lookup — the header may arrive as
+    # "X-Api-Key", "X-API-Key", "x-api-key", etc. depending on the
+    # client, CloudFront, or API Gateway normalisation.
+    if headers:
+        for key, value in headers.items():
+            if key.lower() == "x-api-key":
+                logger.info("Found API key in %s header", key)
+                return value
     return None
 
 
@@ -976,26 +979,14 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
             )
             raise Exception(f"Error retrieving API key secret: {str(secret_err)}")
 
-        # Compare provided secret with stored secret
-        try:
-            if not secrets.compare_digest(provided_secret, stored_secret):
-                metrics.add_metric(
-                    name="validate.api_key.invalid_secret",
-                    unit=MetricUnit.Count,
-                    value=1,
-                )
-                raise Exception("Invalid API key")
-        except Exception as compare_err:
+        # Compare provided secret with stored secret using constant-time comparison
+        if not secrets.compare_digest(provided_secret, stored_secret):
             metrics.add_metric(
-                name="validate.api_key.secret_comparison_error",
+                name="validate.api_key.invalid_secret",
                 unit=MetricUnit.Count,
                 value=1,
             )
-            logger.error(
-                f"Error comparing secrets for API key {api_key_item['id']}: {str(compare_err)}",
-                extra={"correlation_id": correlation_id},
-            )
-            raise Exception("Error validating API key secret")
+            raise Exception("Invalid API key secret")
 
         # Cache successful validation (5 minutes TTL)
         api_key_validation_cache[cache_key] = {
@@ -2133,18 +2124,29 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
                 # Log the policy response before returning
                 logger.info(
-                    f"Returning API key policy response: {json.dumps(policy, default=str)}",
+                    f"Returning API key policy response: Effect={effect}",
                     extra={"correlation_id": correlation_id},
                 )
 
-                # Additional debug logging for policy structure
-                logger.info(f"Policy principalId type: {type(policy['principalId'])}")
-                logger.info(
-                    f"Policy context types: {[(k, type(v)) for k, v in policy['context'].items()]}"
-                )
-                logger.info(
-                    f"Policy context values: {[(k, repr(v)) for k, v in policy['context'].items()]}"
-                )
+                # Best-effort update of lastUsedAt timestamp for the API key.
+                # This is fire-and-forget — failures must never block the auth response.
+                if effect == "Allow" and API_KEYS_TABLE_NAME:
+                    try:
+                        from datetime import datetime, timezone
+
+                        dynamodb.update_item(
+                            TableName=API_KEYS_TABLE_NAME,
+                            Key={"id": {"S": api_key_item.get("id", "")}},
+                            UpdateExpression="SET lastUsedAt = :ts",
+                            ExpressionAttributeValues={
+                                ":ts": {"S": datetime.now(timezone.utc).isoformat()}
+                            },
+                        )
+                    except Exception as lu_err:
+                        logger.warning(
+                            f"Failed to update lastUsedAt for API key: {lu_err}",
+                            extra={"correlation_id": correlation_id},
+                        )
 
                 return policy
 

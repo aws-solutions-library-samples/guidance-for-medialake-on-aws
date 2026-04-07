@@ -87,6 +87,7 @@ class SharedAuthorizerConstruct(Construct):
                 actions=[
                     "dynamodb:GetItem",
                     "dynamodb:Query",
+                    "dynamodb:UpdateItem",
                 ],
                 resources=[props.api_keys_table_arn],
             )
