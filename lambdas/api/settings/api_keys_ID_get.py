@@ -44,6 +44,7 @@ def register_route(app):
                 "scope": item.get("scope", "custom"),
                 "createdAt": item.get("createdAt"),
                 "updatedAt": item.get("updatedAt"),
+                "lastUsedAt": item.get("lastUsedAt"),
             }
 
             # Include permissions if present
