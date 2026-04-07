@@ -708,7 +708,7 @@ Resources:
                   }
 
                   cleanup_and_bootstrap "${AWS::AccountId}" "${AWS::Region}"
-                - |
+
                   if [ "${AWS::Region}" != "us-east-1" ]; then
                     cleanup_and_bootstrap "${AWS::AccountId}" "us-east-1"
                   fi

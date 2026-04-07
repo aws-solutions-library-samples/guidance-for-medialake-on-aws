@@ -30,7 +30,7 @@ function lazyLoad(factory: () => Promise<{ default: React.ComponentType<any> }>)
   );
 }
 
-// Auth page is on the critical path for unauthenticated users — keep eager
+// Auth page is always the first page loaded — keep eager
 import AuthPage from "@/components/AuthPage";
 import AccessDeniedPage from "@/pages/AccessDeniedPage";
 // Lazy page elements — each creates its own code-split chunk

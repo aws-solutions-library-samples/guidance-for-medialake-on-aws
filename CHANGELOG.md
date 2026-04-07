@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.11.4] - 2026-04-07
+
+### Bug Fixes
+
+- fix: CloudFormation deploy script causing CodeBuild not able to deploy to regions outside of us-east-1
+- fix: use of Marengo 3 async calls to use regional ID instead of inference profiles
+- fix: vite chunking modified to have aws-amplify and react in the same chunk
+- fix: search settings API returns proper HTTP status codes
+- fix(search): fixing asset filter results
+
 ## [1.11.3] - 2026-03-29
 
 ### Bug Fixes
