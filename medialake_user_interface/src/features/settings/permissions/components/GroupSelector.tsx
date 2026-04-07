@@ -9,11 +9,14 @@ import {
   Typography,
   Paper,
   Button,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import GroupIcon from "@mui/icons-material/Group";
 import SecurityIcon from "@mui/icons-material/Security";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { Group } from "@/api/types/group.types";
 
 interface GroupSelectorProps {
@@ -21,6 +24,7 @@ interface GroupSelectorProps {
   selectedGroupId: string;
   onGroupChange: (groupId: string) => void;
   onCreateGroupClick?: () => void;
+  onDeleteGroupClick?: () => void;
 }
 
 export function GroupSelector({
@@ -28,6 +32,7 @@ export function GroupSelector({
   selectedGroupId,
   onGroupChange,
   onCreateGroupClick,
+  onDeleteGroupClick,
 }: GroupSelectorProps) {
   const { t } = useTranslation();
 
@@ -103,6 +108,19 @@ export function GroupSelector({
             >
               {t("permissions.newGroup", "New Group")}
             </Button>
+          )}
+
+          {onDeleteGroupClick && selectedGroupId && (
+            <Tooltip title={t("permissions.deleteGroup", "Delete Group")}>
+              <IconButton
+                color="error"
+                onClick={onDeleteGroupClick}
+                size="medium"
+                aria-label={t("permissions.deleteGroup", "Delete Group")}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
       </Box>

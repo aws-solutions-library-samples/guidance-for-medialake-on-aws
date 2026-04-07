@@ -1378,6 +1378,7 @@ export default {
     messages: {
       createSuccess: "Group created successfully",
       createError: "Failed to create group",
+      deleteError: "Error al eliminar el grupo. Inténtelo de nuevo.",
       updateSuccess: "Group updated successfully",
       updateError: "Failed to update group",
       deleteSuccess: "Group deleted successfully",
@@ -1525,6 +1526,11 @@ export default {
     saveError: "Error al guardar los permisos",
     groupCreated: '¡Grupo "{{name}}" creado exitosamente!',
     createError: "Error al crear el grupo. Por favor, inténtelo de nuevo.",
+    deleteGroup: "Eliminar grupo",
+    deleteConfirm:
+      '¿Está seguro de que desea eliminar "{{name}}"? Esta acción no se puede deshacer.',
+    groupDeleted: 'Grupo "{{name}}" eliminado correctamente',
+    deleteError: "Error al eliminar el grupo. Inténtelo de nuevo.",
     copyError: "Error al copiar los permisos. Por favor, inténtelo de nuevo.",
     copySourceNotLoaded:
       "Los permisos del grupo de origen no están cargados. Seleccione primero el grupo de origen.",
