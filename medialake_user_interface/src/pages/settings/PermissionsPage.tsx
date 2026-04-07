@@ -48,7 +48,7 @@ import {
   AreaId,
   isPermissionApplicable,
 } from "@/features/settings/permissions/types/permissions.types";
-import { useCreateGroup } from "@/api/hooks/useGroups";
+import { useCreateGroup, useDeleteGroup } from "@/api/hooks/useGroups";
 
 // Types for change history
 interface PermissionChange {
@@ -129,6 +129,7 @@ const PermissionsPage: React.FC = () => {
   // Fetch groups
   const { data: groups = [], isLoading: isLoadingGroups, error: groupsError } = useGetGroups();
   const createGroupMutation = useCreateGroup();
+  const deleteGroupMutation = useDeleteGroup();
   const updatePermissionsMutation = useUpdateGroupPermissions();
 
   // View mode: 'single' or 'compare'
@@ -332,6 +333,45 @@ const PermissionsPage: React.FC = () => {
       console.error("Error creating group:", err);
       setSaveSeverity("error");
       setSaveMessage(t("permissions.createError", "Error creating group. Please try again."));
+      setSaveSuccess(true);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!selectedGroupId || !selectedGroup) return;
+
+    if (
+      !window.confirm(
+        t("permissions.deleteConfirm", {
+          name: selectedGroup.name,
+          defaultValue: `Are you sure you want to delete "${selectedGroup.name}"? This action cannot be undone.`,
+        })
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteGroupMutation.mutateAsync(selectedGroupId);
+
+      // Select the first remaining group
+      const remaining = groups.filter((g) => g.id !== selectedGroupId);
+      setSelectedGroupId(remaining.length > 0 ? remaining[0].id : "");
+      setHasChanges(false);
+      setChangeHistory([]);
+
+      setSaveSeverity("success");
+      setSaveMessage(
+        t("permissions.groupDeleted", {
+          name: selectedGroup.name,
+          defaultValue: `Group "${selectedGroup.name}" deleted successfully`,
+        })
+      );
+      setSaveSuccess(true);
+    } catch (err) {
+      console.error("Error deleting group:", err);
+      setSaveSeverity("error");
+      setSaveMessage(t("permissions.deleteError", "Error deleting group. Please try again."));
       setSaveSuccess(true);
     }
   };
@@ -622,6 +662,7 @@ const PermissionsPage: React.FC = () => {
               selectedGroupId={selectedGroupId}
               onGroupChange={handleGroupChange}
               onCreateGroupClick={() => setCreateDialogOpen(true)}
+              onDeleteGroupClick={handleDeleteGroup}
             />
           </Box>
         ) : (

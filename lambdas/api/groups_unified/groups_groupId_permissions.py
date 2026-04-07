@@ -203,7 +203,21 @@ def _transform_permissions(permissions_data) -> List[Dict[str, Any]]:
     """
     Transform permissions from various stored formats to a standard array format.
     Handles both object format (resource.action: true) and array format.
+
+    Resource names are normalised to match the frontend area IDs
+    (e.g. "defaultDashboard" → "default_dashboard").
     """
+
+    # Map backend resource keys to frontend area IDs
+    _RESOURCE_NAME_MAP = {
+        "defaultDashboard": "default_dashboard",
+        "pipelinesExecutions": "pipelines_executions",
+        "settings-menu": "settings_menu",
+    }
+
+    def _normalise_resource(name: str) -> str:
+        return _RESOURCE_NAME_MAP.get(name, name)
+
     if isinstance(permissions_data, list):
         # Validate each item has the required keys
         validated = []
@@ -211,11 +225,18 @@ def _transform_permissions(permissions_data) -> List[Dict[str, Any]]:
             if isinstance(item, dict) and all(
                 k in item for k in ("action", "resource", "effect")
             ):
-                validated.append(item)
+                normalised = dict(item)
+                normalised["resource"] = _normalise_resource(normalised["resource"])
+                validated.append(normalised)
         return validated
 
     if isinstance(permissions_data, dict):
         permissions_array = []
+        # Track actions seen under the "settings" key so we can also emit
+        # permissions for the "settings" resource itself (the frontend has a
+        # dedicated "settings" row in the permission matrix).
+        settings_actions = set()
+
         for key, value in permissions_data.items():
             if isinstance(value, dict):
                 # Nested format: { "assets": { "view": true, "edit": true } }
@@ -225,21 +246,22 @@ def _transform_permissions(permissions_data) -> List[Dict[str, Any]]:
                         # Double-nested: e.g. settings.users.view
                         for action_key, action_value in sub_value.items():
                             if isinstance(action_value, bool) and action_value:
+                                resource = sub_key if key == "settings" else key
                                 permissions_array.append(
                                     {
                                         "action": action_key,
-                                        "resource": (
-                                            sub_key if key == "settings" else key
-                                        ),
+                                        "resource": _normalise_resource(resource),
                                         "effect": "Allow",
                                     }
                                 )
+                                if key == "settings":
+                                    settings_actions.add(action_key)
                     elif isinstance(sub_value, bool) and sub_value:
                         # Single-nested: e.g. assets.view = true
                         permissions_array.append(
                             {
                                 "action": sub_key,
-                                "resource": key,
+                                "resource": _normalise_resource(key),
                                 "effect": "Allow",
                             }
                         )
@@ -255,10 +277,22 @@ def _transform_permissions(permissions_data) -> List[Dict[str, Any]]:
                     permissions_array.append(
                         {
                             "action": action,
-                            "resource": resource,
+                            "resource": _normalise_resource(resource),
                             "effect": "Allow",
                         }
                     )
+
+        # Emit aggregated "settings" resource permissions so the frontend
+        # settings row in the permission matrix is populated.
+        for action in settings_actions:
+            permissions_array.append(
+                {
+                    "action": action,
+                    "resource": "settings",
+                    "effect": "Allow",
+                }
+            )
+
         return permissions_array
 
     return []

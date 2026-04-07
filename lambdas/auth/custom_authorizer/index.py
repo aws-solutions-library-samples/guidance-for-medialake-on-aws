@@ -1169,10 +1169,10 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "post /settings/roles": "permissions:create",
         "put /settings/roles/{id}": "permissions:edit",
         "delete /settings/roles/{id}": "permissions:delete",
-        # Search endpoints
-        "get /search": "search:view",
-        "get /search/fields": "search:view",
-        "get /search/connectors": "search:view",
+        # Search endpoints - accessible to all authenticated users
+        "get /search": None,
+        "get /search/fields": None,
+        "get /search/connectors": None,
         # Settings endpoints
         "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
@@ -1180,17 +1180,20 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "put /settings/api-keys/{id}/permissions": "api-keys:edit",
         "delete /settings/api-keys/{id}": "api-keys:delete",
         # Collection types endpoints
-        "get /settings/collection-types": "collection-types:view",
+        # GET collection types is needed by all users for collections UI
+        "get /settings/collection-types": None,
         "post /settings/collection-types": "collection-types:create",
         "put /settings/collection-types/{type_id}": "collection-types:edit",
         "delete /settings/collection-types/{type_id}": "collection-types:delete",
         "post /settings/collection-types/{type_id}/migrate": "collection-types:edit",
         # System settings endpoints
-        "get /settings/system": "system:view",
-        "get /settings/system/search": "system:view",
+        # GET system settings are needed by all users for app initialization
+        "get /settings/system": None,
+        "get /settings/system/search": None,
         "post /settings/system/search": "system:edit",
         "put /settings/system/search": "system:edit",
-        "get /settings/userprofile": "users:view",
+        # User profile - accessible to all authenticated users
+        "get /settings/userprofile": None,
         "get /settings/users": "users:view",
         "put /settings/users/{id}": "users:edit",
         "delete /settings/users/{id}": "users:delete",
@@ -1207,6 +1210,10 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "delete /users/{user_id}": "users:delete",
         "post /users/{user_id}/enable": "users:edit",
         "post /users/{user_id}/disable": "users:edit",
+        # User favorites - accessible to all authenticated users (no permission required)
+        "get /users/favorites": None,
+        "post /users/favorites": None,
+        "delete /users/favorites/{itemType}/{itemId}": None,
     }
 
 
@@ -1263,9 +1270,8 @@ def get_required_permission(
     action_key = f"{http_method.lower()} {normalized_path}"
 
     # Try exact match first
-    required_permission = permission_mapping.get(action_key)
-
-    if required_permission:
+    if action_key in permission_mapping:
+        required_permission = permission_mapping[action_key]
         logger.debug(
             f"Found exact permission match: {action_key} -> {required_permission}"
         )

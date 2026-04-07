@@ -1381,6 +1381,7 @@ export default {
     messages: {
       createSuccess: "Group created successfully",
       createError: "Failed to create group",
+      deleteError: "Fehler beim Löschen der Gruppe. Bitte versuchen Sie es erneut.",
       updateSuccess: "Group updated successfully",
       updateError: "Failed to update group",
       deleteSuccess: "Group deleted successfully",
@@ -1529,6 +1530,11 @@ export default {
     saveError: "Fehler beim Speichern der Berechtigungen",
     groupCreated: 'Gruppe "{{name}}" erfolgreich erstellt!',
     createError: "Fehler beim Erstellen der Gruppe. Bitte versuchen Sie es erneut.",
+    deleteGroup: "Gruppe löschen",
+    deleteConfirm:
+      'Möchten Sie "{{name}}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    groupDeleted: 'Gruppe "{{name}}" erfolgreich gelöscht',
+    deleteError: "Fehler beim Löschen der Gruppe. Bitte versuchen Sie es erneut.",
     copyError: "Fehler beim Kopieren der Berechtigungen. Bitte versuchen Sie es erneut.",
     copySourceNotLoaded:
       "Quellgruppen-Berechtigungen nicht geladen. Wählen Sie zuerst die Quellgruppe aus.",

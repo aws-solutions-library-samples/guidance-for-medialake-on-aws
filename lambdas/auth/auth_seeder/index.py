@@ -72,6 +72,7 @@ DEFAULT_PERMISSION_SETS = [
         "permissions": {
             # Asset permissions
             "assets": {
+                "create": True,
                 "upload": True,
                 "download": True,
                 "view": True,
@@ -85,7 +86,14 @@ DEFAULT_PERMISSION_SETS = [
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
-            "defaultDashboard": {"edit": True},
+            # Dashboard permissions
+            "dashboard": {"view": True, "create": True, "edit": True, "delete": True},
+            "defaultDashboard": {
+                "view": True,
+                "create": True,
+                "edit": True,
+                "delete": True,
+            },
             # System permissions (top-level for app initialization)
             "system": {
                 "view": True,
@@ -210,6 +218,7 @@ DEFAULT_PERMISSION_SETS = [
         "permissions": {
             # Asset permissions
             "assets": {
+                "create": True,
                 "upload": True,
                 "download": True,
                 "view": True,
@@ -223,10 +232,10 @@ DEFAULT_PERMISSION_SETS = [
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
             "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            # Dashboard permissions
+            "dashboard": {"view": True, "create": True, "edit": True, "delete": True},
             # Collection types (view only - needed to work with collections)
             "collection-types": {"view": True},
-            # Users (view only - needed for user lookups in collections sharing, etc.)
-            "users": {"view": True},
             # System permissions (read-only for app initialization)
             "system": {
                 "view": True,
@@ -280,10 +289,10 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
                 "delete": False,
             },
+            # Dashboard permissions (view only)
+            "dashboard": {"view": True},
             # Collection types (view only - needed to view collections)
             "collection-types": {"view": True},
-            # Users (view only - needed for user lookups)
-            "users": {"view": True},
             # System permissions (read-only for app initialization)
             "system": {
                 "view": True,

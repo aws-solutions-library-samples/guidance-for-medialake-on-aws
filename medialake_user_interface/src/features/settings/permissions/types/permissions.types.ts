@@ -42,6 +42,7 @@ export const PERMISSION_TYPES: { id: PermissionType; label: string }[] = [
 export const PERMISSION_APPLICABILITY: Record<PermissionType, AreaId[] | "all"> = {
   view: [
     "dashboard",
+    "default_dashboard",
     "assets",
     "collections",
     "connectors",
@@ -53,6 +54,7 @@ export const PERMISSION_APPLICABILITY: Record<PermissionType, AreaId[] | "all"> 
   ],
   create: [
     "dashboard",
+    "default_dashboard",
     "assets",
     "collections",
     "connectors",
@@ -65,6 +67,7 @@ export const PERMISSION_APPLICABILITY: Record<PermissionType, AreaId[] | "all"> 
   edit: "all",
   delete: [
     "dashboard",
+    "default_dashboard",
     "assets",
     "collections",
     "connectors",
