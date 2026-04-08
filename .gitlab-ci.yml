@@ -246,7 +246,10 @@ release_manual:
         elif [[ "${SUBJECT}" =~ ^perf(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           [ "${BUMP_TYPE}" = "none" ] && BUMP_TYPE="patch"
           PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^(build|test|style|docs|ci|chore|release)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
+        elif [[ "${SUBJECT}" =~ ^test(\([a-zA-Z0-9_.+-]+\))?: ]]; then
+          [ "${BUMP_TYPE}" = "none" ] && BUMP_TYPE="patch"
+          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
+        elif [[ "${SUBJECT}" =~ ^(build|style|docs|ci|chore|release)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
         else
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
