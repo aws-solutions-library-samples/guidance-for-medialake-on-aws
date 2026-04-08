@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.11.5] - 2026-04-07
+
+### Bug Fixes
+
+- fix: api keys last used date is now updated and case sensitivity removed for...
+- fix: updates to break points for viewport and container for widgets
+- fix: permission set creation error handling, matrix display,...
+
+### Other Changes
+
+- ci: removal of temp dir
+
 ## [1.11.4] - 2026-04-07
 
 ### Bug Fixes

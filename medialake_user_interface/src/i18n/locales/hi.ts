@@ -1373,6 +1373,7 @@ export default {
     messages: {
       createSuccess: "Group created successfully",
       createError: "Failed to create group",
+      deleteError: "समूह हटाने में त्रुटि। कृपया पुनः प्रयास करें।",
       updateSuccess: "Group updated successfully",
       updateError: "Failed to update group",
       deleteSuccess: "Group deleted successfully",
@@ -1519,6 +1520,10 @@ export default {
     saveError: "अनुमतियां सहेजने में त्रुटि",
     groupCreated: 'समूह "{{name}}" सफलतापूर्वक बनाया गया!',
     createError: "समूह बनाने में त्रुटि। कृपया पुनः प्रयास करें।",
+    deleteGroup: "समूह हटाएं",
+    deleteConfirm: 'क्या आप वाकई "{{name}}" को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
+    groupDeleted: 'समूह "{{name}}" सफलतापूर्वक हटाया गया',
+    deleteError: "समूह हटाने में त्रुटि। कृपया पुनः प्रयास करें।",
     copyError: "अनुमतियां कॉपी करने में त्रुटि। कृपया पुनः प्रयास करें।",
     copySourceNotLoaded: "स्रोत समूह की अनुमतियां लोड नहीं हुईं। पहले स्रोत समूह चुनें।",
     unsavedWarning: "आपके पास सहेजे नहीं गए परिवर्तन हैं। क्या आप वाकई जारी रखना चाहते हैं?",

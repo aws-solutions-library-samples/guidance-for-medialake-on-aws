@@ -91,11 +91,14 @@ def extract_api_key_from_header(headers: Dict[str, str]) -> Optional[str]:
     Returns:
         API key value or None if not found
     """
-    # Check for X-API-Key header (case-insensitive)
-    api_key = headers.get("X-API-Key") or headers.get("x-api-key")
-    if api_key:
-        logger.info("Found API key in X-API-Key header")
-        return api_key
+    # Truly case-insensitive header lookup — the header may arrive as
+    # "X-Api-Key", "X-API-Key", "x-api-key", etc. depending on the
+    # client, CloudFront, or API Gateway normalisation.
+    if headers:
+        for key, value in headers.items():
+            if key.lower() == "x-api-key":
+                logger.info("Found API key in %s header", key)
+                return value
     return None
 
 
@@ -976,26 +979,14 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
             )
             raise Exception(f"Error retrieving API key secret: {str(secret_err)}")
 
-        # Compare provided secret with stored secret
-        try:
-            if not secrets.compare_digest(provided_secret, stored_secret):
-                metrics.add_metric(
-                    name="validate.api_key.invalid_secret",
-                    unit=MetricUnit.Count,
-                    value=1,
-                )
-                raise Exception("Invalid API key")
-        except Exception as compare_err:
+        # Compare provided secret with stored secret using constant-time comparison
+        if not secrets.compare_digest(provided_secret, stored_secret):
             metrics.add_metric(
-                name="validate.api_key.secret_comparison_error",
+                name="validate.api_key.invalid_secret",
                 unit=MetricUnit.Count,
                 value=1,
             )
-            logger.error(
-                f"Error comparing secrets for API key {api_key_item['id']}: {str(compare_err)}",
-                extra={"correlation_id": correlation_id},
-            )
-            raise Exception("Error validating API key secret")
+            raise Exception("Invalid API key secret")
 
         # Cache successful validation (5 minutes TTL)
         api_key_validation_cache[cache_key] = {
@@ -1169,10 +1160,10 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "post /settings/roles": "permissions:create",
         "put /settings/roles/{id}": "permissions:edit",
         "delete /settings/roles/{id}": "permissions:delete",
-        # Search endpoints
-        "get /search": "search:view",
-        "get /search/fields": "search:view",
-        "get /search/connectors": "search:view",
+        # Search endpoints - accessible to all authenticated users
+        "get /search": None,
+        "get /search/fields": None,
+        "get /search/connectors": None,
         # Settings endpoints
         "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
@@ -1180,17 +1171,20 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "put /settings/api-keys/{id}/permissions": "api-keys:edit",
         "delete /settings/api-keys/{id}": "api-keys:delete",
         # Collection types endpoints
-        "get /settings/collection-types": "collection-types:view",
+        # GET collection types is needed by all users for collections UI
+        "get /settings/collection-types": None,
         "post /settings/collection-types": "collection-types:create",
         "put /settings/collection-types/{type_id}": "collection-types:edit",
         "delete /settings/collection-types/{type_id}": "collection-types:delete",
         "post /settings/collection-types/{type_id}/migrate": "collection-types:edit",
         # System settings endpoints
-        "get /settings/system": "system:view",
-        "get /settings/system/search": "system:view",
+        # GET system settings are needed by all users for app initialization
+        "get /settings/system": None,
+        "get /settings/system/search": None,
         "post /settings/system/search": "system:edit",
         "put /settings/system/search": "system:edit",
-        "get /settings/userprofile": "users:view",
+        # User profile - accessible to all authenticated users
+        "get /settings/userprofile": None,
         "get /settings/users": "users:view",
         "put /settings/users/{id}": "users:edit",
         "delete /settings/users/{id}": "users:delete",
@@ -1207,6 +1201,10 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "delete /users/{user_id}": "users:delete",
         "post /users/{user_id}/enable": "users:edit",
         "post /users/{user_id}/disable": "users:edit",
+        # User favorites - accessible to all authenticated users (no permission required)
+        "get /users/favorites": None,
+        "post /users/favorites": None,
+        "delete /users/favorites/{itemType}/{itemId}": None,
     }
 
 
@@ -1263,9 +1261,8 @@ def get_required_permission(
     action_key = f"{http_method.lower()} {normalized_path}"
 
     # Try exact match first
-    required_permission = permission_mapping.get(action_key)
-
-    if required_permission:
+    if action_key in permission_mapping:
+        required_permission = permission_mapping[action_key]
         logger.debug(
             f"Found exact permission match: {action_key} -> {required_permission}"
         )
@@ -2127,18 +2124,29 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
                 # Log the policy response before returning
                 logger.info(
-                    f"Returning API key policy response: {json.dumps(policy, default=str)}",
+                    f"Returning API key policy response: Effect={effect}",
                     extra={"correlation_id": correlation_id},
                 )
 
-                # Additional debug logging for policy structure
-                logger.info(f"Policy principalId type: {type(policy['principalId'])}")
-                logger.info(
-                    f"Policy context types: {[(k, type(v)) for k, v in policy['context'].items()]}"
-                )
-                logger.info(
-                    f"Policy context values: {[(k, repr(v)) for k, v in policy['context'].items()]}"
-                )
+                # Best-effort update of lastUsedAt timestamp for the API key.
+                # This is fire-and-forget — failures must never block the auth response.
+                if effect == "Allow" and API_KEYS_TABLE_NAME:
+                    try:
+                        from datetime import datetime, timezone
+
+                        dynamodb.update_item(
+                            TableName=API_KEYS_TABLE_NAME,
+                            Key={"id": {"S": api_key_item.get("id", "")}},
+                            UpdateExpression="SET lastUsedAt = :ts",
+                            ExpressionAttributeValues={
+                                ":ts": {"S": datetime.now(timezone.utc).isoformat()}
+                            },
+                        )
+                    except Exception as lu_err:
+                        logger.warning(
+                            f"Failed to update lastUsedAt for API key: {lu_err}",
+                            extra={"correlation_id": correlation_id},
+                        )
 
                 return policy
 

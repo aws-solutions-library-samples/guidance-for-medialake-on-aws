@@ -1514,6 +1514,10 @@ export default {
     saveError: "権限の保存中にエラーが発生しました",
     groupCreated: 'グループ "{{name}}" が正常に作成されました！',
     createError: "グループの作成中にエラーが発生しました。もう一度お試しください。",
+    deleteGroup: "グループを削除",
+    deleteConfirm: '"{{name}}"を削除してもよろしいですか？この操作は元に戻せません。',
+    groupDeleted: 'グループ"{{name}}"が正常に削除されました',
+    deleteError: "グループの削除中にエラーが発生しました。もう一度お試しください。",
     copyError: "権限のコピー中にエラーが発生しました。もう一度お試しください。",
     copySourceNotLoaded:
       "ソースグループの権限が読み込まれていません。先にソースグループを選択してください。",

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import {
   ResponsiveGridLayout,
   verticalCompactor,
@@ -42,8 +42,8 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 // Grid configuration
-const BREAKPOINTS = { xl: 1600, lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
-const COLS = { xl: 12, lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
+const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
+const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
 const ROW_HEIGHT = 80;
 const MARGIN: [number, number] = [16, 16];
 
@@ -87,12 +87,31 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
   // NOT mark the dashboard as having unsaved changes.
   const userInteractedRef = useRef(false);
 
-  // Measure container width
+  // Ref to hold the latest layout for use inside handleLayoutChange without
+  // adding it to the callback's dependency array (avoids re-creating the
+  // callback on every layout change which would feed back into the grid).
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+
+  // Measure container width with debounce to prevent rapid re-renders during
+  // continuous resize (e.g. opening DevTools, dragging window edge).
   useEffect(() => {
+    let rafId: number | null = null;
+
     const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
+      // Cancel any pending frame to coalesce rapid ResizeObserver callbacks
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
       }
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (containerRef.current) {
+          const newWidth = containerRef.current.offsetWidth;
+          // Only update state when the width actually changed to avoid
+          // unnecessary re-renders that trigger layout recalculations.
+          setContainerWidth((prev) => (prev === newWidth ? prev : newWidth));
+        }
+      });
     };
 
     updateWidth();
@@ -102,7 +121,12 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
       resizeObserver.observe(containerRef.current);
     }
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, []);
 
   // Handle layout change from react-grid-layout
@@ -122,8 +146,8 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
           maxH: item.maxH,
         }));
 
-      // Use xl layout for lg if available, otherwise fall back
-      const lgLayout = allLayouts.xl || allLayouts.lg || currentLayout;
+      // Use the lg layout directly
+      const lgLayout = allLayouts.lg || currentLayout;
 
       const newLayouts = {
         lg: convertLayout(lgLayout),
@@ -131,11 +155,17 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
         sm: convertLayout(allLayouts.sm || currentLayout),
       };
 
+      // Read the current layout from the ref to avoid depending on `layout`
+      // in the dependency array. This prevents re-creating this callback on
+      // every store update, which would cause the grid to re-render and fire
+      // onLayoutChange again (feedback loop).
+      const currentStoreLayout = layoutRef.current;
+
       // Only update the store if the layout actually changed.
       // react-grid-layout fires onLayoutChange during mount and on programmatic
       // layout updates — those should not mark the dashboard as modified.
-      if (JSON.stringify(layout.layouts) !== JSON.stringify(newLayouts)) {
-        const updatedLayout = { ...layout, layouts: newLayouts };
+      if (JSON.stringify(currentStoreLayout.layouts) !== JSON.stringify(newLayouts)) {
+        const updatedLayout = { ...currentStoreLayout, layouts: newLayouts };
 
         if (userInteractedRef.current) {
           // User dragged or resized a widget — mark as dirty
@@ -148,7 +178,7 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
         }
       }
     },
-    [layout, setLayout, initializeLayout]
+    [setLayout, initializeLayout]
   );
 
   const handleAddWidget = useCallback(
@@ -212,12 +242,42 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ className, showHea
     });
   };
 
-  const responsiveLayouts: ResponsiveLayouts<string> = {
-    xl: convertToRGLLayout(layout.layouts?.lg), // Use lg layout for xl screens
-    lg: convertToRGLLayout(layout.layouts?.lg),
-    md: convertToRGLLayout(layout.layouts?.md),
-    sm: convertToRGLLayout(layout.layouts?.sm),
+  // Build per-breakpoint layouts that match the column counts.
+  // xs (4 cols) and xxs (2 cols) stack widgets full-width.
+  const buildSmallLayout = (items: LayoutItem[] | undefined, cols: number): RGLLayoutItem[] => {
+    if (!items || !Array.isArray(items)) return [];
+    // Stack all widgets full-width, one after another
+    let y = 0;
+    return items.map((item) => {
+      const widgetDef =
+        WIDGET_DEFINITIONS[layout.widgets.find((w) => w.id === item.i)?.type || "favorites"];
+      const entry: RGLLayoutItem = {
+        i: item.i,
+        x: 0,
+        y,
+        w: cols,
+        h: item.h,
+        minW: Math.min(widgetDef.minSize.w, cols),
+        minH: widgetDef.minSize.h,
+        maxW: cols,
+        maxH: widgetDef.maxSize.h,
+      };
+      y += item.h;
+      return entry;
+    });
   };
+
+  const responsiveLayouts: ResponsiveLayouts<string> = useMemo(
+    () => ({
+      lg: convertToRGLLayout(layout.layouts?.lg),
+      md: convertToRGLLayout(layout.layouts?.md),
+      sm: convertToRGLLayout(layout.layouts?.sm),
+      xs: buildSmallLayout(layout.layouts?.sm, COLS.xs),
+      xxs: buildSmallLayout(layout.layouts?.sm, COLS.xxs),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout.layouts, layout.widgets]
+  );
 
   return (
     <Box className={className} sx={{ width: "100%" }} ref={containerRef}>

@@ -75,11 +75,19 @@ export const useCreateGroup = () => {
 
   return useMutation<GroupResponse, Error, CreateGroupRequest>({
     mutationFn: async (groupData) => {
-      const { data } = await apiClient.post<{
-        statusCode: number;
-        body: string;
-      }>(API_ENDPOINTS.GROUPS.BASE, groupData);
-      return JSON.parse(data.body);
+      const { data } = await apiClient.post<any>(API_ENDPOINTS.GROUPS.BASE, groupData);
+
+      // The response interceptor already unwraps Lambda proxy format
+      // (parses body string and replaces data), so data may already be
+      // the parsed body object. Only parse if body is still a string.
+      if (typeof data.body === "string") {
+        return JSON.parse(data.body);
+      }
+      if (data.body && typeof data.body === "object") {
+        return data.body;
+      }
+      // Interceptor already unwrapped — data IS the parsed body
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.GROUPS.all });
@@ -92,11 +100,15 @@ export const useUpdateGroup = () => {
 
   return useMutation<GroupResponse, Error, { id: string; updates: UpdateGroupRequest }>({
     mutationFn: async ({ id, updates }) => {
-      const { data } = await apiClient.put<{
-        statusCode: number;
-        body: string;
-      }>(API_ENDPOINTS.GROUPS.UPDATE(id), updates);
-      return JSON.parse(data.body);
+      const { data } = await apiClient.put<any>(API_ENDPOINTS.GROUPS.UPDATE(id), updates);
+
+      if (typeof data.body === "string") {
+        return JSON.parse(data.body);
+      }
+      if (data.body && typeof data.body === "object") {
+        return data.body;
+      }
+      return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.GROUPS.all });
@@ -129,11 +141,18 @@ export const useAddGroupMembers = () => {
     { groupId: string; request: AddGroupMembersRequest }
   >({
     mutationFn: async ({ groupId, request }) => {
-      const { data } = await apiClient.post<{
-        statusCode: number;
-        body: string;
-      }>(API_ENDPOINTS.GROUPS.ADD_MEMBERS(groupId), request);
-      return JSON.parse(data.body);
+      const { data } = await apiClient.post<any>(
+        API_ENDPOINTS.GROUPS.ADD_MEMBERS(groupId),
+        request
+      );
+
+      if (typeof data.body === "string") {
+        return JSON.parse(data.body);
+      }
+      if (data.body && typeof data.body === "object") {
+        return data.body;
+      }
+      return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
