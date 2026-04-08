@@ -354,12 +354,15 @@ release_manual:
         cp /tmp/tag_message.txt /tmp/github_release_notes.md
       fi
 
+      # Mirror to GitHub (fatal — repos must stay in sync)
       if ! git remote | grep -q '^github$'; then
         git remote add github "git@github.com:${GITHUB_REPO}.git"
       fi
 
-      git push github main "${NEW_TAG}"
+      git push github main "${NEW_TAG}" --force
       git push --force github latest-release
+
+      echo "Published ${NEW_TAG} to GitLab and GitHub."
 
       # GitHub release creation — uncomment when GITHUB_TOKEN is available
       # if gh release view "${NEW_TAG}" --repo "${GITHUB_REPO}" >/dev/null 2>&1; then
@@ -374,8 +377,6 @@ release_manual:
       #     --notes-file /tmp/github_release_notes.md
       # fi
 
-      echo "Published ${NEW_TAG} to GitLab and GitHub."
-      echo "If GitHub publishing fails after GitLab push succeeds, manually push the tag/branch to GitHub and create the GitHub release from CHANGELOG.md."
       SCRIPT_EOF
     - bash /tmp/release_and_publish.sh
   after_script:
