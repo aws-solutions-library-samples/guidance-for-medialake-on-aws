@@ -1377,7 +1377,6 @@ export default {
       updateSuccess: "Group updated successfully",
       updateError: "Failed to update group",
       deleteSuccess: "Group deleted successfully",
-      deleteError: "Failed to delete group",
       confirmDelete: "Are you sure you want to delete this group?",
       deleteWarning: "This action cannot be undone. All users will be removed from this group.",
       assignPermissionSetSuccess: "Permission set assigned successfully",
