@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.7] - 2026-04-08
+
+### Other Changes
+
+- test: ci promotion test
+- ci: ci promotion updates
+- ci: update ci promotion process
+
 ## [1.11.6] - 2026-04-08
 
 ### Bug Fixes
