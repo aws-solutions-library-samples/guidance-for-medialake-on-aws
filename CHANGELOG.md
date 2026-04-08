@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.6] - 2026-04-08
+
+### Bug Fixes
+
+- fix: duplicate localization keys
+
 ## [1.11.5] - 2026-04-07
 
 ### Bug Fixes
