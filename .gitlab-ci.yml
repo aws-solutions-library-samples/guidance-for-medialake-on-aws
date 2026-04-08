@@ -142,18 +142,19 @@ release_manual:
     - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     - yum install -y nodejs
     - npm install -g prettier
-    - |
-      ARCH="$(uname -m)"
-      case "$ARCH" in
-        x86_64) GH_ARCH="amd64" ;;
-        aarch64) GH_ARCH="arm64" ;;
-        *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-      esac
-      GH_VERSION="2.72.0" # review periodically
-      curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o /tmp/gh.tgz
-      tar -xzf /tmp/gh.tgz -C /tmp
-      mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh
-      chmod +x /usr/local/bin/gh
+    # gh CLI install — uncomment when GITHUB_TOKEN is available
+    # - |
+    #   ARCH="$(uname -m)"
+    #   case "$ARCH" in
+    #     x86_64) GH_ARCH="amd64" ;;
+    #     aarch64) GH_ARCH="arm64" ;;
+    #     *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+    #   esac
+    #   GH_VERSION="2.72.0" # review periodically
+    #   curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o /tmp/gh.tgz
+    #   tar -xzf /tmp/gh.tgz -C /tmp
+    #   mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh
+    #   chmod +x /usr/local/bin/gh
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     - |
@@ -170,12 +171,13 @@ release_manual:
     - chmod 700 ~/.ssh
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    - |
-      if [ -z "${GITHUB_TOKEN}" ]; then
-        echo "ERROR: GITHUB_TOKEN is required"
-        exit 1
-      fi
-    - export GITHUB_TOKEN="${GITHUB_TOKEN}"
+    # Uncomment when GITHUB_TOKEN is available
+    # - |
+    #   if [ -z "${GITHUB_TOKEN}" ]; then
+    #     echo "ERROR: GITHUB_TOKEN is required"
+    #     exit 1
+    #   fi
+    # - export GITHUB_TOKEN="${GITHUB_TOKEN}"
   script:
     - |
       cat > /tmp/release_and_publish.sh <<'SCRIPT_EOF'
@@ -356,17 +358,18 @@ release_manual:
       git push github main "${NEW_TAG}"
       git push --force github latest-release
 
-      if gh release view "${NEW_TAG}" --repo "${GITHUB_REPO}" >/dev/null 2>&1; then
-        gh release edit "${NEW_TAG}" \
-          --repo "${GITHUB_REPO}" \
-          --title "${NEW_TAG}" \
-          --notes-file /tmp/github_release_notes.md
-      else
-        gh release create "${NEW_TAG}" \
-          --repo "${GITHUB_REPO}" \
-          --title "${NEW_TAG}" \
-          --notes-file /tmp/github_release_notes.md
-      fi
+      # GitHub release creation — uncomment when GITHUB_TOKEN is available
+      # if gh release view "${NEW_TAG}" --repo "${GITHUB_REPO}" >/dev/null 2>&1; then
+      #   gh release edit "${NEW_TAG}" \
+      #     --repo "${GITHUB_REPO}" \
+      #     --title "${NEW_TAG}" \
+      #     --notes-file /tmp/github_release_notes.md
+      # else
+      #   gh release create "${NEW_TAG}" \
+      #     --repo "${GITHUB_REPO}" \
+      #     --title "${NEW_TAG}" \
+      #     --notes-file /tmp/github_release_notes.md
+      # fi
 
       echo "Published ${NEW_TAG} to GitLab and GitHub."
       echo "If GitHub publishing fails after GitLab push succeeds, manually push the tag/branch to GitHub and create the GitHub release from CHANGELOG.md."
