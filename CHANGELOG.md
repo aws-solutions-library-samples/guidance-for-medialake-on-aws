@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.8] - 2026-04-08
+
+### Other Changes
+
+- test: fix ci script
+
 ## [1.11.7] - 2026-04-08
 
 ### Other Changes
