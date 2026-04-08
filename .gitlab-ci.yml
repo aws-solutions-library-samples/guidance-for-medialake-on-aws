@@ -1,9 +1,8 @@
 stages:
   - .pre
-  - test
   - lint
   - build
-  - deploy
+  - release
 
 default:
   image: public.ecr.aws/amazonlinux/amazonlinux:latest
@@ -11,95 +10,48 @@ default:
     - arch:amd64
     - size:large
 
-# Variables
 variables:
   PROJECT_ENV: ${CI_COMMIT_REF_SLUG}
   AWS_CONFIG_FILE: ${CI_BUILDS_DIR}/.awscredentialvendor/config
   AWS_SHARED_CREDENTIALS_FILE: ${CI_BUILDS_DIR}/.awscredentialvendor/credentials
+  GITHUB_REPO: "aws-solutions-library-samples/guidance-for-medialake-on-aws"
+  GIT_DEPTH: "1"
 
-# Cache modules between jobs
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
     - .cache/pip
+    - node_modules/
 
-# Simple workflow - only MR pipelines and release branch
 workflow:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: always
-    - if: $CI_COMMIT_BRANCH == "release"
-      when: always
-    - if: $CI_COMMIT_BRANCH == "main-v2"
-      when: always
-    - if: $CI_COMMIT_BRANCH == "feat/dashboards"
+    - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
     - when: never
 
-# This job should ONLY run on MRs targeting 'stable'
-test-mr-to-stable:
-  stage: build
-  image: public.ecr.aws/docker/library/alpine:latest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-  script:
-    - echo "=========================================="
-    - echo "SUCCESS - MR to stable is working"
-    - echo "=========================================="
-    - echo "Source branch - ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
-    - echo "Target branch - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-    - echo "This confirms your pipeline can run for stable branch MRs"
-
-# Validate MR title for main and stable branches
-mr-title-check:
-  stage: .pre
-  image: public.ecr.aws/docker/library/alpine:latest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
-  script:
-    - apk add --no-cache grep
-    - |
-      REGEX="^(revert|build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+"
-      TITLE="${CI_MERGE_REQUEST_TITLE}"
-      echo "Validating MR title: ${TITLE}"
-      if ! echo "${TITLE}" | grep -E "${REGEX}" > /dev/null; then
-        echo "ERROR: MR title must follow Conventional Commits format"
-        echo "Examples: feat(api): add new endpoint, fix: resolve bug"
-        exit 1
-      fi
-      echo "MR title is valid"
-
-# STEP 2: Add back echo_versions anchor and pre_commit_checks
-.echo_versions: &echo_versions
+.base_setup:
   before_script:
     - yum update -y
-    - yum install -y python3 python3-pip python3-devel nodejs npm git jq unzip which findutils gcc
+    - yum install -y python3 python3-pip python3-devel git jq unzip which findutils gcc tar gzip bash openssh-clients
+    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    - yum install -y nodejs
     - yum install -y atk at-spi2-atk cups-libs libdrm libxcb libxkbcommon at-spi2-core libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm pango cairo alsa-lib
-    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    - unzip awscliv2.zip
-    - ./aws/install
-    - npm install -g aws-cdk
-    - echo "login = ${GITLAB_USER_LOGIN} - role = ${AWS_CREDS_TARGET_ROLE}"
+    - npm install -g prettier
     - npm --version
     - node --version
-    - aws --version
-    - cdk --version
-    - jq --version
+    - python3 --version
+    - git --version
 
-pre_commit_checks:
-  stage: lint
-  <<: *echo_versions
-  rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+.pre_commit_template:
+  extends: .base_setup
   script:
-    - echo "Running pre-commit checks for merge request to main"
+    - echo "Running pre-commit checks"
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip install pre-commit
+    - pip install pre-commit autoflake isort black flake8
     - npm install
-    - pip install autoflake isort black flake8
-    - npm install -g prettier
     - pre-commit run --all-files trailing-whitespace
     - pre-commit run --all-files end-of-file-fixer
     - pre-commit run --all-files check-yaml
@@ -114,113 +66,151 @@ pre_commit_checks:
     - pre-commit run --all-files prettier
     - find . -name .DS_Store -type f -delete
 
-# Simple version check for MRs to stable
-version-check:
-  stage: build
-  image: public.ecr.aws/docker/library/alpine:latest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+.frontend_build_template:
+  extends: .base_setup
   script:
-    - echo "=========================================="
-    - echo "This is where semantic versioning would run"
-    - echo "Target - ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
-    - echo "=========================================="
-    - echo "Version check placeholder passed"
+    - echo "Running frontend build"
+    - cd medialake_user_interface
+    - npm install
+    - npm run build
 
-# STEP 1: Add back semantic-version job
-semantic-version:
-  image: public.ecr.aws/docker/library/alpine:latest
+mr-title-check:
   stage: .pre
+  image: public.ecr.aws/docker/library/alpine:latest
   variables:
-    GIT_DEPTH: 0
+    GIT_DEPTH: "1"
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stable"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
   script:
-    - apk add --no-cache git bash nodejs npm
+    - apk add --no-cache grep
+    - |
+      REGEX="^(revert|build|ci|docs|feat|fix|perf|refactor|release|style|test)(\([a-zA-Z0-9\-_.]+\))?(!)?: .+"
+      TITLE="${CI_MERGE_REQUEST_TITLE}"
+      echo "Validating MR title: ${TITLE}"
+      if ! echo "${TITLE}" | grep -E "${REGEX}" > /dev/null; then
+        echo "ERROR: MR title must follow Conventional Commits format"
+        echo "Examples: feat(api): add new endpoint, fix: resolve bug"
+        exit 1
+      fi
+      echo "MR title is valid"
+
+pre_commit_checks_mr:
+  stage: lint
+  extends: .pre_commit_template
+  needs: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+
+frontend_build_mr:
+  stage: build
+  extends: .frontend_build_template
+  needs: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+
+pre_commit_checks_main:
+  stage: lint
+  extends: .pre_commit_template
+  needs: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+frontend_build_main:
+  stage: build
+  extends: .frontend_build_template
+  needs: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+release_manual:
+  stage: release
+  image: public.ecr.aws/amazonlinux/amazonlinux:latest
+  variables:
+    GIT_DEPTH: "0"
+  needs:
+    - job: pre_commit_checks_main
+    - job: frontend_build_main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: false
+  retry: 1
+  timeout: 30m
+  before_script:
+    - yum update -y
+    - yum install -y git jq tar gzip bash openssh-clients
+    - curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    - yum install -y nodejs
     - npm install -g prettier
+    - |
+      ARCH="$(uname -m)"
+      case "$ARCH" in
+        x86_64) GH_ARCH="amd64" ;;
+        aarch64) GH_ARCH="arm64" ;;
+        *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+      esac
+      GH_VERSION="2.72.0" # review periodically
+      curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o /tmp/gh.tgz
+      tar -xzf /tmp/gh.tgz -C /tmp
+      mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh
+      chmod +x /usr/local/bin/gh
     - git config --global user.email "medialake@amazon.com"
     - git config --global user.name "Media Lake CI"
     - |
-      if [ -n "${GITLAB_PUSH_TOKEN}" ]; then
-        echo "Using GITLAB_PUSH_TOKEN for authentication"
-        git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      else
-        echo "GITLAB_PUSH_TOKEN not found, using CI_JOB_TOKEN"
-        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      if [ -z "${GITLAB_PUSH_TOKEN}" ]; then
+        echo "ERROR: GITLAB_PUSH_TOKEN is required"
+        exit 1
       fi
+    - git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git fetch --tags origin
     - git fetch origin main:main
-    - git fetch origin stable:stable
+    - eval "$(ssh-agent -s)"
+    - echo "${GITHUB_SSH_PRIVATE_KEY}" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
     - |
-      cat > /tmp/semantic_version.sh << 'SCRIPT_EOF'
+      if [ -z "${GITHUB_TOKEN}" ]; then
+        echo "ERROR: GITHUB_TOKEN is required"
+        exit 1
+      fi
+    - export GITHUB_TOKEN="${GITHUB_TOKEN}"
+  script:
+    - |
+      cat > /tmp/release_and_publish.sh <<'SCRIPT_EOF'
       #!/bin/bash
-      set -e
-      echo "=========================================="
-      echo "Changelog Generation & Versioning"
-      echo "Triggered by MR: main -> stable"
-      echo "=========================================="
+      set -euo pipefail
 
-      echo "Checking out main branch..."
+      FS=$'\x1f'
+      RS=$'\x1e'
+
       git checkout main
-      echo "Current branch: $(git branch --show-current)"
-      echo "Current commit: $(git rev-parse HEAD)"
+      git pull --ff-only origin main
 
-      LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+      REAL_LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+      LAST_VERSION="0.0.0"
 
-      if [ -z "${LAST_TAG}" ]; then
-        echo "No existing tags found. Will create initial version v1.0.0"
-        LAST_VERSION="0.0.0"
-        LAST_TAG="v0.0.0"
-      else
-        echo "Last version tag: ${LAST_TAG}"
-        LAST_VERSION="${LAST_TAG#v}"
+      if [ -n "${REAL_LAST_TAG}" ]; then
+        LAST_VERSION="${REAL_LAST_TAG#v}"
       fi
 
       IFS='.' read -r MAJOR MINOR PATCH <<< "${LAST_VERSION}"
-      echo "Current version: ${MAJOR}.${MINOR}.${PATCH}"
-      echo ""
 
-      echo "Analyzing commits since last version tag..."
-      echo ""
-      echo "=========================================="
-      echo "DEBUG: Git State Information"
-      echo "=========================================="
-      echo "Last tag: ${LAST_TAG}"
-      echo "Main branch HEAD: $(git rev-parse main)"
-      echo "Stable branch HEAD: $(git rev-parse origin/stable 2>/dev/null || echo 'N/A')"
-
-      if [ -n "${LAST_TAG}" ]; then
-        echo "Last tag commit: $(git rev-parse ${LAST_TAG})"
-        echo "Last tag date: $(git log -1 --format=%ci ${LAST_TAG})"
-      fi
-      echo "=========================================="
-      echo ""
-
-      if [ -n "${LAST_TAG}" ]; then
-        echo "Using last tag ${LAST_TAG} as baseline for commit analysis"
-        COMMITS=$(git log ${LAST_TAG}..main --pretty=format:"%H|%s|%b")
+      if [ -n "${REAL_LAST_TAG}" ]; then
+        COMMIT_STREAM="$(git log "${REAL_LAST_TAG}..main" --pretty=format:"%H${FS}%s${FS}%b${RS}")"
       else
-        echo "No tags found. Analyzing all commits on main branch."
-        COMMITS=$(git log main --pretty=format:"%H|%s|%b")
+        COMMIT_STREAM="$(git log main --pretty=format:"%H${FS}%s${FS}%b${RS}")"
       fi
 
-      echo "DEBUG: Number of commits to analyze: $(echo "${COMMITS}" | grep -c '.' || echo 0)"
-
-      if [ -z "${COMMITS}" ]; then
-        echo "=========================================="
-        echo "No new commits since ${LAST_TAG}"
-        echo "All commits have already been versioned."
-        echo "No version bump needed."
-        echo "=========================================="
+      if [ -z "${COMMIT_STREAM}" ]; then
+        echo "No new commits since last release; nothing to release."
         exit 0
       fi
 
-      echo ""
-      echo "=========================================="
-      echo "DEBUG: Commits to be versioned (first 10):"
-      echo "=========================================="
-      echo "${COMMITS}" | head -10 | cut -d'|' -f2
-      echo "=========================================="
-      echo ""
+      dedupe() {
+        awk '!seen[$0]++' | sed '/^$/d'
+      }
 
       BUMP_TYPE="none"
       BREAKING_CHANGES=""
@@ -230,229 +220,157 @@ semantic-version:
       PERFORMANCES=""
       OTHERS=""
 
-      while IFS='|' read -r HASH SUBJECT BODY; do
-        [ -z "${HASH}" ] && continue
+      while IFS= read -r -d "$RS" RECORD; do
+        [ -z "${RECORD}" ] && continue
 
-        echo "DEBUG: Analyzing commit: ${SUBJECT}"
+        HASH="${RECORD%%${FS}*}"
+        REST="${RECORD#*${FS}}"
+        SUBJECT="${REST%%${FS}*}"
+        BODY="${REST#*${FS}}"
         FULL_MESSAGE="${SUBJECT}"$'\n'"${BODY}"
 
         if [[ "${SUBJECT}" =~ ^[a-z]+(\([a-zA-Z0-9_.+-]+\))?!:[[:space:]] ]] || [[ "${FULL_MESSAGE}" =~ BREAKING[[:space:]]CHANGE: ]]; then
-          echo "  [MAJOR] Breaking change detected: ${SUBJECT}"
           BUMP_TYPE="major"
           BREAKING_CHANGES="${BREAKING_CHANGES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^feat(\([a-zA-Z0-9_.+-]+\))?: ]] || [[ "${SUBJECT}" == feat:* ]]; then
-          echo "  [MINOR] Feature: ${SUBJECT}"
-          if [ "${BUMP_TYPE}" != "major" ]; then
-            BUMP_TYPE="minor"
-          fi
+        elif [[ "${SUBJECT}" =~ ^feat(\([a-zA-Z0-9_.+-]+\))?: ]]; then
+          [ "${BUMP_TYPE}" != "major" ] && BUMP_TYPE="minor"
           FEATURES="${FEATURES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^fix(\([a-zA-Z0-9_.+-]+\))?: ]] || [[ "${SUBJECT}" == fix:* ]]; then
-          echo "  [PATCH] Fix: ${SUBJECT}"
-          if [ "${BUMP_TYPE}" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
+        elif [[ "${SUBJECT}" =~ ^fix(\([a-zA-Z0-9_.+-]+\))?: ]]; then
+          [ "${BUMP_TYPE}" = "none" ] && BUMP_TYPE="patch"
           FIXES="${FIXES}- ${SUBJECT}"$'\n'
         elif [[ "${SUBJECT}" =~ ^refactor(\([a-zA-Z0-9_.+-]+\))?: ]]; then
-          echo "  [PATCH] Refactor: ${SUBJECT}"
-          if [ "${BUMP_TYPE}" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
+          [ "${BUMP_TYPE}" = "none" ] && BUMP_TYPE="patch"
           REFACTORS="${REFACTORS}- ${SUBJECT}"$'\n'
         elif [[ "${SUBJECT}" =~ ^perf(\([a-zA-Z0-9_.+-]+\))?: ]]; then
-          echo "  [PATCH] Performance: ${SUBJECT}"
-          if [ "${BUMP_TYPE}" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
+          [ "${BUMP_TYPE}" = "none" ] && BUMP_TYPE="patch"
           PERFORMANCES="${PERFORMANCES}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^release(\([a-zA-Z0-9_.+-]+\))?: ]]; then
-          echo "  [TRACKED] Release: ${SUBJECT}"
+        elif [[ "${SUBJECT}" =~ ^(build|test|style|docs|ci|chore|release)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^(docs|ci)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
-          echo "  [NO BUMP] ${SUBJECT}"
-          OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
-        elif [[ "${SUBJECT}" =~ ^(style|test|build)(\([a-zA-Z0-9_.+-]+\))?: ]]; then
-          echo "  [PATCH] ${SUBJECT}"
-          if [ "${BUMP_TYPE}" = "none" ]; then
-            BUMP_TYPE="patch"
-          fi
+        else
           OTHERS="${OTHERS}- ${SUBJECT}"$'\n'
         fi
-      done <<< "${COMMITS}"
+      done < <(printf '%s' "${COMMIT_STREAM}")
 
-      echo ""
-      echo "Version bump type: ${BUMP_TYPE}"
+      BREAKING_CHANGES="$(printf "%s" "${BREAKING_CHANGES}" | dedupe || true)"
+      FEATURES="$(printf "%s" "${FEATURES}" | dedupe || true)"
+      FIXES="$(printf "%s" "${FIXES}" | dedupe || true)"
+      REFACTORS="$(printf "%s" "${REFACTORS}" | dedupe || true)"
+      PERFORMANCES="$(printf "%s" "${PERFORMANCES}" | dedupe || true)"
+      OTHERS="$(printf "%s" "${OTHERS}" | dedupe || true)"
 
-      # Deduplicate entries by title (removes duplicate merge commits with same title)
-      deduplicate_entries() {
-        local entries="$1"
-        echo "${entries}" | awk '!seen[$0]++' | grep -v '^$' || true
-      }
+      if [ "${BUMP_TYPE}" = "none" ]; then
+        echo "No semver-bumping changes found; exiting."
+        exit 0
+      fi
 
-      BREAKING_CHANGES=$(deduplicate_entries "${BREAKING_CHANGES}")
-      FEATURES=$(deduplicate_entries "${FEATURES}")
-      FIXES=$(deduplicate_entries "${FIXES}")
-      REFACTORS=$(deduplicate_entries "${REFACTORS}")
-      PERFORMANCES=$(deduplicate_entries "${PERFORMANCES}")
-      OTHERS=$(deduplicate_entries "${OTHERS}")
-
-      echo "DEBUG: After deduplication"
-      echo "  Features: $(echo "${FEATURES}" | grep -c '^-' || echo 0) entries"
-      echo "  Fixes: $(echo "${FIXES}" | grep -c '^-' || echo 0) entries"
-      echo "  Others: $(echo "${OTHERS}" | grep -c '^-' || echo 0) entries"
-
-      case ${BUMP_TYPE} in
+      case "${BUMP_TYPE}" in
         major)
-          MAJOR=$((MAJOR + 1))
-          MINOR=0
-          PATCH=0
-          ;;
+          MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
         minor)
-          MINOR=$((MINOR + 1))
-          PATCH=0
-          ;;
+          MINOR=$((MINOR + 1)); PATCH=0 ;;
         patch)
-          PATCH=$((PATCH + 1))
-          ;;
-        none)
-          echo "No version-bumping changes detected. Keeping version at ${MAJOR}.${MINOR}.${PATCH}"
-          exit 0
-          ;;
+          PATCH=$((PATCH + 1)) ;;
       esac
 
       NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
       NEW_TAG="v${NEW_VERSION}"
 
-      echo "New version: ${NEW_VERSION}"
-      echo "New tag: ${NEW_TAG}"
-      echo ""
-
       CHANGELOG_ENTRY="## [${NEW_VERSION}] - $(date +%Y-%m-%d)"$'\n\n'
-
-      if [ -n "${BREAKING_CHANGES}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### BREAKING CHANGES"$'\n\n'"${BREAKING_CHANGES}"$'\n'
-      fi
-
-      if [ -n "${FEATURES}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Features"$'\n\n'"${FEATURES}"$'\n'
-      fi
-
-      if [ -n "${FIXES}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Bug Fixes"$'\n\n'"${FIXES}"$'\n'
-      fi
-
-      if [ -n "${PERFORMANCES}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Performance Improvements"$'\n\n'"${PERFORMANCES}"$'\n'
-      fi
-
-      if [ -n "${REFACTORS}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Code Refactoring"$'\n\n'"${REFACTORS}"$'\n'
-      fi
-
-      if [ -n "${OTHERS}" ]; then
-        CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Other Changes"$'\n\n'"${OTHERS}"$'\n'
-      fi
+      [ -n "${BREAKING_CHANGES}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### BREAKING CHANGES"$'\n\n'"${BREAKING_CHANGES}"$'\n\n'
+      [ -n "${FEATURES}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Features"$'\n\n'"${FEATURES}"$'\n\n'
+      [ -n "${FIXES}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Bug Fixes"$'\n\n'"${FIXES}"$'\n\n'
+      [ -n "${PERFORMANCES}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Performance Improvements"$'\n\n'"${PERFORMANCES}"$'\n\n'
+      [ -n "${REFACTORS}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Code Refactoring"$'\n\n'"${REFACTORS}"$'\n\n'
+      [ -n "${OTHERS}" ] && CHANGELOG_ENTRY="${CHANGELOG_ENTRY}### Other Changes"$'\n\n'"${OTHERS}"$'\n\n'
 
       if [ -f CHANGELOG.md ]; then
-        echo "Updating existing CHANGELOG.md"
-        TEMP_FILE=$(mktemp)
-        head -n 1 CHANGELOG.md > "${TEMP_FILE}"
-        echo "" >> "${TEMP_FILE}"
-        echo "${CHANGELOG_ENTRY}" >> "${TEMP_FILE}"
-        tail -n +2 CHANGELOG.md >> "${TEMP_FILE}"
-        mv "${TEMP_FILE}" CHANGELOG.md
+        TMP_FILE="$(mktemp)"
+        FIRST_LINE="$(head -n 1 CHANGELOG.md || true)"
+        if [ "${FIRST_LINE}" = "# Changelog" ]; then
+          {
+            echo "# Changelog"
+            echo
+            printf "%s" "${CHANGELOG_ENTRY}"
+            tail -n +2 CHANGELOG.md
+          } > "${TMP_FILE}"
+        else
+          {
+            echo "# Changelog"
+            echo
+            printf "%s" "${CHANGELOG_ENTRY}"
+            cat CHANGELOG.md
+          } > "${TMP_FILE}"
+        fi
+        mv "${TMP_FILE}" CHANGELOG.md
       else
-        echo "Creating new CHANGELOG.md"
-        echo "# Changelog" > CHANGELOG.md
-        echo "" >> CHANGELOG.md
-        echo "${CHANGELOG_ENTRY}" >> CHANGELOG.md
+        {
+          echo "# Changelog"
+          echo
+          printf "%s" "${CHANGELOG_ENTRY}"
+        } > CHANGELOG.md
       fi
 
-      echo "CHANGELOG.md updated successfully"
-      echo ""
-      echo "=========================================="
-      echo "Preview of new CHANGELOG entry:"
-      echo "=========================================="
-      head -n 30 CHANGELOG.md
-      echo "=========================================="
-      echo ""
-
-      echo "Fixing formatting issues in CHANGELOG.md..."
-
-      # Remove trailing whitespace
       sed -i 's/[[:space:]]*$//' CHANGELOG.md
-      echo "Removed trailing whitespace"
-
-      # Ensure file ends with newline
       if [ -n "$(tail -c 1 CHANGELOG.md)" ]; then
-        echo "" >> CHANGELOG.md
-        echo "Added missing newline at end of file"
+        echo >> CHANGELOG.md
       fi
-
-      # Run prettier if available
-      if command -v prettier > /dev/null 2>&1; then
-        prettier --write CHANGELOG.md
-        echo "Formatted with prettier"
-      else
-        echo "Warning: prettier not found, skipping prettier formatting"
-      fi
-
-      echo ""
-      echo "CHANGELOG.md after formatting:"
-      head -n 30 CHANGELOG.md
-      echo ""
+      prettier --write CHANGELOG.md || true
 
       git add CHANGELOG.md
-      git commit -m "chore: update CHANGELOG for ${NEW_TAG} [skip ci]"
+      git commit -m "chore(release): ${NEW_TAG} [skip ci]"
 
-      echo "Release ${NEW_VERSION}" > /tmp/tag_message.txt
-      echo "" >> /tmp/tag_message.txt
-      echo "${CHANGELOG_ENTRY}" >> /tmp/tag_message.txt
+      {
+        echo "Release ${NEW_VERSION}"
+        echo
+        printf "%s" "${CHANGELOG_ENTRY}"
+      } > /tmp/tag_message.txt
+
       git tag -a "${NEW_TAG}" -F /tmp/tag_message.txt
 
-      echo "Created tag: ${NEW_TAG} on main branch"
-      echo "Updated CHANGELOG.md on main branch"
-      echo ""
+      git push origin main "${NEW_TAG}"
 
-      echo "Pushing changes to main..."
-      git push origin main
-      git push origin "${NEW_TAG}"
+      if ! git show-ref --verify --quiet refs/heads/latest-release; then
+        git branch latest-release "${NEW_TAG}"
+      else
+        git branch -f latest-release "${NEW_TAG}"
+      fi
+      git push --force origin latest-release
 
-      echo "Pushed commit and tag to main"
-      echo ""
-      echo "Version ${NEW_VERSION} prepared for release!"
-      echo "The MR can now be merged to stable."
+      awk -v ver="${NEW_VERSION}" '
+        $0 ~ "^## \\[" ver "\\]" {capture=1}
+        capture {
+          if (started && $0 ~ "^## \\[") exit
+          print
+          started=1
+        }
+      ' CHANGELOG.md > /tmp/github_release_notes.md
+
+      if [ ! -s /tmp/github_release_notes.md ]; then
+        cp /tmp/tag_message.txt /tmp/github_release_notes.md
+      fi
+
+      if ! git remote | grep -q '^github$'; then
+        git remote add github "git@github.com:${GITHUB_REPO}.git"
+      fi
+
+      git push github main "${NEW_TAG}"
+      git push --force github latest-release
+
+      if gh release view "${NEW_TAG}" --repo "${GITHUB_REPO}" >/dev/null 2>&1; then
+        gh release edit "${NEW_TAG}" \
+          --repo "${GITHUB_REPO}" \
+          --title "${NEW_TAG}" \
+          --notes-file /tmp/github_release_notes.md
+      else
+        gh release create "${NEW_TAG}" \
+          --repo "${GITHUB_REPO}" \
+          --title "${NEW_TAG}" \
+          --notes-file /tmp/github_release_notes.md
+      fi
+
+      echo "Published ${NEW_TAG} to GitLab and GitHub."
+      echo "If GitHub publishing fails after GitLab push succeeds, manually push the tag/branch to GitHub and create the GitHub release from CHANGELOG.md."
       SCRIPT_EOF
-      chmod +x /tmp/semantic_version.sh
-      bash /tmp/semantic_version.sh
-
-# STEP 3: Add back sync-to-github job
-sync-to-github:
-  image: public.ecr.aws/docker/library/alpine:latest
-  stage: deploy
-  rules:
-    - if: $CI_COMMIT_REF_NAME == "release"
-  script:
-    - apk add --no-cache git openssh rsync
-    - mkdir -p ~/.ssh
-    - echo "${GITHUB_SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan github.com >> ~/.ssh/known_hosts
-    - git config --global user.email "medialake@amazon.com"
-    - git config --global user.name "Media Lake CI"
-    - echo "Debug - Full commit message:"
-    - git log -1 --pretty=%B
-    - echo "Debug - Extracting line 3..."
-    - export COMMIT_MESSAGE=$(git log -1 --pretty=%B | sed -n "3p" | xargs)
-    - echo "Debug - Extracted message - ${COMMIT_MESSAGE}"
-    - if [ -z "${COMMIT_MESSAGE}" ]; then export COMMIT_MESSAGE="${CI_COMMIT_TITLE}"; fi
-    - echo "Final commit message for GitHub - ${COMMIT_MESSAGE}"
-    - git clone git@github.com:aws-solutions-library-samples/guidance-for-medialake-on-aws.git github-repo
-    - cd github-repo
-    - echo "Current GitHub main commit:" && git log --oneline -1
-    - rsync -av --delete --exclude=.git ../ ./ || RSYNC_EXIT=$?; if [ "${RSYNC_EXIT:-0}" -ne 0 ] && [ "${RSYNC_EXIT:-0}" -ne 24 ]; then echo "rsync failed with exit code ${RSYNC_EXIT}"; exit ${RSYNC_EXIT}; fi
-    - rm -f secrets.txt .roomodes .gitleaksignore .gitleaks.toml fix.sh setup-dev.sh manage-hooks.sh PERFORMANCE_OPTIMIZATION.md AUTHORIZATION_FIX.md .pre-commit-config.yaml .gitlab-ci.yml .gitattributes .flake8
-    - rm -rf .sonar/ INTERNAL-utils/ docs/ .roo/ .kiro/ github-repo/ .traycer/ INTERNAL-ai-documentation/ memory-bank/ cdk-test-output/ design/ tests/ scripts/ .githooks/ medialake_user_interface/test-results/ medialake_user_interface/playwright-report/
-    - git add -A
-    - git commit --allow-empty -m "${COMMIT_MESSAGE}"
-    - echo "New commit created:" && git log --oneline -1
-    - git push origin main
+    - bash /tmp/release_and_publish.sh
+  after_script:
+    - eval "$(ssh-agent -k)" 2>/dev/null || true
