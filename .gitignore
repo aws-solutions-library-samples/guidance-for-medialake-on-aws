@@ -4,6 +4,9 @@ cdk.out
 cdk.out*
 cdk_config.json
 
+# Generated git hooks (created by scripts/setup-dev.sh)
+.githooks/
+
 # Node.js
 node_modules/
 npm-debug.log

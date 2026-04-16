@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.1] - 2026-04-16
+
+### Chores
+
+- chore: file cleanup- chore: file cleanup
+
 ## [1.12.0] - 2026-04-16
 
 ### Features
