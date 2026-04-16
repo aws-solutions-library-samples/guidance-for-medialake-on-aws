@@ -22,6 +22,7 @@ interface TabbedSidebarProps {
   onBatchPipelineExecution?: (pipelineId: string) => void;
   onBatchPipelineExecutionRequest?: (pipelineId: string, pipelineName: string) => void;
   isPipelineExecutionLoading?: boolean;
+  canDelete?: boolean;
 }
 
 const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
@@ -37,6 +38,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
   onBatchPipelineExecution,
   onBatchPipelineExecutionRequest,
   isPipelineExecutionLoading,
+  canDelete = true,
 }) => {
   const { t } = useTranslation();
   const { setHasSelectedItems, closeSidebar } = useRightSidebar();
@@ -156,6 +158,7 @@ const TabbedSidebar: React.FC<TabbedSidebarProps> = ({
                 onBatchPipelineExecution={onBatchPipelineExecution}
                 onBatchPipelineExecutionRequest={onBatchPipelineExecutionRequest}
                 isPipelineExecutionLoading={isPipelineExecutionLoading}
+                canDelete={canDelete}
               />
             </Box>
           </>

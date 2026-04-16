@@ -17,6 +17,7 @@ from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
+from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.auth.authorizer_utils import (
     create_shared_custom_authorizer,
@@ -49,13 +50,17 @@ class PermissionsStack(cdk.NestedStack):
         super().__init__(scope, id, **kwargs)
 
         # Use the shared custom authorizer
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        api_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
 
         self._api_authorizer = create_shared_custom_authorizer(
             self, "PermissionsCustomApiAuthorizer", api_gateway_id=api_id
         )
 
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        root_resource_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId")
+        )
 
         api = apigateway.RestApi.from_rest_api_attributes(
             self,

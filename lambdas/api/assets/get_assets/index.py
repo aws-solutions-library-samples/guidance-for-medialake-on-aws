@@ -12,11 +12,12 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from pydantic import BaseModel, Field, validator
 
-from config import global_prefix
+# Use RESOURCE_PREFIX env var for metrics namespace (replaces dead global_prefix import)
+_resource_prefix = os.environ.get("RESOURCE_PREFIX", "medialake")
 
 # Initialize AWS X-Ray, metrics, and logger
 tracer = Tracer(service="asset-service")
-metrics = Metrics(namespace=f"{global_prefix}-asset-service", service="asset-api")
+metrics = Metrics(namespace=f"{_resource_prefix}-asset-service", service="asset-api")
 logger = Logger(service="asset-api", level=os.getenv("LOG_LEVEL", "WARNING"))
 
 # Initialize DynamoDB

@@ -38,6 +38,7 @@ interface AssetCardCompactInfoProps {
   isClipMode: boolean;
   isFavorite: boolean;
   showRemoveButton: boolean;
+  canDelete?: boolean;
   onAssetClick: () => void;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   onEditNameChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -60,6 +61,7 @@ const AssetCardCompactInfo: React.FC<AssetCardCompactInfoProps> = React.memo(
     isClipMode,
     isFavorite,
     showRemoveButton,
+    canDelete = true,
     onAssetClick,
     onEditClick,
     onEditNameChange,
@@ -267,7 +269,7 @@ const AssetCardCompactInfo: React.FC<AssetCardCompactInfoProps> = React.memo(
                     : t("common.actions.addToCollection")}
                 </ListItemText>
               </MenuItem>
-              {!isClipMode && (
+              {!isClipMode && canDelete && (
                 <MenuItem
                   onClick={(e) => {
                     e.stopPropagation();

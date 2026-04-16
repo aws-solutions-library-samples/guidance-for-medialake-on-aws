@@ -29,6 +29,33 @@ def sanitize_role_name(name: str) -> str:
     return sanitized[:64]
 
 
+_IAM_ROLE_CHAR_RE = re.compile(r"[^a-zA-Z0-9+=,.@_-]")
+_MAX_ROLE_NAME = 64
+_MAX_SUFFIX_LEN = 32  # cap suffix so the descriptive part always gets some space
+
+
+def _compose_role_name(descriptive: str, unique_suffix: str) -> str:
+    """Build a ≤64-char IAM role name, always preserving the unique suffix.
+
+    Both parts are cleaned of illegal characters.  If the cleaned suffix
+    exceeds ``_MAX_SUFFIX_LEN`` it is trimmed to its *last* ``_MAX_SUFFIX_LEN``
+    characters (the tail is the most unique part).  The descriptive prefix is
+    then truncated to whatever space remains.
+    """
+    suffix_clean = _IAM_ROLE_CHAR_RE.sub("", unique_suffix)
+    if len(suffix_clean) > _MAX_SUFFIX_LEN:
+        suffix_clean = suffix_clean[-_MAX_SUFFIX_LEN:]
+
+    descriptive_clean = _IAM_ROLE_CHAR_RE.sub("", descriptive)
+    # Reserve 1 char in case sanitize_role_name needs to prepend "_" for "aws" prefix
+    available = _MAX_ROLE_NAME - len(suffix_clean) - 1
+    if available < 0:
+        available = 0
+    descriptive_clean = descriptive_clean[:available]
+
+    return sanitize_role_name(f"{descriptive_clean}{suffix_clean}")
+
+
 def wait_for_role_deletion(role_name: str, max_attempts: int = 40) -> None:
     """Wait for an IAM role to be fully deleted."""
     iam_client = boto3.client("iam")
@@ -791,32 +818,13 @@ def create_lambda_role(
         role_name = lambda_function_name
         logger.info(f"Using lambda function name as role name: {role_name}")
     else:
-        # Fallback to the old naming pattern if lambda_function_name is not provided
-        # Create a base role name without the operation_id
-        base_role_name = (
+        # Fallback to the old naming pattern if lambda_function_name is not provided.
+        # Always preserve the unique suffix (node_id or operation_id) at the end.
+        uid_suffix = f"_{operation_id}" if operation_id else f"_{node_id}"
+        descriptive = (
             f"{resource_prefix}_{pipeline_name}_{node_id}_lambda_execution_role"
         )
-
-        # If we have an operation_id, we need to ensure we don't exceed the 64-character limit
-        if operation_id:
-            # Calculate how much space we have left for the operation_id
-            # We need to account for the underscore that will be added before the operation_id
-            max_base_length = (
-                63 - len(operation_id) - 1
-            )  # 63 to leave room for the underscore
-
-            if len(base_role_name) > max_base_length:
-                # Truncate the base_role_name to make room for the operation_id
-                base_role_name = base_role_name[:max_base_length]
-
-            # Now add the operation_id
-            role_name = sanitize_role_name(f"{base_role_name}_{operation_id}")
-        else:
-            role_name = sanitize_role_name(base_role_name)
-
-        # Ensure the final role name is within the 64-character limit
-        if len(role_name) > 64:
-            role_name = role_name[:64]
+        role_name = _compose_role_name(descriptive, uid_suffix)
     max_retries = 5  # Increased from 3 to 5
     retry_delay = 3  # Increased from 2 to 3 seconds
 
@@ -1028,12 +1036,12 @@ def create_service_roles_from_yaml(
                         }
                     ]
 
-                # Create a unique role name
+                # Create a unique role name, preserving the node_id suffix for uniqueness
                 sanitized_pipeline_name = sanitize_role_name(pipeline_name)
-                base_role_name = (
-                    f"{resource_prefix}_{sanitized_pipeline_name}_{node_id}_{role_name}"
+                sanitized_role_name = _compose_role_name(
+                    f"{resource_prefix}_{sanitized_pipeline_name}",
+                    f"_{node_id}_{role_name}",
                 )
-                sanitized_role_name = sanitize_role_name(base_role_name)
 
                 # Create the role
                 iam_client = boto3.client("iam")
@@ -1204,13 +1212,11 @@ def create_service_role(
     """
     iam_client = boto3.client("iam")
 
-    # Create a base role name
-    base_role_name = f"{resource_prefix}_{pipeline_name}_{node_id}_{role_name_suffix}"
-    role_name = sanitize_role_name(base_role_name)
-
-    # Ensure the final role name is within the 64-character limit
-    if len(role_name) > 64:
-        role_name = role_name[:64]
+    # Create a role name, preserving the node_id suffix for uniqueness
+    role_name = _compose_role_name(
+        f"{resource_prefix}_{pipeline_name}",
+        f"_{node_id}_{role_name_suffix}",
+    )
 
     # Create trust relationship policy
     trust_policy = {

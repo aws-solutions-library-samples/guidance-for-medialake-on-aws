@@ -111,24 +111,42 @@ const useS3Upload = (): UseS3UploadReturn => {
   );
 
   const signPart = useCallback(async (request: SignPartRequest): Promise<SignPartResponse> => {
-    // Don't set loading state for individual part signing to avoid UI flickering
-    try {
-      const response = await apiClient.post<{
-        status: string;
-        message: string;
-        data: SignPartResponse;
-      }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/sign`, request);
+    // Don't set loading state for individual part signing to avoid UI flickering.
+    // Retry transient failures (network blips, 502/503/504) up to 3 times with
+    // exponential backoff — this is the hottest path during large uploads.
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await apiClient.post<{
+          status: string;
+          message: string;
+          data: SignPartResponse;
+        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/sign`, request);
 
-      if (response.data.status === "success" && response.data.data) {
-        return response.data.data;
+        if (response.data.status === "success" && response.data.data) {
+          return response.data.data;
+        }
+
+        throw new Error(response.data.message || "Failed to sign part");
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const isRetryable =
+          !status || status === 429 || status === 502 || status === 503 || status === 504;
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          // Exponential backoff with jitter to avoid thundering herd
+          const baseDelay = 500 * Math.pow(2, attempt);
+          const jitter = baseDelay * (0.5 + Math.random() * 0.5); // 50-100% of base
+          await new Promise((r) => setTimeout(r, jitter));
+          continue;
+        }
+
+        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+        throw new Error(`Error signing part ${request.part_number}: ${errorMessage}`);
       }
-
-      throw new Error(response.data.message || "Failed to sign part");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      const error = new Error(`Error signing part ${request.part_number}: ${errorMessage}`);
-      throw error;
     }
+    // Unreachable, but TypeScript needs it
+    throw new Error(`Error signing part ${request.part_number}: max retries exceeded`);
   }, []);
 
   const abortMultipartUpload = useCallback(

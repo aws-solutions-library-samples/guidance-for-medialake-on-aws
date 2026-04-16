@@ -5,6 +5,7 @@ from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
+from config import config
 from medialake_constructs.api_gateway.api_gateway_main_construct import (
     ApiGatewayConstruct,
     ApiGatewayProps,
@@ -88,12 +89,12 @@ class ApiGatewayCoreStack(Stack):
     @property
     def user_pool_arn(self):
         # Import from the CognitoStack export
-        return Fn.import_value("MediaLakeCognito-UserPoolArn")
+        return Fn.import_value(config.cfn_export("MediaLakeCognito", "UserPoolArn"))
 
     @property
     def identity_pool(self):
         # Import from the CognitoStack export
-        return Fn.import_value("MediaLakeCognito-IdentityPoolId")
+        return Fn.import_value(config.cfn_export("MediaLakeCognito", "IdentityPoolId"))
 
     @property
     def user_pool_client(self) -> cognito.UserPoolClient:
@@ -106,12 +107,14 @@ class ApiGatewayCoreStack(Stack):
     @property
     def user_pool_client_id(self):
         # Import from the CognitoStack export
-        return Fn.import_value("MediaLakeCognito-UserPoolClientId")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeCognito", "UserPoolClientId")
+        )
 
     @property
     def user_pool_id(self):
         # Import from the CognitoStack export
-        return Fn.import_value("MediaLakeCognito-UserPoolId")
+        return Fn.import_value(config.cfn_export("MediaLakeCognito", "UserPoolId"))
 
     @property
     def waf_acl_arn(self):
@@ -120,7 +123,9 @@ class ApiGatewayCoreStack(Stack):
     @property
     def cognito_domain_prefix(self):
         # Import from the CognitoStack export
-        return Fn.import_value("MediaLakeCognito-CognitoDomainPrefix")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeCognito", "CognitoDomainPrefix")
+        )
 
     @property
     def cognito_construct(self):

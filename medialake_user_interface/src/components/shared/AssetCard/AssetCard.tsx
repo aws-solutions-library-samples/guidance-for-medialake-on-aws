@@ -41,6 +41,7 @@ export interface AssetCardProps {
   onDownloadClick: (event: React.MouseEvent<HTMLElement>) => void;
   onAddToCollectionClick?: (event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean;
+  canDelete?: boolean;
   onEditClick?: (event: React.MouseEvent<HTMLElement>) => void;
   placeholderImage?: string;
   onImageError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
@@ -78,6 +79,7 @@ const AssetCard = React.memo<AssetCardProps>(
     onDownloadClick,
     onAddToCollectionClick,
     showRemoveButton = false,
+    canDelete = true,
     onEditClick,
     placeholderImage,
     onImageError,
@@ -188,6 +190,7 @@ const AssetCard = React.memo<AssetCardProps>(
             isClipMode={isClipMode}
             isFavorite={isFavorite}
             showRemoveButton={showRemoveButton}
+            canDelete={canDelete}
             onAssetClick={onAssetClick}
             onDeleteClick={onDeleteClick}
             onDownloadClick={onDownloadClick}
@@ -215,6 +218,7 @@ const AssetCard = React.memo<AssetCardProps>(
             isClipMode={isClipMode}
             isFavorite={isFavorite}
             showRemoveButton={showRemoveButton}
+            canDelete={canDelete}
             onAssetClick={onAssetClick}
             onEditClick={onEditClick}
             onEditNameChange={onEditNameChange}

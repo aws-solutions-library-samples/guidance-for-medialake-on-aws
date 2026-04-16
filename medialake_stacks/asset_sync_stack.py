@@ -286,7 +286,7 @@ class AssetSyncStack(cdk.NestedStack):
         self.asset_sync_events_queue = sqs.Queue(
             self,
             "AssetSyncSQSQueue",
-            queue_name="AssetSyncSQSQueue",
+            queue_name=f"{config.resource_prefix}-asset-sync-queue-{config.environment}",
             visibility_timeout=Duration.minutes(15),
             encryption=sqs.QueueEncryption.SQS_MANAGED,
             dead_letter_queue=sqs.DeadLetterQueue(

@@ -79,6 +79,7 @@ export interface AssetTableProps<T> {
   onDownloadClick: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onAddToCollectionClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   showRemoveButton?: boolean;
+  canDelete?: boolean;
   onEditClick?: (item: T, event: React.MouseEvent<HTMLElement>) => void;
   onAssetClick: (item: T) => void;
   getThumbnailUrl: (item: T) => string;
@@ -129,6 +130,7 @@ export function AssetTable<T>({
   selectedSearchFields,
   isRenaming = false,
   renamingAssetId,
+  canDelete = true,
 }: AssetTableProps<T>): React.ReactElement {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -463,9 +465,17 @@ export function AssetTable<T>({
                 <FavoriteBorderIcon fontSize="small" />
               )}
             </IconButton>
-            <IconButton size="small" onClick={(e) => onDeleteClick(info.row.original, e)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            {canDelete && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteClick(info.row.original, e);
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
             <IconButton
               size="small"
               onClick={(e) => onDownloadClick(info.row.original, e)}

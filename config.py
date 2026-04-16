@@ -91,12 +91,18 @@ def validate_opensearch_instance_type(instance_type: str) -> str:
     valid_prefixes = [
         "c5",
         "c6g",
+        "c7i",
+        "c7g",
+        "c8g",
         "m5",
         "m6g",
+        "m8g",
         "r5",
         "r6g",
         "r7g",
         "r7gd",
+        "r8g",
+        "r8gd",
         "t3",
         "i3",
         "i3en",
@@ -523,7 +529,18 @@ class CloudFrontCustomDomainConfig(BaseModel):
 
 
 class CDKConfig(BaseModel):
-    """Configuration for CDK Application"""
+    """Configuration for CDK Application.
+
+    Multi-deployment support:
+        When ``use_prefixed_names`` is True (opt-in), all CloudFormation stack names,
+        SSM parameter paths, and CloudFormation export names are prefixed with
+        ``resource_prefix`` and ``environment`` so that multiple independent MediaLake
+        deployments can coexist in the same AWS account and region.
+
+        Existing deployments that do **not** set this flag continue to use the legacy
+        hardcoded names (``MediaLakeBaseInfrastructure``, ``/medialake/...``, etc.)
+        and are fully backwards-compatible.
+    """
 
     lambda_tail_warming: bool = False
     environment: str  # Used for retain decisions
@@ -546,6 +563,100 @@ class CDKConfig(BaseModel):
     cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
     video_download_enabled: bool = True
     external_nodes_bucket: Optional[str] = None
+    use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
+
+    # ── Multi-deployment naming helpers ──────────────────────────────────
+
+    @property
+    def stack_prefix(self) -> str:
+        """Prefix prepended to CloudFormation stack logical IDs.
+
+        When ``use_prefixed_names`` is False (default / legacy), returns the
+        empty string so that stack names stay unchanged (e.g. ``MediaLakeStack``).
+
+        When True, returns ``"{resource_prefix}-{environment}-"`` so that each
+        deployment gets unique stack names (e.g. ``ml-dev-MediaLakeStack``).
+        """
+        if not self.use_prefixed_names:
+            return ""
+        return f"{self.resource_prefix}-{self.environment}-"
+
+    @property
+    def ssm_prefix(self) -> str:
+        """Root path for all SSM parameters belonging to this deployment.
+
+        Legacy:  ``/medialake/{environment}``
+        Prefixed: ``/{resource_prefix}/{environment}``
+
+        Individual parameters append their own sub-paths after this.
+        """
+        if not self.use_prefixed_names:
+            return f"/medialake/{self.environment}"
+        return f"/{self.resource_prefix}/{self.environment}"
+
+    @property
+    def export_prefix(self) -> str:
+        """Prefix for CloudFormation export names.
+
+        Legacy:  ``""`` (exports use raw stack names like ``MediaLakeCognito-UserPoolId``)
+        Prefixed: ``"{resource_prefix}-{environment}-"``
+        """
+        if not self.use_prefixed_names:
+            return ""
+        return f"{self.resource_prefix}-{self.environment}-"
+
+    def stack_name(self, base_name: str) -> str:
+        """Return the full CloudFormation stack name for a given base name.
+
+        Args:
+            base_name: The legacy stack name, e.g. ``"MediaLakeBaseInfrastructure"``
+
+        Returns:
+            ``base_name`` when legacy mode, or ``"{stack_prefix}{base_name}"`` when
+            prefixed names are enabled.
+        """
+        return f"{self.stack_prefix}{base_name}"
+
+    def ssm_param(self, *parts: str) -> str:
+        """Build a fully-qualified SSM parameter path.
+
+        Both legacy and prefixed modes use ``{ssm_prefix}/{parts...}`` where
+        ``ssm_prefix`` already includes the environment.
+
+        Args:
+            *parts: Path segments after the prefix, e.g. ``("cloudfront-distribution-domain",)``
+        """
+        return f"{self.ssm_prefix}/{'/'.join(parts)}"
+
+    def ssm_param_global(self, *parts: str) -> str:
+        """Build an SSM parameter path without environment scoping (legacy global params).
+
+        Legacy:  ``/medialake/{parts...}``  (no environment in path)
+        Prefixed: ``/{resource_prefix}/{environment}/{parts...}``  (always scoped)
+
+        Use this only for parameters that were historically global (e.g. WAF ACL ARN).
+        New parameters should always use ``ssm_param()`` instead.
+        """
+        if not self.use_prefixed_names:
+            return f"/medialake/{'/'.join(parts)}"
+        return f"/{self.resource_prefix}/{self.environment}/{'/'.join(parts)}"
+
+    def cfn_export(self, stack_base_name: str, export_key: str) -> str:
+        """Build a CloudFormation export name.
+
+        Legacy:  ``"{stack_base_name}-{export_key}"``
+        Prefixed: ``"{export_prefix}{stack_base_name}-{export_key}"``
+        """
+        return f"{self.export_prefix}{stack_base_name}-{export_key}"
+
+    @property
+    def tenancy(self) -> Optional[dict]:
+        """Tenancy configuration — optional, not validated beyond presence.
+
+        Note: This field exists in some config.json files but is not currently
+        used by any CDK constructs. Pydantic v2 silently ignores extra fields.
+        """
+        return None
 
     def __init__(self, **data):
         """Initialize CDKConfig and log configuration values for audit trail.

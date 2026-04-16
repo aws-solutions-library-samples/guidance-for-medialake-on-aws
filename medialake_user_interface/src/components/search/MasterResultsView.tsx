@@ -93,6 +93,7 @@ interface MasterResultsViewProps {
   // Loading states
   isRenaming?: boolean;
   renamingAssetId?: string;
+  canDelete?: boolean;
 }
 
 const MasterResultsView: React.FC<MasterResultsViewProps> = ({
@@ -158,6 +159,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   // Loading states
   isRenaming = false,
   renamingAssetId,
+  canDelete = true,
 }) => {
   const { t } = useTranslation();
 
@@ -309,6 +311,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       renamingAssetId,
       isSemantic,
       confidenceThreshold,
+      canDelete,
       getAssetId,
       getAssetName,
       getAssetType,
@@ -334,6 +337,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
       renamingAssetId,
       isSemantic,
       confidenceThreshold,
+      canDelete,
       getAssetId,
       getAssetName,
       getAssetType,

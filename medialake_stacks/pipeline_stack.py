@@ -18,10 +18,10 @@ from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import custom_resources as cr
-
-# from config import config
 from constructs import Construct
 
+# from config import config
+from config import config
 from medialake_constructs.api_gateway.api_gateway_pipelines import (
     ApiGatewayPipelinesConstruct,
     ApiGatewayPipelinesProps,
@@ -76,8 +76,8 @@ class PipelineStack(cdk.NestedStack):
     ):
         super().__init__(scope, construct_id, **kwargs)
 
-        Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        Fn.import_value(config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId"))
+        Fn.import_value(config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId"))
 
         # api = apigateway.RestApi.from_rest_api_attributes(
         #     self,

@@ -57,36 +57,38 @@ const SummaryTab = ({ assetData, mediaType }: { assetData: any; mediaType: "vide
     : "Unknown";
 
   // Video-specific extraction
-  const videoMetadata = Array.isArray(metadata.video) ? metadata.video[0] : {};
+  const videoMetadata =
+    Array.isArray(metadata.video) && metadata.video.length > 0 ? metadata.video[0] : {};
   const videoDuration = generalMetadata.Duration
     ? `${parseFloat(generalMetadata.Duration).toFixed(2)}`
     : "Unknown";
-  const width = videoMetadata.Width ?? "Unknown";
-  const height = videoMetadata.Height ?? "Unknown";
-  const frameRate = videoMetadata.FrameRate ? `${videoMetadata.FrameRate} FPS` : "Unknown";
+  const width = videoMetadata?.Width ?? "Unknown";
+  const height = videoMetadata?.Height ?? "Unknown";
+  const frameRate = videoMetadata?.FrameRate ? `${videoMetadata.FrameRate} FPS` : "Unknown";
   const videoBitRate =
-    videoMetadata.OverallBitRate || videoMetadata.BitRate
+    videoMetadata?.OverallBitRate || videoMetadata?.BitRate
       ? `${Math.round((videoMetadata.OverallBitRate || videoMetadata.BitRate) / 1000)} kbps`
       : "Unknown";
-  const videoCodec = videoMetadata.codec_name || generalMetadata.Format || "Unknown";
+  const videoCodec = videoMetadata?.codec_name || generalMetadata.Format || "Unknown";
 
   // Audio-specific extraction
-  const audioMeta = Array.isArray(metadata.audio) ? metadata.audio[0] : {};
+  const audioMeta =
+    Array.isArray(metadata.audio) && metadata.audio.length > 0 ? metadata.audio[0] : {};
   const audioDuration =
-    audioMeta.duration != null
+    audioMeta?.duration != null
       ? parseFloat(String(audioMeta.duration)).toFixed(2)
       : generalMetadata.Duration
         ? parseFloat(generalMetadata.Duration).toFixed(2)
         : "Unknown";
-  const sampleRate = audioMeta.sample_rate
+  const sampleRate = audioMeta?.sample_rate
     ? (parseInt(String(audioMeta.sample_rate), 10) / 1000).toFixed(1)
     : "Unknown";
-  const bitDepth = audioMeta.BitsPerSample || audioMeta.bit_depth || "Unknown";
-  const channels = audioMeta.channels || audioMeta.Channels || "Unknown";
-  const audioBitRate = audioMeta.bit_rate
+  const bitDepth = audioMeta?.BitsPerSample || audioMeta?.bit_depth || "Unknown";
+  const channels = audioMeta?.channels || audioMeta?.Channels || "Unknown";
+  const audioBitRate = audioMeta?.bit_rate
     ? `${Math.round(Number(audioMeta.bit_rate) / 1000)} kbps`
     : "Unknown";
-  const audioCodec = audioMeta.codec_name || generalMetadata.Format || "Unknown";
+  const audioCodec = audioMeta?.codec_name || generalMetadata.Format || "Unknown";
 
   const duration = mediaType === "video" ? videoDuration : audioDuration;
   const bitRate = mediaType === "video" ? videoBitRate : audioBitRate;

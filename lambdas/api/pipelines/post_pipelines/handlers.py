@@ -43,8 +43,12 @@ def _resolve_cloudfront_domain() -> str:
         return domain
 
     # Env var not set (cross-stack ordering) — read from SSM like other Lambdas do.
-    environment = os.environ.get("ENVIRONMENT", "dev")
-    ssm_param = f"/medialake/{environment}/cloudfront-distribution-domain"
+    # Use CLOUDFRONT_DOMAIN_SSM_PARAM env var if set (preferred), otherwise fall back to convention
+    ssm_param = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+    if not ssm_param:
+        environment = os.environ.get("ENVIRONMENT", "dev")
+        ssm_prefix = os.environ.get("SSM_PREFIX", f"/medialake/{environment}")
+        ssm_param = f"{ssm_prefix}/cloudfront-distribution-domain"
     logger.info(
         f"CLOUDFRONT_DOMAIN env var is empty, attempting SSM fallback: {ssm_param}"
     )
@@ -389,6 +393,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
             cloudfront_domain = _resolve_cloudfront_domain()
             if not cloudfront_domain:
                 environment = os.environ.get("ENVIRONMENT", "dev")
+                ssm_prefix = os.environ.get("SSM_PREFIX", f"/medialake/{environment}")
                 return {
                     "statusCode": 503,
                     "headers": {
@@ -400,7 +405,7 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                             "error": (
                                 "CloudFront domain is not available. "
                                 "The CLOUDFRONT_DOMAIN env var is empty and the SSM parameter "
-                                f"/medialake/{environment}/cloudfront-distribution-domain "
+                                f"{ssm_prefix}/cloudfront-distribution-domain "
                                 "could not be read. Ensure the MediaLakeUserInterface stack "
                                 "has been deployed successfully."
                             )
@@ -482,13 +487,15 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     f"[DEBUG] create_lambda_function returned for node {node_id}"
                 )
 
-                # Create a specific key for Lambda ARN mapping that distinguishes methods/operations.
-                lambda_key = node.data.id
+                # Create a unique key for Lambda ARN mapping using the node's unique
+                # instance ID (node.id) so that duplicate node types each keep
+                # their own Lambda ARN instead of overwriting each other.
+                lambda_key = node.id
                 if (
                     node.data.type.lower() == "integration"
                     and "method" in node.data.configuration
                 ):
-                    lambda_key = f"{node.data.id}_{node.data.configuration['method']}"
+                    lambda_key = f"{node.id}_{node.data.configuration['method']}"
                     if (
                         "operationId" in node.data.configuration
                         and node.data.configuration["operationId"]
@@ -506,9 +513,9 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                         "service_roles" in lambda_result
                         and lambda_result["service_roles"]
                     ):
-                        if node.data.id not in service_role_arns:
-                            service_role_arns[node.data.id] = {}
-                        service_role_arns[node.data.id].update(
+                        if node.id not in service_role_arns:
+                            service_role_arns[node.id] = {}
+                        service_role_arns[node.id].update(
                             lambda_result["service_roles"]
                         )
                         logger.info(
@@ -671,10 +678,13 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     cloudfront_domain = _resolve_cloudfront_domain()
                     if not cloudfront_domain:
                         environment = os.environ.get("ENVIRONMENT", "dev")
+                        ssm_prefix = os.environ.get(
+                            "SSM_PREFIX", f"/medialake/{environment}"
+                        )
                         raise ValueError(
                             "CloudFront domain is not available. "
                             "The CLOUDFRONT_DOMAIN env var is empty and the SSM parameter "
-                            f"/medialake/{environment}/cloudfront-distribution-domain "
+                            f"{ssm_prefix}/cloudfront-distribution-domain "
                             "could not be read. Ensure the MediaLakeUserInterface stack "
                             "has been deployed successfully."
                         )
@@ -743,14 +753,12 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                         active=pipeline.active,
                     )
                     if rule_result:
-                        eventbridge_rule_arns[node.data.id] = rule_result["rule_arn"]
-                        eventbridge_role_arns[node.data.id] = rule_result["role_arn"]
-                        trigger_lambda_arns[node.data.id] = rule_result[
-                            "trigger_lambda_arn"
-                        ]
-                        sqs_queue_arns[node.data.id] = rule_result["queue_arn"]
+                        eventbridge_rule_arns[node.id] = rule_result["rule_arn"]
+                        eventbridge_role_arns[node.id] = rule_result["role_arn"]
+                        trigger_lambda_arns[node.id] = rule_result["trigger_lambda_arn"]
+                        sqs_queue_arns[node.id] = rule_result["queue_arn"]
                         if rule_result["event_source_mapping_uuid"]:
-                            event_source_mapping_uuids[node.data.id] = rule_result[
+                            event_source_mapping_uuids[node.id] = rule_result[
                                 "event_source_mapping_uuid"
                             ]
                         logger.info(

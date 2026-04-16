@@ -30,6 +30,7 @@ import TabbedSidebar from "../components/common/RightSidebar/TabbedSidebar";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import ApiStatusModal from "../components/ApiStatusModal";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 
 // Inner component that uses the selection context
 const HomeContent: React.FC = () => {
@@ -48,6 +49,9 @@ const HomeContent: React.FC = () => {
 
   // Get selection state from context
   const assetSelection = useDashboardSelectionRequired();
+
+  // Permission check for asset delete
+  const deleteAssetPermission = useActionPermission("delete", "asset");
 
   const handleOpenWidgetSelector = () => {
     setWidgetSelectorOpen(true);
@@ -168,6 +172,7 @@ const HomeContent: React.FC = () => {
             onRemoveItem={assetSelection.handleRemoveAsset}
             onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
             isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
+            canDelete={deleteAssetPermission.allowed}
           />
         </RightSidebar>
 

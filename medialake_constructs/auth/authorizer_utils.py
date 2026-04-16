@@ -11,6 +11,8 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
+from config import config
+
 # Global variable to store the shared authorizer Lambda instance
 _shared_authorizer_lambda: Optional[lambda_.Function] = None
 
@@ -29,7 +31,9 @@ def _get_shared_authorizer_lambda(scope: Construct) -> lambda_.Function:
 
     if _shared_authorizer_lambda is None:
         # Import the shared authorizer Lambda ARN
-        authorizer_lambda_arn = Fn.import_value("MediaLake-SharedAuthorizerLambdaArn")
+        authorizer_lambda_arn = Fn.import_value(
+            config.cfn_export("MediaLake", "SharedAuthorizerLambdaArn")
+        )
 
         # Create the Lambda function instance by ARN
         _shared_authorizer_lambda = lambda_.Function.from_function_arn(

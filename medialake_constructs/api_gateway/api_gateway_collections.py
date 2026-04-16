@@ -282,7 +282,7 @@ class CollectionsApi(Construct):
                 effect=iam.Effect.ALLOW,
                 actions=["ssm:GetParameter"],
                 resources=[
-                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*"
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_prefix}/*"
                 ],
             )
         )

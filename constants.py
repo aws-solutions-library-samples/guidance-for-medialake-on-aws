@@ -81,8 +81,12 @@ class KMS:
     # Key aliases
     MEDIA_BUCKET_KEY_ALIAS = f"alias/{S3.ASSETS_BUCKET_EXPORT}-Key"
     LOGS_BUCKET_KEY_ALIAS = f"alias/{S3.LOGS_BUCKET_EXPORT}-Key"
-    LAMBDA_LAYER_KEY_ALIAS = f"alias/{config.resource_prefix}-lambda-layer-key"
-    DYNAMODB_KEY_ALIAS = f"alias/{config.resource_prefix}-dynamodb-key"
+    LAMBDA_LAYER_KEY_ALIAS = (
+        f"alias/{config.resource_prefix}-lambda-layer-key-{config.environment}"
+    )
+    DYNAMODB_KEY_ALIAS = (
+        f"alias/{config.resource_prefix}-dynamodb-key-{config.environment}"
+    )
 
     # Key descriptions
     MEDIA_BUCKET_KEY_DESCRIPTION = (

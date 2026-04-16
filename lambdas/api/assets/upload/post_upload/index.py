@@ -34,7 +34,8 @@ _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
 _S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
 
 # Define constants
-DEFAULT_EXPIRATION = 3600  # 1 hour in seconds
+# 6 hours — large files (500GB) with many parts need longer-lived URLs
+DEFAULT_EXPIRATION = 21600
 ALLOWED_CONTENT_TYPES = [
     "audio/*",
     "video/*",
@@ -42,7 +43,11 @@ ALLOWED_CONTENT_TYPES = [
     "application/x-mpegURL",  # HLS
     "application/dash+xml",  # MPEG-DASH
 ]
-FILENAME_REGEX = r"^[a-zA-Z0-9!\-_.*'()]+$"  # S3-compatible filename regex
+# S3-compatible filename regex.
+# Allows: alphanumeric, S3 safe chars (!-_.*'()), and chars that require
+# URL-encoding but are fully supported (space @$+,;=&:).
+# Blocks: control chars and S3 "characters to avoid" (\{}^`~|%<>"#[])
+FILENAME_REGEX = r"^[a-zA-Z0-9!\-_.*'() @\$+,;=&:]+$"
 
 """
 TESTING RECOMMENDATIONS FOR MULTIPART UPLOADS:
@@ -314,7 +319,11 @@ def generate_presigned_post_url(
         conditions = [
             {"bucket": bucket},
             {"key": key},
-            ["content-length-range", 1, 10 * 1024 * 1024 * 1024],  # 1 byte to 10GB
+            [
+                "content-length-range",
+                1,
+                100 * 1024 * 1024,
+            ],  # 1 byte to 100MB (single-part threshold)
             {"Content-Type": content_type},
         ]
 
@@ -496,19 +505,30 @@ def lambda_handler(
             )
             upload_id = multipart_upload_info["upload_id"]
 
-            # Calculate number of parts based on file size
-            # Use dynamic part size to handle large files efficiently
-            part_size = 5 * 1024 * 1024  # Start with 5MB
+            # Calculate optimal part size based on file size.
+            # Strategy: scale chunk size with file size to keep total parts
+            # manageable (fewer sign requests) while respecting S3 limits
+            # (min 5MB, max 5GB per part, max 10,000 parts per upload).
+            GB = 1024 * 1024 * 1024
+            MB = 1024 * 1024
+
+            if request.file_size >= 100 * GB:
+                part_size = 500 * MB  # 100GB+ → 500MB chunks
+            elif request.file_size >= 10 * GB:
+                part_size = 200 * MB  # 10-100GB → 200MB chunks
+            elif request.file_size >= 1 * GB:
+                part_size = 100 * MB  # 1-10GB → 100MB chunks
+            elif request.file_size >= 100 * MB:
+                part_size = 50 * MB  # 100MB-1GB → 50MB chunks
+            else:
+                part_size = 5 * MB  # <100MB → 5MB chunks
+
             total_parts = (request.file_size + part_size - 1) // part_size
 
-            # If file would exceed 10,000 parts, increase part size
+            # Safety: if still over 10,000 parts, bump part size to fit
             if total_parts > 10000:
-                # Calculate minimum part size needed to stay under 10,000 parts
-                part_size = (request.file_size + 9999) // 10000  # Ceiling division
-                # Round up to nearest MB for cleaner part sizes
-                part_size = ((part_size + 1024 * 1024 - 1) // (1024 * 1024)) * (
-                    1024 * 1024
-                )
+                part_size = (request.file_size + 9999) // 10000
+                part_size = ((part_size + MB - 1) // MB) * MB  # Round up to nearest MB
                 total_parts = (request.file_size + part_size - 1) // part_size
 
                 logger.info(

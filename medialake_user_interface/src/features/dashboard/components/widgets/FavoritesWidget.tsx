@@ -22,6 +22,7 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import ApiStatusModal from "@/components/ApiStatusModal";
 import { useDashboardSelection } from "../../contexts/DashboardSelectionContext";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import type { BaseWidgetProps } from "../../types";
 import type { Favorite } from "@/api/hooks/useFavorites";
 
@@ -92,6 +93,9 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
 
   // Dashboard selection context for batch operations
   const dashboardSelection = useDashboardSelection();
+
+  // Permission check for asset delete
+  const deleteAssetPermission = useActionPermission("delete", "asset");
 
   // Add to collection mutation
   const addItemToCollection = useAddItemToCollection();
@@ -251,6 +255,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
                     }
                   : undefined
               }
+              canDelete={deleteAssetPermission.allowed}
               cardSize="medium"
               aspectRatio="square"
               thumbnailScale="fit"

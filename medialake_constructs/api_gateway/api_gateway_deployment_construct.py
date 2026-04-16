@@ -40,7 +40,7 @@ class ApiGatewayDeploymentConstruct(Construct):
             "RestAPILogGroup",
             removal_policy=RemovalPolicy.DESTROY,
             retention=logs.RetentionDays.THREE_MONTHS,
-            log_group_name=f"/aws/apigateway/medialake-access-logs-deployment",
+            log_group_name=f"/aws/apigateway/{config.resource_prefix}-access-logs-deployment-{config.environment}",
         )
 
         # Create an access log format
@@ -57,8 +57,12 @@ class ApiGatewayDeploymentConstruct(Construct):
         )
 
         # Import the API Gateway from CloudFormation outputs
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        api_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
+        root_resource_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId")
+        )
 
         rest_api = apigateway.RestApi.from_rest_api_attributes(
             self,

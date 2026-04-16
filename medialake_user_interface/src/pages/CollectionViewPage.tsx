@@ -61,6 +61,7 @@ import ApiStatusModal from "../components/ApiStatusModal";
 import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import { springEasing } from "@/constants";
@@ -235,6 +236,10 @@ const CollectionViewPage: React.FC = () => {
     deleteModalState,
     handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
+
+  // Permission check for asset delete
+  const deleteAssetPermission = useActionPermission("delete", "asset");
+
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
       const assetType = asset.DigitalSourceAsset.Type.toLowerCase();
@@ -884,6 +889,7 @@ const CollectionViewPage: React.FC = () => {
                   onSelectToggle: assetSelection.handleSelectToggle,
                   isRenaming: assetOperationsLoading.rename,
                   renamingAssetId,
+                  canDelete: deleteAssetPermission.allowed,
                   getAssetId,
                   getAssetName,
                   getAssetType,
@@ -990,6 +996,7 @@ const CollectionViewPage: React.FC = () => {
               isDeleteLoading={assetSelection.isDeleteLoading}
               onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
               isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
+              canDelete={deleteAssetPermission.allowed}
               filterComponent={
                 <SearchFilters
                   filters={filters}

@@ -43,6 +43,7 @@ export interface AssetEditingState {
   isAssetSelected?: (assetId: string) => boolean;
   isSemantic?: boolean;
   confidenceThreshold?: number;
+  canDelete?: boolean;
 }
 
 // ─── Combined type for backward compatibility ───
@@ -119,6 +120,7 @@ export function AssetItemProvider<T>({
       isAssetSelected: value.isAssetSelected,
       isSemantic: value.isSemantic,
       confidenceThreshold: value.confidenceThreshold,
+      canDelete: value.canDelete,
     }),
     [
       value.editingAssetId,
@@ -129,6 +131,7 @@ export function AssetItemProvider<T>({
       value.isAssetSelected,
       value.isSemantic,
       value.confidenceThreshold,
+      value.canDelete,
     ]
   );
 

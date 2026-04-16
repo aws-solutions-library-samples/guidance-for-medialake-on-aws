@@ -3,6 +3,12 @@ import { useAuth } from "../common/hooks/auth-context";
 import { isTokenExpiringSoon } from "../common/helpers/token-helper";
 import { StorageHelper } from "../common/helpers/storage-helper";
 
+// How often to check token expiry (4 minutes).
+const CHECK_INTERVAL_MS = 4 * 60 * 1000;
+
+// Refresh when the token has less than 5 minutes left.
+const REFRESH_BUFFER_SECONDS = 300;
+
 export const useTokenRefresh = () => {
   const { refreshSession, isAuthenticated, silentAuthCheck } = useAuth();
   const refreshInProgress = useRef(false);
@@ -14,15 +20,15 @@ export const useTokenRefresh = () => {
     if (!token) return;
 
     try {
-      // Check if token is expiring soon (5 minutes before expiry)
-      if (isTokenExpiringSoon(token, 300)) {
+      if (isTokenExpiringSoon(token, REFRESH_BUFFER_SECONDS)) {
         refreshInProgress.current = true;
 
         try {
           await refreshSession();
         } catch (error) {
           console.error("Failed to refresh token:", error);
-          // Silent check — don't flash a loading spinner
+          // Fallback: silentAuthCheck uses Amplify's fetchAuthSession which
+          // will attempt the refresh via the Cognito refresh token.
           await silentAuthCheck();
         } finally {
           refreshInProgress.current = false;
@@ -37,14 +43,39 @@ export const useTokenRefresh = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Check immediately when component mounts
+    // Check immediately on mount
     checkAndRefreshToken();
 
-    // Set up periodic check every 4 minutes
-    const interval = setInterval(checkAndRefreshToken, 4 * 60 * 1000);
+    // Use a self-correcting timer instead of setInterval.
+    // Browsers throttle setInterval in background tabs (Chrome suspends
+    // them entirely after ~5 min). When the tab wakes up, a plain
+    // setInterval may not fire for a long time. By scheduling each
+    // iteration with setTimeout and checking the *actual* elapsed time,
+    // we can detect that we were suspended and refresh immediately.
+    let timerId: ReturnType<typeof setTimeout>;
+    let lastCheck = Date.now();
+
+    const scheduleNext = () => {
+      timerId = setTimeout(async () => {
+        const elapsed = Date.now() - lastCheck;
+        lastCheck = Date.now();
+
+        // If more time passed than expected (tab was suspended), the token
+        // may have expired or be close to expiry — always check.
+        if (elapsed > CHECK_INTERVAL_MS * 1.5) {
+          // Tab was likely suspended. Force a refresh attempt.
+          refreshInProgress.current = false; // Reset in case it was stuck
+        }
+
+        await checkAndRefreshToken();
+        scheduleNext();
+      }, CHECK_INTERVAL_MS);
+    };
+
+    scheduleNext();
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(timerId);
     };
   }, [isAuthenticated, checkAndRefreshToken]);
 

@@ -56,7 +56,7 @@ class ApiGatewayEnvironmentsConstruct(Construct):
             self,
             "EnvironmentsTable",
             props=DynamoDBProps(
-                name=f"{config.resource_prefix}-environments",
+                name=f"{config.resource_prefix}-environments-{config.environment}",
                 partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="SK",

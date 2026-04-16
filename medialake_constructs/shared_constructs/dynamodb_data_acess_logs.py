@@ -9,6 +9,8 @@ from aws_cdk import aws_s3 as s3
 from aws_cdk import custom_resources as cr
 from constructs import Construct
 
+from config import config
+
 # Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,7 +38,7 @@ class DynamoDBCloudTrailLogs(Construct):
         super().__init__(scope, id, **kwargs)
 
         trail_name = "DynamoDBDataPlaneTrail"
-        bucket_name = f"medialake-access-logs-{Aws.ACCOUNT_ID}-{Aws.REGION}-dev2"
+        bucket_name = f"{config.resource_prefix}-access-logs-{Aws.ACCOUNT_ID}-{Aws.REGION}-{config.environment}"
 
         logger.info(f"Creating CloudTrail bucket with name: {bucket_name}")
 

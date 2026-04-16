@@ -294,7 +294,9 @@ class Lambda(Construct):
         if config.name is not None:
             lambda_function_name = validate_lambda_resources_names(config.name)
         else:
-            lambda_function_name = f"{construct_id}-{env_config.environment}"
+            lambda_function_name = (
+                f"{env_config.resource_prefix}-{construct_id}-{env_config.environment}"
+            )
         logger.debug(f"Validated function name: {lambda_function_name}")
 
         # Create powertools layer

@@ -72,6 +72,20 @@ actions:
         default: ${MEDIACONVERT_ROLE_ARN}
         schema:
           type: string
+      - in: body
+        name: output_bucket
+        required: false
+        default: ""
+        schema:
+          type: string
+        description: S3 bucket for proxy and thumbnail output. Leave empty to use the default media assets bucket.
+      - in: body
+        name: Audio Track Selection Rules
+        required: false
+        default: ""
+        schema:
+          type: string
+        description: 'JSON array of rules controlling which audio tracks are selected for the output proxy. Each rule has a ''condition'' (track count match) and ''tracks'' (1-based track numbers or "all"). Example for a customer with stereo downmix at tracks 7&8 for 8+ track files: [{"condition":{"exact":1},"tracks":[1]},{"condition":{"min":2,"max":7},"tracks":[1,2]},{"condition":{"min":8},"tracks":[7,8]}]. Leave empty to use MediaConvert default selection. See assets/docs/audio-track-selection.md for full documentation.'
     x-requestMapping: processor/video_proxy_and_thumbnail/extract/
     x-responseMapping: processor/video_proxy_and_thumbnail/extract/
     connections:

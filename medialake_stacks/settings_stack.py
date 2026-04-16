@@ -63,7 +63,7 @@ class SettingsStack(cdk.NestedStack):
             self,
             "SystemSettingsTable",
             props=DynamoDBProps(
-                name="system-settings",
+                name=f"{config.resource_prefix}-system-settings-{config.environment}",
                 partition_key_name="PK",
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="SK",

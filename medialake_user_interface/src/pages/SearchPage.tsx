@@ -37,6 +37,7 @@ import ApiStatusModal from "../components/ApiStatusModal";
 import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -280,6 +281,9 @@ const SearchPage: React.FC = () => {
     deleteModalState,
     handleDeleteModalClose,
   } = useAssetOperations<AssetItem>();
+
+  // Permission check for asset delete
+  const deleteAssetPermission = useActionPermission("delete", "asset");
 
   const handleAssetClick = useCallback(
     (asset: AssetItem) => {
@@ -639,6 +643,7 @@ const SearchPage: React.FC = () => {
                 onSelectAllToggle={handleSelectAllToggle}
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
+                canDelete={deleteAssetPermission.allowed}
                 error={
                   error
                     ? {
@@ -664,6 +669,7 @@ const SearchPage: React.FC = () => {
               isDeleteLoading={assetSelection.isDeleteLoading}
               onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
               isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
+              canDelete={deleteAssetPermission.allowed}
               filterComponent={
                 <>
                   <SearchFilters

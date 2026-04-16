@@ -34,7 +34,9 @@ class ApiGatewayDeploymentStack(Stack):
 
         super().__init__(scope, id, **kwargs)
 
-        waf_acl_arn = Fn.import_value("MediaLakeApiGatewayCore-ApiGatwayWAFACLARN")
+        waf_acl_arn = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatwayWAFACLARN")
+        )
 
         self.api_deployment = ApiGatewayDeploymentConstruct(
             self,
@@ -47,7 +49,9 @@ class ApiGatewayDeploymentStack(Stack):
 
         # Create a custom resource to ensure API is deployed correctly
         # This will run after all other resources are created
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        api_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
         stage_name = self.api_deployment.stage.stage_name
 
         # Create a Lambda function to create a new deployment
@@ -124,7 +128,7 @@ def handler(event, context):
         stage_name_param = ssm.StringParameter(
             self,
             "ApiGatewayStageNameParameter",
-            parameter_name=f"/medialake/{config.environment}/api-gateway-stage-name",
+            parameter_name=config.ssm_param("api-gateway-stage-name"),
             string_value=self.api_deployment.stage.stage_name,
             description="API Gateway deployment stage name for MediaLake",
         )

@@ -87,8 +87,12 @@ class ApiGatewayStack(cdk.NestedStack):
         # Store props for later use in property accessors
         self._props = props
 
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        api_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
+        root_resource_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId")
+        )
 
         # Create the RestApi object once and store it
         self._rest_api = apigateway.RestApi.from_rest_api_attributes(

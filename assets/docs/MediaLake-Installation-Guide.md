@@ -44,6 +44,112 @@
 
 ---
 
+## 1b. Deploying Multiple Instances (Same Account/Region)
+
+Media Lake supports running multiple independent instances in the same AWS account and region. Each instance gets its own VPC, OpenSearch cluster, DynamoDB tables, Cognito user pool, and all other resources — fully isolated from other instances.
+
+### How It Works
+
+Each deployment is identified by a **Deployment Name** (the `DeploymentName` parameter in CloudFormation, or `resource_prefix` in `config.json`). The first/default deployment uses `medialake` and legacy resource naming. Additional deployments use a different name and automatically get prefixed resource names to avoid collisions.
+
+### Deploy a Second Instance via CloudFormation
+
+1. Go to **CloudFormation** > **Create Stack** > **With new resources (standard)**
+2. Upload the same `medialake.template` file
+3. Set a **different stack name** (e.g., `medialake-team2-cf`)
+4. Configure the parameters:
+   - **Deployment Name**: Set to a unique value like `ml-team2` (must be different from `medialake`)
+   - **Email**: Use a different email or alias (e.g., `user+team2@example.com`)
+   - **Environment Name**: Can be the same (`dev`) or different (`staging`)
+   - All other parameters: configure as needed for this instance
+5. Complete the deployment as normal
+
+The template automatically:
+
+- Allocates a non-overlapping VPC CIDR block (scans existing VPCs and picks the next available `/16`)
+- Prefixes all CloudFormation stack names, SSM parameters, and resource names with the deployment name
+- Creates isolated CodePipeline, CodeBuild projects, and artifact buckets
+
+### Deploy a Second Instance via CDK CLI
+
+1. Create a separate config file (e.g., `config-team2.json`):
+
+```json
+{
+  "environment": "dev",
+  "account_id": "123456789012",
+  "resource_prefix": "ml-team2",
+  "resource_application_tag": "ml-team2",
+  "use_prefixed_names": true,
+  "primary_region": "us-east-1",
+  "api_path": "v1",
+  "opensearch_deployment_size": "small",
+  "initial_user": {
+    "email": "user+team2@example.com",
+    "first_name": "Jane",
+    "last_name": "Doe"
+  },
+  "vpc": {
+    "use_existing_vpc": false,
+    "new_vpc": {
+      "vpc_name": "MediaLakeVPC-team2",
+      "max_azs": 3,
+      "cidr": "10.2.0.0/16",
+      "enable_dns_hostnames": true,
+      "enable_dns_support": true
+    },
+    "security_groups": {
+      "use_existing_groups": false,
+      "new_groups": {
+        "media_lake_sg": {
+          "name": "MediaLakeSG-team2",
+          "description": "MediaLake SG - Team 2"
+        },
+        "opensearch_sg": {
+          "name": "OpenSearchSG-team2",
+          "description": "OpenSearch SG - Team 2"
+        }
+      }
+    }
+  },
+  "authZ": {
+    "identity_providers": [{ "identity_provider_method": "cognito" }]
+  }
+}
+```
+
+Key differences from the default config:
+
+- `resource_prefix`: A unique short name (e.g., `ml-team2`) — this prefixes all AWS resources
+- `use_prefixed_names`: Must be `true` for additional instances — this prefixes CloudFormation stack names, SSM parameters, and exports
+- `vpc.new_vpc.cidr`: Must not overlap with other deployments (e.g., first uses `10.1.0.0/16`, second uses `10.2.0.0/16`)
+
+2. Swap the config and deploy:
+
+```bash
+cp config.json config-original.json
+cp config-team2.json config.json
+rm -rf cdk.out
+cdk deploy --all --require-approval never --concurrency 2 --profile <your-profile>
+```
+
+3. Switch back to the original config when done:
+
+```bash
+cp config-original.json config.json
+```
+
+### Limits and Considerations
+
+- **S3 bucket sharing**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance sets up its own EventBridge rules and Lambda triggers on the bucket — overlapping paths will cause duplicate processing, event conflicts, and data corruption. You CAN connect the same bucket to multiple instances if each instance uses different, non-overlapping object prefixes (e.g., instance 1 uses `team-a/` and instance 2 uses `team-b/`).
+- **Maximum instances**: 4–6 per account/region is practical. AWS service quotas (CloudWatch Logs resource policies, OpenSearch domains, etc.) become the limiting factor.
+- **CloudWatch Logs resource policies**: AWS limits these to 10 per account per region. Each Media Lake instance uses approximately 3–4 policies. Monitor usage via `aws logs describe-resource-policies`.
+- **VPC CIDR planning**: Each instance needs a non-overlapping `/16` block. The CloudFormation template auto-allocates these; for CDK CLI deployments, plan CIDRs manually.
+- **Cost**: Each instance is a full independent deployment with its own OpenSearch cluster, VPC, NAT Gateway, etc. Costs scale linearly.
+- **First deployment backward compatibility**: Existing deployments with `resource_prefix: medialake` and no `use_prefixed_names` field continue to work unchanged. The flag defaults to `false`.
+
+---
+
 ## 2. Storage Connector Setup
 
 After deployment, you'll need to configure storage connectors to connect media lake to your data sources.
@@ -55,6 +161,8 @@ After deployment, you'll need to configure storage connectors to connect media l
 2. **Navigate to the media lake web interface** using the URL provided in the deployment completion email
 
 ### 2.2 Configure S3 Storage Connectors
+
+> ⚠️ **Multi-Instance Warning**: If you are running multiple Media Lake instances in the same account, do NOT connect the same S3 bucket with the same paths/prefixes to more than one instance. Overlapping bucket+prefix combinations across instances will cause duplicate processing, event conflicts, and data corruption. You CAN share a bucket across instances if each uses different, non-overlapping object prefixes.
 
 1. **Navigate to Connectors**:
 
@@ -91,6 +199,8 @@ After deployment, you'll need to configure storage connectors to connect media l
    - **Object Prefix** (optional): Add single or multiple prefixes to ensure content will only be ingested from specific locations in your bucket (e.g., 'media/', 'videos/2024/')
      - Click **Add Prefix** to add additional prefixes if needed
        ![S3 Connector Configuration](../images/installation-guide/MediaLake-Configuration-5.png)
+
+   > ⚠️ **If running multiple Media Lake instances**: Each instance must use different, non-overlapping prefixes when connecting to the same bucket. Never connect the same bucket+prefix combination to more than one instance.
 
    > **Note**: If you have existing assets in the bucket, you can optionally use sync to ingest the content. After creating the connector, navigate back to the Connectors list, find your connector, and click the sync button to perform an initial scan of existing media files.
 
@@ -215,8 +325,11 @@ If you deployed using the **Git** source type, Media Lake can be updated with th
 1. In the AWS console, go to **CodePipeline**
    ![CodePipeline](../images/installation-guide/IncrementalUpdates-1.png)
 
-2. Select the `MediaLakeCDKPipeline` pipeline and click **Release change** to trigger the deployment
-   ![ReleaseChange](../images/installation-guide/IncrementalUpdates-2.png)
+2. Select the pipeline for your deployment and click **Release change** to trigger the deployment:
+
+   - Default deployment: `medialake-CDKPipeline`
+   - Additional deployments: `{deployment-name}-CDKPipeline` (e.g., `ml-team2-CDKPipeline`)
+     ![ReleaseChange](../images/installation-guide/IncrementalUpdates-2.png)
 
 3. The deployment will automatically pull the latest version from the GitHub repository and update your Media Lake instance
 
@@ -266,11 +379,14 @@ Configure integrations to securely store API credentials for external services (
 
 ## 7. Full Redeploy / Stack Cleanup
 
-- In CloudFormation, delete all stacks prefixed with `Media Lake` and `medialake-cf`.
-  ![CloudFormation Stacks](../images/installation-guide/medialake-incremental-updates-using-a-url.png)
+- In CloudFormation, delete all stacks belonging to the deployment you want to remove.
+  - For the default deployment: stacks prefixed with `MediaLake` and the `medialake-cf` pipeline stack.
+  - For additional deployments: stacks prefixed with the deployment name (e.g., `ml-team2-dev-MediaLake*`) and the pipeline stack (e.g., `ml-team2-cf`).
+    ![CloudFormation Stacks](../images/installation-guide/medialake-incremental-updates-using-a-url.png)
 - **Important for S3 Buckets**: For new buckets created via media lake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion.
 - If you encounter dependency errors, retry after deleting prerequisite stacks.
 - When clean, redeploy using the base install steps above.
+- **Note**: Deleting one instance does not affect other instances in the same account. Each deployment is fully independent.
 
 ---
 

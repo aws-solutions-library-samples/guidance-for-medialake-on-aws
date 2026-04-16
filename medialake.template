@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'CloudFormation template to create a pipeline for building and deploying CDK V2 application (Python backend with TypeScript/React frontend)'
 
 Parameters:
+  DeploymentName:
+    Description: Unique name for this MediaLake deployment. Use 'medialake' for the first/default instance. Use a different name (e.g., 'ml-team2') for additional instances in the same account/region.
+    Type: String
+    Default: medialake
+    MinLength: 2
+    MaxLength: 20
+    AllowedPattern: '^[a-z][a-z0-9\-]*$'
+    ConstraintDescription: Must start with a lowercase letter, contain only lowercase letters, numbers, and hyphens.
+
   SourceType:
     Description: Source type for the CDK code
     Type: String
@@ -67,6 +76,11 @@ Metadata:
     ParameterGroups:
       -
         Label:
+          default: Deployment Identity
+        Parameters:
+          - DeploymentName
+      -
+        Label:
           default: Initial Media Lake User
         Parameters:
           - InitialUserEmail
@@ -87,6 +101,8 @@ Metadata:
           - GitRepositoryUrl
           - S3PresignedURL
     ParameterLabels:
+      DeploymentName:
+        default: Deployment Name (unique per instance)
       InitialUserEmail:
         default: Email
       InitialUserFirstName:
@@ -111,8 +127,105 @@ Conditions:
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
   NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
   HasExternalS3Bucket: !Not [!Equals [!Ref ExternalS3Bucket, '']]
+  IsDefaultDeployment: !Equals [!Ref DeploymentName, 'medialake']
 
 Resources:
+  # CIDR Allocator - finds an unused /16 CIDR block in the 10.0.0.0/8 range
+  CidrAllocatorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt CidrAllocatorRole.Arn
+      Runtime: python3.12
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              logger.info(f"Received event: {event}")
+              response_data = {}
+
+              if event['RequestType'] == 'Delete':
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  return
+
+              try:
+                  ec2 = boto3.client('ec2')
+
+                  # Get all VPC CIDRs in the account/region
+                  used_cidrs = set()
+                  paginator = ec2.get_paginator('describe_vpcs')
+                  for page in paginator.paginate():
+                      for vpc in page['Vpcs']:
+                          cidr = vpc['CidrBlock']
+                          # Extract the second octet from 10.X.0.0/16 patterns
+                          parts = cidr.split('.')
+                          if parts[0] == '10' and cidr.endswith('/16'):
+                              used_cidrs.add(int(parts[1]))
+                          # Also check CIDR association sets for secondary CIDRs
+                          for assoc in vpc.get('CidrBlockAssociationSet', []):
+                              cidr2 = assoc.get('CidrBlock', '')
+                              parts2 = cidr2.split('.')
+                              if parts2[0] == '10' and cidr2.endswith('/16'):
+                                  used_cidrs.add(int(parts2[1]))
+
+                  logger.info(f"Used second octets in 10.x.0.0/16 range: {sorted(used_cidrs)}")
+
+                  # Find first available /16 in 10.0.0.0/8, starting from 10.1.0.0/16
+                  # Skip 10.0.0.0/16 as it's commonly used as default
+                  allocated_cidr = None
+                  for second_octet in range(1, 256):
+                      if second_octet not in used_cidrs:
+                          allocated_cidr = f"10.{second_octet}.0.0/16"
+                          break
+
+                  if not allocated_cidr:
+                      raise Exception("No available /16 CIDR blocks in 10.0.0.0/8 range")
+
+                  logger.info(f"Allocated CIDR: {allocated_cidr}")
+                  response_data['Cidr'] = allocated_cidr
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+              except Exception as e:
+                  logger.error(f"Error allocating CIDR: {str(e)}")
+                  response_data['Error'] = str(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+
+  CidrAllocatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: DescribeVpcs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeVpcs'
+                Resource: '*'
+
+  CidrAllocation:
+    Type: Custom::CidrAllocator
+    Properties:
+      ServiceToken: !GetAtt CidrAllocatorFunction.Arn
+      # Force re-evaluation on each stack update by including deployment name
+      DeploymentName: !Ref DeploymentName
+
   # Add the Service Linked Role Manager resources first
   ServiceLinkedRoleFunction:
     Type: AWS::Lambda::Function
@@ -354,7 +467,7 @@ Resources:
         Rules:
           - Id: DeleteOldPipelineArtifacts
             Status: Enabled
-            Prefix: 'MediaLakeCDKPipeline/'
+            Prefix: !Sub '${DeploymentName}-pipeline/'
             ExpirationInDays: 30
           - Id: CleanupBeforeDeletion
             Status: Enabled
@@ -373,7 +486,7 @@ Resources:
       BucketName: !Ref ArtifactBucket
       SourceKey: 'source-package.zip'
       Content: !Sub |
-        This is a source placeholder for the MediaLakeCDKPipeline pipeline.
+        This is a source placeholder for the ${DeploymentName} pipeline.
         Created on ${AWS::StackName} in ${AWS::Region}.
         Timestamp: ${AWS::AccountId}
 
@@ -451,7 +564,6 @@ Resources:
                 Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
   # CodeBuild Projects
-  # Git Clone Project for public repositories
   GitCloneProject:
     Type: 'AWS::CodeBuild::Project'
     Condition: IsGitSource
@@ -459,7 +571,7 @@ Resources:
       - ServiceLinkedRoleManager
       - InitialSourcePackage
     Properties:
-      Name: 'MediaLakeCDKPipeline-GitClone'
+      Name: !Sub '${DeploymentName}-CDKPipeline-GitClone'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -494,7 +606,7 @@ Resources:
       - ServiceLinkedRoleManager
       - InitialSourcePackage
     Properties:
-      Name: 'MediaLakeCDKPipeline-DownloadSource'
+      Name: !Sub '${DeploymentName}-CDKPipeline-DownloadSource'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -524,7 +636,7 @@ Resources:
     Type: 'AWS::CodeBuild::Project'
     DependsOn: ServiceLinkedRoleManager
     Properties:
-      Name: 'MediaLakeCDKPipeline-BuildAndDeploy'
+      Name: !Sub '${DeploymentName}-CDKPipeline-BuildAndDeploy'
       ServiceRole: !GetAtt CDKDeployRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -536,6 +648,13 @@ Resources:
         ComputeType: BUILD_GENERAL1_MEDIUM
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: DEPLOYMENT_NAME
+            Value: !Ref DeploymentName
+          - Name: IS_DEFAULT_DEPLOYMENT
+            Value: !If [IsDefaultDeployment, 'true', 'false']
+          - Name: VPC_CIDR
+            Value: !GetAtt CidrAllocation.Cidr
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -547,12 +666,9 @@ Resources:
               CDK_DEFAULT_REGION: ${AWS::Region}
           cache:
             paths:
-              # Node.js dependency caches
               - 'medialake_user_interface/node_modules/**/*'
               - '/root/.npm/**/*'
-              # Python dependency cache
               - '/root/.cache/pip/**/*'
-              # Native layer output caches - skip rebuild if output already exists
               - 'dist/lambdas/layers/ffprobe/**/*'
               - 'dist/lambdas/layers/ffmpeg/**/*'
               - 'dist/lambdas/layers/resvg/**/*'
@@ -592,7 +708,7 @@ Resources:
                   wait $NPM_PID || exit 1
             pre_build:
               commands:
-                - echo "Preparing config file"
+                - echo "Preparing config file for deployment '$DEPLOYMENT_NAME'"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
                 - if [ -f "config.json" ]; then echo "Using existing config file"; else echo "Creating config file"; cp .cicd/config.json-template config.json; fi
                 - echo "$( jq --arg e "${MediaLakeEnvironmentName}" '.environment = $e' config.json )" > config.json
@@ -603,6 +719,22 @@ Resources:
                 - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
                 - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
                 - echo "$( jq --arg b "${ExternalS3Bucket}" '.external_nodes_bucket = $b' config.json )" > config.json
+                # Set resource_prefix and use_prefixed_names based on DeploymentName
+                - echo "$( jq --arg p "$DEPLOYMENT_NAME" '.resource_prefix = $p' config.json )" > config.json
+                - echo "$( jq --arg t "$DEPLOYMENT_NAME" '.resource_application_tag = $t' config.json )" > config.json
+                - |
+                  if [ "$IS_DEFAULT_DEPLOYMENT" = "true" ]; then
+                    echo "Default deployment - using legacy naming (use_prefixed_names=false)"
+                    echo "$( jq '.use_prefixed_names = false' config.json )" > config.json
+                  else
+                    echo "Additional deployment '$DEPLOYMENT_NAME' - using prefixed naming"
+                    echo "$( jq '.use_prefixed_names = true' config.json )" > config.json
+                  fi
+                # Set VPC CIDR from auto-allocated block (avoids collisions with existing VPCs)
+                - echo "Setting VPC CIDR to $VPC_CIDR"
+                - echo "$( jq --arg c "$VPC_CIDR" '.vpc.new_vpc.cidr = $c' config.json )" > config.json
+                - echo "Final config.json:"
+                - cat config.json
             build:
               commands:
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
@@ -618,35 +750,30 @@ Resources:
                 - |
                   echo "Building native layers in parallel..."
                   LAYER_PIDS=""
-                  # FFmpeg + FFprobe share the same archive - build together
                   if [ -d "dist/lambdas/layers/ffprobe/bin" ] && [ -d "dist/lambdas/layers/ffmpeg/bin" ]; then
                     echo "FFmpeg/FFprobe layers cached, skipping"
                   else
                     (bash .cicd/build_ffmpeg_ffprobe.sh 2>&1 || (bash .cicd/build_ffprobe.sh 2>&1 && bash .cicd/build_ffmpeg.sh 2>&1)) &
                     LAYER_PIDS="$LAYER_PIDS $!"
                   fi
-                  # Resvg
                   if [ -d "dist/lambdas/layers/resvg/bin" ]; then
                     echo "Resvg layer cached, skipping"
                   else
                     bash .cicd/build_resvg.sh 2>&1 &
                     LAYER_PIDS="$LAYER_PIDS $!"
                   fi
-                  # NumPy
                   if [ -d "dist/lambdas/layers/numpy/python" ]; then
                     echo "NumPy layer cached, skipping"
                   else
                     bash .cicd/build_numpy.sh 2>&1 &
                     LAYER_PIDS="$LAYER_PIDS $!"
                   fi
-                  # OpenEXR
                   if [ -d "dist/lambdas/layers/openexr/python" ]; then
                     echo "OpenEXR layer cached, skipping"
                   else
                     bash .cicd/build_openexr.sh 2>&1 &
                     LAYER_PIDS="$LAYER_PIDS $!"
                   fi
-                  # Wait for all layer builds
                   LAYER_FAIL=0
                   for PID in $LAYER_PIDS; do
                     wait $PID || LAYER_FAIL=1
@@ -654,7 +781,6 @@ Resources:
                   if [ $LAYER_FAIL -ne 0 ]; then echo "One or more native layer builds failed"; exit 1; fi
                 - test -d dist/lambdas/layers/numpy || (echo "NumPy layer directory not found after build" && exit 1)
                 - test -d dist/lambdas/layers/openexr || (echo "OpenEXR layer directory not found after build" && exit 1)
-                # Lambda functions and Python layers (preserves native layers during clean)
                 - echo "Building Lambda functions"
                 - python3 .cicd/build_lambdas.py build
                 # Wait for frontend build to finish
@@ -672,7 +798,6 @@ Resources:
                     local REGION=$2
                     local QUALIFIER="hnb659fds"
 
-                    # Check if CDKToolkit stack exists and its status
                     STACK_STATUS=$(aws cloudformation describe-stacks --stack-name CDKToolkit --region "${!REGION}" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
 
                     if [ "${!STACK_STATUS}" = "ROLLBACK_COMPLETE" ] || [ "${!STACK_STATUS}" = "DELETE_FAILED" ]; then
@@ -686,12 +811,10 @@ Resources:
                       echo "Cleaning up any orphaned CDK bootstrap roles in ${!REGION}..."
                       for ROLE_SUFFIX in cfn-exec-role deploy-role file-publishing-role image-publishing-role lookup-role; do
                         ROLE_NAME="cdk-${!QUALIFIER}-${!ROLE_SUFFIX}-${!ACCOUNT_ID}-${!REGION}"
-                        # Detach managed policies
                         ATTACHED=$(aws iam list-attached-role-policies --role-name "${!ROLE_NAME}" --query "AttachedPolicies[].PolicyArn" --output text 2>/dev/null || true)
                         for POLICY_ARN in ${!ATTACHED}; do
                           aws iam detach-role-policy --role-name "${!ROLE_NAME}" --policy-arn "${!POLICY_ARN}" 2>/dev/null || true
                         done
-                        # Delete inline policies
                         INLINE=$(aws iam list-role-policies --role-name "${!ROLE_NAME}" --query "PolicyNames[]" --output text 2>/dev/null || true)
                         for POLICY_NAME in ${!INLINE}; do
                           aws iam delete-role-policy --role-name "${!ROLE_NAME}" --policy-name "${!POLICY_NAME}" 2>/dev/null || true
@@ -732,7 +855,7 @@ Resources:
       - GitCloneProject
       - BuildAndDeployProject
     Properties:
-      Name: MediaLakeCDKPipeline
+      Name: !Sub '${DeploymentName}-CDKPipeline'
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -792,7 +915,7 @@ Resources:
       - DownloadSourceProject
       - BuildAndDeployProject
     Properties:
-      Name: MediaLakeCDKPipeline
+      Name: !Sub '${DeploymentName}-CDKPipeline'
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -950,3 +1073,7 @@ Outputs:
   ArtifactBucketName:
     Description: Name of the S3 bucket used to store pipeline artifacts
     Value: !Ref ArtifactBucket
+
+  DeploymentNameOutput:
+    Description: The deployment name used for this MediaLake instance
+    Value: !Ref DeploymentName

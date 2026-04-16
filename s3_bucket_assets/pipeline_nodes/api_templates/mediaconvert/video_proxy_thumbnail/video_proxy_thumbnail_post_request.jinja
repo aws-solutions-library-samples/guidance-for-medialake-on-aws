@@ -104,7 +104,12 @@
       {
         "AudioSelectors": {
           "Audio Selector 1": {
+            {% if variables.use_track_selection and variables.audio_tracks %}
+            "SelectorType": "TRACK",
+            "Tracks": {{ variables.audio_tracks | jsonify }}
+            {% else %}
             "DefaultSelection": "DEFAULT"
+            {% endif %}
           }
         },
         "VideoSelector": {},

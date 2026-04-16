@@ -38,4 +38,7 @@ def translate_event_to_request(event: Dict[str, Any]) -> Dict[str, Any]:
         # ── handy for logs / future use ───────────────────────────────
         "inventory_id": inp["InventoryID"],
         "asset_id": clean_asset_id(dsa["ID"]),
+        # ── audio track selection ─────────────────────────────────────
+        "audio_tracks": event.get("audio_tracks"),  # list[int] | None
+        "use_track_selection": event.get("use_track_selection", False),  # bool
     }

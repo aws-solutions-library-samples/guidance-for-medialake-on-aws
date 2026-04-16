@@ -387,11 +387,18 @@ class CognitoConstruct(Construct):
             ),
         )
 
+        # Note: This construct-level export is kept for backwards compatibility.
+        # The CognitoStack also exports this value with a stack-prefixed name.
+        legacy_export_name = (
+            "UserPoolClientId"
+            if not config.use_prefixed_names
+            else config.cfn_export("Cognito", "UserPoolClientId")
+        )
         self.client_id = CfnOutput(
             self,
             "UserPoolClientId",
             value=self._user_pool_client.user_pool_client_id,
-            export_name="UserPoolClientId",
+            export_name=legacy_export_name,
         )
 
     @property

@@ -16,6 +16,7 @@ import os
 import os.path
 from typing import Any, Dict, List
 
+import audio_track_selection as ats
 import boto3
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -262,6 +263,75 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         input_key_no_ext, orig_ext = os.path.splitext(in_key)
         orig_ext = orig_ext.lstrip(".").lower() if orig_ext else "unknown"
         output_key = f"{in_bucket}/{input_key_no_ext}-{orig_ext}"
+
+        # ── AUDIO TRACK SELECTION ────────────────────────────────────────────────
+        # EmbeddedMetadata is NOT propagated through the Step Functions event —
+        # only ObjectMetadata is. Fetch the full record from DynamoDB to get
+        # Metadata.EmbeddedMetadata.audio.
+        inv_id_for_meta = asset.get("InventoryID")
+        audio_streams = []
+        if inv_id_for_meta:
+            try:
+                ddb_resp = asset_table.get_item(Key={"InventoryID": inv_id_for_meta})
+                fetched = ddb_resp.get("Item", {})
+                audio_streams = (
+                    fetched.get("Metadata", {})
+                    .get("EmbeddedMetadata", {})
+                    .get("audio", [])
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch full asset record for audio metadata",
+                    extra={"inventory_id": inv_id_for_meta, "error": str(e)},
+                )
+        track_count = len(audio_streams) if isinstance(audio_streams, list) else 0
+        logger.info("Audio track count extracted", extra={"track_count": track_count})
+
+        raw_rules = os.getenv("AUDIO_TRACK_SELECTION_RULES", "") or event.get(
+            "parameters", {}
+        ).get("Audio Track Selection Rules", "")
+
+        if raw_rules and raw_rules.strip():
+            rules = ats.parse_rules(raw_rules)
+            if rules:
+                matched = ats.match_rule(rules, track_count)
+                if matched is not None:
+                    rule_index = rules.index(matched)
+                    tracks = ats.resolve_tracks(matched, track_count)
+                    ats.validate_track_bounds(tracks, track_count, rule_index, in_key)
+                    logger.info(
+                        "Audio track selection rule matched",
+                        extra={
+                            "rule_index": rule_index,
+                            "condition": matched["condition"],
+                            "tracks_selector": matched["tracks"],
+                            "resolved_tracks": tracks,
+                        },
+                    )
+                    event["audio_tracks"] = tracks
+                    event["use_track_selection"] = True
+                else:
+                    logger.warning(
+                        "No audio track selection rule matched",
+                        extra={
+                            "track_count": track_count,
+                            "rules_evaluated": len(rules),
+                        },
+                    )
+                    event["audio_tracks"] = None
+                    event["use_track_selection"] = False
+            else:
+                logger.info(
+                    "Audio track selection rules parsed to empty list, using default behavior"
+                )
+                event["audio_tracks"] = None
+                event["use_track_selection"] = False
+        else:
+            logger.info(
+                "No audio track selection rules configured, using default behavior"
+            )
+            event["audio_tracks"] = None
+            event["use_track_selection"] = False
 
         # delete existing proxy (.mp4) and thumbnails (.jpg, numbered variants)
         # Clean up proxy

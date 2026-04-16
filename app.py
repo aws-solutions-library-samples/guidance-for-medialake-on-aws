@@ -81,30 +81,32 @@ else:
     env = cdk.Environment(account=app.account, region=app.region)
 
 cloudfront_waf_stack = CloudFrontWafStack(
-    app, "MediaLakeCloudFrontWAF", env=env_us_east_1
+    app, config.stack_name("MediaLakeCloudFrontWAF"), env=env_us_east_1
 )
 
 # Create Edge Lambda Stack in us-east-1 (required for Lambda@Edge)
 # Lambda@Edge functions must be deployed in us-east-1 regardless of main stack region
 edge_lambda_stack = EdgeLambdaStack(
-    app, "MediaLakeEdgeLambda", env=env_us_east_1  # Must be us-east-1
+    app,
+    config.stack_name("MediaLakeEdgeLambda"),
+    env=env_us_east_1,  # Must be us-east-1
 )
 
 # Create the BaseInfrastructureStack
 base_infrastructure = BaseInfrastructureStack(
-    app, "MediaLakeBaseInfrastructure", env=env
+    app, config.stack_name("MediaLakeBaseInfrastructure"), env=env
 )
 
 cognito_stack = CognitoStack(
     app,
-    "MediaLakeCognito",
+    config.stack_name("MediaLakeCognito"),
     props=CognitoStackProps(),
     env=env,
 )
 
 api_gateway_core_stack = ApiGatewayCoreStack(
     app,
-    "MediaLakeApiGatewayCore",
+    config.stack_name("MediaLakeApiGatewayCore"),
     props=ApiGatewayCoreStackProps(
         access_log_bucket=base_infrastructure.access_log_bucket,
         cognito_user_pool=cognito_stack.user_pool,
@@ -112,7 +114,7 @@ api_gateway_core_stack = ApiGatewayCoreStack(
     env=env,
 )
 
-waf_acl_ssm_param_name = "/medialake/cloudfront-waf-acl-arn"
+waf_acl_ssm_param_name = config.ssm_param_global("cloudfront-waf-acl-arn")
 
 api_gateway_core_stack.add_dependency(base_infrastructure)
 api_gateway_core_stack.add_dependency(cognito_stack)
@@ -120,7 +122,7 @@ api_gateway_core_stack.add_dependency(cognito_stack)
 # Create the Authorization Stack (depends on Cognito, NOT on ApiGatewayCore)
 authorization_stack = AuthorizationStack(
     app,
-    "MediaLakeAuthorizationStack",
+    config.stack_name("MediaLakeAuthorizationStack"),
     props=AuthorizationStackProps(
         cognito_user_pool=cognito_stack.user_pool,
         cognito_construct=cognito_stack.cognito_construct,
@@ -182,22 +184,30 @@ class ResourceImporter:
     @staticmethod
     def get_rest_api_id():
         """Get the REST API ID from CloudFormation export."""
-        return Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
 
     @staticmethod
     def get_root_resource_id():
         """Get the root resource ID from CloudFormation export."""
-        return Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId")
+        )
 
     @staticmethod
     def get_x_origin_verify_secret_arn():
         """Get the X-Origin verify secret ARN from CloudFormation export."""
-        return Fn.import_value("MediaLakeApiGatewayCore-XOriginVerifySecretArn")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "XOriginVerifySecretArn")
+        )
 
     @staticmethod
     def get_waf_acl_arn():
         """Get the WAF ACL ARN from CloudFormation export."""
-        return Fn.import_value("MediaLakeApiGatewayCore-ApiGatwayWAFACLARN")
+        return Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatwayWAFACLARN")
+        )
 
 
 @dataclass
@@ -582,7 +592,7 @@ class MediaLakeStack(cdk.Stack):
 
 medialake_stack = MediaLakeStack(
     app,
-    "MediaLakeStack",
+    config.stack_name("MediaLakeStack"),
     props=MediaLakeStackProps(
         # api_gateway_core_stack=api_gateway_core_stack,  # Removed to break circular dependency
         base_infrastructure=base_infrastructure,
@@ -609,7 +619,7 @@ if resource_count == 0:
 # This ensures the SSM parameter for stage name is created before UI stack tries to read it
 api_gateway_deployment_stack = ApiGatewayDeploymentStack(
     app,
-    "MediaLakeApiGatewayDeployment",
+    config.stack_name("MediaLakeApiGatewayDeployment"),
     props=ApiGatewayDeploymentStackProps(
         api_dependencies=api_resource_collector.get_resources(),  # Use the collector
     ),
@@ -622,7 +632,7 @@ api_gateway_deployment_stack.add_dependency(medialake_stack)
 # This stack reads the API Gateway stage name from SSM Parameter Store
 user_interface_stack = UserInterfaceStack(
     app,
-    "MediaLakeUserInterface",
+    config.stack_name("MediaLakeUserInterface"),
     props=UserInterfaceStackProps(
         cognito_user_pool_id=cognito_stack.user_pool_id,
         cognito_user_pool_client_id=cognito_stack.user_pool_client_id,
@@ -647,7 +657,7 @@ user_interface_stack.add_dependency(
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(
     app,
-    "MediaLakeCognitoUpdate",
+    config.stack_name("MediaLakeCognitoUpdate"),
     props=CognitoUpdateStackProps(
         cognito_user_pool=cognito_stack.user_pool,
         cognito_user_pool_id=cognito_stack.user_pool_id,
@@ -661,7 +671,7 @@ cognito_update_stack.add_dependency(authorization_stack)
 
 cleanup_stack = CleanupStack(
     app,
-    "MediaLakeCleanupStack",
+    config.stack_name("MediaLakeCleanupStack"),
     props=CleanupStackProps(
         pipelines_event_bus=base_infrastructure.pipelines_event_bus,
         pipeline_table=base_infrastructure.pipeline_table,

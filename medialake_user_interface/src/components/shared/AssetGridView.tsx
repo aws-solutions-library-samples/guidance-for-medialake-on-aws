@@ -86,6 +86,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   onEditNameComplete,
   onFavoriteToggle,
   onSelectToggle,
+  canDelete,
 }: {
   asset: T;
   cardFields: AssetField[];
@@ -116,6 +117,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   onEditNameComplete: (a: T, save: boolean, value?: string) => void;
   onFavoriteToggle?: (a: T, e: React.MouseEvent<HTMLElement>) => void;
   onSelectToggle?: (a: T, e: React.MouseEvent<HTMLElement>) => void;
+  canDelete?: boolean;
 }) {
   const assetId = getAssetId(asset);
 
@@ -184,6 +186,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
       isRenaming={isCardRenaming}
       isSemantic={isSemantic}
       confidenceThreshold={confidenceThreshold}
+      canDelete={canDelete}
     />
   );
 }) as <T>(props: any) => React.ReactElement;
@@ -237,6 +240,7 @@ function AssetGridItemWrapper<T>({
       isCardRenaming={isCardRenaming}
       isSemantic={editing.isSemantic ?? false}
       confidenceThreshold={editing.confidenceThreshold ?? 0}
+      canDelete={editing.canDelete ?? true}
       {...accessors}
       {...actions}
       showRemoveButton={actions.showRemoveButton ?? false}

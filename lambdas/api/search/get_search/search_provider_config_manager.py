@@ -240,7 +240,8 @@ class SearchProviderConfigManager:
             ARN of the created secret
         """
         try:
-            secret_name = f"medialake-search-{provider_name}-api-key"
+            resource_prefix = os.environ.get("RESOURCE_PREFIX", "medialake")
+            secret_name = f"{resource_prefix}-search-{provider_name}-api-key"
 
             # Check if secret already exists
             try:

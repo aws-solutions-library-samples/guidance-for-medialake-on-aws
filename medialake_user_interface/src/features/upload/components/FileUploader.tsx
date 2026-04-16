@@ -34,7 +34,7 @@ function getUppy() {
     autoProceed: false,
     debug: process.env.NODE_ENV === "development",
     restrictions: {
-      maxFileSize: 10 * 1024 * 1024 * 1024, // 10GB max file size
+      maxFileSize: 500 * 1024 * 1024 * 1024, // 500GB max file size
       allowedFileTypes: [
         "audio/*",
         "video/*",
@@ -42,13 +42,16 @@ function getUppy() {
         "application/x-mpegURL", // HLS
         "application/dash+xml", // MPEG-DASH
       ],
-      maxNumberOfFiles: 10,
+      maxNumberOfFiles: 500,
     },
   });
 }
 
-// Regex pattern for S3-compatible filenames
-const FILENAME_REGEX = /^[a-zA-Z0-9!\-_.*'()]+$/;
+// S3-compatible filename regex.
+// Allows: alphanumeric, S3 safe chars (!-_.*'()), and chars that require
+// URL-encoding but are fully supported (space @$+,;=&:).
+// Blocks: control chars and S3 "characters to avoid" (\{}^`~|%<>"#[])
+const FILENAME_REGEX = /^[a-zA-Z0-9!\-_.*'() @$+,;=&:]+$/;
 
 /**
  * FileUploaderProps interface
@@ -153,7 +156,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     uppyInstance.on("file-added", (file) => {
       if (!FILENAME_REGEX.test(file.name)) {
         uppyInstance.info(
-          `Filename "${file.name}" contains invalid characters. Only alphanumeric characters, dashes, underscores, dots, exclamation marks, asterisks, single quotes, and parentheses are allowed.`,
+          `Filename "${file.name}" contains characters not supported by S3. Avoid: \\ { } ^ \` ~ | % < > " # [ ]`, // i18n-ignore
           "error",
           5000
         );
@@ -164,7 +167,23 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     // Add AWS S3 plugin with multipart support
     uppyInstance.use(AwsS3, {
       id: "S3Uploader",
-      limit: 5, // concurrent uploads (as per requirements)
+      // Concurrent file uploads — kept conservative since S3 uses HTTP/1.1
+      // and each multipart file generates many sign requests
+      limit: 6,
+      // Scale chunk size with file size to reduce sign round-trips.
+      // Each chunk requires a sign API call (~2-3s) so fewer, larger chunks
+      // dramatically reduce overhead for big files.
+      getChunkSize: (file: { size: number }) => {
+        const GB = 1024 * 1024 * 1024;
+        const MB = 1024 * 1024;
+        if (file.size >= 100 * GB) return 500 * MB; // 100GB+ → 500MB chunks (~200-1000 parts)
+        if (file.size >= 10 * GB) return 200 * MB; // 10-100GB → 200MB chunks
+        if (file.size >= 1 * GB) return 100 * MB; // 1-10GB → 100MB chunks (~10-100 parts)
+        if (file.size >= 100 * MB) return 50 * MB; // 100MB-1GB → 50MB chunks
+        return 5 * MB; // <100MB → 5MB chunks (S3 minimum)
+      },
+      // More aggressive retries for large/long uploads
+      retryDelays: [0, 1000, 3000, 5000, 10000],
     } as any);
 
     setUppy(uppyInstance);

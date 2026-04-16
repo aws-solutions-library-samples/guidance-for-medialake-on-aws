@@ -1,6 +1,6 @@
 {
   "name": "Default Video Pipeline",
-  "description": "",
+  "description": "Default video ingest pipeline. Extracts metadata, creates a proxy MP4 and thumbnails via MediaConvert, then polls for job completion. The Video Proxy and Thumbnail node supports optional audio track selection rules — see assets/docs/audio-track-selection.md for configuration syntax and examples.",
   "active": true,
   "configuration": {
     "nodes": [
@@ -231,7 +231,8 @@
             "parameters": {
               "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
               "output_bucket": "",
-              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}",
+              "Audio Track Selection Rules": ""
             }
           }
         },

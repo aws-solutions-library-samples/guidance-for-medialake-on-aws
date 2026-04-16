@@ -156,7 +156,7 @@ class UIConstruct(Construct):
         self.user_interface_waf_log_group = logs.LogGroup(
             self,
             "WafLogGroup",
-            log_group_name=f"aws-waf-logs-{config.resource_prefix}-{stack.region}-{stack.account}-user-interface-waf-logs",
+            log_group_name=f"aws-waf-logs-{config.resource_prefix}-{config.environment}-{stack.region}-{stack.account}-user-interface-waf-logs",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -433,9 +433,7 @@ class UIConstruct(Construct):
             on_update={
                 "service": "SSM",
                 "action": "getParameter",
-                "parameters": {
-                    "Name": f"/medialake/{config.environment}/edge-lambda-version-arn"
-                },
+                "parameters": {"Name": config.ssm_param("edge-lambda-version-arn")},
                 "region": "us-east-1",  # Must read from us-east-1
                 "physical_resource_id": cr.PhysicalResourceId.of(
                     "edge-lambda-version-arn-param"
@@ -483,7 +481,7 @@ function handler(event) {
 }
 """
             ),
-            function_name=f"{config.resource_prefix}-spa-url-rewrite",
+            function_name=f"{config.resource_prefix}-spa-url-rewrite-{config.environment}",
             comment="Rewrites non-file SPA routes to /index.html for client-side routing",
         )
 
@@ -765,7 +763,7 @@ function handler(event) {
             ssm.StringParameter(
                 self,
                 "CloudFrontDistributionDomainParameter",
-                parameter_name=f"/medialake/{config.environment}/cloudfront-distribution-domain",
+                parameter_name=config.ssm_param("cloudfront-distribution-domain"),
                 string_value=self.cloudfront_distribution.distribution_domain_name,
                 description="CloudFront distribution domain for MediaLake UI (includes environment for multi-env support)",
             )

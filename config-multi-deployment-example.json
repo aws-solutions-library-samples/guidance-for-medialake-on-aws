@@ -1,0 +1,52 @@
+{
+  "account_id": "XXXXXXXXXXXX",
+  "api_path": "v1",
+  "authZ": {
+    "identity_providers": [
+      {
+        "identity_provider_method": "cognito"
+      }
+    ]
+  },
+  "environment": "dev",
+  "initial_user": {
+    "email": "user@example.com",
+    "first_name": "Jane",
+    "last_name": "Doe"
+  },
+  "logging": {
+    "api_gateway_retention_days": 90,
+    "cloudwatch_retention_days": 90,
+    "retention_days": 90,
+    "s3_retention_days": 90,
+    "waf_retention_days": 90
+  },
+  "opensearch_deployment_size": "medium",
+  "primary_region": "us-east-1",
+  "resource_application_tag": "medialake-teamA",
+  "resource_prefix": "ml-teamA",
+  "use_prefixed_names": true,
+  "vpc": {
+    "new_vpc": {
+      "cidr": "10.1.0.0/16",
+      "enable_dns_hostnames": true,
+      "enable_dns_support": true,
+      "max_azs": 3,
+      "vpc_name": "MediaLakeVPC-teamA"
+    },
+    "security_groups": {
+      "new_groups": {
+        "media_lake_sg": {
+          "description": "MediaLake Security Group - Team A",
+          "name": "MediaLakeSecurityGroup-teamA"
+        },
+        "opensearch_sg": {
+          "description": "Allow limited access to OpenSearch - Team A",
+          "name": "OpenSearchSG-teamA"
+        }
+      },
+      "use_existing_groups": false
+    },
+    "use_existing_vpc": false
+  }
+}

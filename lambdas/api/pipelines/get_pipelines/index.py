@@ -230,6 +230,15 @@ def get_pipelines(
                     "ExpressionAttributeValues": {":status": status},
                 }
             )
+        else:
+            # By default, exclude DELETED pipelines from the list
+            scan_params.update(
+                {
+                    "FilterExpression": "attribute_not_exists(#ds) OR #ds <> :deleted",
+                    "ExpressionAttributeNames": {"#ds": "deploymentStatus"},
+                    "ExpressionAttributeValues": {":deleted": "DELETED"},
+                }
+            )
 
         # Add LastEvaluatedKey if next_token is provided
         if next_token:

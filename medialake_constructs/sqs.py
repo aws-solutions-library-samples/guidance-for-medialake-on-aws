@@ -125,11 +125,12 @@ class SQSConstruct(Construct):
         self._queue = sqs.Queue(self, f"{construct_id}Queue", **queue_props)
 
         # Output queue URL
+        sqs_export_prefix = config.export_prefix if config.use_prefixed_names else ""
         CfnOutput(
             self,
             f"{construct_id}QueueUrl",
             value=self._queue.queue_url,
-            export_name=f"{construct_id}QueueUrl",
+            export_name=f"{sqs_export_prefix}{construct_id}QueueUrl",
         )
 
         # Output queue ARN
@@ -137,7 +138,7 @@ class SQSConstruct(Construct):
             self,
             f"{construct_id}QueueArn",
             value=self._queue.queue_arn,
-            export_name=f"{construct_id}QueueArn",
+            export_name=f"{sqs_export_prefix}{construct_id}QueueArn",
         )
 
         # Store the key for properties

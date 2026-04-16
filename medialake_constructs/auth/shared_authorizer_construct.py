@@ -14,6 +14,7 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
+from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -139,7 +140,7 @@ class SharedAuthorizerConstruct(Construct):
             self,
             "SharedAuthorizerLambdaArn",
             value=self._authorizer_lambda.function.function_arn,
-            export_name="MediaLake-SharedAuthorizerLambdaArn",
+            export_name=config.cfn_export("MediaLake", "SharedAuthorizerLambdaArn"),
         )
 
         # Export the Lambda function name for cross-stack usage
@@ -147,7 +148,7 @@ class SharedAuthorizerConstruct(Construct):
             self,
             "SharedAuthorizerLambdaName",
             value=self._authorizer_lambda.function.function_name,
-            export_name="MediaLake-SharedAuthorizerLambdaName",
+            export_name=config.cfn_export("MediaLake", "SharedAuthorizerLambdaName"),
         )
 
         # Lambda warming for shared custom authorizer

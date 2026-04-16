@@ -17,6 +17,7 @@ interface AssetCardActionsProps {
   isClipMode: boolean;
   isFavorite: boolean;
   showRemoveButton: boolean;
+  canDelete?: boolean;
   onAssetClick: () => void;
   onDeleteClick?: (event: React.MouseEvent<HTMLElement>) => void;
   onDownloadClick?: (event: React.MouseEvent<HTMLElement>) => void;
@@ -34,6 +35,7 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
     isClipMode,
     isFavorite,
     showRemoveButton,
+    canDelete = true,
     onAssetClick,
     onDeleteClick,
     onDownloadClick,
@@ -133,7 +135,7 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
         >
           {isFavorite ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
         </IconButton>
-        {!isClipMode && (
+        {!isClipMode && canDelete && (
           <IconButton
             size="small"
             onClick={(e) => {

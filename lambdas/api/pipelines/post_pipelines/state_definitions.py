@@ -277,7 +277,7 @@ class StateDefinitionFactory:
             else:
                 # Handle Lambda function nodes
                 # Use the more specific lambda key that includes the method if available
-                lambda_key = self.node_id_to_lambda_key.get(node.id, node.data.id)
+                lambda_key = self.node_id_to_lambda_key.get(node.id, node.id)
                 lambda_arn = self.lambda_arns.get(lambda_key)
 
                 if not lambda_arn:
@@ -373,19 +373,22 @@ class StateDefinitionFactory:
         """
         Build mappings from node IDs to Lambda ARN keys.
 
+        Uses node.id (the unique instance identifier) as the key so that
+        duplicate node types each resolve to their own Lambda ARN.
+
         Args:
             nodes: List of nodes from the pipeline
         """
         for node in nodes:
             if node.id and node.data and node.data.id:
-                # Create a more specific key for Lambda ARN mapping that includes the method
-                # This ensures different operations (GET, POST) for the same node type get different Lambda functions
-                lambda_key = node.data.id
+                # Use node.id (unique instance) as the lambda key so duplicate
+                # node types don't collide.
+                lambda_key = node.id
                 if (
                     node.data.type.lower() == "integration"
                     and "method" in node.data.configuration
                 ):
-                    lambda_key = f"{node.data.id}_{node.data.configuration['method']}"
+                    lambda_key = f"{node.id}_{node.data.configuration['method']}"
                     # Add operationId to the key if available
                     if (
                         "operationId" in node.data.configuration
@@ -560,7 +563,7 @@ class StateDefinitionFactory:
 
                     # Get the Lambda ARN for this processor node
                     lambda_key = self.node_id_to_lambda_key.get(
-                        processor_id, processor_node.data.id
+                        processor_id, processor_id
                     )
                     processor_lambda_arn = self.lambda_arns.get(lambda_key)
 

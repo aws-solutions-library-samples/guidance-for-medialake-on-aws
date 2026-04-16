@@ -18,6 +18,7 @@ interface BatchOperationsWrapperProps {
   onBatchPipelineExecution?: (pipelineId: string) => void;
   onBatchPipelineExecutionRequest?: (pipelineId: string, pipelineName: string) => void;
   isPipelineExecutionLoading?: boolean;
+  canDelete?: boolean;
 }
 
 const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
@@ -32,6 +33,7 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
   onBatchPipelineExecution,
   onBatchPipelineExecutionRequest,
   isPipelineExecutionLoading,
+  canDelete = true,
 }) => {
   return (
     <Box sx={{ height: "100%" }}>
@@ -48,6 +50,7 @@ const BatchOperationsWrapper: React.FC<BatchOperationsWrapperProps> = ({
           onBatchPipelineExecution={onBatchPipelineExecution}
           onBatchPipelineExecutionRequest={onBatchPipelineExecutionRequest}
           isPipelineExecutionLoading={isPipelineExecutionLoading}
+          canDelete={canDelete}
         />
       )}
     </Box>

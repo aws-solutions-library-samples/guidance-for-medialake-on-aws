@@ -3,6 +3,8 @@ from aws_cdk import aws_ssm as ssm
 from aws_cdk import aws_wafv2 as wafv2
 from constructs import Construct
 
+from config import config
+
 
 class CloudFrontWafStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs):
@@ -66,7 +68,7 @@ class CloudFrontWafStack(Stack):
         self.waf_acl_parameter = ssm.StringParameter(
             self,
             "CloudFrontWafAclArnParam",
-            parameter_name="/medialake/cloudfront-waf-acl-arn",
+            parameter_name=config.ssm_param_global("cloudfront-waf-acl-arn"),
             string_value=self.web_acl.attr_arn,
             description="ARN of the CloudFront WAF ACL",
         )

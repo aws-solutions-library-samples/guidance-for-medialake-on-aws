@@ -31,6 +31,7 @@ interface AssetTableViewProps<T> {
   selectedSearchFields?: string[];
   isRenaming?: boolean;
   renamingAssetId?: string;
+  canDelete?: boolean;
 }
 
 function AssetTableView<T>({
@@ -60,6 +61,7 @@ function AssetTableView<T>({
   selectedSearchFields,
   isRenaming,
   renamingAssetId,
+  canDelete = true,
 }: AssetTableViewProps<T>) {
   // Group results by type if needed
   const groupedResults = React.useMemo(() => {
@@ -95,6 +97,7 @@ function AssetTableView<T>({
         selectedSearchFields={selectedSearchFields}
         isRenaming={isRenaming}
         renamingAssetId={renamingAssetId}
+        canDelete={canDelete}
       />
     );
   }
@@ -146,6 +149,7 @@ function AssetTableView<T>({
               selectedSearchFields={selectedSearchFields}
               isRenaming={isRenaming}
               renamingAssetId={renamingAssetId}
+              canDelete={canDelete}
             />
           </Box>
         ))}

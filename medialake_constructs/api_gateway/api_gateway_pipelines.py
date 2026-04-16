@@ -109,6 +109,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                         "events:*",
                         "states:*",
                         "logs:*",
+                        "secretsmanager:DeleteSecret",
                     ],
                     resources=["*"],
                 ),
@@ -198,7 +199,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                     effect=iam.Effect.ALLOW,
                     actions=["ssm:GetParameter"],
                     resources=[
-                        f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*"
+                        f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_prefix}/*"
                     ],
                 ),
                 # Allow Secrets Manager operations for webhook secrets
@@ -304,7 +305,6 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
                 "NODE_TEMPLATES_BUCKET": props.pipelines_nodes_templates_bucket.bucket_name,
                 "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
-                "RESOURCE_PREFIX": config.resource_prefix,
                 "MEDIACONVERT_QUEUE_ARN": props.mediaconvert_queue_arn,
                 "MEDIACONVERT_ROLE_ARN": props.mediaconvert_role_arn,
                 "NODE_TABLE": props.node_table.table_arn,
@@ -324,6 +324,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                 "CLOUDFRONT_DOMAIN": props.cloudfront_domain,
                 "ENVIRONMENT": config.environment,
+                "SSM_PREFIX": config.ssm_prefix,
+                "RESOURCE_PREFIX": config.resource_prefix,
             },
         )
 
@@ -541,7 +543,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             iam.PolicyStatement(
                 actions=["ssm:GetParameter"],
                 resources=[
-                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/{config.environment}/cloudfront-distribution-domain"
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}"
                 ],
             )
         )
@@ -569,7 +571,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         pipeline_creation_log_group = logs.LogGroup(
             self,
             "PipelineCreationStateMachineLogGroup",
-            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Pipeline_Creator_{config.environment}",
             retention=logs.RetentionDays.ONE_MONTH,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -578,7 +580,7 @@ class ApiGatewayPipelinesConstruct(Construct):
         self._pipeline_creation_state_machine = sfn.StateMachine(
             self,
             "PipelineCreationStateMachine",
-            state_machine_name=f"{config.resource_prefix}_Pipeline_Creator",
+            state_machine_name=f"{config.resource_prefix}_Pipeline_Creator_{config.environment}",
             definition=definition,
             timeout=Duration.minutes(300),
             logs=sfn.LogOptions(
@@ -868,17 +870,16 @@ class ApiGatewayPipelinesConstruct(Construct):
             )
         )
 
-        # Lambda event source mapping permissions - scoped to region/account
+        # Lambda event source mapping permissions — DeleteEventSourceMapping
+        # and ListEventSourceMappings require wildcard resource access because
+        # the API identifies mappings by UUID, not by ARN.
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "lambda:ListEventSourceMappings",
                     "lambda:DeleteEventSourceMapping",
                 ],
-                resources=[
-                    f"arn:aws:lambda:{self.region}:{self.account_id}:event-source-mapping:*",
-                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:*",
-                ],
+                resources=["*"],
             )
         )
 
@@ -943,7 +944,12 @@ class ApiGatewayPipelinesConstruct(Construct):
         # Add DynamoDB delete permission
         self._del_pipeline_id_handler.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["dynamodb:DeleteItem", "dynamodb:GetItem", "dynamodb:Scan"],
+                actions=[
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Scan",
+                    "dynamodb:UpdateItem",
+                ],
                 resources=[props.pipeline_table.table_arn],
             )
         )
@@ -963,6 +969,18 @@ class ApiGatewayPipelinesConstruct(Construct):
                 actions=["secretsmanager:DeleteSecret"],
                 resources=[
                     f"arn:aws:secretsmanager:*:*:secret:{config.resource_prefix}/webhooks/*"
+                ],
+            )
+        )
+
+        # Allow the delete Lambda to invoke itself asynchronously for background cleanup.
+        # Use a constructed ARN pattern to avoid a circular dependency between the
+        # Lambda, its execution role, and this policy statement.
+        self._del_pipeline_id_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account_id}:function:{config.resource_prefix}_pipeline_del_*"
                 ],
             )
         )

@@ -53,7 +53,15 @@ def get_pipeline_by_name(pipeline_name: str) -> Dict[str, Any]:
         )
         items = response.get("Items", [])
         if items:
-            pipeline = items[0]
+            # Skip pipelines that have been deleted — allow name reuse
+            active_items = [
+                item
+                for item in items
+                if item.get("deploymentStatus") not in ("DELETED", "DELETING")
+            ]
+            if not active_items:
+                return None
+            pipeline = active_items[0]
             return pipeline
         return None
     except Exception as e:

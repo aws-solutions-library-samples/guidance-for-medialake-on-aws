@@ -8,6 +8,19 @@ import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 // Import and initialize i18next configuration
 import "./i18n/i18n";
 
+// Auto-reload when Vite chunk imports fail after a deploy (stale hash in cached index.html).
+// The flag prevents an infinite reload loop if the new index.html also fails for some reason.
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  const reloadedKey = "chunk-reload";
+  if (!sessionStorage.getItem(reloadedKey)) {
+    sessionStorage.setItem(reloadedKey, "1");
+    window.location.reload();
+  }
+});
+// Clear the flag on successful page load so future deploys can trigger a reload again.
+window.addEventListener("load", () => sessionStorage.removeItem("chunk-reload"));
+
 // Omakase player styles — imported globally so both grid-card (Stamp theme)
 // and detail-view (Omakase theme) players render correctly.
 import "@byomakase/omakase-player/dist/style.css";

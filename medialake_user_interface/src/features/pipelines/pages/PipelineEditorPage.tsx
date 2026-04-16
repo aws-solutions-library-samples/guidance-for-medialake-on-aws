@@ -956,6 +956,21 @@ const PipelineEditorContent = () => {
     [setNodes, setFormData, updateNodeInternals]
   );
 
+  // Attach event handlers to nodes that were set without them (e.g. during import)
+  const withHandlers = useCallback(
+    (nodes: any[]) =>
+      nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          onDelete: onDeleteNode,
+          onConfigure: onConfigureNode,
+          onRotate: onRotateNode,
+        },
+      })),
+    [onDeleteNode, onConfigureNode, onRotateNode]
+  );
+
   // Debug pipeline object
   React.useEffect(() => {
     if (pipeline) {
@@ -1073,7 +1088,7 @@ const PipelineEditorContent = () => {
                 // All integration IDs are valid, proceed with import
                 // Update ID counter to avoid conflicts with existing nodes
                 updateIdCounter(fixedNodes);
-                setNodes(fixedNodes);
+                setNodes(withHandlers(fixedNodes));
                 setEdges(fixedEdges);
 
                 // Update form data
@@ -1110,7 +1125,7 @@ const PipelineEditorContent = () => {
               // Proceed with import without validation
               // Update ID counter to avoid conflicts with existing nodes
               updateIdCounter(fixedNodes);
-              setNodes(fixedNodes);
+              setNodes(withHandlers(fixedNodes));
               setEdges(fixedEdges);
 
               // Update form data
@@ -1190,7 +1205,7 @@ const PipelineEditorContent = () => {
         // Apply the updated nodes
         // Update ID counter to avoid conflicts with existing nodes
         updateIdCounter(updatedReactFlowNodes);
-        setNodes(updatedReactFlowNodes);
+        setNodes(withHandlers(updatedReactFlowNodes));
         setEdges(importedFlowData.edges);
 
         // Update form data

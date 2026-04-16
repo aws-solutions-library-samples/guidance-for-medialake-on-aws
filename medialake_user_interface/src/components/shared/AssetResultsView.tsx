@@ -146,6 +146,7 @@ function AssetResultsView<T>({
     isAssetSelected,
     isRenaming,
     renamingAssetId,
+    canDelete,
   } = useAssetEditingState();
 
   // Memoize sorted results to prevent video player unmount/remount
@@ -307,6 +308,7 @@ function AssetResultsView<T>({
           onFavoriteToggle={onFavoriteToggle}
           isRenaming={isRenaming}
           renamingAssetId={renamingAssetId}
+          canDelete={canDelete}
         />
       )}
 

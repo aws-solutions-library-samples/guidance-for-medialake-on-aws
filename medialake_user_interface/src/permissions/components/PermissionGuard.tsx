@@ -20,7 +20,7 @@ export function PermissionGuard({
   fallback = null,
   children,
 }: PermissionGuardProps) {
-  const { can, loading } = usePermission();
+  const { ability, can, loading } = usePermission();
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useAuth();
   const location = useLocation();
 
@@ -50,7 +50,35 @@ export function PermissionGuard({
     return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 
-  // Check if the user has permission
+  // Check if the user has permission.
+  // Guard against false negatives: if the ability has no rules yet (empty
+  // after a token refresh / cache clear), treat it as "still loading" rather
+  // than "denied". This prevents a flash redirect to /access-denied while
+  // the permission context is rebuilding after a token refresh.
+  const abilityHasRules = ability && ability.rules && ability.rules.length > 0;
+
+  if (isAuthenticated && !abilityHasRules) {
+    // Permissions haven't been hydrated yet — show the loading state
+    // instead of incorrectly denying access.
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          gap: 2,
+        }}
+      >
+        <CircularProgress />
+        <Typography variant="body2" color="text.secondary">
+          Loading permissions...
+        </Typography>
+      </Box>
+    );
+  }
+
   const allowed = can(action, subject, field);
 
   // If allowed, render the children
@@ -63,7 +91,7 @@ export function PermissionGuard({
     return <>{fallback}</>;
   }
 
-  // Otherwise, redirect to the login page or access denied page
+  // Otherwise, redirect to the access denied page
   return <Navigate to="/access-denied" state={{ from: location }} replace />;
 }
 

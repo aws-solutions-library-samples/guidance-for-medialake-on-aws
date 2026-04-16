@@ -88,31 +88,33 @@ class UserInterfaceStack(Stack):
             )
             waf_acl_arn = waf_acl_param.get_response_field("Parameter.Value")
 
-        parameter_name = (
-            f"/medialake/{config.environment}/cloudfront-distribution-domain"
-        )
+        parameter_name = config.ssm_param("cloudfront-distribution-domain")
 
         # Import API Gateway REST API ID from CloudFormation export
-        api_gateway_rest_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
+        api_gateway_rest_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
 
         # Read API Gateway stage name from SSM Parameter Store instead of CloudFormation export
         # This avoids circular dependency issues since the deployment stack is created after this stack
         api_gateway_stage_param = ssm.StringParameter.from_string_parameter_name(
             self,
             "ApiGatewayStageNameParameter",
-            string_parameter_name=f"/medialake/{config.environment}/api-gateway-stage-name",
+            string_parameter_name=config.ssm_param("api-gateway-stage-name"),
         )
         api_gateway_stage = api_gateway_stage_param.string_value
 
         # Import S3 buckets from BaseInfrastructureStack exports
         media_assets_bucket_arn = Fn.import_value(
-            "MediaLakeBaseInfrastructure-MediaAssetsBucketArn"
+            config.cfn_export("MediaLakeBaseInfrastructure", "MediaAssetsBucketArn")
         )
         media_assets_bucket_kms_key_arn = Fn.import_value(
-            "MediaLakeBaseInfrastructure-MediaAssetsBucketKmsKeyArn"
+            config.cfn_export(
+                "MediaLakeBaseInfrastructure", "MediaAssetsBucketKmsKeyArn"
+            )
         )
         access_log_bucket_arn = Fn.import_value(
-            "MediaLakeBaseInfrastructure-AccessLogsBucketArn"
+            config.cfn_export("MediaLakeBaseInfrastructure", "AccessLogsBucketArn")
         )
 
         # Create bucket references from ARNs
@@ -164,7 +166,7 @@ class UserInterfaceStack(Stack):
         CfnOutput(
             self,
             "CloudFrontDistributionDomainParameterName",
-            value=f"/medialake/{config.environment}/cloudfront-distribution-domain",
+            value=config.ssm_param("cloudfront-distribution-domain"),
             description="SSM parameter name for CloudFront distribution domain",
             export_name=f"{self.stack_name}-CloudFrontDistributionDomainParameterName",
         )

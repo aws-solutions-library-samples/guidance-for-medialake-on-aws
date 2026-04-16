@@ -670,6 +670,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
                   onSelectToggle: assetSelection.handleSelectToggle,
                   isRenaming: assetOperationsLoading.rename,
                   renamingAssetId,
+                  canDelete: deleteAssetPermission.allowed,
                   getAssetId,
                   getAssetName,
                   getAssetType,
@@ -891,6 +892,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
             isDeleteLoading={assetSelection.isDeleteLoading}
             onBatchPipelineExecutionRequest={assetSelection.handleBatchPipelineExecutionRequest}
             isPipelineExecutionLoading={assetSelection.isPipelineExecutionLoading}
+            canDelete={deleteAssetPermission.allowed}
           />
         </RightSidebar>
       </Box>

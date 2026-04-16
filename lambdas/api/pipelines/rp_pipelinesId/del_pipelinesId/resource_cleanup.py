@@ -16,7 +16,7 @@ def delete_lambda_function(function_arn: str) -> bool:
         function_arn: ARN of the Lambda function to delete
 
     Returns:
-        True if deletion was successful, False otherwise
+        True if deletion was successful or already deleted, False otherwise
     """
     try:
         # Extract function name from ARN
@@ -24,8 +24,13 @@ def delete_lambda_function(function_arn: str) -> bool:
         logger.info(f"Deleting Lambda function: {function_name}")
 
         lambda_client = boto3.client("lambda")
-        lambda_client.delete_function(FunctionName=function_name)
-        logger.info(f"Successfully deleted Lambda function: {function_name}")
+        try:
+            lambda_client.delete_function(FunctionName=function_name)
+            logger.info(f"Successfully deleted Lambda function: {function_name}")
+        except lambda_client.exceptions.ResourceNotFoundException:
+            logger.info(
+                f"Lambda function {function_name} already deleted, treating as success"
+            )
         return True
     except Exception as e:
         logger.error(f"Error deleting Lambda function {function_arn}: {e}")
@@ -86,23 +91,29 @@ def delete_eventbridge_rule(rule_arn: str) -> bool:
 
         events_client = boto3.client("events")
 
-        # List all targets for the rule
-        targets_response = events_client.list_targets_by_rule(
-            Rule=rule_name, EventBusName=event_bus_name
-        )
-
-        # Remove all targets from the rule
-        if targets_response.get("Targets"):
-            target_ids = [target["Id"] for target in targets_response["Targets"]]
-            events_client.remove_targets(
-                Rule=rule_name, EventBusName=event_bus_name, Ids=target_ids
+        try:
+            # List all targets for the rule
+            targets_response = events_client.list_targets_by_rule(
+                Rule=rule_name, EventBusName=event_bus_name
             )
-            logger.info(f"Removed {len(target_ids)} targets from rule {rule_name}")
 
-        # Delete the rule
-        events_client.delete_rule(Name=rule_name, EventBusName=event_bus_name)
+            # Remove all targets from the rule
+            if targets_response.get("Targets"):
+                target_ids = [target["Id"] for target in targets_response["Targets"]]
+                events_client.remove_targets(
+                    Rule=rule_name, EventBusName=event_bus_name, Ids=target_ids
+                )
+                logger.info(f"Removed {len(target_ids)} targets from rule {rule_name}")
 
-        logger.info(f"Successfully deleted EventBridge rule: {rule_name}")
+            # Delete the rule
+            events_client.delete_rule(Name=rule_name, EventBusName=event_bus_name)
+
+            logger.info(f"Successfully deleted EventBridge rule: {rule_name}")
+        except events_client.exceptions.ResourceNotFoundException:
+            logger.info(
+                f"EventBridge rule {rule_name} already deleted, treating as success"
+            )
+
         return True
     except Exception as e:
         logger.error(f"Error deleting EventBridge rule {rule_arn}: {e}")
@@ -126,31 +137,35 @@ def delete_iam_role(role_arn: str) -> bool:
 
         iam_client = boto3.client("iam")
 
-        # First detach all managed policies
-        paginator = iam_client.get_paginator("list_attached_role_policies")
-        for page in paginator.paginate(RoleName=role_name):
-            for policy in page["AttachedPolicies"]:
-                logger.info(
-                    f"Detaching policy {policy['PolicyArn']} from role {role_name}"
-                )
-                iam_client.detach_role_policy(
-                    RoleName=role_name, PolicyArn=policy["PolicyArn"]
-                )
+        try:
+            # First detach all managed policies
+            paginator = iam_client.get_paginator("list_attached_role_policies")
+            for page in paginator.paginate(RoleName=role_name):
+                for policy in page["AttachedPolicies"]:
+                    logger.info(
+                        f"Detaching policy {policy['PolicyArn']} from role {role_name}"
+                    )
+                    iam_client.detach_role_policy(
+                        RoleName=role_name, PolicyArn=policy["PolicyArn"]
+                    )
 
-        # Delete all inline policies
-        paginator = iam_client.get_paginator("list_role_policies")
-        for page in paginator.paginate(RoleName=role_name):
-            for policy_name in page["PolicyNames"]:
-                logger.info(
-                    f"Deleting inline policy {policy_name} from role {role_name}"
-                )
-                iam_client.delete_role_policy(
-                    RoleName=role_name, PolicyName=policy_name
-                )
+            # Delete all inline policies
+            paginator = iam_client.get_paginator("list_role_policies")
+            for page in paginator.paginate(RoleName=role_name):
+                for policy_name in page["PolicyNames"]:
+                    logger.info(
+                        f"Deleting inline policy {policy_name} from role {role_name}"
+                    )
+                    iam_client.delete_role_policy(
+                        RoleName=role_name, PolicyName=policy_name
+                    )
 
-        # Delete the role
-        iam_client.delete_role(RoleName=role_name)
-        logger.info(f"Successfully deleted IAM role: {role_name}")
+            # Delete the role
+            iam_client.delete_role(RoleName=role_name)
+            logger.info(f"Successfully deleted IAM role: {role_name}")
+        except iam_client.exceptions.NoSuchEntityException:
+            logger.info(f"IAM role {role_name} already deleted, treating as success")
+
         return True
     except Exception as e:
         logger.error(f"Error deleting IAM role {role_arn}: {e}")
@@ -182,9 +197,24 @@ def delete_sqs_queue(queue_arn: str) -> bool:
         # Get the queue URL
         queue_url = f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
 
-        # Delete the queue
-        sqs_client.delete_queue(QueueUrl=queue_url)
-        logger.info(f"Successfully deleted SQS queue: {queue_name}")
+        try:
+            # Delete the queue
+            sqs_client.delete_queue(QueueUrl=queue_url)
+            logger.info(f"Successfully deleted SQS queue: {queue_name}")
+        except sqs_client.exceptions.QueueDoesNotExist:
+            logger.info(f"SQS queue {queue_name} already deleted, treating as success")
+        except Exception as e:
+            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+            if (
+                "NonExistentQueue" in str(e)
+                or error_code == "AWS.SimpleQueueService.NonExistentQueue"
+            ):
+                logger.info(
+                    f"SQS queue {queue_name} already deleted, treating as success"
+                )
+            else:
+                raise
+
         return True
     except Exception as e:
         logger.error(f"Error deleting SQS queue {queue_arn}: {e}")
@@ -205,7 +235,13 @@ def delete_event_source_mapping(mapping_uuid: str) -> bool:
         logger.info(f"Deleting event source mapping: {mapping_uuid}")
 
         lambda_client = boto3.client("lambda")
-        lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
+        try:
+            lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
+        except lambda_client.exceptions.ResourceNotFoundException:
+            logger.info(
+                f"Event source mapping {mapping_uuid} already deleted, treating as success"
+            )
+            return True
 
         # Wait for the event source mapping to be deleted
         max_attempts = 10
@@ -300,7 +336,20 @@ def cleanup_pipeline_resources(
         "other_resources": {"success": [], "failed": []},
     }
 
+    # Deduplicate resources to avoid deleting the same resource twice
+    seen = set()
+    unique_resources = []
     for resource_type, resource_arn in dependent_resources:
+        key = (resource_type, resource_arn)
+        if key not in seen:
+            seen.add(key)
+            unique_resources.append((resource_type, resource_arn))
+        else:
+            logger.info(
+                f"Skipping duplicate resource: {resource_type} - {resource_arn}"
+            )
+
+    for resource_type, resource_arn in unique_resources:
         try:
             if resource_type == "lambda" or resource_type == "trigger_lambda":
                 success = delete_lambda_function(resource_arn)

@@ -248,7 +248,7 @@ class ConnectorsConstruct(Construct):
         ssm.StringParameter(
             self,
             "ConnectorTableNameParameter",
-            parameter_name=f"/{config.resource_prefix}/connector-table-name",
+            parameter_name=config.ssm_param("connector-table-name"),
             string_value=self.connectors_table.table.table_name,
             description="MediaLake Connector Table Name",
         )
@@ -483,7 +483,9 @@ class ConnectorsConstruct(Construct):
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,
             # SSM Parameter name for CloudFront domain (read at runtime by Lambda)
             # The Lambda will read this parameter to get the CORS origin dynamically
-            "CLOUDFRONT_DOMAIN_SSM_PARAM": f"/medialake/{config.environment}/cloudfront-distribution-domain",
+            "CLOUDFRONT_DOMAIN_SSM_PARAM": config.ssm_param(
+                "cloudfront-distribution-domain"
+            ),
             # Environment flag for development-specific behavior
             "ENVIRONMENT": config.environment,
         }
@@ -504,7 +506,7 @@ class ConnectorsConstruct(Construct):
             iam.PolicyStatement(
                 actions=["ssm:GetParameter"],
                 resources=[
-                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/{config.environment}/cloudfront-distribution-domain"
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}"
                 ],
             )
         )

@@ -194,6 +194,18 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 
 See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
 
+### Deploying Multiple Instances
+
+Media Lake supports multiple independent instances in the same AWS account and region. To deploy a second instance:
+
+1. Launch the same `medialake.template` in CloudFormation with a **different stack name**
+2. Set the **Deployment Name** parameter to a unique value (e.g., `ml-team2` instead of the default `medialake`)
+3. The template automatically allocates a non-overlapping VPC CIDR and prefixes all resource names
+
+Each instance is fully isolated with its own VPC, OpenSearch cluster, Cognito user pool, and all other resources. See the [Installation Guide](assets/docs/MediaLake-Installation-Guide.md) for detailed multi-deployment instructions and CDK CLI examples.
+
+> ⚠️ **S3 Bucket Sharing**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance creates its own event triggers on the bucket — overlapping paths cause duplicate processing and data corruption. You CAN share a bucket if each instance uses different, non-overlapping object prefixes.
+
 ---
 
 ## Development Environment Setup and CDK Deployment
@@ -272,6 +284,7 @@ Key configuration parameters include:
     - Certificate must cover the specified domain name (exact match or wildcard)
     - After deployment, you must create a DNS CNAME or Alias record pointing your domain to the CloudFront distribution domain
   - **Note**: This configuration is entirely optional. If omitted, MediaLake will use the default CloudFront domain name
+- **use_prefixed_names** (optional): Set to `true` for additional deployments in the same account/region. When enabled, all CloudFormation stack names, SSM parameters, and exports are prefixed with `resource_prefix` and `environment` to avoid collisions. Defaults to `false` for backward compatibility with existing deployments.
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
@@ -599,6 +612,7 @@ Use the emailed credentials and link to log in to the media lake UI.
 - Navigate to **Settings > Connectors** in the UI.
 - Add a connector, choosing Amazon S3 and providing your bucket details.
 - **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
+- ⚠️ **Multi-Instance Warning**: If running multiple Media Lake instances, do NOT connect the same S3 bucket with the same paths/prefixes to more than one instance. Overlapping bucket+prefix combinations cause duplicate processing, event conflicts, and data corruption. You CAN share a bucket across instances if each uses different, non-overlapping object prefixes.
 
 ### 3. **Enable Semantic Search and Integrations**
 
@@ -793,9 +807,12 @@ To remove all media lake resources:
 ### Manual Cleanup (AWS Console):
 
 - Go to CloudFormation console
-- Delete all stacks with prefix "Media Lake" and `medialake-cf`
+- Delete all stacks belonging to the deployment you want to remove:
+  - Default deployment: stacks prefixed with `MediaLake` and the `medialake-cf` pipeline stack
+  - Additional deployments: stacks prefixed with the deployment name (e.g., `ml-team2-dev-MediaLake*`) and the pipeline stack
 - **Important for S3 Buckets**: For new buckets created via media lake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
 - Delete any other associated S3 buckets, DynamoDB tables, or resources as needed
+- **Note**: Deleting one instance does not affect other instances in the same account
 
 > **Warning:** This will permanently remove all media lake data and resources. Use with caution.
 
@@ -803,6 +820,7 @@ To remove all media lake resources:
 
 ## FAQ, Known Issues, and Additional Considerations
 
+- **S3 bucket sharing across instances**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance creates EventBridge rules and Lambda triggers on the bucket — overlapping paths will cause duplicate processing, event conflicts, and data corruption. You CAN connect the same bucket to multiple instances if each instance uses different, non-overlapping object prefixes (e.g., instance 1 uses `team-a/` prefix and instance 2 uses `team-b/` prefix).
 - For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.

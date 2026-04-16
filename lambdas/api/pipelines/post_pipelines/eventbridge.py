@@ -954,9 +954,16 @@ def create_eventbridge_rule(
             c for c in sanitized_pipeline_name if c.isalnum() or c in "-_"
         )
 
-        unique_rule_name = f"{sanitized_pipeline_name}-{rule_name}-{node.data.id}"[
-            :64
-        ]  # Ensure name is not too long
+        # Build a unique rule name, preserving the node.id suffix for uniqueness.
+        # EventBridge rule names have a 64-character limit.
+        uid_suffix = f"-{node.id}"
+        descriptive = f"{sanitized_pipeline_name}-{rule_name}"
+        available = 64 - len(uid_suffix)
+        if len(descriptive) > available:
+            descriptive = descriptive[:available]
+        # Remove trailing hyphens or underscores after truncation
+        descriptive = descriptive.rstrip("-_")
+        unique_rule_name = f"{descriptive}{uid_suffix}"
 
         # Get event pattern based on rule name and node configuration, passing the YAML data
         event_pattern = get_event_pattern_for_rule(
@@ -1017,7 +1024,16 @@ def create_eventbridge_rule(
         # Take the first character of each non-empty part, uppercase it, join
         abvr = "".join(p[0].upper() for p in parts if p)
         uuid = shortuuid.uuid()
-        trigger_lambda_name = f"{resource_prefix}_{abvr}_{uuid}_trigger".lower()
+
+        # Build trigger lambda name, preserving the UUID suffix for uniqueness.
+        # Lambda function names have a 64-character limit.
+        uid_suffix = f"_{uuid}_trigger".lower()
+        descriptive = f"{resource_prefix}_{abvr}".lower()
+        available = 64 - len(uid_suffix)
+        if len(descriptive) > available:
+            descriptive = descriptive[:available]
+        descriptive = descriptive.rstrip("_-")
+        trigger_lambda_name = f"{descriptive}{uid_suffix}"
 
         # Create the trigger lambda function
         lambda_client = boto3.client("lambda")
@@ -1046,10 +1062,15 @@ def create_eventbridge_rule(
             # Create a role for the trigger lambda
             iam_client = boto3.client("iam")
             # Import sanitize_role_name to ensure proper role name formatting
-            from iam_operations import sanitize_role_name
 
-            base_role_name = f"{resource_prefix}_{sanitized_pipeline_name}_trigger_role"
-            role_name = sanitize_role_name(base_role_name)
+            # Preserve the _trigger_role suffix when truncating, and include
+            # the node ID so each trigger node gets its own unique role.
+            from iam_operations import _compose_role_name
+
+            role_name = _compose_role_name(
+                f"{resource_prefix}_{sanitized_pipeline_name}",
+                f"_{node.id}_trigger_role",
+            )
 
             # Check if role already exists
             try:

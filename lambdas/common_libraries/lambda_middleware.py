@@ -622,6 +622,17 @@ class LambdaMiddleware:
             ext_st == "" or ext_st.lower() == "completed"
         )
 
+        # Determine pipeline status.
+        # When a node is both first AND last (single-node workflow),
+        # the final output is "Completed"; a separate "Started" event
+        # is emitted by __call__ before this one.
+        if status_is_complete:
+            pipeline_status = "Completed"
+        elif self.is_first:
+            pipeline_status = "Started"
+        else:
+            pipeline_status = "InProgress"
+
         # Build metadata
         meta = {
             "service": self.service,
@@ -637,11 +648,7 @@ class LambdaMiddleware:
             "pipelineExecutionStartTime": orig.get("pipelineExecutionStartTime", ""),
             "pipelineExecutionEndTime": now if self.is_last else "",
             "pipelineName": self.pipe_name,
-            "pipelineStatus": (
-                "Started"
-                if self.is_first
-                else "Completed" if status_is_complete else "InProgress"
-            ),
+            "pipelineStatus": pipeline_status,
             "pipelineId": prev_meta.get("pipelineId", ""),
             "pipelineExecutionId": prev_meta.get("pipelineExecutionId", ""),
             "externalJobResult": ext_rs,
@@ -882,6 +889,19 @@ class LambdaMiddleware:
                     raise
 
             out = self._make_output(result, standard_event, start)
+
+            # Single-node workflow: both first and last — emit a "Started"
+            # event first so downstream consumers see the full lifecycle.
+            if (
+                self.is_first
+                and self.is_last
+                and out.get("metadata", {}).get("pipelineStatus") == "Completed"
+            ):
+                started_out = copy.deepcopy(out)
+                started_out["metadata"]["pipelineStatus"] = "Started"
+                started_out["metadata"]["pipelineExecutionEndTime"] = ""
+                self._publish(started_out)
+
             self._publish(out)
             return out
 

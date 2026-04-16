@@ -608,7 +608,7 @@ class BaseInfrastructureStack(Stack):
         ssm.StringParameter(
             self,
             "MediaAssetsBucketNameParameter",
-            parameter_name=f"/medialake/{config.environment}/media-assets-bucket-name",
+            parameter_name=config.ssm_param("media-assets-bucket-name"),
             string_value=self.media_assets_s3_bucket.bucket_name,
             description="Media assets bucket name for cross-stack reference",
         )

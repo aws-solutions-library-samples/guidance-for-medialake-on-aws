@@ -44,6 +44,7 @@ interface BatchOperationsProps {
   onBatchPipelineExecution?: (pipelineId: string) => void;
   onBatchPipelineExecutionRequest?: (pipelineId: string, pipelineName: string) => void;
   isPipelineExecutionLoading?: boolean;
+  canDelete?: boolean;
 }
 
 const getAssetTypeIcon = (type: string) => {
@@ -65,6 +66,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onBatchPipelineExecution,
   onBatchPipelineExecutionRequest,
   isPipelineExecutionLoading = false,
+  canDelete = true,
 }) => {
   const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
@@ -225,29 +227,31 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
-            <span>
-              <IconButton
-                size="small"
-                data-testid="batch-delete-button"
-                onClick={() => onBatchDelete?.()}
-                disabled={isDeleteLoading || !onBatchDelete}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": {
-                    color: "error.main",
-                    bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                  },
-                }}
-              >
-                {isDeleteLoading ? (
-                  <CircularProgress size={18} />
-                ) : (
-                  <DeleteOutlineIcon fontSize="small" />
-                )}
-              </IconButton>
-            </span>
-          </Tooltip>
+          {canDelete && (
+            <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  data-testid="batch-delete-button"
+                  onClick={() => onBatchDelete?.()}
+                  disabled={isDeleteLoading || !onBatchDelete}
+                  sx={{
+                    color: "text.secondary",
+                    "&:hover": {
+                      color: "error.main",
+                      bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                    },
+                  }}
+                >
+                  {isDeleteLoading ? (
+                    <CircularProgress size={18} />
+                  ) : (
+                    <DeleteOutlineIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
         </Box>
       </Box>
 

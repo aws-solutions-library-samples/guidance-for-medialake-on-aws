@@ -29,7 +29,7 @@ class EdgeLambdaStack(Stack):
         ssm.StringParameter(
             self,
             "EdgeLambdaVersionArnParameter",
-            parameter_name=f"/medialake/{config.environment}/edge-lambda-version-arn",
+            parameter_name=config.ssm_param("edge-lambda-version-arn"),
             string_value=edge_lambda.lambda_version.function_arn,
             description="Lambda@Edge function version ARN for CloudFront",
         )
@@ -39,7 +39,7 @@ class EdgeLambdaStack(Stack):
             self,
             "EdgeLambdaVersionArn",
             value=edge_lambda.lambda_version.function_arn,
-            export_name="MediaLakeEdgeLambda-VersionArn",
+            export_name=config.cfn_export("MediaLakeEdgeLambda", "VersionArn"),
             description="Lambda@Edge version ARN for CloudFront distribution",
         )
 

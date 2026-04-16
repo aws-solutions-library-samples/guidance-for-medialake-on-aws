@@ -99,6 +99,7 @@ export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
                 onAssetClick={() => onItemClick?.(item)}
                 onDeleteClick={() => {}} // Not needed for related items
                 onDownloadClick={() => {}} // Not needed for related items
+                canDelete={false}
                 cardSize="medium"
                 aspectRatio="square"
                 thumbnailScale="fill"

@@ -217,12 +217,14 @@ class OpenSearchCluster(Construct):
         log_policy = logs.CfnResourcePolicy(
             self,
             "AllowOpenSearchToCWLogsPolicy",
-            policy_name="AllowOpenSearchPublishing",
+            policy_name=f"{config.resource_prefix}-AllowOpenSearchPublishing-{config.environment}",
             policy_document=json.dumps(policy_doc),
         )
 
-        for lg in (app_log_group, slow_search_log_group, slow_index_log_group):
-            grant_opensearch_access(lg)
+        # Note: We intentionally do NOT call grant_opensearch_access() on each log group
+        # because that creates individual AWS::Logs::ResourcePolicy resources per log group.
+        # AWS limits resource policies to 10 per account per region. The single CfnResourcePolicy
+        # above already covers all three log groups in one policy document.
 
         # Configure VPC subnets if subnet IDs are provided
         vpc_subnets = None
@@ -359,6 +361,7 @@ class OpenSearchCluster(Construct):
                 self,
                 "MediaLakeIndexCreationFunction",
                 config=LambdaConfig(
+                    name="index-creation",
                     entry="lambdas/back_end/create_os_index",
                     lambda_handler="handler",
                     vpc=props.vpc,

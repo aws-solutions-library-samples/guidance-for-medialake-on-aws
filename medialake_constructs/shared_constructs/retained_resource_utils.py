@@ -27,7 +27,9 @@ def check_retained_resource(
 
     try:
         ssm_client = boto3.client("ssm", region_name=region)
-        param_prefix = f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}"
+        param_prefix = config.ssm_param(
+            "retained-resources", resource_type, resource_id
+        )
 
         # Get the ARN parameter
         arn_param = f"{param_prefix}/arn"

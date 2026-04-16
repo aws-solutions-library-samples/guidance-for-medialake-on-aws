@@ -36,7 +36,7 @@ _SIGV4_CFG = Config(
     signature_version="s3v4",
     s3={"addressing_style": "virtual"},
     connect_timeout=5,
-    read_timeout=60,  # Longer timeout for completing multipart uploads
+    read_timeout=120,  # Completing uploads with thousands of parts can be slow
 )
 
 _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"

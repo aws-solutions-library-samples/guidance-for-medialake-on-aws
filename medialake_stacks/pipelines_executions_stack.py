@@ -37,7 +37,7 @@ class PipelinesExecutionsStack(Stack):
             self,
             "PipelineExecutionsEventBus",
             props=EventBusConfig(
-                bus_name=f"{config.resource_prefix}-pipelines-executions",
+                bus_name=f"{config.resource_prefix}-pipelines-executions-{config.environment}",
                 log_all=True,
             ),
         )
@@ -45,7 +45,7 @@ class PipelinesExecutionsStack(Stack):
         _ = events.Rule(
             self,
             "StepFunctionsRule",
-            rule_name="step-functions-events-rule",
+            rule_name=f"{config.resource_prefix}-step-functions-events-rule-{config.environment}",
             event_pattern=events.EventPattern(
                 source=["aws.states"],
                 detail_type=[

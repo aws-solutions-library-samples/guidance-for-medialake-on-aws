@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'CloudFormation template to create a pipeline for building and deploying CDK V2 application with VPC configuration support (Python backend with TypeScript/React frontend)'
 
 Parameters:
+  DeploymentName:
+    Description: Unique name for this MediaLake deployment. Use 'medialake' for the first/default instance. Use a different name (e.g., 'ml-team2') for additional instances in the same account/region.
+    Type: String
+    Default: medialake
+    MinLength: 2
+    MaxLength: 20
+    AllowedPattern: '^[a-z][a-z0-9\-]*$'
+    ConstraintDescription: Must start with a lowercase letter, contain only lowercase letters, numbers, and hyphens.
+
   SourceType:
     Description: Source type for the CDK code
     Type: String
@@ -87,6 +96,11 @@ Metadata:
     ParameterGroups:
       -
         Label:
+          default: Deployment Identity
+        Parameters:
+          - DeploymentName
+      -
+        Label:
           default: Initial Media Lake User
         Parameters:
           - InitialUserEmail
@@ -115,6 +129,8 @@ Metadata:
           - GitRepositoryUrl
           - S3PresignedURL
     ParameterLabels:
+      DeploymentName:
+        default: Deployment Name (unique per instance)
       InitialUserEmail:
         default: Email
       InitialUserFirstName:
@@ -147,6 +163,7 @@ Conditions:
   IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
   NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
   HasExternalS3Bucket: !Not [!Equals [!Ref ExternalS3Bucket, '']]
+  IsDefaultDeployment: !Equals [!Ref DeploymentName, 'medialake']
 
 Resources:
   # Add the Service Linked Role Manager resources first
@@ -390,7 +407,7 @@ Resources:
         Rules:
           - Id: DeleteOldPipelineArtifacts
             Status: Enabled
-            Prefix: 'MediaLakeCDKPipeline/'
+            Prefix: !Sub '${DeploymentName}-pipeline/'
             ExpirationInDays: 30
           - Id: CleanupBeforeDeletion
             Status: Enabled
@@ -409,7 +426,7 @@ Resources:
       BucketName: !Ref ArtifactBucket
       SourceKey: 'source-package.zip'
       Content: !Sub |
-        This is a source placeholder for the MediaLakeCDKPipeline pipeline.
+        This is a source placeholder for the ${DeploymentName} pipeline.
         Created on ${AWS::StackName} in ${AWS::Region}.
         Timestamp: ${AWS::AccountId}
 
@@ -487,7 +504,6 @@ Resources:
                 Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
 
   # CodeBuild Projects
-  # Git Clone Project for public repositories
   GitCloneProject:
     Type: 'AWS::CodeBuild::Project'
     Condition: IsGitSource
@@ -495,13 +511,13 @@ Resources:
       - ServiceLinkedRoleManager
       - InitialSourcePackage
     Properties:
-      Name: 'MediaLakeCDKPipeline-GitClone'
+      Name: !Sub '${DeploymentName}-CDKPipeline-GitClone'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
       Environment:
         Type: LINUX_CONTAINER
-        ComputeType: BUILD_GENERAL1_MEDIUM
+        ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         EnvironmentVariables:
           - Name: GIT_REPOSITORY_URL
@@ -530,7 +546,7 @@ Resources:
       - ServiceLinkedRoleManager
       - InitialSourcePackage
     Properties:
-      Name: 'MediaLakeCDKPipeline-DownloadSource'
+      Name: !Sub '${DeploymentName}-CDKPipeline-DownloadSource'
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -560,7 +576,7 @@ Resources:
     Type: 'AWS::CodeBuild::Project'
     DependsOn: ServiceLinkedRoleManager
     Properties:
-      Name: 'MediaLakeCDKPipeline-BuildAndDeploy'
+      Name: !Sub '${DeploymentName}-CDKPipeline-BuildAndDeploy'
       ServiceRole: !GetAtt CDKDeployRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -569,9 +585,14 @@ Resources:
         Location: !Sub '${ArtifactBucket}/build-cache'
       Environment:
         Type: LINUX_CONTAINER
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: BUILD_GENERAL1_MEDIUM
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: DEPLOYMENT_NAME
+            Value: !Ref DeploymentName
+          - Name: IS_DEFAULT_DEPLOYMENT
+            Value: !If [IsDefaultDeployment, 'true', 'false']
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -583,12 +604,9 @@ Resources:
               CDK_DEFAULT_REGION: ${AWS::Region}
           cache:
             paths:
-              # Node.js dependency caches
               - 'medialake_user_interface/node_modules/**/*'
               - '/root/.npm/**/*'
-              # Python dependency cache
               - '/root/.cache/pip/**/*'
-              # Native layer output caches - skip rebuild if output already exists
               - 'dist/lambdas/layers/ffprobe/**/*'
               - 'dist/lambdas/layers/ffmpeg/**/*'
               - 'dist/lambdas/layers/resvg/**/*'
@@ -602,8 +620,7 @@ Resources:
               commands:
                 - echo "Installing dependencies"
                 - yum install jq
-                - npm install -g aws-cdk
-                - npm install -g esbuild
+                - npm install -g aws-cdk esbuild
                 - pip install -U pip
                 - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
                 - export FRONTEND_DIR=$(if [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
@@ -611,15 +628,25 @@ Resources:
                 - echo "Frontend directory $FRONTEND_DIR"
                 - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
                 - if [ -z "$FRONTEND_DIR" ]; then echo "Could not find frontend directory"; exit 1; fi
-                - cd $CDK_DIR
-                - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-                - if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
-                - if [ -f "package.json" ]; then npm install; fi
-                - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
-                - if [ -f "package.json" ]; then npm install; fi
+                # Install Python and Node deps in parallel
+                - |
+                  (
+                    cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                    if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+                    if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
+                    if [ -f "package.json" ]; then npm install; fi
+                  ) &
+                  PIP_PID=$!
+                  (
+                    cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                    if [ -f "package.json" ]; then npm install; fi
+                  ) &
+                  NPM_PID=$!
+                  wait $PIP_PID || exit 1
+                  wait $NPM_PID || exit 1
             pre_build:
               commands:
-                - echo "Preparing config file"
+                - echo "Preparing config file for deployment '$DEPLOYMENT_NAME'"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
                 - if [ -f "config.json" ]; then echo "Using existing config file"; else echo "Creating config file"; cp .cicd/config.json-template config.json; fi
                 - echo "$( jq --arg e "${MediaLakeEnvironmentName}" '.environment = $e' config.json )" > config.json
@@ -630,7 +657,7 @@ Resources:
                 - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
                 - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
                 - echo "$( jq --arg b "${ExternalS3Bucket}" '.external_nodes_bucket = $b' config.json )" > config.json
-                - echo "Configuring existing VPC settings"
+                # Configure existing VPC settings
                 - echo "$( jq '.vpc.use_existing_vpc = true' config.json )" > config.json
                 - echo "$( jq --arg v "${ExistingVPCId}" '.vpc.existing_vpc.vpc_id = $v' config.json )" > config.json
                 - echo "$( jq --arg c "${ExistingVPCCIDR}" '.vpc.existing_vpc.vpc_cidr = $c' config.json )" > config.json
@@ -640,33 +667,75 @@ Resources:
                   PRIVATE_SUBNETS=$(echo "${ExistingPrivateSubnetIds}" | jq -R 'split(",") | map(select(length > 0) | gsub("^\\s+|\\s+$";""))')
                   echo "$( jq --argjson pub "$PUBLIC_SUBNETS" '.vpc.existing_vpc.subnet_ids.public = $pub' config.json )" > config.json
                   echo "$( jq --argjson priv "$PRIVATE_SUBNETS" '.vpc.existing_vpc.subnet_ids.private = $priv' config.json )" > config.json
+                # Set resource_prefix and use_prefixed_names based on DeploymentName
+                - echo "$( jq --arg p "$DEPLOYMENT_NAME" '.resource_prefix = $p' config.json )" > config.json
+                - echo "$( jq --arg t "$DEPLOYMENT_NAME" '.resource_application_tag = $t' config.json )" > config.json
+                - |
+                  if [ "$IS_DEFAULT_DEPLOYMENT" = "true" ]; then
+                    echo "Default deployment - using legacy naming (use_prefixed_names=false)"
+                    echo "$( jq '.use_prefixed_names = false' config.json )" > config.json
+                  else
+                    echo "Additional deployment '$DEPLOYMENT_NAME' - using prefixed naming"
+                    echo "$( jq '.use_prefixed_names = true' config.json )" > config.json
+                  fi
                 - echo "Final config.json:"
                 - cat config.json
             build:
               commands:
-                - echo "Building frontend"
-                - cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
-                - if [ -f "package.json" ]; then npm run build; fi
-                - export BUILD_DIR=$(if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
-                - if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p build; export BUILD_DIR="build"; fi
-                - echo "Build output directory $BUILD_DIR"
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                - mkdir -p assets/dist
-                - if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
-                # Native layers first - skip if cached output exists
-                - echo "Building FFprobe"
-                - if [ -d "dist/lambdas/layers/ffprobe/bin" ]; then echo "FFprobe layer cached, skipping"; else bash .cicd/build_ffprobe.sh; fi
-                - echo "Building FFmpeg"
-                - if [ -d "dist/lambdas/layers/ffmpeg/bin" ]; then echo "FFmpeg layer cached, skipping"; else bash .cicd/build_ffmpeg.sh; fi
-                - echo "Building RSSVG"
-                - if [ -d "dist/lambdas/layers/resvg/bin" ]; then echo "Resvg layer cached, skipping"; else bash .cicd/build_resvg.sh; fi
-                - echo "Building NumPy layer"
-                - if [ -d "dist/lambdas/layers/numpy/python" ]; then echo "NumPy layer cached, skipping"; else bash .cicd/build_numpy.sh; fi
-                - echo "Building OpenEXR layer"
-                - if [ -d "dist/lambdas/layers/openexr/python" ]; then echo "OpenEXR layer cached, skipping"; else bash .cicd/build_openexr.sh; fi
-                # Lambda functions and Python layers (preserves native layers during clean)
+                # Start frontend build in background
+                - |
+                  (
+                    echo "Building frontend"
+                    cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                    if [ -f "package.json" ]; then npm run build; fi
+                  ) &
+                  FRONTEND_PID=$!
+                # Build native layers in parallel (skip if cached)
+                - |
+                  echo "Building native layers in parallel..."
+                  LAYER_PIDS=""
+                  if [ -d "dist/lambdas/layers/ffprobe/bin" ] && [ -d "dist/lambdas/layers/ffmpeg/bin" ]; then
+                    echo "FFmpeg/FFprobe layers cached, skipping"
+                  else
+                    (bash .cicd/build_ffmpeg_ffprobe.sh 2>&1 || (bash .cicd/build_ffprobe.sh 2>&1 && bash .cicd/build_ffmpeg.sh 2>&1)) &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/resvg/bin" ]; then
+                    echo "Resvg layer cached, skipping"
+                  else
+                    bash .cicd/build_resvg.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/numpy/python" ]; then
+                    echo "NumPy layer cached, skipping"
+                  else
+                    bash .cicd/build_numpy.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/openexr/python" ]; then
+                    echo "OpenEXR layer cached, skipping"
+                  else
+                    bash .cicd/build_openexr.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  LAYER_FAIL=0
+                  for PID in $LAYER_PIDS; do
+                    wait $PID || LAYER_FAIL=1
+                  done
+                  if [ $LAYER_FAIL -ne 0 ]; then echo "One or more native layer builds failed"; exit 1; fi
+                - test -d dist/lambdas/layers/numpy || (echo "NumPy layer directory not found after build" && exit 1)
+                - test -d dist/lambdas/layers/openexr || (echo "OpenEXR layer directory not found after build" && exit 1)
                 - echo "Building Lambda functions"
                 - python3 .cicd/build_lambdas.py build
+                # Wait for frontend build to finish
+                - |
+                  wait $FRONTEND_PID || (echo "Frontend build failed" && exit 1)
+                  export BUILD_DIR=$(cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR && if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
+                  if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p $CODEBUILD_SRC_DIR/$FRONTEND_DIR/build; export BUILD_DIR="build"; fi
+                  echo "Build output directory $BUILD_DIR"
+                  mkdir -p assets/dist
+                  if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
                 - echo "Checking CDK bootstrap status"
                 - |
                   cleanup_and_bootstrap() {
@@ -674,7 +743,6 @@ Resources:
                     local REGION=$2
                     local QUALIFIER="hnb659fds"
 
-                    # Check if CDKToolkit stack exists and its status
                     STACK_STATUS=$(aws cloudformation describe-stacks --stack-name CDKToolkit --region "${!REGION}" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
 
                     if [ "${!STACK_STATUS}" = "ROLLBACK_COMPLETE" ] || [ "${!STACK_STATUS}" = "DELETE_FAILED" ]; then
@@ -688,12 +756,10 @@ Resources:
                       echo "Cleaning up any orphaned CDK bootstrap roles in ${!REGION}..."
                       for ROLE_SUFFIX in cfn-exec-role deploy-role file-publishing-role image-publishing-role lookup-role; do
                         ROLE_NAME="cdk-${!QUALIFIER}-${!ROLE_SUFFIX}-${!ACCOUNT_ID}-${!REGION}"
-                        # Detach managed policies
                         ATTACHED=$(aws iam list-attached-role-policies --role-name "${!ROLE_NAME}" --query "AttachedPolicies[].PolicyArn" --output text 2>/dev/null || true)
                         for POLICY_ARN in ${!ATTACHED}; do
                           aws iam detach-role-policy --role-name "${!ROLE_NAME}" --policy-arn "${!POLICY_ARN}" 2>/dev/null || true
                         done
-                        # Delete inline policies
                         INLINE=$(aws iam list-role-policies --role-name "${!ROLE_NAME}" --query "PolicyNames[]" --output text 2>/dev/null || true)
                         for POLICY_NAME in ${!INLINE}; do
                           aws iam delete-role-policy --role-name "${!ROLE_NAME}" --policy-name "${!POLICY_NAME}" 2>/dev/null || true
@@ -734,7 +800,7 @@ Resources:
       - GitCloneProject
       - BuildAndDeployProject
     Properties:
-      Name: MediaLakeCDKPipeline
+      Name: !Sub '${DeploymentName}-CDKPipeline'
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -794,7 +860,7 @@ Resources:
       - DownloadSourceProject
       - BuildAndDeployProject
     Properties:
-      Name: MediaLakeCDKPipeline
+      Name: !Sub '${DeploymentName}-CDKPipeline'
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       ArtifactStore:
         Type: S3
@@ -952,6 +1018,10 @@ Outputs:
   ArtifactBucketName:
     Description: Name of the S3 bucket used to store pipeline artifacts
     Value: !Ref ArtifactBucket
+
+  DeploymentNameOutput:
+    Description: The deployment name used for this MediaLake instance
+    Value: !Ref DeploymentName
 
   VPCConfiguration:
     Description: VPC configuration

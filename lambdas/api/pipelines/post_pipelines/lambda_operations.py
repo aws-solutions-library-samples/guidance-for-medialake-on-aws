@@ -41,14 +41,19 @@ def sanitize_function_name(pipeline_name, node_label, version):
     """
     Create a sanitized Lambda function name from pipeline name, node label, and version.
 
+    The UUID suffix is always preserved to guarantee uniqueness.
+    The descriptive middle portion is truncated if the total exceeds 64 characters.
+
     Args:
         pipeline_name: Name of the pipeline
         node_label: Label of the node
         version: Version string
 
     Returns:
-        A sanitized function name suitable for AWS Lambda
+        A sanitized function name suitable for AWS Lambda (max 64 chars)
     """
+    max_length = 64
+
     # Combine the components
     parts = re.split(r"[^A-Za-z0-9]+", pipeline_name)
 
@@ -56,22 +61,30 @@ def sanitize_function_name(pipeline_name, node_label, version):
     abvr = "".join(p[0].upper() for p in parts if p)
     uuid = shortuuid.uuid()
 
-    raw_name = f"{resource_prefix}_{abvr}_{node_label}_{version}_{uuid}".lower()
+    # Build the unique suffix that must always be preserved
+    uid_suffix = f"_{uuid}".lower()
+
+    # Build the descriptive prefix
+    descriptive = f"{resource_prefix}_{abvr}_{node_label}_{version}".lower()
 
     # Replace spaces with hyphens
-    raw_name = raw_name.replace(" ", "-")
+    descriptive = descriptive.replace(" ", "-")
 
     # Replace non-alphanumeric characters (except hyphens) with underscores
-    sanitized_name = re.sub(r"[^a-z0-9-]", "_", raw_name)
+    descriptive = re.sub(r"[^a-z0-9-]", "_", descriptive)
 
     # Ensure the name starts with a letter or number
-    sanitized_name = re.sub(r"^[^a-z0-9]+", "", sanitized_name)
+    descriptive = re.sub(r"^[^a-z0-9]+", "", descriptive)
 
-    # Truncate to 64 characters (maximum length for Lambda function names)
-    sanitized_name = sanitized_name[:64]
+    # Truncate the descriptive part to leave room for the UUID suffix
+    available = max_length - len(uid_suffix)
+    if len(descriptive) > available:
+        descriptive = descriptive[:available]
 
-    # Ensure the name doesn't end with a hyphen or underscore
-    sanitized_name = re.sub(r"[-_]+$", "", sanitized_name)
+    # Remove trailing hyphens or underscores from the descriptive part
+    descriptive = re.sub(r"[-_]+$", "", descriptive)
+
+    sanitized_name = f"{descriptive}{uid_suffix}"
 
     return sanitized_name
 
@@ -639,15 +652,11 @@ def create_lambda_function(
     logger.debug(yaml_data)
 
     # Create service roles defined in the YAML
-    logger.info(f"[DEBUG] About to create service roles for node {node.data.id}")
-    service_roles = create_service_roles_from_yaml(
-        pipeline_name, node.data.id, yaml_data
-    )
-    logger.info(f"[DEBUG] Service roles created for node {node.data.id}")
+    logger.info(f"[DEBUG] About to create service roles for node {node.id}")
+    service_roles = create_service_roles_from_yaml(pipeline_name, node.id, yaml_data)
+    logger.info(f"[DEBUG] Service roles created for node {node.id}")
     if service_roles:
-        logger.info(
-            f"Created {len(service_roles)} service roles for node {node.data.id}"
-        )
+        logger.info(f"Created {len(service_roles)} service roles for node {node.id}")
 
     # Get API service URL from OpenAPI spec if available
     api_service_url = os.environ.get("API_SERVICE_URL", "")

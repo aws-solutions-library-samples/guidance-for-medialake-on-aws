@@ -20,7 +20,7 @@ class ApiClient extends ApiClientBase {
     super();
     this.axiosInstance = axios.create({
       baseURL: this.getBaseURL(),
-
+      timeout: 120000, // 2 minutes — generous for sign/complete calls under heavy upload load
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",

@@ -46,7 +46,9 @@ _ENDPOINT_TMPL = "https://s3.{region}.amazonaws.com"
 _S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
 
 # Define constants
-DEFAULT_EXPIRATION = 3600  # 1 hour in seconds
+# 6 hours — large files (500GB) can take many hours; parts are signed on-demand
+# but may still queue behind other concurrent uploads before being PUT to S3.
+DEFAULT_EXPIRATION = 21600
 
 
 # Request validation model

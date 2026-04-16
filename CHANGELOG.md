@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.12.0] - 2026-04-16
+
+### Features
+
+- feat: add new OpenSearch instances to validator
+- feat: same account deployment in the same region and other regions
+- feat: add configurable audio track selection to video proxy pipeline
+
+### Bug Fixes
+
+- fix: single node fix
+- fix: error in AssetDetailPage for videos with no audio
+
+### Code Refactoring
+
+- refactor: Increase upload to 500 assets at a time, a single asset can be up to 500 GB with multi-part upload
+- refactor: fix for the same node is used twice the pipeline would overwrite it's resources in DynamoDB, updated delete pipelines to async to avoid API Gateway time out
+- refactor: Optimize token refresh in background and long inactivity
+- refactor: removal of delete buttons/icons if user doesn't have delete permissions
+
+### Other Changes
+
+- ci: updates to gitlab ci for promotion to GitHub
+- ci: revert 1.12.0 tag
+- chore(release): v1.12.0 [skip ci]
+- ci: updates to ci promotion process
+- Revert "style: apply black formatting to lambda_middleware.py"
+- style: apply black formatting to lambda_middleware.py
+- updates to middleware
+- build: update of requests library
+
+## [1.11.8] - 2026-04-08
+
+### Other Changes
+
+- test: fix ci script
+
+## [1.11.7] - 2026-04-08
+
+### Other Changes
+
+- test: ci promotion test
+- ci: ci promotion updates
+- ci: update ci promotion process
+
 ## [1.11.6] - 2026-04-08
 
 ### Bug Fixes

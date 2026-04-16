@@ -85,8 +85,12 @@ def _get_cloudfront_domain() -> str:
 
     try:
         # Get environment from environment variable or default to 'dev'
-        environment = os.environ.get("ENVIRONMENT", "dev")
-        ssm_parameter_name = f"/medialake/{environment}/cloudfront-distribution-domain"
+        # Use CLOUDFRONT_DOMAIN_SSM_PARAM env var if set (preferred), otherwise fall back to convention
+        ssm_parameter_name = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+        if not ssm_parameter_name:
+            environment = os.environ.get("ENVIRONMENT", "dev")
+            ssm_prefix = os.environ.get("SSM_PREFIX", f"/medialake/{environment}")
+            ssm_parameter_name = f"{ssm_prefix}/cloudfront-distribution-domain"
 
         logger.info(
             f"[URL_DEBUG] Retrieving CloudFront domain from SSM parameter: {ssm_parameter_name}"

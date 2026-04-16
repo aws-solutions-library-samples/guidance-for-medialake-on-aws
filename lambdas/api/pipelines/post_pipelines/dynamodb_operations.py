@@ -128,7 +128,18 @@ def get_pipeline_by_name(
         )
         items = response.get("Items", [])
         if items:
-            pipeline = items[0]
+            # Skip pipelines that have been deleted — allow name reuse
+            active_items = [
+                item
+                for item in items
+                if item.get("deploymentStatus") not in ("DELETED", "DELETING")
+            ]
+            if not active_items:
+                logger.info(
+                    f"Found pipeline(s) with name {pipeline_name} but all are deleted/deleting"
+                )
+                return None
+            pipeline = active_items[0]
             # Check if the pipeline has a definition
             if "definition" in pipeline:
                 # If definition is provided, check if it matches

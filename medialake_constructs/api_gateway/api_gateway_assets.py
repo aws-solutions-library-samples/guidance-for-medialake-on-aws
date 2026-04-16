@@ -288,7 +288,7 @@ class AssetsConstruct(Construct):
             iam.PolicyStatement(
                 actions=["ssm:GetParameter"],
                 resources=[
-                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/*/cloudfront-distribution-domain"
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}"
                 ],
             )
         )
@@ -550,6 +550,7 @@ class AssetsConstruct(Construct):
                 name="upload_asset",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/upload/post_upload",
+                memory_size=256,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -648,7 +649,8 @@ class AssetsConstruct(Construct):
                 name="upload_multipart_complete",
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/upload/multipart_complete",
-                timeout_minutes=1,
+                timeout_minutes=2,
+                memory_size=256,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -756,6 +758,7 @@ class AssetsConstruct(Construct):
                 layers=[search_layer.layer],
                 entry="lambdas/api/assets/upload/multipart_sign",
                 timeout_minutes=1,
+                memory_size=256,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
@@ -772,12 +775,24 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add S3 permissions for multipart sign Lambda
+        # The Lambda generates presigned URLs for upload_part — S3 validates
+        # the signer's permissions when the URL is used, so PutObject is required.
+        multipart_sign_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["s3:PutObject"],
+                resources=["arn:aws:s3:::*/*"],
+            )
+        )
+
         # Add KMS permissions for multipart sign Lambda
         multipart_sign_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
                     "kms:Decrypt",
                     "kms:DescribeKey",
+                    "kms:Encrypt",
+                    "kms:GenerateDataKey",
                 ],
                 resources=["*"],
             )
@@ -2303,7 +2318,7 @@ class AssetsConstruct(Construct):
         bulk_download_log_group = logs.LogGroup(
             self,
             "AssetsBulkDownloadLogGroup",
-            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Bulk-Download",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Bulk-Download_{config.environment}",
             retention=logs.RetentionDays.ONE_MONTH,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -2312,7 +2327,7 @@ class AssetsConstruct(Construct):
         self._state_machine = sfn.StateMachine(
             self,
             "AssetsBulkDownloadStateMachine",
-            state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download",
+            state_machine_name=f"{config.resource_prefix}_Asset-Bulk-Download_{config.environment}",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(6),  # Increase timeout for large file processing
             logs=sfn.LogOptions(
@@ -2683,7 +2698,7 @@ class AssetsConstruct(Construct):
         batch_delete_log_group = logs.LogGroup(
             self,
             "AssetsBatchDeleteLogGroup",
-            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Batch-Delete",
+            log_group_name=f"/aws/vendedlogs/states/{config.resource_prefix}_Asset-Batch-Delete_{config.environment}",
             retention=logs.RetentionDays.ONE_MONTH,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -2692,7 +2707,7 @@ class AssetsConstruct(Construct):
         self._batch_delete_state_machine = sfn.StateMachine(
             self,
             "AssetsBatchDeleteStateMachine",
-            state_machine_name=f"{config.resource_prefix}_Asset-Batch-Delete",
+            state_machine_name=f"{config.resource_prefix}_Asset-Batch-Delete_{config.environment}",
             definition_body=sfn.DefinitionBody.from_chainable(workflow),
             timeout=Duration.hours(2),
             logs=sfn.LogOptions(
@@ -2798,7 +2813,7 @@ class AssetsConstruct(Construct):
             "MediaLakeSubClipQueue",
             props=MediaConvertProps(
                 description="A MediaLake queue for creating Sub-Clips of source assets",
-                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                name=f"{config.resource_prefix}-SubClipQueue-{config.environment}",
                 pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
                 status="ACTIVE",  # Could also be "PAUSED"
                 tags=[
@@ -2812,7 +2827,7 @@ class AssetsConstruct(Construct):
             self,
             "SubClipMediaConvertRole",
             assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
-            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role_{config.environment}",
             description="IAM role for MediaConvert SubClip Operations",
         )
 
@@ -2863,7 +2878,7 @@ class AssetsConstruct(Construct):
             "MediaLakeSubClipQueue",
             props=MediaConvertProps(
                 description="A MediaLake queue for creating Sub-Clips of source assets",
-                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                name=f"{config.resource_prefix}-SubClipQueue-{config.environment}",
                 pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
                 status="ACTIVE",  # Could also be "PAUSED"
                 tags=[
@@ -2877,7 +2892,7 @@ class AssetsConstruct(Construct):
             self,
             "SubClipMediaConvertRole",
             assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
-            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role_{config.environment}",
             description="IAM role for MediaConvert SubClip Operations",
         )
 
@@ -2928,7 +2943,7 @@ class AssetsConstruct(Construct):
             "MediaLakeSubClipQueue",
             props=MediaConvertProps(
                 description="A MediaLake queue for creating Sub-Clips of source assets",
-                name="MediaLakeSubClipQueue",  # If omitted, one is auto-generated
+                name=f"{config.resource_prefix}-SubClipQueue-{config.environment}",
                 pricing_plan="ON_DEMAND",  # Must be ON_DEMAND for CF-based queue creation
                 status="ACTIVE",  # Could also be "PAUSED"
                 tags=[
@@ -2942,7 +2957,7 @@ class AssetsConstruct(Construct):
             self,
             "SubClipMediaConvertRole",
             assumed_by=iam.ServicePrincipal("mediaconvert.amazonaws.com"),
-            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role",
+            role_name=f"{config.resource_prefix}_SubClip_MediaConvert_Role_{config.environment}",
             description="IAM role for MediaConvert SubClip Operations",
         )
 

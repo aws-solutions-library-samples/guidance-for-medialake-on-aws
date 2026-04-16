@@ -358,7 +358,7 @@ The node returns an `enrichment_status` field that determines the Step Function 
 
 ## Dependencies
 
-- `requests>=2.31.0` - HTTP client
+- `requests>=2.33.0` - HTTP client
 - `boto3>=1.34.0` - AWS SDK
 - `aws-lambda-powertools>=2.32.0` - Logging, tracing, metrics
 - `xmltodict>=0.13.0` - XML to dictionary conversion

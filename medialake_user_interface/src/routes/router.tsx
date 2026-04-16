@@ -20,9 +20,21 @@ const RouteFallback = () => (
   </Box>
 );
 
-// Helper to wrap a lazy component with Suspense
+// Helper to wrap a lazy component with Suspense.
+// Retries once on chunk load failure (e.g. after a deploy swaps hashed filenames).
 function lazyLoad(factory: () => Promise<{ default: React.ComponentType<any> }>) {
-  const Component = React.lazy(factory);
+  const Component = React.lazy(() =>
+    factory().catch(() => {
+      // First import failed — likely a stale chunk hash. Reload to pick up the new index.html.
+      const reloadedKey = "chunk-reload";
+      if (!sessionStorage.getItem(reloadedKey)) {
+        sessionStorage.setItem(reloadedKey, "1");
+        window.location.reload();
+      }
+      // If we already reloaded and it still fails, surface the error to the error boundary.
+      return factory();
+    })
+  );
   return (
     <Suspense fallback={<RouteFallback />}>
       <Component />

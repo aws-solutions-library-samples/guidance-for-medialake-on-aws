@@ -69,7 +69,9 @@ class RetainedResourceRegistry(Construct):
                 service="SSM",
                 action="putParameter",
                 parameters={
-                    "Name": f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}/arn",
+                    "Name": config.ssm_param(
+                        "retained-resources", resource_type, resource_id, "arn"
+                    ),
                     "Value": resource_arn,
                     "Type": "String",
                     "Overwrite": True,
@@ -83,7 +85,9 @@ class RetainedResourceRegistry(Construct):
                 service="SSM",
                 action="putParameter",
                 parameters={
-                    "Name": f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}/arn",
+                    "Name": config.ssm_param(
+                        "retained-resources", resource_type, resource_id, "arn"
+                    ),
                     "Value": resource_arn,
                     "Type": "String",
                     "Overwrite": True,
@@ -116,7 +120,12 @@ class RetainedResourceRegistry(Construct):
                             service="SSM",
                             action="putParameter",
                             parameters={
-                                "Name": f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}/{data_key}",
+                                "Name": config.ssm_param(
+                                    "retained-resources",
+                                    resource_type,
+                                    resource_id,
+                                    data_key,
+                                ),
                                 "Value": value,
                                 "Type": "String",
                                 "Overwrite": True,
@@ -130,7 +139,12 @@ class RetainedResourceRegistry(Construct):
                             service="SSM",
                             action="putParameter",
                             parameters={
-                                "Name": f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}/{data_key}",
+                                "Name": config.ssm_param(
+                                    "retained-resources",
+                                    resource_type,
+                                    resource_id,
+                                    data_key,
+                                ),
                                 "Value": value,
                                 "Type": "String",
                                 "Overwrite": True,
@@ -165,4 +179,6 @@ class RetainedResourceRegistry(Construct):
         Returns:
             The SSM parameter name
         """
-        return f"/medialake/{config.environment}/retained-resources/{resource_type}/{resource_id}/{attribute}"
+        return config.ssm_param(
+            "retained-resources", resource_type, resource_id, attribute
+        )

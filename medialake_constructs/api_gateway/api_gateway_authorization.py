@@ -15,6 +15,7 @@ from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
+from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
@@ -62,8 +63,12 @@ class AuthorizationApi(Construct):
         self._api_authorizer = props.shared_authorizer_lambda
 
         # Get API Gateway information
-        api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-        root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
+        api_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "ApiGatewayId")
+        )
+        root_resource_id = Fn.import_value(
+            config.cfn_export("MediaLakeApiGatewayCore", "RootResourceId")
+        )
 
         api = apigateway.RestApi.from_rest_api_attributes(
             self,
