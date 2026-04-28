@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.13.1] - 2026-04-28
+
+### Bug Fixes
+
+- fix: custom metadata filters working with semantic searches
+
 ## [1.13.0] - 2026-04-28
 
 ### Features
