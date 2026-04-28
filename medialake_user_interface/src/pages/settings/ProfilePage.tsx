@@ -15,14 +15,22 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Button,
+  TextField,
+  Alert,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import {
   Email as EmailIcon,
   Person as PersonIcon,
   Language as LanguageIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Lock as LockIcon,
 } from "@mui/icons-material";
-import { useGetUser } from "../../api/hooks/useUsers";
+import { useGetUser, useChangePassword } from "../../api/hooks/useUsers";
 import { getCurrentUser } from "aws-amplify/auth";
 import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,6 +43,16 @@ const ProfilePage: React.FC = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const { direction } = useDirection();
   const isRTL = direction === "rtl";
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const changePasswordMutation = useChangePassword();
 
   // Create a theme with the appropriate direction
   const rtlTheme = useMemo(
@@ -171,6 +189,183 @@ const ProfilePage: React.FC = () => {
                 {email}
               </Typography>
               <Chip label={userStatus} color="success" size="small" sx={{ mt: 1 }} />
+
+              <Box sx={{ mt: 3 }}>
+                {!showChangePassword ? (
+                  <Button
+                    variant="outlined"
+                    startIcon={<LockIcon />}
+                    fullWidth
+                    onClick={() => {
+                      setShowChangePassword(true);
+                      setPasswordError("");
+                      setPasswordSuccess("");
+                    }}
+                  >
+                    {t("profile.changePassword", "Change Password")}
+                  </Button>
+                ) : (
+                  <Box
+                    component="form"
+                    onSubmit={(e: React.FormEvent) => {
+                      e.preventDefault();
+                      setPasswordError("");
+                      setPasswordSuccess("");
+
+                      if (newPassword !== confirmPassword) {
+                        setPasswordError(
+                          t("auth.forgotPassword.passwordMismatch", "Passwords do not match.")
+                        );
+                        return;
+                      }
+
+                      changePasswordMutation.mutate(
+                        { current_password: currentPassword, new_password: newPassword },
+                        {
+                          onSuccess: () => {
+                            setPasswordSuccess(
+                              t("profile.passwordChanged", "Password changed successfully.")
+                            );
+                            setCurrentPassword("");
+                            setNewPassword("");
+                            setConfirmPassword("");
+                            setShowChangePassword(false);
+                          },
+                          onError: (err: Error) => {
+                            const msg =
+                              (err as { response?: { data?: { message?: string } } })?.response
+                                ?.data?.message ||
+                              err.message ||
+                              "Failed to change password";
+                            setPasswordError(msg);
+                          },
+                        }
+                      );
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ mb: 1.5, textAlign: "left" }}>
+                      {t("profile.changePassword", "Change Password")}
+                    </Typography>
+
+                    {passwordError && (
+                      <Alert severity="error" sx={{ mb: 1.5 }}>
+                        {passwordError}
+                      </Alert>
+                    )}
+
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type={showCurrentPassword ? "text" : "password"}
+                      label={t("profile.currentPassword", "Current Password")}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      sx={{ mb: 1.5 }}
+                      required
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                              >
+                                {showCurrentPassword ? (
+                                  <VisibilityOffIcon fontSize="small" />
+                                ) : (
+                                  <VisibilityIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type={showNewPassword ? "text" : "password"}
+                      label={t("profile.newPassword", "New Password")}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      sx={{ mb: 1.5 }}
+                      required
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                              >
+                                {showNewPassword ? (
+                                  <VisibilityOffIcon fontSize="small" />
+                                ) : (
+                                  <VisibilityIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="password"
+                      label={t("profile.confirmNewPassword", "Confirm New Password")}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      error={confirmPassword.length > 0 && newPassword !== confirmPassword}
+                      helperText={
+                        confirmPassword.length > 0 && newPassword !== confirmPassword
+                          ? t("auth.forgotPassword.passwordMismatch", "Passwords do not match.")
+                          : ""
+                      }
+                      sx={{ mb: 2 }}
+                      required
+                    />
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        disabled={
+                          !currentPassword ||
+                          !newPassword ||
+                          !confirmPassword ||
+                          newPassword !== confirmPassword ||
+                          changePasswordMutation.isPending
+                        }
+                      >
+                        {changePasswordMutation.isPending
+                          ? t("common.saving", "Saving...")
+                          : t("common.save", "Save")}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        onClick={() => {
+                          setShowChangePassword(false);
+                          setCurrentPassword("");
+                          setNewPassword("");
+                          setConfirmPassword("");
+                          setPasswordError("");
+                        }}
+                      >
+                        {t("common.cancel", "Cancel")}
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+                {passwordSuccess && (
+                  <Alert severity="success" sx={{ mt: 1.5 }}>
+                    {passwordSuccess}
+                  </Alert>
+                )}
+              </Box>
             </Paper>
           </Grid>
 

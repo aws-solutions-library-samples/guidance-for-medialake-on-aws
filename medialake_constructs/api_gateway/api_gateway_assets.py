@@ -239,7 +239,7 @@ class AssetsConstruct(Construct):
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
-                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
                 },
             ),
         )
@@ -2458,7 +2458,7 @@ class AssetsConstruct(Construct):
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,  # For TwelveLabs plugin
             "S3_VECTOR_INDEX": props.s3_vector_index_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,  # For TwelveLabs plugin
-            "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+            "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
         }
 
         # Create the batch delete processor Lambda (worker)

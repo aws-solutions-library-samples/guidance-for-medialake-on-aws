@@ -11,6 +11,9 @@ export interface FieldInfo {
   description: string;
   type: string;
   isDefault: boolean;
+  isFilterable?: boolean;
+  autoPopulateValues?: boolean;
+  predefinedValues?: string[];
 }
 
 export interface SearchFieldsData {
@@ -68,7 +71,7 @@ export const useSearchFields = () => {
         throw error;
       }
     },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    gcTime: 1000 * 60 * 10, // Keep unused data for 10 minutes
+    staleTime: 1000 * 30, // Cache for 30 seconds — short so admin changes propagate quickly
+    gcTime: 1000 * 60 * 5, // Keep unused data for 5 minutes
   });
 };

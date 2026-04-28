@@ -906,10 +906,12 @@ def manage_bucket_cors(
         # Get MediaLake application origin from SSM Parameter Store
         # This is read at runtime to avoid deployment order issues with CloudFront domain
         ssm_param_name = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+        custom_domain_ssm_param = os.environ.get("CUSTOM_DOMAIN_SSM_PARAM")
+
+        ssm_client = boto3.client("ssm", region_name=region)
 
         if ssm_param_name:
             try:
-                ssm_client = boto3.client("ssm", region_name=region)
                 param_response = ssm_client.get_parameter(Name=ssm_param_name)
                 cloudfront_domain = param_response["Parameter"]["Value"]
                 medialake_origin_env = f"https://{cloudfront_domain}"
@@ -934,6 +936,26 @@ def manage_bucket_cors(
             for origin in medialake_origin_env.split(",")
             if origin.strip()
         ]
+
+        # If a custom domain is configured, add it to allowed origins
+        # so CORS works when users access MediaLake via the custom domain
+        if custom_domain_ssm_param:
+            try:
+                custom_param_response = ssm_client.get_parameter(
+                    Name=custom_domain_ssm_param
+                )
+                custom_domain = custom_param_response["Parameter"]["Value"]
+                if custom_domain and custom_domain.strip():
+                    custom_origin = f"https://{custom_domain.strip()}"
+                    if custom_origin not in allowed_origins:
+                        allowed_origins.append(custom_origin)
+                        logger.info(
+                            f"Added custom domain to CORS origins: {custom_origin}"
+                        )
+            except Exception as e:
+                logger.info(
+                    f"No custom domain configured in SSM ({custom_domain_ssm_param}): {str(e)}"
+                )
 
         # In dev environment, append localhost origins if not already present
         environment = os.environ.get("ENVIRONMENT", "")
@@ -1576,7 +1598,7 @@ def create_connector(createconnector: S3Connector) -> dict:
             policies_to_attach.append((eventbridge_policy_name, eventbridge_policy))
 
             # DynamoDB policy
-            system_settings_table = os.environ.get("SYSTEM_SETTINGS_TABLE", "")
+            system_settings_table = os.environ.get("SYSTEM_SETTINGS_TABLE_NAME", "")
             dynamodb_resources = [
                 medialake_asset_table,
                 asset_table_file_hash_index_arn,
@@ -1799,8 +1821,8 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "VECTOR_INDEX_NAME", "media-vectors"
                         ),
                         # System settings table for external service manager
-                        "SYSTEM_SETTINGS_TABLE": os.environ.get(
-                            "SYSTEM_SETTINGS_TABLE", ""
+                        "SYSTEM_SETTINGS_TABLE_NAME": os.environ.get(
+                            "SYSTEM_SETTINGS_TABLE_NAME", ""
                         ),
                     }
                 },

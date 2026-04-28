@@ -264,10 +264,10 @@ export default {
       editTitle: "コレクションを編集",
       deleteTitle: "コレクションを削除",
     },
-    collectionUpdated: "Collection updated successfully",
-    collectionUpdateFailed: "Failed to update collection",
-    collectionDeleted: "Collection deleted successfully",
-    collectionDeleteFailed: "Failed to delete collection",
+    collectionUpdated: "コレクションが正常に更新されました",
+    collectionUpdateFailed: "コレクションの更新に失敗しました",
+    collectionDeleted: "コレクションが正常に削除されました",
+    collectionDeleteFailed: "コレクションの削除に失敗しました",
     createFailed: "コレクションの作成に失敗しました。もう一度お試しください。",
     addToCollection: "コレクションに追加",
     searchCollections: "コレクションを検索...",
@@ -312,6 +312,10 @@ export default {
     emailNotifications: "メール通知",
     pushNotifications: "プッシュ通知",
     changePassword: "パスワードを変更",
+    currentPassword: "現在のパスワード",
+    newPassword: "新しいパスワード",
+    confirmNewPassword: "新しいパスワードの確認",
+    passwordChanged: "パスワードが正常に変更されました。",
     twoFactorAuth: "二要素認証",
     appearance: "外観",
     noFirstName: "ユーザーは名前を設定していません",
@@ -364,6 +368,9 @@ export default {
       before: "以前",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "{{field}}でフィルター…",
+      noValuesFound: "値が見つかりません",
+      typeToAdd: "値を入力してEnterを押してください",
     },
     bar: {
       label: "検索",
@@ -602,6 +609,7 @@ export default {
     description: "システムユーザーとそのアクセスを管理",
     actions: {
       addUser: "ユーザーを追加",
+      resetPassword: "パスワードをリセット",
     },
     apiMessages: {
       creating: {
@@ -633,6 +641,13 @@ export default {
         success: "ユーザーが無効化されました",
         successMessage: "ユーザーが正常に無効化されました。",
         error: "ユーザーの無効化に失敗しました",
+      },
+      resettingPassword: {
+        loading: "パスワードをリセット中...",
+        success: "パスワードリセットを送信しました",
+        successMessage:
+          "パスワードリセットメールが送信されました。ユーザーは新しいパスワードを設定する手順を受け取ります。",
+        error: "パスワードリセットに失敗しました",
       },
     },
     form: {
@@ -736,6 +751,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "メタデータフィールド",
       },
       search: {
         title: "検索設定",
@@ -763,6 +779,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "フィールドを検索...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -858,6 +877,7 @@ export default {
     adding: "追加中...",
     lessOptions: "オプションを減らす",
     moreOptions: "その他のオプション",
+    chipMore: "+{{count}} 件",
     edit: "編集",
     delete: "削除",
     share: "共有",
@@ -1007,6 +1027,8 @@ export default {
       desc: "降順",
       noSortableFields: "並べ替え可能なフィールドがありません。",
       enableMoreFields: "並べ替えを有効にするには、フィールドを追加してください。",
+      customFields: "カスタムフィールド",
+      default: "デフォルト",
       confidence: {
         label: "信頼度：",
         low: "低",
@@ -1495,6 +1517,28 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "読み込み中 AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "パスワードをお忘れですか？",
+      title: "パスワードをリセット",
+      description:
+        "メールアドレスを入力してください。パスワードをリセットするためのコードをお送りします。",
+      emailPlaceholder: "メールアドレスを入力",
+      sendCode: "リセットコードを送信",
+      codeSent: "メールに確認コードを送信しました。",
+      codePlaceholder: "確認コードを入力",
+      newPasswordPlaceholder: "新しいパスワードを入力",
+      confirmPasswordPlaceholder: "新しいパスワードを確認",
+      resetPassword: "パスワードをリセット",
+      backToSignIn: "サインインに戻る",
+      success: "パスワードのリセットに成功しました。新しいパスワードでサインインできます。",
+      errorSendingCode:
+        "リセットコードの送信に失敗しました。メールアドレスを確認して再度お試しください。",
+      errorResettingPassword:
+        "パスワードのリセットに失敗しました。コードを確認して再度お試しください。",
+      passwordMismatch: "パスワードが一致しません。",
+    },
   },
   permissions: {
     accessDenied: "アクセス拒否 - このページを表示する権限がありません",

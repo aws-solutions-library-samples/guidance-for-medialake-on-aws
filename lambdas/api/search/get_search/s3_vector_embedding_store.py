@@ -48,14 +48,20 @@ class S3VectorEmbeddingStore(BaseEmbeddingStore):
         return self._s3_vector_client
 
     def _get_opensearch_client(self) -> OpenSearch:
-        """Create and return a cached OpenSearch client for metadata filtering"""
+        """Create and return a cached OpenSearch client for metadata filtering.
+
+        Uses refreshable credentials so that long-lived Lambda containers
+        never sign requests with expired IAM tokens.
+        """
         if self._opensearch_client is None:
+            from refreshable_auth import get_refreshable_credentials
+
             host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
             region = os.environ["AWS_REGION"]
             service_scope = os.environ["SCOPE"]
 
             auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
+                get_refreshable_credentials(), region, service_scope
             )
 
             self._opensearch_client = OpenSearch(

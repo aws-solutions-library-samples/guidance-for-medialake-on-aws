@@ -1,9 +1,7 @@
 import logging
 import os
 
-import boto3
 from opensearchpy import OpenSearch, RequestsHttpConnection
-from requests_aws4auth import AWS4Auth
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,14 +27,11 @@ class OpenSearchClient:
         logging.basicConfig(**default_log_args)
 
     def _create_client(self):
-        credentials = boto3.Session().get_credentials()
-        awsauth = AWS4Auth(
-            credentials.access_key,
-            credentials.secret_key,
-            self.region_name,
-            self.service,
-            session_token=credentials.token,
-        )
+        from opensearchpy import RequestsAWSV4SignerAuth
+        from refreshable_auth import get_refreshable_credentials
+
+        credentials = get_refreshable_credentials()
+        awsauth = RequestsAWSV4SignerAuth(credentials, self.region_name, self.service)
         host = self.collection_endpoint.replace("https://", "")
 
         return OpenSearch(

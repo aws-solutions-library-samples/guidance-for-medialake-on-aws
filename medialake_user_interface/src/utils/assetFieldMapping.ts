@@ -74,6 +74,9 @@ export function getVisibleFields(
     }
 
     const apiFieldIds = REVERSE_FIELD_MAPPING[field.id] || [];
-    return apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId));
+    if (apiFieldIds.some((apiFieldId) => selectedSearchFields.includes(apiFieldId))) return true;
+
+    // Custom metadata fields: field.id IS the dot-path itself (e.g. "Metadata.Embedded.EXIF.Make")
+    return selectedSearchFields.includes(field.id);
   });
 }

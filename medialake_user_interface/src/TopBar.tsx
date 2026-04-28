@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   Box,
   useTheme as useMuiTheme,
@@ -36,6 +36,7 @@ import {
   useSemanticSearch,
   useDomainActions,
   useUIActions,
+  useActiveFilterCount,
 } from "./stores/searchStore";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
@@ -79,6 +80,15 @@ function TopBar() {
   const { isSemanticSearchEnabled, isConfigured, providerData } = useSemanticSearchStatus();
   const isMarengo30 = providerData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0";
 
+  // Keep a ref to the latest filters so the debounced callback always reads
+  // the current value instead of a stale closure capture.
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
+  // Same for storeIsSemantic — the debounced callback should read the latest value.
+  const storeIsSemanticRef = useRef(storeIsSemantic);
+  storeIsSemanticRef.current = storeIsSemantic;
+
   // Initialize semantic search from URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -92,8 +102,9 @@ function TopBar() {
 
   // Sync search input with store query only when on search page
   useEffect(() => {
-    // Only sync if we're on the search page and the store query differs from input
-    if (location.pathname === "/search" && storeQuery && storeQuery !== searchInput) {
+    // Sync the search input from the store when on the search page.
+    // Use !== null to allow empty string (browse-all) to clear the input.
+    if (location.pathname === "/search" && storeQuery !== null && storeQuery !== searchInput) {
       setSearchInput(storeQuery);
     }
   }, [location.pathname, storeQuery]);
@@ -103,58 +114,74 @@ function TopBar() {
     return `${tagPart}${tagPart && searchInput ? " " : ""}${searchInput}`.trim();
   }, [searchTags, searchInput]);
 
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      if (query.trim()) {
-        // Update store state first
-        setQuery(query);
-        setIsSemantic(storeIsSemantic);
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((query: string) => {
+        if (query.trim()) {
+          // Read latest values from refs to avoid stale closures
+          const currentFilters = filtersRef.current;
+          const currentIsSemantic = storeIsSemanticRef.current;
 
-        // Build facet parameters for cache invalidation
-        const facetParams = {
-          type: filters.type,
-          extension: filters.extension,
-          asset_size_gte: filters.asset_size_gte,
-          asset_size_lte: filters.asset_size_lte,
-          ingested_date_gte: filters.ingested_date_gte,
-          ingested_date_lte: filters.ingested_date_lte,
-          filename: filters.filename,
-        };
+          // Update store state first
+          setQuery(query);
+          setIsSemantic(currentIsSemantic);
 
-        // Remove undefined values from facetParams
-        Object.keys(facetParams).forEach((key) => {
-          if (facetParams[key as keyof typeof facetParams] === undefined) {
-            delete facetParams[key as keyof typeof facetParams];
-          }
-        });
+          // Build facet parameters for cache invalidation
+          const facetParams: Record<string, any> = {
+            type: currentFilters.type,
+            extension: currentFilters.extension,
+            asset_size_gte: currentFilters.asset_size_gte,
+            asset_size_lte: currentFilters.asset_size_lte,
+            ingested_date_gte: currentFilters.ingested_date_gte,
+            ingested_date_lte: currentFilters.ingested_date_lte,
+            filename: currentFilters.filename,
+          };
 
-        // Invalidate search cache to force refetch
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.SEARCH.list(query, 1, 50, storeIsSemantic, [], facetParams),
-        });
+          // Remove undefined values from facetParams
+          Object.keys(facetParams).forEach((key) => {
+            if (facetParams[key] === undefined) {
+              delete facetParams[key];
+            }
+          });
 
-        // Build URL with semantic parameter
-        const params = new URLSearchParams();
-        params.set("q", query);
-        params.set("semantic", storeIsSemantic.toString());
+          // Invalidate search cache to force refetch
+          queryClient.invalidateQueries({
+            queryKey: QUERY_KEYS.SEARCH.list(query, 1, 50, currentIsSemantic, [], facetParams),
+          });
 
-        // Add filters to URL
-        if (filters.type) params.set("type", filters.type);
-        if (filters.extension) params.set("extension", filters.extension);
-        if (filters.asset_size_gte) params.set("asset_size_gte", filters.asset_size_gte.toString());
-        if (filters.asset_size_lte) params.set("asset_size_lte", filters.asset_size_lte.toString());
-        if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
-        if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
-        if (filters.filename) params.set("filename", filters.filename);
+          // Build URL with semantic parameter
+          const params = new URLSearchParams();
+          params.set("q", query);
+          params.set("semantic", currentIsSemantic.toString());
 
-        // Navigate with URL parameters
-        navigate(`/search?${params.toString()}`);
-      }
-    }, 500),
-    [navigate, storeIsSemantic, setQuery, setIsSemantic, filters, queryClient]
+          // Add filters to URL
+          if (currentFilters.type) params.set("type", currentFilters.type);
+          if (currentFilters.extension) params.set("extension", currentFilters.extension);
+          if (currentFilters.asset_size_gte)
+            params.set("asset_size_gte", currentFilters.asset_size_gte.toString());
+          if (currentFilters.asset_size_lte)
+            params.set("asset_size_lte", currentFilters.asset_size_lte.toString());
+          if (currentFilters.ingested_date_gte)
+            params.set("ingested_date_gte", currentFilters.ingested_date_gte);
+          if (currentFilters.ingested_date_lte)
+            params.set("ingested_date_lte", currentFilters.ingested_date_lte);
+          if (currentFilters.filename) params.set("filename", currentFilters.filename);
+
+          // Navigate with URL parameters
+          navigate(`/search?${params.toString()}`);
+        }
+      }, 500),
+    [navigate, setQuery, setIsSemantic, queryClient]
   );
 
   // Handle search results from session storage
+  useEffect(() => {
+    // Cancel any pending debounced search on unmount
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
+
   useEffect(() => {
     const handleStorageChange = () => {
       const storedResults = sessionStorage.getItem("searchResults");
@@ -404,7 +431,8 @@ function TopBar() {
     handleCloseUploadModal();
   };
 
-  const hasActiveFilters = Object.keys(filters).filter((k) => k !== "date_range_option").length > 0;
+  const activeFilterCount = useActiveFilterCount();
+  const hasActiveFilters = activeFilterCount > 0;
 
   return (
     <Box
@@ -677,7 +705,7 @@ function TopBar() {
                       boxSizing: "content-box",
                     }}
                   >
-                    {Object.keys(filters).filter((k) => k !== "date_range_option").length}
+                    {activeFilterCount}
                   </Box>
                 )}
               </IconButton>

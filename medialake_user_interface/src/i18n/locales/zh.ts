@@ -259,10 +259,10 @@ export default {
       editTitle: "编辑收藏集",
       deleteTitle: "删除收藏集",
     },
-    collectionUpdated: "Collection updated successfully",
-    collectionUpdateFailed: "Failed to update collection",
-    collectionDeleted: "Collection deleted successfully",
-    collectionDeleteFailed: "Failed to delete collection",
+    collectionUpdated: "收藏集更新成功",
+    collectionUpdateFailed: "收藏集更新失败",
+    collectionDeleted: "收藏集删除成功",
+    collectionDeleteFailed: "收藏集删除失败",
     createFailed: "创建收藏失败。请重试。",
     addToCollection: "添加到收藏集",
     searchCollections: "搜索收藏集...",
@@ -307,6 +307,10 @@ export default {
     emailNotifications: "邮件通知",
     pushNotifications: "推送通知",
     changePassword: "更改密码",
+    currentPassword: "当前密码",
+    newPassword: "新密码",
+    confirmNewPassword: "确认新密码",
+    passwordChanged: "密码修改成功。",
     twoFactorAuth: "两步验证",
     appearance: "外观",
     noFirstName: "用户未配置名字",
@@ -359,6 +363,9 @@ export default {
       before: "之前",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "按{{field}}筛选…",
+      noValuesFound: "未找到值",
+      typeToAdd: "输入值并按 Enter",
     },
     bar: {
       label: "搜索",
@@ -596,6 +603,7 @@ export default {
     description: "管理系统用户及其权限",
     actions: {
       addUser: "添加用户",
+      resetPassword: "重置密码",
     },
     apiMessages: {
       creating: {
@@ -627,6 +635,12 @@ export default {
         success: "用户已禁用",
         successMessage: "用户已成功禁用。",
         error: "用户禁用失败",
+      },
+      resettingPassword: {
+        loading: "正在重置密码...",
+        success: "密码重置已发送",
+        successMessage: "密码重置邮件已发送。用户将收到设置新密码的说明。",
+        error: "密码重置失败",
       },
     },
     form: {
@@ -730,6 +744,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "元数据字段",
       },
       search: {
         title: "搜索配置",
@@ -756,6 +771,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "搜索字段...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -850,6 +868,7 @@ export default {
     adding: "添加中...",
     lessOptions: "更少选项",
     moreOptions: "更多选项",
+    chipMore: "+{{count}} 更多",
     edit: "编辑",
     delete: "删除",
     share: "分享",
@@ -1011,6 +1030,8 @@ export default {
       desc: "降序",
       noSortableFields: "没有可排序的字段。",
       enableMoreFields: "启用更多字段以解锁排序。",
+      customFields: "自定义字段",
+      default: "默认",
       confidence: {
         label: "置信度：",
         low: "低",
@@ -1485,6 +1506,25 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "加载中 AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "忘记密码？",
+      title: "重置密码",
+      description: "输入您的电子邮件地址，我们将向您发送重置密码的验证码。",
+      emailPlaceholder: "输入您的电子邮件",
+      sendCode: "发送重置验证码",
+      codeSent: "我们已向您的电子邮件发送了验证码。",
+      codePlaceholder: "输入验证码",
+      newPasswordPlaceholder: "输入新密码",
+      confirmPasswordPlaceholder: "确认新密码",
+      resetPassword: "重置密码",
+      backToSignIn: "返回登录",
+      success: "密码重置成功。您现在可以使用新密码登录。",
+      errorSendingCode: "发送重置验证码失败。请检查您的电子邮件并重试。",
+      errorResettingPassword: "重置密码失败。请检查您的验证码并重试。",
+      passwordMismatch: "密码不匹配。",
+    },
   },
   permissions: {
     accessDenied: "访问被拒绝 - 您没有查看此页面的权限",

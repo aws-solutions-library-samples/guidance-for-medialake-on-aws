@@ -100,14 +100,17 @@ class LambdaMiddleware:
 
     # ---------------------------------------------------------- private helpers
     @staticmethod
-    def _true_original(ev: Dict[str, Any]) -> Dict[str, Any]:
+    def _true_original(ev: Dict[str, Any], max_depth: int = 50) -> Dict[str, Any]:
         cur = ev.get("originalEvent", ev)
+        depth = 0
         while (
-            isinstance(cur, dict)
+            depth < max_depth
+            and isinstance(cur, dict)
             and isinstance(cur.get("payload"), dict)
             and isinstance(cur["payload"].get("event"), dict)
         ):
             cur = cur["payload"]["event"]
+            depth += 1
         return cur
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

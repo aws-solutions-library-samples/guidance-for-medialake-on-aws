@@ -19,7 +19,7 @@ class SearchProviderConfigManager:
         self.dynamodb = boto3.resource("dynamodb")
         self.secretsmanager = boto3.client("secretsmanager")
         self.system_settings_table = self.dynamodb.Table(
-            os.environ.get("SYSTEM_SETTINGS_TABLE")
+            os.environ.get("SYSTEM_SETTINGS_TABLE_NAME")
         )
 
     def save_provider_config(self, provider_config: Dict[str, Any]) -> bool:

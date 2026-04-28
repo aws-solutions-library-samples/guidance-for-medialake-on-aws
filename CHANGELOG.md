@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.13.0] - 2026-04-28
+
+### Features
+
+- feat: Ability to select custom metadata to show on search result cards as well as filter off of
+
+### Bug Fixes
+
+- fix: CORS policy added correctly to S3 buckets when upload is selected when custom domains are used
+- fix: dual pipeline triggers fix so both event trigger assemblies are built
+
+### Code Refactoring
+
+- refactor: User password reset added to user admin interface and self reset through login UI
+
+### Other Changes
+
+- ci: update to CI promo process
+
 ## [1.12.1] - 2026-04-16
 
 ### Chores

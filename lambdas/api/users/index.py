@@ -19,6 +19,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from favorites_delete import handle_delete_favorite
 from favorites_get import handle_get_favorites
 from favorites_post import handle_post_favorite
+from profile_change_password_post import handle_change_password
 from profile_get import handle_get_profile
 from profile_put import handle_put_profile
 from settings_get import handle_get_settings
@@ -29,6 +30,7 @@ from users_enable_post import handle_enable_user
 from users_get import handle_get_user
 from users_post import handle_create_user
 from users_put import handle_put_user
+from users_reset_password_post import handle_reset_password
 
 # Initialize PowerTools
 logger = Logger(
@@ -96,7 +98,16 @@ def put_user(user_id: str):
 @tracer.capture_method
 def delete_user(user_id: str):
     """DELETE /users/{user_id} - Delete a user"""
-    return handle_delete_user(user_id, cognito, USER_POOL_ID, logger, metrics, tracer)
+    return handle_delete_user(
+        user_id,
+        cognito,
+        USER_POOL_ID,
+        logger,
+        metrics,
+        tracer,
+        dynamodb=dynamodb,
+        user_table_name=USER_TABLE_NAME,
+    )
 
 
 @app.post("/users/<user_id>/disable")
@@ -113,6 +124,15 @@ def enable_user(user_id: str):
     return handle_enable_user(user_id, cognito, USER_POOL_ID, logger, metrics, tracer)
 
 
+@app.post("/users/<user_id>/reset-password")
+@tracer.capture_method
+def reset_password(user_id: str):
+    """POST /users/{user_id}/reset-password - Reset a user's password"""
+    return handle_reset_password(
+        user_id, cognito, USER_POOL_ID, logger, metrics, tracer
+    )
+
+
 # Profile routes
 @app.get("/users/profile")
 @tracer.capture_method
@@ -126,6 +146,13 @@ def get_profile():
 def put_profile():
     """PUT /users/profile - Update user profile"""
     return handle_put_profile(app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer)
+
+
+@app.post("/users/profile/change-password")
+@tracer.capture_method
+def change_password():
+    """POST /users/profile/change-password - Change own password"""
+    return handle_change_password(app, cognito, USER_POOL_ID, logger, metrics, tracer)
 
 
 # Settings routes
@@ -169,6 +196,33 @@ def delete_favorite(item_type: str, item_id: str):
     )
 
 
+SENSITIVE_BODY_KEYS = {"current_password", "new_password", "password"}
+
+
+def _sanitize_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a shallow copy of the event with sensitive body fields redacted."""
+    if not event.get("body"):
+        return event
+
+    sanitized = {**event}
+    try:
+        body = (
+            json.loads(sanitized["body"])
+            if isinstance(sanitized["body"], str)
+            else sanitized["body"]
+        )
+        if any(k in body for k in SENSITIVE_BODY_KEYS):
+            redacted = {
+                k: "***REDACTED***" if k in SENSITIVE_BODY_KEYS else v
+                for k, v in body.items()
+            }
+            sanitized["body"] = json.dumps(redacted)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass  # non-JSON body, leave as-is
+
+    return sanitized
+
+
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
@@ -177,7 +231,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
     logger.debug(
         {
             "message": "Lambda handler invoked",
-            "event": event,
+            "event": _sanitize_event(event),
             "operation": "lambda_handler",
         }
     )

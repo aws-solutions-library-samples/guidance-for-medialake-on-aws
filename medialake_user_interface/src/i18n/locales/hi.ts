@@ -176,12 +176,12 @@ export default {
     noSharedCollections: "अभी तक कोई कलेक्शन आपके साथ साझा नहीं किया गया है",
     noSharedByMe: "आपने अभी तक कोई कलेक्शन साझा नहीं किया है",
     stats: {
-      assignedTasks: "Assigned Tasks",
-      activeTasks: "सक्रिय tasks",
-      pipelineExecutions: "पाइपलाइन Executions",
-      last24Hours: "Last 24 hours",
-      newAssets: "New Assets",
-      uploadedToday: "Uploaded today",
+      assignedTasks: "सौंपे गए कार्य",
+      activeTasks: "सक्रिय कार्य",
+      pipelineExecutions: "पाइपलाइन निष्पादन",
+      last24Hours: "पिछले 24 घंटे",
+      newAssets: "नई संपत्तियाँ",
+      uploadedToday: "आज अपलोड किया गया",
     },
   },
   collections: {
@@ -314,6 +314,10 @@ export default {
     emailNotifications: "ईमेल सूचनाएँ",
     pushNotifications: "पुश सूचनाएँ",
     changePassword: "पासवर्ड बदलें",
+    currentPassword: "वर्तमान पासवर्ड",
+    newPassword: "नया पासवर्ड",
+    confirmNewPassword: "नए पासवर्ड की पुष्टि करें",
+    passwordChanged: "पासवर्ड सफलतापूर्वक बदला गया।",
     twoFactorAuth: "दो-कारक प्रमाणीकरण",
     appearance: "दिखावट",
     noFirstName: "उपयोगकर्ता ने प्रथम नाम सेट नहीं किया है",
@@ -325,7 +329,7 @@ export default {
       loadingConfig: "AWS विन्यास लोड करते समय त्रुटि:",
       loadingUserAttributes: "उपयोगकर्ता गुण लोड करते समय त्रुटि:",
       signingOut: "साइन आउट करते समय त्रुटि:",
-      somethingWentWrong: "Something went wrong",
+      somethingWentWrong: "कुछ गलत हो गया",
     },
     navigation: {
       preventedDuplicate: "डुप्लिकेट नेविगेशन रोका गया",
@@ -364,8 +368,11 @@ export default {
       creationDate: "निर्माण तिथि",
       after: "के बाद",
       before: "से पहले",
-      clearAll: "Clear All",
-      filenameSearch: "Search by filename",
+      clearAll: "सभी साफ़ करें",
+      filenameSearch: "फ़ाइल नाम से खोजें",
+      filterBy: "{{field}} द्वारा फ़िल्टर करें…",
+      noValuesFound: "कोई मान नहीं मिला",
+      typeToAdd: "एक मान टाइप करें और Enter दबाएँ",
     },
     bar: {
       label: "खोजें",
@@ -592,10 +599,10 @@ export default {
       retryFromCurrent: "वर्तमान स्थिति से पुनः प्रयास करें",
       retryFromStart: "शुरू से पुनः प्रयास करें",
     },
-    details: "Execution Details",
+    details: "निष्पादन विवरण",
     fields: {
-      started: "Started",
-      ended: "Ended",
+      started: "शुरू हुआ",
+      ended: "समाप्त हुआ",
       status: "स्थिति",
     },
   },
@@ -604,6 +611,7 @@ export default {
     description: "सिस्टम उपयोगकर्ताओं और उनके एक्सेस का प्रबंधन करें",
     actions: {
       addUser: "उपयोगकर्ता जोड़ें",
+      resetPassword: "पासवर्ड रीसेट करें",
     },
     apiMessages: {
       creating: {
@@ -636,11 +644,18 @@ export default {
         successMessage: "उपयोगकर्ता सफलतापूर्वक निष्क्रिय किया गया।",
         error: "उपयोगकर्ता निष्क्रिय करने में विफल",
       },
+      resettingPassword: {
+        loading: "पासवर्ड रीसेट हो रहा है...",
+        success: "पासवर्ड रीसेट भेजा गया",
+        successMessage:
+          "पासवर्ड रीसेट ईमेल भेजा गया है। उपयोगकर्ता को नया पासवर्ड सेट करने के निर्देश प्राप्त होंगे।",
+        error: "पासवर्ड रीसेट विफल",
+      },
     },
     form: {
       title: {
         add: "उपयोगकर्ता जोड़ें",
-        edit: "Edit User",
+        edit: "उपयोगकर्ता संपादित करें",
       },
       fields: {
         groups: {
@@ -682,8 +697,8 @@ export default {
       },
     },
     status: {
-      active: "Active",
-      inactive: "Inactive",
+      active: "सक्रिय",
+      inactive: "निष्क्रिय",
     },
   },
   roles: {
@@ -738,6 +753,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "मेटाडेटा फ़ील्ड्स",
       },
       search: {
         title: "खोज विन्यास",
@@ -766,6 +782,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "फ़ील्ड्स खोजें...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -862,6 +881,7 @@ export default {
     adding: "जोड़ा जा रहा है...",
     lessOptions: "कम विकल्प",
     moreOptions: "अधिक विकल्प",
+    chipMore: "+{{count}} और",
     edit: "संपादित करें",
     delete: "हटाएं",
     share: "साझा करें",
@@ -1043,6 +1063,8 @@ export default {
       desc: "अवरोही",
       noSortableFields: "कोई क्रमबद्ध करने योग्य फ़ील्ड उपलब्ध नहीं।",
       enableMoreFields: "क्रमबद्ध करने के लिए अधिक फ़ील्ड सक्षम करें।",
+      customFields: "कस्टम फ़ील्ड",
+      default: "डिफ़ॉल्ट",
       confidence: {
         label: "विश्वास:",
         low: "कम",
@@ -1499,6 +1521,26 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "लोड हो रहा है AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "पासवर्ड भूल गए?",
+      title: "पासवर्ड रीसेट करें",
+      description: "अपना ईमेल पता दर्ज करें और हम आपको पासवर्ड रीसेट करने के लिए एक कोड भेजेंगे।",
+      emailPlaceholder: "अपना ईमेल दर्ज करें",
+      sendCode: "रीसेट कोड भेजें",
+      codeSent: "हमने आपके ईमेल पर एक सत्यापन कोड भेजा है।",
+      codePlaceholder: "सत्यापन कोड दर्ज करें",
+      newPasswordPlaceholder: "नया पासवर्ड दर्ज करें",
+      confirmPasswordPlaceholder: "नया पासवर्ड पुष्टि करें",
+      resetPassword: "पासवर्ड रीसेट करें",
+      backToSignIn: "साइन इन पर वापस जाएं",
+      success: "पासवर्ड सफलतापूर्वक रीसेट हो गया। अब आप अपने नए पासवर्ड से साइन इन कर सकते हैं।",
+      errorSendingCode: "रीसेट कोड भेजने में विफल। कृपया अपना ईमेल जांचें और पुनः प्रयास करें।",
+      errorResettingPassword:
+        "पासवर्ड रीसेट करने में विफल। कृपया अपना कोड जांचें और पुनः प्रयास करें।",
+      passwordMismatch: "पासवर्ड मेल नहीं खाते।",
+    },
   },
   permissions: {
     accessDenied: "पहुंच अस्वीकृत - आपके पास इस पृष्ठ को देखने की अनुमति नहीं है",

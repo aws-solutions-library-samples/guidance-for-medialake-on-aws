@@ -72,10 +72,8 @@ class ApiGatewayStackProps:
     identity_pool: str
     user_pool_client: str
     waf_acl_arn: str
-    cloudfront_domain: str  # CloudFront distribution domain for CORS configuration
     # user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
-    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -238,8 +236,6 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
-                cloudfront_domain=props.cloudfront_domain,
-                ui_origin_host=props.ui_origin_host,
             ),
         )
 

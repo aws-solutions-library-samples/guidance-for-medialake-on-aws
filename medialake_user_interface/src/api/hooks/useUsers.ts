@@ -170,3 +170,29 @@ export const useEnableUser = () => {
     },
   });
 };
+
+export const useResetPassword = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: async (userId) => {
+      await apiClient.post(API_ENDPOINTS.RESET_PASSWORD(userId));
+    },
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: QUERY_KEYS.USERS.all });
+    },
+  });
+};
+
+interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export const useChangePassword = () => {
+  return useMutation<void, Error, ChangePasswordRequest>({
+    mutationFn: async (payload) => {
+      await apiClient.post(API_ENDPOINTS.CHANGE_PASSWORD, payload);
+    },
+  });
+};

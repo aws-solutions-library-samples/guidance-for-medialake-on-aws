@@ -14,6 +14,11 @@ import boto3
 from api_utils import get_api_key, get_search_provider_config
 from twelvelabs import TwelveLabs
 
+# Module-level cached AWS clients for reuse across invocations
+_aws_region = os.environ.get("AWS_REGION", "us-west-2")
+_bedrock_runtime_client = boto3.client("bedrock-runtime", region_name=_aws_region)
+_s3_client = boto3.client("s3", region_name=_aws_region)
+
 
 @dataclass
 class SearchResult:
@@ -150,12 +155,7 @@ class BaseEmbeddingStore(ABC):
         """
 
         try:
-            # Initialize Bedrock client
-            bedrock_init_start = time.time()
-            bedrock_client = boto3.client("bedrock-runtime")
-            self.logger.info(
-                f"[PERF] Bedrock client initialization took: {time.time() - bedrock_init_start:.3f}s"
-            )
+            bedrock_client = _bedrock_runtime_client
 
             # Determine the correct inference profile based on AWS region
             inference_profile_id = self._get_regional_inference_profile()
@@ -353,13 +353,8 @@ class BaseEmbeddingStore(ABC):
             List of float values representing the embedding
         """
         try:
-            # Initialize Bedrock runtime client
-            bedrock_runtime = boto3.client(
-                "bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-west-2")
-            )
-            s3 = boto3.client(
-                "s3", region_name=os.environ.get("AWS_REGION", "us-west-2")
-            )
+            bedrock_runtime = _bedrock_runtime_client
+            s3 = _s3_client
 
             # Get S3 bucket for embedding output
             s3_bucket_name = os.environ.get("S3_VECTOR_BUCKET_NAME")

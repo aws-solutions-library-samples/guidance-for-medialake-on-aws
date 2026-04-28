@@ -314,6 +314,10 @@ export default {
     emailNotifications: "Notificaciones por email",
     pushNotifications: "Notificaciones push",
     changePassword: "Cambiar contraseña",
+    currentPassword: "Contraseña actual",
+    newPassword: "Nueva contraseña",
+    confirmNewPassword: "Confirmar nueva contraseña",
+    passwordChanged: "Contraseña cambiada con éxito.",
     twoFactorAuth: "Autenticación de dos factores",
     appearance: "Apariencia",
     noFirstName: "El usuario no tiene un nombre configurado",
@@ -366,6 +370,9 @@ export default {
       before: "Antes",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "Filtrar por {{field}}…",
+      noValuesFound: "No se encontraron valores",
+      typeToAdd: "Escribe un valor y presiona Enter",
     },
     bar: {
       label: "Buscar",
@@ -605,6 +612,7 @@ export default {
     description: "Gestiona los usuarios del sistema y su acceso",
     actions: {
       addUser: "Agregar usuario",
+      resetPassword: "Restablecer contraseña",
     },
     apiMessages: {
       creating: {
@@ -636,6 +644,13 @@ export default {
         success: "Usuario deshabilitado",
         successMessage: "El usuario se ha deshabilitado exitosamente.",
         error: "Error al deshabilitar el usuario",
+      },
+      resettingPassword: {
+        loading: "Restableciendo contraseña...",
+        success: "Restablecimiento de contraseña enviado",
+        successMessage:
+          "Se ha enviado un correo de restablecimiento de contraseña. El usuario recibirá instrucciones para establecer una nueva contraseña.",
+        error: "Error al restablecer la contraseña",
       },
     },
     form: {
@@ -739,6 +754,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "Campos de metadatos",
       },
       search: {
         title: "Configuración de búsqueda",
@@ -768,6 +784,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Buscar campos...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -867,6 +886,7 @@ export default {
     adding: "Añadiendo...",
     lessOptions: "Menos opciones",
     moreOptions: "Más opciones",
+    chipMore: "+{{count}} más",
     edit: "Editar",
     delete: "Eliminar",
     share: "Compartir",
@@ -1048,6 +1068,8 @@ export default {
       desc: "Desc.",
       noSortableFields: "No hay campos ordenables disponibles.",
       enableMoreFields: "Active más campos para desbloquear la ordenación.",
+      customFields: "Campos personalizados",
+      default: "Predeterminado",
       confidence: {
         label: "Confianza:",
         low: "Baja",
@@ -1505,6 +1527,29 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "Cargando AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "¿Olvidaste tu contraseña?",
+      title: "Restablecer contraseña",
+      description:
+        "Ingresa tu dirección de correo electrónico y te enviaremos un código para restablecer tu contraseña.",
+      emailPlaceholder: "Ingresa tu correo electrónico",
+      sendCode: "Enviar código de restablecimiento",
+      codeSent: "Hemos enviado un código de verificación a tu correo electrónico.",
+      codePlaceholder: "Ingresa el código de verificación",
+      newPasswordPlaceholder: "Ingresa la nueva contraseña",
+      confirmPasswordPlaceholder: "Confirmar nueva contraseña",
+      resetPassword: "Restablecer contraseña",
+      backToSignIn: "Volver a iniciar sesión",
+      success:
+        "Contraseña restablecida con éxito. Ahora puedes iniciar sesión con tu nueva contraseña.",
+      errorSendingCode:
+        "Error al enviar el código de restablecimiento. Verifica tu correo e inténtalo de nuevo.",
+      errorResettingPassword:
+        "Error al restablecer la contraseña. Verifica tu código e inténtalo de nuevo.",
+      passwordMismatch: "Las contraseñas no coinciden.",
+    },
   },
   permissions: {
     accessDenied: "Acceso denegado - No tiene permiso para ver esta página",

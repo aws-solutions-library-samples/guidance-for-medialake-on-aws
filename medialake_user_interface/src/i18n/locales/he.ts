@@ -260,10 +260,10 @@ export default {
       editTitle: "ערוך אוסף",
       deleteTitle: "מחק אוסף",
     },
-    collectionUpdated: "Collection updated successfully",
-    collectionUpdateFailed: "Failed to update collection",
-    collectionDeleted: "Collection deleted successfully",
-    collectionDeleteFailed: "Failed to delete collection",
+    collectionUpdated: "האוסף עודכן בהצלחה",
+    collectionUpdateFailed: "עדכון האוסף נכשל",
+    collectionDeleted: "האוסף נמחק בהצלחה",
+    collectionDeleteFailed: "מחיקת האוסף נכשלה",
     createFailed: "יצירת האוסף נכשלה. אנא נסה שוב.",
     addToCollection: "הוסף לאוסף",
     searchCollections: "חיפוש אוספים...",
@@ -308,6 +308,10 @@ export default {
     emailNotifications: "התראות דואר אלקטרוני",
     pushNotifications: "התראות דחיפה",
     changePassword: "שנה סיסמה",
+    currentPassword: "סיסמה נוכחית",
+    newPassword: "סיסמה חדשה",
+    confirmNewPassword: "אשר סיסמה חדשה",
+    passwordChanged: "הסיסמה שונתה בהצלחה.",
     twoFactorAuth: "אימות דו-גורמי",
     appearance: "מראה",
     noFirstName: "המשתמש לא הגדיר שם פרטי",
@@ -360,6 +364,9 @@ export default {
       before: "לפני",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "סנן לפי {{field}}…",
+      noValuesFound: "לא נמצאו ערכים",
+      typeToAdd: "הקלד ערך ולחץ Enter",
     },
     bar: {
       label: "חיפוש",
@@ -597,6 +604,7 @@ export default {
     description: "נהל את משתמשי המערכת והרשאותיהם",
     actions: {
       addUser: "הוסף משתמש",
+      resetPassword: "איפוס סיסמה",
     },
     apiMessages: {
       creating: {
@@ -628,6 +636,12 @@ export default {
         success: "המשתמש הושבת",
         successMessage: "המשתמש הושבת בהצלחה.",
         error: "השבתת המשתמש נכשלה",
+      },
+      resettingPassword: {
+        loading: "מאפס סיסמה...",
+        success: "איפוס סיסמה נשלח",
+        successMessage: 'דוא"ל לאיפוס סיסמה נשלח. המשתמש יקבל הוראות להגדרת סיסמה חדשה.',
+        error: "איפוס הסיסמה נכשל",
       },
     },
     form: {
@@ -731,6 +745,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "שדות מטא-נתונים",
       },
       search: {
         title: "הגדרות חיפוש",
@@ -757,6 +772,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "חיפוש שדות...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -852,6 +870,7 @@ export default {
     adding: "מוסיף...",
     lessOptions: "פחות אפשרויות",
     moreOptions: "אפשרויות נוספות",
+    chipMore: "+{{count}} נוספים",
     edit: "ערוך",
     delete: "מחק",
     share: "שתף",
@@ -1001,6 +1020,8 @@ export default {
       desc: "יורד",
       noSortableFields: "אין שדות הניתנים למיון.",
       enableMoreFields: "הפעל שדות נוספים כדי לאפשר מיון.",
+      customFields: "שדות מותאמים אישית",
+      default: "ברירת מחדל",
       confidence: {
         label: "ביטחון:",
         low: "נמוך",
@@ -1487,6 +1508,25 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "טוען AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "שכחת את הסיסמה?",
+      title: "איפוס סיסמה",
+      description: 'הזן את כתובת הדוא"ל שלך ונשלח לך קוד לאיפוס הסיסמה.',
+      emailPlaceholder: 'הזן את הדוא"ל שלך',
+      sendCode: "שלח קוד איפוס",
+      codeSent: 'שלחנו קוד אימות לדוא"ל שלך.',
+      codePlaceholder: "הזן קוד אימות",
+      newPasswordPlaceholder: "הזן סיסמה חדשה",
+      confirmPasswordPlaceholder: "אשר סיסמה חדשה",
+      resetPassword: "אפס סיסמה",
+      backToSignIn: "חזרה להתחברות",
+      success: "איפוס הסיסמה הצליח. כעת תוכל להתחבר עם הסיסמה החדשה שלך.",
+      errorSendingCode: 'שליחת קוד האיפוס נכשלה. אנא בדוק את הדוא"ל שלך ונסה שוב.',
+      errorResettingPassword: "איפוס הסיסמה נכשל. אנא בדוק את הקוד שלך ונסה שוב.",
+      passwordMismatch: "הסיסמאות אינן תואמות.",
+    },
   },
   permissions: {
     accessDenied: "הגישה נדחתה - אין לך הרשאה לצפות בדף זה",

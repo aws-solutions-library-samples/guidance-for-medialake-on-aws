@@ -3,7 +3,6 @@
 import os
 from typing import Any, Dict, List, Optional
 
-import boto3
 from aws_lambda_powertools import Logger
 from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
 
@@ -18,7 +17,11 @@ _opensearch_client = None
 
 
 def get_opensearch_client() -> Optional[OpenSearch]:
-    """Create and return a cached OpenSearch client"""
+    """Create and return a cached OpenSearch client.
+
+    Uses refreshable credentials so that long-lived Lambda containers
+    never sign requests with expired IAM tokens.
+    """
     global _opensearch_client
 
     if not OPENSEARCH_ENDPOINT or not OPENSEARCH_INDEX:
@@ -27,12 +30,14 @@ def get_opensearch_client() -> Optional[OpenSearch]:
 
     if _opensearch_client is None:
         try:
+            from refreshable_auth import get_refreshable_credentials
+
             host = OPENSEARCH_ENDPOINT.replace("https://", "")
             region = os.environ["AWS_REGION"]
             service_scope = os.environ.get("SCOPE", "es")
 
             auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
+                get_refreshable_credentials(), region, service_scope
             )
 
             _opensearch_client = OpenSearch(

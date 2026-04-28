@@ -31,19 +31,27 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
     def __init__(self, config, logger, metrics):
         super().__init__(config, logger, metrics)
         self._opensearch_client = None
+        self._cached_token = None
+        self._token_expiry = 0
 
     def _get_provider_location(self) -> ProviderLocation:
         return ProviderLocation.EXTERNAL
 
     def _get_opensearch_client(self) -> OpenSearch:
-        """Create and return a cached OpenSearch client for metadata enrichment"""
+        """Create and return a cached OpenSearch client for metadata enrichment.
+
+        Uses refreshable credentials so that long-lived Lambda containers
+        never sign requests with expired IAM tokens.
+        """
         if self._opensearch_client is None:
+            from refreshable_auth import get_refreshable_credentials
+
             host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
             region = os.environ["AWS_REGION"]
             service_scope = os.environ["SCOPE"]
 
             auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
+                get_refreshable_credentials(), region, service_scope
             )
 
             self._opensearch_client = OpenSearch(
@@ -99,6 +107,11 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
 
     def _get_auth_token(self) -> Optional[str]:
         """Get JWT access token by exchanging personal token with Coactive API"""
+        # Return cached token if still valid
+        now = time.time()
+        if self._cached_token and self._token_expiry > now:
+            return self._cached_token
+
         try:
             self.logger.info(f"Auth config: {self.config.auth}")
 
@@ -170,6 +183,8 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                     self.logger.info(
                         "Successfully obtained JWT access token from Coactive API"
                     )
+                    self._cached_token = access_token
+                    self._token_expiry = time.time() + 3300  # 55 minutes
                     return access_token
 
                 except Exception as auth_e:
@@ -233,11 +248,9 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         # as this would exclude images when in clip mode
         if query.filters:
             for filter_item in query.filters:
-                if (
-                    filter_item.field == "asset_type"
-                    or filter_item.field == "DigitalSourceAsset.Type"
-                ):
-                    payload["asset_type"] = filter_item.value
+                key = filter_item.get("key", filter_item.get("field", ""))
+                if key in ("asset_type", "DigitalSourceAsset.Type"):
+                    payload["asset_type"] = filter_item.get("value")
                     break
 
         self.logger.info(f"Built Coactive payload: {payload}")
@@ -389,20 +402,19 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 )
                 continue
 
-            # Convert order-based ranking to 0.0-1.0 score
-            # First result gets 1.0, subsequent results get progressively lower scores
-            if len(results) > 1:
-                # Use exponential decay to create meaningful score differences
-                # This ensures first result gets 1.0, and scores decrease meaningfully
-                ranking_score = max(0.1, 1.0 - (i * 0.8 / (len(results) - 1)))
+            # Use the raw rank position (1-based) as the score.
+            # Coactive returns results in relevance order but doesn't provide
+            # explicit relevance scores.  The rank is the most honest
+            # representation — no synthetic decay curves.
+            rank = i + 1
+            # If Coactive provides a real score, use it. Otherwise derive a
+            # score from rank that preserves descending order (rank 1 = highest).
+            raw_score = result.get("relevance_score") or result.get("score")
+            if raw_score is not None:
+                score = float(raw_score)
             else:
-                ranking_score = 1.0
-
-            # Keep original score for reference but use ranking score for sorting
-            original_score = float(
-                result.get("relevance_score") or result.get("score", ranking_score)
-            )
-            score = ranking_score
+                # Invert rank so first result has highest score
+                score = 1.0 / rank
 
             if score > max_score:
                 max_score = score
@@ -419,11 +431,10 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 if score > assets_with_clips[medialake_uuid]["max_score"]:
                     assets_with_clips[medialake_uuid]["max_score"] = score
 
-            # Create clip data with both ranking score and original score
+            # Create clip data with rank and score
             clip_data = {
-                "score": score,  # Use ranking score for sorting
-                "original_score": original_score,  # Keep original for reference
-                "ranking_position": i + 1,  # 1-based position for debugging
+                "score": score,
+                "rank": rank,
                 "coactive_metadata": coactive_metadata,
                 "coactive_result": result,  # Store full result for debugging
             }
@@ -431,22 +442,6 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             assets_with_clips[medialake_uuid]["clips"].append(clip_data)
 
         self.logger.info(f"Grouped results into {len(assets_with_clips)} unique assets")
-
-        # Log ranking conversion for debugging
-        if results:
-            self.logger.info("Coactive ranking conversion applied:")
-            for index, result in enumerate(results[:5]):  # Log first 5 for debugging
-                ranking_score = (
-                    max(0.1, 1.0 - (index * 0.8 / (len(results) - 1)))
-                    if len(results) > 1
-                    else 1.0
-                )
-                original_score = result.get("relevance_score") or result.get(
-                    "score", "N/A"
-                )
-                self.logger.info(
-                    f"  Position {index + 1}: original_score={original_score} -> ranking_score={ranking_score:.3f}"
-                )
 
         # Convert to SearchHit format
         hits = []
@@ -653,132 +648,53 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
     def _fetch_medialake_metadata(
         self, asset_ids: List[str], query: SearchQuery
     ) -> List[Dict[str, Any]]:
-        """Fetch MediaLake metadata from OpenSearch with filter support"""
+        """Fetch MediaLake metadata from OpenSearch with filter support.
+
+        Uses the shared ``fetch_parent_docs_batch`` utility so metadata filters
+        are applied at query time by OpenSearch, and only the required + UI-requested
+        fields are returned.
+        """
         try:
+            from metadata_filter_utils import fetch_parent_docs_batch
+
             client = self._get_opensearch_client()
             index_name = os.environ["OPENSEARCH_INDEX"]
 
-            # Build query for specific asset IDs using match queries (same as S3VectorEmbeddingStore)
-            should_clauses = [
-                {"match": {"InventoryID": asset_id}} for asset_id in asset_ids
-            ]
+            # Extract deferred/metadata filters from the query
+            filters = query.filters if query.filters else None
 
-            opensearch_query = {
-                "query": {
-                    "bool": {
-                        "must": [
-                            {
-                                "bool": {
-                                    "should": should_clauses,
-                                    "minimum_should_match": 1,
-                                }
-                            }
-                        ],
-                        "must_not": [{"term": {"embedding_scope": "clip"}}],
-                        "filter": [],
-                    }
-                },
-                "size": len(asset_ids),
-            }
-
-            # Apply filters from the original query to the enrichment
-            filters_to_add = self._build_filters_from_query(query)
-            if filters_to_add:
-                opensearch_query["query"]["bool"]["filter"].extend(filters_to_add)
-                self.logger.info(
-                    f"Applied {len(filters_to_add)} filters to MediaLake enrichment query"
-                )
-
-            # For MediaLake enrichment, we always need complete records
-            # Ignore any field restrictions from the original query
-            # This ensures we get all the MediaLake asset structure needed for the response
-
-            response = client.search(body=opensearch_query, index=index_name)
-            hits = response.get("hits", {}).get("hits", [])
-
-            self.logger.info(
-                f"Fetched MediaLake metadata for {len(hits)} assets (after filters)"
+            parent_lookup = fetch_parent_docs_batch(
+                client=client,
+                index_name=index_name,
+                inventory_ids=asset_ids,
+                filters=filters,
+                ui_fields=query.fields,
             )
 
-            # Debug: Log what fields are actually returned
-            if hits:
-                sample_hit = hits[0]
-                source_keys = list(sample_hit.get("_source", {}).keys())
-                self.logger.info(f"OpenSearch returned fields: {source_keys}")
-                self.logger.info(
-                    f"Sample record structure: {sample_hit.get('_source', {})}"
-                )
+            self.logger.info(
+                f"Fetched MediaLake metadata for {len(parent_lookup)} assets "
+                f"(requested {len(asset_ids)}, after filters)"
+            )
 
-            return hits
+            # Return in the format expected by enrich_results_with_medialake_data
+            return [{"_source": source} for source in parent_lookup.values()]
 
         except Exception as e:
             self.logger.error(f"Failed to fetch MediaLake metadata: {str(e)}")
             return []
 
     def _build_filters_from_query(self, query: SearchQuery) -> List[Dict[str, Any]]:
-        """Build OpenSearch filters from SearchQuery unified filters"""
-        filters = []
+        """Build OpenSearch filters from SearchQuery unified filters.
+
+        Delegates to the shared ``build_opensearch_filters`` utility so filter
+        behavior is consistent across all providers.
+        """
+        from metadata_filter_utils import build_opensearch_filters
 
         if not query.filters:
-            return filters
+            return []
 
-        # Process unified filters from SearchQuery
-        for filter_item in query.filters:
-            filter_key = filter_item.get("key")
-            filter_operator = filter_item.get("operator")
-            filter_value = filter_item.get("value")
-
-            if not filter_key or not filter_operator:
-                continue
-
-            # Map filter keys to OpenSearch field paths
-            opensearch_field = self._map_filter_field_to_opensearch(filter_key)
-
-            # Build OpenSearch filter based on operator
-            if filter_operator == "==" or filter_operator == "term":
-                filters.append({"term": {opensearch_field: filter_value}})
-
-            elif filter_operator == "in":
-                if isinstance(filter_value, list):
-                    filters.append({"terms": {opensearch_field: filter_value}})
-                else:
-                    # Single value, treat as term
-                    filters.append({"term": {opensearch_field: filter_value}})
-
-            elif filter_operator == "range":
-                if isinstance(filter_value, dict):
-                    range_query = {"range": {opensearch_field: {}}}
-                    if "gte" in filter_value:
-                        range_query["range"][opensearch_field]["gte"] = filter_value[
-                            "gte"
-                        ]
-                    if "lte" in filter_value:
-                        range_query["range"][opensearch_field]["lte"] = filter_value[
-                            "lte"
-                        ]
-                    if "gt" in filter_value:
-                        range_query["range"][opensearch_field]["gt"] = filter_value[
-                            "gt"
-                        ]
-                    if "lt" in filter_value:
-                        range_query["range"][opensearch_field]["lt"] = filter_value[
-                            "lt"
-                        ]
-                    filters.append(range_query)
-
-            elif filter_operator in [">=", "gte"]:
-                filters.append({"range": {opensearch_field: {"gte": filter_value}}})
-
-            elif filter_operator in ["<=", "lte"]:
-                filters.append({"range": {opensearch_field: {"lte": filter_value}}})
-
-            elif filter_operator in [">", "gt"]:
-                filters.append({"range": {opensearch_field: {"gt": filter_value}}})
-
-            elif filter_operator in ["<", "lt"]:
-                filters.append({"range": {opensearch_field: {"lt": filter_value}}})
-
-        return filters
+        return build_opensearch_filters(query.filters)
 
     def _map_filter_field_to_opensearch(self, filter_key: str) -> str:
         """Map unified filter field names to OpenSearch field paths"""

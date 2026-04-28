@@ -1,4 +1,17 @@
 /**
+ * Interface for a custom metadata API filter
+ */
+export interface CustomMetadataApiFilter {
+  field: string;
+  operator: "term" | "match" | "range";
+  value?: string;
+  gte?: number | string;
+  lte?: number | string;
+  /** Carries the original field type so round-tripping through filters preserves date vs number ranges. */
+  type?: "string" | "number" | "date";
+}
+
+/**
  * Interface for facet search filters
  */
 export interface FacetFilters {
@@ -26,6 +39,11 @@ export interface FacetFilters {
    * Can be one of: '24h', '7d', '14d', '30d'
    */
   date_range_option?: string;
+
+  /**
+   * Custom metadata filters
+   */
+  customMetadataFilters?: CustomMetadataApiFilter[];
 }
 
 /**

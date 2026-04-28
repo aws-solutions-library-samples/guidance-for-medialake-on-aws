@@ -173,8 +173,6 @@ const AssetDetailLayout: React.FC<AssetDetailLayoutProps> = ({
         <Box sx={{ py: 0, mb: 0 }}>
           <BreadcrumbNavigation
             searchTerm={effectiveSearchTerm}
-            currentResult={currentResult}
-            totalResults={totalResults}
             onBack={handleBack}
             assetName={assetName}
             assetId={assetId}

@@ -64,7 +64,7 @@ const SummaryTab = ({ assetData, mediaType }: { assetData: any; mediaType: "vide
     : "Unknown";
   const width = videoMetadata?.Width ?? "Unknown";
   const height = videoMetadata?.Height ?? "Unknown";
-  const frameRate = videoMetadata?.FrameRate ? `${videoMetadata.FrameRate} FPS` : "Unknown";
+  const frameRate = videoMetadata?.FrameRate ? `${videoMetadata.FrameRate}` : "Unknown";
   const videoBitRate =
     videoMetadata?.OverallBitRate || videoMetadata?.BitRate
       ? `${Math.round((videoMetadata.OverallBitRate || videoMetadata.BitRate) / 1000)} kbps`
@@ -564,8 +564,6 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
       <Box sx={{ p: 3 }}>
         <BreadcrumbNavigation
           searchTerm={effectiveSearchTerm}
-          currentResult={48}
-          totalResults={156}
           onBack={handleBack}
           onPrevious={() => navigate(-1)}
           onNext={() => navigate(1)}
@@ -611,8 +609,6 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
         <Box sx={{ py: 0, mb: 0 }}>
           <BreadcrumbNavigation
             searchTerm={effectiveSearchTerm}
-            currentResult={48}
-            totalResults={156}
             onBack={handleBack}
             onPrevious={() => navigate(-1)}
             onNext={() => navigate(1)}

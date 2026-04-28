@@ -315,6 +315,10 @@ export default {
     emailNotifications: "Notifications par email",
     pushNotifications: "Notifications push",
     changePassword: "Changer le mot de passe",
+    currentPassword: "Mot de passe actuel",
+    newPassword: "Nouveau mot de passe",
+    confirmNewPassword: "Confirmer le nouveau mot de passe",
+    passwordChanged: "Mot de passe modifié avec succès.",
     twoFactorAuth: "Authentification à deux facteurs",
     appearance: "Apparence",
     noFirstName: "L'utilisateur n'a pas de prénom configuré",
@@ -365,8 +369,11 @@ export default {
       creationDate: "Date de création",
       after: "Après",
       before: "Avant",
-      clearAll: "Clear All",
-      filenameSearch: "Search by filename",
+      clearAll: "Tout effacer",
+      filenameSearch: "Rechercher par nom de fichier",
+      filterBy: "Filtrer par {{field}}…",
+      noValuesFound: "Aucune valeur trouvée",
+      typeToAdd: "Saisissez une valeur et appuyez sur Entrée",
     },
     bar: {
       label: "Rechercher",
@@ -562,6 +569,7 @@ export default {
     description: "Gérez les utilisateurs du système et leurs accès",
     actions: {
       addUser: "Ajouter un utilisateur",
+      resetPassword: "Reset Password",
     },
     apiMessages: {
       creating: {
@@ -593,6 +601,13 @@ export default {
         success: "Utilisateur désactivé",
         successMessage: "L'utilisateur a été désactivé avec succès.",
         error: "Échec de la désactivation de l'utilisateur",
+      },
+      resettingPassword: {
+        loading: "Resetting password...",
+        success: "Password Reset Sent",
+        successMessage:
+          "Password reset email has been sent. The user will receive instructions to set a new password.",
+        error: "Password Reset Failed",
       },
     },
     form: {
@@ -693,9 +708,10 @@ export default {
       tabs: {
         search: "Recherche",
         security: "Sécurité",
-        apiKeys: "API Keys",
+        apiKeys: "Clés API",
         collections: "Collections",
-        upgrades: "Upgrades",
+        upgrades: "Mises à jour",
+        metadataFields: "Champs de métadonnées",
       },
       search: {
         title: "Configuration de la recherche",
@@ -726,6 +742,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Rechercher des champs...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -822,6 +841,7 @@ export default {
     adding: "Ajout...",
     lessOptions: "Moins d'options",
     moreOptions: "Plus d'options",
+    chipMore: "+{{count}} de plus",
     edit: "Modifier",
     delete: "Supprimer",
     share: "Partager",
@@ -1051,6 +1071,8 @@ export default {
       desc: "Décroiss.",
       noSortableFields: "Aucun champ triable disponible.",
       enableMoreFields: "Activez plus de champs pour débloquer le tri.",
+      customFields: "Champs personnalisés",
+      default: "par défaut",
       confidence: {
         label: "Confiance :",
         low: "Faible",
@@ -1507,6 +1529,29 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "Chargement AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "Mot de passe oublié ?",
+      title: "Réinitialiser le mot de passe",
+      description:
+        "Entrez votre adresse e-mail et nous vous enverrons un code pour réinitialiser votre mot de passe.",
+      emailPlaceholder: "Entrez votre e-mail",
+      sendCode: "Envoyer le code de réinitialisation",
+      codeSent: "Nous avons envoyé un code de vérification à votre adresse e-mail.",
+      codePlaceholder: "Entrez le code de vérification",
+      newPasswordPlaceholder: "Entrez le nouveau mot de passe",
+      confirmPasswordPlaceholder: "Confirmer le nouveau mot de passe",
+      resetPassword: "Réinitialiser le mot de passe",
+      backToSignIn: "Retour à la connexion",
+      success:
+        "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+      errorSendingCode:
+        "Échec de l'envoi du code de réinitialisation. Veuillez vérifier votre e-mail et réessayer.",
+      errorResettingPassword:
+        "Échec de la réinitialisation du mot de passe. Veuillez vérifier votre code et réessayer.",
+      passwordMismatch: "Les mots de passe ne correspondent pas.",
+    },
   },
   permissions: {
     accessDenied: "Accès refusé - Vous n'avez pas la permission de voir cette page",

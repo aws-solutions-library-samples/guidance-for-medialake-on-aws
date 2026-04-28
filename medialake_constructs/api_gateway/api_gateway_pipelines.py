@@ -259,7 +259,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 entry="lambdas/api/pipelines/get_pipelines",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                    "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
                 },
             ),
         )
@@ -697,7 +697,7 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                 "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket_name,
                 "MEDIA_ASSETS_BUCKET_ARN_KMS_KEY": props.media_assets_bucket.key_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 # "IMAGE_PROXY_LAMBDA_ARN": props.image_proxy_lambda.function_arn,
                 # "IMAGE_METADATA_EXTRACTOR_LAMBDA_ARN": props.image_metadata_extractor_lambda.function_arn,
@@ -733,7 +733,7 @@ class ApiGatewayPipelinesConstruct(Construct):
             entry=("lambdas/api/pipelines/rp_pipelinesId/get_pipelinesId"),
             environment_variables={
                 "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE_NAME": props.pipeline_table.table_arn,
+                "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,
             },
         )
 

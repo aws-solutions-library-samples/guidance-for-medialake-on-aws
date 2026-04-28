@@ -316,6 +316,10 @@ export default {
     emailNotifications: "E-Mail-Benachrichtigungen",
     pushNotifications: "Push-Benachrichtigungen",
     changePassword: "Passwort ändern",
+    currentPassword: "Aktuelles Passwort",
+    newPassword: "Neues Passwort",
+    confirmNewPassword: "Neues Passwort bestätigen",
+    passwordChanged: "Passwort erfolgreich geändert.",
     twoFactorAuth: "Zwei-Faktor-Authentifizierung",
     appearance: "Erscheinungsbild",
     noFirstName: "Benutzer hat keinen Vornamen konfiguriert",
@@ -368,6 +372,9 @@ export default {
       before: "Vor",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "Filtern nach {{field}}…",
+      noValuesFound: "Keine Werte gefunden",
+      typeToAdd: "Wert eingeben und Enter drücken",
     },
     bar: {
       label: "Suchen",
@@ -607,6 +614,7 @@ export default {
     description: "Systembenutzer und deren Zugriff verwalten",
     actions: {
       addUser: "Benutzer hinzufügen",
+      resetPassword: "Passwort zurücksetzen",
     },
     apiMessages: {
       creating: {
@@ -638,6 +646,13 @@ export default {
         success: "Benutzer deaktiviert",
         successMessage: "Benutzer wurde erfolgreich deaktiviert.",
         error: "Benutzerdeaktivierung fehlgeschlagen",
+      },
+      resettingPassword: {
+        loading: "Resetting password...",
+        success: "Password Reset Sent",
+        successMessage:
+          "Password reset email has been sent. The user will receive instructions to set a new password.",
+        error: "Password Reset Failed",
       },
     },
     form: {
@@ -741,6 +756,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "Metadatenfelder",
       },
       search: {
         title: "Suchkonfiguration",
@@ -770,6 +786,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "Felder durchsuchen...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -867,6 +886,7 @@ export default {
     adding: "Hinzufügen...",
     lessOptions: "Weniger Optionen",
     moreOptions: "Mehr Optionen",
+    chipMore: "+{{count}} weitere",
     edit: "Bearbeiten",
     delete: "Löschen",
     share: "Teilen",
@@ -1048,6 +1068,8 @@ export default {
       desc: "Abst.",
       noSortableFields: "Keine sortierbaren Felder verfügbar.",
       enableMoreFields: "Aktivieren Sie weitere Felder zum Sortieren.",
+      customFields: "Benutzerdefinierte Felder",
+      default: "Standard",
       confidence: {
         label: "Konfidenz:",
         low: "Niedrig",
@@ -1509,6 +1531,29 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "Laden AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "Passwort vergessen?",
+      title: "Passwort zurücksetzen",
+      description:
+        "Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Code zum Zurücksetzen Ihres Passworts.",
+      emailPlaceholder: "E-Mail-Adresse eingeben",
+      sendCode: "Code senden",
+      codeSent: "Wir haben einen Bestätigungscode an Ihre E-Mail-Adresse gesendet.",
+      codePlaceholder: "Bestätigungscode eingeben",
+      newPasswordPlaceholder: "Neues Passwort eingeben",
+      confirmPasswordPlaceholder: "Neues Passwort bestätigen",
+      resetPassword: "Passwort zurücksetzen",
+      backToSignIn: "Zurück zur Anmeldung",
+      success:
+        "Passwort erfolgreich zurückgesetzt. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+      errorSendingCode:
+        "Code konnte nicht gesendet werden. Bitte überprüfen Sie Ihre E-Mail-Adresse und versuchen Sie es erneut.",
+      errorResettingPassword:
+        "Passwort konnte nicht zurückgesetzt werden. Bitte überprüfen Sie Ihren Code und versuchen Sie es erneut.",
+      passwordMismatch: "Passwörter stimmen nicht überein.",
+    },
   },
   permissions: {
     accessDenied: "Zugriff verweigert - Sie haben keine Berechtigung, diese Seite anzuzeigen",

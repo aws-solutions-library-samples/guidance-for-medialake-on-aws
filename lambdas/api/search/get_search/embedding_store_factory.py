@@ -10,6 +10,9 @@ from base_embedding_store import BaseEmbeddingStore
 from opensearch_embedding_store import OpenSearchEmbeddingStore
 from s3_vector_embedding_store import S3VectorEmbeddingStore
 
+# Global DynamoDB resource — reused across all factory instances
+_dynamodb_resource = boto3.resource("dynamodb")
+
 
 class EmbeddingStoreFactory:
     """Factory class for creating embedding store instances"""
@@ -23,9 +26,8 @@ class EmbeddingStoreFactory:
     def get_embedding_store_setting(self) -> str:
         """Get the current embedding store setting from system settings"""
         try:
-            dynamodb = boto3.resource("dynamodb")
-            system_settings_table = dynamodb.Table(
-                os.environ.get("SYSTEM_SETTINGS_TABLE")
+            system_settings_table = _dynamodb_resource.Table(
+                os.environ.get("SYSTEM_SETTINGS_TABLE_NAME")
             )
 
             response = system_settings_table.get_item(

@@ -261,10 +261,10 @@ export default {
       editTitle: "컬렉션 편집",
       deleteTitle: "컬렉션 삭제",
     },
-    collectionUpdated: "Collection updated successfully",
-    collectionUpdateFailed: "Failed to update collection",
-    collectionDeleted: "Collection deleted successfully",
-    collectionDeleteFailed: "Failed to delete collection",
+    collectionUpdated: "컬렉션이 성공적으로 업데이트되었습니다",
+    collectionUpdateFailed: "컬렉션 업데이트에 실패했습니다",
+    collectionDeleted: "컬렉션이 성공적으로 삭제되었습니다",
+    collectionDeleteFailed: "컬렉션 삭제에 실패했습니다",
     createFailed: "컬렉션 생성에 실패했습니다. 다시 시도하세요.",
     addToCollection: "컬렉션에 추가",
     searchCollections: "컬렉션 검색...",
@@ -309,6 +309,10 @@ export default {
     emailNotifications: "이메일 알림",
     pushNotifications: "푸시 알림",
     changePassword: "비밀번호 변경",
+    currentPassword: "현재 비밀번호",
+    newPassword: "새 비밀번호",
+    confirmNewPassword: "새 비밀번호 확인",
+    passwordChanged: "비밀번호가 성공적으로 변경되었습니다.",
     twoFactorAuth: "2단계 인증",
     appearance: "외관",
     noFirstName: "사용자가 이름을 설정하지 않았습니다",
@@ -361,6 +365,9 @@ export default {
       before: "이전",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "{{field}}(으)로 필터…",
+      noValuesFound: "값을 찾을 수 없습니다",
+      typeToAdd: "값을 입력하고 Enter를 누르세요",
     },
     bar: {
       label: "검색",
@@ -598,6 +605,7 @@ export default {
     description: "시스템 사용자 및 액세스 관리",
     actions: {
       addUser: "사용자 추가",
+      resetPassword: "비밀번호 재설정",
     },
     apiMessages: {
       creating: {
@@ -629,6 +637,13 @@ export default {
         success: "사용자가 비활성화되었습니다",
         successMessage: "사용자가 성공적으로 비활성화되었습니다.",
         error: "사용자 비활성화에 실패했습니다",
+      },
+      resettingPassword: {
+        loading: "비밀번호 재설정 중...",
+        success: "비밀번호 재설정 전송됨",
+        successMessage:
+          "비밀번호 재설정 이메일이 전송되었습니다. 사용자는 새 비밀번호를 설정하는 안내를 받게 됩니다.",
+        error: "비밀번호 재설정 실패",
       },
     },
     form: {
@@ -732,6 +747,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "메타데이터 필드",
       },
       search: {
         title: "검색 구성",
@@ -758,6 +774,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "필드 검색...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -854,6 +873,7 @@ export default {
     adding: "추가 중...",
     lessOptions: "옵션 줄이기",
     moreOptions: "더 많은 옵션",
+    chipMore: "+{{count}}개 더",
     edit: "편집",
     delete: "삭제",
     share: "공유",
@@ -1035,6 +1055,8 @@ export default {
       desc: "내림차순",
       noSortableFields: "정렬 가능한 필드가 없습니다.",
       enableMoreFields: "정렬을 사용하려면 더 많은 필드를 활성화하세요.",
+      customFields: "사용자 정의 필드",
+      default: "기본값",
       confidence: {
         label: "신뢰도:",
         low: "낮음",
@@ -1489,6 +1511,25 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "로딩 중 AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "비밀번호를 잊으셨나요?",
+      title: "비밀번호 재설정",
+      description: "이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 코드를 보내드립니다.",
+      emailPlaceholder: "이메일 입력",
+      sendCode: "재설정 코드 전송",
+      codeSent: "이메일로 인증 코드를 전송했습니다.",
+      codePlaceholder: "인증 코드 입력",
+      newPasswordPlaceholder: "새 비밀번호 입력",
+      confirmPasswordPlaceholder: "새 비밀번호 확인",
+      resetPassword: "비밀번호 재설정",
+      backToSignIn: "로그인으로 돌아가기",
+      success: "비밀번호가 성공적으로 재설정되었습니다. 새 비밀번호로 로그인할 수 있습니다.",
+      errorSendingCode: "재설정 코드 전송에 실패했습니다. 이메일을 확인하고 다시 시도해 주세요.",
+      errorResettingPassword: "비밀번호 재설정에 실패했습니다. 코드를 확인하고 다시 시도해 주세요.",
+      passwordMismatch: "비밀번호가 일치하지 않습니다.",
+    },
   },
   permissions: {
     accessDenied: "접근 거부 - 이 페이지를 볼 권한이 없습니다",

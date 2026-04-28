@@ -309,6 +309,10 @@ export default {
     emailNotifications: "إشعارات البريد الإلكتروني",
     pushNotifications: "إشعارات الدفع",
     changePassword: "تغيير كلمة المرور",
+    currentPassword: "كلمة المرور الحالية",
+    newPassword: "كلمة المرور الجديدة",
+    confirmNewPassword: "تأكيد كلمة المرور الجديدة",
+    passwordChanged: "تم تغيير كلمة المرور بنجاح.",
     twoFactorAuth: "المصادقة الثنائية",
     appearance: "المظهر",
     noFirstName: "لم يقم المستخدم بتعيين الاسم الأول",
@@ -361,6 +365,9 @@ export default {
       before: "قبل",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "تصفية حسب {{field}}…",
+      noValuesFound: "لم يتم العثور على قيم",
+      typeToAdd: "اكتب قيمة واضغط Enter",
     },
     bar: {
       label: "بحث",
@@ -598,6 +605,7 @@ export default {
     description: "قم بإدارة مستخدمي النظام ووصولهم",
     actions: {
       addUser: "إضافة مستخدم",
+      resetPassword: "إعادة تعيين كلمة المرور",
     },
     apiMessages: {
       creating: {
@@ -629,6 +637,13 @@ export default {
         success: "تم تعطيل المستخدم",
         successMessage: "تم تعطيل المستخدم بنجاح.",
         error: "فشل تعطيل المستخدم",
+      },
+      resettingPassword: {
+        loading: "جارٍ إعادة تعيين كلمة المرور...",
+        success: "تم إرسال إعادة تعيين كلمة المرور",
+        successMessage:
+          "تم إرسال بريد إلكتروني لإعادة تعيين كلمة المرور. سيتلقى المستخدم تعليمات لتعيين كلمة مرور جديدة.",
+        error: "فشل إعادة تعيين كلمة المرور",
       },
     },
     form: {
@@ -732,6 +747,7 @@ export default {
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+        metadataFields: "حقول البيانات الوصفية",
       },
       search: {
         title: "إعدادات البحث",
@@ -758,6 +774,9 @@ export default {
         external: "External",
         internal: "Internal",
         savingApiKey: "Saving API key...",
+      },
+      metadataFields: {
+        searchPlaceholder: "البحث في الحقول...",
       },
       upgrade: {
         noHistory: "No upgrade history available",
@@ -853,6 +872,7 @@ export default {
     adding: "جارٍ الإضافة...",
     lessOptions: "خيارات أقل",
     moreOptions: "خيارات أكثر",
+    chipMore: "+{{count}} المزيد",
     edit: "تعديل",
     delete: "حذف",
     share: "مشاركة",
@@ -1034,6 +1054,8 @@ export default {
       desc: "تنازلي",
       noSortableFields: "لا توجد حقول قابلة للترتيب.",
       enableMoreFields: "قم بتمكين المزيد من الحقول لفتح الترتيب.",
+      customFields: "حقول مخصصة",
+      default: "افتراضي",
       confidence: {
         label: "الثقة:",
         low: "منخفض",
@@ -1488,6 +1510,27 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "جار التحميل AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "هل نسيت كلمة المرور؟",
+      title: "إعادة تعيين كلمة المرور",
+      description: "أدخل عنوان بريدك الإلكتروني وسنرسل لك رمزًا لإعادة تعيين كلمة المرور.",
+      emailPlaceholder: "أدخل بريدك الإلكتروني",
+      sendCode: "إرسال رمز إعادة التعيين",
+      codeSent: "لقد أرسلنا رمز التحقق إلى بريدك الإلكتروني.",
+      codePlaceholder: "أدخل رمز التحقق",
+      newPasswordPlaceholder: "أدخل كلمة المرور الجديدة",
+      confirmPasswordPlaceholder: "تأكيد كلمة المرور الجديدة",
+      resetPassword: "إعادة تعيين كلمة المرور",
+      backToSignIn: "العودة إلى تسجيل الدخول",
+      success: "تمت إعادة تعيين كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.",
+      errorSendingCode:
+        "فشل إرسال رمز إعادة التعيين. يرجى التحقق من بريدك الإلكتروني والمحاولة مرة أخرى.",
+      errorResettingPassword:
+        "فشل إعادة تعيين كلمة المرور. يرجى التحقق من الرمز والمحاولة مرة أخرى.",
+      passwordMismatch: "كلمات المرور غير متطابقة.",
+    },
   },
   permissions: {
     accessDenied: "Access Denied - You don't have permission to view this page",

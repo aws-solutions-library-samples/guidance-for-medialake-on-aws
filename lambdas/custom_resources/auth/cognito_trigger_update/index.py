@@ -8,6 +8,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 cognito = boto3.client("cognito-idp")
+ssm = boto3.client("ssm")
 
 # CloudFormation response constants and helper function
 SUCCESS = "SUCCESS"
@@ -63,9 +64,26 @@ def lambda_handler(event, context):
         pre_token_generation_lambda_arn = event["ResourceProperties"][
             "PreTokenGenerationLambdaArn"
         ]
+        cloudfront_domain_ssm_param = event["ResourceProperties"].get(
+            "CloudFrontDomainSsmParam", ""
+        )
 
         if request_type in ["Create", "Update"]:
             logger.info(f"Updating triggers for user pool {user_pool_id}")
+
+            # Resolve CloudFront domain from SSM for email templates
+            cloudfront_url = ""
+            if cloudfront_domain_ssm_param:
+                try:
+                    resp = ssm.get_parameter(Name=cloudfront_domain_ssm_param)
+                    domain = resp["Parameter"]["Value"].strip().strip("/")
+                    if domain and not domain.startswith("PENDING"):
+                        cloudfront_url = f"https://{domain}"
+                        logger.info(
+                            f"Resolved CloudFront URL for emails: {cloudfront_url}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Could not read CloudFront domain from SSM: {e}")
 
             # Get current user pool configuration
             response = cognito.describe_user_pool(UserPoolId=user_pool_id)
@@ -89,14 +107,57 @@ def lambda_handler(event, context):
                 update_params["AutoVerifiedAttributes"] = current_config[
                     "AutoVerifiedAttributes"
                 ]
-            if "AdminCreateUserConfig" in current_config:
-                update_params["AdminCreateUserConfig"] = current_config[
-                    "AdminCreateUserConfig"
-                ]
-            if "VerificationMessageTemplate" in current_config:
-                update_params["VerificationMessageTemplate"] = current_config[
-                    "VerificationMessageTemplate"
-                ]
+
+            # Update AdminCreateUserConfig with CloudFront URL in invite email
+            admin_config = current_config.get("AdminCreateUserConfig", {})
+            if cloudfront_url:
+                admin_config["InviteMessageTemplate"] = {
+                    "EmailMessage": (
+                        "<html><body>"
+                        "<p>Hello,</p>"
+                        "<p>Welcome to Media Lake! Your account has been created successfully.</p>"
+                        "<p><strong>Your login credentials:</strong><br/>"
+                        "Username: {username}<br/>"
+                        "Temporary Password: {####}</p>"
+                        "<p><strong>To get started:</strong></p>"
+                        "<ol>"
+                        f'<li>Go to <a href="{cloudfront_url}">{cloudfront_url}</a></li>'
+                        "<li>Sign in with your credentials above</li>"
+                        "<li>You'll be prompted to create a new password on your first login</li>"
+                        "</ol>"
+                        "<p><em>For security reasons, please change your password immediately upon signing in.</em></p>"
+                        "<p>If you need assistance, please contact your Media Lake administrator.</p>"
+                        "<p>Best regards,<br/>The Media Lake Team</p>"
+                        "</body></html>"
+                    ),
+                    "EmailSubject": "Welcome to Media Lake",
+                }
+                logger.info("Updated invite email template with CloudFront URL")
+            update_params["AdminCreateUserConfig"] = admin_config
+
+            # Update VerificationMessageTemplate with CloudFront URL in reset email
+            verification_template = current_config.get(
+                "VerificationMessageTemplate", {}
+            )
+            if cloudfront_url:
+                reset_link = f"{cloudfront_url}?action=reset-password"
+                verification_template["EmailMessage"] = (
+                    "<html><body>"
+                    "<p>Hello,</p>"
+                    "<p>You have requested to reset your Media Lake password.</p>"
+                    "<p>Your verification code is: <strong>{####}</strong></p>"
+                    f'<p>Enter this code at <a href="{reset_link}">{reset_link}</a> '
+                    "to set a new password.</p>"
+                    "<p>If you did not request this password reset, please ignore this email.</p>"
+                    "<p>Best regards,<br/>The Media Lake Team</p>"
+                    "</body></html>"
+                )
+                verification_template["EmailSubject"] = (
+                    "Media Lake - Password Reset Code"
+                )
+                logger.info("Updated verification email template with CloudFront URL")
+            update_params["VerificationMessageTemplate"] = verification_template
+
             if "UserPoolAddOns" in current_config:
                 update_params["UserPoolAddOns"] = current_config["UserPoolAddOns"]
             # Note: UsernameAttributes cannot be updated after user pool creation

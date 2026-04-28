@@ -218,7 +218,6 @@ class MediaLakeStackProps:
     cognito_stack: CognitoStack
     resource_collector: ApiResourceCollector
     cloudfront_domain: str  # CloudFront distribution domain for CORS configuration
-    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class MediaLakeStack(cdk.Stack):
@@ -316,10 +315,8 @@ class MediaLakeStack(cdk.Stack):
                 identity_pool=props.cognito_stack.identity_pool,
                 user_pool_client=props.cognito_stack.user_pool_client,
                 waf_acl_arn=ResourceImporter.get_waf_acl_arn(),  # Use importer instead of direct access
-                cloudfront_domain=props.cloudfront_domain,  # CloudFront domain passed from UserInterfaceStack
                 # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
-                ui_origin_host=props.ui_origin_host,  # Custom UI origin host, if configured
             ),
         )
 
@@ -600,7 +597,6 @@ medialake_stack = MediaLakeStack(
         cognito_stack=cognito_stack,
         resource_collector=api_resource_collector,  # Pass the resource collector
         cloudfront_domain="",  # Will be set after UI stack is created
-        ui_origin_host=None,  # Will be set after UI stack is created
     ),
     env=env,
 )

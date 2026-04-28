@@ -123,6 +123,21 @@ class CognitoUpdateStack(Stack):
             )
         )
 
+        # Grant permission to read CloudFront domain from SSM for email templates
+        from config import config as app_config
+
+        cloudfront_domain_ssm_param = app_config.ssm_param(
+            "cloudfront-distribution-domain"
+        )
+        self._cognito_trigger_update_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter{cloudfront_domain_ssm_param}"
+                ],
+            )
+        )
+
         # Create a provider for the Cognito trigger updates
         cognito_update_provider = cr.Provider(
             self,
@@ -139,6 +154,7 @@ class CognitoUpdateStack(Stack):
                 "UserPoolId": props.cognito_user_pool_id,
                 # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
                 "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
+                "CloudFrontDomainSsmParam": cloudfront_domain_ssm_param,
                 "Timestamp": str(
                     datetime.datetime.now().timestamp()
                 ),  # Force update on each deployment

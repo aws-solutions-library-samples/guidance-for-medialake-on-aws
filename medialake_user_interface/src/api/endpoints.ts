@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
     BASE: (id: string) => `/pipelines/executions/${id}/retry`,
   },
   SEARCH: "/search",
+  SEARCH_FIELDS_MAPPING: "/search/fields/mapping",
+  SEARCH_FIELDS_VALUES: "/search/fields/values",
   SEARCH_CONNECTORS: "/search/connectors",
   ASSETS: {
     GET: (id: string) => `/assets/${id}`,
@@ -58,9 +60,12 @@ export const API_ENDPOINTS = {
 
   DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
   ENABLE_USER: (userId: string) => `/users/${userId}/enable`,
+  RESET_PASSWORD: (userId: string) => `/users/${userId}/reset-password`,
+  CHANGE_PASSWORD: "/users/profile/change-password",
   SYSTEM_SETTINGS: {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",
+    METADATA_FIELDS: "/settings/system/metadata-fields",
   },
   FAVORITES: {
     BASE: "/users/favorites",

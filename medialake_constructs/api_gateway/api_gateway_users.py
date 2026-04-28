@@ -111,8 +111,16 @@ class UsersApi(Construct):
         # /users/{user_id}/disable resource
         user_disable_resource = user_id_resource.add_resource("disable")
 
+        # /users/{user_id}/reset-password resource
+        user_reset_password_resource = user_id_resource.add_resource("reset-password")
+
         # /users/profile resource
         profile_resource = users_resource.add_resource("profile")
+
+        # /users/profile/change-password resource
+        profile_change_password_resource = profile_resource.add_resource(
+            "change-password"
+        )
 
         # /users/settings resource
         settings_resource = users_resource.add_resource("settings")
@@ -198,6 +206,15 @@ class UsersApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # POST /users/{user_id}/reset-password - Reset user password
+        user_reset_password_method = user_reset_password_resource.add_method(
+            "POST",
+            lambda_integration,
+        )
+        cfn_method = user_reset_password_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # GET /users/profile - Get user profile
         profile_get_method = profile_resource.add_method(
             "GET",
@@ -213,6 +230,15 @@ class UsersApi(Construct):
             lambda_integration,
         )
         cfn_method = profile_put_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # POST /users/profile/change-password - Change own password
+        profile_change_password_method = profile_change_password_resource.add_method(
+            "POST",
+            lambda_integration,
+        )
+        cfn_method = profile_change_password_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
@@ -266,7 +292,9 @@ class UsersApi(Construct):
         add_cors_options_method(user_id_resource)
         add_cors_options_method(user_enable_resource)
         add_cors_options_method(user_disable_resource)
+        add_cors_options_method(user_reset_password_resource)
         add_cors_options_method(profile_resource)
+        add_cors_options_method(profile_change_password_resource)
         add_cors_options_method(settings_resource)
         add_cors_options_method(settings_namespace_resource)
         add_cors_options_method(settings_namespace_key_resource)

@@ -454,8 +454,6 @@ const ImageDetailContent: React.FC = () => {
         <Box sx={{ px: 0, py: 0, mb: 0 }}>
           <BreadcrumbNavigation
             searchTerm={searchTerm}
-            currentResult={currentResult}
-            totalResults={totalResults}
             onBack={handleBack}
             assetName={
               assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation

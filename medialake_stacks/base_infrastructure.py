@@ -276,6 +276,25 @@ class BaseInfrastructureStack(Stack):
         )
 
         # Create new media asset bucket
+        # Build CORS allowed origins for the media assets bucket
+        media_assets_cors_origins = [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "https://*.cloudfront.net",
+        ]
+
+        # Include the custom domain in CORS origins if configured
+        if (
+            config.cloudfront_custom_domain
+            and config.cloudfront_custom_domain.domain_name
+            and config.cloudfront_custom_domain.domain_name.strip()
+        ):
+            media_assets_cors_origins.append(
+                f"https://{config.cloudfront_custom_domain.domain_name.strip()}"
+            )
+
         self.media_assets_s3_bucket = S3Bucket(
             self,
             "MediaAssets",
@@ -293,13 +312,7 @@ class BaseInfrastructureStack(Stack):
                             s3.HttpMethods.DELETE,
                             s3.HttpMethods.HEAD,
                         ],
-                        allowed_origins=[
-                            "http://localhost:5173",
-                            "http://localhost:5174",
-                            "http://localhost:3000",
-                            "http://localhost:8080",
-                            "https://*.cloudfront.net",
-                        ],
+                        allowed_origins=media_assets_cors_origins,
                         allowed_headers=["*"],
                         exposed_headers=["ETag"],
                         max_age=3000,
@@ -587,7 +600,6 @@ class BaseInfrastructureStack(Stack):
                 events.Rule(
                     self,
                     f"{fn.node.id}WarmerRule",
-                    event_bus=self._application_service_events_internal_event_bus.event_bus,
                     schedule=events.Schedule.rate(
                         Duration.minutes(LambdaConstants.WARMER_INTERVAL_MINUTES)
                     ),
@@ -646,119 +658,6 @@ class BaseInfrastructureStack(Stack):
         This method is kept for backwards compatibility but no longer checks environment.
         """
         return
-
-        # VPC Outputs
-        CfnOutput(
-            self,
-            "RetainedVpcId",
-            value=self._vpc.vpc.vpc_id,
-            description="Retained VPC ID",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedVpcCidr",
-            value=self._vpc.vpc.vpc_cidr_block,
-            description="Retained VPC CIDR Block",
-        )
-
-        # Security Group Output
-        CfnOutput(
-            self,
-            "RetainedSecurityGroup",
-            value=self._security_group.security_group_id,
-            description="Retained Security Group ID",
-        )
-
-        # DynamoDB Tables Outputs
-        CfnOutput(
-            self,
-            "RetainedPipelineTable",
-            value=f"{self._pipeline_table.table_name}|{self._pipeline_table.table_arn}",
-            description="Retained Pipeline Table (Name|ARN)",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedAssetTable",
-            value=f"{self._asset_table.table_name}|{self._asset_table.table_arn}",
-            description="Retained Asset Table (Name|ARN)",
-        )
-
-        # Asset Table GSIs
-        CfnOutput(
-            self,
-            "RetainedAssetTableGSIs",
-            value="AssetIDIndex,FileHashIndex,S3PathIndex",
-            description="Retained Asset Table GSIs",
-        )
-
-        # CfnOutput(
-        #     self,
-        #     "RetainedAssetV2Table",
-        #     value=f"{self._assetv2_table.table_name}|{self._assetv2_table.table_arn}",
-        #     description="Retained Asset V2 Table (Name|ARN)",
-        # )
-
-        # Asset V2 Table GSIs
-        # CfnOutput(
-        #     self,
-        #     "RetainedAssetV2TableGSIs",
-        #     value="GSI1,GSI2,GSI3,GSI4,GSI5,GSI6",
-        #     description="Retained Asset V2 Table GSIs",
-        # )
-
-        # OpenSearch Cluster Outputs
-        CfnOutput(
-            self,
-            "RetainedOpenSearchCluster",
-            value=f"{self._opensearch_cluster.domain_endpoint}|{self._opensearch_cluster.domain_arn}",
-            description="Retained OpenSearch Cluster (Endpoint|ARN)",
-        )
-
-        # S3 Vector Cluster Outputs
-        CfnOutput(
-            self,
-            "RetainedS3VectorCluster",
-            value=f"{self._s3_vector_cluster.bucket_name}|{self._s3_vector_cluster.bucket_arn}",
-            description="Retained S3 Vector Cluster (Bucket Name|ARN)",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedS3VectorDimension",
-            value=str(self._s3_vector_cluster.vector_dimension),
-            description="Retained S3 Vector Dimension",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedS3VectorIndexes",
-            value=",".join(self._s3_vector_cluster.indexes),
-            description="Retained S3 Vector Indexes",
-        )
-
-        # S3 Bucket Outputs
-        CfnOutput(
-            self,
-            "RetainedAccessLogsBucket",
-            value=f"{self._access_logs_bucket.bucket_name}|{self._access_logs_bucket.bucket_arn}",
-            description="Retained Access Logs Bucket (Name|ARN)",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedAssetBucket",
-            value=f"{self.media_assets_s3_bucket.bucket_name}|{self.media_assets_s3_bucket.bucket_arn}",
-            description="Retained Asset Bucket (Name|ARN)",
-        )
-
-        CfnOutput(
-            self,
-            "RetainedIACAssetsBucket",
-            value=f"{self.iac_assets_bucket.bucket_name}|{self.iac_assets_bucket.bucket_arn}",
-            description="Retained IAC Assets Bucket (Name|ARN)",
-        )
 
     @property
     def pipelines_event_bus(self) -> events.EventBus:

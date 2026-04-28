@@ -115,6 +115,10 @@ def start_execution_with_backoff(state_machine_arn, execution_input):
             else:
                 logger.error(f"Failed to start execution: {e}")
                 raise
+    raise RuntimeError(
+        f"Failed to start execution after {MAX_API_RETRIES} retries "
+        f"due to persistent throttling"
+    )
 
 
 @logger.inject_lambda_context

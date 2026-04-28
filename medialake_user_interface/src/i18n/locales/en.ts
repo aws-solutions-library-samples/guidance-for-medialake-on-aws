@@ -310,6 +310,10 @@ export default {
     emailNotifications: "Email Notifications",
     pushNotifications: "Push Notifications",
     changePassword: "Change Password",
+    currentPassword: "Current Password",
+    newPassword: "New Password",
+    confirmNewPassword: "Confirm New Password",
+    passwordChanged: "Password changed successfully.",
     twoFactorAuth: "Two-Factor Authentication",
     appearance: "Appearance",
     noFirstName: "User doesn't have a first name configured",
@@ -362,6 +366,9 @@ export default {
       before: "Before",
       clearAll: "Clear All",
       filenameSearch: "Search by filename",
+      filterBy: "Filter by {{field}}…",
+      noValuesFound: "No values found",
+      typeToAdd: "Type a value and press Enter",
     },
     bar: {
       label: "Search",
@@ -559,6 +566,7 @@ export default {
     },
     actions: {
       addUser: "Add User",
+      resetPassword: "Reset Password",
     },
     apiMessages: {
       creating: {
@@ -590,6 +598,13 @@ export default {
         success: "User Disabled",
         successMessage: "User has been successfully disabled.",
         error: "User Disable Failed",
+      },
+      resettingPassword: {
+        loading: "Resetting password...",
+        success: "Password Reset Sent",
+        successMessage:
+          "Password reset email has been sent. The user will receive instructions to set a new password.",
+        error: "Password Reset Failed",
       },
     },
     form: {
@@ -685,10 +700,14 @@ export default {
       title: "System Settings",
       tabs: {
         search: "Search",
+        metadataFields: "Metadata Fields",
         security: "Security",
         apiKeys: "API Keys",
         collections: "Collections",
         upgrades: "Upgrades",
+      },
+      metadataFields: {
+        searchPlaceholder: "Search fields...",
       },
       upgrade: {
         title: "System Upgrade",
@@ -812,6 +831,7 @@ export default {
     adding: "Adding...",
     lessOptions: "Less options",
     moreOptions: "More options",
+    chipMore: "+{{count}} more",
     edit: "Edit",
     delete: "Delete",
     share: "Share",
@@ -1044,6 +1064,8 @@ export default {
       desc: "Desc",
       noSortableFields: "No sortable fields available.",
       enableMoreFields: "Enable more fields to unlock sorting.",
+      customFields: "Custom fields",
+      default: "Default",
       confidence: {
         label: "Confidence:",
         low: "Low",
@@ -1492,6 +1514,25 @@ export default {
   },
   config: {
     loadingAwsConfiguration: "Loading AWS configuration...",
+  },
+  auth: {
+    forgotPassword: {
+      link: "Forgot your password?",
+      title: "Reset Password",
+      description: "Enter your email address and we'll send you a code to reset your password.",
+      emailPlaceholder: "Enter your email",
+      sendCode: "Send Reset Code",
+      codeSent: "We've sent a verification code to your email.",
+      codePlaceholder: "Enter verification code",
+      newPasswordPlaceholder: "Enter new password",
+      confirmPasswordPlaceholder: "Confirm new password",
+      resetPassword: "Reset Password",
+      backToSignIn: "Back to Sign In",
+      success: "Password reset successful. You can now sign in with your new password.",
+      errorSendingCode: "Failed to send reset code. Please check your email and try again.",
+      errorResettingPassword: "Failed to reset password. Please check your code and try again.",
+      passwordMismatch: "Passwords do not match.",
+    },
   },
   permissions: {
     accessDenied: "Access Denied - You don't have permission to view this page",

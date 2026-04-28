@@ -41,7 +41,9 @@ class MediaLakeExternalServiceManager:
 
         # AWS clients
         self.dynamodb = boto3.resource("dynamodb")
-        self.system_settings_table_name = os.environ.get("SYSTEM_SETTINGS_TABLE", "")
+        self.system_settings_table_name = os.environ.get(
+            "SYSTEM_SETTINGS_TABLE_NAME", ""
+        )
 
     def _register_builtin_plugins(self):
         """Register built-in external service plugins"""
@@ -57,7 +59,7 @@ class MediaLakeExternalServiceManager:
         """
         try:
             if not self.system_settings_table_name:
-                self.logger.warning("SYSTEM_SETTINGS_TABLE not configured")
+                self.logger.warning("SYSTEM_SETTINGS_TABLE_NAME not configured")
                 return {"isConfigured": False, "isEnabled": False}
 
             table = self.dynamodb.Table(self.system_settings_table_name)

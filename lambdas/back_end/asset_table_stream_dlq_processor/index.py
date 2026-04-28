@@ -3,11 +3,9 @@ import os
 from decimal import Decimal
 from typing import Any, Dict
 
-import boto3
 from aws_lambda_powertools import Logger, Tracer
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from opensearchpy.helpers import bulk
-from requests_aws4auth import AWS4Auth
 
 logger = Logger(service="ddb-dlq-processor")
 tracer = Tracer()
@@ -17,19 +15,16 @@ REGION = os.environ["OS_DOMAIN_REGION"]
 HOST = os.environ["OPENSEARCH_ENDPOINT"].split("://")[-1]
 INDEX = os.environ["OPENSEARCH_INDEX"]
 
+from opensearchpy import RequestsAWSV4SignerAuth as _DlqSignerAuth
+
 # Initialize AWS credentials and clients
-credentials = boto3.Session().get_credentials()
-awsauth = AWS4Auth(
-    credentials.access_key,
-    credentials.secret_key,
-    REGION,
-    "es",
-    session_token=credentials.token,
-)
+# Use RequestsAWSV4SignerAuth with refreshable credentials so that
+# long-lived Lambda containers never sign requests with expired tokens.
+from refreshable_auth import get_refreshable_credentials
 
 opensearch_client = OpenSearch(
     hosts=[{"host": HOST, "port": 443}],
-    http_auth=awsauth,
+    http_auth=_DlqSignerAuth(get_refreshable_credentials(), REGION, "es"),
     use_ssl=True,
     verify_certs=True,
     connection_class=RequestsHttpConnection,
