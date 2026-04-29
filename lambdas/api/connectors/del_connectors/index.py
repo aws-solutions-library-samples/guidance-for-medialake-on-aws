@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Any, List
+from typing import Any
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
@@ -49,38 +49,14 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
             }
 
         connector = response["Item"]
-        region = connector.get(
-            "region", "us-east-1"
-        )  # Default to us-east-1 if not specified
+        region = connector.get("region", "us-east-1")
         queue_url = connector.get("queueUrl")
         bucket_name = connector.get("storageIdentifier")
         lambda_arn = connector.get("lambdaArn")
         iam_role_arn = connector.get("iamRoleArn")
         pipe_arn = connector.get("pipeArn")
         pipe_role_arn = connector.get("pipeRoleArn")
-
-        # Validate critical fields
-        required_fields = []
-        if not bucket_name:
-            required_fields.append("storageIdentifier (bucket name)")
-        if not lambda_arn:
-            required_fields.append("lambdaArn")
-        if not iam_role_arn:
-            required_fields.append("iamRoleArn")
-
-        if required_fields:
-            missing_fields = ", ".join(required_fields)
-            logger.error(
-                f"Invalid connector configuration for ID: {connector_id}, missing: {missing_fields}"
-            )
-            return {
-                "statusCode": 400,
-                "body": json.dumps(
-                    {
-                        "message": f"Invalid connector configuration: missing {missing_fields}"
-                    }
-                ),
-            }
+        event_bridge_rule_name = connector.get("eventBridgeRuleName")
 
         # Create AWS clients in the specified region
         lambda_client = boto3.client("lambda", region_name=region)
@@ -90,40 +66,30 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
         eventbridge = boto3.client("events", region_name=region)
         pipes = boto3.client("pipes", region_name=region)
 
-        errors: List[str] = []
-
-        # Delete Lambda first
+        # Best-effort cleanup — each step is wrapped individually
+        # Delete Lambda
         if lambda_arn:
             try:
                 lambda_client.delete_function(FunctionName=lambda_arn.split(":")[-1])
                 logger.info(f"Deleted Lambda function {lambda_arn}")
             except ClientError as e:
-                if e.response["Error"]["Code"] != "ResourceNotFoundException":
-                    error_msg = f"Error deleting Lambda: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
+                logger.warning(f"Error deleting Lambda: {str(e)}")
 
-        # Delete EventBridge Pipe if present - must be deleted before its IAM role
+        # Delete EventBridge Pipe
         if pipe_arn:
             try:
                 delete_eventbridge_pipe(pipes, pipe_arn)
-                # Wait a bit to ensure pipe is deleted before deleting its role
                 time.sleep(3)
             except ClientError as e:
-                error_msg = f"Error deleting EventBridge Pipe: {str(e)}"
-                logger.error(error_msg)
-                errors.append(error_msg)
+                logger.warning(f"Error deleting EventBridge Pipe: {str(e)}")
 
-        # Delete EventBridge Pipe IAM role AFTER pipe is deleted
+        # Delete EventBridge Pipe IAM role
         if pipe_role_arn:
             try:
                 delete_iam_role(iam, pipe_role_arn)
                 logger.info(f"Deleted EventBridge Pipe IAM role {pipe_role_arn}")
             except ClientError as e:
-                if e.response["Error"]["Code"] != "NoSuchEntity":
-                    error_msg = f"Error deleting EventBridge Pipe IAM role: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
+                logger.warning(f"Error deleting EventBridge Pipe IAM role: {str(e)}")
 
         # Delete SQS queue
         if queue_url:
@@ -131,66 +97,53 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 sqs.delete_queue(QueueUrl=queue_url)
                 logger.info(f"Deleted SQS queue {queue_url}")
             except ClientError as e:
-                if (
-                    e.response["Error"]["Code"]
-                    != "AWS.SimpleQueueService.NonExistentQueue"
-                ):
-                    error_msg = f"Error deleting SQS queue: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
+                logger.warning(f"Error deleting SQS queue: {str(e)}")
 
         # Handle different integration methods
         integration_method = connector.get("integrationMethod")
-        if integration_method == "s3Notifications":
-            errors.extend(remove_s3_notifications(s3, bucket_name))
+        if integration_method == "s3Notifications" and bucket_name:
+            try:
+                remove_s3_notifications(s3, bucket_name)
+            except Exception as e:
+                logger.warning(f"Error removing S3 notifications: {str(e)}")
         elif integration_method == "eventbridge":
-            errors.extend(remove_eventbridge_rule(eventbridge, connector_id, region))
-        else:
-            logger.info(
-                f"No specific cleanup needed for integration method: {integration_method}"
-            )
+            try:
+                remove_eventbridge_rule(
+                    eventbridge,
+                    connector_id,
+                    region,
+                    stored_rule_name=event_bridge_rule_name,
+                    bucket_name=bucket_name,
+                )
+            except Exception as e:
+                logger.warning(f"Error removing EventBridge rule: {str(e)}")
 
-        # Delete main IAM role LAST after all resources using it are gone
+        # Delete main IAM role LAST
         if iam_role_arn:
             try:
-                # Wait a bit to ensure dependent resources are deleted
                 time.sleep(5)
                 delete_iam_role(iam, iam_role_arn)
                 logger.info(f"Deleted IAM role {iam_role_arn}")
             except ClientError as e:
-                if e.response["Error"]["Code"] != "NoSuchEntity":
-                    error_msg = f"Error deleting IAM role: {str(e)}"
-                    logger.error(error_msg)
-                    errors.append(error_msg)
+                logger.warning(f"Error deleting IAM role: {str(e)}")
 
-        # Delete connector from DynamoDB only if all other resources are cleaned up
-        if not errors:
-            try:
-                table.delete_item(Key={"id": connector_id})
-                logger.info(f"Successfully deleted connector with ID: {connector_id}")
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({"message": "Connector deleted successfully"}),
-                }
-            except ClientError as e:
-                logger.error(f"Failed to delete connector from DynamoDB: {str(e)}")
-                return {
-                    "statusCode": 500,
-                    "body": json.dumps(
-                        {
-                            "message": "Failed to delete connector record",
-                            "error": str(e),
-                        }
-                    ),
-                }
-        else:
-            logger.error(
-                f"Errors occurred while deleting connector {connector_id}: {errors}"
-            )
+        # Always delete the DynamoDB record
+        try:
+            table.delete_item(Key={"id": connector_id})
+            logger.info(f"Successfully deleted connector with ID: {connector_id}")
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"message": "Connector deleted successfully"}),
+            }
+        except ClientError as e:
+            logger.error(f"Failed to delete connector from DynamoDB: {str(e)}")
             return {
                 "statusCode": 500,
                 "body": json.dumps(
-                    {"message": "Error deleting connector", "errors": errors}
+                    {
+                        "message": "Failed to delete connector record",
+                        "error": str(e),
+                    }
                 ),
             }
 
@@ -277,9 +230,9 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
             logger.info(f"Stopping EventBridge Pipe {pipe_name}")
 
             # Wait for pipe to stop before deleting
-            max_retries = 15  # Increased retries for longer wait time
+            max_retries = 15
             for i in range(max_retries):
-                time.sleep(3)  # Wait 3 seconds between checks
+                time.sleep(3)
                 try:
                     pipe_info = pipes_client.describe_pipe(Name=pipe_name)
                     if pipe_info.get("CurrentState") in [
@@ -308,7 +261,6 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
                         f"Pipe {pipe_name} did not reach stopped state in time, attempting delete anyway"
                     )
         elif current_state in ["CREATING", "UPDATING", "DELETING"]:
-            # For these states, we need to wait for the operation to complete
             logger.info(
                 f"Pipe {pipe_name} is in {current_state} state. Waiting before deletion attempt."
             )
@@ -366,47 +318,133 @@ def delete_eventbridge_pipe(pipes_client: Any, pipe_arn: str) -> None:
             raise
 
 
-def remove_s3_notifications(s3: Any, bucket_name: str) -> List[str]:
-    errors: List[str] = []
+def remove_s3_notifications(s3: Any, bucket_name: str) -> None:
     try:
         s3.put_bucket_notification_configuration(
             Bucket=bucket_name,
-            NotificationConfiguration={},  # Empty config removes all notifications
+            NotificationConfiguration={},
         )
         logger.info(f"Removed S3 bucket notifications for bucket: {bucket_name}")
     except ClientError as e:
         if e.response["Error"]["Code"] != "NoSuchBucket":
-            error_msg = f"Error removing S3 bucket notification: {str(e)}"
-            logger.error(error_msg)
-            errors.append(error_msg)
-    return errors
+            logger.warning(f"Error removing S3 bucket notification: {str(e)}")
+
+
+def _verify_rule_bucket(
+    eventbridge: Any, rule_name: str, bucket_name: str, connector_id: str
+) -> bool:
+    try:
+        response = eventbridge.describe_rule(Name=rule_name)
+        event_pattern = response.get("EventPattern")
+        if not event_pattern:
+            logger.warning(
+                f"rule_name={rule_name}, connector_id={connector_id}, reason=missing_event_pattern"
+            )
+            return False
+        try:
+            pattern = json.loads(event_pattern)
+        except Exception:
+            logger.warning(
+                f"rule_name={rule_name}, connector_id={connector_id}, reason=unparseable_event_pattern"
+            )
+            return False
+        bucket_names = pattern.get("detail", {}).get("bucket", {}).get("name", [])
+        if bucket_name in bucket_names:
+            return True
+        logger.warning(
+            f"rule_name={rule_name}, connector_id={connector_id}, reason=bucket_not_in_pattern"
+        )
+        return False
+    except Exception as e:
+        logger.warning(f"rule_name={rule_name}, connector_id={connector_id}, error={e}")
+        return False
+
+
+def _delete_rule_best_effort(
+    eventbridge: Any, rule_name: str, connector_id: str
+) -> bool:
+    try:
+        targets = eventbridge.list_targets_by_rule(Rule=rule_name)["Targets"]
+        if targets:
+            eventbridge.remove_targets(Rule=rule_name, Ids=[t["Id"] for t in targets])
+        eventbridge.delete_rule(Name=rule_name)
+        logger.info(
+            f"Deleted EventBridge rule: {rule_name}, connector_id={connector_id}"
+        )
+        return True
+    except ClientError as e:
+        code = e.response["Error"]["Code"]
+        if code in ("ResourceNotFoundException", "ValidationException"):
+            logger.warning(
+                f"EventBridge rule not found, skipping: rule_name={rule_name}, connector_id={connector_id}, error_code={code}"
+            )
+        else:
+            logger.warning(
+                f"Error deleting EventBridge rule: rule_name={rule_name}, connector_id={connector_id}, error={e}"
+            )
+        return False
 
 
 def remove_eventbridge_rule(
-    eventbridge: Any, connector_id: str, region: str
-) -> List[str]:
-    errors: List[str] = []
-    rule_name = f"medialake-connector-{connector_id}"
-
-    try:
-        # List targets for the rule
-        targets = eventbridge.list_targets_by_rule(Rule=rule_name)["Targets"]
-
-        # Remove targets from the rule
-        if targets:
-            target_ids = [target["Id"] for target in targets]
-            eventbridge.remove_targets(Rule=rule_name, Ids=target_ids)
-
-        # Delete the rule
-        eventbridge.delete_rule(Name=rule_name)
-
+    eventbridge: Any,
+    connector_id: str,
+    region: str,
+    stored_rule_name: str | None = None,
+    bucket_name: str | None = None,
+) -> None:
+    if stored_rule_name:
         logger.info(
-            f"Successfully removed EventBridge rule and targets for connector: {connector_id}"
+            f"cleanup_path=stored_name, rule_name={stored_rule_name}, connector_id={connector_id}"
         )
-    except ClientError as e:
-        if e.response["Error"]["Code"] != "ResourceNotFoundException":
-            error_msg = f"Error removing EventBridge rule: {str(e)}"
-            logger.error(error_msg)
-            errors.append(error_msg)
+        _delete_rule_best_effort(eventbridge, stored_rule_name, connector_id)
+        return
 
-    return errors
+    logger.info(
+        f"cleanup_path=legacy_fallback, connector_id={connector_id}, bucket_name={bucket_name}"
+    )
+
+    candidates = [f"medialake-connector-{connector_id}"]
+
+    if bucket_name:
+        full_prefix = f"medialake-{bucket_name}-s3-events"
+        # Derive truncated prefix matching create_resource_name_with_suffix for eventbridge_rule (max 64, minus 5 for -XXXX suffix)
+        truncated_prefix = full_prefix[:59]
+        prefixes = list(
+            dict.fromkeys([full_prefix, truncated_prefix])
+        )  # dedupe, preserve order
+        for prefix in prefixes:
+            try:
+                paginator = eventbridge.get_paginator("list_rules")
+                for page in paginator.paginate(NamePrefix=prefix):
+                    for rule in page.get("Rules", []):
+                        name = rule["Name"]
+                        if name not in candidates:
+                            if _verify_rule_bucket(
+                                eventbridge, name, bucket_name, connector_id
+                            ):
+                                logger.info(
+                                    f"rule_name={name}, connector_id={connector_id}, bucket_name={bucket_name}, status=bucket_verified"
+                                )
+                                candidates.append(name)
+                            else:
+                                logger.warning(
+                                    f"rule_name={name}, connector_id={connector_id}, bucket_name={bucket_name}, status=bucket_mismatch_skipped"
+                                )
+                logger.info(
+                    f"legacy_discovery prefix={prefix}, rules_found={len(candidates) - 1}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Error during legacy rule discovery: prefix={prefix}, error={e}"
+                )
+
+    for rule_name in candidates:
+        deleted = _delete_rule_best_effort(eventbridge, rule_name, connector_id)
+        if deleted:
+            logger.info(
+                f"Legacy cleanup deleted rule: {rule_name}, connector_id={connector_id}"
+            )
+        else:
+            logger.warning(
+                f"Legacy cleanup skipped rule: {rule_name}, connector_id={connector_id}"
+            )

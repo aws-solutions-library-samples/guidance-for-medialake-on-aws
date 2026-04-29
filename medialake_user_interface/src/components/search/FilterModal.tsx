@@ -6,8 +6,12 @@ import {
   useAggregations,
   useFacetsInfo,
   useSemanticSearch,
+  useSearchQuery,
+  useSearchStore,
+  appendFiltersToUrlParams,
   type CustomMetadataFieldDraft,
 } from "../../stores/searchStore";
+import { useNavigate, useLocation } from "react-router";
 import { useSearchFields } from "@/api/hooks/useSearchFields";
 import { useSearchFieldValues, useRefreshFieldValues } from "@/api/hooks/useSearchFieldValues";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
@@ -301,6 +305,10 @@ const FilterModal: React.FC<FilterModalProps> = () => {
   const { closeFilterModal, updateFilterModalDraft, applyFilterModalDraft, resetFilterModalDraft } =
     useUIActions();
 
+  const navigate = useNavigate();
+  const location = useLocation();
+  const storeQuery = useSearchQuery();
+
   // Custom metadata data
   const { data: fieldsData } = useSearchFields();
   const { data: fieldValuesMap } = useSearchFieldValues();
@@ -369,14 +377,40 @@ const FilterModal: React.FC<FilterModalProps> = () => {
     updateFilterModalDraft({ customMetadataFilters: newDrafts });
   };
 
+  // Push the current store filters into the URL (when on the search page) so
+  // the search query refetches with the new filters and they persist across
+  // subsequent search submissions. Mirrors how TopBar builds URL params.
+  const syncFiltersToUrl = () => {
+    if (location.pathname !== "/search") return;
+
+    // Read filters straight from the store — applyFilterModalDraft has just
+    // written them synchronously, so this is always current.
+    const currentFilters = useSearchStore.getState().filters;
+
+    const params = new URLSearchParams();
+    // Preserve the existing query and semantic flag; fall back to URL if the
+    // store hasn't been populated yet.
+    const existing = new URLSearchParams(location.search);
+    const query = storeQuery || existing.get("q") || "";
+    const semantic = isSemantic.toString();
+
+    if (query) params.set("q", query);
+    params.set("semantic", semantic);
+    appendFiltersToUrlParams(params, currentFilters);
+
+    navigate(`/search?${params.toString()}`, { replace: true });
+  };
+
   const handleApply = () => {
     applyFilterModalDraft();
+    syncFiltersToUrl();
     closeFilterModal();
   };
 
   const handleReset = () => {
     resetFilterModalDraft();
     applyFilterModalDraft(); // Apply the reset immediately
+    syncFiltersToUrl();
   };
 
   const handleClose = () => {

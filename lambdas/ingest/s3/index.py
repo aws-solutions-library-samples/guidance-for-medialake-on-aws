@@ -9,7 +9,7 @@ import threading
 import urllib.parse
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple, TypedDict
 from urllib.parse import urlparse
@@ -25,6 +25,11 @@ from botocore.config import Config
 # Import centralized file extension constants from common_libraries layer
 from file_extensions import SUPPORTED_EXTENSIONS
 
+
+def utc_now_z() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 # OpenSearch configuration
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
 OPENSEARCH_INDEX = os.environ.get("INDEX_NAME", "media")
@@ -34,6 +39,13 @@ AWS_REGION = os.environ.get("REGION", "")
 # S3 Vector Store configuration
 VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME", "")
 VECTOR_INDEX_NAME = os.environ.get("VECTOR_INDEX_NAME", "media-vectors")
+
+# Connector table configuration for bucket→connector lookup
+CONNECTOR_TABLE_NAME = os.environ.get("MEDIALAKE_CONNECTOR_TABLE_NAME", "")
+CONNECTOR_TABLE_REGION = os.environ.get("CONNECTOR_TABLE_REGION", "") or AWS_REGION
+CONNECTOR_STORAGE_IDENTIFIER_INDEX = os.environ.get(
+    "CONNECTOR_STORAGE_IDENTIFIER_INDEX", "StorageIdentifierIndex"
+)
 
 # Re-use boto3's session credentials
 _session = boto3.Session()
@@ -45,6 +57,7 @@ dynamodb_resource = None
 dynamodb_client = None
 eventbridge_client = None
 s3_vector_client = None
+connector_dynamodb_client = None
 
 # Environment configuration
 DO_NOT_INGEST_DUPLICATES = (
@@ -195,7 +208,7 @@ def release_processing_lock(
 
 def initialize_global_clients():
     """Initialize global AWS clients for container reuse"""
-    global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client, s3_vector_client
+    global s3_client, dynamodb_resource, dynamodb_client, eventbridge_client, s3_vector_client, connector_dynamodb_client
 
     if s3_client is None:
         s3_client = boto3.client("s3", config=s3_config)
@@ -236,6 +249,15 @@ def initialize_global_clients():
             logger.warning(f"Failed to initialize S3 Vector Store client: {e}")
             s3_vector_client = None
 
+    if connector_dynamodb_client is None and CONNECTOR_TABLE_NAME:
+        connector_dynamodb_client = boto3.client(
+            "dynamodb", region_name=CONNECTOR_TABLE_REGION
+        )
+        logger.info(
+            "Initialized global connector DynamoDB client",
+            extra={"region": CONNECTOR_TABLE_REGION},
+        )
+
 
 # Improved JSON serialization
 class DateTimeEncoder(json.JSONEncoder):
@@ -243,7 +265,7 @@ class DateTimeEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, datetime):
-            return obj.isoformat()
+            return obj.isoformat().replace("+00:00", "Z")
         if isinstance(obj, Decimal):
             # Convert Decimal to int or float appropriately
             return float(obj) if obj % 1 != 0 else int(obj)
@@ -337,14 +359,45 @@ def determine_asset_type(content_type: str, file_extension: str) -> str:
 
 # Event filtering optimization
 def is_relevant_event(
-    event_name: str, allowed_prefixes=("ObjectCreated:", "ObjectRemoved:")
+    event_name: str,
+    allowed_prefixes=(
+        "ObjectCreated:",
+        "ObjectRemoved:",
+        "ObjectStorageClassChanged",
+        "ObjectRestore:Post",
+        "ObjectRestore:Completed",
+        "ObjectRestore:Delete",
+    ),
 ) -> bool:
     """Quick check if event should be processed"""
-    # For improved logging, explicitly check for 'Copy' events
-    if event_name == "ObjectCreated:Copy":
-        logger.info("Processing ObjectCreated:Copy event as a relevant event")
-        return True
     return any(event_name.startswith(prefix) for prefix in allowed_prefixes)
+
+
+@functools.lru_cache(maxsize=50)
+def lookup_connector_by_bucket(bucket_name: str) -> dict | None:
+    """Cached lookup of connector record by bucket name using GSI query."""
+    if not CONNECTOR_TABLE_NAME or connector_dynamodb_client is None:
+        return None
+    try:
+        resp = connector_dynamodb_client.query(
+            TableName=CONNECTOR_TABLE_NAME,
+            IndexName=CONNECTOR_STORAGE_IDENTIFIER_INDEX,
+            KeyConditionExpression="storageIdentifier = :b",
+            ExpressionAttributeValues={":b": {"S": bucket_name}},
+            ProjectionExpression="id, integrationMethod",
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        if not items:
+            return None
+        item = items[0]
+        return {
+            "id": item["id"]["S"],
+            "integrationMethod": item.get("integrationMethod", {}).get("S", ""),
+        }
+    except Exception as e:
+        logger.warning(f"Connector lookup failed for bucket {bucket_name}: {e}")
+        return None
 
 
 class FileHash(TypedDict):
@@ -371,6 +424,8 @@ class PrimaryLocation(TypedDict):
     ObjectKey: ObjectKey
     Status: str
     FileInfo: FileInfo
+    StorageClass: str
+    RestoreStatus: Optional[str]
 
 
 class StorageInfo(TypedDict):
@@ -416,6 +471,14 @@ class AssetRecord(TypedDict):
     Metadata: Optional[AssetMetadata]
     FileHash: str
     StoragePath: str
+
+
+class S3EventContext(TypedDict):
+    event_type: str
+    bucket: str
+    key: str
+    version_id: Optional[str]
+    destination_storage_class: Optional[str]
 
 
 class AssetProcessor:
@@ -880,9 +943,11 @@ class AssetProcessor:
             asset_type = determine_asset_type(content_type, file_ext)
 
             # Get S3 object's last modified date
-            s3_last_modified = response.get("LastModified", datetime.utcnow())
+            s3_last_modified = response.get("LastModified", datetime.now(timezone.utc))
             if isinstance(s3_last_modified, datetime):
-                s3_last_modified_str = s3_last_modified.isoformat()
+                s3_last_modified_str = s3_last_modified.isoformat().replace(
+                    "+00:00", "Z"
+                )
             else:
                 s3_last_modified_str = s3_last_modified
 
@@ -1078,7 +1143,7 @@ class AssetProcessor:
                                 )
 
                             # Current time for ingest date
-                            current_time = datetime.utcnow().isoformat()
+                            current_time = utc_now_z()
 
                             # Create the item structure
                             item = {
@@ -1088,8 +1153,8 @@ class AssetProcessor:
                                 "DigitalSourceAsset": {
                                     "ID": asset_id,
                                     "Type": asset_type,
-                                    "CreateDate": datetime.utcnow().isoformat(),
-                                    "IngestedAt": datetime.utcnow().isoformat(),
+                                    "CreateDate": utc_now_z(),
+                                    "IngestedAt": utc_now_z(),
                                     "originalIngestDate": current_time,
                                     "lastModifiedDate": s3_last_modified_str,
                                     "MainRepresentation": {
@@ -1449,8 +1514,10 @@ class AssetProcessor:
         # Use extraction for performance
         content_length = s3_response.get("ContentLength", 0)
         etag = s3_response.get("ETag", "").strip('"')
-        last_modified = s3_response.get("LastModified", datetime.utcnow()).isoformat()
+        _lm = s3_response.get("LastModified", datetime.now(timezone.utc))
+        last_modified = _lm.isoformat().replace("+00:00", "Z")
         content_type = s3_response.get("ContentType", "")
+        storage_class = s3_response.get("StorageClass") or "STANDARD"
 
         return {
             "StorageInfo": {
@@ -1472,11 +1539,13 @@ class AssetProcessor:
                         },
                         "CreateDate": last_modified,
                     },
+                    "StorageClass": storage_class,
+                    "RestoreStatus": None,
                 }
             },
             "Metadata": {
                 "ObjectMetadata": {
-                    "ExtractedDate": datetime.utcnow().isoformat(),
+                    "ExtractedDate": utc_now_z(),
                     "S3": {
                         "Metadata": s3_response.get("Metadata", {}),
                         "ContentType": content_type,
@@ -1536,7 +1605,7 @@ class AssetProcessor:
             type_abbrev = get_type_abbreviation(asset_type)
 
             # Get current timestamp once for reuse
-            timestamp = datetime.utcnow().isoformat()
+            timestamp = utc_now_z()
 
             # Use provided S3 last modified date or current timestamp
             if not s3_last_modified:
@@ -1668,7 +1737,7 @@ class AssetProcessor:
                 asset_type = determine_asset_type(content_type, file_ext)
 
                 # Get timestamp once for reuse
-                timestamp = datetime.utcnow().isoformat()
+                timestamp = utc_now_z()
 
                 # Get last modified date from S3 metadata if available
                 s3_last_modified = (
@@ -1976,7 +2045,7 @@ class AssetProcessor:
         try:
             event_detail = {
                 "InventoryID": inventory_id,
-                "DeletedAt": datetime.utcnow().isoformat(),
+                "DeletedAt": utc_now_z(),
             }
 
             # Use optimized JSON serialization
@@ -2015,6 +2084,97 @@ class AssetProcessor:
             raise
 
 
+def _lookup_asset_by_storage_path(table, bucket: str, key: str) -> Optional[Dict]:
+    """Query S3PathIndex for an asset record, filtering out LOCK# items."""
+    storage_path = f"{bucket}:{key}"
+    try:
+        response = table.query(
+            IndexName="S3PathIndex",
+            KeyConditionExpression="StoragePath = :path",
+            ExpressionAttributeValues={":path": storage_path},
+        )
+        for item in response.get("Items", []):
+            if not item.get("InventoryID", "").startswith("LOCK#"):
+                return item
+    except Exception as e:
+        logger.exception(f"Error querying S3PathIndex for {storage_path}: {e}")
+    return None
+
+
+def update_storage_class(
+    table, s3, bucket: str, key: str, destination_storage_class: Optional[str]
+) -> None:
+    """Update StorageClass on an existing asset record."""
+    storage_class = destination_storage_class
+    if not storage_class:
+        try:
+            head = s3.head_object(Bucket=bucket, Key=key)
+            storage_class = head.get("StorageClass", "STANDARD")
+            if storage_class == "STANDARD" and "StorageClass" not in head:
+                logger.warning(
+                    f"Defaulting to STANDARD for {bucket}/{key} — StorageClass absent from head_object"
+                )
+                metrics.add_metric(
+                    name="unknown-storage-class", unit=MetricUnit.Count, value=1
+                )
+        except Exception as e:
+            logger.warning(
+                f"head_object failed for {bucket}/{key}: {e}, defaulting to STANDARD"
+            )
+            metrics.add_metric(
+                name="unknown-storage-class", unit=MetricUnit.Count, value=1
+            )
+            storage_class = "STANDARD"
+
+    item = _lookup_asset_by_storage_path(table, bucket, key)
+    if not item:
+        logger.info(
+            f"No asset record found for {bucket}/{key} — ignoring storage class change"
+        )
+        metrics.add_metric(
+            name="lifecycle-ignored-record-missing", unit=MetricUnit.Count, value=1
+        )
+        return
+
+    table.update_item(
+        Key={"InventoryID": item["InventoryID"]},
+        UpdateExpression="SET DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.StorageClass = :sc",
+        ExpressionAttributeValues={":sc": storage_class},
+    )
+    logger.info(f"Updated StorageClass to {storage_class} for {bucket}/{key}")
+    metrics.add_metric(name="lifecycle-updated", unit=MetricUnit.Count, value=1)
+
+
+def update_restore_status(
+    table, bucket: str, key: str, restore_status: Optional[str]
+) -> None:
+    """Update or remove RestoreStatus on an existing asset record."""
+    item = _lookup_asset_by_storage_path(table, bucket, key)
+    if not item:
+        logger.info(
+            f"No asset record found for {bucket}/{key} — ignoring restore status change"
+        )
+        metrics.add_metric(
+            name="lifecycle-ignored-record-missing", unit=MetricUnit.Count, value=1
+        )
+        return
+
+    if restore_status is None:
+        table.update_item(
+            Key={"InventoryID": item["InventoryID"]},
+            UpdateExpression="SET DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.RestoreStatus = :rs",
+            ExpressionAttributeValues={":rs": None},
+        )
+    else:
+        table.update_item(
+            Key={"InventoryID": item["InventoryID"]},
+            UpdateExpression="SET DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.RestoreStatus = :rs",
+            ExpressionAttributeValues={":rs": restore_status},
+        )
+    logger.info(f"Updated RestoreStatus to {restore_status} for {bucket}/{key}")
+    metrics.add_metric(name="lifecycle-updated", unit=MetricUnit.Count, value=1)
+
+
 # Process records in parallel with improved logging
 def process_records_in_parallel(
     processor: AssetProcessor, records: List[Dict], max_workers: int = 5
@@ -2033,31 +2193,26 @@ def process_records_in_parallel(
 
         for i, record in enumerate(records):
             try:
-                # Extract S3 details using the helper function
-                bucket, key, event_name, version_id = extract_s3_details_from_event(
-                    record
-                )
+                contexts = normalize_event_contexts(record)
 
-                if bucket and key:
-                    # Debug log for keys containing special characters
-                    if "+" in key or "%" in key:
-                        logger.info(f"Key with special characters: {key}")
+                if contexts:
+                    for ctx in contexts:
+                        # Debug log for keys containing special characters
+                        if "+" in ctx["key"] or "%" in ctx["key"]:
+                            logger.info(f"Key with special characters: {ctx['key']}")
 
-                    logger.info(
-                        f"Submitting task for bucket: {bucket}, key: {key}, event: {event_name}, version: {version_id}"
-                    )
-                    futures.append(
-                        executor.submit(
-                            process_s3_event,
-                            processor,
-                            bucket,
-                            key,
-                            event_name,
-                            version_id,
+                        logger.info(
+                            f"Submitting task for bucket: {ctx['bucket']}, key: {ctx['key']}, event: {ctx['event_type']}, version: {ctx.get('version_id')}"
                         )
-                    )
+                        futures.append(
+                            executor.submit(
+                                process_s3_event,
+                                processor,
+                                ctx,
+                            )
+                        )
                 else:
-                    logger.warning(f"Could not extract bucket/key from record {i}")
+                    logger.warning(f"Could not extract context from record {i}")
                     skipped_records += 1
             except Exception as e:
                 logger.exception(
@@ -2249,111 +2404,25 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
             )
             total_records = len(event["Records"])
 
-            # Process records in parallel
-            s3_records = []
-            for record in event["Records"]:
-                if (
-                    "body" in record
-                    and "eventSource" in record
-                    and record["eventSource"] == "aws:sqs"
-                ):
-                    # This is an SQS message, parse the body
-                    try:
-                        body = json.loads(record["body"])
-                        if "Records" in body and isinstance(body["Records"], list):
-                            # Extract S3 records from SQS message body
-                            for s3_record in body["Records"]:
-                                # Validate that this is a proper S3 record
-                                if "s3" in s3_record and "eventSource" in s3_record:
-                                    valid_sources = [
-                                        "aws:s3",
-                                        "medialake.AssetSyncProcessor",
-                                    ]
-                                    if s3_record.get("eventSource") in valid_sources:
-                                        s3_records.append(s3_record)
-                                        logger.info(
-                                            f"Extracted S3 record from SQS: {s3_record.get('eventSource')} - {s3_record['s3']['bucket']['name']}/{s3_record['s3']['object']['key']}"
-                                        )
-                        else:
-                            logger.warning(
-                                f"SQS message body does not contain Records array"
-                            )
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse SQS message body: {str(e)}")
-                        continue
-                    except Exception as e:
-                        logger.warning(f"Error processing SQS message: {str(e)}")
-                        continue
-                elif "s3" in record:
-                    # Direct S3 record (not from SQS)
-                    s3_records.append(record)
-                else:
-                    logger.warning(
-                        f"Unrecognized record format: {json_serialize(record)}"
-                    )
-
-            # Process the collected records in parallel
-            if s3_records:
-                logger.info(f"Processing {len(s3_records)} S3 records in parallel")
-                process_records_in_parallel(processor, s3_records)
+            # Pass raw records directly to process_records_in_parallel;
+            # normalize_event_context handles all shapes (S3, SQS-wrapped S3,
+            # SQS-wrapped EventBridge, direct EventBridge).
+            process_records_in_parallel(processor, event["Records"])
 
         elif isinstance(event, dict) and "detail-type" in event:
             # EventBridge event format - single event
             logger.info("Processing EventBridge event")
             total_records = 1
 
-            if event.get("source") != "aws.s3":
-                logger.warning(f"Unexpected event source: {event.get('source')}")
-                return {"statusCode": 200, "body": "Event ignored - not from S3"}
-
-            detail = event.get("detail", {})
-
-            # Extract bucket and key with enhanced robustness
-            bucket = None
-            key = None
-            version_id = None
-
-            # Check all possible locations for bucket
-            if isinstance(detail.get("bucket"), dict):
-                bucket = detail["bucket"].get("name")
-            elif isinstance(detail.get("bucket"), str):
-                bucket = detail["bucket"]
-
-            # Check all possible locations for key
-            if isinstance(detail.get("object"), dict):
-                key = detail["object"].get("key")
-                version_id = detail["object"].get("version-id") or detail["object"].get(
-                    "versionId"
-                )
-            elif isinstance(detail.get("object"), str):
-                key = detail["object"]
-            elif "key" in detail:
-                key = detail["key"]
-
-            # Map EventBridge detail-type to S3 event name
-            detail_type = event.get("detail-type", "")
-            event_type_mapping = {
-                "Object Created": "ObjectCreated:",
-                "Object Deleted": "ObjectRemoved:",
-                "Object Restored": "ObjectRestore:",
-                "Object Tagged": "ObjectTagging:",
-                "PutObject": "ObjectCreated:Put",
-                "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
-                "DeleteObject": "ObjectRemoved:Delete",
-                "CopyObject": "ObjectCreated:Copy",  # Add mapping for CopyObject events
-            }
-
-            event_name = event_type_mapping.get(detail_type, "")
-
-            # If we have valid bucket and key, process the event
-            if bucket and key:
+            ctx = normalize_event_context(event)
+            if ctx:
                 logger.info(
-                    f"Processing EventBridge event for {bucket}/{key} with event type: {event_name}, version: {version_id}"
+                    f"Processing EventBridge event for {ctx['bucket']}/{ctx['key']} with event type: {ctx['event_type']}, version: {ctx.get('version_id')}"
                 )
-                process_s3_event(processor, bucket, key, event_name, version_id)
+                process_s3_event(processor, ctx)
             else:
                 logger.warning(
-                    f"Missing bucket or key in EventBridge event: {json_serialize(detail)}"
+                    f"Could not normalize EventBridge event: {json_serialize(event)}"
                 )
 
         # Calculate memory usage metrics
@@ -2383,16 +2452,38 @@ def handler(event: Dict, context: LambdaContext) -> Dict:
 
 def process_s3_event(
     processor: AssetProcessor,
-    bucket: str,
-    key: str,
-    event_name: str,
-    version_id: str = None,
+    ctx: S3EventContext,
 ):
     """Process a single S3 event with improved performance"""
+    bucket = ctx["bucket"]
+    key = ctx["key"]
+    event_name = ctx["event_type"]
+    version_id = ctx.get("version_id")
+
     # Skip processing if event type not relevant (quick filtering)
     if not is_relevant_event(event_name):
         logger.info(f"Skipping irrelevant event type: {event_name} for {bucket}/{key}")
         return
+
+    # Lookup connector for telemetry
+    connector_info = lookup_connector_by_bucket(bucket)
+    if connector_info:
+        if connector_info["integrationMethod"] != "eventbridge":
+            logger.append_keys(
+                connectorId=connector_info["id"],
+                integrationMethod=connector_info["integrationMethod"],
+            )
+            metrics.add_dimension(name="ConnectorId", value=connector_info["id"])
+            metrics.add_dimension(
+                name="IntegrationMethod", value=connector_info["integrationMethod"]
+            )
+            metrics.add_metric(
+                name="CapabilityLimitationDetected", unit=MetricUnit.Count, value=1
+            )
+            # Flush the limitation metric with connector dimensions immediately,
+            # then remove dimensions so they don't leak to unrelated metrics.
+            metrics.flush_metrics()
+            logger.remove_keys(["connectorId", "integrationMethod"])
 
     logger.info(
         f"Processing {event_name} event for asset: {bucket}/{key}, version: {version_id}"
@@ -2400,6 +2491,12 @@ def process_s3_event(
 
     # Record start time for duration tracking
     start_time = datetime.now()
+
+    _RESTORE_STATUS_MAP = {
+        "ObjectRestore:Post": "RESTORING",
+        "ObjectRestore:Completed": "RESTORED",
+        "ObjectRestore:Delete": None,
+    }
 
     try:
         if event_name.startswith("ObjectRemoved:"):
@@ -2412,7 +2509,19 @@ def process_s3_event(
             )
             metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
             logger.info(f"Asset deletion processed: {key}")
-        else:
+        elif event_name == "ObjectStorageClassChanged":
+            update_storage_class(
+                processor.table,
+                processor.s3,
+                bucket,
+                key,
+                ctx.get("destination_storage_class"),
+            )
+        elif event_name in _RESTORE_STATUS_MAP:
+            update_restore_status(
+                processor.table, bucket, key, _RESTORE_STATUS_MAP[event_name]
+            )
+        elif event_name.startswith("ObjectCreated:"):
             # Handle creation/modification/copy events - process all ObjectCreated events the same way
             logger.info(f"Processing ObjectCreated event for {bucket}/{key}")
 
@@ -2513,6 +2622,13 @@ def process_s3_event(
                 )
             else:
                 logger.info(f"Asset already processed or skipped: {key}")
+        else:
+            logger.warning(
+                f"Unknown event type in dispatch: {event_name} for {bucket}/{key}"
+            )
+            metrics.add_metric(
+                name="unknown-event-type", unit=MetricUnit.Count, value=1
+            )
 
         # Track processing duration
         duration = (datetime.now() - start_time).total_seconds()
@@ -2549,6 +2665,7 @@ def extract_s3_details_from_event(
     event_record: Dict,
 ) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """
+    DEPRECATED: Use normalize_event_context() instead.
     Extract S3 bucket, key, event type, and version ID from various event structures
     Returns: (bucket, key, event_name, version_id)
     """
@@ -2650,3 +2767,224 @@ def extract_s3_details_from_event(
     logger.warning(f"Unrecognized event structure: {json_serialize(event_record)}")
 
     return None, None, None, None
+
+
+# EventBridge detail-type to S3 event type mapping
+_EVENTBRIDGE_DETAIL_TYPE_MAP = {
+    "Object Created": "ObjectCreated:",
+    "Object Deleted": "ObjectRemoved:",
+    "Object Storage Class Changed": "ObjectStorageClassChanged",
+    "Object Restore Initiated": "ObjectRestore:Post",
+    "Object Restore Completed": "ObjectRestore:Completed",
+    "Object Restore Expired": "ObjectRestore:Delete",
+    "PutObject": "ObjectCreated:Put",
+    "CompleteMultipartUpload": "ObjectCreated:CompleteMultipartUpload",
+    "DeleteObject": "ObjectRemoved:Delete",
+    "CopyObject": "ObjectCreated:Copy",
+}
+
+
+def _decode_s3_key(raw_key: str) -> str:
+    """Decode S3 key — URL-decode and replace '+' with space."""
+    return urllib.parse.unquote(raw_key).replace("+", " ")
+
+
+def _extract_eventbridge_context(event_data: Dict) -> Optional[S3EventContext]:
+    """Extract S3EventContext from an EventBridge-shaped payload."""
+    if event_data.get("source") != "aws.s3":
+        return None
+
+    detail = event_data.get("detail", {})
+    detail_type = event_data.get("detail-type", "")
+
+    event_type = _EVENTBRIDGE_DETAIL_TYPE_MAP.get(detail_type)
+    if event_type is None:
+        logger.warning(f"Unknown EventBridge detail-type: {detail_type}")
+        metrics.add_metric(name="unknown-event-type", unit=MetricUnit.Count, value=1)
+        return None
+
+    # Extract bucket
+    bucket = None
+    if isinstance(detail.get("bucket"), dict):
+        bucket = detail["bucket"].get("name")
+    elif isinstance(detail.get("bucket"), str):
+        bucket = detail["bucket"]
+
+    # Extract key and version_id
+    key = None
+    version_id = None
+    if isinstance(detail.get("object"), dict):
+        key = detail["object"].get("key")
+        version_id = detail["object"].get("version-id") or detail["object"].get(
+            "versionId"
+        )
+    elif isinstance(detail.get("object"), str):
+        key = detail["object"]
+    elif "key" in detail:
+        key = detail["key"]
+
+    if not bucket or not key:
+        logger.warning(
+            f"Missing bucket or key in EventBridge detail: {json_serialize(detail)}"
+        )
+        return None
+
+    key = _decode_s3_key(key)
+
+    destination_storage_class = None
+    if detail_type == "Object Storage Class Changed":
+        destination_storage_class = detail.get("destination-storage-class")
+
+    return S3EventContext(
+        event_type=event_type,
+        bucket=bucket,
+        key=key,
+        version_id=version_id,
+        destination_storage_class=destination_storage_class,
+    )
+
+
+def normalize_event_context(event_record: Dict) -> Optional[S3EventContext]:
+    """Normalize any inbound event shape into an S3EventContext."""
+    # Direct S3 record
+    if "s3" in event_record:
+        s3_info = event_record["s3"]
+        if "bucket" in s3_info and "object" in s3_info:
+            return S3EventContext(
+                event_type=event_record.get("eventName", "ObjectCreated:"),
+                bucket=s3_info["bucket"]["name"],
+                key=_decode_s3_key(s3_info["object"]["key"]),
+                version_id=s3_info["object"].get("versionId"),
+                destination_storage_class=None,
+            )
+
+    # SQS-wrapped record
+    if event_record.get("eventSource") == "aws:sqs" and "body" in event_record:
+        try:
+            body = json.loads(event_record["body"])
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse SQS message body: {e}")
+            metrics.add_metric(name="parse-failure", unit=MetricUnit.Count, value=1)
+            return None
+
+        # SQS-wrapped EventBridge
+        if body.get("source") == "aws.s3" and "detail" in body:
+            return _extract_eventbridge_context(body)
+
+        # SQS-wrapped S3 records
+        if "Records" in body and isinstance(body["Records"], list):
+            for record in body["Records"]:
+                valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
+                if record.get("eventSource") in valid_sources and "s3" in record:
+                    return S3EventContext(
+                        event_type=record.get("eventName", "ObjectCreated:"),
+                        bucket=record["s3"]["bucket"]["name"],
+                        key=_decode_s3_key(record["s3"]["object"]["key"]),
+                        version_id=record["s3"]["object"].get("versionId"),
+                        destination_storage_class=None,
+                    )
+
+    # EventBridge direct
+    if "detail-type" in event_record and "source" in event_record:
+        return _extract_eventbridge_context(event_record)
+
+    logger.warning(
+        f"Unrecognized event structure in normalize_event_context: {json_serialize(event_record)}"
+    )
+    return None
+
+
+def normalize_event_contexts(event_record: Dict) -> List[S3EventContext]:
+    """Normalize any inbound event shape into a list of S3EventContext.
+
+    Unlike normalize_event_context (singular), this correctly yields ALL nested
+    S3 records when an SQS message body contains multiple Records entries.
+    """
+    # Direct S3 record
+    if "s3" in event_record:
+        s3_info = event_record["s3"]
+        if "bucket" in s3_info and "object" in s3_info:
+            return [
+                S3EventContext(
+                    event_type=event_record.get("eventName", "ObjectCreated:"),
+                    bucket=s3_info["bucket"]["name"],
+                    key=_decode_s3_key(s3_info["object"]["key"]),
+                    version_id=s3_info["object"].get("versionId"),
+                    destination_storage_class=None,
+                )
+            ]
+
+    # SQS-wrapped record
+    if event_record.get("eventSource") == "aws:sqs" and "body" in event_record:
+        try:
+            body = json.loads(event_record["body"])
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse SQS message body: {e}")
+            metrics.add_metric(name="parse-failure", unit=MetricUnit.Count, value=1)
+            return []
+
+        # SQS-wrapped EventBridge
+        if body.get("source") == "aws.s3" and "detail" in body:
+            ctx = _extract_eventbridge_context(body)
+            return [ctx] if ctx else []
+
+        # SQS-wrapped S3 records — collect ALL valid nested records
+        if "Records" in body and isinstance(body["Records"], list):
+            contexts: List[S3EventContext] = []
+            valid_sources = ["aws:s3", "medialake.AssetSyncProcessor"]
+            for idx, record in enumerate(body["Records"]):
+                try:
+                    if (
+                        record.get("eventSource") not in valid_sources
+                        or "s3" not in record
+                    ):
+                        logger.warning(
+                            f"Skipping unrecognized nested record {idx}: {json_serialize(record)}"
+                        )
+                        metrics.add_metric(
+                            name="unrecognized-nested-record",
+                            unit=MetricUnit.Count,
+                            value=1,
+                        )
+                        continue
+                    s3_info = record["s3"]
+                    if (
+                        "bucket" not in s3_info
+                        or "name" not in s3_info.get("bucket", {})
+                        or "object" not in s3_info
+                        or "key" not in s3_info.get("object", {})
+                    ):
+                        logger.warning(
+                            f"Skipping malformed nested record {idx}: missing s3.bucket.name or s3.object.key"
+                        )
+                        metrics.add_metric(
+                            name="malformed-nested-record",
+                            unit=MetricUnit.Count,
+                            value=1,
+                        )
+                        continue
+                    contexts.append(
+                        S3EventContext(
+                            event_type=record.get("eventName", "ObjectCreated:"),
+                            bucket=s3_info["bucket"]["name"],
+                            key=_decode_s3_key(s3_info["object"]["key"]),
+                            version_id=s3_info["object"].get("versionId"),
+                            destination_storage_class=None,
+                        )
+                    )
+                except Exception as e:
+                    logger.warning(f"Skipping malformed nested record {idx}: {e}")
+                    metrics.add_metric(
+                        name="malformed-nested-record", unit=MetricUnit.Count, value=1
+                    )
+            return contexts
+
+    # EventBridge direct
+    if "detail-type" in event_record and "source" in event_record:
+        ctx = _extract_eventbridge_context(event_record)
+        return [ctx] if ctx else []
+
+    logger.warning(
+        f"Unrecognized event structure in normalize_event_contexts: {json_serialize(event_record)}"
+    )
+    return []

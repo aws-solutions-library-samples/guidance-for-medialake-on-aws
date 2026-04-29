@@ -37,6 +37,7 @@ import {
   useDomainActions,
   useUIActions,
   useActiveFilterCount,
+  appendFiltersToUrlParams,
 } from "./stores/searchStore";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
@@ -135,6 +136,7 @@ function TopBar() {
             ingested_date_gte: currentFilters.ingested_date_gte,
             ingested_date_lte: currentFilters.ingested_date_lte,
             filename: currentFilters.filename,
+            customMetadataFilters: currentFilters.customMetadataFilters,
           };
 
           // Remove undefined values from facetParams
@@ -154,18 +156,8 @@ function TopBar() {
           params.set("q", query);
           params.set("semantic", currentIsSemantic.toString());
 
-          // Add filters to URL
-          if (currentFilters.type) params.set("type", currentFilters.type);
-          if (currentFilters.extension) params.set("extension", currentFilters.extension);
-          if (currentFilters.asset_size_gte)
-            params.set("asset_size_gte", currentFilters.asset_size_gte.toString());
-          if (currentFilters.asset_size_lte)
-            params.set("asset_size_lte", currentFilters.asset_size_lte.toString());
-          if (currentFilters.ingested_date_gte)
-            params.set("ingested_date_gte", currentFilters.ingested_date_gte);
-          if (currentFilters.ingested_date_lte)
-            params.set("ingested_date_lte", currentFilters.ingested_date_lte);
-          if (currentFilters.filename) params.set("filename", currentFilters.filename);
+          // Add filters to URL (includes customMetadataFilters as JSON)
+          appendFiltersToUrlParams(params, currentFilters);
 
           // Navigate with URL parameters
           navigate(`/search?${params.toString()}`);
@@ -234,6 +226,7 @@ function TopBar() {
           ingested_date_gte: filters.ingested_date_gte,
           ingested_date_lte: filters.ingested_date_lte,
           filename: filters.filename,
+          customMetadataFilters: filters.customMetadataFilters,
         };
 
         // Remove undefined values from facetParams
@@ -252,6 +245,7 @@ function TopBar() {
         const params = new URLSearchParams();
         params.set("q", searchQuery);
         params.set("semantic", storeIsSemantic.toString());
+        appendFiltersToUrlParams(params, filters);
 
         navigate(`/search?${params.toString()}`);
         return true;
@@ -307,6 +301,7 @@ function TopBar() {
         ingested_date_gte: filters.ingested_date_gte,
         ingested_date_lte: filters.ingested_date_lte,
         filename: filters.filename,
+        customMetadataFilters: filters.customMetadataFilters,
       };
 
       // Remove undefined values from facetParams
@@ -326,14 +321,8 @@ function TopBar() {
       params.set("q", searchQuery);
       params.set("semantic", storeIsSemantic.toString());
 
-      // Add current filters to URL
-      if (filters.type) params.set("type", filters.type);
-      if (filters.extension) params.set("extension", filters.extension);
-      if (filters.asset_size_gte) params.set("asset_size_gte", filters.asset_size_gte.toString());
-      if (filters.asset_size_lte) params.set("asset_size_lte", filters.asset_size_lte.toString());
-      if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
-      if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
-      if (filters.filename) params.set("filename", filters.filename);
+      // Add current filters to URL (includes customMetadataFilters as JSON)
+      appendFiltersToUrlParams(params, filters);
 
       navigate(`/search?${params.toString()}`);
 
@@ -358,6 +347,7 @@ function TopBar() {
         ingested_date_gte: filters.ingested_date_gte,
         ingested_date_lte: filters.ingested_date_lte,
         filename: filters.filename,
+        customMetadataFilters: filters.customMetadataFilters,
       };
 
       // Remove undefined values from facetParams
@@ -376,6 +366,7 @@ function TopBar() {
       const params = new URLSearchParams();
       params.set("q", searchQuery);
       params.set("semantic", storeIsSemantic.toString());
+      appendFiltersToUrlParams(params, filters);
 
       navigate(`/search?${params.toString()}`);
       return newTags;

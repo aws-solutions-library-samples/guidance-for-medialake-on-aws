@@ -6,7 +6,7 @@ import {
   useSearchFilters,
   useDomainActions,
 } from "../stores/searchStore";
-import { FacetFilters } from "../types/facetSearch";
+import { FacetFilters, CustomMetadataApiFilter } from "../types/facetSearch";
 
 interface UseSearchStateProps {
   initialQuery?: string;
@@ -43,6 +43,23 @@ function parseFiltersFromParams(searchParams: URLSearchParams): FacetFilters {
     filters.ingested_date_gte = searchParams.get("ingested_date_gte") || undefined;
   if (searchParams.has("date_range_option"))
     filters.date_range_option = searchParams.get("date_range_option") || undefined;
+
+  // Custom metadata filters are serialized as a JSON array under `custom_md`.
+  // These originate from the FilterModal and must round-trip through the URL
+  // so they persist across search submissions (alongside regular filters).
+  if (searchParams.has("custom_md")) {
+    const raw = searchParams.get("custom_md");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as CustomMetadataApiFilter[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          filters.customMetadataFilters = parsed;
+        }
+      } catch {
+        // Malformed custom_md param — ignore and continue without custom filters
+      }
+    }
+  }
 
   return filters;
 }

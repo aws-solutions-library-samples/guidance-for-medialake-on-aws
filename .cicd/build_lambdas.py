@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import click
+import yaml
 
 # Add CDK directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -33,12 +34,46 @@ class LambdaBuilder:
         self.lambda_build_path = Path(LAMBDA_DIST_PATH)
         self.layer_build_path = Path(LAYER_DIST_PATH)
 
+    # Known node categories whose YAML may contain lambda configuration.
+    _NODE_CATEGORIES = ("integration", "utility", "trigger")
+
+    @staticmethod
+    def _get_node_lambda_config(node_data: dict) -> dict:
+        """Extract ``node.<category>.config.lambda`` checking all known categories."""
+        node = node_data.get("node", {})
+        for category in LambdaBuilder._NODE_CATEGORIES:
+            cfg = node.get(category, {}).get("config", {}).get("lambda", {})
+            if cfg:
+                return cfg
+        return {}
+
     def _detect_lambda_type(self, lambda_dir: Path) -> str:
         """Detect the type of Lambda function based on files present
 
         Returns:
-            str: 'python', 'nodejs', or 'unknown'
+            str: 'python', 'nodejs', 'container', or 'unknown'
         """
+        # Container nodes have a Dockerfile AND are declared as package_type: Image
+        # in their YAML template. A Dockerfile alone (e.g., for local testing) is
+        # not sufficient — cross-reference with the node template.
+        has_dockerfile = (lambda_dir / "Dockerfile").exists()
+        if has_dockerfile:
+            node_id = lambda_dir.name
+            templates_dir = Path("s3_bucket_assets/pipeline_nodes/node_templates")
+            for yaml_file in templates_dir.rglob("*.yaml"):
+                try:
+                    with open(yaml_file) as f:
+                        data = yaml.safe_load(f)
+                    if data.get("node", {}).get("id") == node_id:
+                        # Check all node categories (integration, utility, trigger)
+                        lambda_cfg = self._get_node_lambda_config(data)
+                        pkg_type = lambda_cfg.get("package_type", "Zip")
+                        if isinstance(pkg_type, str) and pkg_type.lower() == "image":
+                            return "container"
+                        break
+                except Exception:
+                    continue
+
         has_python = any(
             item.is_file() and item.suffix == ".py" for item in lambda_dir.iterdir()
         )

@@ -107,10 +107,18 @@ class ExternalNodesSynthHelper:
     def run(self) -> list:
         # a. Bucket access + YAML discovery
         s3 = boto3.client("s3")
+        all_contents = []
+        continuation_token = None
         try:
-            response = s3.list_objects_v2(
-                Bucket=self.bucket_name, Prefix="node_templates/"
-            )
+            while True:
+                kwargs = {"Bucket": self.bucket_name, "Prefix": "node_templates/"}
+                if continuation_token:
+                    kwargs["ContinuationToken"] = continuation_token
+                response = s3.list_objects_v2(**kwargs)
+                all_contents.extend(response.get("Contents", []))
+                if not response.get("IsTruncated"):
+                    break
+                continuation_token = response["NextContinuationToken"]
         except ClientError as e:
             err = e.response["Error"]
             print(
@@ -119,9 +127,8 @@ class ExternalNodesSynthHelper:
             )
             sys.exit(1)
 
-        contents = response.get("Contents", [])
         yaml_keys = [
-            obj["Key"] for obj in contents if obj["Key"].endswith((".yaml", ".yml"))
+            obj["Key"] for obj in all_contents if obj["Key"].endswith((".yaml", ".yml"))
         ]
         if not yaml_keys:
             print(

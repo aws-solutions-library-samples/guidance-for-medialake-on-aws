@@ -486,6 +486,28 @@ def determine_layers_for_node(
     """
     layers = []
 
+    # Skip layer resolution for container nodes — dependencies are baked into the image
+    lambda_config = (
+        yaml_data.get("node", {})
+        .get("integration", {})
+        .get("config", {})
+        .get("lambda", {})
+    )
+    if not lambda_config:
+        # Also check utility nodes
+        lambda_config = (
+            yaml_data.get("node", {})
+            .get("utility", {})
+            .get("config", {})
+            .get("lambda", {})
+        )
+    if lambda_config and lambda_config.get("package_type", "Zip").lower() == "image":
+        logger.info(
+            f"Skipping layer resolution for container node {node_id} "
+            f"(layers are baked into the container image)"
+        )
+        return []
+
     # Then, try to get layers from DynamoDB
     try:
         # Get the layers item from DynamoDB
@@ -583,6 +605,25 @@ def _determine_connection_input_type(
             break
 
     return None
+
+
+def get_deployment_config(node_id: str) -> Dict[str, Any]:
+    """Retrieve deployment configuration for a node from DynamoDB.
+
+    Returns a dict with at least ``packageType`` (``"Zip"`` or ``"Image"``).
+    For container nodes the dict also contains ``imageUri`` and ``imageTag``.
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(os.environ["NODE_TABLE"])
+        response = table.get_item(
+            Key={"pk": f"NODE#{node_id}", "sk": "DEPLOYMENT_CONFIG"}
+        )
+        if "Item" in response:
+            return response["Item"]
+    except Exception as e:
+        logger.warning(f"Error retrieving deployment config for node {node_id}: {e}")
+    return {"packageType": "Zip"}
 
 
 def create_lambda_function(
@@ -718,65 +759,100 @@ def create_lambda_function(
             f"Failed to extract API service URL and path from node info: {e}"
         )
 
-    # Get Lambda configuration from YAML
-    lambda_config = yaml_data["node"]["integration"]["config"]["lambda"]
-    zip_file_prefix = f"lambda-code/nodes/{lambda_config['handler']}"
+    # Get Lambda configuration from YAML (supports both integration and utility node types)
+    lambda_config = (
+        yaml_data.get("node", {})
+        .get("integration", {})
+        .get("config", {})
+        .get("lambda", {})
+    )
+    if not lambda_config:
+        # Fall back to utility node path
+        lambda_config = (
+            yaml_data.get("node", {})
+            .get("utility", {})
+            .get("config", {})
+            .get("lambda", {})
+        )
+    if not lambda_config:
+        raise ValueError(
+            f"No lambda config found for node {node.data.id} in YAML "
+            f"(checked node.integration.config.lambda and node.utility.config.lambda)"
+        )
 
-    # Get the actual zip file key
-    zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
+    # Determine deployment type (Zip or Image)
+    deployment_config = get_deployment_config(node.data.id)
+    package_type = deployment_config.get("packageType", "Zip")
+    is_container = package_type == "Image"
 
-    # Collect multiline parameters that need to be embedded in the Lambda zip
+    logger.info(f"Node {node.data.id} deployment: package_type={package_type}")
+
+    # Zip-specific: resolve zip file key and handle multiline parameters
+    zip_file_key = None
+    zip_file_prefix = None
     multiline_params = {}
-    if hasattr(node.data, "configuration") and "parameters" in node.data.configuration:
-        logger.info(
-            f"Node has {len(node.data.configuration['parameters'])} parameters to check"
-        )
-        for param_key, param_value in node.data.configuration["parameters"].items():
-            # Skip numeric keys as they are just parameter definitions
-            if param_key.isdigit():
-                logger.debug(f"Skipping numeric key: {param_key}")
-                continue
+    temp_zip_to_cleanup = None
 
+    if not is_container:
+        zip_file_prefix = f"lambda-code/nodes/{lambda_config['handler']}"
+
+        # Get the actual zip file key
+        zip_file_key = get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
+
+        # Collect multiline parameters that need to be embedded in the Lambda zip
+        if (
+            hasattr(node.data, "configuration")
+            and "parameters" in node.data.configuration
+        ):
             logger.info(
-                f"Checking parameter '{param_key}' (has value: {param_value is not None})"
+                f"Node has {len(node.data.configuration['parameters'])} parameters to check"
             )
+            for param_key, param_value in node.data.configuration["parameters"].items():
+                # Skip numeric keys as they are just parameter definitions
+                if param_key.isdigit():
+                    logger.debug(f"Skipping numeric key: {param_key}")
+                    continue
 
-            # Check if this parameter is multiline
-            if param_value:
-                is_ml = is_multiline_parameter(yaml_data, param_key)
-                logger.info(f"Parameter '{param_key}' multiline check result: {is_ml}")
+                logger.info(
+                    f"Checking parameter '{param_key}' (has value: {param_value is not None})"
+                )
 
-                if is_ml:
-                    param_str = str(param_value)
+                # Check if this parameter is multiline
+                if param_value:
+                    is_ml = is_multiline_parameter(yaml_data, param_key)
                     logger.info(
-                        f"✓ Found multiline parameter '{param_key}' (size: {len(param_str)} bytes), "
-                        f"will embed in Lambda deployment package"
+                        f"Parameter '{param_key}' multiline check result: {is_ml}"
                     )
-                    multiline_params[param_key] = param_str
+
+                    if is_ml:
+                        param_str = str(param_value)
+                        logger.info(
+                            f"✓ Found multiline parameter '{param_key}' (size: {len(param_str)} bytes), "
+                            f"will embed in Lambda deployment package"
+                        )
+                        multiline_params[param_key] = param_str
+                    else:
+                        logger.info(
+                            f"Parameter '{param_key}' is not multiline, will use env var"
+                        )
                 else:
-                    logger.info(
-                        f"Parameter '{param_key}' is not multiline, will use env var"
-                    )
-            else:
-                logger.info(f"Parameter '{param_key}' has no value, skipping")
-    else:
-        logger.info("Node has no configuration parameters")
+                    logger.info(f"Parameter '{param_key}' has no value, skipping")
+        else:
+            logger.info("Node has no configuration parameters")
 
-    # If we have multiline parameters, modify the zip to include them
-    if multiline_params:
-        logger.info(
-            f"Modifying Lambda zip to include {len(multiline_params)} multiline parameters: {list(multiline_params.keys())}"
-        )
-        zip_file_key = add_multiline_params_to_zip(
-            IAC_ASSETS_BUCKET, zip_file_key, multiline_params
-        )
-    else:
-        logger.info("No multiline parameters found, using original zip file")
+        # If we have multiline parameters, modify the zip to include them
+        if multiline_params:
+            logger.info(
+                f"Modifying Lambda zip to include {len(multiline_params)} multiline parameters: {list(multiline_params.keys())}"
+            )
+            zip_file_key = add_multiline_params_to_zip(
+                IAC_ASSETS_BUCKET, zip_file_key, multiline_params
+            )
+        else:
+            logger.info("No multiline parameters found, using original zip file")
 
-    # Track if we need to clean up a temporary zip file
-    temp_zip_to_cleanup = zip_file_key if multiline_params else None
-
-    runtime = lambda_config["runtime"].lower()
+        # Track if we need to clean up a temporary zip file
+        temp_zip_to_cleanup = zip_file_key if multiline_params else None
 
     # Extract configurable Lambda parameters with defaults
     config_params = get_lambda_config_with_defaults(lambda_config)
@@ -814,30 +890,69 @@ def create_lambda_function(
         for attempt in range(max_retries):
             try:
 
-                # Build common parameters for the Lambda function creation
-                create_function_params = {
-                    "FunctionName": function_name,
-                    "Runtime": runtime,
-                    "MemorySize": config_params["memory_size"],
-                    "EphemeralStorage": {
-                        "Size": config_params["ephemeral_storage_size"]
-                    },
-                    "Timeout": config_params["timeout"],
-                    "Role": role_arn,
-                    "Handler": "index.lambda_handler",
-                    "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
-                    "Publish": True,
-                }
+                # Build create_function_params based on package type
+                if is_container:
+                    # ---- CONTAINER IMAGE PATH ----
+                    image_uri = deployment_config.get("imageUri", "")
+                    if not image_uri:
+                        raise ValueError(
+                            f"No image URI found for container node {node.data.id}. "
+                            f"Ensure the node's container image has been built and pushed to ECR."
+                        )
 
-                # Determine which layers to attach
-                layers = determine_layers_for_node(
-                    node.data.id, node.data.type.lower(), yaml_data
-                )
-                if layers:
-                    create_function_params["Layers"] = layers
+                    # Target architecture — must match the Docker image platform
+                    # built by ContainerImageDeployment. Default arm64 (Graviton).
+                    architecture = deployment_config.get("architecture", "arm64")
+                    if architecture not in ("arm64", "x86_64"):
+                        architecture = "arm64"
+
+                    create_function_params = {
+                        "FunctionName": function_name,
+                        "PackageType": "Image",
+                        "Code": {"ImageUri": image_uri},
+                        "Role": role_arn,
+                        "MemorySize": config_params["memory_size"],
+                        "EphemeralStorage": {
+                            "Size": config_params["ephemeral_storage_size"]
+                        },
+                        "Timeout": config_params["timeout"],
+                        "Architectures": [architecture],
+                        "Publish": True,
+                        # No Handler, Runtime, or Layers for container images
+                    }
+
                     logger.info(
-                        f"Attaching layers to Lambda function {function_name}: {layers}"
+                        f"Container Lambda {function_name}: "
+                        f"image={image_uri}, architecture={architecture}"
                     )
+                else:
+                    # ---- ZIP PACKAGE PATH (existing behavior) ----
+                    runtime = lambda_config["runtime"].lower()
+
+                    create_function_params = {
+                        "FunctionName": function_name,
+                        "Runtime": runtime,
+                        "MemorySize": config_params["memory_size"],
+                        "EphemeralStorage": {
+                            "Size": config_params["ephemeral_storage_size"]
+                        },
+                        "Timeout": config_params["timeout"],
+                        "Role": role_arn,
+                        "Handler": "index.lambda_handler",
+                        "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
+                        "Publish": True,
+                    }
+
+                # Determine which layers to attach (zip-based nodes only)
+                if not is_container:
+                    layers = determine_layers_for_node(
+                        node.data.id, node.data.type.lower(), yaml_data
+                    )
+                    if layers:
+                        create_function_params["Layers"] = layers
+                        logger.info(
+                            f"Attaching layers to Lambda function {function_name}: {layers}"
+                        )
 
                 # Determine connection input type for this node
                 connection_input_type = _determine_connection_input_type(
@@ -1097,22 +1212,22 @@ def create_lambda_function(
                 vpc_config = None
                 try:
                     # Check for VPC configuration in the YAML
-                    lambda_config = (
+                    vpc_lambda_config = (
                         yaml_data.get("node", {})
                         .get("integration", {})
                         .get("config", {})
                         .get("lambda", {})
                     )
-                    if not lambda_config:
+                    if not vpc_lambda_config:
                         # Also check utility nodes
-                        lambda_config = (
+                        vpc_lambda_config = (
                             yaml_data.get("node", {})
                             .get("utility", {})
                             .get("config", {})
                             .get("lambda", {})
                         )
 
-                    if lambda_config and lambda_config.get("vpc", False):
+                    if vpc_lambda_config and vpc_lambda_config.get("vpc", False):
                         subnet_ids = (
                             OPENSEARCH_VPC_SUBNET_IDS.split(",")
                             if OPENSEARCH_VPC_SUBNET_IDS
@@ -1142,15 +1257,27 @@ def create_lambda_function(
                 # Priority: User parameter > YAML config > No limit
                 reserved_concurrency = None
 
-                # First, check YAML configuration
-                lambda_config = (
+                # First, check YAML configuration (supports both integration and utility)
+                concurrency_lambda_config = (
                     yaml_data.get("node", {})
                     .get("integration", {})
                     .get("config", {})
                     .get("lambda", {})
                 )
-                if lambda_config and "reserved_concurrency" in lambda_config:
-                    reserved_concurrency = lambda_config["reserved_concurrency"]
+                if not concurrency_lambda_config:
+                    concurrency_lambda_config = (
+                        yaml_data.get("node", {})
+                        .get("utility", {})
+                        .get("config", {})
+                        .get("lambda", {})
+                    )
+                if (
+                    concurrency_lambda_config
+                    and "reserved_concurrency" in concurrency_lambda_config
+                ):
+                    reserved_concurrency = concurrency_lambda_config[
+                        "reserved_concurrency"
+                    ]
                     logger.info(
                         f"Found reserved_concurrency in YAML config: {reserved_concurrency}"
                     )
@@ -1235,8 +1362,11 @@ def create_lambda_function(
                 time.sleep(backoff_time)
 
         # Clean up temporary zip file if one was created
-        if temp_zip_to_cleanup and temp_zip_to_cleanup != get_zip_file_key(
-            IAC_ASSETS_BUCKET, zip_file_prefix
+        if (
+            temp_zip_to_cleanup
+            and zip_file_prefix
+            and temp_zip_to_cleanup
+            != get_zip_file_key(IAC_ASSETS_BUCKET, zip_file_prefix)
         ):
             try:
                 s3_client = boto3.client("s3")

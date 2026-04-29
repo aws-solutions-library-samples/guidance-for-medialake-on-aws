@@ -564,6 +564,7 @@ class CDKConfig(BaseModel):
     video_download_enabled: bool = True
     external_nodes_bucket: Optional[str] = None
     use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
+    container_nodes_enabled: bool = False  # Opt-in for container-based pipeline nodes
 
     # ── Multi-deployment naming helpers ──────────────────────────────────
 

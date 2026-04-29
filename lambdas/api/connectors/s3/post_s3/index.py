@@ -448,7 +448,7 @@ def setup_eventbridge_notifications(
     )
     created_resources.append(("eventbridge_target", (rule_name, target_id)))
 
-    return queue_url, queue_arn
+    return queue_url, queue_arn, rule_name
 
 
 def create_eventbridge_role(
@@ -1379,8 +1379,9 @@ def create_connector(createconnector: S3Connector) -> dict:
         # Set up notifications based on integration method
         queue_url = None
         queue_arn = None
+        rule_name = None
         if integration_method == "eventbridge":
-            queue_url, queue_arn = setup_eventbridge_notifications(
+            queue_url, queue_arn, rule_name = setup_eventbridge_notifications(
                 s3_bucket, bucket_region, created_resources, object_prefix, suffix
             )
         elif integration_method in ["s3Notifications"]:
@@ -1637,6 +1638,33 @@ def create_connector(createconnector: S3Connector) -> dict:
             )
             policies_to_attach.append((dynamodb_policy_name, dynamodb_policy))
 
+            # Connector table read policy for bucket→connector lookup
+            connector_table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE_NAME", "")
+            connector_table_region = os.environ.get(
+                "CONNECTOR_TABLE_REGION", ""
+            ) or os.environ.get("REGION", bucket_region)
+            if connector_table_name:
+                connector_table_arn = f"arn:aws:dynamodb:{connector_table_region}:{account_id}:table/{connector_table_name}"
+                connector_table_policy = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": ["dynamodb:Query"],
+                            "Resource": [
+                                connector_table_arn,
+                                f"{connector_table_arn}/index/*",
+                            ],
+                        }
+                    ],
+                }
+                connector_policy_name = truncate_resource_name(
+                    "iam_policy", f"{role_name}-connector-tbl-policy"
+                )
+                policies_to_attach.append(
+                    (connector_policy_name, connector_table_policy)
+                )
+
             # Secrets Manager policy for external service API keys
             # Allow access to search provider secrets for external service deletion
             secrets_policy = {
@@ -1824,6 +1852,14 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "SYSTEM_SETTINGS_TABLE_NAME": os.environ.get(
                             "SYSTEM_SETTINGS_TABLE_NAME", ""
                         ),
+                        # Connector table for bucket→connector lookup
+                        "MEDIALAKE_CONNECTOR_TABLE_NAME": os.environ.get(
+                            "MEDIALAKE_CONNECTOR_TABLE_NAME", ""
+                        ),
+                        "CONNECTOR_STORAGE_IDENTIFIER_INDEX": "StorageIdentifierIndex",
+                        "CONNECTOR_TABLE_REGION": os.environ.get(
+                            "CONNECTOR_TABLE_REGION", os.environ.get("REGION", "")
+                        ),
                     }
                 },
                 "Layers": layers,  # Updated to include both custom and AWS SDK layers
@@ -1951,6 +1987,10 @@ def create_connector(createconnector: S3Connector) -> dict:
         if cors_metadata:
             connector_item["corsRuleId"] = cors_metadata["corsRuleId"]
             connector_item["corsRuleIndex"] = cors_metadata["corsRuleIndex"]
+
+        # Add EventBridge rule name if applicable
+        if integration_method == "eventbridge" and rule_name:
+            connector_item["eventBridgeRuleName"] = rule_name
 
         table.put_item(Item=connector_item)
         created_resources.append(("dynamodb_item", (table_name, connector_id)))

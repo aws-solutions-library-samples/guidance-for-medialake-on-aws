@@ -239,6 +239,16 @@ class ConnectorsConstruct(Construct):
                 name=DynamoDBConstants.connector_table_name(),
                 partition_key_name="id",
                 partition_key_type=dynamodb.AttributeType.STRING,
+                global_secondary_indexes=[
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="StorageIdentifierIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="storageIdentifier",
+                            type=dynamodb.AttributeType.STRING,
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    )
+                ],
             ),
         )
 
@@ -457,6 +467,8 @@ class ConnectorsConstruct(Construct):
         env_vars = {
             "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
             "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+            "MEDIALAKE_CONNECTOR_TABLE_NAME": self.connectors_table.table_name,
+            "CONNECTOR_TABLE_REGION": Stack.of(self).region,
             "S3_CONNECTOR_LAMBDA": self.lambda_deployment.deployment_key,
             "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
             "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket.bucket_name,  # Added for cross-bucket deletion

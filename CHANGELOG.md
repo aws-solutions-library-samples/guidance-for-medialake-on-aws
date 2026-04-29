@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.14.0] - 2026-04-29
+
+### Features
+
+- feat: Add ability for nodes to be Lambda containers
+
+### Bug Fixes
+
+- fix: custom metadata filters working with state store
+
 ## [1.13.1] - 2026-04-28
 
 ### Bug Fixes

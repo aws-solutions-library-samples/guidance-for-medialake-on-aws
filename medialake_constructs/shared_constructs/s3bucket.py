@@ -75,6 +75,8 @@ class S3Bucket(Construct):
             "cors": "cors",
             "server_access_logs_bucket": "access_logs_bucket",
             "intelligent_tiering_configurations": "intelligent_tiering_configurations",
+            "website_index_document": "website_index_document",
+            "website_error_document": "website_error_document",
         }
 
         for prop_name, bucket_prop_name in optional_props.items():

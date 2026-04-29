@@ -48,6 +48,30 @@ const FILE_SIZE_UNITS = [
   { value: 1024 * 1024 * 1024, label: "GB" },
 ];
 
+/**
+ * Serialize a FacetFilters object into URL search params (mutating `params`).
+ *
+ * Regular filters become their own query params; custom metadata filters are
+ * JSON-encoded under `custom_md` so they round-trip cleanly through the URL
+ * and persist across search submissions (matching the behavior of regular
+ * filters like type/extension).
+ */
+export function appendFiltersToUrlParams(params: URLSearchParams, filters: FacetFilters): void {
+  if (filters.type) params.set("type", filters.type);
+  if (filters.extension) params.set("extension", filters.extension);
+  if (filters.filename) params.set("filename", filters.filename);
+  if (filters.asset_size_gte !== undefined)
+    params.set("asset_size_gte", filters.asset_size_gte.toString());
+  if (filters.asset_size_lte !== undefined)
+    params.set("asset_size_lte", filters.asset_size_lte.toString());
+  if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
+  if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
+  if (filters.date_range_option) params.set("date_range_option", filters.date_range_option);
+  if (filters.customMetadataFilters && filters.customMetadataFilters.length > 0) {
+    params.set("custom_md", JSON.stringify(filters.customMetadataFilters));
+  }
+}
+
 // Helper function to convert bytes to appropriate unit for display
 const convertBytesToDisplayUnit = (bytes: number) => {
   if (bytes >= FILE_SIZE_UNITS[3].value) {
