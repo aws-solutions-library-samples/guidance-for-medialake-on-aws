@@ -229,6 +229,11 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Coactive AI"),
                         "id": item.get("id"),
+                        # Configurable Coactive endpoints
+                        "search_endpoint": item.get("searchEndpoint"),
+                        "dataset_endpoint": item.get("datasetEndpoint"),
+                        "auth_endpoint": item.get("authEndpoint"),
+                        "response_format": item.get("responseFormat"),
                     }
                 elif provider_type in [
                     "bedrock twelvelabs",

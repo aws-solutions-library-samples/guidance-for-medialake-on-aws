@@ -162,6 +162,10 @@ class SearchProviderConfigManager:
         api_key: str,
         endpoint: Optional[str] = None,
         metadata_mapping: Optional[Dict[str, str]] = None,
+        search_endpoint: Optional[str] = None,
+        dataset_endpoint: Optional[str] = None,
+        auth_endpoint: Optional[str] = None,
+        response_format: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a Coactive provider configuration.
@@ -169,12 +173,22 @@ class SearchProviderConfigManager:
         Args:
             dataset_id: Coactive dataset ID
             api_key: Coactive API key
-            endpoint: Optional custom endpoint
+            endpoint: Optional custom endpoint (legacy, prefer search_endpoint)
             metadata_mapping: Optional field mapping
+            search_endpoint: Optional custom search API URL
+            dataset_endpoint: Optional custom dataset management base URL
+            auth_endpoint: Optional custom auth/login URL
+            response_format: Optional response format version ('v1' or 'v2')
 
         Returns:
             Coactive configuration dictionary
         """
+        from coactive_response_adapters import get_default_endpoints
+
+        # Determine defaults based on response format
+        fmt = response_format or "v1"
+        defaults = get_default_endpoints(fmt)
+
         # Store API key in Secrets Manager
         secret_arn = self._store_api_key_in_secrets("coactive", api_key)
 
@@ -184,7 +198,7 @@ class SearchProviderConfigManager:
             "architecture": "external_semantic_service",
             "capabilities": {"media": ["video", "audio", "image"], "semantic": True},
             "dataset_id": dataset_id,
-            "endpoint": endpoint or "https://app.coactive.ai/api/v1/search",
+            "endpoint": endpoint or defaults["search"],
             "auth": {"type": "bearer", "secret_arn": secret_arn},
             "metadata_mapping": metadata_mapping
             or {
@@ -192,6 +206,10 @@ class SearchProviderConfigManager:
                 "mediaType": "media_type",
                 "duration": "duration_ms",
             },
+            "search_endpoint": search_endpoint or defaults["search"],
+            "dataset_endpoint": dataset_endpoint or defaults["dataset"],
+            "auth_endpoint": auth_endpoint or defaults["auth"],
+            "response_format": fmt,
         }
 
         return config

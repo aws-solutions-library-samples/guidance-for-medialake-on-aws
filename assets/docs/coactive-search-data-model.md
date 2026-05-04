@@ -98,6 +98,91 @@ POST https://api.coactive.ai/api/v1/search/text-to-image
 | **Video results**        | Nested `video` object containing `coactiveVideoId` and `metadata`, plus a `shot` object with temporal boundaries (`start_time_ms`, `end_time_ms`) and a `timestamp` midpoint |
 | **Media type detection** | Determined by the presence/absence of the `video` key in the result object                                                                                                   |
 
+### V2 Response Structure (New)
+
+The V2 response format uses a flat structure where all results share the same shape regardless of media type:
+
+```json
+{
+  "results": [
+    {
+      "id": "7a3079fa-e071-438b-b2c1-8456ea54312f",
+      "index": 0,
+      "start_frame_num": 0,
+      "end_frame_num": 20910,
+      "start_time_ms": 0,
+      "end_time_ms": 871250,
+      "composite_id": "ba53b654-0f0c-4cf6-b6d5-9f4bb7b1acd3",
+      "composite_type": "shot",
+      "composite_slice_score": 0.2558,
+      "video_id": "098c509b-567b-4784-aad8-4e094df483f1",
+      "source_path": "s3://coactive-datasets-production/...",
+      "metadata": {
+        "data": {
+          "medialake_uuid": "b50b11b5-ea36-4b76-aaff-b70b39cee45c",
+          "media_type": "video",
+          "file_format": "MOV",
+          "edit_type": "raw footage",
+          "artist": "Jean Dawson",
+          "episode": "E10"
+        }
+      }
+    }
+  ]
+}
+```
+
+### V1 vs V2 Comparison
+
+| Aspect                 | V1 Format                                                    | V2 Format                                 |
+| ---------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| **Results array**      | `response["data"]`                                           | `response["results"]`                     |
+| **Total count**        | `response["total_count"]`                                    | Derived from `len(results)`               |
+| **Result structure**   | Different shapes for image vs video                          | Flat — all results share same shape       |
+| **MediaLake UUID**     | `metadata.medialake_uuid` or `video.metadata.medialake_uuid` | `metadata.data.medialake_uuid`            |
+| **Score**              | `relevance_score` or `score`                                 | `composite_slice_score`                   |
+| **Timing**             | Nested in `shot.start_time_ms`                               | Top-level `start_time_ms` / `end_time_ms` |
+| **Media type**         | `metadata.media_type`                                        | `metadata.data.media_type`                |
+| **Video ID**           | `video.coactiveVideoId`                                      | `video_id`                                |
+| **Shot ID**            | `shot.shot_id`                                               | `composite_id` + `composite_type`         |
+| **Frame info**         | Not present                                                  | `start_frame_num`, `end_frame_num`        |
+| **Source path**        | Not present                                                  | `source_path` (S3 URI)                    |
+| **Coactive result ID** | `coactiveImageId` / `coactiveVideoId`                        | `id` (top-level)                          |
+
+### Response Adapter Pattern
+
+The system uses a **Response Adapter Pattern** to handle both formats transparently:
+
+```mermaid
+classDiagram
+    class CoactiveResponseAdapter {
+        <<abstract>>
+        +get_format_version() str
+        +get_results(response) list
+        +get_total_count(response, results) int
+        +get_medialake_uuid(result) str
+        +get_score(result, rank) float
+        +get_media_type(result) str
+        +get_timing_info(result) dict
+        +get_coactive_asset_id(result) str
+        +get_video_group_key(result) str
+        +get_coactive_metadata(result) dict
+    }
+
+    class CoactiveV1ResponseAdapter {
+        +get_format_version() "v1"
+    }
+
+    class CoactiveV2ResponseAdapter {
+        +get_format_version() "v2"
+    }
+
+    CoactiveResponseAdapter <|-- CoactiveV1ResponseAdapter
+    CoactiveResponseAdapter <|-- CoactiveV2ResponseAdapter
+```
+
+The adapter is selected based on the `responseFormat` configuration field, or auto-detected from the response structure if not explicitly configured. See [`coactive_response_adapters.py`](lambdas/api/search/get_search/coactive_response_adapters.py).
+
 ### Image vs. Video Result Structures
 
 ```mermaid
@@ -736,15 +821,53 @@ CoActive provider configuration is stored in DynamoDB under the composite key:
 
 #### DynamoDB Record Fields
 
-| Field             | Type      | Description                                              |
-| ----------------- | --------- | -------------------------------------------------------- |
-| `type`            | `string`  | `"coactive"`                                             |
-| `name`            | `string`  | Display name (e.g., `"Coactive AI"`)                     |
-| `isEnabled`       | `boolean` | Whether the provider is active                           |
-| `endpoint`        | `string`  | CoActive API base URL                                    |
-| `secretArn`       | `string`  | ARN of the Secrets Manager secret containing the API key |
-| `datasetId`       | `string`  | CoActive dataset identifier for this environment         |
-| `metadataMapping` | `object`  | Field mapping between CoActive and MediaLake metadata    |
+| Field             | Type      | Description                                                                       |
+| ----------------- | --------- | --------------------------------------------------------------------------------- |
+| `type`            | `string`  | `"coactive"`                                                                      |
+| `name`            | `string`  | Display name (e.g., `"Coactive AI"`)                                              |
+| `isEnabled`       | `boolean` | Whether the provider is active                                                    |
+| `endpoint`        | `string`  | CoActive API base URL (legacy)                                                    |
+| `secretArn`       | `string`  | ARN of the Secrets Manager secret containing the API key                          |
+| `datasetId`       | `string`  | CoActive dataset identifier for this environment                                  |
+| `metadataMapping` | `object`  | Field mapping between CoActive and MediaLake metadata                             |
+| `searchEndpoint`  | `string`  | _(Optional)_ Custom search API URL — overrides default                            |
+| `datasetEndpoint` | `string`  | _(Optional)_ Custom dataset management base URL — overrides default               |
+| `authEndpoint`    | `string`  | _(Optional)_ Custom auth/login URL — overrides default                            |
+| `responseFormat`  | `string`  | _(Optional)_ Response format version: `"v1"` or `"v2"` (auto-detected if omitted) |
+
+### Configurable Endpoints
+
+All CoActive endpoints are now configurable via the system settings API. If not explicitly set, defaults are used:
+
+| Endpoint       | Default Value                                         | DynamoDB Field    |
+| -------------- | ----------------------------------------------------- | ----------------- |
+| Search API     | `https://api.coactive.ai/api/v1/search/text-to-image` | `searchEndpoint`  |
+| Dataset Mgmt   | `https://app.coactive.ai/api/v1`                      | `datasetEndpoint` |
+| Authentication | `https://api.coactive.ai/api/v0/login`                | `authEndpoint`    |
+
+To override, include the fields in the POST or PUT request body:
+
+```json
+{
+  "name": "Coactive AI",
+  "type": "coactive",
+  "apiKey": "your-api-key",
+  "searchEndpoint": "https://custom-api.coactive.ai/api/v2/search",
+  "datasetEndpoint": "https://custom-app.coactive.ai/api/v2",
+  "responseFormat": "v2"
+}
+```
+
+### Response Format Versions
+
+The system supports multiple CoActive API response formats via the **Response Adapter Pattern**:
+
+| Format | Description                                                                | Auto-Detection Key      |
+| ------ | -------------------------------------------------------------------------- | ----------------------- |
+| `v1`   | Original format: `data[]`, `total_count`, nested `video`/`shot` structures | `"data"` in response    |
+| `v2`   | New flat format: `results[]`, `composite_slice_score`, top-level timing    | `"results"` in response |
+
+If `responseFormat` is not explicitly configured, the system auto-detects the format from the response structure.
 
 ### Provider Metadata
 
@@ -755,7 +878,14 @@ Defined in [`system_search_get.py`](lambdas/api/settings/system_search_get.py):
     "id": "coactive",
     "name": "Coactive AI",
     "type": "coactive",
+    # Legacy fallback — kept for backwards compatibility only.
+    # Per-endpoint keys below are authoritative and override this value.
     "defaultEndpoint": "https://app.coactive.ai/api/v1/search",
+    "defaultSearchEndpoint": "https://api.coactive.ai/api/v1/search/text-to-image",
+    "defaultDatasetEndpoint": "https://app.coactive.ai/api/v1",
+    "defaultAuthEndpoint": "https://api.coactive.ai/api/v0/login",
+    "defaultResponseFormat": "v1",
+    "supportedResponseFormats": ["v1", "v2"],
     "requiresApiKey": True,
     "isExternal": True,
     "supportedMediaTypes": ["image", "video"],
@@ -763,15 +893,17 @@ Defined in [`system_search_get.py`](lambdas/api/settings/system_search_get.py):
 }
 ```
 
+> **Precedence note:** The per-endpoint keys (`defaultSearchEndpoint`, `defaultDatasetEndpoint`, `defaultAuthEndpoint`) are authoritative and always override the legacy `defaultEndpoint`. `defaultEndpoint` is retained only as a fallback for older clients that have not been updated to consume the per-endpoint keys.
+
 ### Dataset Auto-Creation
 
 When a CoActive provider is first configured via the settings POST endpoint ([`system_search_post.py`](lambdas/api/settings/system_search_post.py)), the system automatically creates a dataset in CoActive:
 
-| Parameter        | Value                                                              |
-| ---------------- | ------------------------------------------------------------------ |
-| **Dataset name** | `MediaLake_Dataset_{ENVIRONMENT}` (e.g., `MediaLake_Dataset_prod`) |
-| **Encoder**      | `"multimodal-tx-large3"`                                           |
-| **API endpoint** | `POST https://app.coactive.ai/api/v1/datasets`                     |
+| Parameter        | Value                                                                          |
+| ---------------- | ------------------------------------------------------------------------------ |
+| **Dataset name** | `MediaLake_Dataset_{ENVIRONMENT}` (e.g., `MediaLake_Dataset_prod`)             |
+| **Encoder**      | `"multimodal-tx-large3"`                                                       |
+| **API endpoint** | Configurable via `datasetEndpoint` (default: `https://app.coactive.ai/api/v1`) |
 
 Updates to the dataset configuration are handled by [`system_search_put.py`](lambdas/api/settings/system_search_put.py).
 
@@ -779,19 +911,21 @@ Updates to the dataset configuration are handled by [`system_search_put.py`](lam
 
 ## 9. Key API Endpoints & Constants
 
-### API Endpoints
+### API Endpoints (Defaults — All Configurable)
 
-| Constant                    | Value                                                          | Host              |
-| --------------------------- | -------------------------------------------------------------- | ----------------- |
-| CoActive Login URL          | `https://api.coactive.ai/api/v0/login`                         | `api.coactive.ai` |
-| CoActive Search URL         | `https://api.coactive.ai/api/v1/search/text-to-image`          | `api.coactive.ai` |
-| CoActive Datasets URL       | `https://app.coactive.ai/api/v1/datasets`                      | `app.coactive.ai` |
-| CoActive Delete URL pattern | `https://app.coactive.ai/api/v1/datasets/{id}/video/{assetId}` | `app.coactive.ai` |
+| Constant                    | Default Value                                         | Host              | Config Field      |
+| --------------------------- | ----------------------------------------------------- | ----------------- | ----------------- |
+| CoActive Login URL          | `https://api.coactive.ai/api/v0/login`                | `api.coactive.ai` | `authEndpoint`    |
+| CoActive Search URL         | `https://api.coactive.ai/api/v1/search/text-to-image` | `api.coactive.ai` | `searchEndpoint`  |
+| CoActive Datasets URL       | `https://app.coactive.ai/api/v1`                      | `app.coactive.ai` | `datasetEndpoint` |
+| CoActive Delete URL pattern | `{datasetEndpoint}/datasets/{id}/video/{assetId}`     | `app.coactive.ai` | `datasetEndpoint` |
 
-> **⚠️ Note:** CoActive uses **two different API hosts**:
+> **⚠️ Note:** CoActive uses **two different API hosts** by default:
 >
 > - **`api.coactive.ai`** — Authentication and search operations
 > - **`app.coactive.ai`** — Dataset management, asset deletion, and administrative operations
+>
+> All endpoints can be overridden via system settings for custom deployments.
 
 ### Internal Constants
 
@@ -814,6 +948,7 @@ Updates to the dataset configuration are handled by [`system_search_put.py`](lam
 | File                                                                                                   | Description                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | [`coactive_search_provider.py`](lambdas/api/search/get_search/coactive_search_provider.py)             | Core CoActive search provider — payload building, API calls, response conversion, enrichment                                |
+| [`coactive_response_adapters.py`](lambdas/api/search/get_search/coactive_response_adapters.py)         | Response adapter pattern — V1 and V2 format adapters, auto-detection, default endpoint registry                             |
 | [`unified_search_orchestrator.py`](lambdas/api/search/get_search/unified_search_orchestrator.py)       | Routes queries to providers, loads config from DynamoDB, converts to final response format                                  |
 | [`unified_search_provider.py`](lambdas/api/search/get_search/unified_search_provider.py)               | Base classes (`BaseSearchProvider`, `ProviderPlusStoreSearchProvider`, `ExternalSemanticServiceProvider`), provider factory |
 | [`unified_search_models.py`](lambdas/api/search/get_search/unified_search_models.py)                   | Internal dataclasses: `SearchQuery`, `SearchHit`, `SearchResult`, `SearchProviderConfig`, `SearchArchitectureType`          |

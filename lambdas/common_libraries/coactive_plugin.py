@@ -17,11 +17,28 @@ from search_provider_models import AssetDeletionResult, ExternalServicePlugin
 class CoactivePlugin(ExternalServicePlugin):
     """Plugin for Coactive AI external service integration"""
 
+    # Default endpoints
+    DEFAULT_AUTH_ENDPOINT = "https://api.coactive.ai/api/v0/login"
+    DEFAULT_SEARCH_ENDPOINT = "https://api.coactive.ai/api/v1/search/text-to-image"
+    DEFAULT_DATASET_ENDPOINT = "https://app.coactive.ai/api/v1"
+
     def __init__(self, config: Dict[str, Any], logger, metrics):
         super().__init__(config, logger, metrics)
         self.secrets_client = boto3.client("secretsmanager")
         self._api_key = None
         self._dataset_id = None
+
+    def _get_auth_endpoint(self) -> str:
+        """Get the configured auth endpoint, falling back to default."""
+        return self.config.get("auth_endpoint") or self.DEFAULT_AUTH_ENDPOINT
+
+    def _get_search_endpoint(self) -> str:
+        """Get the configured search endpoint, falling back to default."""
+        return self.config.get("search_endpoint") or self.DEFAULT_SEARCH_ENDPOINT
+
+    def _get_dataset_endpoint(self) -> str:
+        """Get the configured dataset management endpoint, falling back to default."""
+        return self.config.get("dataset_endpoint") or self.DEFAULT_DATASET_ENDPOINT
 
     def get_service_name(self) -> str:
         """Return the name of the external service"""
@@ -167,20 +184,27 @@ class CoactivePlugin(ExternalServicePlugin):
         This follows the same pattern as system_search_post.py
         """
         try:
+            from urllib.parse import urlparse
+
             personal_token = self._get_api_key()
             if not personal_token:
                 self.logger.error("No personal token available")
                 return None
 
             # Step 1: Authenticate to get access token
-            conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
+            auth_endpoint = self._get_auth_endpoint()
+            parsed_auth = urlparse(auth_endpoint)
+            auth_host = parsed_auth.netloc
+            auth_path = parsed_auth.path
+
+            conn = http.client.HTTPSConnection(auth_host, timeout=30)
 
             login_payload = {"grant_type": "refresh_token"}
             login_data = json.dumps(login_payload)
 
             conn.request(
                 "POST",
-                "/api/v0/login",
+                auth_path,
                 body=login_data,
                 headers={
                     "Authorization": f"Bearer {personal_token}",
@@ -319,6 +343,8 @@ class CoactivePlugin(ExternalServicePlugin):
     def _get_auth_token(self) -> Optional[str]:
         """Get JWT access token by exchanging personal token with Coactive API"""
         try:
+            from urllib.parse import urlparse
+
             # Get API key (personal token) from config
             api_key = self._get_api_key()
             if not api_key:
@@ -326,7 +352,12 @@ class CoactivePlugin(ExternalServicePlugin):
                 return None
 
             # Exchange personal token for JWT access token
-            conn = http.client.HTTPSConnection("api.coactive.ai")
+            auth_endpoint = self._get_auth_endpoint()
+            parsed_auth = urlparse(auth_endpoint)
+            auth_host = parsed_auth.netloc
+            auth_path = parsed_auth.path
+
+            conn = http.client.HTTPSConnection(auth_host)
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
@@ -335,7 +366,7 @@ class CoactivePlugin(ExternalServicePlugin):
             body = json.dumps(payload)
 
             self.logger.info("Exchanging personal token for JWT access token")
-            conn.request("POST", "/api/v0/login", body=body, headers=headers)
+            conn.request("POST", auth_path, body=body, headers=headers)
             auth_response = conn.getresponse()
             response_data = auth_response.read().decode("utf-8")
             conn.close()
@@ -397,18 +428,22 @@ class CoactivePlugin(ExternalServicePlugin):
                 f"Querying Coactive for medialake_uuid: {medialake_uuid} (type: {asset_type})"
             )
 
-            # Make request to Coactive search API
-            endpoint = "https://api.coactive.ai/api/v1/search/text-to-image"
+            # Make request to Coactive search API using configurable endpoint
+            from urllib.parse import urlparse
+
+            search_endpoint = self._get_search_endpoint()
+            parsed_search = urlparse(search_endpoint)
+            search_host = parsed_search.netloc
+            search_path = parsed_search.path
+
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {auth_token}",
             }
 
-            conn = http.client.HTTPSConnection("api.coactive.ai")
+            conn = http.client.HTTPSConnection(search_host)
             body = json.dumps(payload)
-            conn.request(
-                "POST", "/api/v1/search/text-to-image", body=body, headers=headers
-            )
+            conn.request("POST", search_path, body=body, headers=headers)
             response = conn.getresponse()
             response_data = response.read().decode("utf-8")
             conn.close()
@@ -461,10 +496,11 @@ class CoactivePlugin(ExternalServicePlugin):
                 return False
 
             # Determine the correct endpoint based on asset type (using singular form per API docs)
+            dataset_base = self._get_dataset_endpoint().rstrip("/")
             if asset_type == "video":
-                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/video/{coactive_id}"
+                endpoint = f"{dataset_base}/datasets/{dataset_id}/video/{coactive_id}"
             elif asset_type == "image":
-                endpoint = f"https://app.coactive.ai/api/v1/datasets/{dataset_id}/image/{coactive_id}"
+                endpoint = f"{dataset_base}/datasets/{dataset_id}/image/{coactive_id}"
             else:
                 self.logger.error(
                     f"Unsupported asset type for Coactive deletion: {asset_type}"

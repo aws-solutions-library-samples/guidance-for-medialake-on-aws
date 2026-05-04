@@ -21,14 +21,100 @@ metrics = Metrics(namespace=os.environ.get("METRICS_NAMESPACE", "MediaLake"))
 dynamodb = boto3.resource("dynamodb")
 secretsmanager = boto3.client("secretsmanager")
 
+# Allow-list of hostnames (and their subdomains) permitted for Coactive endpoints.
+# Validation is applied to user-supplied values before they are used in any HTTP call.
+COACTIVE_ALLOWED_HOSTS = ("api.coactive.ai", "app.coactive.ai")
 
-def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
+
+def _is_private_or_loopback_host(hostname: str) -> bool:
+    """Return True if hostname resolves to a private/loopback/link-local/reserved IP."""
+    import ipaddress
+    import socket
+
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        # If DNS resolution fails we cannot confirm the host is public; treat as invalid.
+        return True
+
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            continue
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            return True
+    return False
+
+
+def validate_coactive_endpoint(endpoint: str, endpoint_type: str) -> None:
+    """
+    Validate a Coactive endpoint URL before it is used to open an HTTPS connection.
+
+    - Scheme must be https.
+    - Hostname must match an entry in COACTIVE_ALLOWED_HOSTS (exact match or subdomain).
+    - Hostname must not resolve to a private/internal IP range.
+
+    Args:
+        endpoint: The fully-qualified URL to validate.
+        endpoint_type: A human-readable label (e.g. "authEndpoint") used in error messages.
+
+    Raises:
+        BadRequestError: If the endpoint fails any validation rule.
+    """
+    from urllib.parse import urlparse
+
+    if not endpoint or not isinstance(endpoint, str):
+        raise BadRequestError(f"Invalid {endpoint_type}: must be a non-empty string")
+
+    parsed = urlparse(endpoint)
+    if parsed.scheme != "https":
+        raise BadRequestError(
+            f"Invalid {endpoint_type}: scheme must be https (got '{parsed.scheme}')"
+        )
+
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise BadRequestError(f"Invalid {endpoint_type}: missing hostname")
+
+    allowed = any(
+        hostname == host or hostname.endswith(f".{host}")
+        for host in COACTIVE_ALLOWED_HOSTS
+    )
+    if not allowed:
+        raise BadRequestError(
+            f"Invalid {endpoint_type}: hostname '{hostname}' is not in the Coactive allow-list "
+            f"({', '.join(COACTIVE_ALLOWED_HOSTS)})"
+        )
+
+    if _is_private_or_loopback_host(hostname):
+        raise BadRequestError(
+            f"Invalid {endpoint_type}: hostname '{hostname}' resolves to a private or internal address"
+        )
+
+
+def create_coactive_dataset(
+    api_key: str,
+    endpoint: str = None,
+    auth_endpoint: str = None,
+    dataset_endpoint: str = None,
+) -> dict:
     """
     Create or find existing MediaLake_Dataset_{ENVIRONMENT} in Coactive.
 
     Args:
         api_key: Coactive personal token
-        endpoint: Coactive API endpoint (not used, we use correct hosts)
+        endpoint: Coactive API endpoint (legacy, not used directly)
+        auth_endpoint: Coactive auth endpoint (default: https://api.coactive.ai/api/v0/login)
+        dataset_endpoint: Coactive dataset management base URL (default: https://app.coactive.ai/api/v1)
 
     Returns:
         dict: Dataset information including datasetId
@@ -36,19 +122,37 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
     Raises:
         Exception: If dataset creation/lookup fails
     """
+    from urllib.parse import urlparse
+
+    # Resolve endpoints with defaults
+    resolved_auth_endpoint = auth_endpoint or "https://api.coactive.ai/api/v0/login"
+    resolved_dataset_endpoint = dataset_endpoint or "https://app.coactive.ai/api/v1"
+
+    # Validate resolved endpoints before using them in any HTTPS connection.
+    validate_coactive_endpoint(resolved_auth_endpoint, "authEndpoint")
+    validate_coactive_endpoint(resolved_dataset_endpoint, "datasetEndpoint")
+
+    parsed_auth = urlparse(resolved_auth_endpoint)
+    auth_host = parsed_auth.netloc
+    auth_path = parsed_auth.path
+
+    parsed_dataset = urlparse(resolved_dataset_endpoint)
+    dataset_host = parsed_dataset.netloc
+    dataset_base_path = parsed_dataset.path.rstrip("/")
+
     environment = os.environ.get("ENVIRONMENT", "dev")
     dataset_name = f"MediaLake_Dataset_{environment}"
     try:
         # Step 1: Authenticate to get access token (following working script pattern)
-        auth_conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
+        auth_conn = http.client.HTTPSConnection(auth_host, timeout=30)
 
         login_payload = {"grant_type": "refresh_token"}
         login_data = json.dumps(login_payload)
 
-        logger.info("Authenticating with Coactive API using personal token")
+        logger.info(f"Authenticating with Coactive API at {resolved_auth_endpoint}")
         auth_conn.request(
             "POST",
-            "/api/v0/login",
+            auth_path,
             body=login_data,
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -75,12 +179,12 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
 
         # Step 2: Check if MediaLake_Dataset_{ENVIRONMENT} already exists (following working script pattern)
         logger.info(f"Checking for existing {dataset_name}")
-        dataset_conn = http.client.HTTPSConnection("app.coactive.ai", timeout=30)
+        dataset_conn = http.client.HTTPSConnection(dataset_host, timeout=30)
 
         # List datasets to find existing dataset
         dataset_conn.request(
             "GET",
-            "/api/v1/datasets?limit=100",
+            f"{dataset_base_path}/datasets?limit=100",
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
@@ -114,7 +218,7 @@ def create_coactive_dataset(api_key: str, endpoint: str = None) -> dict:
         logger.info(f"Creating new {dataset_name} in Coactive")
         dataset_conn.request(
             "POST",
-            "/api/v1/datasets",
+            f"{dataset_base_path}/datasets",
             body=dataset_data,
             headers={
                 "Authorization": f"Bearer {access_token}",
@@ -184,6 +288,15 @@ def register_route(app):
             if body.get("type") == "coactive" and "apiKey" not in body:
                 raise BadRequestError("API key is required for Coactive provider")
 
+            # Validate Coactive-specific advanced configuration
+            if body.get("type") == "coactive":
+                if "responseFormat" in body:
+                    allowed_formats = ["v1", "v2"]
+                    if body["responseFormat"] not in allowed_formats:
+                        raise BadRequestError(
+                            f"Invalid responseFormat. Allowed values: {allowed_formats}"
+                        )
+
             # Validate inference_provider if provided
             if "inference_provider" in body and not isinstance(
                 body["inference_provider"], str
@@ -252,6 +365,25 @@ def register_route(app):
             if "isEnabled" in body:
                 search_provider["isEnabled"] = body["isEnabled"]
 
+            # Add Coactive-specific advanced configuration fields
+            if body.get("type") == "coactive":
+                # Validate any user-supplied endpoints before storing them so that
+                # unvalidated hostnames can never be read back and used by other
+                # callers (searches, dataset operations, auth).
+                if "searchEndpoint" in body:
+                    validate_coactive_endpoint(body["searchEndpoint"], "searchEndpoint")
+                    search_provider["searchEndpoint"] = body["searchEndpoint"]
+                if "datasetEndpoint" in body:
+                    validate_coactive_endpoint(
+                        body["datasetEndpoint"], "datasetEndpoint"
+                    )
+                    search_provider["datasetEndpoint"] = body["datasetEndpoint"]
+                if "authEndpoint" in body:
+                    validate_coactive_endpoint(body["authEndpoint"], "authEndpoint")
+                    search_provider["authEndpoint"] = body["authEndpoint"]
+                if "responseFormat" in body:
+                    search_provider["responseFormat"] = body["responseFormat"]
+
             # Handle Coactive dataset creation
             coactive_dataset_id = None
             if body.get("type") == "coactive" and "apiKey" in body:
@@ -264,11 +396,16 @@ def register_route(app):
                         endpoint=body.get(
                             "endpoint", "https://app.coactive.ai/api/v1/search"
                         ),
+                        auth_endpoint=body.get("authEndpoint"),
+                        dataset_endpoint=body.get("datasetEndpoint"),
                     )
                     coactive_dataset_id = dataset_info.get("datasetId")
                     logger.info(
                         f"Successfully created Coactive dataset with ID: {coactive_dataset_id}"
                     )
+                except BadRequestError:
+                    # Let endpoint-validation failures surface as 4xx errors.
+                    raise
                 except Exception as e:
                     logger.error(f"Failed to create Coactive dataset: {str(e)}")
                     raise InternalServerError(
@@ -349,6 +486,9 @@ def register_route(app):
                     "embeddingStore": embedding_store_response,
                 },
             }
+        except BadRequestError:
+            # Preserve validation errors (e.g. endpoint allow-list) as 4xx responses.
+            raise
         except Exception as e:
             logger.exception("Error creating search provider")
             raise InternalServerError(f"Error creating search provider: {str(e)}")

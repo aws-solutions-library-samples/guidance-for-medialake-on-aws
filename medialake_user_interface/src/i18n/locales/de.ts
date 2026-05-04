@@ -781,6 +781,33 @@ export default {
         saveError: "Fehler beim Speichern der Einstellungen",
         cancelSuccess: "Änderungen abgebrochen",
         errorLoading: "Fehler beim Laden der Suchanbieter-Konfiguration",
+        advancedConfig: "Erweiterte Konfiguration",
+        advancedConfigDesc:
+          "Überschreiben Sie die Standard-Coactive-API-Endpunkte und das Antwortformat. Leer lassen, um die Standardwerte zu verwenden.",
+        searchEndpoint: "Such-Endpunkt",
+        searchEndpointHelp: "URL der Coactive-Such-API",
+        datasetId: "Datensatz-ID",
+        datasetIdHelp: "Coactive-Datensatzkennung, die für Suchanfragen verwendet wird",
+        authEndpoint: "Authentifizierungs-Endpunkt",
+        authEndpointHelp: "URL für die Coactive-Authentifizierung/Anmeldung",
+        responseFormat: "Antwortformat",
+        responseFormatAuto: "Automatische Erkennung",
+        responseFormatV1: "V1 (Original)",
+        responseFormatV2: "V2 (Neues flaches Format)",
+        embeddingStoreCoactiveDesc:
+          "Coactive AI verwendet einen eigenen externen Suchdienst und benötigt keine Konfiguration eines Embedding-Speichers.",
+        externalService: "Externer Dienst",
+        embeddingDimension: "Embedding-Dimension",
+        embeddingDimensionDesc: "Vektorraum-Dimension für Embeddings",
+        selectProviderOption: "Anbieter auswählen …",
+        savingApiKeyMessage: "Suchanbieter wird konfiguriert …",
+        apiKeySaveSuccessMessage: "Der Suchanbieter wurde erfolgreich konfiguriert und aktiviert.",
+        apiKeySaveErrorMessage:
+          "Speichern des API-Schlüssels fehlgeschlagen. Bitte erneut versuchen.",
+        embeddingStoreSaveSuccess:
+          "Einstellungen für den Embedding-Speicher erfolgreich gespeichert",
+        embeddingStoreSaveError:
+          "Fehler beim Speichern der Einstellungen für den Embedding-Speicher",
         apiKeySaveError: "Failed to save API key",
         apiKeySaveSuccess: "API key saved successfully",
         external: "External",

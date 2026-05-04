@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.14.1] - 2026-05-04
+
+### Code Refactoring
+
+- refactor: CoActive refactor to support advanced configuration for unique search endpoint and dataset ID's
+
 ## [1.14.0] - 2026-04-29
 
 ### Features

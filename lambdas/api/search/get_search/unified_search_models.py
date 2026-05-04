@@ -222,6 +222,11 @@ class SearchProviderConfig:
     type: Optional[str] = None
     dimensions: Optional[int] = None
     target_index: Optional[str] = None  # Target OpenSearch index for search queries
+    # Configurable Coactive endpoints (override defaults per response format)
+    search_endpoint: Optional[str] = None  # Coactive search API URL
+    dataset_endpoint: Optional[str] = None  # Coactive dataset management base URL
+    auth_endpoint: Optional[str] = None  # Coactive auth/login URL
+    response_format: Optional[str] = None  # Response format version ("v1" or "v2")
 
 
 def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:

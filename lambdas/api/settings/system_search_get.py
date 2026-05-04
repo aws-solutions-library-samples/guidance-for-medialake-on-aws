@@ -50,6 +50,11 @@ PROVIDER_METADATA = {
         "name": "Coactive AI",
         "type": "coactive",
         "defaultEndpoint": "https://app.coactive.ai/api/v1/search",
+        "defaultSearchEndpoint": "https://api.coactive.ai/api/v1/search/text-to-image",
+        "defaultDatasetEndpoint": "https://app.coactive.ai/api/v1",
+        "defaultAuthEndpoint": "https://api.coactive.ai/api/v0/login",
+        "defaultResponseFormat": "v1",
+        "supportedResponseFormats": ["v1", "v2"],
         "requiresApiKey": True,
         "isExternal": True,
         "supportedMediaTypes": ["image", "video"],
@@ -123,6 +128,16 @@ def register_route(app):
                         search_provider.setdefault(
                             "dimensions", metadata["dimensions"][0]
                         )
+
+                # Include configurable endpoint fields if present
+                for endpoint_field in [
+                    "searchEndpoint",
+                    "datasetEndpoint",
+                    "authEndpoint",
+                    "responseFormat",
+                ]:
+                    if endpoint_field in original_item:
+                        search_provider[endpoint_field] = original_item[endpoint_field]
 
             # Get embedding store settings
             embedding_response = system_settings_table.get_item(

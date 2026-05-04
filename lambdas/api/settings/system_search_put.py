@@ -22,13 +22,20 @@ dynamodb = boto3.resource("dynamodb")
 secretsmanager = boto3.client("secretsmanager")
 
 
-def create_coactive_dataset(api_key: str, endpoint: str) -> dict:
+def create_coactive_dataset(
+    api_key: str,
+    endpoint: str,
+    auth_endpoint: str = None,
+    dataset_endpoint: str = None,
+) -> dict:
     """
     Create or find existing MediaLake_Dataset_{ENVIRONMENT} in Coactive and return the dataset information
 
     Args:
         api_key: Coactive personal token
-        endpoint: Coactive API endpoint (not used, we use correct hosts)
+        endpoint: Coactive API endpoint (legacy, not used directly)
+        auth_endpoint: Coactive auth endpoint (default: https://api.coactive.ai/api/v0/login)
+        dataset_endpoint: Coactive dataset management base URL (default: https://app.coactive.ai/api/v1)
 
     Returns:
         dict: Dataset information including datasetId
@@ -36,19 +43,33 @@ def create_coactive_dataset(api_key: str, endpoint: str) -> dict:
     Raises:
         Exception: If dataset creation/lookup fails
     """
+    from urllib.parse import urlparse
+
+    # Resolve endpoints with defaults
+    resolved_auth_endpoint = auth_endpoint or "https://api.coactive.ai/api/v0/login"
+    resolved_dataset_endpoint = dataset_endpoint or "https://app.coactive.ai/api/v1"
+
+    parsed_auth = urlparse(resolved_auth_endpoint)
+    auth_host = parsed_auth.netloc
+    auth_path = parsed_auth.path
+
+    parsed_dataset = urlparse(resolved_dataset_endpoint)
+    dataset_host = parsed_dataset.netloc
+    dataset_base_path = parsed_dataset.path.rstrip("/")
+
     environment = os.environ.get("ENVIRONMENT", "dev")
     dataset_name = f"MediaLake_Dataset_{environment}"
 
     try:
-        auth_conn = http.client.HTTPSConnection("api.coactive.ai", timeout=30)
+        auth_conn = http.client.HTTPSConnection(auth_host, timeout=30)
 
         login_payload = {"grant_type": "refresh_token"}
         login_data = json.dumps(login_payload)
 
-        logger.info("Authenticating with Coactive API using personal token")
+        logger.info(f"Authenticating with Coactive API at {resolved_auth_endpoint}")
         auth_conn.request(
             "POST",
-            "/api/v0/login",
+            auth_path,
             body=login_data,
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -74,11 +95,11 @@ def create_coactive_dataset(api_key: str, endpoint: str) -> dict:
         logger.info("Successfully obtained Coactive access token")
 
         logger.info(f"Checking for existing {dataset_name}")
-        dataset_conn = http.client.HTTPSConnection("app.coactive.ai", timeout=30)
+        dataset_conn = http.client.HTTPSConnection(dataset_host, timeout=30)
 
         dataset_conn.request(
             "GET",
-            "/api/v1/datasets?limit=100",
+            f"{dataset_base_path}/datasets?limit=100",
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
@@ -110,7 +131,7 @@ def create_coactive_dataset(api_key: str, endpoint: str) -> dict:
         logger.info(f"Creating new {dataset_name} in Coactive")
         dataset_conn.request(
             "POST",
-            "/api/v1/datasets",
+            f"{dataset_base_path}/datasets",
             body=dataset_data,
             headers={
                 "Authorization": f"Bearer {access_token}",
@@ -197,6 +218,11 @@ def register_route(app):
                 "embeddingStore",
                 "dimensions",
                 "inference_provider",
+                "searchEndpoint",
+                "datasetEndpoint",
+                "authEndpoint",
+                "responseFormat",
+                "datasetId",
             ]
             for field in body:
                 if field not in allowed_fields:
@@ -223,6 +249,14 @@ def register_route(app):
                     "message": "inference_provider must be a string",
                     "data": {},
                 }
+
+            # Validate responseFormat if provided
+            if "responseFormat" in body:
+                allowed_formats = ["v1", "v2"]
+                if body["responseFormat"] not in allowed_formats:
+                    raise BadRequestError(
+                        f"Invalid responseFormat. Allowed values: {', '.join(allowed_formats)}"
+                    )
 
             # Validate embedding store if provided
             if "embeddingStore" in body:
@@ -274,6 +308,8 @@ def register_route(app):
                         endpoint=body.get(
                             "endpoint", "https://app.coactive.ai/api/v1/search"
                         ),
+                        auth_endpoint=body.get("authEndpoint"),
+                        dataset_endpoint=body.get("datasetEndpoint"),
                     )
                     coactive_dataset_id = dataset_info.get("datasetId")
                     logger.info(
@@ -358,6 +394,17 @@ def register_route(app):
                 if coactive_dataset_id:
                     search_provider_item["datasetId"] = coactive_dataset_id
 
+                # Add Coactive-specific advanced configuration fields
+                for field_name in [
+                    "searchEndpoint",
+                    "datasetEndpoint",
+                    "authEndpoint",
+                    "responseFormat",
+                    "datasetId",
+                ]:
+                    if field_name in body:
+                        search_provider_item[field_name] = body[field_name]
+
                 system_settings_table.put_item(Item=search_provider_item)
                 updated_provider = search_provider_item
                 logger.info(f"Created new search provider: {provider_id}")
@@ -403,6 +450,22 @@ def register_route(app):
                 if secret_arn:
                     update_expression_parts.append("secretArn = :secretArn")
                     expression_attribute_values[":secretArn"] = secret_arn
+
+                # Add Coactive-specific advanced configuration fields.
+                # User-provided values always take precedence over any
+                # auto-created values (e.g. datasetId from coactive_dataset_id).
+                for field_name in [
+                    "searchEndpoint",
+                    "datasetEndpoint",
+                    "authEndpoint",
+                    "responseFormat",
+                    "datasetId",
+                ]:
+                    if field_name in body:
+                        expression_part = f"{field_name} = :{field_name}"
+                        if expression_part not in update_expression_parts:
+                            update_expression_parts.append(expression_part)
+                        expression_attribute_values[f":{field_name}"] = body[field_name]
 
                 update_expression = " , ".join(update_expression_parts)
 

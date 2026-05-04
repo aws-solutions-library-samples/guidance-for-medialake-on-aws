@@ -33,6 +33,39 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         self._opensearch_client = None
         self._cached_token = None
         self._token_expiry = 0
+        self._response_adapter = None
+
+    def _get_response_adapter(self):
+        """Get or create the response adapter based on configuration."""
+        if self._response_adapter is None:
+            from coactive_response_adapters import get_response_adapter
+
+            fmt = self.config.response_format or "v1"
+            self._response_adapter = get_response_adapter(fmt)
+            self.logger.info(
+                f"Using Coactive response adapter: {self._response_adapter.get_format_version()}"
+            )
+        return self._response_adapter
+
+    def _get_search_endpoint(self) -> str:
+        """Get the configured search endpoint, falling back to defaults."""
+        from coactive_response_adapters import get_default_endpoints
+
+        if self.config.search_endpoint:
+            return self.config.search_endpoint
+        if self.config.endpoint:
+            return self.config.endpoint
+        fmt = self.config.response_format or "v1"
+        return get_default_endpoints(fmt)["search"]
+
+    def _get_auth_endpoint(self) -> str:
+        """Get the configured auth endpoint, falling back to default."""
+        from coactive_response_adapters import get_default_endpoints
+
+        if self.config.auth_endpoint:
+            return self.config.auth_endpoint
+        fmt = self.config.response_format or "v1"
+        return get_default_endpoints(fmt)["auth"]
 
     def _get_provider_location(self) -> ProviderLocation:
         return ProviderLocation.EXTERNAL
@@ -153,7 +186,14 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 import json as json_lib
 
                 try:
-                    conn = http.client.HTTPSConnection("api.coactive.ai")
+                    auth_endpoint = self._get_auth_endpoint()
+                    from urllib.parse import urlparse
+
+                    parsed_auth = urlparse(auth_endpoint)
+                    auth_host = parsed_auth.netloc
+                    auth_path = parsed_auth.path
+
+                    conn = http.client.HTTPSConnection(auth_host)
                     headers = {
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {personal_token}",
@@ -161,8 +201,10 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                     payload = {"grant_type": "refresh_token"}
                     body = json_lib.dumps(payload)
 
-                    self.logger.info("Making authentication request to /api/v0/login")
-                    conn.request("POST", "/api/v0/login", body=body, headers=headers)
+                    self.logger.info(
+                        f"Making authentication request to {auth_endpoint}"
+                    )
+                    conn.request("POST", auth_path, body=body, headers=headers)
                     auth_response = conn.getresponse()
                     response_data = auth_response.read().decode("utf-8")
                     conn.close()
@@ -235,10 +277,24 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             )
 
     def _build_coactive_payload(self, query: SearchQuery) -> Dict[str, Any]:
-        """Build Coactive API request payload for new POST endpoint"""
+        """Build Coactive API request payload.
+
+        Uses 'query' field for custom endpoints (v2) and 'text_query' for the
+        default Coactive API (v1).
+        """
+        from coactive_response_adapters import COACTIVE_DEFAULT_ENDPOINTS
+
+        search_endpoint = self._get_search_endpoint()
+        is_default_endpoint = search_endpoint in [
+            defaults["search"] for defaults in COACTIVE_DEFAULT_ENDPOINTS.values()
+        ]
+
+        # Custom endpoints use 'query'; default Coactive API uses 'text_query'
+        query_field = "text_query" if is_default_endpoint else "query"
+
         payload = {
             "dataset_id": self.config.dataset_id,
-            "text_query": query.query_text,
+            query_field: query.query_text,
             "offset": query.page_offset,
             "limit": query.page_size,
         }
@@ -287,19 +343,34 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         return operator_mappings.get(operator, operator)
 
     def _make_coactive_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Make HTTP request to Coactive API using new POST endpoint"""
-        # Use the new Coactive search endpoint
-        endpoint = "https://api.coactive.ai/api/v1/search/text-to-image"
+        """Make HTTP request to Coactive API using configured search endpoint"""
+        from coactive_response_adapters import COACTIVE_DEFAULT_ENDPOINTS
+
+        # Use the configurable search endpoint
+        endpoint = self._get_search_endpoint()
 
         # Get auth token from Secrets Manager
         auth_token = self._get_auth_token()
         if not auth_token:
             raise Exception("Coactive auth token not available")
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {auth_token}",
-        }
+        # Determine if this is a custom endpoint or the default Coactive API
+        is_default_endpoint = endpoint in [
+            defaults["search"] for defaults in COACTIVE_DEFAULT_ENDPOINTS.values()
+        ]
+
+        # Default Coactive API uses Authorization: Bearer
+        # Custom endpoints use x-coactive-key header
+        if is_default_endpoint:
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_token}",
+            }
+        else:
+            headers = {
+                "Content-Type": "application/json",
+                "x-coactive-key": auth_token,
+            }
 
         self.logger.info(f"Making Coactive API request to {endpoint}")
         self.logger.debug(f"Coactive request payload: {json.dumps(payload, indent=2)}")
@@ -343,81 +414,57 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         self, response: Dict[str, Any], query: SearchQuery
     ) -> SearchResult:
         """
-        Convert Coactive API response to SearchResult with proper MediaLake format.
+        Convert Coactive API response to SearchResult using the configured response adapter.
 
-        Coactive returns results in relevance order but doesn't provide explicit ranking scores.
-        This method converts the positional order to a 0.0-1.0 ranking score where:
-        - First result gets 1.0 (highest relevance)
-        - Subsequent results get progressively lower scores using exponential decay
-        - Minimum score is 0.1 to maintain meaningful differences
+        The adapter pattern allows this method to remain format-agnostic. The active
+        adapter (V1 or V2) handles all response-format-specific field extraction.
+
+        If no explicit response_format is configured, the adapter is auto-detected
+        from the response structure.
         """
-        # Based on working example, results are in 'data' field
-        results = response.get("data", [])
-        total_count = response.get("total_count", len(results))
+        from coactive_response_adapters import (
+            detect_response_format,
+            get_response_adapter,
+        )
+
+        # Use configured adapter, or auto-detect from response
+        if self.config.response_format:
+            adapter = self._get_response_adapter()
+        else:
+            detected_format = detect_response_format(response)
+            adapter = get_response_adapter(detected_format)
+            self.logger.info(
+                f"Auto-detected Coactive response format: {detected_format}"
+            )
+
+        results = adapter.get_results(response)
+        total_count = adapter.get_total_count(response, results)
 
         self.logger.info(
-            f"Processing {len(results)} Coactive search results with order-based ranking conversion"
+            f"Processing {len(results)} Coactive search results "
+            f"(format: {adapter.get_format_version()})"
         )
 
         # Group results by MediaLake asset UUID to create proper clips structure
         assets_with_clips = {}
-        max_score = 1.0  # Since we're normalizing, max score will be 1.0
+        max_score = 1.0
         for i, result in enumerate(results):
             self.logger.info(f"[CLIP_DEBUG] Processing result {i+1}/{len(results)}")
 
-            # Extract MediaLake UUID from different locations based on media type
-            medialake_uuid = None
-            coactive_metadata = {}
-
-            # For images: UUID is directly in metadata
-            if result.get("metadata", {}).get("medialake_uuid"):
-                medialake_uuid = result["metadata"]["medialake_uuid"]
-                coactive_metadata = result.get("metadata", {})
-
-            # For videos: UUID is in video.metadata, with timing info in shot
-            elif result.get("video", {}).get("metadata", {}).get("medialake_uuid"):
-                medialake_uuid = result["video"]["metadata"]["medialake_uuid"]
-                coactive_metadata = result["video"].get("metadata", {})
-
-                # Add timing information for video clips
-                if result.get("shot"):
-                    coactive_metadata.update(
-                        {
-                            "start_time_ms": result["shot"].get("start_time_ms", 0),
-                            "end_time_ms": result["shot"].get("end_time_ms", 0),
-                            "timestamp_ms": result.get("timestamp", 0),
-                            "shot_id": result["shot"].get("shot_id"),
-                        }
-                    )
-
-                # Add Coactive video ID
-                if result.get("video", {}).get("coactiveVideoId"):
-                    coactive_metadata["coactive_video_id"] = result["video"][
-                        "coactiveVideoId"
-                    ]
-
+            medialake_uuid = adapter.get_medialake_uuid(result)
             if not medialake_uuid:
                 self.logger.warning(
                     f"No MediaLake UUID found in Coactive result: {result}"
                 )
                 continue
 
-            # Use the raw rank position (1-based) as the score.
-            # Coactive returns results in relevance order but doesn't provide
-            # explicit relevance scores.  The rank is the most honest
-            # representation — no synthetic decay curves.
             rank = i + 1
-            # If Coactive provides a real score, use it. Otherwise derive a
-            # score from rank that preserves descending order (rank 1 = highest).
-            raw_score = result.get("relevance_score") or result.get("score")
-            if raw_score is not None:
-                score = float(raw_score)
-            else:
-                # Invert rank so first result has highest score
-                score = 1.0 / rank
+            score = adapter.get_score(result, rank)
 
             if score > max_score:
                 max_score = score
+
+            coactive_metadata = adapter.get_coactive_metadata(result)
 
             # Group clips by asset UUID
             if medialake_uuid not in assets_with_clips:
@@ -427,7 +474,6 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                     "max_score": score,
                 }
             else:
-                # Update max score for this asset
                 if score > assets_with_clips[medialake_uuid]["max_score"]:
                     assets_with_clips[medialake_uuid]["max_score"] = score
 
@@ -436,7 +482,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                 "score": score,
                 "rank": rank,
                 "coactive_metadata": coactive_metadata,
-                "coactive_result": result,  # Store full result for debugging
+                "coactive_result": result,
             }
 
             assets_with_clips[medialake_uuid]["clips"].append(clip_data)
@@ -446,24 +492,24 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         # Convert to SearchHit format
         hits = []
         for asset_uuid, asset_data in assets_with_clips.items():
-            # Determine media type from first clip
+            # Determine media type from first clip's result
             first_clip = asset_data["clips"][0] if asset_data["clips"] else {}
-            media_type_str = first_clip.get("coactive_metadata", {}).get(
-                "media_type", "video"
-            )
+            first_result = first_clip.get("coactive_result", {})
+            media_type_str = adapter.get_media_type(first_result)
             try:
                 media_type = MediaType(media_type_str.lower())
             except ValueError:
-                media_type = MediaType.VIDEO  # default fallback
+                media_type = MediaType.VIDEO
 
             hit = SearchHit(
                 asset_id=asset_uuid,
                 score=asset_data["max_score"],
-                source=asset_data,  # Store grouped clips data
+                source=asset_data,
                 media_type=media_type,
                 provider_metadata={
                     "provider": "coactive",
                     "clips_count": len(asset_data["clips"]),
+                    "response_format": adapter.get_format_version(),
                 },
             )
             hits.append(hit)
@@ -477,7 +523,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
             hits=hits,
             total_results=total_count,
             max_score=max_score,
-            took_ms=0,  # Will be set by caller
+            took_ms=0,
             provider="coactive",
             architecture_type=SearchArchitectureType.EXTERNAL_SEMANTIC_SERVICE,
             provider_location=ProviderLocation.EXTERNAL,
