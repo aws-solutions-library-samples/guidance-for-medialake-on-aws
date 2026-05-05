@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.14.2] - 2026-05-05
+
+### Code Refactoring
+
+- refactor: Turn pruning to False for IAC bucket that holds custom nodes to prevent 50 tag limit being hit on the S3 bucket
+
 ## [1.14.1] - 2026-05-04
 
 ### Code Refactoring
