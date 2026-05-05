@@ -197,7 +197,7 @@ const SearchPage: React.FC = () => {
     pageSize: pageSize,
     isSemantic: currentSemantic,
     searchModes: searchModes,
-    fields: isCoactiveProvider ? [] : debouncedSelectedFields,
+    fields: debouncedSelectedFields,
     ...facetFilters,
   });
 
@@ -686,9 +686,9 @@ const SearchPage: React.FC = () => {
                 error={
                   error
                     ? {
-                        status: (error as SearchError).apiResponse?.status || error.name,
-                        message: (error as SearchError).apiResponse?.message || error.message,
-                      }
+                      status: (error as SearchError).apiResponse?.status || error.name,
+                      message: (error as SearchError).apiResponse?.message || error.message,
+                    }
                     : undefined
                 }
                 isLoading={isLoading || isFetching}
