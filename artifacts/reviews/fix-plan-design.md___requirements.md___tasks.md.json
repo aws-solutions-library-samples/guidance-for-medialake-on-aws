@@ -1,0 +1,167 @@
+{
+  "fixes": [
+    {
+      "priority": 1,
+      "severity": "critical",
+      "agreed_by": ["kiro-claude", "claude-code"],
+      "title": "Address shared-with-me and shared-by-me tabs",
+      "description": "The spec completely ignores useGetCollectionsSharedWithMe() and useGetCollectionsSharedByMe() hooks and their /collections/shared-with-me, /collections/shared-by-me API endpoints. CollectionsPage.tsx uses both (lines 67-68) for the 'Shared with me' and 'Shared by me' tabs. CollectionsWidget also uses these hooks. The spec only addresses 'all' and 'myCollections' tabs \u2014 two of five tabs will break or be left in an inconsistent state.",
+      "remediation": "Add a new Requirement 13 'Migrate Shared Tabs to OpenSearch' with these acceptance criteria:\n\n1. Add `filterSharedWithMe: boolean` and `filterSharedByMe: boolean` parameters to `UseGetCollectionsParams` and `ListCollectionsQueryParams`.\n2. In `collections_search.py`, when `shared_with_me=True`: add a `must` clause for `term: { sharedWithUserIds: user_id }` AND a `must_not` clause for `term: { ownerId: user_id }` (shared with me = I can access it, but I don't own it).\n3. When `shared_by_me=True`: add a `must` clause for `term: { ownerId: user_id }` AND a `filter` clause for `exists: { field: sharedWithUserIds }` (collections I own that have been shared with at least one other user).\n4. Update CollectionsPage.tsx tab logic: 'Shared with me' tab passes `filterSharedWithMe: true`, 'Shared by me' tab passes `filterSharedByMe: true` \u2014 both use `useGetCollections` instead of the old dedicated hooks.\n5. Delete `useGetCollectionsSharedWithMe` and `useGetCollectionsSharedByMe` hooks after migration.\n6. Add corresponding tasks (new Task Group 12) with subtasks for each acceptance criterion.\n\nAlternatively, if the old endpoints must be preserved for other consumers, explicitly document them as out-of-scope with a rationale section.",
+      "section_affected": "requirements.md (new Requirement 13), design.md (Section 1 search_collections signature, Section 6 useGetCollections params, Section 9 CollectionsPage), tasks.md (new Task Group 12)",
+      "estimated_effort": "medium"
+    },
+    {
+      "priority": 2,
+      "severity": "critical",
+      "agreed_by": ["kiro-claude", "claude-code"],
+      "title": "Fix queryKeys.ts naming collision on 'all'",
+      "description": "QUERY_KEYS.COLLECTIONS.all already exists as ['collections'] \u2014 the base key used for broad cache invalidation across all collection queries. The spec proposes adding all: () => [...lists(), 'all'] which overwrites this existing property, breaking React Query invalidation for every collection mutation (create, update, delete, share).",
+      "remediation": "In design.md Section 11 (queryKeys.ts), rename the new key factory:\n\n```typescript\nCOLLECTIONS: {\n  // ... existing keys (all, lists, list) unchanged ...\n  fullSet: () => [...COLLECTIONS.lists(), 'fullSet'] as const,\n}\n```\n\nUpdate all references throughout the spec:\n- design.md Section 7 (useGetAllCollections): change `queryKey: QUERY_KEYS.COLLECTIONS.all()` \u2192 `queryKey: QUERY_KEYS.COLLECTIONS.fullSet()`\n- tasks.md Task 5.1: change to `fullSet: () => [...lists(), 'fullSet']`\n- tasks.md Task 5.4: update test description to reference `fullSet` key",
+      "section_affected": "design.md (Sections 7, 11), tasks.md (Task 5.1, 5.4)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 3,
+      "severity": "critical",
+      "agreed_by": ["claude-code"],
+      "title": "Move access control should clause into nested filter bool",
+      "description": "The access control uses a top-level should clause with minimum_should_match: 1. When combined with must clauses (e.g., multi_match for search text), OpenSearch's bool query semantics can make should clauses act as optional boosters rather than hard filters, depending on query construction. This is a security risk \u2014 users could see collections they don't have access to.",
+      "remediation": "In design.md Section 1, restructure the OpenSearch query to nest the access control inside a filter clause:\n\n```json\n{\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        { \"term\": { \"documentType\": \"collection\" } },\n        {\n          \"bool\": {\n            \"should\": [\n              { \"term\": { \"ownerId\": \"user_123\" } },\n              { \"term\": { \"isPublic\": true } },\n              { \"term\": { \"sharedWithUserIds\": \"user_123\" } }\n            ],\n            \"minimum_should_match\": 1\n          }\n        }\n      ],\n      \"must_not\": [\n        { \"exists\": { \"field\": \"parentId\" } }\n      ],\n      \"must\": []\n    }\n  }\n}\n```\n\nUpdate both query examples (root collections and all collections). Update Property 1 and Property 6 descriptions to specify the nested bool structure. Update tasks 2.1, 10.1, and 10.6 to reflect the nested filter approach.",
+      "section_affected": "design.md (Section 1 query examples, Correctness Properties 1 and 6), requirements.md (Requirement 4.1), tasks.md (Tasks 2.1, 10.1, 10.6)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 4,
+      "severity": "major",
+      "agreed_by": ["kiro-claude", "claude-code"],
+      "title": "Keep snake_case API response format",
+      "description": "The pagination response changes from snake_case (has_next_page, total_results) to camelCase (hasNextPage, totalResults) without documenting this as a breaking API change. The existing CollectionsResponse TypeScript interface uses snake_case. External consumers will break silently.",
+      "remediation": "In design.md Section 2 (pagination response format) and the API Response Format section, change to snake_case:\n\n```json\n{\n  \"pagination\": {\n    \"page\": 1,\n    \"page_size\": 50,\n    \"total_results\": 342,\n    \"total_pages\": 7,\n    \"has_next_page\": true,\n    \"has_prev_page\": false\n  }\n}\n```\n\nUpdate design.md Section 6 `PaginatedCollectionsResponse` TypeScript interface to use snake_case field names. Update Correctness Property 5 to reference snake_case field names. Update tasks 4.5, 4.6, 6.2 to use snake_case pagination fields.",
+      "section_affected": "design.md (Sections 2, 5, 6, Correctness Property 5), requirements.md (Requirement 2.6), tasks.md (Tasks 4.5, 4.6, 6.2)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 5,
+      "severity": "major",
+      "agreed_by": ["kiro-claude", "claude-code"],
+      "title": "Phase GSI removal into separate deployment",
+      "description": "GSI removal is irreversible and bundled in the same deployment as the OpenSearch migration. CloudFormation will delete GSI3 and GSI5 from the live table. If OpenSearch has issues in production, there's no fallback \u2014 recreating GSIs takes significant time and causes write throttling.",
+      "remediation": "In requirements.md Requirement 12, add a new acceptance criterion:\n\n> 12.6 THE GSI removal (GSI3 and GSI5) SHALL be deployed as a separate follow-up deployment, no earlier than 2 weeks after the OpenSearch-only listing code is deployed and confirmed stable in production.\n\nIn tasks.md, move Task 9 (GSI removal) into a new 'Phase 2' section with a note: 'Execute only after 2-week bake period confirms OpenSearch stability. Do NOT include in the same deployment as Tasks 1-8.'\n\nIn design.md Key Design Decision 8, add: 'GSI removal is phased separately from the query migration. The OpenSearch-only code is deployed first with GSIs still present, enabling rollback to DynamoDB queries if needed. After a 2-week stability period, GSIs are removed in a follow-up deployment.'",
+      "section_affected": "requirements.md (Requirement 12), design.md (Key Design Decision 8), tasks.md (Task 9)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 6,
+      "severity": "major",
+      "agreed_by": ["kiro-claude", "claude-code"],
+      "title": "Handle silent truncation in useGetAllCollections",
+      "description": "useGetAllCollections with pageSize=5000 silently truncates if a user has access to >5000 collections. Tree views and modals would show incomplete data with no indication. The spec acknowledges up to 50,000 collections in the system \u2014 admins could easily exceed 5000.",
+      "remediation": "In design.md Section 7 (useGetAllCollections), add a truncation warning:\n\n```typescript\nexport const useGetAllCollections = () => {\n  return useQuery<PaginatedCollectionsResponse, Error>({\n    queryKey: QUERY_KEYS.COLLECTIONS.fullSet(),\n    queryFn: async ({ signal }) => {\n      // ... existing code ...\n      const response = await apiClient.get<PaginatedCollectionsResponse>(url, { signal });\n      if (response.data.pagination.total_results > 5000) {\n        console.warn(\n          `useGetAllCollections: truncated ${response.data.pagination.total_results} collections to 5000. Consider implementing scroll pagination.`\n        );\n      }\n      return response.data;\n    },\n  });\n};\n```\n\nIn requirements.md Requirement 9, add acceptance criterion:\n> 9.5 IF the API response indicates `total_results` exceeds `pageSize`, THE `useGetAllCollections` hook SHALL log a warning with the actual total count.\n\nIn tasks.md, add Task 5.5: 'Add truncation warning in useGetAllCollections when total_results > pageSize'.",
+      "section_affected": "design.md (Section 7), requirements.md (Requirement 9), tasks.md (Task 5)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 7,
+      "severity": "major",
+      "agreed_by": ["claude-code"],
+      "title": "Preserve collection enrichment metadata after removing _filter_collections_by_access",
+      "description": "Deleting _filter_collections_by_access loses enrichment metadata it sets on collection objects \u2014 isShared, sharedWithMe, myRole, sharedAt flags. Frontend components render share badges, role indicators, and 'shared at' timestamps from these fields.",
+      "remediation": "In design.md Section 2 (collections_get.py), add a post-processing step after OpenSearch results are returned:\n\n```python\ndef _enrich_collection_metadata(collections: List[Dict], user_id: str) -> List[Dict]:\n    \"\"\"Derive share metadata from OpenSearch fields + current user context.\"\"\"\n    for collection in collections:\n        shared_user_ids = collection.get('sharedWithUserIds', [])\n        owner_id = collection.get('ownerId')\n        collection['isShared'] = len(shared_user_ids) > 0\n        collection['sharedWithMe'] = user_id in shared_user_ids and owner_id != user_id\n        # myRole and sharedAt require PERM# record data \u2014 batch fetch from DynamoDB\n    return collections\n```\n\nFor `myRole` and `sharedAt`: either (a) store `role` and `sharedAt` per-user in OpenSearch (requires changing sharedWithUserIds from a flat array to a nested object \u2014 more complex), or (b) do a lightweight batch DynamoDB query for PERM# records for the current user on the returned collection IDs (O(page_size) queries, not O(total)), or (c) document that myRole/sharedAt are deferred to a follow-up task.\n\nAdd tasks: Task 4.22 'Add _enrich_collection_metadata post-processing step' and Task 4.23 'Write tests for enrichment metadata derivation'.",
+      "section_affected": "design.md (Section 2), tasks.md (Task 4)",
+      "estimated_effort": "medium"
+    },
+    {
+      "priority": 8,
+      "severity": "major",
+      "agreed_by": ["claude-code"],
+      "title": "Optimize backfill PERM# querying from O(N) to O(1)",
+      "description": "The backfill queries PERM# records per-collection \u2014 O(N) DynamoDB queries. With 8000+ collections, this means 8000+ additional operations, risking read capacity throttling and exceeding the 15-minute Lambda timeout.",
+      "remediation": "In design.md Section 5 (backfill lambda), replace the per-collection PERM# query approach:\n\n> The backfill lambda performs a single DynamoDB Scan with FilterExpression `begins_with(SK, 'PERM#')` to retrieve all permission records. It builds an in-memory map of `collectionId \u2192 [userIds]`. During the collection indexing pass, each collection's `sharedWithUserIds` is populated from this map.\n\nIn tasks.md Task 1.8, update to: 'Update backfill lambda to populate sharedWithUserIds: (a) perform a single Scan with FilterExpression for SK begins_with PERM#, (b) build collectionId \u2192 userIds map in memory, (c) merge into collection documents during indexing.'",
+      "section_affected": "design.md (Section 5), tasks.md (Task 1.8)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 9,
+      "severity": "major",
+      "agreed_by": ["claude-code"],
+      "title": "Handle PERM# sync race condition with upsert",
+      "description": "If a PERM# stream event arrives before the METADATA event, the OpenSearch update on a non-existent document returns 404. The retry will keep failing, eventually sending records to the DLQ and silently losing sharedWithUserIds data.",
+      "remediation": "In design.md Section 4 (sync pipeline PERM# processing), change the update strategy to use scripted_upsert:\n\n```json\n{\n  \"scripted_upsert\": true,\n  \"script\": {\n    \"source\": \"if (ctx._source.sharedWithUserIds == null) { ctx._source.sharedWithUserIds = [params.userId] } else if (!ctx._source.sharedWithUserIds.contains(params.userId)) { ctx._source.sharedWithUserIds.add(params.userId) }\",\n    \"params\": { \"userId\": \"user_xyz\" }\n  },\n  \"upsert\": {\n    \"sharedWithUserIds\": [\"user_xyz\"]\n  }\n}\n```\n\nAdd a note: 'Using scripted_upsert ensures that if the PERM# event arrives before the METADATA event, a minimal document is created. When the METADATA event arrives later, the full document will be indexed and the sharedWithUserIds field will be preserved via the transform.'\n\nUpdate tasks 1.5 and 1.7 to specify scripted_upsert behavior. Add test case in 1.9 for 'PERM# update when collection document does not yet exist in OpenSearch'.",
+      "section_affected": "design.md (Section 4), tasks.md (Tasks 1.5, 1.7, 1.9)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 10,
+      "severity": "minor",
+      "agreed_by": ["claude-code"],
+      "title": "Add observability requirements for OpenSearch as sole listing path",
+      "description": "No observability requirements exist for a migration that makes OpenSearch the sole critical path for all collection listing. No metrics, alarms, or dashboards specified.",
+      "remediation": "Add Requirement 14 'Observability for OpenSearch Listing' with acceptance criteria:\n\n1. THE Collections_API SHALL emit CloudWatch custom metrics for search_collections latency (p50/p95/p99).\n2. THE Collections_API SHALL emit a metric for 503 error count.\n3. A CloudWatch alarm SHALL be configured to trigger when 503 rate exceeds 1% over a 5-minute window.\n4. THE Sync_Lambda SHALL emit a metric for event processing age (time from DynamoDB stream event timestamp to OpenSearch update completion).\n\nAdd Task Group 13 with subtasks for each metric/alarm. Mark as 'should ship with Phase 1 deployment, before GSI removal'.",
+      "section_affected": "requirements.md (new Requirement 14), tasks.md (new Task Group 13)",
+      "estimated_effort": "medium"
+    },
+    {
+      "priority": 11,
+      "severity": "minor",
+      "agreed_by": ["claude-code"],
+      "title": "Change Tasks 7.6 and 7.7 from 'verify' to 'update'",
+      "description": "The hook signature changes from Record<string, any> to a typed UseGetCollectionsParams interface. CollectionsWidget and CollectionGroupWidget will need actual code changes, not just verification.",
+      "remediation": "In tasks.md:\n- Task 7.6: Change to 'Update CollectionsWidget.tsx to adapt collectionsParams to the new UseGetCollectionsParams interface'\n- Task 7.7: Change to 'Update CollectionGroupWidget.tsx to adapt { groupIds: config.groupId } to the new UseGetCollectionsParams interface'",
+      "section_affected": "tasks.md (Tasks 7.6, 7.7)",
+      "estimated_effort": "small"
+    },
+    {
+      "priority": 12,
+      "severity": "minor",
+      "agreed_by": ["claude-code"],
+      "title": "Add PERM# record input validation",
+      "description": "PERM# sync pipeline trusts stream record data without validation. Malformed targetId could corrupt sharedWithUserIds or cause OpenSearch script errors.",
+      "remediation": "In design.md Section 4, add to _process_perm_record: 'Validate that targetId is a non-empty string before constructing the update script. Log and skip records with missing or empty targetId.'\n\nIn tasks.md Task 1.5, add: 'Include validation that targetId is a non-empty string; skip and log warning for invalid records.' Add test case in 1.9 for 'PERM# record with empty/null targetId is skipped'.",
+      "section_affected": "design.md (Section 4), tasks.md (Tasks 1.5, 1.9)",
+      "estimated_effort": "small"
+    }
+  ],
+  "unanswered_questions": [
+    {
+      "question": "How should myRole (OWNER/EDITOR/VIEWER) and sharedAt (timestamp) be provided to the frontend after _filter_collections_by_access is deleted? Options: (a) batch DynamoDB query for PERM# records per page of results, (b) store per-user role/sharedAt in OpenSearch as nested objects, (c) defer to follow-up.",
+      "why_it_matters": "Frontend components render role indicators and 'shared at' timestamps. Without a decision, the enrichment approach in fix #7 cannot be fully specified. Option (a) adds O(page_size) DynamoDB reads per request. Option (b) significantly complicates the sync pipeline. Option (c) ships with degraded UI.",
+      "asked_by": ["kiro-claude", "claude-code"]
+    },
+    {
+      "question": "Are the /collections/shared-with-me and /collections/shared-by-me endpoints consumed by anything other than the frontend hooks (e.g., external scripts, mobile apps, integrations)?",
+      "why_it_matters": "If there are external consumers, the old endpoints must be preserved or a migration path documented. If only the frontend uses them, they can be cleanly replaced with filter parameters on the unified endpoint.",
+      "asked_by": ["kiro-claude", "claude-code"]
+    },
+    {
+      "question": "What is the expected upper bound for collections a single admin user can access? Is 5,000 a safe ceiling for useGetAllCollections, or should we plan for higher?",
+      "why_it_matters": "Determines whether the truncation warning (fix #6) is sufficient or whether auto-pagination must be implemented immediately. If admins routinely access >5000, tree views and modals will show incomplete data from day one.",
+      "asked_by": ["kiro-claude", "claude-code"]
+    },
+    {
+      "question": "Should the tab badge counts (e.g., '12' next to 'Shared with me') be preserved, and if so, how? Options: (a) lightweight /collections/counts endpoint using OpenSearch aggregations, (b) use totalResults from each tab's first load and cache, (c) remove badge counts.",
+      "why_it_matters": "Tab badges are a core UX element. With server-side pagination, counts can't be computed from local data. The approach affects whether a new API endpoint is needed.",
+      "asked_by": ["claude-code"]
+    }
+  ],
+  "disagreements_resolved": [
+    {
+      "topic": "Whether critical issues from claude-code are duplicates of kiro-claude issues",
+      "positions": {
+        "kiro-claude": "Flagged shared tabs gap and queryKeys collision as critical",
+        "claude-code": "Flagged the same two issues independently, plus added enrichment metadata loss as a separate major issue"
+      },
+      "resolution": "Treat shared tabs and queryKeys collision as single consensus critical issues (fixes #1 and #2). Treat enrichment metadata loss as a distinct major issue (fix #7) since it covers a different concern \u2014 response shape preservation vs. tab functionality.",
+      "reasoning": "The shared tabs issue and queryKeys collision are clearly the same findings from both reviewers. The enrichment metadata concern is related to but distinct from the shared tabs issue \u2014 even if shared tabs are migrated, the isShared/myRole/sharedAt fields still need a source."
+    },
+    {
+      "topic": "Whether the backfill optimization belongs with the scaling/truncation consensus issue",
+      "positions": {
+        "kiro-claude": "Flagged useGetAllCollections 5000 truncation as the scaling concern",
+        "claude-code": "Flagged both 5000 truncation AND backfill O(N) PERM# queries as scaling concerns"
+      },
+      "resolution": "Separate them into fix #6 (truncation warning) and fix #8 (backfill optimization). The consensus synthesis incorrectly merged the backfill suggestion into the truncation issue's suggestions list.",
+      "reasoning": "These are fundamentally different problems: one is runtime query truncation affecting users, the other is one-time backfill performance affecting deployment. They have different remediations and different affected sections."
+    }
+  ],
+  "summary": "The spec has two critical consensus issues that must be fixed before implementation: (1) the shared-with-me/shared-by-me tabs are completely unaddressed and will break, and (2) the queryKeys.ts 'all' naming collision will break React Query cache invalidation globally. Additionally, the access control should clause should be nested inside a filter bool to prevent it from being treated as an optional booster \u2014 a security concern. The remaining major fixes (snake_case API format, phased GSI removal, truncation warning, enrichment metadata preservation, backfill optimization, PERM# upsert handling) are straightforward spec edits. Four questions need human input before the enrichment and shared-tabs fixes can be fully specified."
+}

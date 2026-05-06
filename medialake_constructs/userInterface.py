@@ -417,7 +417,7 @@ class UIConstruct(Construct):
             header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
                 "Range", "If-Range", "If-Modified-Since", "If-None-Match"
             ),
-            query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
             enable_accept_encoding_gzip=True,
             enable_accept_encoding_brotli=True,
         )

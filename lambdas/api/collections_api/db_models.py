@@ -74,17 +74,9 @@ class CollectionModel(Model):
     GSI2_PK = UnicodeAttribute(null=True)
     GSI2_SK = UnicodeAttribute(null=True)
 
-    # GSI3 - Collection type index
-    GSI3_PK = UnicodeAttribute(null=True)
-    GSI3_SK = UnicodeAttribute(null=True)
-
     # GSI4 - Child-parent relationship (not used for metadata)
     GSI4_PK = UnicodeAttribute(null=True)
     GSI4_SK = UnicodeAttribute(null=True)
-
-    # GSI5 - All collections index
-    GSI5_PK = UnicodeAttribute(null=True)  # "COLLECTIONS"
-    GSI5_SK = UnicodeAttribute(null=True)  # timestamp for sorting
 
 
 class ChildReferenceModel(Model):

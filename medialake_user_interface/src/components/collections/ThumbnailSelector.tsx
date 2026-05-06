@@ -323,6 +323,7 @@ interface ThumbnailSelectorProps {
   onSelectIcon: (iconName: string) => void;
   onUploadImage: (base64Data: string) => void;
   onRemoveThumbnail: () => void;
+  onError?: (message: string) => void;
   isLoading?: boolean;
   disabled?: boolean;
 }
@@ -336,6 +337,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
   onSelectIcon,
   onUploadImage,
   onRemoveThumbnail,
+  onError,
   isLoading = false,
   disabled = false,
 }) => {
@@ -345,6 +347,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
   const [iconSearch, setIconSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("general");
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasThumbnail = currentThumbnailType && (currentThumbnailUrl || currentThumbnailValue);
@@ -364,20 +367,70 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
         ICON_CATEGORIES[selectedCategory as keyof typeof ICON_CATEGORIES]?.icons || {}
       );
 
+  const ACCEPTED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "image/bmp",
+  ];
+  const MAX_FILE_SIZE_MB = 10;
+  // API Gateway has a 10MB payload limit. Base64 adds ~33% overhead, plus the JSON wrapper.
+  // 10MB raw → ~13.3MB base64 → exceeds limit. So we check the encoded payload size after reading.
+  const MAX_PAYLOAD_BYTES = 9.5 * 1024 * 1024; // 9.5MB leaves room for JSON wrapper + headers
+
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
 
+      setUploadError(null);
+
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        alert(t("collections.thumbnail.invalidFileType", "Please select an image file"));
+        const msg = t(
+          "collections.thumbnail.invalidFileType",
+          "Please select an image file (JPEG, PNG, GIF, WebP, SVG, or BMP)"
+        );
+        setUploadError(msg);
+        onError?.(msg);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert(t("collections.thumbnail.fileTooLarge", "Image must be less than 5MB"));
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        const msg = t(
+          "collections.thumbnail.unsupportedFormat",
+          `Unsupported image format: ${file.type}. Use JPEG, PNG, GIF, WebP, SVG, or BMP.`
+        );
+        setUploadError(msg);
+        onError?.(msg);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        const msg = t(
+          "collections.thumbnail.fileTooLarge",
+          `Image must be less than ${MAX_FILE_SIZE_MB}MB. Selected file is ${(
+            file.size /
+            (1024 * 1024)
+          ).toFixed(1)}MB.`
+        );
+        setUploadError(msg);
+        onError?.(msg);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      // Validate not empty
+      if (file.size === 0) {
+        const msg = t("collections.thumbnail.emptyFile", "Selected file is empty");
+        setUploadError(msg);
+        onError?.(msg);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
@@ -385,9 +438,31 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
-        // Remove the data URL prefix to get just the base64 data
         const base64Data = base64.split(",")[1];
+        if (!base64Data) {
+          const msg = t("collections.thumbnail.readError", "Failed to read image file");
+          setUploadError(msg);
+          onError?.(msg);
+          return;
+        }
+        // Check that the base64 payload fits within the API Gateway limit
+        if (base64Data.length > MAX_PAYLOAD_BYTES) {
+          const actualMB = (file.size / (1024 * 1024)).toFixed(1);
+          const msg = t(
+            "collections.thumbnail.payloadTooLarge",
+            `Image is too large for upload (${actualMB}MB). Try a smaller file or compress the image first.`
+          );
+          setUploadError(msg);
+          onError?.(msg);
+          return;
+        }
+        setUploadError(null);
         onUploadImage(base64Data);
+      };
+      reader.onerror = () => {
+        const msg = t("collections.thumbnail.readError", "Failed to read image file");
+        setUploadError(msg);
+        onError?.(msg);
       };
       reader.readAsDataURL(file);
 
@@ -396,7 +471,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
         fileInputRef.current.value = "";
       }
     },
-    [onUploadImage, t]
+    [onUploadImage, onError, t]
   );
 
   const handleIconSelect = useCallback(
@@ -549,10 +624,33 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
         style={{ display: "none" }}
         onChange={handleFileSelect}
       />
+
+      {/* Upload error message */}
+      {uploadError && (
+        <Typography
+          variant="caption"
+          color="error"
+          sx={{ mt: 1, display: "block", fontSize: "0.78rem" }}
+        >
+          {uploadError}
+        </Typography>
+      )}
+
+      {/* Upload guidelines */}
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ mt: 0.75, display: "block", fontSize: "0.7rem", lineHeight: 1.5, opacity: 0.7 }}
+      >
+        {t(
+          "collections.thumbnail.uploadHint",
+          "Recommended: 512×512px or larger, square aspect ratio. Max 10MB. JPEG, PNG, GIF, WebP, SVG, or BMP. Images are resized to 512×512px."
+        )}
+      </Typography>
 
       {/* Icon picker dialog */}
       <Dialog

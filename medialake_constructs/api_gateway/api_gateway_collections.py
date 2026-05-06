@@ -18,22 +18,30 @@ The module handles:
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Duration, Stack
+from aws_cdk import Duration, RemovalPolicy, Stack
 from aws_cdk import aws_apigateway as api_gateway
+from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_cloudwatch_actions as cloudwatch_actions
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_events as events
 from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from aws_cdk import aws_secretsmanager as secrets_manager
+from aws_cdk import aws_sns as sns
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
+from medialake_constructs.shared_constructs.lambda_layers import SearchLayer
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
+from medialake_constructs.sqs import SQSConstruct, SQSProps
 
 
 @dataclass
@@ -152,6 +160,7 @@ class CollectionsApi(Construct):
                 sort_key_type=dynamodb.AttributeType.STRING,
                 global_secondary_indexes=gsi_list,
                 ttl_attribute="expiresAt",
+                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
             ),
         )
 
@@ -177,6 +186,7 @@ class CollectionsApi(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "SCOPE": "es",
                     "ENVIRONMENT": config.environment,
+                    "COLLECTIONS_INDEX_NAME": f"{config.resource_prefix}_collections_{config.environment}",
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     # Cognito user pool for /collections/users endpoint
@@ -393,6 +403,267 @@ class CollectionsApi(Construct):
         add_cors_options_method(collections_users_resource)
         add_cors_options_method(collection_id_resource)
         add_cors_options_method(collection_proxy_resource)
+
+        # =====================================================================
+        # Collections DynamoDB-to-OpenSearch Sync Pipeline
+        # Follows the AssetTableStream pattern from asset_table_stream.py
+        # =====================================================================
+
+        stack = Stack.of(self)
+
+        # Collections index name following the environment naming pattern
+        collections_index_name = (
+            f"{config.resource_prefix}_collections_{config.environment}"
+        )
+
+        # --- Task 3.4: Create SQS DLQ for failed sync events ---
+        # Visibility timeout must be >= Lambda timeout (15 min) + buffer
+        self._collections_sync_dlq = SQSConstruct(
+            self,
+            "CollectionsSyncDLQ",
+            props=SQSProps(
+                queue_name="collections-sync-dlq",
+                visibility_timeout=Duration.minutes(
+                    20
+                ),  # 15 min Lambda timeout + 5 min buffer
+                retention_period=Duration.days(14),
+                encryption=False,  # Use SSE-SQS (AWS managed) for consistency
+                enforce_ssl=True,
+                max_receive_count=0,  # No DLQ for this queue as it's already a DLQ
+                removal_policy=RemovalPolicy.DESTROY,
+            ),
+        )
+
+        # --- Task 3.2: Create Sync Lambda ---
+        search_layer = SearchLayer(self, "CollectionsSyncSearchLayer")
+
+        self._collections_sync_lambda = Lambda(
+            self,
+            "CollectionsSyncLambda",
+            LambdaConfig(
+                name="collections-sync",
+                entry="lambdas/sync/collections_sync",
+                timeout_minutes=15,
+                memory_size=2048,
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                layers=[search_layer.layer],
+                environment_variables={
+                    "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "COLLECTIONS_INDEX_NAME": collections_index_name,
+                    "OS_DOMAIN_REGION": stack.region,
+                },
+                reserved_concurrent_executions=5,
+            ),
+        )
+
+        # --- Task 3.3: Add DynamoDB Stream event source ---
+        # NOTE: StartingPosition.LATEST means any writes between stream enablement
+        # and event source creation are missed. This is acceptable because the
+        # backfill lambda (triggered on initial deployment) indexes all existing
+        # records. If the event source mapping is ever recreated, re-run the
+        # backfill to close the gap.
+        self._collections_sync_lambda.function.add_event_source(
+            lambda_event_sources.DynamoEventSource(
+                self._collections_table.table,
+                starting_position=lambda_.StartingPosition.LATEST,
+                batch_size=100,
+                max_batching_window=Duration.seconds(5),
+                retry_attempts=3,
+                bisect_batch_on_error=True,
+                report_batch_item_failures=True,
+                on_failure=lambda_event_sources.SqsDlq(
+                    self._collections_sync_dlq.queue
+                ),
+            )
+        )
+
+        # --- Task 3.6: Grant Sync Lambda IAM permissions ---
+        # OpenSearch permissions (domain-level + index-level)
+        self._collections_sync_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpHead",
+                    "es:ESHttpPost",
+                    "es:ESHttpGet",
+                    "es:ESHttpPut",
+                    "es:ESHttpDelete",
+                ],
+                resources=[
+                    props.open_search_arn,
+                    f"{props.open_search_arn}/*",
+                ],
+            )
+        )
+
+        # DynamoDB Stream permissions
+        self._collections_table.table.grant_stream_read(
+            self._collections_sync_lambda.function
+        )
+
+        # SQS permissions for DLQ
+        self._collections_sync_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sqs:SendMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:GetQueueUrl",
+                ],
+                resources=[self._collections_sync_dlq.queue_arn],
+            )
+        )
+
+        # EC2 permissions for VPC Lambda
+        self._collections_sync_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # --- Task 3.5: Create Backfill Lambda ---
+        self._collections_backfill_lambda = Lambda(
+            self,
+            "CollectionsBackfillLambda",
+            LambdaConfig(
+                name="collections-backfill",
+                entry="lambdas/sync/collections_backfill",
+                timeout_minutes=15,
+                memory_size=2048,
+                vpc=props.vpc,
+                security_groups=[props.security_group],
+                layers=[search_layer.layer],
+                environment_variables={
+                    "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "COLLECTIONS_INDEX_NAME": collections_index_name,
+                    "OS_DOMAIN_REGION": stack.region,
+                },
+            ),
+        )
+
+        # Grant Backfill Lambda read permissions on Collections table
+        self._collections_table.table.grant_read_data(
+            self._collections_backfill_lambda.function
+        )
+
+        # Grant Backfill Lambda OpenSearch write permissions
+        self._collections_backfill_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "es:ESHttpHead",
+                    "es:ESHttpPost",
+                    "es:ESHttpGet",
+                    "es:ESHttpPut",
+                ],
+                resources=[
+                    props.open_search_arn,
+                    f"{props.open_search_arn}/*",
+                ],
+            )
+        )
+
+        # EC2 permissions for VPC Lambda
+        self._collections_backfill_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # --- Trigger Backfill once on initial deploy ---
+        # Uses AwsCustomResource to invoke the backfill Lambda via the AWS SDK
+        # on CREATE only. Subsequent deploys skip it (no properties change).
+        cr.AwsCustomResource(
+            self,
+            "CollectionsBackfillTrigger",
+            on_create=cr.AwsSdkCall(
+                service="Lambda",
+                action="invoke",
+                parameters={
+                    "FunctionName": self._collections_backfill_lambda.function.function_name,
+                    "InvocationType": "Event",  # Async — don't wait for completion
+                    "Payload": '{"RequestType": "Create"}',
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    "collections-backfill-trigger"
+                ),
+            ),
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=["lambda:InvokeFunction"],
+                        resources=[
+                            self._collections_backfill_lambda.function.function_arn
+                        ],
+                    )
+                ]
+            ),
+        )
+
+        # --- Task 3.7: Create CloudWatch alarm on DLQ depth ---
+        collections_sync_dlq_alarm_topic = sns.Topic(
+            self,
+            "CollectionsSyncDLQAlarmTopic",
+            display_name="Collections Sync DLQ Alarm",
+        )
+
+        collections_sync_dlq_alarm = cloudwatch.Alarm(
+            self,
+            "CollectionsSyncDLQAlarm",
+            metric=self._collections_sync_dlq.queue.metric_approximate_number_of_messages_visible(),
+            threshold=10,
+            evaluation_periods=1,
+            alarm_description="Collections sync DLQ depth exceeds 10 messages",
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+        )
+        collections_sync_dlq_alarm.add_alarm_action(
+            cloudwatch_actions.SnsAction(collections_sync_dlq_alarm_topic)
+        )
+
+        # --- Task 3.8: Add DLQ queue access policy ---
+        # Allow only the Lambda function to send messages to the queue
+        self._collections_sync_dlq.queue.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="AllowLambdaSendMessage",
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("lambda.amazonaws.com")],
+                actions=[
+                    "sqs:SendMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:GetQueueUrl",
+                ],
+                resources=[self._collections_sync_dlq.queue_arn],
+                conditions={
+                    "ArnEquals": {
+                        "aws:SourceArn": self._collections_sync_lambda.function.function_arn
+                    }
+                },
+            )
+        )
+
+        # Explicitly deny all actions from any principal outside the account
+        self._collections_sync_dlq.queue.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="DenyPublicAccess",
+                effect=iam.Effect.DENY,
+                principals=[iam.AnyPrincipal()],
+                actions=["sqs:*"],
+                resources=[self._collections_sync_dlq.queue_arn],
+                conditions={"StringNotEquals": {"aws:PrincipalAccount": stack.account}},
+            )
+        )
 
     @property
     def collections_table(self) -> DynamoDB:

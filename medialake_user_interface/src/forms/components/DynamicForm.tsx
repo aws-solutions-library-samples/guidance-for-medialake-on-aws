@@ -14,6 +14,14 @@ const FormJsonEditor = React.lazy(() =>
   import("./FormJsonEditor").then((m) => ({ default: m.FormJsonEditor }))
 );
 
+// Lazy-load the KeyValueEditor so it's only pulled in when a node template
+// declares a `keyvalue` parameter (currently only collection_manager).
+const KeyValueEditor = React.lazy(() =>
+  import("@/components/collections/KeyValueEditor").then((m) => ({
+    default: m.KeyValueEditor,
+  }))
+);
+
 interface DynamicFormProps {
   definition: FormDefinition;
   defaultValues?: Record<string, any>;
@@ -40,6 +48,18 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
       mode: "onBlur",
       reValidateMode: "onBlur",
     });
+
+    // React Hook Form only applies `defaultValues` on mount. When the parent
+    // recomputes defaults (e.g. after async node method data loads), we need
+    // to push the new values into the form via `reset()`. Without this, the
+    // form stays empty until the user manually interacts with it.
+    const defaultValuesJson = JSON.stringify(defaultValues);
+    React.useEffect(() => {
+      if (defaultValues) {
+        form.reset(defaultValues);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultValuesJson]);
 
     // Render fields - NOT memoized so it re-evaluates when watched values change
     const renderField = definition.fields.map((field: FormFieldDefinition) => {
@@ -88,6 +108,38 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
           return (
             <React.Suspense key={field.name} fallback={<Box sx={{ height: 200 }} />}>
               <FormJsonEditor {...commonProps} />
+            </React.Suspense>
+          );
+
+        case "keyvalue":
+          return (
+            <React.Suspense key={field.name} fallback={<Box sx={{ height: 80 }} />}>
+              <Box>
+                {field.label && (
+                  <Box sx={{ mb: 0.5, fontSize: "0.875rem", fontWeight: 500 }}>{field.label}</Box>
+                )}
+                <KeyValueEditor
+                  label=""
+                  rows={(() => {
+                    const val = form.watch(field.name);
+                    if (Array.isArray(val)) return val;
+                    if (val && typeof val === "object") {
+                      return Object.entries(val).map(([key, value]) => ({
+                        key,
+                        value: String(value),
+                      }));
+                    }
+                    return [];
+                  })()}
+                  onChange={(rows) => {
+                    const obj: Record<string, string> = {};
+                    for (const r of rows) {
+                      if (r.key.trim()) obj[r.key.trim()] = r.value.trim();
+                    }
+                    form.setValue(field.name, obj, { shouldDirty: true });
+                  }}
+                />
+              </Box>
             </React.Suspense>
           );
 

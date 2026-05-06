@@ -1,6 +1,5 @@
 """PATCH /collections/<collection_id> - Update collection."""
 
-import json
 import os
 from datetime import datetime
 
@@ -13,14 +12,15 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import (
     COLLECTION_PK_PREFIX,
-    COLLECTIONS_GSI5_PK,
     METADATA_SK,
     create_error_response,
+    get_user_collection_role,
 )
 from db_models import CollectionModel
 from models import UpdateCollectionRequest
 from pynamodb.exceptions import DoesNotExist, UpdateError
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import update_collection_document
 
 logger = Logger(
     service="collections-ID-patch", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -38,7 +38,10 @@ def register_route(app):
         """Update collection with Pydantic validation"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
-            user_context.get("user_id")
+            user_id = user_context.get("user_id")
+
+            if not user_id:
+                raise BadRequestError("Authentication required")
 
             # Parse and validate with Pydantic
             try:
@@ -60,13 +63,30 @@ def register_route(app):
             except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
+            # Check user's role on this collection
+            user_role = get_user_collection_role(collection, user_id)
+
+            if user_role is None or user_role == "VIEWER":
+                raise BadRequestError(
+                    "You do not have permission to update this collection"
+                )
+
+            is_owner = user_role == "OWNER"
+
+            # Editors cannot change ownership-level settings
+            if not is_owner:
+                if request_data.isPublic is not None:
+                    raise BadRequestError(
+                        "Only the collection owner can change visibility settings"
+                    )
+                if request_data.status is not None:
+                    raise BadRequestError(
+                        "Only the collection owner can change the collection status"
+                    )
+
             # Build update actions for PynamoDB
             actions = [
                 CollectionModel.updatedAt.set(current_timestamp),
-                # Keep GSI5 (RecentlyModifiedGSI) in sync so listing queries
-                # return collections ordered by most recent update.
-                CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
-                CollectionModel.GSI5_SK.set(current_timestamp),
             ]
 
             if request_data.name is not None:
@@ -125,19 +145,38 @@ def register_route(app):
                 name="SuccessfulCollectionUpdates", unit=MetricUnit.Count, value=1
             )
 
+            # Write-through to OpenSearch so the update is immediately visible
+            # in list/search results. Stream sync remains as safety net.
+            os_updates = {"updatedAt": current_timestamp}
+            if request_data.name is not None:
+                os_updates["name"] = request_data.name
+            if request_data.description is not None:
+                os_updates["description"] = request_data.description
+            if request_data.status is not None:
+                os_updates["status"] = request_data.status.value
+            if request_data.isPublic is not None:
+                os_updates["isPublic"] = request_data.isPublic
+            if request_data.metadata is not None:
+                os_updates["customMetadata"] = request_data.metadata
+            if request_data.tags is not None:
+                os_updates["tags"] = list(request_data.tags)
+            if request_data.thumbnailType is not None:
+                os_updates["thumbnailType"] = request_data.thumbnailType.value
+                if request_data.thumbnailType.value == "icon":
+                    os_updates["thumbnailS3Key"] = None
+            if request_data.thumbnailValue is not None:
+                os_updates["thumbnailValue"] = request_data.thumbnailValue
+
+            update_collection_document(collection_id, os_updates)
+
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": {"id": collection_id, "updatedAt": current_timestamp},
-                        "meta": {
-                            "timestamp": current_timestamp,
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": {"id": collection_id, "updatedAt": current_timestamp},
+                "meta": {
+                    "timestamp": current_timestamp,
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except (BadRequestError, NotFoundError):

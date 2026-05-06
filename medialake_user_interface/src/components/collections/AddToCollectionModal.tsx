@@ -35,7 +35,7 @@ import {
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import {
-  useGetCollections,
+  useGetAllCollections,
   useCreateCollection,
   type Collection,
   type CreateCollectionRequest,
@@ -71,7 +71,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   const [createError, setCreateError] = useState<string | null>(null);
 
   // API hooks
-  const { data: collectionsResponse, isLoading, refetch } = useGetCollections();
+  const { data: collectionsResponse, isLoading, refetch } = useGetAllCollections();
   const createCollectionMutation = useCreateCollection();
   const collections = collectionsResponse?.data || [];
 

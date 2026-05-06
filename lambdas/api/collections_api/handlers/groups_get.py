@@ -1,29 +1,21 @@
-"""GET /collections/groups - List collection groups with pagination."""
+"""GET /collections/groups - List collection groups with page-based pagination via OpenSearch."""
 
+import math
 import os
 
-import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
-from collection_groups_utils import (
-    GROUPS_GSI2_PK,
-    format_collection_group_item,
-)
+from aws_lambda_powertools.utilities.parser import ValidationError
+from collection_groups_utils import format_collection_group_item
 from collections_utils import create_error_response, create_success_response
+from models import ListGroupsQueryParams
 from user_auth import extract_user_context
-
-# Initialize DynamoDB resource
-dynamodb = boto3.resource("dynamodb")
-table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
-groups_table = dynamodb.Table(table_name)
+from utils.collections_search import search_groups
 
 logger = Logger(service="groups-get", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="groups-get")
 metrics = Metrics(namespace="medialake", service="collection-groups")
-
-DEFAULT_LIMIT = 20
-MAX_LIMIT = 100
 
 
 def register_route(app):
@@ -32,7 +24,7 @@ def register_route(app):
     @app.get("/collections/groups")
     @tracer.capture_method
     def groups_get():
-        """Get list of collection groups with pagination and search"""
+        """Get list of collection groups with page-based pagination via OpenSearch."""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
             user_id = user_context.get("user_id")
@@ -40,97 +32,89 @@ def register_route(app):
             if not user_id:
                 raise BadRequestError("Authentication required to list groups")
 
-            # Parse query parameters
-            limit = int(
-                app.current_event.get_query_string_value("limit", DEFAULT_LIMIT)
-            )
-            limit = min(limit, MAX_LIMIT)
+            # Parse and validate query parameters
+            try:
+                query_params_dict = {
+                    "page": int(app.current_event.get_query_string_value("page", 1)),
+                    "pageSize": int(
+                        app.current_event.get_query_string_value("pageSize", 20)
+                    ),
+                }
 
-            search = app.current_event.get_query_string_value("search")
-            cursor = app.current_event.get_query_string_value("cursor")
+                if sort_val := app.current_event.get_query_string_value("sort"):
+                    query_params_dict["sort"] = sort_val
+                if sort_dir := app.current_event.get_query_string_value(
+                    "sortDirection"
+                ):
+                    query_params_dict["sortDirection"] = sort_dir
+                if search_val := app.current_event.get_query_string_value("search"):
+                    query_params_dict["search"] = search_val
+
+                query_params = ListGroupsQueryParams(**query_params_dict)
+            except (ValidationError, ValueError) as e:
+                logger.warning(f"Query parameter validation error: {e}")
+                raise BadRequestError(f"Invalid query parameters: {e}")
 
             logger.info(
                 "Listing collection groups",
-                extra={"user_id": user_id, "limit": limit, "search": search},
+                extra={
+                    "user_id": user_id,
+                    "page": query_params.page,
+                    "page_size": query_params.pageSize,
+                    "search": query_params.search,
+                },
             )
 
-            # Query all groups using GSI2 (all groups index)
-            query_params = {
-                "IndexName": "ItemCollectionsGSI",  # Reusing GSI2
-                "KeyConditionExpression": "GSI2_PK = :groups_pk",
-                "ExpressionAttributeValues": {":groups_pk": GROUPS_GSI2_PK},
-                "Limit": limit + 1,
-                "ScanIndexForward": False,  # Most recent first
-            }
-
-            # Add cursor for pagination
-            if cursor:
-                try:
-                    import base64
-                    import json
-
-                    decoded = json.loads(base64.b64decode(cursor))
-                    query_params["ExclusiveStartKey"] = {
-                        "PK": decoded["pk"],
-                        "SK": decoded["sk"],
-                        "GSI2_PK": decoded.get("gsi2_pk", GROUPS_GSI2_PK),
-                        "GSI2_SK": decoded.get("gsi2_sk"),
-                    }
-                except Exception as e:
-                    logger.warning(f"Invalid cursor: {e}")
-
-            response = groups_table.query(**query_params)
-            items = response.get("Items", [])
-
-            # Apply search filter if provided
-            if search:
-                search_lower = search.lower()
-                items = [
-                    item
-                    for item in items
-                    if search_lower in item.get("name", "").lower()
-                    or search_lower in item.get("description", "").lower()
-                ]
-
-            # Check if there are more results
-            has_more = len(items) > limit
-            if has_more:
-                items = items[:limit]
+            # Query OpenSearch
+            try:
+                results, total_hits = search_groups(
+                    user_id=user_id,
+                    search_text=query_params.search,
+                    page=query_params.page,
+                    page_size=query_params.pageSize,
+                    sort_field=query_params.sort or "name",
+                    sort_direction=query_params.sortDirection or "asc",
+                )
+            except Exception as e:
+                logger.error(
+                    "OpenSearch groups listing failed", extra={"error": str(e)}
+                )
+                return create_error_response(
+                    error_code="ServiceUnavailable",
+                    error_message="Group listing service is temporarily unavailable",
+                    status_code=503,
+                    request_id=app.current_event.request_context.request_id,
+                )
 
             # Format items
             formatted_items = [
-                format_collection_group_item(item, user_context) for item in items
+                format_collection_group_item(item, user_context) for item in results
             ]
 
-            # Create pagination
+            # Compute pagination metadata
+            page = query_params.page
+            page_size = query_params.pageSize
+            total_results = total_hits
+            total_pages = math.ceil(total_results / page_size) if page_size > 0 else 0
+
             pagination = {
-                "has_next_page": has_more,
-                "has_prev_page": cursor is not None,
-                "limit": limit,
+                "page": page,
+                "pageSize": page_size,
+                "totalResults": total_results,
+                "totalPages": total_pages,
+                "hasNextPage": page < total_pages,
+                "hasPrevPage": page > 1,
             }
 
-            if has_more and items:
-                import base64
-                import json
-
-                last_item = items[-1]
-                next_cursor = base64.b64encode(
-                    json.dumps(
-                        {
-                            "pk": last_item["PK"],
-                            "sk": last_item["SK"],
-                            "gsi2_pk": GROUPS_GSI2_PK,
-                            "gsi2_sk": last_item.get("GSI2_SK"),
-                        }
-                    ).encode()
-                ).decode()
-                pagination["next_cursor"] = next_cursor
-
             metrics.add_metric(
-                name="SuccessfulGroupRetrievals", unit=MetricUnit.Count, value=1
+                name="SuccessfulGroupRetrievals",
+                unit=MetricUnit.Count,
+                value=1,
             )
             metrics.add_metric(
-                name="GroupsReturned", unit=MetricUnit.Count, value=len(formatted_items)
+                name="GroupsReturned",
+                unit=MetricUnit.Count,
+                value=len(formatted_items),
             )
 
             return create_success_response(

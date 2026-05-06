@@ -163,9 +163,13 @@ export const QUERY_KEYS = {
     items: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
     assets: (id: string, filters?: Record<string, any>) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
+    allCollections: () => [...QUERY_KEYS.COLLECTIONS.lists(), "all"] as const,
     children: (parentId: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
     ancestors: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "ancestors"] as const,
+    metadataKeys: () => ["collections", "metadata-keys"] as const,
+    collectionTypes: () => [...QUERY_KEYS.COLLECTIONS.all, "collection-types"] as const,
+    users: () => [...QUERY_KEYS.COLLECTIONS.all, "users"] as const,
   },
   COLLECTION_TYPES: {
     all: ["collection-types"] as const,

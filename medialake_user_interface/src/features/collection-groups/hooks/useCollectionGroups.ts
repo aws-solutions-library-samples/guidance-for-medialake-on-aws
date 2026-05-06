@@ -2,26 +2,26 @@
  * React Query hooks for Collection Groups
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { collectionGroupsApi } from "../api/collectionGroupsApi";
-import type {
-  CreateGroupRequest,
-  UpdateGroupRequest,
-  AddCollectionsRequest,
-  RemoveCollectionsRequest,
-} from "../types";
+import type { CreateGroupRequest, UpdateGroupRequest, CollectionGroupListResponse } from "../types";
+
+export interface UseCollectionGroupsParams {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  sortDirection?: "asc" | "desc";
+}
 
 /**
- * Hook to fetch list of collection groups
+ * Hook to fetch list of collection groups with server-side pagination and search
  */
-export const useCollectionGroups = (params?: {
-  search?: string;
-  limit?: number;
-  cursor?: string;
-}) => {
-  return useQuery({
+export const useCollectionGroups = (params?: UseCollectionGroupsParams) => {
+  return useQuery<CollectionGroupListResponse, Error>({
     queryKey: ["collection-groups", params],
     queryFn: () => collectionGroupsApi.list(params),
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -96,7 +96,6 @@ export const useAddCollectionsToGroup = () => {
       queryClient.invalidateQueries({
         queryKey: ["collection-group", variables.groupId],
       });
-      // Also invalidate collections list as group membership changed
       queryClient.invalidateQueries({ queryKey: ["collections"] });
     },
   });
@@ -116,7 +115,6 @@ export const useRemoveCollectionsFromGroup = () => {
       queryClient.invalidateQueries({
         queryKey: ["collection-group", variables.groupId],
       });
-      // Also invalidate collections list as group membership changed
       queryClient.invalidateQueries({ queryKey: ["collections"] });
     },
   });

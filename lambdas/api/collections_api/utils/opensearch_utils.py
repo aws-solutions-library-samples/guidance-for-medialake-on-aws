@@ -11,6 +11,9 @@ logger = Logger(service="opensearch-utils")
 # Environment variables
 OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
 OPENSEARCH_INDEX = os.environ.get("OPENSEARCH_INDEX", "")
+# NOTE: OPENSEARCH_INDEX is the media/assets index used for asset search, clip retrieval,
+# and asset data fetching. This is distinct from COLLECTIONS_INDEX_NAME used in
+# collections_search.py, which points to the collections metadata index.
 
 # Cache for OpenSearch client
 _opensearch_client = None

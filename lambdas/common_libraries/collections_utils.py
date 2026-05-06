@@ -8,9 +8,11 @@ be used across all collections Lambda functions.
 
 import base64
 import json
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from boto3.dynamodb.conditions import Key
@@ -28,7 +30,6 @@ CHILD_SK_PREFIX = "CHILD#"
 USER_PK_PREFIX = "USER#"
 SYSTEM_PK = "SYSTEM"
 COLLECTION_TYPE_SK_PREFIX = "COLLTYPE#"
-COLLECTIONS_GSI5_PK = "COLLECTIONS"
 
 # Item-related SK prefixes
 ITEM_SK_PREFIX = "ITEM#"
@@ -45,6 +46,17 @@ VALID_ITEM_TYPES = ["asset", "workflow", "collection"]
 
 # Access levels
 ACCESS_LEVELS = {"READ": "read", "WRITE": "write", "DELETE": "delete", "SHARE": "share"}
+
+# Cached DynamoDB resource and collections table for permission lookups.
+# Initialised at module level so they are reused across invocations within
+# the same Lambda execution environment.
+_DYNAMODB_RESOURCE = boto3.resource("dynamodb")
+_COLLECTIONS_TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME")
+_COLLECTIONS_TABLE = (
+    _DYNAMODB_RESOURCE.Table(_COLLECTIONS_TABLE_NAME)
+    if _COLLECTIONS_TABLE_NAME
+    else None
+)
 
 
 @tracer.capture_method
@@ -353,6 +365,57 @@ def validate_collection_access(
 
 
 @tracer.capture_method
+def get_user_collection_role(collection: Any, user_id: Optional[str]) -> Optional[str]:
+    """
+    Look up the user's role for a collection by querying the ShareModel.
+
+    Args:
+        collection: Collection model instance or dict with PK/ownerId
+        user_id: User ID to check
+
+    Returns:
+        Role string (e.g. 'EDITOR', 'VIEWER') or None if no share exists.
+        Returns 'OWNER' if the user is the collection owner.
+    """
+    if not user_id:
+        return None
+
+    # Support both PynamoDB model instances and dicts
+    if hasattr(collection, "ownerId"):
+        owner_id = collection.ownerId
+        pk = collection.PK
+    else:
+        owner_id = collection.get("ownerId")
+        pk = collection.get("PK", "")
+
+    if owner_id == user_id:
+        return "OWNER"
+
+    try:
+        if _COLLECTIONS_TABLE is None:
+            logger.error("COLLECTIONS_TABLE_NAME environment variable is not set")
+            return None
+
+        response = _COLLECTIONS_TABLE.get_item(
+            Key={"PK": pk, "SK": f"{PERM_SK_PREFIX}{user_id}"}
+        )
+        item = response.get("Item")
+        if item:
+            return item.get("role", "VIEWER").upper()
+    except Exception as e:
+        logger.warning(
+            {
+                "message": "Failed to look up user collection role",
+                "user_id": user_id,
+                "error": str(e),
+                "operation": "get_user_collection_role",
+            }
+        )
+
+    return None
+
+
+@tracer.capture_method
 def _check_collection_permissions(
     collection: Dict[str, Any], user_id: Optional[str], required_access: str
 ) -> bool:
@@ -379,13 +442,24 @@ def _check_collection_permissions(
     if collection.get("ownerId") == user_id:
         return True
 
-    # TODO: Implement proper permission checking for shared collections
-    # For now, authenticated users get read access to all collections
-    # and only owners get write/delete/share access
+    # Check shared collection permissions via UserRelationshipModel
+    user_role = get_user_collection_role(collection, user_id)
+
+    if user_role:
+        role_upper = user_role.upper()
+        if required_access == ACCESS_LEVELS["READ"]:
+            return True
+        if required_access == ACCESS_LEVELS["WRITE"] and role_upper == "EDITOR":
+            return True
+        # VIEWER role only gets read access
+        # DELETE and SHARE access restricted to owners
+        return False
+
+    # Authenticated users get read access to all collections
     if required_access == ACCESS_LEVELS["READ"]:
         return True
 
-    # Write, delete, and share access currently restricted to owners
+    # Write, delete, and share access restricted to owners
     return False
 
 
@@ -491,7 +565,7 @@ def format_collection_item(
         "collectionTypeId": item.get("collectionTypeId", ""),
         "parentId": item.get("parentId"),
         "ownerId": owner_id,
-        "metadata": item.get("customMetadata", {}),
+        "customMetadata": item.get("customMetadata", {}),
         "tags": item.get("tags", {}),
         "status": item.get("status", ACTIVE_STATUS),
         "itemCount": item.get("itemCount", 0),
@@ -519,8 +593,12 @@ def format_collection_item(
             # For icons, frontend handles rendering - no URL needed
             formatted_item["thumbnailUrl"] = None
         elif thumbnail_s3_key:
-            # For upload, asset, or frame types - generate CloudFront URL
-            thumbnail_url = _resolve_collection_thumbnail_url(thumbnail_s3_key)
+            # For upload, asset, or frame types - generate CloudFront URL.
+            # Pass updatedAt so the URL changes whenever the thumbnail is
+            # replaced at the same S3 key, busting browser/CDN caches.
+            thumbnail_url = _resolve_collection_thumbnail_url(
+                thumbnail_s3_key, updated_at=item.get("updatedAt")
+            )
             formatted_item["thumbnailUrl"] = thumbnail_url
 
     # Add user-specific fields if user context available
@@ -550,12 +628,22 @@ def format_collection_item(
 
 
 @tracer.capture_method
-def _resolve_collection_thumbnail_url(s3_key: str) -> Optional[str]:
+def _resolve_collection_thumbnail_url(
+    s3_key: str, updated_at: Optional[str] = None
+) -> Optional[str]:
     """
     Resolve a collection thumbnail S3 key to a CloudFront URL.
 
+    When ``updated_at`` is provided, a ``?v=<token>`` query string is appended
+    so the URL changes whenever the thumbnail is replaced. Collection thumbnails
+    are written to a stable S3 key (``collections/{id}/thumbnail.png``), so
+    without this cache-buster browsers and CloudFront would keep serving the
+    previous image after an update.
+
     Args:
         s3_key: S3 key for the thumbnail (e.g., 'collections/{id}/thumbnail.png')
+        updated_at: Collection ``updatedAt`` ISO-8601 timestamp, used as the
+            cache-bust token. Any string is accepted; it's URL-quoted.
 
     Returns:
         CloudFront URL or None if resolution fails
@@ -563,6 +651,7 @@ def _resolve_collection_thumbnail_url(s3_key: str) -> Optional[str]:
     try:
         # Import here to avoid circular dependencies
         import os
+        from urllib.parse import quote
 
         from url_utils import generate_cloudfront_url
 
@@ -579,6 +668,9 @@ def _resolve_collection_thumbnail_url(s3_key: str) -> Optional[str]:
             return None
 
         url = generate_cloudfront_url(bucket, s3_key)
+        if url and updated_at:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}v={quote(updated_at, safe='')}"
         return url
     except Exception as e:
         logger.warning(
@@ -719,7 +811,7 @@ def create_error_response(
     error_message: str,
     status_code: int = 500,
     request_id: Optional[str] = None,
-) -> Dict[str, Any]:
+):
     """
     Create standardized error response for collections API.
 
@@ -730,8 +822,10 @@ def create_error_response(
         request_id: Optional request ID for tracking
 
     Returns:
-        Standardized error response dictionary
+        Powertools Response with the appropriate status code and JSON body.
     """
+    from aws_lambda_powertools.event_handler import Response, content_types
+
     response = {
         "success": False,
         "error": {
@@ -747,7 +841,11 @@ def create_error_response(
     if request_id:
         response["meta"]["request_id"] = request_id
 
-    return response, status_code
+    return Response(
+        status_code=status_code,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps(response),
+    )
 
 
 @tracer.capture_method

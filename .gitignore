@@ -154,6 +154,21 @@ aiPrompt.json
 .playwright-cli/
 /blob-report/
 /playwright/.cache/
+
+# Stray Playwright snapshot files (saved to root by --filename flag)
+/t[0-9]*-*.yml
+/search-*.yml
+/after-*.yml
+/before-*.yml
+/page*.yml
+/sort-*.yml
+/col-*.yml
+/final-*.yml
+/deployed-*.yml
+/reload-*.yml
+/create-*.yml
+/edit-*.yml
+/collections-*.yml
 1scratch
 
 

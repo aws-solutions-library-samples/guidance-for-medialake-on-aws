@@ -139,7 +139,7 @@ def acquire_processing_lock(
                 "ProcessingStatus": {"S": "in-progress"},
                 "ProcessingStartTime": {"N": str(current_time)},
                 "LockExpiry": {"N": str(lock_expiry)},
-                "StoragePath": {"S": f"{bucket}:{key}"},
+                "StoragePath": {"S": f"LOCK::{bucket}:{key}"},
             },
             ConditionExpression="attribute_not_exists(InventoryID) OR LockExpiry < :current_time",
             ExpressionAttributeValues={":current_time": {"N": str(current_time)}},
@@ -1242,10 +1242,21 @@ class AssetProcessor:
                     ExpressionAttributeValues={":path": storage_path},
                 )
                 if path_query_response.get("Items"):
-                    existing_at_path = path_query_response["Items"][0]
-                    logger.info(
-                        f"Found existing record at StoragePath {storage_path}: InventoryID={existing_at_path['InventoryID']}, FileHash={existing_at_path.get('FileHash')}"
-                    )
+                    # Filter out LOCK records - they are processing locks, not real assets
+                    real_items = [
+                        item
+                        for item in path_query_response["Items"]
+                        if not item["InventoryID"].startswith("LOCK#")
+                    ]
+                    existing_at_path = real_items[0] if real_items else None
+                    if existing_at_path:
+                        logger.info(
+                            f"Found existing record at StoragePath {storage_path}: InventoryID={existing_at_path['InventoryID']}, FileHash={existing_at_path.get('FileHash')}"
+                        )
+                    elif path_query_response["Items"]:
+                        logger.info(
+                            f"Only LOCK records found at StoragePath {storage_path} - no real asset record"
+                        )
             except Exception as e:
                 logger.warning(f"Error checking StoragePath index: {str(e)}")
 
@@ -1857,9 +1868,16 @@ class AssetProcessor:
             inventory_id = None
             asset_data = None
 
-            if response["Items"]:
+            # Filter out LOCK records - they are processing locks, not real assets
+            real_items = [
+                item
+                for item in response.get("Items", [])
+                if not item["InventoryID"].startswith("LOCK#")
+            ]
+
+            if real_items:
                 # Found the item in DynamoDB
-                asset_data = response["Items"][0]
+                asset_data = real_items[0]
                 inventory_id = asset_data["InventoryID"]
                 logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
 

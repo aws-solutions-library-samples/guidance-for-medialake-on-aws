@@ -192,15 +192,34 @@ class LambdaBuilder:
 
         print(f"🔨 Building {lambda_dir.name} in {lambda_build}...")
 
-        # Copy Python files and directories
+        # Copy Python and JSON files and directories
         for item in lambda_dir.iterdir():
-            if item.is_file() and item.suffix == ".py":
+            if item.is_file() and item.suffix in (".py", ".json"):
                 shutil.copy2(item, lambda_build)
             elif item.is_dir() and not item.name.startswith("."):
                 target_dir = lambda_build / item.name
                 if target_dir.exists():
                     shutil.rmtree(target_dir)
                 shutil.copytree(item, target_dir)
+
+        # Copy shared files from parent directory (e.g., shared JSON mappings)
+        ALLOWED_PARENT_JSON = {
+            "shared_config.json",
+            "field_mappings.json",
+            "constants.json",
+        }
+        for item in lambda_dir.parent.iterdir():
+            if (
+                item.is_file()
+                and item.suffix == ".json"
+                and item.name in ALLOWED_PARENT_JSON
+            ):
+                dest = lambda_build / item.name
+                if dest.exists():
+                    print(f"  ⏭ Skipping parent JSON (already exists): {item.name}")
+                    continue
+                shutil.copy2(item, lambda_build)
+                print(f"  📄 Copied parent JSON: {item.name}")
 
         # Install requirements
         req_file = lambda_dir / "requirements.txt"
@@ -393,13 +412,32 @@ class LambdaBuilder:
         print(f"🔨 Copying {lambda_dir.name} → {lambda_build}")
 
         for item in lambda_dir.iterdir():
-            if item.is_file() and item.suffix == ".py":
+            if item.is_file() and item.suffix in (".py", ".json"):
                 shutil.copy2(item, lambda_build)
             elif item.is_dir() and not item.name.startswith("."):
                 target_dir = lambda_build / item.name
                 if target_dir.exists():
                     shutil.rmtree(target_dir)
                 shutil.copytree(item, target_dir)
+
+        # Copy shared files from parent directory (e.g., shared JSON mappings)
+        ALLOWED_PARENT_JSON = {
+            "shared_config.json",
+            "field_mappings.json",
+            "constants.json",
+        }
+        for item in lambda_dir.parent.iterdir():
+            if (
+                item.is_file()
+                and item.suffix == ".json"
+                and item.name in ALLOWED_PARENT_JSON
+            ):
+                dest = lambda_build / item.name
+                if dest.exists():
+                    print(f"  ⏭ Skipping parent JSON (already exists): {item.name}")
+                    continue
+                shutil.copy2(item, lambda_build)
+                print(f"  📄 Copied parent JSON: {item.name}")
 
         # Queue pip install for parallel execution instead of running inline
         req_file = lambda_dir / "requirements.txt"

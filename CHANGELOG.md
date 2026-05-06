@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.3] - 2026-05-06
+
+### Code Refactoring
+
+- refactor: Remove connector from storing LOCK records in DynamoDB asset table
+- refactor: Migrate collections listing and search to OpenSearch with DynamoDB stream sync
+
 ## [1.14.2] - 2026-05-05
 
 ### Code Refactoring

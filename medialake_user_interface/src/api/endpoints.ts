@@ -87,6 +87,7 @@ export const API_ENDPOINTS = {
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
     THUMBNAIL: (id: string) => `/collections/${id}/thumbnail`,
+    METADATA_KEYS: "/collections/metadata-keys",
   },
   COLLECTION_TYPES: {
     BASE: "/settings/collection-types",

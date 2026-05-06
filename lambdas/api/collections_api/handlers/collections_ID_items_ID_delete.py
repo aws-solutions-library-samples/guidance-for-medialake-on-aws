@@ -7,7 +7,6 @@ from urllib.parse import unquote
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from collections_utils import (
     COLLECTION_PK_PREFIX,
-    COLLECTIONS_GSI5_PK,
     METADATA_SK,
     create_error_response,
     create_success_response,
@@ -81,8 +80,6 @@ def register_route(app):
                             CollectionModel.itemCount.set(
                                 (CollectionModel.itemCount - 1)
                             ),
-                            CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
-                            CollectionModel.GSI5_SK.set(current_timestamp),
                         ],
                         condition=(CollectionModel.itemCount > 0),
                     )
@@ -95,8 +92,6 @@ def register_route(app):
                     collection.update(
                         actions=[
                             CollectionModel.updatedAt.set(current_timestamp),
-                            CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
-                            CollectionModel.GSI5_SK.set(current_timestamp),
                         ]
                     )
                 logger.info(f"[DELETE] Updated collection updatedAt timestamp")

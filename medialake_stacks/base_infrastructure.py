@@ -77,6 +77,9 @@ class BaseInfrastructureStack(Stack):
         region = Stack.of(self).region
         opensearch_index_name = "media"
         asset_embeddings_index_name = "asset-embeddings"
+        collections_index_name = (
+            f"{config.resource_prefix}_collections_{config.environment}"
+        )
         s3_vector_index_name = "media-vectors"
         parent_stack = cdk.Stack.of(self)
         parent_stack.region
@@ -257,7 +260,11 @@ class BaseInfrastructureStack(Stack):
                 domain_name=domain_name,
                 vpc=self._vpc.vpc,
                 subnet_ids=selected_subnet_ids,
-                collection_indexes=[opensearch_index_name, asset_embeddings_index_name],
+                collection_indexes=[
+                    opensearch_index_name,
+                    asset_embeddings_index_name,
+                    collections_index_name,
+                ],
                 security_group=self._security_group,
             ),
         )

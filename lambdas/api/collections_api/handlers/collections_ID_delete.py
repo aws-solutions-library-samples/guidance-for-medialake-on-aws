@@ -1,6 +1,5 @@
 """DELETE /collections/<collection_id> - Delete collection (hard delete)."""
 
-import json
 import os
 from datetime import datetime
 
@@ -24,6 +23,7 @@ from db_models import (
 )
 from pynamodb.exceptions import DoesNotExist
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import delete_collection_document
 
 logger = Logger(
     service="collections-ID-delete", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -32,8 +32,16 @@ tracer = Tracer(service="collections-ID-delete")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
-def _delete_collection_recursive(collection_id, user_id, current_timestamp):
+MAX_DELETE_DEPTH = 20
+
+
+def _delete_collection_recursive(collection_id, user_id, depth=0):
     """Recursively delete a collection and all its children using PynamoDB"""
+    if depth > MAX_DELETE_DEPTH:
+        raise ValueError(
+            f"Maximum collection nesting depth ({MAX_DELETE_DEPTH}) exceeded during delete"
+        )
+
     logger.info(f"[CASCADE] Deleting collection: {collection_id}")
 
     # Step 1: Query for child collections using CHILD# references
@@ -54,7 +62,7 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
         child_id = child_ref.childCollectionId
         if child_id:
             logger.info(f"[CASCADE] Recursively deleting child: {child_id}")
-            _delete_collection_recursive(child_id, user_id, current_timestamp)
+            _delete_collection_recursive(child_id, user_id, depth=depth + 1)
 
     # Step 3: Delete this collection's items (query all items in partition)
     deleted_count = 0
@@ -122,6 +130,11 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
     logger.info(
         f"[CASCADE] Deleted {deleted_count} items from collection {collection_id}"
     )
+
+    # Write-through: remove from OpenSearch immediately so the collection
+    # disappears from list/search results without waiting for stream sync.
+    delete_collection_document(collection_id)
+
     return deleted_count
 
 
@@ -159,9 +172,7 @@ def register_route(app):
                 )
 
             # Step 2: Recursively delete this collection and all children
-            total_deleted = _delete_collection_recursive(
-                collection_id, user_id, current_timestamp
-            )
+            total_deleted = _delete_collection_recursive(collection_id, user_id)
 
             # Step 2.5: Remove this collection from all collection groups (cascade)
             try:
@@ -229,23 +240,18 @@ def register_route(app):
             )
 
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": {
-                            "id": collection_id,
-                            "status": "DELETED",
-                            "itemsDeleted": total_deleted,
-                            "deletionType": "CASCADE",
-                        },
-                        "meta": {
-                            "timestamp": current_timestamp,
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": {
+                    "id": collection_id,
+                    "status": "DELETED",
+                    "itemsDeleted": total_deleted,
+                    "deletionType": "CASCADE",
+                },
+                "meta": {
+                    "timestamp": current_timestamp,
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except (BadRequestError, NotFoundError):

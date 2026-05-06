@@ -73,6 +73,19 @@ def register_route(app):
             # Create group
             group_item = create_collection_group(groups_table, group_data)
 
+            # Write-through to OpenSearch for immediate visibility
+            try:
+                from utils.collections_opensearch_write import (
+                    index_collection_group,
+                )
+
+                index_collection_group(group_id, group_item)
+            except Exception as os_err:
+                logger.warning(
+                    "OpenSearch write-through failed for group — stream sync will retry",
+                    extra={"group_id": group_id, "error": str(os_err)},
+                )
+
             logger.info(
                 f"Collection group created: {group_id}",
                 extra={"group_id": group_id, "owner_id": user_id},
@@ -84,9 +97,12 @@ def register_route(app):
             # Format response
             response_data = format_collection_group_item(group_item, user_context)
 
-            return {
-                "statusCode": 201,
-                "body": json.dumps(
+            from aws_lambda_powertools.event_handler import Response, content_types
+
+            return Response(
+                status_code=201,
+                content_type=content_types.APPLICATION_JSON,
+                body=json.dumps(
                     {
                         "success": True,
                         "data": response_data,
@@ -97,7 +113,7 @@ def register_route(app):
                         },
                     }
                 ),
-            }
+            )
 
         except BadRequestError:
             raise

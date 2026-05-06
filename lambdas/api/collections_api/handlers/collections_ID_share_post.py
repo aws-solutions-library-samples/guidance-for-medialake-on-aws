@@ -104,9 +104,12 @@ def register_route(app):
             if permission.message:
                 permission_dict["message"] = permission.message
 
-            return {
-                "statusCode": 201,
-                "body": json.dumps(
+            from aws_lambda_powertools.event_handler import Response, content_types
+
+            return Response(
+                status_code=201,
+                content_type=content_types.APPLICATION_JSON,
+                body=json.dumps(
                     {
                         "success": True,
                         "data": format_share(permission_dict),
@@ -117,7 +120,7 @@ def register_route(app):
                         },
                     }
                 ),
-            }
+            )
 
         except BadRequestError:
             raise
