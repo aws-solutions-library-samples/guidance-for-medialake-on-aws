@@ -1,0 +1,638 @@
+import React, { useMemo, useState, useRef } from "react";
+import {
+  Box,
+  Typography,
+  Chip,
+  Tooltip,
+  IconButton,
+  useTheme,
+  alpha,
+  Menu,
+  MenuItem,
+} from "@mui/material";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  ColumnDef,
+  SortingState,
+  ColumnFiltersState,
+  FilterFn,
+  ColumnResizeMode,
+  ColumnSizingState,
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import LockIcon from "@mui/icons-material/Lock";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import GroupIcon from "@mui/icons-material/Group";
+import { User } from "@/api/types/api.types";
+import { useGetGroups } from "@/api/hooks/useGroups";
+import { useUpdateUser } from "@/api/hooks/useUsers";
+import { useTranslation } from "react-i18next";
+import { UserFilterPopover } from "./UserFilterPopover";
+import { ResizableTable, ColumnVisibilityMenu, TableCellContent } from "@/components/common/table";
+import { UserTableToolbar } from "./UserTableToolbar";
+import {
+  TableFiltersProvider,
+  TableFilter,
+  TableSort,
+} from "@/components/common/table/context/TableFiltersContext";
+
+interface UserListProps {
+  users: User[];
+  onEditUser: (user: User) => void;
+  onDeleteUser: (username: string) => void;
+  onToggleUserStatus: (username: string, newStatus: boolean) => void;
+  activeFilters?: { columnId: string; value: string }[];
+  activeSorting?: { columnId: string; desc: boolean }[];
+  onRemoveFilter?: (columnId: string) => void;
+  onRemoveSort?: (columnId: string) => void;
+  onFilterChange?: (columnId: string, value: string) => void;
+  onSortChange?: (columnId: string, desc: boolean) => void;
+  handleMutation: (options: any, variables: any) => Promise<any>;
+}
+
+// Helper component for managing single group selection
+const GroupChips: React.FC<{
+  user: User;
+  theme: any;
+  groups: any[] | undefined;
+  isLoadingGroups: boolean;
+  handleMutation: (options: any, variables: any) => Promise<any>;
+}> = ({ user, theme, groups, isLoadingGroups, handleMutation }) => {
+  const { t } = useTranslation();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const updateUserMutation = useUpdateUser();
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleGroupChange = async (groupId: string) => {
+    // Close dropdown immediately on selection
+    handleClose();
+
+    await handleMutation(
+      {
+        mutation: updateUserMutation,
+        actionMessages: {
+          loading: t("users.apiMessages.updating.loading"),
+          success: t("users.apiMessages.updating.success"),
+          successMessage: t("users.apiMessages.updating.successMessage"),
+          error: t("users.apiMessages.updating.error"),
+        },
+      },
+      {
+        username: user.username,
+        updates: {
+          username: user.username,
+          groups: [groupId], // Use group.id (actual Cognito group name)
+        },
+      }
+    );
+  };
+
+  // Get the current group (first one if multiple exist)
+  // user.groups contains the actual Cognito group name (group.id)
+  const currentGroupId = user.groups && user.groups.length > 0 ? user.groups[0] : null;
+
+  // Find the matching group object to get the display name
+  const currentGroupObj = currentGroupId ? groups?.find((g) => g.id === currentGroupId) : null;
+
+  const currentGroupDisplayName = isLoadingGroups
+    ? t("common.loadingGroups", "Getting groups...")
+    : currentGroupObj
+      ? currentGroupObj.name
+      : t("common.noGroup", "No Group");
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+      }}
+    >
+      <Box
+        onClick={handleClick}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          cursor: "pointer",
+          padding: "4px 8px",
+          borderRadius: "6px",
+          backgroundColor: currentGroupId
+            ? alpha(theme.palette.primary.main, 0.1)
+            : alpha(theme.palette.grey[500], 0.1),
+          color: currentGroupId ? theme.palette.primary.main : theme.palette.text.secondary,
+          fontWeight: currentGroupId ? 600 : 400,
+          fontSize: "0.875rem",
+          transition: "background-color 0.2s",
+          "&:hover": {
+            backgroundColor: currentGroupId
+              ? alpha(theme.palette.primary.main, 0.15)
+              : alpha(theme.palette.grey[500], 0.15),
+          },
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
+          {currentGroupDisplayName}
+        </Typography>
+        <KeyboardArrowDownIcon fontSize="small" />
+      </Box>
+
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
+        {groups && groups.length > 0 ? (
+          groups.map((group) => (
+            <MenuItem
+              key={group.id}
+              onClick={() => handleGroupChange(group.id)}
+              selected={currentGroupId === group.id}
+            >
+              {group.name}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled>{t("groups.noAvailableGroups")}</MenuItem>
+        )}
+      </Menu>
+    </Box>
+  );
+};
+
+const containsFilter: FilterFn<any> = (row, columnId, filterValue) => {
+  const cellValue = row.getValue(columnId);
+  if (cellValue == null) return false;
+
+  // Handle date filtering
+  if (typeof filterValue === "object" && filterValue.filterDate) {
+    const cellDate = new Date(cellValue as string);
+    const dateStr = cellDate.toLocaleDateString();
+    return dateStr === filterValue.value;
+  }
+
+  return String(cellValue).toLowerCase().includes(String(filterValue).toLowerCase());
+};
+
+const UserList: React.FC<UserListProps> = ({
+  users,
+  onEditUser,
+  onDeleteUser,
+  onToggleUserStatus,
+  activeFilters = [],
+  activeSorting = [],
+  onRemoveFilter,
+  onRemoveSort,
+  onFilterChange,
+  onSortChange,
+  handleMutation,
+}) => {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+  // Fetch groups at the parent level
+  const { data: groups, isLoading: isLoadingGroups } = useGetGroups(true);
+
+  // Sync external state with internal state
+  React.useEffect(() => {
+    if (activeSorting) {
+      setSorting(
+        activeSorting.map((sort) => ({
+          id: sort.columnId,
+          desc: sort.desc,
+        }))
+      );
+    }
+  }, [activeSorting]);
+
+  React.useEffect(() => {
+    if (activeFilters) {
+      setColumnFilters(
+        activeFilters.map((filter) => ({
+          id: filter.columnId,
+          value: filter.value,
+        }))
+      );
+    }
+  }, [activeFilters]);
+
+  // Handle internal state changes
+  const handleSortingChange = (newSorting: SortingState) => {
+    setSorting(newSorting);
+    if (onSortChange && newSorting.length > 0) {
+      newSorting.forEach((sort) => {
+        onSortChange(sort.id, sort.desc);
+      });
+    } else if (onSortChange) {
+      onSortChange("", false);
+    }
+  };
+
+  const handleFilterChange = (newFilters: ColumnFiltersState) => {
+    setColumnFilters(newFilters);
+    if (onFilterChange && newFilters.length > 0) {
+      newFilters.forEach((filter) => {
+        onFilterChange(filter.id, filter.value as string);
+      });
+    }
+  };
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [columnVisibility, setColumnVisibility] = useState({
+    username: false,
+    modified: true, // Show modified column by default
+  });
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+
+  const formatDate = (dateString: string, includeTime: boolean = false) => {
+    const date = new Date(dateString);
+    if (includeTime) {
+      return date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  };
+
+  const columns = useMemo<ColumnDef<User>[]>(() => {
+    return [
+      {
+        header: t("common.columns.username"),
+        accessorKey: "username",
+        minSize: 120,
+        size: 180,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => {
+          return <TableCellContent variant="primary">{getValue() as string}</TableCellContent>;
+        },
+      },
+      {
+        header: t("common.columns.firstName"),
+        accessorKey: "name",
+        minSize: 100,
+        size: 160,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => (
+          <TableCellContent variant="secondary">{(getValue() as string) || "-"}</TableCellContent>
+        ),
+      },
+      {
+        header: t("common.columns.lastName"),
+        accessorKey: "family_name",
+        minSize: 120,
+        size: 160,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => (
+          <TableCellContent variant="secondary">{(getValue() as string) || "-"}</TableCellContent>
+        ),
+      },
+      {
+        header: t("common.columns.email"),
+        accessorKey: "email",
+        minSize: 150,
+        size: 275,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => (
+          <TableCellContent variant="secondary" wordBreak="break-all">
+            {getValue() as string}
+          </TableCellContent>
+        ),
+      },
+      {
+        header: t("common.columns.status"),
+        accessorKey: "enabled",
+        minSize: 100,
+        size: 100,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => {
+          const enabled = getValue() as boolean;
+          return (
+            <Chip
+              label={enabled ? t("common.status.active") : t("common.status.inactive")}
+              size="small"
+              sx={{
+                backgroundColor: enabled
+                  ? alpha(theme.palette.success.main, 0.1)
+                  : alpha(theme.palette.grey[500], 0.1),
+                color: enabled ? theme.palette.success.main : theme.palette.grey[500],
+                fontWeight: 600,
+                borderRadius: "6px",
+                height: "24px",
+                "& .MuiChip-label": {
+                  px: 1.5,
+                },
+              }}
+            />
+          );
+        },
+      },
+      {
+        header: t("common.columns.groups"),
+        accessorKey: "groups",
+        minSize: 200,
+        size: 250,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ row }) => {
+          return (
+            <GroupChips
+              user={row.original}
+              theme={theme}
+              groups={groups}
+              isLoadingGroups={isLoadingGroups}
+              handleMutation={handleMutation}
+            />
+          );
+        },
+      },
+      {
+        header: t("common.columns.created"),
+        accessorKey: "created",
+        minSize: 120,
+        size: 120,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => {
+          const dateValue = getValue() as string;
+          return (
+            <Tooltip title={formatDate(dateValue, true)} placement="top">
+              <Box>
+                <TableCellContent variant="secondary">{formatDate(dateValue)}</TableCellContent>
+              </Box>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        header: t("common.columns.modified"),
+        accessorKey: "modified",
+        minSize: 150,
+        size: 200,
+        enableResizing: true,
+        enableSorting: true,
+        enableFiltering: true,
+        cell: ({ getValue }) => {
+          const dateValue = getValue() as string;
+          return (
+            <Tooltip title={formatDate(dateValue, true)} placement="top">
+              <Box>
+                <TableCellContent variant="secondary">{formatDate(dateValue)}</TableCellContent>
+              </Box>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        id: "actions",
+        header: () => (
+          <Box sx={{ width: "100%", textAlign: "center" }}>{t("common.columns.actions")}</Box>
+        ),
+        minSize: 100,
+        size: 120,
+        enableResizing: true,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+            <Tooltip title={t("common.actions.edit")}>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditUser(row.original);
+                }}
+                sx={{
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  "&:hover": {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                  },
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip
+              title={
+                row.original.enabled ? t("common.actions.deactivate") : t("common.actions.activate")
+              }
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleUserStatus(row.original.username, !row.original.enabled);
+                }}
+                sx={{
+                  backgroundColor: row.original.enabled
+                    ? alpha(theme.palette.success.main, 0.1)
+                    : alpha(theme.palette.grey[500], 0.1),
+                  "&:hover": {
+                    backgroundColor: row.original.enabled
+                      ? alpha(theme.palette.success.main, 0.2)
+                      : alpha(theme.palette.grey[500], 0.2),
+                  },
+                }}
+              >
+                {row.original.enabled ? (
+                  <LockOpenIcon fontSize="small" />
+                ) : (
+                  <LockIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={t("common.actions.delete")}>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteUser(row.original.username);
+                }}
+                sx={{
+                  backgroundColor: alpha(theme.palette.error.main, 0.1),
+                  "&:hover": {
+                    backgroundColor: alpha(theme.palette.error.main, 0.2),
+                  },
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      },
+    ];
+  }, [
+    theme,
+    t,
+    onEditUser,
+    onDeleteUser,
+    onToggleUserStatus,
+    groups,
+    isLoadingGroups,
+    handleMutation,
+  ]);
+
+  const table = useReactTable({
+    data: users,
+    columns,
+    filterFns: {
+      contains: containsFilter,
+    },
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      columnVisibility,
+      columnSizing,
+    },
+    onSortingChange: handleSortingChange,
+    onColumnFiltersChange: handleFilterChange,
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    columnResizeMode: "onChange" as ColumnResizeMode,
+  });
+
+  const { rows } = table.getRowModel();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 53,
+    overscan: 10,
+  });
+
+  const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setColumnMenuAnchor(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchor(null);
+  };
+
+  const handleFilterMenuOpen = (event: React.MouseEvent<HTMLElement>, columnId: string) => {
+    setFilterMenuAnchor(event.currentTarget);
+    setActiveFilterColumn(columnId);
+  };
+
+  const handleFilterMenuClose = () => {
+    setFilterMenuAnchor(null);
+    setActiveFilterColumn(null);
+  };
+
+  const tableFiltersValue = useMemo(
+    () => ({
+      activeFilters: columnFilters.map((f) => ({
+        columnId: f.id,
+        value: f.value as string,
+      })) as TableFilter[],
+      activeSorting: sorting.map((s) => ({
+        columnId: s.id,
+        desc: s.desc,
+      })) as TableSort[],
+      onRemoveFilter,
+      onRemoveSort,
+      onFilterChange: (columnId: string, value: string) => {
+        const newFilters = columnFilters.map((f) => (f.id === columnId ? { ...f, value } : f));
+        handleFilterChange(newFilters);
+      },
+      onSortChange: (columnId: string, desc: boolean) => {
+        const newSorting = sorting.map((s) => (s.id === columnId ? { ...s, desc } : s));
+        handleSortingChange(newSorting);
+      },
+    }),
+    [columnFilters, sorting, onRemoveFilter, onRemoveSort, handleFilterChange, handleSortingChange]
+  );
+
+  return (
+    <TableFiltersProvider {...tableFiltersValue}>
+      <Box
+        sx={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+        }}
+      >
+        <UserTableToolbar
+          globalFilter={globalFilter}
+          onGlobalFilterChange={setGlobalFilter}
+          onColumnMenuOpen={handleColumnMenuOpen}
+          activeFilters={activeFilters}
+          activeSorting={activeSorting}
+          onRemoveFilter={onRemoveFilter}
+          onRemoveSort={onRemoveSort}
+        />
+
+        <ResizableTable
+          table={table}
+          containerRef={containerRef}
+          virtualizer={rowVirtualizer}
+          rows={rows}
+          onFilterClick={handleFilterMenuOpen}
+          activeFilters={activeFilters}
+          activeSorting={activeSorting}
+          onRemoveFilter={onRemoveFilter}
+          onRemoveSort={onRemoveSort}
+          emptyState={{
+            message: t("common.noUsersFound"),
+            icon: <GroupIcon sx={{ fontSize: 40 }} />,
+          }}
+        />
+
+        <ColumnVisibilityMenu
+          anchorEl={columnMenuAnchor}
+          columns={table.getAllLeafColumns()}
+          onClose={handleColumnMenuClose}
+          excludeIds={["actions"]}
+        />
+
+        <UserFilterPopover
+          anchorEl={filterMenuAnchor}
+          column={activeFilterColumn ? table.getColumn(activeFilterColumn) : null}
+          onClose={handleFilterMenuClose}
+          users={users}
+        />
+      </Box>
+    </TableFiltersProvider>
+  );
+};
+
+export default UserList;

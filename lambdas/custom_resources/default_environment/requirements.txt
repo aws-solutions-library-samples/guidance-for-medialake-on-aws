@@ -1,0 +1,4 @@
+boto3>=1.24.0
+aws-lambda-powertools>=2.13.0
+crhelper>=2.0.11
+aws_xray_sdk

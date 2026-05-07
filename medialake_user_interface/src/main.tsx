@@ -1,0 +1,98 @@
+import React, { Suspense, useState, useEffect } from "react";
+import ReactDOM from "react-dom/client";
+import AppConfigured from "./components/app-configured";
+import { Amplify } from "aws-amplify";
+import { useTranslation } from "react-i18next";
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+
+// Import and initialize i18next configuration
+import "./i18n/i18n";
+
+// Auto-reload when Vite chunk imports fail after a deploy (stale hash in cached index.html).
+// The flag prevents an infinite reload loop if the new index.html also fails for some reason.
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  const reloadedKey = "chunk-reload";
+  if (!sessionStorage.getItem(reloadedKey)) {
+    sessionStorage.setItem(reloadedKey, "1");
+    window.location.reload();
+  }
+});
+// Clear the flag on successful page load so future deploys can trigger a reload again.
+window.addEventListener("load", () => sessionStorage.removeItem("chunk-reload"));
+
+// Omakase player styles — imported globally so both grid-card (Stamp theme)
+// and detail-view (Omakase theme) players render correctly.
+import "@byomakase/omakase-player/dist/style.css";
+import "@byomakase/omakase-player/style/player-chroming/player-chroming.css";
+import "./styles/player-overrides.css";
+
+// Create a loading component that uses translations
+const LoadingFallback = () => {
+  const { t } = useTranslation();
+  return <>{t("app.loading", "Loading...")}</>;
+};
+
+// App component that initializes feature flags and renders AppConfigured
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    // Initialize AWS configuration
+    const initializeApp = async () => {
+      try {
+        await initializeAWS();
+        setIsLoading(false);
+      } catch (error) {
+        console.error(t("app.errors.loadingConfig", "Error loading configuration:"), error);
+        setIsLoading(false);
+      }
+    };
+
+    const initializeAWS = async () => {
+      try {
+        // Fetch AWS configuration
+        const awsResponse = await fetch("/aws-exports.json");
+        const awsConfig = await awsResponse.json();
+
+        // Configure Amplify
+        Amplify.configure({
+          Auth: {
+            Cognito: {
+              userPoolId: awsConfig.Auth.Cognito.userPoolId,
+              userPoolClientId: awsConfig.Auth.Cognito.userPoolClientId,
+              identityPoolId: awsConfig.Auth.Cognito.identityPoolId,
+            },
+          },
+          API: awsConfig.API,
+        });
+
+        return true;
+      } catch (error) {
+        console.error("Error loading AWS configuration:", error);
+        throw error;
+      }
+    };
+
+    initializeApp();
+  }, [t]);
+
+  if (isLoading) {
+    return <LoadingFallback />;
+  }
+
+  return (
+    <FeatureFlagsProvider>
+      <Suspense fallback={<LoadingFallback />}>
+        <AppConfigured />
+      </Suspense>
+    </FeatureFlagsProvider>
+  );
+};
+
+// Render the app
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(<App />);
+}

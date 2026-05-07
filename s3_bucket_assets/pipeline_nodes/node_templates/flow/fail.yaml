@@ -1,0 +1,34 @@
+spec: v1.0.0
+node:
+  id: fail
+  title: Fail
+  description: End the state machine execution with a failure
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: fail
+actions:
+  fail:
+    summary: End the state machine execution with a failure
+    description: This step will end the state machine execution with a failure status
+    operationId: fail
+    parameters:
+      - in: body
+        name: Error
+        required: false
+        schema:
+          type: string
+          description: Error code for the failure
+          default: "Failed"
+      - in: body
+        name: Cause
+        required: false
+        schema:
+          type: string
+          description: Description of the failure cause
+          default: "Flow step failed"
+    connections:
+      incoming:
+        type: [any]

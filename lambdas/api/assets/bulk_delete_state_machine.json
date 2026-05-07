@@ -1,0 +1,152 @@
+{
+  "Comment": "Bulk Asset Deletion Workflow with Distributed Map",
+  "StartAt": "InitializeJob",
+  "States": {
+    "InitializeJob": {
+      "Type": "Pass",
+      "Comment": "Initialize job context",
+      "Parameters": {
+        "jobId.$": "$.jobId",
+        "userId.$": "$.userId",
+        "assetIds.$": "$.assetIds",
+        "totalAssets.$": "$.totalAssets"
+      },
+      "Next": "ProcessDeletions"
+    },
+
+    "ProcessDeletions": {
+      "Type": "Map",
+      "Comment": "Process asset deletions in parallel using Distributed Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "DISTRIBUTED",
+          "ExecutionType": "STANDARD"
+        },
+        "StartAt": "DeleteAsset",
+        "States": {
+          "DeleteAsset": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${BulkDeleteWorkerLambdaArn}",
+              "Payload": {
+                "jobId.$": "$.jobId",
+                "userId.$": "$.userId",
+                "assetId.$": "$.assetId"
+              }
+            },
+            "ResultSelector": {
+              "jobId.$": "$.Payload.jobId",
+              "assetId.$": "$.Payload.assetId",
+              "status.$": "$.Payload.status",
+              "error.$": "$.Payload.error",
+              "timestamp.$": "$.Payload.timestamp",
+              "details.$": "$.Payload.details"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 3,
+                "BackoffRate": 2.0
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "ResultPath": "$.errorInfo",
+                "Next": "MarkAsError"
+              }
+            ],
+            "End": true
+          },
+
+          "MarkAsError": {
+            "Type": "Pass",
+            "Comment": "Mark deletion as error when catch is triggered",
+            "Parameters": {
+              "jobId.$": "$.jobId",
+              "assetId.$": "$.assetId",
+              "status": "error",
+              "error.$": "$.errorInfo.Error",
+              "timestamp.$": "$$.State.EnteredTime"
+            },
+            "End": true
+          }
+        }
+      },
+      "Label": "ProcessDeletions",
+      "MaxConcurrency": 100,
+      "ItemsPath": "$.assetIds",
+      "ItemSelector": {
+        "jobId.$": "$.jobId",
+        "userId.$": "$.userId",
+        "assetId.$": "$$.Map.Item.Value"
+      },
+      "ResultPath": "$.results",
+      "Next": "AggregateResults"
+    },
+
+    "AggregateResults": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${BulkDeleteAggregatorLambdaArn}",
+        "Payload": {
+          "jobId.$": "$.jobId",
+          "userId.$": "$.userId",
+          "totalAssets.$": "$.totalAssets",
+          "results.$": "$.results"
+        }
+      },
+      "ResultSelector": {
+        "jobId.$": "$.Payload.jobId",
+        "userId.$": "$.Payload.userId",
+        "status.$": "$.Payload.status",
+        "summary.$": "$.Payload.summary",
+        "completedAt.$": "$.Payload.completedAt"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.aggregationError",
+          "Next": "AggregationFailed"
+        }
+      ],
+      "Next": "JobCompleted"
+    },
+
+    "JobCompleted": {
+      "Type": "Pass",
+      "Comment": "Job completed successfully",
+      "Parameters": {
+        "jobId.$": "$.jobId",
+        "status.$": "$.status",
+        "summary.$": "$.summary",
+        "message": "Bulk deletion completed",
+        "completedAt.$": "$.completedAt"
+      },
+      "End": true
+    },
+
+    "AggregationFailed": {
+      "Type": "Pass",
+      "Comment": "Aggregation failed, but deletions may have succeeded",
+      "Parameters": {
+        "jobId.$": "$.jobId",
+        "status": "AGGREGATION_FAILED",
+        "error.$": "$.aggregationError",
+        "message": "Some deletions may have succeeded, but result aggregation failed"
+      },
+      "End": true
+    }
+  }
+}

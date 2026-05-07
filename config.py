@@ -1,0 +1,999 @@
+import json
+import os
+import sys
+import warnings
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from aws_cdk import aws_logs as logs
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+    root_validator,
+    validator,
+)
+
+
+class DeploymentSize(str, Enum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
+class OpenSearchPresets:
+    """Predefined OpenSearch cluster configurations for different deployment sizes."""
+
+    @staticmethod
+    def get_preset(deployment_size: DeploymentSize) -> Dict:
+        """Get OpenSearch configuration preset based on deployment size."""
+        presets = {
+            DeploymentSize.SMALL: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 3,
+                "master_node_instance_type": "t3.small.search",
+                "data_node_count": 2,
+                "data_node_instance_type": "t3.small.search",
+                "data_node_volume_size": 10,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 3000,
+                "availability_zone_count": 2,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": True,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None,
+            },
+            DeploymentSize.MEDIUM: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 3,
+                "master_node_instance_type": "t3.medium.search",
+                "data_node_count": 2,
+                "data_node_instance_type": "t3.medium.search",
+                "data_node_volume_size": 50,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 3000,
+                "availability_zone_count": 2,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": True,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None,
+            },
+            DeploymentSize.LARGE: {
+                "use_dedicated_master_nodes": True,
+                "master_node_count": 3,
+                "master_node_instance_type": "r7g.medium.search",
+                "data_node_count": 2,
+                "data_node_instance_type": "r7g.medium.search",
+                "data_node_volume_size": 10,
+                "data_node_volume_type": "gp3",
+                "data_node_volume_iops": 3000,
+                "availability_zone_count": 2,
+                "multi_az_with_standby_enabled": False,
+                "automated_snapshot_start_hour": 20,
+                "off_peak_window_enabled": True,
+                "off_peak_window_start": "20:00",
+                "domain_endpoint": None,
+            },
+        }
+
+        if deployment_size not in presets:
+            raise ValueError(f"Unknown deployment size: {deployment_size}")
+
+        return presets[deployment_size]
+
+
+def validate_opensearch_instance_type(instance_type: str) -> str:
+    valid_prefixes = [
+        "c5",
+        "c6g",
+        "c7i",
+        "c7g",
+        "c8g",
+        "m5",
+        "m6g",
+        "m8g",
+        "r5",
+        "r6g",
+        "r7g",
+        "r7gd",
+        "r8g",
+        "r8gd",
+        "t3",
+        "i3",
+        "i3en",
+    ]
+    valid_suffixes = [
+        "small",
+        "medium",
+        "large",
+        "xlarge",
+        "2xlarge",
+        "4xlarge",
+        "8xlarge",
+        "12xlarge",
+        "16xlarge",
+        "24xlarge",
+    ]
+
+    parts = instance_type.split(".")
+    if len(parts) != 3 or parts[2] != "search":
+        raise ValueError(f"Invalid instance type format: {instance_type}")
+
+    prefix, size, _ = parts
+
+    if prefix not in valid_prefixes:
+        raise ValueError(f"Invalid instance family: {prefix}")
+
+    if size not in valid_suffixes:
+        raise ValueError(f"Invalid instance size: {size}")
+
+    return instance_type
+
+
+class LoggingConfig(BaseModel):
+    level: str = "INFO"
+    retention_days: int = 90
+    s3_retention_days: int = 90
+    cloudwatch_retention_days: int = 90
+    waf_retention_days: int = 90
+    api_gateway_retention_days: int = 90
+    lambda_cloudwatch_log_retention_days: int = 90  # Lambda log group retention
+
+    @field_validator("level")
+    @classmethod
+    def validate_level(cls, v):
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in valid_levels:
+            raise ValueError(f"Log level must be one of {valid_levels}")
+        return v.upper()
+
+    @property
+    def cloudwatch_retention(self) -> logs.RetentionDays:
+        # Map days to CloudWatch RetentionDays enum
+        retention_map = {
+            1: logs.RetentionDays.ONE_DAY,
+            3: logs.RetentionDays.THREE_DAYS,
+            5: logs.RetentionDays.FIVE_DAYS,
+            7: logs.RetentionDays.ONE_WEEK,
+            14: logs.RetentionDays.TWO_WEEKS,
+            30: logs.RetentionDays.ONE_MONTH,
+            60: logs.RetentionDays.TWO_MONTHS,
+            90: logs.RetentionDays.THREE_MONTHS,
+            120: logs.RetentionDays.FOUR_MONTHS,
+            150: logs.RetentionDays.FIVE_MONTHS,
+            180: logs.RetentionDays.SIX_MONTHS,
+            365: logs.RetentionDays.ONE_YEAR,
+            400: logs.RetentionDays.THIRTEEN_MONTHS,
+            545: logs.RetentionDays.EIGHTEEN_MONTHS,
+            731: logs.RetentionDays.TWO_YEARS,
+            1827: logs.RetentionDays.FIVE_YEARS,
+            3653: logs.RetentionDays.TEN_YEARS,
+            0: logs.RetentionDays.INFINITE,
+        }
+
+        # Find the closest matching retention period
+        valid_days = sorted(retention_map.keys())
+        closest_days = min(
+            valid_days, key=lambda x: abs(x - self.cloudwatch_retention_days)
+        )
+        return retention_map[closest_days]
+
+
+class OpenSearchClusterSettings(BaseModel):
+    use_dedicated_master_nodes: bool = True
+    master_node_count: int = 2
+    master_node_instance_type: str = "r7g.medium.search"
+    data_node_count: int = 3
+    data_node_instance_type: str = "r7g.medium.search"
+    data_node_volume_size: int = 10
+    data_node_volume_type: str = "gp3"
+    data_node_volume_iops: int = 3000
+    availability_zone_count: int = 2
+    multi_az_with_standby_enabled: bool = False
+    automated_snapshot_start_hour: int = 20  # Default to 8 PM UTC
+    off_peak_window_enabled: bool = True
+    off_peak_window_start: str = "20:00"
+    domain_endpoint: Optional[str] = None
+
+    @field_validator("off_peak_window_start")
+    @classmethod
+    def validate_off_peak_window_start(cls, v):
+        try:
+            time = datetime.strptime(v, "%H:%M")
+            return v
+        except ValueError:
+            raise ValueError(
+                "Off-peak window start time must be in HH:MM format (24-hour)"
+            )
+
+    @field_validator("automated_snapshot_start_hour")
+    @classmethod
+    def validate_snapshot_hour(cls, v):
+        if not 0 <= v <= 23:
+            raise ValueError("Automated snapshot start hour must be between 0 and 23")
+        return v
+
+    @field_validator("master_node_instance_type", "data_node_instance_type")
+    @classmethod
+    def validate_instance_types(cls, v):
+        return validate_opensearch_instance_type(v)
+
+    @root_validator(pre=True)
+    @classmethod
+    def validate_master_node_count(cls, values):
+        use_dedicated_masters = values.get("use_dedicated_master_nodes", True)
+        multi_az = values.get("multi_az_with_standby_enabled", False)
+        master_count = values.get("master_node_count", 2)
+
+        if use_dedicated_masters and multi_az and master_count < 3:
+            raise ValueError(
+                "When multi_az_with_standby_enabled is True and using dedicated master nodes, you must choose at least three dedicated master nodes"
+            )
+        return values
+
+    @model_validator(mode="after")
+    def check_az_count(self):
+        if self.availability_zone_count > 3:  # Assuming a maximum of 3 AZs per region
+            warnings.warn(
+                f"availability_zone_count ({self.availability_zone_count}) may be greater than the "
+                "number of available AZs in the region. This might cause deployment issues."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_collapsed_node_config(self):
+        if not self.use_dedicated_master_nodes and self.data_node_count < 2:
+            raise ValueError(
+                "When not using dedicated master nodes (collapsed configuration), "
+                "you must have at least 2 data nodes for high availability"
+            )
+        return self
+
+
+class UserConfig(BaseModel):
+    email: str
+    first_name: str
+    last_name: str
+
+
+class IdentityProviderConfig(BaseModel):
+    identity_provider_method: str
+    identity_provider_name: Optional[str] = None
+    identity_provider_metadata_url: Optional[str] = None
+    identity_provider_metadata_path: Optional[str] = None
+    identity_provider_arn: Optional[str] = None
+
+    @validator("identity_provider_method")
+    @classmethod
+    def validate_provider_method(cls, v):
+        if v not in ["cognito", "saml"]:
+            raise ValueError(
+                'identity_provider_method must be either "cognito" or "saml"'
+            )
+        return v
+
+    @validator("identity_provider_name", "identity_provider_metadata_url")
+    @classmethod
+    def validate_saml_fields(cls, v, values):
+        if values.get("identity_provider_method") == "saml" and not v:
+            raise ValueError(
+                "SAML provider requires identity_provider_name and identity_provider_metadata_url"
+            )
+        return v
+
+
+class AuthConfig(BaseModel):
+    identity_providers: List[IdentityProviderConfig] = [
+        IdentityProviderConfig(identity_provider_method="cognito")
+    ]
+
+    @validator("identity_providers")
+    @classmethod
+    def validate_providers(cls, v):
+        if not v:
+            raise ValueError("At least one identity provider must be configured")
+
+        # Check if at least one provider has valid method
+        valid_methods = ["saml", "cognito"]
+        has_valid_provider = False
+
+        for provider in v:
+            if provider.identity_provider_method in valid_methods:
+                has_valid_provider = True
+
+                # Additional validation for SAML providers
+                if provider.identity_provider_method == "saml":
+                    if not provider.identity_provider_name:
+                        raise ValueError(
+                            "SAML provider requires identity_provider_name"
+                        )
+                    if not provider.identity_provider_metadata_url:
+                        raise ValueError(
+                            "SAML provider requires identity_provider_metadata_url"
+                        )
+
+        if not has_valid_provider:
+            raise ValueError(
+                "At least one provider must have identity_provider_method of 'saml' or 'cognito'"
+            )
+
+        return v
+
+
+class ExistingVpcConfig(BaseModel):
+    vpc_id: str
+    vpc_cidr: str
+    subnet_ids: Dict[str, List[str]]
+
+
+class NewVpcConfig(BaseModel):
+    vpc_name: str = "MediaLakeVPC"
+    max_azs: int = 3
+    cidr: str = "10.0.0.0/16"
+    enable_dns_hostnames: bool = True
+    enable_dns_support: bool = True
+
+
+class ExistingSecurityGroupsConfig(BaseModel):
+    media_lake_sg: str
+    opensearch_sg: str
+
+
+class NewSecurityGroupConfig(BaseModel):
+    name: str
+    description: str
+
+
+class SecurityGroupsConfig(BaseModel):
+    use_existing_groups: bool = False
+    existing_groups: Optional[ExistingSecurityGroupsConfig] = None
+    new_groups: Optional[Dict[str, NewSecurityGroupConfig]] = None
+
+    @model_validator(mode="after")
+    def check_security_groups_config(self):
+        if self.use_existing_groups and not self.existing_groups:
+            raise ValueError(
+                "When use_existing_groups is True, existing_groups must be provided"
+            )
+        if not self.use_existing_groups and not self.new_groups:
+            raise ValueError(
+                "When use_existing_groups is False, new_groups must be provided"
+            )
+        return self
+
+
+class VpcConfig(BaseModel):
+    use_existing_vpc: bool = False
+    existing_vpc: Optional[ExistingVpcConfig] = None
+    new_vpc: Optional[NewVpcConfig] = NewVpcConfig()  # Provide a default NewVpcConfig
+    security_groups: SecurityGroupsConfig = Field(default_factory=SecurityGroupsConfig)
+
+    @model_validator(mode="after")
+    def check_vpc_config(self, values):
+        if self.use_existing_vpc and not self.existing_vpc:
+            raise ValueError(
+                "When use_existing_vpc is True, existing_vpc must be provided"
+            )
+        if not self.use_existing_vpc and not self.new_vpc:
+            raise ValueError("When use_existing_vpc is False, new_vpc must be provided")
+
+        if self.use_existing_vpc:
+            if not self.existing_vpc.subnet_ids.get("private"):
+                raise ValueError(
+                    "No private subnets found in the existing VPC configuration"
+                )
+
+        return self
+
+
+class CloudFrontCustomDomainConfig(BaseModel):
+    """Configuration for CloudFront custom domain settings"""
+
+    domain_name: Optional[str] = None
+    certificate_arn: Optional[str] = None
+
+    @field_validator("domain_name")
+    @classmethod
+    def validate_domain_name_format(cls, v):
+        """Validate DNS hostname format.
+
+        Domain name must:
+        - Contain only alphanumeric characters, hyphens, and dots
+        - Not start or end with a hyphen or dot
+        - Have valid label structure (labels separated by dots)
+        - Each label must be 1-63 characters
+        - Total length must not exceed 253 characters
+        """
+        # Skip validation if value is None or empty/whitespace
+        if not v or not v.strip():
+            return v
+
+        import re
+
+        domain = v.strip()
+
+        # Check total length
+        if len(domain) > 253:
+            raise ValueError(
+                f"Invalid domain name: total length exceeds 253 characters. "
+                f"Domain name: {domain}"
+            )
+
+        # Check for leading or trailing dots or hyphens
+        if domain.startswith(".") or domain.endswith("."):
+            raise ValueError(
+                f"Invalid domain name: cannot start or end with a dot. "
+                f"Domain name: {domain}"
+            )
+
+        if domain.startswith("-") or domain.endswith("-"):
+            raise ValueError(
+                f"Invalid domain name: cannot start or end with a hyphen. "
+                f"Domain name: {domain}"
+            )
+
+        # Split into labels and validate each
+        labels = domain.split(".")
+
+        if len(labels) < 2:
+            raise ValueError(
+                f"Invalid domain name: must contain at least one dot (e.g., example.com). "
+                f"Domain name: {domain}"
+            )
+
+        # Pattern for valid DNS label: alphanumeric and hyphens, not starting/ending with hyphen
+        label_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
+
+        for label in labels:
+            if not label:
+                raise ValueError(
+                    f"Invalid domain name: contains empty label (consecutive dots). "
+                    f"Domain name: {domain}"
+                )
+
+            if len(label) > 63:
+                raise ValueError(
+                    f"Invalid domain name: label '{label}' exceeds 63 characters. "
+                    f"Domain name: {domain}"
+                )
+
+            if not re.match(label_pattern, label):
+                raise ValueError(
+                    f"Invalid domain name: label '{label}' contains invalid characters "
+                    f"or starts/ends with a hyphen. Labels must contain only alphanumeric "
+                    f"characters and hyphens, and cannot start or end with a hyphen. "
+                    f"Domain name: {domain}"
+                )
+
+        return domain
+
+    @field_validator("certificate_arn")
+    @classmethod
+    def validate_certificate_arn_format(cls, v):
+        """Validate ACM certificate ARN format and region.
+
+        Certificate ARN must:
+        - Match the AWS ACM ARN format pattern
+        - Be in us-east-1 region (CloudFront requirement)
+        """
+        # Skip validation if value is None or empty/whitespace
+        if not v or not v.strip():
+            return v
+
+        import re
+
+        # ACM certificate ARN pattern: arn:aws:acm:region:account-id:certificate/certificate-id
+        arn_pattern = r"^arn:aws:acm:([a-z0-9-]+):(\d{12}):certificate/([a-f0-9-]+)$"
+
+        match = re.match(arn_pattern, v)
+        if not match:
+            raise ValueError(
+                f"Invalid certificate ARN format. Expected format: "
+                f"arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID. "
+                f"Received: {v}"
+            )
+
+        # Extract region from ARN
+        region = match.group(1)
+
+        # CloudFront requires certificates to be in us-east-1
+        if region != "us-east-1":
+            raise ValueError(
+                f"ACM certificate must be in us-east-1 region for CloudFront custom domains. "
+                f"Certificate is in {region} region. Please create or import a certificate in us-east-1."
+            )
+
+        return v
+
+    @model_validator(mode="after")
+    def validate_both_or_neither(self):
+        """Validate that both domain_name and certificate_arn are provided together or both omitted.
+
+        Treats null, empty string, and whitespace-only values as "not configured".
+        """
+        # Normalize values - treat None, empty, and whitespace-only as "not configured"
+        has_domain = bool(self.domain_name and self.domain_name.strip())
+        has_cert = bool(self.certificate_arn and self.certificate_arn.strip())
+
+        if has_domain != has_cert:
+            raise ValueError(
+                "Both domain_name and certificate_arn must be provided together, "
+                "or both must be omitted. Custom domain configuration requires both fields."
+            )
+        return self
+
+
+class CDKConfig(BaseModel):
+    """Configuration for CDK Application.
+
+    Multi-deployment support:
+        When ``use_prefixed_names`` is True (opt-in), all CloudFormation stack names,
+        SSM parameter paths, and CloudFormation export names are prefixed with
+        ``resource_prefix`` and ``environment`` so that multiple independent MediaLake
+        deployments can coexist in the same AWS account and region.
+
+        Existing deployments that do **not** set this flag continue to use the legacy
+        hardcoded names (``MediaLakeBaseInfrastructure``, ``/medialake/...``, etc.)
+        and are fully backwards-compatible.
+    """
+
+    lambda_tail_warming: bool = False
+    environment: str  # Used for retain decisions
+    opensearch_deployment_size: DeploymentSize = (
+        DeploymentSize.MEDIUM
+    )  # NEW: Dynamic deployment sizing
+    resource_prefix: str
+    resource_application_tag: str
+    account_id: str
+    primary_region: str
+    api_path: str
+    initial_user: UserConfig
+    logging: LoggingConfig = LoggingConfig()
+    secondary_region: Optional[str] = None
+    opensearch_cluster_settings: Optional[OpenSearchClusterSettings] = (
+        None  # Can override presets
+    )
+    authZ: AuthConfig = AuthConfig()
+    vpc: VpcConfig = Field(default_factory=VpcConfig)
+    cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
+    video_download_enabled: bool = True
+    external_nodes_bucket: Optional[str] = None
+    ses_from_address: Optional[str] = None
+    portal_rate_limit_per_5min: Optional[int] = 1000
+
+    @field_validator("portal_rate_limit_per_5min", mode="before")
+    @classmethod
+    def _validate_portal_rate_limit(cls, v: Any) -> int:
+        if v is None or v == "":
+            return 1000
+        v = int(v)
+        if not (100 <= v <= 2_000_000_000):
+            raise ValueError(
+                "portal_rate_limit_per_5min must be between 100 and 2,000,000,000"
+            )
+        return v
+
+    use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
+
+    # ── Multi-deployment naming helpers ──────────────────────────────────
+
+    @property
+    def stack_prefix(self) -> str:
+        """Prefix prepended to CloudFormation stack logical IDs.
+
+        When ``use_prefixed_names`` is False (default / legacy), returns the
+        empty string so that stack names stay unchanged (e.g. ``MediaLakeStack``).
+
+        When True, returns ``"{resource_prefix}-{environment}-"`` so that each
+        deployment gets unique stack names (e.g. ``ml-dev-MediaLakeStack``).
+        """
+        if not self.use_prefixed_names:
+            return ""
+        return f"{self.resource_prefix}-{self.environment}-"
+
+    @property
+    def ssm_prefix(self) -> str:
+        """Root path for all SSM parameters belonging to this deployment.
+
+        Legacy:  ``/medialake/{environment}``
+        Prefixed: ``/{resource_prefix}/{environment}``
+
+        Individual parameters append their own sub-paths after this.
+        """
+        if not self.use_prefixed_names:
+            return f"/medialake/{self.environment}"
+        return f"/{self.resource_prefix}/{self.environment}"
+
+    @property
+    def export_prefix(self) -> str:
+        """Prefix for CloudFormation export names.
+
+        Legacy:  ``""`` (exports use raw stack names like ``MediaLakeCognito-UserPoolId``)
+        Prefixed: ``"{resource_prefix}-{environment}-"``
+        """
+        if not self.use_prefixed_names:
+            return ""
+        return f"{self.resource_prefix}-{self.environment}-"
+
+    def stack_name(self, base_name: str) -> str:
+        """Return the full CloudFormation stack name for a given base name.
+
+        Args:
+            base_name: The legacy stack name, e.g. ``"MediaLakeBaseInfrastructure"``
+
+        Returns:
+            ``base_name`` when legacy mode, or ``"{stack_prefix}{base_name}"`` when
+            prefixed names are enabled.
+        """
+        return f"{self.stack_prefix}{base_name}"
+
+    def ssm_param(self, *parts: str) -> str:
+        """Build a fully-qualified SSM parameter path.
+
+        Both legacy and prefixed modes use ``{ssm_prefix}/{parts...}`` where
+        ``ssm_prefix`` already includes the environment.
+
+        Args:
+            *parts: Path segments after the prefix, e.g. ``("cloudfront-distribution-domain",)``
+        """
+        return f"{self.ssm_prefix}/{'/'.join(parts)}"
+
+    def ssm_param_global(self, *parts: str) -> str:
+        """Build an SSM parameter path without environment scoping (legacy global params).
+
+        Legacy:  ``/medialake/{parts...}``  (no environment in path)
+        Prefixed: ``/{resource_prefix}/{environment}/{parts...}``  (always scoped)
+
+        Use this only for parameters that were historically global (e.g. WAF ACL ARN).
+        New parameters should always use ``ssm_param()`` instead.
+        """
+        if not self.use_prefixed_names:
+            return f"/medialake/{'/'.join(parts)}"
+        return f"/{self.resource_prefix}/{self.environment}/{'/'.join(parts)}"
+
+    def cfn_export(self, stack_base_name: str, export_key: str) -> str:
+        """Build a CloudFormation export name.
+
+        Legacy:  ``"{stack_base_name}-{export_key}"``
+        Prefixed: ``"{export_prefix}{stack_base_name}-{export_key}"``
+        """
+        return f"{self.export_prefix}{stack_base_name}-{export_key}"
+
+    @property
+    def tenancy(self) -> Optional[dict]:
+        """Tenancy configuration — optional, not validated beyond presence.
+
+        Note: This field exists in some config.json files but is not currently
+        used by any CDK constructs. Pydantic v2 silently ignores extra fields.
+        """
+        return None
+
+    def __init__(self, **data):
+        """Initialize CDKConfig and log configuration values for audit trail.
+
+        Raises:
+            SystemExit: When configuration validation fails, causing CDK deployment to fail
+        """
+        try:
+            super().__init__(**data)
+            self._log_configuration_audit_trail()
+        except ValidationError as e:
+            # Handle Pydantic validation errors during direct instantiation
+            # Initialize logger for error reporting
+            try:
+                from cdk_logger import CDKLogger
+
+                logger = CDKLogger.get_logger("CDKConfig")
+            except ImportError:
+                import logging
+
+                logger = logging.getLogger("CDKConfig")
+                if not logger.handlers:
+                    handler = logging.StreamHandler()
+                    formatter = logging.Formatter(
+                        '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                    )
+                    handler.setFormatter(formatter)
+                    logger.addHandler(handler)
+                    logger.setLevel(logging.INFO)
+
+            # Format validation errors with detailed messages
+            error_details = []
+            for error in e.errors():
+                field_path = " -> ".join(str(loc) for loc in error["loc"])
+                error_details.append(f"  • Field '{field_path}': {error['msg']}")
+                if "input" in error:
+                    error_details.append(f"    Received value: {error['input']}")
+
+            error_msg = (
+                f"CDK Configuration Validation Error: Invalid configuration provided. "
+                f"Please fix the following validation errors:\n"
+                + "\n".join(error_details)
+                + f"\n\nFor more information about configuration options, please refer to the documentation."
+            )
+
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+
+            # Exit with error code to fail CDK deployment
+            # This ensures that configuration validation errors propagate to deployment failures
+            sys.exit(1)
+
+    def _log_configuration_audit_trail(self):
+        """Log configuration values for audit trail during CDK synthesis."""
+        # Import here to avoid circular imports during module loading
+        try:
+            from cdk_logger import CDKLogger
+
+            logger = CDKLogger.get_logger("CDKConfig")
+        except ImportError:
+            # Fallback to standard logging if CDKLogger is not available
+            import logging
+
+            logger = logging.getLogger("CDKConfig")
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter(
+                    '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                )
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+                logger.setLevel(logging.INFO)
+
+        # Get current timestamp for audit trail
+        timestamp = datetime.utcnow().isoformat() + "Z"
+
+        # Log the resolved video_download_enabled value with deployment context
+        logger.info(
+            f"CDK Configuration Audit: video_download_enabled={self.video_download_enabled}, "
+            f"external_nodes_bucket={self.external_nodes_bucket}, "
+            f"environment={self.environment}, "
+            f"resource_prefix={self.resource_prefix}, "
+            f"account_id={self.account_id}, "
+            f"primary_region={self.primary_region}, "
+            f"synthesis_timestamp={timestamp}"
+        )
+
+    @field_validator("video_download_enabled")
+    @classmethod
+    def validate_video_download_enabled(cls, v):
+        """Validate that video_download_enabled is a boolean value.
+
+        Args:
+            v: The value to validate
+
+        Returns:
+            bool: The validated boolean value
+
+        Raises:
+            ValueError: If the value is not a boolean type with detailed error message
+        """
+        if not isinstance(v, bool):
+            # Provide detailed error message with examples and type information
+            error_msg = (
+                f"video_download_enabled must be a boolean value (true or false). "
+                f"Received: {repr(v)} (type: {type(v).__name__}). "
+                f"Valid examples: true, false. "
+                f"Common mistakes: using strings like 'true'/'false' instead of boolean values, "
+                f"or using numbers like 1/0 instead of true/false."
+            )
+            raise ValueError(error_msg)
+        return v
+
+    @field_validator("external_nodes_bucket")
+    @classmethod
+    def validate_external_nodes_bucket(cls, v):
+        """Validate that external_nodes_bucket is a valid S3 bucket name if provided."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        import re
+
+        if not re.match(r"^(?!.*--)[a-z0-9]([a-z0-9-]*[a-z0-9])?$", v) or not (
+            3 <= len(v) <= 63
+        ):
+            raise ValueError(
+                f"external_nodes_bucket must be a valid S3 bucket name: 3-63 characters, "
+                f"lowercase letters, numbers, and hyphens only, cannot start or end with a hyphen, "
+                f"no consecutive hyphens. Received: '{v}'"
+            )
+        return v
+
+    @property
+    def resolved_opensearch_cluster_settings(self) -> OpenSearchClusterSettings:
+        """Get OpenSearch cluster settings, using preset if not explicitly configured."""
+        if self.opensearch_cluster_settings is not None:
+            # Use explicitly provided settings
+            return self.opensearch_cluster_settings
+
+        # Use preset based on deployment_size
+        preset_config = OpenSearchPresets.get_preset(self.opensearch_deployment_size)
+        return OpenSearchClusterSettings(**preset_config)
+
+    @model_validator(mode="after")
+    def check_az_count_vpc(self):
+        if self.vpc:
+            opensearch_settings = self.resolved_opensearch_cluster_settings
+            if self.vpc.use_existing_vpc:
+                required_subnet_count = opensearch_settings.availability_zone_count
+                if (
+                    len(self.vpc.existing_vpc.subnet_ids["private"])
+                    < required_subnet_count
+                ):
+                    raise ValueError(
+                        f"Not enough private subnets in different AZs. Required: {required_subnet_count}, Found: {len(self.vpc.existing_vpc.subnet_ids['private'])}"
+                    )
+            elif self.vpc.new_vpc:
+                vpc_max_azs = self.vpc.new_vpc.max_azs
+                opensearch_az_count = opensearch_settings.availability_zone_count
+
+                if opensearch_az_count > vpc_max_azs:
+                    warnings.warn(
+                        f"OpenSearch availability_zone_count ({opensearch_az_count}) is greater than VPC max_azs ({vpc_max_azs}). This might cause deployment issues."
+                    )
+
+        return self
+
+    @property
+    def regions(self) -> List[str]:
+        regions = [self.primary_region]
+        if getattr(self, "enable_ha", False) and self.secondary_region:
+            regions.append(self.secondary_region)
+        return regions
+
+    @classmethod
+    def load_from_file(cls, filename="config.json"):
+        """Load configuration from file and log audit trail.
+
+        Args:
+            filename: Path to the configuration file
+
+        Returns:
+            CDKConfig: Loaded and validated configuration instance
+
+        Raises:
+            SystemExit: When configuration validation fails, causing CDK deployment to fail
+        """
+        # Initialize logger first for error reporting
+        try:
+            from cdk_logger import CDKLogger
+
+            logger = CDKLogger.get_logger("CDKConfig")
+        except ImportError:
+            import logging
+
+            logger = logging.getLogger("CDKConfig")
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter(
+                    '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+                )
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+                logger.setLevel(logging.INFO)
+
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+
+            # Create instance which will automatically trigger audit logging
+            # This is where Pydantic validation occurs
+            instance = cls(**config_data)
+
+            logger.info(f"Configuration loaded successfully from file: {filename}")
+            return instance
+
+        except FileNotFoundError as e:
+            error_msg = (
+                f"CDK Configuration Error: Configuration file '{filename}' not found. "
+                f"Please ensure the configuration file exists and is accessible. "
+                f"Error details: {str(e)}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Create default instance which will also trigger audit logging
+            return cls()
+
+        except json.JSONDecodeError as e:
+            error_msg = (
+                f"CDK Configuration Error: Invalid JSON format in configuration file '{filename}'. "
+                f"Please check the JSON syntax. "
+                f"Error at line {e.lineno}, column {e.colno}: {e.msg}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Exit with error code to fail CDK deployment
+            sys.exit(1)
+
+        except ValidationError as e:
+            # Handle Pydantic validation errors with detailed messages
+            error_details = []
+            for error in e.errors():
+                field_path = " -> ".join(str(loc) for loc in error["loc"])
+                error_details.append(f"  • Field '{field_path}': {error['msg']}")
+                if "input" in error:
+                    error_details.append(f"    Received value: {error['input']}")
+
+            error_msg = (
+                f"CDK Configuration Validation Error: Invalid configuration in '{filename}'. "
+                f"Please fix the following validation errors:\n"
+                + "\n".join(error_details)
+                + f"\n\nFor more information about configuration options, please refer to the documentation."
+            )
+
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+
+            # Exit with error code to fail CDK deployment
+            # This ensures that configuration validation errors propagate to deployment failures
+            sys.exit(1)
+
+        except Exception as e:
+            # Handle any other unexpected errors during configuration loading
+            error_msg = (
+                f"CDK Configuration Error: Unexpected error while loading configuration from '{filename}'. "
+                f"Error type: {type(e).__name__}, Details: {str(e)}"
+            )
+            logger.error(error_msg)
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Exit with error code to fail CDK deployment
+            sys.exit(1)
+
+
+# Load configuration from config.json with comprehensive error handling
+try:
+    config = CDKConfig.load_from_file()
+except SystemExit:
+    # Re-raise SystemExit to ensure CDK deployment fails
+    raise
+except Exception as e:
+    # Handle any unexpected errors during module-level configuration loading
+    import sys
+
+    try:
+        from cdk_logger import CDKLogger
+
+        logger = CDKLogger.get_logger("CDKConfig")
+    except ImportError:
+        import logging
+
+        logger = logging.getLogger("CDKConfig")
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '{"timestamp":"%(asctime)s", "level":"%(levelname)s", "service":"%(name)s", "message":"%(message)s"}'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+
+    error_msg = (
+        f"CDK Configuration Error: Critical error during module initialization. "
+        f"Error type: {type(e).__name__}, Details: {str(e)}. "
+        f"This error prevents CDK deployment from proceeding."
+    )
+    logger.error(error_msg)
+    print(f"ERROR: {error_msg}", file=sys.stderr)
+    sys.exit(1)
+
+# Define constants based on config values
+WORKFLOW_PAYLOAD_TEMP_BUCKET = "mne-mscdemo-workflow-payload-temp-data"
+
+# CI/CD constants
+_ROOT = os.path.dirname(__file__)
+DIST_DIR = "dist"
+LAMBDA_DIR = "lambdas"
+LAYER_DIR = "lambdas/layers"
+DIST_PATH = os.path.join(_ROOT, DIST_DIR)
+LAMBDA_BASE_PATH = os.path.join(_ROOT, LAMBDA_DIR)
+LAYER_BASE_PATH = os.path.join(_ROOT, LAYER_DIR)
+LAMBDA_DIST_PATH = os.path.join(_ROOT, DIST_DIR, LAMBDA_DIR)
+LAYER_DIST_PATH = os.path.join(_ROOT, DIST_DIR, LAYER_DIR)
+FFPROBE_LAYER_DIST_PATH = os.path.join(LAYER_DIST_PATH, "ffmpeg")

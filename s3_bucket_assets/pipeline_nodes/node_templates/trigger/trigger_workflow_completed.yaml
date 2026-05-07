@@ -1,0 +1,48 @@
+spec: v1.0.0
+node:
+  id: trigger_workflow_completed
+  title: Workflow Completed
+  description: Trigger after a workflow is completed
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: workflow_completed_trigger
+        event_pattern:
+          detail:
+            metadata:
+              pipelineName: ["${pipeline_name}"]
+              pipelineStatus: ["Completed"]
+actions:
+  trigger:
+    summary: Trigger after a workflow is completed
+    description: This step will trigger after a workflow is completed
+    operationId: triggerWorkflowCompleted
+    parameters:
+      - in: body
+        name: pipeline_name
+        label: Pipeline Name
+        required: true
+        schema:
+          type: select
+      - in: body
+        name: asset_representation
+        label: Representation
+        required: false
+        schema:
+          type: select
+          options:
+            - label: "Any (All representations)"
+              value: ""
+            - label: "Source (Original file)"
+              value: "Source"
+            - label: "Proxy (Web-optimized version)"
+              value: "Proxy"
+            - label: "Thumbnail (Preview image)"
+              value: "Thumbnail"
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

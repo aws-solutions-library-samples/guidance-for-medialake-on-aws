@@ -1,0 +1,313 @@
+{
+  "name": "TwelveLabs Pegasus Bedrock Video Enrichment with Splitter",
+  "description": "",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": {
+          "x": 320,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "trigger_video_processing_completed",
+          "label": "Video Processing Completed (trigger)",
+          "description": "This step will trigger after video processing is completed",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "method": "trigger",
+            "parameters": {
+              "Prefix": ""
+            },
+            "requestMapping": null,
+            "responseMapping": null,
+            "path": "",
+            "operationId": ""
+          },
+          "id": "trigger_video_processing_completed"
+        },
+        "width": 204,
+        "height": 119
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": {
+          "x": 560,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "video_splitter",
+          "label": "Video Splitter (split)",
+          "description": "Split video into chunks for parallel processing",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["video"],
+          "outputTypes": [
+            {
+              "name": "video",
+              "description": "Output type: video"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "split",
+            "parameters": {
+              "Chunk Duration": 3600,
+              "Overlap Duration": 60
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "video_splitter"
+        },
+        "width": 204,
+        "height": 115
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": {
+          "x": 800,
+          "y": 208
+        },
+        "data": {
+          "nodeId": "map",
+          "label": "Map (map)",
+          "description": "This step will iterate over an array of items and execute the same steps for each item",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Processor",
+              "description": "json payload item processor"
+            },
+            {
+              "name": "Next",
+              "description": "output to the next node"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "map",
+            "parameters": {
+              "ItemsPath": "$.payload.data",
+              "MapType": "Inline",
+              "ConcurrencyLimit": 1
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "map"
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 128
+        },
+        "data": {
+          "nodeId": "bedrock_content_processor",
+          "label": "Bedrock Content Processor (process_content)",
+          "description": "Process any content using Amazon Bedrock models with customizable prompts",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "method": "process_content",
+            "parameters": {
+              "content_source": "proxy",
+              "model_id_text": "amazon.nova-lite-v1:0",
+              "model_id_media": "twelvelabs.pegasus-1-2-v1:0",
+              "prompt_source": "saved",
+              "saved_prompt_name": "summary_100",
+              "model_region": "us-west-2"
+            },
+            "path": "",
+            "operationId": ""
+          },
+          "id": "bedrock_content_processor"
+        },
+        "width": 204,
+        "height": 115
+      },
+      {
+        "id": "dndnode_4",
+        "type": "custom",
+        "position": {
+          "x": 1040,
+          "y": 288
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          },
+          "id": "success"
+        },
+        "width": 204,
+        "height": 119
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-video"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "video",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Processor",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_4",
+        "source": "dndnode_2",
+        "target": "dndnode_4",
+        "type": "custom",
+        "animated": true,
+        "style": {
+          "animation": "dashdraw 2s linear infinite",
+          "strokeDasharray": 5
+        },
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 20,
+          "height": 20,
+          "refX": 19,
+          "refY": 10
+        },
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Next",
+        "targetHandle": "input-any"
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 7200
+    }
+  }
+}

@@ -1,0 +1,46 @@
+spec: v1.0.0
+node:
+  id: pre_signed_url
+  title: Presigned URL Generator
+  description: Generate an AWS S3 pre-signed URL
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/PreSignedUrlLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:GetBucketLocation
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - kms:Decrypt
+              resources:
+                - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+actions:
+  generate:
+    summary: Generate pre-signed URL
+    description: Generate a pre-signed URL for S3 object access
+    operationId: generatePresignedUrl
+    parameters:
+      - in: body
+        name: URL Validity Duration
+        required: true
+        default: 3600
+        schema:
+          type: number
+    x-requestMapping: utility/pre_signed_url/generate/
+    x-responseMapping: utility/pre_signed_url/generate/
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [presigned_url]

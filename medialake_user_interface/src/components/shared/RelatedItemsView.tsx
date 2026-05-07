@@ -1,0 +1,129 @@
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { Box, Grid, Typography, CircularProgress, Button } from "@mui/material";
+import { formatFileSize } from "../../utils/imageUtils";
+import { formatLocalDateTime } from "../../shared/utils/dateUtils";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AssetCard from "./AssetCard";
+import TabContentContainer from "../common/TabContentContainer";
+
+export interface RelatedItem {
+  id: string;
+  title: string;
+  type: string;
+  thumbnail?: string;
+  proxyUrl?: string;
+  score: number;
+  format: string;
+  fileSize: number;
+  createDate: string;
+}
+
+export interface RelatedItemsViewProps {
+  items: RelatedItem[];
+  isLoading: boolean;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  viewMode?: "grid" | "list";
+  onItemClick?: (item: RelatedItem) => void;
+}
+
+export const RelatedItemsView: React.FC<RelatedItemsViewProps> = ({
+  items,
+  isLoading,
+  onLoadMore,
+  hasMore,
+  onItemClick,
+}) => {
+  const { t } = useTranslation();
+
+  const defaultFields = [
+    { id: "name", label: "Name", visible: true },
+    { id: "type", label: "Type", visible: true },
+    { id: "format", label: "Format", visible: true },
+    { id: "size", label: "Size", visible: true },
+    { id: "createdAt", label: "Created", visible: true },
+  ];
+
+  const renderField = (fieldId: string, item: RelatedItem) => {
+    switch (fieldId) {
+      case "name":
+        return item.title;
+      case "type":
+        return item.type.toUpperCase();
+      case "format":
+        return item.format;
+      case "size":
+        return formatFileSize(item.fileSize);
+      case "createdAt":
+        return formatLocalDateTime(item.createDate);
+      default:
+        return "";
+    }
+  };
+
+  if (isLoading && items.length === 0) {
+    return (
+      <TabContentContainer>
+        <Box sx={{ display: "flex", justifyContent: "center", p: 1 }}>
+          <CircularProgress />
+        </Box>
+      </TabContentContainer>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <TabContentContainer>
+        <Box sx={{ textAlign: "center" }}>
+          <Typography color="text.secondary">{t("emptyStates.noRelatedItems")}</Typography>
+        </Box>
+      </TabContentContainer>
+    );
+  }
+
+  return (
+    <TabContentContainer>
+      <Box>
+        <Grid container spacing={3}>
+          {items.map((item) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={item.id}>
+              <AssetCard
+                id={item.id}
+                name={item.title}
+                thumbnailUrl={item.thumbnail}
+                proxyUrl={item.proxyUrl}
+                assetType={item.type}
+                fields={defaultFields}
+                renderField={(fieldId) => renderField(fieldId, item)}
+                onAssetClick={() => onItemClick?.(item)}
+                onDeleteClick={() => {}} // Not needed for related items
+                onDownloadClick={() => {}} // Not needed for related items
+                canDelete={false}
+                cardSize="medium"
+                aspectRatio="square"
+                thumbnailScale="fill"
+                showMetadata={true}
+                isFavorite={false} // Default to false since we don't have favorite info here
+                onFavoriteToggle={() => {}}
+              />
+            </Grid>
+          ))}
+        </Grid>
+
+        {hasMore && (
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <Button
+              variant="outlined"
+              onClick={onLoadMore}
+              disabled={isLoading}
+              startIcon={isLoading ? <CircularProgress size={20} /> : <ExpandMoreIcon />}
+            >
+              Load More
+            </Button>
+          </Box>
+        )}
+      </Box>
+    </TabContentContainer>
+  );
+};

@@ -1,0 +1,849 @@
+# Guidance for a Media Lake on AWS
+
+> **Table of Contents**
+>
+> - [Overview](#overview)
+> - [Cost](#cost)
+>   - [Base Services Cost Table - OpenSearch Deployment](#base-services-cost-table---opensearch-deployment)
+>   - [Base Services Cost Table - S3 Vectors Deployment](#base-services-cost-table---s3-vectors-deployment)
+>   - [Usage Based Cost Example Table](#usage-based-cost-example-table)
+> - [Quick Deployment (CloudFormation)](#quick-deployment-cloudformation)
+> - [Development Environment Setup and CDK Deployment](#development-environment-setup-and-cdk-deployment)
+>   - [Clone the repository](#1-clone-the-repository)
+>   - [Prepare the environment](#2-prepare-the-environment)
+>   - [Configure AWS account and region](#3-configure-aws-account-and-region)
+>   - [Configuration Setup](#4-configuration-setup)
+>   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
+> - [Development](#development)
+>   - [Prerequisites](#prerequisites)
+>   - [Operating System](#operating-system)
+> - [Deployment Validation](#deployment-validation)
+> - [External Pipeline Nodes (Optional)](#external-pipeline-nodes-optional)
+> - [Running the Guidance](#running-the-guidance)
+>   - [Login](#1-login)
+>   - [Connect Storage](#2-connect-storage)
+>   - [Ingest Media](#3-ingest-media)
+>   - [Enable Semantic Search and Integrations](#4-enable-semantic-search-and-integrations)
+>   - [Process and Retrieve Assets](#5-process-and-retrieve-assets)
+> - [Next Steps](#next-steps)
+> - [Project Structure](#project-structure)
+> - [Key Components](#key-components)
+>   - [Storage Connectors](#storage-connectors)
+>   - [Processing Pipelines](#processing-pipelines)
+>   - [AWS Services Used](#aws-services-used)
+> - [Security Features](#security-features)
+> - [Supported Media Types](#supported-media-types)
+>   - [Audio Files](#audio-files)
+>   - [Video Files](#video-files)
+>   - [Image Files](#image-files)
+> - [Cleanup](#cleanup)
+>   - [Manual Cleanup (AWS Console)](#manual-cleanup-aws-console)
+> - [FAQ, Known Issues, and Additional Considerations](#faq-known-issues-and-additional-considerations)
+> - [Revisions](#revisions)
+> - [Notices](#notices)
+> - [Authors](#authors)
+
+---
+
+## Overview
+
+**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, metadata management, and workflow orchestration on AWS. Media lake enables you to connect multiple storage sources, known as connectors, ingest and organize media at scale, creating a unified search space for your media. Workflows, knows as pipelines, run customizable processing workflows (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
+
+### High-Level Overview
+
+![Guidance for a Media Lake Overview](assets/images/medialake-architecture-overview.png)
+
+> _Diagram: Media Lake provides a comprehensive serverless platform connecting storage sources, processing pipelines, and enrichment services with secure user interfaces and API endpoints for scalable media management workflows._
+
+### Application Architecture
+
+![Guidance for a Media Lake Architecture](assets/images/medialake-architecture-application.png)
+
+> _Diagram: Media lake application layer shows the React UI, API Gateway endpoints, Lambda functions, and data flow between Cognito authentication, DynamoDB storage, and OpenSearch indexing for user interactions and asset management._
+
+### Pipeline Execution and Deployment
+
+![Guidance for a Media Lake Pipeline Architecture](assets/images/medialake-architecture-pipeline.png)
+
+> _Diagram: Media lake processes media through S3 ingestion, EventBridge routing, Lambda orchestration, Step Functions, and enrichment with metadata, search, and integration endpoints._
+
+---
+
+## Cost
+
+You are responsible for the cost of the AWS services used while running this Guidance.
+
+**Base Infrastructure Cost (without variable workloads):**
+As of July 2025, the cost for running this Guidance with the **small deployment configuration** in the **US East (N. Virginia)** region is approximately **$73.20 per month** for the baseline services only.
+
+**Variable Workload Costs:**
+Additional costs will be incurred based on actual usage:
+
+- Media processing and enrichment services (Lambda, Step Functions, MediaConvert, TwelveLabs, Transcription)
+- Media and Metadata storage (OpenSearch, DynamoDB, S3)
+- Interfactions with the user interface and viewing media(CloudFront, Data Transfer Out, Step Functions, Lambda, OpenSearch and DynamoDB queries)
+
+The total monthly cost will vary based on the volume of media processed, storage requirements, and usage patterns.
+
+We recommend creating a **Budget through AWS Cost Explorer** to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this guidance.
+
+### Base Services Cost Table - OpenSearch Deployment
+
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)**                        |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                                                  |
+| **OpenSearch Service (Search)**    | Search and index storage and compute                       | t3.small: \$28.72 (1 instance)<br>Storage: \$2.44 (gp3) |
+| **NAT Gateway (VPC)**              | Outbound internet access from VPC                          | \$33.30                                                 |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00                         |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$73.20**                                             |
+
+### Base Services Cost Table - S3 Vectors Deployment
+
+| **Service & Usage**                | **How It Relates to Your Team's Usage**                    | **Estimated Monthly Cost (USD)** |
+| ---------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| **Cognito (Users)**                | 50 active users signing in and using the system each month | \$2.00                           |
+| **WAF (Web Application Firewall)** | API & web protection (rules + ACLs + requests)             | WebACL: \$5.00<br>Rules: \$2.00  |
+| **TOTAL**                          | **Monthly cost estimate for small deployment**             | **\$9.00**                       |
+
+### Usage Based Cost Example Table
+
+| **Service & Usage**                           | **How It Relates to Your Team’s Usage**                                                                           | **Estimated Monthly Cost (USD)**                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **S3 + Step Functions (Uploads)**             | 1,000 new media files uploaded/month, each triggering a workflow                                                  | S3 storage: \$23.55<br>Step Functions: \$2.40                                           |
+| **S3/CloudFront (Images, Audio, Video)**      | All users viewing/downloading images, audio, and video each month (aggregate, served via S3 and CloudFront)       | S3 requests: \$0.05 + \$0.40<br>CloudFront data: \$29.75<br>CloudFront requests: \$0.03 |
+| **Total Media Downloaded (S3/CloudFront)**    | About 350GB of media files viewed/downloaded per month                                                            | S3 data transfer out: \$45.00                                                           |
+| **Web/App Requests (CloudFront)**             | 25,000 clicks or page loads/month through CDN                                                                     | \$0.03                                                                                  |
+| **API Gateway (API Requests)**                | 500,000 system actions/searches/uploads per month                                                                 | \$1.75                                                                                  |
+| **Lambda (All Automated and API Processing)** | All automated backend tasks, API logic, file processing, and event handling; includes 1,000,000 invocations/month | \~\$13.00                                                                               |
+| **Database Usage (DynamoDB)**                 | 200,000 new or updated records per month (write/read/storage)                                                     | Writes: \$18.75<br>Reads: \$7.50<br>Storage: \$25.00                                    |
+| **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
+| **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
+| **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | Requests: \$0.30                                                                        |
+| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$15.00.00                                                                              |
+| **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
+| **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
+| **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
+| **TOTAL**                                     | **Monthly cost estimate for usage-based services**                                                                | **\$197.50**                                                                            |
+
+## Quick Deployment (CloudFormation)
+
+**Recommended for most users** - Deploy media lake quickly using the pre-built CloudFormation template without setting up a development environment.
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources
+- Access to the AWS Console
+
+### Deployment Steps
+
+1. **Download the CloudFormation template**
+
+   - Download `medialake.template` from the GitHub repository
+
+2. **Deploy using AWS Console**
+
+   - Go to the AWS Console > CloudFormation > "Create Stack" > "With new resources (standard)"
+   - Choose **Upload a template file**, select `medialake.template`
+   - Set stack name to `medialake-cf`
+
+3. **Configure template parameters:**
+
+   #### Initial Media Lake User
+
+   - **InitialUserEmail**: Email address for the initial administrator account (required)
+   - **InitialUserFirstName**: First name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+   - **InitialUserLastName**: Last name of the initial administrator (1-50 characters, letters/spaces/hyphens/periods only)
+
+   #### Media Lake Configuration
+
+   - **MediaLakeEnvironmentName**: Environment identifier (1-4 alphanumeric characters, default: `dev`)
+   - **OpenSearchDeploymentSize**: Controls the size of your OpenSearch cluster
+     - `small`: Suitable for development and testing environments
+     - `medium`: Recommended for moderate production workloads
+     - `large`: Designed for high-volume production environments
+   - **ExternalS3Bucket** _(optional)_: Name of an external S3 bucket containing custom pipeline nodes. Leave empty if not needed. The bucket must already exist and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only).
+
+   #### Media Lake Deployment Configuration
+
+   - **SourceType**: Deployment source method
+     - `Git`: Deploy directly from a public Git repository
+     - `S3PresignedURL`: Deploy from a ZIP file via presigned URL
+   - **GitRepositoryUrl**: Public Git repository URL (default: AWS Solutions Library media lake repository)
+   - **S3PresignedURL**: Presigned URL for ZIP file download (required when using S3PresignedURL source type)
+
+   > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
+
+4. **Complete deployment**
+
+   - Accept the required IAM capabilities and deploy
+   - Monitor the stack creation progress in the CloudFormation console
+
+5. **Initiate deployment**
+
+   - Click "Create stack" to begin the deployment process
+   - The initial CloudFormation stack will be created first
+
+6. **Monitor CodePipeline deployment**
+   - A CodePipeline will be automatically created to deploy the CDK code
+   - This deployment process will take approximately 1 hour to complete
+   - You will receive a welcome email at the address you provided once deployment is finished
+   - To monitor deployment progress:
+     - Go to the CloudFormation console
+     - Navigate to your stack's "Outputs" tab
+     - Click on the CodePipeline link to view the deployment status
+
+See the [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md) for a complete CloudFormation deployment guide.
+
+### Deploying Multiple Instances
+
+Media Lake supports multiple independent instances in the same AWS account and region. To deploy a second instance:
+
+1. Launch the same `medialake.template` in CloudFormation with a **different stack name**
+2. Set the **Deployment Name** parameter to a unique value (e.g., `ml-team2` instead of the default `medialake`)
+3. The template automatically allocates a non-overlapping VPC CIDR and prefixes all resource names
+
+Each instance is fully isolated with its own VPC, OpenSearch cluster, Cognito user pool, and all other resources. See the [Installation Guide](assets/docs/MediaLake-Installation-Guide.md) for detailed multi-deployment instructions and CDK CLI examples.
+
+> ⚠️ **S3 Bucket Sharing**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance creates its own event triggers on the bucket — overlapping paths cause duplicate processing and data corruption. You CAN share a bucket if each instance uses different, non-overlapping object prefixes.
+
+---
+
+## Development Environment Setup and CDK Deployment
+
+**For developers** who want to customize the solution, contribute to the project, or deploy using AWS CDK.
+
+### Prerequisites
+
+- An AWS account with appropriate permissions to create and manage resources
+- **AWS CLI** configured with your account credentials
+- **AWS CDK CLI** (`npm install -g aws-cdk`)
+- **Node.js** (v20.x or later)
+- **Python** (3.12)
+- **Docker** (for local development)
+- **Git** for cloning the repository
+- Optional: Third-party services (such as Twelve Labs) require separate setup and API credentials for integration
+
+### 1. **Clone the repository**
+
+```bash
+git clone https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws.git
+cd guidance-for-medialake-on-aws
+```
+
+### 2. **Prepare the environment**
+
+#### (a) **Python virtual environment (recommended):**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate      # Mac
+# OR for Windows
+.venv\Scripts\activate.bat     # Windows
+```
+
+#### (b) **Install dependencies:**
+
+```bash
+pip install -r requirements.txt
+npm install
+```
+
+For development:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### 3. **Configuration Setup**
+
+Create a [`config.json`](config.json) file in the project root with your deployment settings:
+
+```bash
+touch config.json
+```
+
+Key configuration parameters include:
+
+- **environment**: Choose between 1-4 letters that are alphanumeric that represent an environment name
+- **deployment_size**: OpenSearch deployment size ("small", "medium", "large")
+- **resource_prefix**: Prefix for all AWS resources created
+- **account_id**: AWS Account ID for deployment
+- **primary_region**: Primary region for deployment
+- **initial_user**: Initial user configuration with email and name
+- **vpc**: VPC configuration for using existing or creating new VPC
+- **authZ**: Identity provider configuration (Cognito, SAML)
+- **video_download_enabled** (optional): Enable/disable video download functionality (defaults to `true`)
+- **external_nodes_bucket** (optional): Name of an external S3 bucket containing custom pipeline nodes. The bucket must exist in the same AWS account and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only). Leave empty or omit if not needed.
+- **cloudfront_custom_domain** (optional): Custom domain configuration for CloudFront distribution
+  - **domain_name**: Your custom domain name (e.g., "medialake.example.com")
+  - **certificate_arn**: ARN of your ACM certificate in us-east-1 region
+  - **Requirements**:
+    - Both `domain_name` and `certificate_arn` must be provided together, or both omitted
+    - ACM certificate must be in `us-east-1` region (CloudFront requirement)
+    - Certificate must be in `ISSUED` status before deployment
+    - Certificate must cover the specified domain name (exact match or wildcard)
+    - After deployment, you must create a DNS CNAME or Alias record pointing your domain to the CloudFront distribution domain
+  - **Note**: This configuration is entirely optional. If omitted, MediaLake will use the default CloudFront domain name
+- **use_prefixed_names** (optional): Set to `true` for additional deployments in the same account/region. When enabled, all CloudFormation stack names, SSM parameters, and exports are prefixed with `resource_prefix` and `environment` to avoid collisions. Defaults to `false` for backward compatibility with existing deployments.
+
+See the [`config-example.json`](config-example.json) for a complete configuration example.
+
+### 4. \*\*Create the required roles
+
+OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
+"Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
+
+To make sure this doesn't happens, manually create the required roles using the following AWS CLI commands:
+
+```bash
+aws iam create-service-linked-role --aws-service-name es.amazonaws.com
+aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
+aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
+```
+
+- **Note**: If you recive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
+- **Note**: If you are new to IAM: These roles are not user roles nor allow general access to your account. A service-linked role is a special type of IAM role that's directly associated with an AWS service. For more information, see this [AWS re:Post article](https://repost.aws/articles/ARtUa9sqlFR02vngsy1zgmHg/what-s-special-about-aws-service-linked-iam-roles) or the [AWS Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create-service-linked-role.html).
+
+### 5. **Configure AWS account and region**
+
+Ensure AWS credentials are configured (`aws configure`), and bootstrap your account for CDK:
+
+```bash
+cdk bootstrap --profile <profile> --region <region>
+```
+
+- **Note**: Bootstrapping itself is a one-time operation performed by AWS account administrators, and we recommend executing it using `AdministratorAccess` privileges. This makes sure you are safe against future changes, and since the bootstrapping process will—by design—create new Roles with arbitrary policies anyway, there is no real benefit to restricting the permissions. For more information, see the [CDK Security and Safety Dev Guide](https://github.com/aws/aws-cdk/wiki/Security-And-Safety-Dev-Guide).
+
+### 6. **Deploy using AWS CDK**
+
+Deploy all stacks using CDK:
+
+```bash
+cdk deploy --all --profile <profile> --region <region>
+```
+
+---
+
+## Deployment Validation
+
+1. In the AWS CloudFormation console, check that the related media lake stacks are in **CREATE_COMPLETE** status.
+2. After deployment, you will receive a welcome email at the address you provided, containing:
+   - The media lake application URL
+   - Username (your email)
+   - Temporary password
+3. Log in at the URL provided. You should see the media lake user interface and be able to add storage connectors and media.
+
+---
+
+## Custom Domain Setup (Optional)
+
+If you configured a custom domain in your `config.json`, follow these additional steps to complete the setup:
+
+### Prerequisites
+
+Before deploying with a custom domain, ensure you have:
+
+1. **Domain Ownership**: You must own or control the domain name you want to use
+2. **ACM Certificate**: Create an SSL/TLS certificate in AWS Certificate Manager (ACM)
+   - **Region Requirement**: Certificate MUST be in `us-east-1` region (CloudFront requirement)
+   - **Status**: Certificate must be in `ISSUED` status before deployment
+   - **Domain Coverage**: Certificate must cover your domain name (exact match or wildcard)
+
+### Creating an ACM Certificate
+
+If you don't have a certificate yet:
+
+1. Open the AWS Certificate Manager console in `us-east-1` region
+2. Click **Request a certificate**
+3. Choose **Request a public certificate**
+4. Enter your domain name (e.g., `medialake.example.com` or `*.example.com` for wildcard)
+5. Choose validation method (DNS or Email)
+6. Complete the validation process
+7. Wait for certificate status to become `ISSUED`
+8. Copy the certificate ARN for use in your `config.json`
+
+### Configuration
+
+Add the following to your `config.json`:
+
+```json
+{
+  "cloudfront_custom_domain": {
+    "domain_name": "medialake.example.com",
+    "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+  }
+}
+```
+
+**Important**: Both `domain_name` and `certificate_arn` must be provided together, or both must be omitted.
+
+### DNS Configuration (Post-Deployment)
+
+After successful deployment with custom domain configuration:
+
+1. **Get CloudFront Domain**: Find your CloudFront distribution domain name in the AWS Console or deployment outputs
+2. **Create DNS Record**: In your DNS provider (Route 53, GoDaddy, Cloudflare, etc.):
+   - **For Route 53**: Create an Alias record pointing to the CloudFront distribution
+   - **For Other Providers**: Create a CNAME record pointing to the CloudFront domain
+3. **Wait for Propagation**: DNS changes typically take 5-60 minutes to propagate
+4. **Verify**: Access your custom domain in a browser to confirm it's working
+
+### Example DNS Configuration
+
+**Route 53 (Recommended)**:
+
+- Record Type: A (Alias)
+- Name: medialake.example.com
+- Alias Target: Your CloudFront distribution
+- Routing Policy: Simple
+
+**Other DNS Providers**:
+
+- Record Type: CNAME
+- Name: medialake
+- Value: d111111abcdef8.cloudfront.net (your CloudFront domain)
+- TTL: 300
+
+### Troubleshooting
+
+- **Certificate not found**: Verify the certificate ARN is correct and in `us-east-1` region
+- **Certificate not validated**: Complete the ACM certificate validation process
+- **Domain mismatch**: Ensure the certificate covers your domain name
+- **DNS not resolving**: Wait for DNS propagation (up to 48 hours in rare cases)
+- **HTTPS errors**: Verify the certificate is in `ISSUED` status and covers the domain
+
+---
+
+## External Pipeline Nodes (Optional)
+
+You can extend Media Lake with custom pipeline nodes by hosting them in an external S3 bucket. External nodes are deployed alongside built-in nodes and appear in the pipeline builder as first-class peers — indistinguishable to end users.
+
+### How It Works
+
+During `cdk deploy` (or the CloudFormation CodeBuild pipeline), CDK reads the `external_nodes_bucket` configuration, downloads your YAML templates and Lambda source code from the bucket, packages them using the same build process as built-in nodes, and deploys them into the node catalogue. External nodes are validated at synthesis time — invalid templates, missing source code, or duplicate node IDs will fail the deployment with a clear error.
+
+### S3 Bucket Layout
+
+Your external bucket must follow this structure:
+
+```
+my-custom-pipeline-nodes/
+├── node_templates/
+│   └── utility/
+│       └── my_custom_node.yaml        # Node definition template
+└── lambdas/
+    └── nodes/
+        └── my_custom_node/             # Lambda source folder
+            ├── index.py                # Handler code
+            └── requirements.txt        # Python dependencies
+```
+
+- `node_templates/` — YAML node definitions (any subfolder structure is fine)
+- The Lambda source folder path is declared in the YAML template via `lambda_source_path`
+
+### Example: Custom Watermark Node
+
+This example creates a node that adds a text watermark to image metadata.
+
+**1. Node template** (`node_templates/utility/image_watermark.yaml`):
+
+```yaml
+spec: v1.0.0
+node:
+  id: image_watermark
+  title: Image Watermark
+  description: Add a text watermark reference to image assets
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/ImageWatermarkLambdaDeployment
+        lambda_source_path: lambdas/nodes/image_watermark
+        runtime: python3.12
+        memory_size: 256
+        timeout: 60
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - s3:GetObject
+                - s3:PutObject
+              resources:
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+actions:
+  process:
+    summary: Apply watermark
+    description: Add a text watermark reference to the asset metadata
+    operationId: applyWatermark
+    parameters:
+      - in: body
+        name: watermark_text
+        required: false
+        default: "DRAFT"
+        schema:
+          type: string
+          description: Watermark text to apply
+    connections:
+      incoming:
+        type: [image]
+      outgoing:
+        type: [image]
+```
+
+Key differences from built-in templates:
+
+- `lambda_source_path` is required — points to the Lambda source folder in your S3 bucket
+- `handler` still follows the `{type}/{ConstructId}` pattern and is used at runtime for artifact resolution
+- `node.id` must be globally unique across all built-in and external nodes
+
+**2. Lambda source** (`lambdas/nodes/image_watermark/index.py`):
+
+```python
+import json
+import os
+
+import boto3
+from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+
+logger = Logger()
+tracer = Tracer()
+dynamodb = boto3.resource("dynamodb")
+
+
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event, context: LambdaContext):
+    logger.info("Processing watermark request")
+
+    input_payload = event.get("payload", {}).get("event", {}).get("input", {}) or {}
+    watermark_text = os.environ.get(
+        "WATERMARK_TEXT", input_payload.get("watermark_text", "DRAFT")
+    )
+
+    # Add watermark metadata to the asset record
+    asset_id = input_payload.get("assetId")
+    if asset_id:
+        logger.info(f"Applying watermark '{watermark_text}' to asset {asset_id}")
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "message": f"Watermark '{watermark_text}' applied",
+            "assetId": asset_id,
+        }),
+    }
+```
+
+**3. Dependencies** (`lambdas/nodes/image_watermark/requirements.txt`):
+
+```
+aws-lambda-powertools>=2.0.0
+aws-xray-sdk
+```
+
+### Bucket Permissions
+
+Your external S3 bucket must grant read access to the MediaLake deployment role. Add a bucket policy like:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowMediaLakeRead",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::<YOUR_ACCOUNT_ID>:root"
+      },
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::my-custom-pipeline-nodes",
+        "arn:aws:s3:::my-custom-pipeline-nodes/*"
+      ]
+    }
+  ]
+}
+```
+
+### Configuration
+
+Set the bucket name in `config.json`:
+
+```json
+{
+  "external_nodes_bucket": "my-custom-pipeline-nodes"
+}
+```
+
+Or via the CloudFormation `ExternalS3Bucket` parameter when deploying with the template.
+
+Then run `cdk deploy` (or trigger the CodePipeline). Your custom nodes will appear in the pipeline builder after deployment.
+
+### Validation Rules
+
+Deployment will fail fast if any of these conditions are detected:
+
+- External bucket is inaccessible or does not exist
+- No `.yaml`/`.yml` files found under `node_templates/`
+- Missing required YAML fields (`node.id`, `node.title`, `node.type`, `node.integration.config.lambda.handler`, `node.integration.config.lambda.lambda_source_path`)
+- No source files found at the declared `lambda_source_path`
+- Duplicate `node.id` across built-in and external nodes
+- Construct ID naming collisions
+
+---
+
+## Running the Guidance
+
+### 1. **Login**
+
+Use the emailed credentials and link to log in to the media lake UI.
+
+### 2. **Connect Storage**
+
+- Navigate to **Settings > Connectors** in the UI.
+- Add a connector, choosing Amazon S3 and providing your bucket details.
+- **Note**: If you create new S3 buckets through media lake, remember that these will need to be manually emptied and deleted during cleanup as they are not automatically removed when the media lake stack is deleted.
+- ⚠️ **Multi-Instance Warning**: If running multiple Media Lake instances, do NOT connect the same S3 bucket with the same paths/prefixes to more than one instance. Overlapping bucket+prefix combinations cause duplicate processing, event conflicts, and data corruption. You CAN share a bucket across instances if each uses different, non-overlapping object prefixes.
+
+### 3. **Enable Semantic Search and Integrations**
+
+- Enable and configure semantic search providers as described in the UI and [`MediaLake-Installation-Guide.md`](assets/docs/MediaLake-Installation-Guide.md).
+- **Semantic Search Architecture**: Media lake supports two architectural patterns:
+  - **Provider + Store Architecture** (TwelveLabs): AI provider generates embeddings stored in OpenSearch or S3 Vectors
+  - **External Semantic Service Architecture** (Coactive): External service manages both embedding generation and storage
+- **Embedding Store Options** (for Provider + Store Architecture): OpenSearch (recommended for production) or S3 Vectors (cost-effective, preview mode)
+  - **S3 Vectors Preview Note**: As S3 Vectors is currently in preview, queries return a maximum of 30 vectors per request (topK=30), meaning each search will return up to 30 results.
+- **Supported Providers**:
+  - **TwelveLabs**: Via direct API or AWS Bedrock integration
+  - **Coactive**: Direct API integration for multimodal search
+- **Integration Configuration**: Integrations provide secure credential storage for pipelines requiring external API access. Configure integrations in **Settings > Integrations** before importing dependent pipelines:
+  - **Required for**: TwelveLabs API pipelines, Coactive pipelines
+  - **Not required for**: TwelveLabs Bedrock pipelines (uses IAM role permissions) and others
+- Import pipelines for semantic search, enrichment, and transcription.
+
+### 4. **Ingest Media**
+
+- Upload media to your configured S3 bucket.
+
+### 5. **Process and Retrieve Assets**
+
+- Monitor pipeline executions, view extracted metadata, and use search/discovery features in the UI.
+
+---
+
+## Next Steps
+
+- Customize pipeline configurations for your use case.
+- Scale up OpenSearch or DynamoDB for higher performance.
+
+---
+
+## Project Structure
+
+```
+guidance-for-medialake-on-aws/
+├── assets/                          # Documentation, images, and scripts
+│   ├── docs/                        # Installation and configuration guides
+│   └── images/                      # Architecture diagrams and screenshots
+├── medialake_constructs/            # CDK construct definitions
+│   ├── api_gateway/                 # API Gateway constructs
+│   ├── auth/                        # Authentication constructs
+│   └── shared_constructs/           # Shared AWS constructs
+├── medialake_stacks/                # CDK stack definitions
+│   ├── api_gateway_core_stack.py    # Core API Gateway stack
+│   ├── api_gateway_deployment_stack.py # API deployment stack
+│   ├── api_gateway_stack.py         # Main API Gateway stack
+│   └── [additional stack files]     # Infrastructure and service stacks
+├── medialake_user_interface/        # React TypeScript frontend
+│   ├── src/                         # Source code
+│   │   ├── api/                     # API service layer
+│   │   ├── features/                # Feature-based modules
+│   │   ├── pages/                   # Page components
+│   │   ├── shared/                  # Common utilities and types
+│   │   └── [additional folders]     # Components, hooks, contexts
+│   ├── tests/                       # End-to-end tests
+│   ├── package.json                 # Node.js dependencies
+│   └── playwright.config.ts         # Testing configuration
+├── lambdas/                         # Lambda function source code
+│   ├── api/                         # API endpoint handlers
+│   ├── auth/                        # Authentication functions
+│   ├── back_end/                    # Backend processing functions
+│   ├── nodes/                       # Pipeline processing nodes
+│   ├── pipelines/                   # Pipeline orchestration
+│   └── common_libraries/            # Shared Lambda utilities
+├── pipeline_library/               # Default pipeline templates
+├── s3_bucket_assets/               # S3 deployment assets
+│   ├── pipeline_library/           # Pipeline definitions
+│   └── pipeline_nodes/             # Node templates and specs
+├── app.py                          # Main CDK application entry point
+├── cdk.json                        # CDK configuration and settings
+├── config_utils.py                 # Configuration utilities
+├── config-dev.json                 # Development configuration example
+├── requirements.txt                # Python dependencies
+├── requirements-dev.txt            # Development Python dependencies
+├── package.json                    # Node.js dependencies for CDK
+└── README.md                       # This documentation file
+```
+
+---
+
+## Key Components
+
+### Storage Connectors
+
+- S3 Connector with EventBridge/S3 event integration
+- Automatic resource provisioning (SQS, Lambda, IAM roles)
+- Bucket exploration and management capabilities
+
+### Processing Pipelines
+
+- FIFO queue-based media processing
+- Step Functions workflow orchestration
+- Customizable processing steps
+- Event-driven architecture
+
+### AWS Services Used
+
+**Core Services:**
+
+- **AWS Lambda** - Serverless compute for API handlers and media processing
+- **Amazon S3** - Object storage for media assets and metadata
+- **AWS Step Functions** - Orchestration of media processing workflows
+- **Amazon SQS** - Queues for ordered media processing
+- **Amazon EventBridge** - Event routing and pipeline triggers
+- **Amazon API Gateway** - REST API endpoint management
+- **Amazon DynamoDB** - Asset metadata and configuration storage
+- **AWS MediaConvert** - Media transcoding and format conversion service
+- **Amazon CloudWatch** - Metrics, logging, and alerting
+- **Amazon OpenSearch** - Search and analytics engine
+
+**Security & Authentication:**
+
+- **AWS Cognito** - User authentication and authorization
+- **AWS KMS** - Encryption key management
+- **AWS IAM** - Resource access control
+
+---
+
+## Security Features
+
+- AWS Cognito authentication and authorization including support for local username/password and federated authentication via SAML
+- KMS encryption for sensitive data
+- CORS-enabled API endpoints
+- VPC deployment options for network isolation
+
+---
+
+## Supported Media Types
+
+Media lake supports processing of the following file types through its default pipelines:
+
+### Audio Files
+
+- **WAV** - Waveform Audio File Format
+- **AIFF/AIF** - Audio Interchange File Format
+- **MP3** - MPEG Audio Layer III
+- **PCM** - Pulse Code Modulation
+- **M4A** - MPEG-4 Audio
+
+### Video Files
+
+- **FLV** - Flash Video
+- **MP4** - MPEG-4 Part 14
+- **MOV** - QuickTime Movie
+- **AVI** - Audio Video Interleave
+- **MKV** - Matroska Video
+- **WEBM** - WebM Video
+- **MXF** - Material Exchange Format
+
+### Image Files
+
+**Standard Formats:**
+
+- **APNG** - Animated Portable Network Graphics
+- **AVIF** - AV1 Image File Format
+- **BMP** - Bitmap Image File
+- **GIF** - Graphics Interchange Format
+- **ICO** - Icon File Format
+- **J2K** - JPEG 2000 Code Stream
+- **JP2** - JPEG 2000
+- **JPEG/JPG** - Joint Photographic Experts Group
+- **PBM** - Portable Bitmap
+- **PCX** - Picture Exchange
+- **PGM** - Portable Graymap
+- **PNG** - Portable Network Graphics
+- **PPM** - Portable Pixmap
+- **PSD** - Adobe Photoshop Document
+- **SVG** - Scalable Vector Graphics
+- **TIF/TIFF** - Tagged Image File Format
+- **WEBP** - WebP Image Format
+- **WMF** - Windows Metafile
+- **XBM** - X11 Bitmap
+- **XPM** - X11 Pixmap
+
+**RAW Camera Formats:**
+
+- **CR2** - Canon Raw 2 (Note: CHDK-modified files are not supported)
+- **ERF** - Epson Raw Format
+- **NEF** - Nikon Electronic Format
+
+Each media type is automatically processed through dedicated pipelines that handle metadata extraction, proxy/thumbnail generation, and integration with AI services for enhanced search and analysis capabilities.
+
+---
+
+## Cleanup
+
+To remove all media lake resources:
+
+### Manual Cleanup (AWS Console):
+
+- Go to CloudFormation console
+- Delete all stacks belonging to the deployment you want to remove:
+  - Default deployment: stacks prefixed with `MediaLake` and the `medialake-cf` pipeline stack
+  - Additional deployments: stacks prefixed with the deployment name (e.g., `ml-team2-dev-MediaLake*`) and the pipeline stack
+- **Important for S3 Buckets**: For new buckets created via media lake, you must manually empty and delete them as they are not automatically cleaned up during stack deletion
+- Delete any other associated S3 buckets, DynamoDB tables, or resources as needed
+- **Note**: Deleting one instance does not affect other instances in the same account
+
+> **Warning:** This will permanently remove all media lake data and resources. Use with caution.
+
+---
+
+## FAQ, Known Issues, and Additional Considerations
+
+- **S3 bucket sharing across instances**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance creates EventBridge rules and Lambda triggers on the bucket — overlapping paths will cause duplicate processing, event conflicts, and data corruption. You CAN connect the same bucket to multiple instances if each instance uses different, non-overlapping object prefixes (e.g., instance 1 uses `team-a/` prefix and instance 2 uses `team-b/` prefix).
+- For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
+- Known issues and deployment tips will be tracked in the Issues section.
+- Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
+- For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).
+
+---
+
+## Revisions
+
+- Nov 5 2025: Initial Semantic Version release v1.0.0.
+- July 2025: Initial release and commit of repository.
+- See repository commit history for further changes.
+
+---
+
+## Notices
+
+Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided "as is" without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
+
+---
+
+## Authors
+
+- Joao Seike
+- Lior Berezinski
+- Robert Raver

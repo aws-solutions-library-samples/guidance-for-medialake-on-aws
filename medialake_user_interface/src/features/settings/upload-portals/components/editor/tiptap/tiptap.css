@@ -1,0 +1,126 @@
+/*
+ * Tiptap editor stylesheet (Requirement 8.8).
+ *
+ * Scoped to the `.ProseMirror` root that Tiptap injects. Provides:
+ *   - baseline padding / min-height / focus handling so the editor feels
+ *     like a native MUI form control
+ *   - placeholder rendering via `data-placeholder` (used by
+ *     `@tiptap/extension-placeholder`)
+ *   - sensible margins for the two heading levels we expose (H2, H3)
+ *   - link color that flows from the surrounding MUI theme
+ *
+ * Colors use CSS custom properties from MUI's theme where possible (via
+ * `currentColor`) so the editor automatically adapts to light / dark mode
+ * without extra JS wiring. We deliberately avoid hard-coded palette values
+ * so the editor surface inherits whatever color the parent `TextField` /
+ * `Paper` is rendered in.
+ */
+
+.ProseMirror {
+  /* Match the vertical rhythm of MUI's outlined TextField so a multi-line
+   * editor embedded inside a form does not look out of place. 12px/14px
+   * mirrors `.MuiInputBase-input`'s default padding. */
+  padding: 12px 14px;
+  min-height: 96px;
+
+  /* Prevent the default ProseMirror focus ring; MUI's outlined container
+   * owns the focus treatment via `.ProseMirror:focus-visible` below. */
+  outline: none;
+
+  /* Long unbreakable strings (URLs, code) should wrap rather than overflow
+   * horizontally — `word-break: break-word` keeps the card layout stable. */
+  word-break: break-word;
+}
+
+/*
+ * Placeholder rendering.
+ *
+ * The `Placeholder` extension adds `.is-editor-empty` to the first empty
+ * paragraph and stores the placeholder string on `data-placeholder`. We
+ * render it as a `::before` pseudo-element so it occupies no layout space
+ * and does not block clicks into the editor.
+ */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(0, 0, 0, 0.38); /* matches MUI's placeholder text color */
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+
+/*
+ * Dark-mode placeholder color. Kept as a separate rule so sites without
+ * the `[data-mui-color-scheme="dark"]` attribute still get the default
+ * light-mode shade above.
+ */
+[data-mui-color-scheme="dark"] .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/*
+ * Focus ring. Only shown for keyboard-originated focus thanks to
+ * `:focus-visible`; pointer focus remains ring-less to avoid competing
+ * with MUI's own outlined-input treatment.
+ */
+.ProseMirror:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/*
+ * Heading margins. We only register H2 and H3 via `StarterKit.heading`, so
+ * no styles for H1/H4+ are needed. Values track `@mui/material` typography
+ * defaults loosely (not copied verbatim — these apply inside the editor
+ * pane, not the live preview).
+ */
+.ProseMirror h2 {
+  margin: 0.75em 0 0.4em;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+.ProseMirror h3 {
+  margin: 0.6em 0 0.3em;
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+/* Paragraph spacing matches the outline of MUI's body1 typography so the
+ * in-editor rhythm matches the preview pane. */
+.ProseMirror p {
+  margin: 0.5em 0;
+}
+
+/* Links inside the editor pane render in MUI's default primary blue.
+ * This is hardcoded rather than inherited because the editor pane is
+ * rendered outside the per-portal `ThemeProvider` used by the live
+ * preview — there's no ancestor providing a theme-scoped color here.
+ * The live preview's theme override applies to rendered portal content,
+ * not to the authoring surface. Keep this value in sync with MUI's
+ * default `palette.primary.main` (`#1976d2`). */
+.ProseMirror a {
+  color: #1976d2; /* MUI default primary; authoring-surface only */
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  text-decoration: none;
+}
+
+/*
+ * Bubble menu positioning.
+ *
+ * Tiptap's BubbleMenu emits a wrapper element with `data-tippy-root` or a
+ * similar positioning attribute depending on version. We defensively apply
+ * z-index boosts to both the tippy root and any descendant `.tippy-box` so
+ * the menu sits above MUI `Dialog`s (z-index 1300) and `Drawer`s. No layout
+ * styles are applied here — positioning is owned by tippy.js.
+ */
+[data-tippy-root] {
+  z-index: 1400;
+}
+
+.tippy-box {
+  z-index: 1400;
+}

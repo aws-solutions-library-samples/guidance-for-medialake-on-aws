@@ -1,0 +1,127 @@
+{
+  "Queue": "{{ variables.mediaconvert_queue_arn }}",
+  "UserMetadata": {},
+  "Role": "{{ variables.mediaconvert_role_arn }}",
+  "Settings": {
+    "OutputGroups": [
+      {
+        "Name": "Proxy Video",
+        "Outputs": [
+          {
+            "ContainerSettings": {
+              "Container": "MP4",
+              "Mp4Settings": {
+                "MoovPlacement": "PROGRESSIVE_DOWNLOAD"
+              }
+            },
+            "VideoDescription": {
+              "Width": 640,
+              "Height": 360,
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "MaxBitrate": {{ (variables.proxy_max_kbps | default(1500)) * 1000 }},
+                  "RateControlMode": "QVBR",
+                  "SceneChangeDetect": "TRANSITION_DETECTION",
+                  "QualityTuningLevel": "SINGLE_PASS_HQ",
+                  "CodecProfile": "MAIN",
+                  "CodecLevel": "LEVEL_3_2",
+                  "QvbrSettings": {
+                    "QvbrQualityLevel": {{ variables.proxy_qvbr_quality | default(8) }}
+                  }
+                }
+              },
+              "VideoPreprocessors": {
+                "Deinterlacer": {
+                  "Mode": "DEINTERLACE",
+                  "Algorithm": "INTERPOLATE"
+                }
+              }
+            },
+            "AudioDescriptions": [
+              {
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "Bitrate": {{ (variables.proxy_audio_kbps | default(128)) * 1000 }},
+                    "CodingMode": "CODING_MODE_2_0",
+                    "SampleRate": 44100
+                  }
+                },
+                "AudioSourceName": "Audio Selector 1"
+              }
+            ],
+            "NameModifier": "_proxy"
+          }
+        ],
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "DestinationSettings": {
+              "S3Settings": {
+                "AccessControl": {
+                  "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "Name": "Thumbnail",
+        "Outputs": [
+          {
+            "ContainerSettings": {
+              "Container": "RAW"
+            },
+            "VideoDescription": {
+              "Width": {{ variables.thumbnail_width | default(640) }},
+              "Height": {{ variables.thumbnail_height | default(360) }},
+              "CodecSettings": {
+                "Codec": "FRAME_CAPTURE",
+                "FrameCaptureSettings": {
+                  "FramerateNumerator": 1,
+                  "FramerateDenominator": {{ variables.thumbnail_frame_denominator | default(2) }},
+                  "MaxCaptures": {{ variables.thumbnail_max_captures | default(5) }},
+                  "Quality": 80
+                }
+              }
+            },
+            "Extension": "jpg",
+            "NameModifier": "_thumbnail"
+          }
+        ],
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}"
+          }
+        }
+      }
+    ],
+    "Inputs": [
+      {
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            {% if variables.use_track_selection and variables.audio_tracks %}
+            "SelectorType": "TRACK",
+            "Tracks": {{ variables.audio_tracks | jsonify }}
+            {% else %}
+            "DefaultSelection": "DEFAULT"
+            {% endif %}
+          }
+        },
+        "VideoSelector": {},
+        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}"
+      }
+    ],
+    "FollowSource": 1
+  },
+  "BillingTagsSource": "JOB",
+  "AccelerationSettings": {
+    "Mode": "DISABLED"
+  },
+  "StatusUpdateInterval": "SECONDS_60",
+  "Priority": 0
+}

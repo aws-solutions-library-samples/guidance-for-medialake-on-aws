@@ -1,0 +1,521 @@
+"""
+Graph analysis utilities for pipeline definitions.
+"""
+
+import sys
+from typing import Any, Dict, List, Optional, Tuple
+
+from aws_lambda_powertools import Logger
+
+logger = Logger()
+
+
+class GraphAnalyzer:
+    """
+    Analyzes the graph structure of a pipeline definition.
+
+    This class provides utilities for finding root nodes, leaf nodes,
+    and analyzing the connectivity of the pipeline graph.
+    """
+
+    def __init__(self, pipeline: Any):
+        """
+        Initialize the GraphAnalyzer.
+
+        Args:
+            pipeline: Pipeline definition object
+        """
+        self.pipeline = pipeline
+        self.nodes = pipeline.configuration.nodes
+        self.edges = pipeline.configuration.edges
+
+        # Will be populated during analysis
+        self.node_id_to_data_id = {}
+        self.data_id_to_node_id = {}
+        self.node_id_to_node = {}
+        self.graph = {}  # node_id -> [node_id]
+        self.data_id_graph = {}  # data_id -> [data_id]
+        self.root_nodes = set()
+        self.leaf_nodes = set()
+
+    def analyze(self) -> None:
+        """
+        Analyze the pipeline graph structure.
+
+        This method builds the graph representation and identifies
+        root and leaf nodes.
+        """
+        logger.info("Analyzing pipeline graph structure")
+
+        # Build node mappings
+        self._build_node_mappings()
+
+        # Build graph representation
+        self._build_graph()
+
+        # Find root and leaf nodes
+        self._find_root_and_leaf_nodes()
+
+        logger.info(
+            f"Graph analysis complete. Found {len(self.root_nodes)} root nodes and {len(self.leaf_nodes)} leaf nodes"
+        )
+
+    def _build_node_mappings(self) -> None:
+        """Build mappings between different node ID formats."""
+        for node in self.nodes:
+            if node.id and node.data and node.data.id:
+                self.node_id_to_data_id[node.id] = node.data.id
+                self.data_id_to_node_id[node.data.id] = node.id
+                self.node_id_to_node[node.id] = node
+                logger.debug(
+                    f"Node mapping: {node.id} -> {node.data.id} ({node.data.type})"
+                )
+
+    def _build_graph(self) -> None:
+        """Build graph representations of the pipeline."""
+        # Build node.id -> node.id graph
+        for edge in self.edges:
+            # Handle both dictionary and object structures
+            if isinstance(edge, dict):
+                source_id = edge.get("source")
+                target_id = edge.get("target")
+            else:
+                source_id = edge.source
+                target_id = edge.target
+
+            if source_id not in self.graph:
+                self.graph[source_id] = []
+            self.graph[source_id].append(target_id)
+
+            # Also build data.id -> data.id graph
+            source_data_id = self.node_id_to_data_id.get(source_id)
+            target_data_id = self.node_id_to_data_id.get(target_id)
+
+            if source_data_id and target_data_id:
+                if source_data_id not in self.data_id_graph:
+                    self.data_id_graph[source_data_id] = []
+                self.data_id_graph[source_data_id].append(target_data_id)
+                logger.debug(
+                    f"Added edge to data_id_graph: {source_data_id} -> {target_data_id}"
+                )
+
+    def _find_root_and_leaf_nodes(self) -> None:
+        """Find root nodes (no incoming edges) and leaf nodes (no outgoing edges)."""
+        all_nodes = set(node.id for node in self.nodes)
+        target_nodes = set()
+
+        for edge in self.edges:
+            # Handle both dictionary and object structures
+            if isinstance(edge, dict):
+                target_nodes.add(edge.get("target"))
+            else:
+                target_nodes.add(edge.target)
+
+        # Root nodes have no incoming edges
+        self.root_nodes = all_nodes - target_nodes
+
+        # Leaf nodes have no outgoing edges
+        self.leaf_nodes = set(
+            node_id for node_id in all_nodes if node_id not in self.graph
+        )
+
+        logger.info(f"Root nodes: {self.root_nodes}")
+        logger.info(f"Leaf nodes: {self.leaf_nodes}")
+
+    def get_root_node(self) -> Optional[str]:
+        """
+        Get the primary root node for the pipeline.
+
+        If multiple root nodes exist, prefer trigger nodes.
+        If no root nodes exist, return the first node.
+
+        Returns:
+            Node ID of the root node, or None if no nodes exist
+        """
+        if not self.root_nodes:
+            logger.warning("No root node found in the graph. Using first node as root.")
+            return self.nodes[0].id if self.nodes else None
+
+        # Prefer trigger nodes as root
+        trigger_roots = [
+            node.id
+            for node in self.nodes
+            if node.id in self.root_nodes and node.data.type.lower() == "trigger"
+        ]
+
+        root_node_id = (
+            trigger_roots[0] if trigger_roots else next(iter(self.root_nodes))
+        )
+        logger.info(f"Selected root node: {root_node_id}")
+        return root_node_id
+
+    def find_execution_path(
+        self, start_node: str, state_names: Dict[str, str]
+    ) -> List[str]:
+        """
+        Find the execution path through the state machine starting from a given node.
+
+        Args:
+            start_node: Node ID to start from
+            state_names: Mapping from node IDs to state names
+
+        Returns:
+            List of state names in execution order
+        """
+        visited = set()
+        path = []
+
+        def dfs(node_id):
+            if node_id in visited:
+                return
+
+            visited.add(node_id)
+            state_name = state_names.get(node_id)
+
+            if state_name:
+                path.append(state_name)
+
+            for next_node in self.graph.get(node_id, []):
+                dfs(next_node)
+
+        dfs(start_node)
+        return path
+
+    def find_special_edges(
+        self,
+    ) -> Tuple[
+        Dict[str, str],
+        Dict[str, str],
+        Dict[str, str],
+        Dict[str, List[str]],
+        Dict[str, Dict[str, str]],
+    ]:
+        """
+        Find special edge types in the pipeline.
+
+        Returns:
+            Tuple of (
+                          choice_true_targets,
+                          choice_false_targets,
+                          choice_fail_targets,
+                          map_processor_chains,
+                          choice_custom_branches
+                      )
+            where:
+            - map_processor_chains maps Map node IDs to lists of node IDs in their processor chains
+            - choice_custom_branches maps Choice node IDs to dicts of {output_name: target_node_id}
+        """
+        choice_true_targets = {}  # Maps Choice node ID to its "true" target node ID
+        choice_false_targets = {}  # Maps Choice node ID to its "false" target node ID
+        choice_fail_targets = {}  # Maps Choice node ID to its "fail" target node ID
+        map_processor_chains = (
+            {}
+        )  # Maps Map node ID to a list of node IDs in its processor chain
+        choice_custom_branches = (
+            {}
+        )  # Maps Choice node ID to {output_name: target_node_id}
+
+        # Standard output names that are handled by existing logic
+        standard_outputs = {
+            "Completed",
+            "In Progress",
+            "Fail",
+            "any",
+            "True",
+            "False",
+            "condition_true",
+            "condition_false",
+            "condition_true_output",
+            "condition_false_output",
+        }
+
+        # First identify the initial processor nodes for each Map
+        initial_processor_targets = (
+            {}
+        )  # Maps Map node ID to its initial processor node ID
+
+        for edge in self.edges:
+            # Extract source, target, and sourceHandle
+            if isinstance(edge, dict):
+                source_id = edge.get("source")
+                target_id = edge.get("target")
+                source_handle = edge.get("sourceHandle")
+            else:
+                source_id = edge.source
+                target_id = edge.target
+                source_handle = getattr(edge, "sourceHandle", None)
+
+            source_node = self.node_id_to_node.get(source_id)
+            if not source_node:
+                continue
+
+            # Get the template type (nodeId) for proper node type detection
+            # Fall back to id for backward compatibility with pipelines that don't have nodeId
+            # Use isinstance check to handle test mocks that return MagicMock for any attribute
+            node_id_value = getattr(source_node.data, "nodeId", None)
+            template_id = (
+                node_id_value if isinstance(node_id_value, str) else source_node.data.id
+            )
+
+            # Handle Choice node edges (both choice and conditional nodes)
+            if source_node.data.type.lower() == "flow" and template_id in [
+                "choice",
+                "conditional",
+            ]:
+                # Check for standard outputs first
+                if source_handle in ["Completed", "True"]:
+                    choice_true_targets[source_id] = target_id
+                    logger.info(
+                        f"Identified Choice/Conditional true path: {source_id} -> {target_id}"
+                    )
+                elif source_handle in ["In Progress", "False"]:
+                    choice_false_targets[source_id] = target_id
+                    logger.info(
+                        f"Identified Choice/Conditional false path: {source_id} -> {target_id}"
+                    )
+                elif source_handle == "Fail":
+                    choice_fail_targets[source_id] = target_id
+                    logger.info(
+                        f"Identified Choice fail path: {source_id} -> {target_id}"
+                    )
+                elif source_handle and source_handle not in standard_outputs:
+                    # Check if this is a custom output from outputTypes
+                    output_types = getattr(source_node.data, "outputTypes", [])
+                    if output_types:
+                        custom_output_names = {
+                            ot.get("name")
+                            for ot in output_types
+                            if isinstance(ot, dict) and ot.get("name")
+                        }
+
+                        if source_handle in custom_output_names:
+                            if source_id not in choice_custom_branches:
+                                choice_custom_branches[source_id] = {}
+                            choice_custom_branches[source_id][source_handle] = target_id
+                            logger.info(
+                                f"Identified custom Choice branch '{source_handle}': {source_id} -> {target_id}"
+                            )
+
+            # Handle Map node edges
+            if source_node.data.type.lower() == "flow" and template_id == "map":
+                if source_handle == "Processor":
+                    initial_processor_targets[source_id] = target_id
+                    logger.info(
+                        f"Identified initial Map processor: {source_id} -> {target_id}"
+                    )
+
+        # Now build the complete processor chains
+        for map_id, initial_target in initial_processor_targets.items():
+            chain = [initial_target]
+            current_node = initial_target
+
+            # Follow the chain of nodes connected to the initial processor
+            while current_node in self.graph and self.graph[current_node]:
+                next_node = self.graph[current_node][0]  # Take the first outgoing edge
+                chain.append(next_node)
+                current_node = next_node
+
+            map_processor_chains[map_id] = chain
+            logger.info(f"Built processor chain for Map {map_id}: {chain}")
+
+        # Log summary of custom branches found
+        if choice_custom_branches:
+            logger.info(
+                f"Found custom Choice branches for {len(choice_custom_branches)} Choice nodes: {choice_custom_branches}"
+            )
+
+        return (
+            choice_true_targets,
+            choice_false_targets,
+            choice_fail_targets,
+            map_processor_chains,
+            choice_custom_branches,
+        )
+
+    def find_first_and_last_lambdas(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Find the first and last non-trigger, non-flow nodes in the execution path.
+
+        The algorithm:
+        1. Finds the first Lambda node via BFS from the root
+        2. Finds all terminal Lambda nodes (nodes with no Lambda children)
+        3. Calculates the longest path from root to each terminal node
+        4. Selects the terminal node with the longest path as the "last" node
+
+        This handles cases where:
+        - Nodes have no children but aren't in the main execution path
+        - Multiple parallel branches exist
+        - The graph has complex branching structures
+
+        Returns:
+            Tuple of (first_node_id, last_node_id)
+        """
+        # Get the root node
+        root_node_id = self.get_root_node()
+        if not root_node_id:
+            return None, None
+
+        # Find the first non-trigger, non-flow node
+        first_node_id = None
+        current_id = root_node_id
+        visited = set()
+
+        # BFS to find the first lambda node
+        queue = [current_id]
+        while queue and not first_node_id:
+            current_id = queue.pop(0)
+            if current_id in visited:
+                continue
+
+            visited.add(current_id)
+            current_node = self.node_id_to_node.get(current_id)
+
+            if not current_node:
+                continue
+
+            # Skip trigger and flow nodes
+            if (
+                current_node.data.type.lower() != "trigger"
+                and current_node.data.type.lower() != "flow"
+            ):
+                first_node_id = current_id
+                break
+
+            # Add children to queue
+            if current_id in self.graph:
+                queue.extend(self.graph[current_id])
+
+        # Find all lambda nodes
+        all_lambda_nodes = []
+        for node_id, node in self.node_id_to_node.items():
+            if node.data.type.lower() != "trigger" and node.data.type.lower() != "flow":
+                all_lambda_nodes.append(node_id)
+
+        # If there are no lambda nodes, return None, None
+        if not all_lambda_nodes:
+            return None, None
+
+        # If there's only one lambda node, it's both first and last
+        if len(all_lambda_nodes) == 1:
+            return all_lambda_nodes[0], all_lambda_nodes[0]
+
+        # Find all terminal lambda nodes (nodes with no Lambda children)
+        terminal_lambda_nodes = []
+        for node_id in all_lambda_nodes:
+            has_lambda_children = False
+            if node_id in self.graph:
+                for child_id in self.graph[node_id]:
+                    child_node = self.node_id_to_node.get(child_id)
+                    if (
+                        child_node
+                        and child_node.data.type.lower() != "trigger"
+                        and child_node.data.type.lower() != "flow"
+                    ):
+                        has_lambda_children = True
+                        break
+
+            if not has_lambda_children:
+                terminal_lambda_nodes.append(node_id)
+                logger.debug(f"Found terminal lambda node: {node_id}")
+
+        # If no terminal nodes found, something is wrong (circular graph?)
+        if not terminal_lambda_nodes:
+            logger.warning("No terminal lambda nodes found, using last node in list")
+            last_node_id = all_lambda_nodes[-1]
+            logger.info(f"Identified first lambda node: {first_node_id}")
+            logger.info(f"Identified last lambda node: {last_node_id}")
+            return first_node_id, last_node_id
+
+        # If only one terminal node, that's our last node
+        if len(terminal_lambda_nodes) == 1:
+            last_node_id = terminal_lambda_nodes[0]
+            logger.info(f"Identified first lambda node: {first_node_id}")
+            logger.info(f"Identified last lambda node: {last_node_id}")
+            return first_node_id, last_node_id
+
+        # Multiple terminal nodes - find the one with the longest path from root
+        # This handles cases where disconnected nodes exist
+        def calculate_longest_path_from_root(target_node_id: str) -> int:
+            """
+            Calculate the longest path from root to target node.
+            Returns -1 if the node is not reachable from root.
+            Uses DFS with memoization to handle cycles properly.
+            """
+            # Use DFS with memoization and cycle detection
+            memo = {}  # node_id -> longest path to target from this node
+
+            def dfs(current_id: str, visited_in_path: set, depth: int) -> int:
+                """
+                DFS to find longest path from current node to target.
+                Returns the depth at which target is found, or -1 if not reachable.
+                """
+                # If we reached the target, return current depth
+                if current_id == target_node_id:
+                    return depth
+
+                # Cycle detection - if we've seen this node in current path, skip
+                if current_id in visited_in_path:
+                    return -1
+
+                # Check memo
+                cache_key = (current_id, depth)
+                if cache_key in memo:
+                    return memo[cache_key]
+
+                # Mark as visited in current path
+                visited_in_path.add(current_id)
+
+                max_depth = -1
+                if current_id in self.graph:
+                    for child_id in self.graph[current_id]:
+                        result = dfs(child_id, visited_in_path, depth + 1)
+                        if result > max_depth:
+                            max_depth = result
+
+                # Unmark from current path
+                visited_in_path.remove(current_id)
+
+                memo[cache_key] = max_depth
+                return max_depth
+
+            # Limit recursion depth to prevent stack overflow
+            old_limit = sys.getrecursionlimit()
+            sys.setrecursionlimit(max(old_limit, 1000))
+
+            try:
+                result = dfs(root_node_id, set(), 0)
+            finally:
+                sys.setrecursionlimit(old_limit)
+
+            return result
+
+        # Calculate path lengths for all terminal nodes
+        terminal_nodes_with_paths = []
+        for node_id in terminal_lambda_nodes:
+            path_length = calculate_longest_path_from_root(node_id)
+            terminal_nodes_with_paths.append((node_id, path_length))
+            logger.debug(
+                f"Terminal node {node_id} has path length {path_length} from root"
+            )
+
+        # Filter out unreachable nodes (path_length == -1)
+        reachable_terminals = [
+            (nid, length) for nid, length in terminal_nodes_with_paths if length >= 0
+        ]
+
+        if not reachable_terminals:
+            logger.warning(
+                "No terminal nodes are reachable from root, using first terminal node"
+            )
+            last_node_id = terminal_lambda_nodes[0]
+        else:
+            # Select the terminal node with the longest path
+            last_node_id = max(reachable_terminals, key=lambda x: x[1])[0]
+            logger.info(
+                f"Selected terminal node {last_node_id} with longest path from root"
+            )
+
+        logger.info(f"Identified first lambda node: {first_node_id}")
+        logger.info(f"Identified last lambda node: {last_node_id}")
+
+        return first_node_id, last_node_id

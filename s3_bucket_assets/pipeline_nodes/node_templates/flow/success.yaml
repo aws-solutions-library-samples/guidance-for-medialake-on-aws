@@ -1,0 +1,19 @@
+spec: v1.0.0
+node:
+  id: success
+  title: Success
+  description: End execution with a success status
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: succeed
+actions:
+  success:
+    summary: End execution with success
+    description: This step will end the execution with a success status
+    operationId: success
+    connections:
+      incoming:
+        type: [any]

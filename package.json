@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@casl/ability": "^6.7.3",
+    "@casl/react": "^5.0.0",
+    "cdk": "^2.164.1"
+  },
+  "scripts": {
+    "dev": "cd medialake_user_interface && npm run dev"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "typescript": "~5.3.3"
+  }
+}

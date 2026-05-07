@@ -1,0 +1,734 @@
+# Changelog
+
+## [1.11.8] - 2026-04-08
+
+### Other Changes
+
+- test: fix ci script
+
+## [1.11.7] - 2026-04-08
+
+### Other Changes
+
+- test: ci promotion test
+- ci: ci promotion updates
+- ci: update ci promotion process
+
+## [1.11.6] - 2026-04-08
+
+### Bug Fixes
+
+- fix: duplicate localization keys
+
+## [1.11.5] - 2026-04-07
+
+### Bug Fixes
+
+- fix: api keys last used date is now updated and case sensitivity removed for...
+- fix: updates to break points for viewport and container for widgets
+- fix: permission set creation error handling, matrix display,...
+
+### Other Changes
+
+- ci: removal of temp dir
+
+## [1.11.4] - 2026-04-07
+
+### Bug Fixes
+
+- fix: CloudFormation deploy script causing CodeBuild not able to deploy to regions outside of us-east-1
+- fix: use of Marengo 3 async calls to use regional ID instead of inference profiles
+- fix: vite chunking modified to have aws-amplify and react in the same chunk
+- fix: search settings API returns proper HTTP status codes
+- fix(search): fixing asset filter results
+
+## [1.11.3] - 2026-03-29
+
+### Bug Fixes
+
+- fix: import of css file for video player stamp theme
+
+### Code Refactoring
+
+- refactor: Marengo 3 pipelines and search profile switch to geo based inference profiles
+
+### Other Changes
+
+- docs: minor readme updates
+
+## [1.11.2] - 2026-03-26
+
+### Code Refactoring
+
+- refactor: Removal of extra code in index.html
+
+## [1.11.1] - 2026-03-26
+
+### Bug Fixes
+
+- fix: CF template UI copy issue
+
+### Other Changes
+
+- ci: update to sync to github job
+
+## [1.11.0] - 2026-03-25
+
+### Features
+
+- feat: add webhook trigger node
+- feat: add external nodes S3 bucket for custom nodes
+
+### Bug Fixes
+
+- fix: Update ffprobe build to handle the layer build if the cache is unavailable and update to clean up CDK resources if left over from prior bootstraps.
+
+### Code Refactoring
+
+- refactor: CloudFormation build and deploy optimization
+- refactor: Update to React 19 and FE packages
+- refactor: Updated the asset detail audio and video pages to use Omakase theme configured player
+- refactor: search results, asset card, video/audio player implementation, orphaned, and unused code
+- refactor: add CORS OPTIONS methods to bulk download user and job resources
+
+### Other Changes
+
+- ci: file clean-up
+
+## [1.10.0] - 2026-02-23
+
+### Features
+
+- feat: add manual pipelines trigger node
+
+### Bug Fixes
+
+- fix: remove confidence slider for coactive search provider
+- fix: thumbnails being added to collections during creation and editing, on edit, user needs to save for thumbnail to take affect
+
+### Code Refactoring
+
+- refactor: user interface refactor to unify tokens, font, and spacing
+- refactor: modified video splitter and added a TwelveLabs Pegasus pipeline with video splitter
+- refactor: video and audio asset player, asset side bar, removal of excessive console logs
+
+### Other Changes
+
+- ci: update CloudFormation template to have 3 hr duration and explicitly block public access
+
+## [1.9.0] - 2026-02-16
+
+### Features
+
+- feat: Custom permissions based off of scope and action
+
+### Bug Fixes
+
+- fix: metadata enrichment node resilience
+
+### Code Refactoring
+
+- refactor: Auth token refresh and lifecycle management
+- refactor: TwelveLabs marengo 3 pipelines, embedding node, confidence score calibration
+- refactor: refactor queries that get collections and sub-collections
+
+### Other Changes
+
+- ci: swap to gitleaks
+- ci: switch to gitleaks vs. detect-secrets
+
+## [1.8.1] - 2026-02-13
+
+### Bug Fixes
+
+- fix: remove S3 lifecycle policy for code pipeline S3 bucket artifact, keep lifecycle policy for artifacts that can be removed
+- fix: resolve CDK alpha package version mismatch
+
+### Code Refactoring
+
+- refactor: add collection asset cards to collection detail page
+- refactor: number of collections is more than 30 on collections
+- refactor: refactore the search bar
+- refactor: dashboard thumbnails
+
+## [1.8.0] - 2026-02-09
+
+### Features
+
+- feat: Collection thumbnails, refactor collections page, update dashboards page
+- feat: Dashboards implemented for home screen
+- feat: Add TwelveLabs Marengo 3.0 On a New Index
+
+### Bug Fixes
+
+- fix: asset detail links from dashboard
+- fix: added permissions for assets page for view and edit role
+
+### Code Refactoring
+
+- refactor: Removal of unused permissions and cloudfront 403 or index.html behavior depending on origin
+- refactor: update to provisioned lambdas to use warmer due to intermittent deployment failures
+
+## [1.7.0] - 2026-02-03
+
+### Features
+
+- feat: Add External Metadata Enrichment with MovieLabs Normalization
+
+### Bug Fixes
+
+- fix: assets page connector view sorting, searching response, and pagination
+- fix: user page not rendering and user page state management
+- fix: add fallback to Docker bundling when CI asset path doesn't exist
+- fix: align Lambda log group naming with AWS defaults
+
+### Code Refactoring
+
+- refactor: permission mapping updates for administrator, editor, and viewer
+- refactor: add JWT permission checking in the custom authorizer with a 403 permission denied wrapper in the UI
+- refactor: Deployment modifications on how cloudwatch log groups for Lambda's are deployed and managed with CDK
+- refactor: X icon to clear search input when there's text in the search input
+
+## [1.6.4] - 2026-01-27
+
+### Bug Fixes
+
+- fix: lambda layer for FFProbe command string correction
+- fix: correct environment variable name in pre_signed_url node
+
+## [1.6.3] - 2026-01-22
+
+### Bug Fixes
+
+- fix: update to localization files to remove duplicate keys
+
+## [1.6.2] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
+## [1.6.1] - 2026-01-22
+
+### Bug Fixes
+
+- fix: delete all MediaConvert-generated video thumbnails during asset deletion
+
+## [1.6.0] - 2026-01-21
+
+### Features
+
+- feat: Initial implementation of collection sharing
+
+## [1.5.0] - 2026-01-16
+
+### Features
+
+- feat: add EXR support with OpenEXR 3.4.4
+
+### Bug Fixes
+
+- fix: use cp -rL instead of cp -au for Docker bundling compatibility
+- fix: preserve assets when downloading external payloads in middleware
+
+### Refactors
+
+- refactor: migrate S3 Vector to native CDK constructs and leverage GA improvements
+
+## [1.4.1] - 2026-01-20
+
+- fix: update FFmpeg version to autobuild-2025-11-30-12-53
+
+## [1.4.0] - 2026-01-05
+
+### Features
+
+- feat: adds backend feature flag to enable/disable downloads
+
+### Bug Fixes
+
+- fix: pin FFmpeg/FFprobe to version autobuild-2025-12-30-12-55
+- fix(ui): Resolve problem when searching while in VideoDetailPage because of the player shortcuts
+- fix: remove glow when there is more than two lines on asset card in dark theme
+- fix: Private collections only shows your own collections now
+
+## [1.3.0] - 2025-12-30
+
+### Features
+
+- feat: Favorites implementation
+
+### Bug Fixes
+
+- fix: resolve infinite loop in pipeline creation for cyclic graphs
+- fix: use configured Max Concurrent Executions parameter instead of hardcoded value
+
+## [1.2.2] - 2025-12-22
+
+### Bug Fixes
+
+- fix: Workflow Completed trigger to match actual event structure
+
+### Other Changes
+
+- ci: update to push main-v2 to github
+
+## [1.2.1] - 2025-12-20
+
+### Bug Fixes
+
+- fix: Workflow Completed trigger to match actual event structure
+
+### Other Changes
+
+- ci: update to push main-v2 to github
+- ci: disable eslint temporarily
+- ci: fix regex issue and removed test steps
+- ci: add deduplication to changelog
+
+## [1.2.0] - 2025-12-19
+
+### Features
+
+- feat: adds optional custom domain support for cloudfront distribution
+- feat: add intelligent tiering and lifecycle policies to s3
+- feat: add TwelveLabs Marengo Embed 3.0 provider with 512D embeddings
+- feat: implement MediaConvert throttling mitigation with module-level caching
+- feat: add mts video extension support
+- feat: migrate hardcoded strings to translation system
+- feat: add ApiStatusModal for search provider API key save with masked input
+- feat: add ApiStatusModal for asset delete operations
+- feat: Add backward-compatible asset_embeddings support with dual-query search
+
+### Bug Fixes
+
+- fix: missing support for vbr/cbr audio/video
+- fix: Collections itemCount bugs
+- fix: resolve S3 notification removal error for connectors
+- fix: resolve S3 notification removal error for connectors
+- fix: pipeline map itemspath parameter
+- fix: restore pipeline delete dialog to show pipeline name confirmation
+- fix: add retry configuration for s3 vectors service unavailable errors
+- fix: correct model_id parameter to model_id_text in transcription pipelines
+- fix: filter pipeline executions to show only MediaLake pipelines
+- fix: resolve embedding store retry failures and flatten payload structure
+- fix: filter map child executions from database
+- fix: update to OS version
+
+## [1.1.0] - 2025-11-25
+
+### Features
+
+- feat: enhance DLQ with detailed OpenSearch error information
+- feat: implement bulk delete with centralized deletion service
+- feat: eventbridge trigger node
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+
+### Bug Fixes
+
+- fix: prevent label duplication in node configuration
+- fix: improve list view UI consistency and functionality
+- fix: trim whitespace from subnet IDs to prevent null AZ error
+- fix: resolve case-sensitive pattern matching in TriggerTypeChips
+- fix: shorten password confirmation placeholder text
+- fix: change twelvelabs-api isExternal flag to false
+- fix: resolve lambda_handler not found error in asset deletion
+- fix: improve pipeline button responsiveness
+- fix: remove debug logs
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+
+## [6.0.0] - 2025-11-22
+
+### ⚠ BREAKING CHANGES
+
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+
+### ✨ Features
+
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+- feat: video thumbnail in stamp player
+- feat: video thumbnail in stamp player
+- feat: User upload through the UI initial implementation
+- feat: User upload through the UI initial implementation
+- feat: add loader when editing pipeline
+- feat: add loader when editing pipeline
+- feat: Add i18n mode for internationalization tasks
+- feat: Add i18n mode for internationalization tasks
+- feat: provider metadata display
+- feat: provider metadata display
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: disable update button no changes
+- feat: disable update button no changes
+- feat: initial Semantic release v1.0
+- feat: initial Semantic release v1.0
+- feat: initial release v1 test
+- feat: initial release v1 test
+- feat: initial Semantic Version 1.0.0
+- feat: initial Semantic Version 1.0.0
+
+### 🐛 Bug Fixes
+
+- fix: remove debug logs
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+- fix: Update to API parameter options for deployment of new s3 bucket that was blocking creation of new S3 buckets in connectors
+- fix: profile-page-api-response-parsing
+- fix: profile-page-api-response-parsing
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: correct pipeline delete navigation path
+- fix: correct pipeline delete navigation path
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: executions sorting complete
+- fix: executions sorting complete
+- fix: executions sorting load more
+- fix: executions sorting load more
+- fix: clean up SQS resources when updating pipelines
+- fix: clean up SQS resources when updating pipelines
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: import button small screen
+- fix: import button small screen
+- fix: bumped omakase to 0.22.1
+- fix: bumped omakase to 0.22.1
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: ci test
+- fix: ci test
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+
+## [5.0.0] - 2025-11-22
+
+### ⚠ BREAKING CHANGES
+
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+
+### ✨ Features
+
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+- feat: video thumbnail in stamp player
+- feat: video thumbnail in stamp player
+- feat: User upload through the UI initial implementation
+- feat: User upload through the UI initial implementation
+- feat: add loader when editing pipeline
+- feat: add loader when editing pipeline
+- feat: Add i18n mode for internationalization tasks
+- feat: Add i18n mode for internationalization tasks
+- feat: provider metadata display
+- feat: provider metadata display
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: disable update button no changes
+- feat: disable update button no changes
+- feat: initial Semantic release v1.0
+- feat: initial Semantic release v1.0
+- feat: initial release v1 test
+- feat: initial release v1 test
+- feat: initial Semantic Version 1.0.0
+- feat: initial Semantic Version 1.0.0
+
+### 🐛 Bug Fixes
+
+- fix: remove debug logs
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+- fix: Update to API parameter options for deployment of new s3 bucket that was blocking creation of new S3 buckets in connectors
+- fix: profile-page-api-response-parsing
+- fix: profile-page-api-response-parsing
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: correct pipeline delete navigation path
+- fix: correct pipeline delete navigation path
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: executions sorting complete
+- fix: executions sorting complete
+- fix: executions sorting load more
+- fix: executions sorting load more
+- fix: clean up SQS resources when updating pipelines
+- fix: clean up SQS resources when updating pipelines
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: import button small screen
+- fix: import button small screen
+- fix: bumped omakase to 0.22.1
+- fix: bumped omakase to 0.22.1
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: ci test
+- fix: ci test
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+
+## [4.0.0] - 2025-11-22
+
+### ⚠ BREAKING CHANGES
+
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+
+### ✨ Features
+
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+- feat: video thumbnail in stamp player
+- feat: video thumbnail in stamp player
+- feat: User upload through the UI initial implementation
+- feat: User upload through the UI initial implementation
+- feat: add loader when editing pipeline
+- feat: add loader when editing pipeline
+- feat: Add i18n mode for internationalization tasks
+- feat: Add i18n mode for internationalization tasks
+- feat: provider metadata display
+- feat: provider metadata display
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: disable update button no changes
+- feat: disable update button no changes
+- feat: initial Semantic release v1.0
+- feat: initial Semantic release v1.0
+- feat: initial release v1 test
+- feat: initial release v1 test
+- feat: initial Semantic Version 1.0.0
+- feat: initial Semantic Version 1.0.0
+
+### 🐛 Bug Fixes
+
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+- fix: Update to API parameter options for deployment of new s3 bucket that was blocking creation of new S3 buckets in connectors
+- fix: profile-page-api-response-parsing
+- fix: profile-page-api-response-parsing
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: correct pipeline delete navigation path
+- fix: correct pipeline delete navigation path
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: executions sorting complete
+- fix: executions sorting complete
+- fix: executions sorting load more
+- fix: executions sorting load more
+- fix: clean up SQS resources when updating pipelines
+- fix: clean up SQS resources when updating pipelines
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: import button small screen
+- fix: import button small screen
+- fix: bumped omakase to 0.22.1
+- fix: bumped omakase to 0.22.1
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: ci test
+- fix: ci test
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+
+## [3.0.0] - 2025-11-22
+
+### ⚠ BREAKING CHANGES
+
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+
+### ✨ Features
+
+- feat: add custom prompts with user-friendly labels to bedrock content processor
+- feat: video thumbnail in stamp player
+- feat: video thumbnail in stamp player
+- feat: User upload through the UI initial implementation
+- feat: User upload through the UI initial implementation
+- feat: add loader when editing pipeline
+- feat: add loader when editing pipeline
+- feat: Add i18n mode for internationalization tasks
+- feat: Add i18n mode for internationalization tasks
+- feat: provider metadata display
+- feat: provider metadata display
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: disable update button no changes
+- feat: disable update button no changes
+- feat: initial Semantic release v1.0
+- feat: initial Semantic release v1.0
+- feat: initial release v1 test
+- feat: initial release v1 test
+- feat: initial Semantic Version 1.0.0
+- feat: initial Semantic Version 1.0.0
+
+### 🐛 Bug Fixes
+
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+- fix: Update to API parameter options for deployment of new s3 bucket that was blocking creation of new S3 buckets in connectors
+- fix: profile-page-api-response-parsing
+- fix: profile-page-api-response-parsing
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: correct pipeline delete navigation path
+- fix: correct pipeline delete navigation path
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: executions sorting complete
+- fix: executions sorting complete
+- fix: executions sorting load more
+- fix: executions sorting load more
+- fix: clean up SQS resources when updating pipelines
+- fix: clean up SQS resources when updating pipelines
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: import button small screen
+- fix: import button small screen
+- fix: bumped omakase to 0.22.1
+- fix: bumped omakase to 0.22.1
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: ci test
+- fix: ci test
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+
+## [2.0.0] - 2025-11-21
+
+### ⚠ BREAKING CHANGES
+
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+- BREAKING CHANGE: Initial v1.0.0 semantic version release
+
+### ✨ Features
+
+- feat: video thumbnail in stamp player
+- feat: video thumbnail in stamp player
+- feat: User upload through the UI initial implementation
+- feat: User upload through the UI initial implementation
+- feat: add loader when editing pipeline
+- feat: add loader when editing pipeline
+- feat: Add i18n mode for internationalization tasks
+- feat: Add i18n mode for internationalization tasks
+- feat: provider metadata display
+- feat: provider metadata display
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: add model-dependent embedding type filtering for twelvelabs search clips to...
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: Add glassy effect to pipeline toolbar and auto-refresh on save
+- feat: disable update button no changes
+- feat: disable update button no changes
+- feat: initial Semantic release v1.0
+- feat: initial Semantic release v1.0
+- feat: initial release v1 test
+- feat: initial release v1 test
+- feat: initial Semantic Version 1.0.0
+- feat: initial Semantic Version 1.0.0
+
+### 🐛 Bug Fixes
+
+- fix: remove sensitive data from log statements
+- fix: missing support for vbr/cbr audio/video
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+- fix: Update to API parameter options for deployment of new s3 bucket that was blocking creation of new S3 buckets in connectors
+- fix: profile-page-api-response-parsing
+- fix: profile-page-api-response-parsing
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: use Distributed Map for embedding pipelines to support better scale
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: correct pipeline delete navigation path
+- fix: correct pipeline delete navigation path
+- fix: prevent canvas reset during spacebar drag in ImageViewer
+- fix: executions sorting complete
+- fix: executions sorting complete
+- fix: executions sorting load more
+- fix: executions sorting load more
+- fix: clean up SQS resources when updating pipelines
+- fix: clean up SQS resources when updating pipelines
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: api key management: ui label cutoff, partition key mismatch, optional...
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: Update to IAM roles that manage infrastructure for media lake
+- fix: import button small screen
+- fix: import button small screen
+- fix: bumped omakase to 0.22.1
+- fix: bumped omakase to 0.22.1
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: StoragePath using filename instead of full path in rename operation
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: Add on_delete handlers to pipeline custom resources for graceful rollback
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: update stack permissions and S3 Vector bucket naming schema
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: implement CloudWatch log group cleanup for Step Functions
+- fix: ci test
+- fix: ci test
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+- fix: resolve Bedrock token limit exceeded error in video transcription pipeline
+
+## [1.0.1] - 2025-11-21
+
+### Bug Fixes
+
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+
+## [1.0.0] - 2025-11-21
+
+### Bug Fixes
+
+- fix: update image formats to production-verified list
+- fix: consolidate extension list
+
+### Features
+
+- feat: Initial Semantic Versioning release 1.0.0
+- feat: User uploads initial release

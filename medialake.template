@@ -1,0 +1,1079 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template to create a pipeline for building and deploying CDK V2 application (Python backend with TypeScript/React frontend)'
+
+Parameters:
+  DeploymentName:
+    Description: Unique name for this MediaLake deployment. Use 'medialake' for the first/default instance. Use a different name (e.g., 'ml-team2') for additional instances in the same account/region.
+    Type: String
+    Default: medialake
+    MinLength: 2
+    MaxLength: 20
+    AllowedPattern: '^[a-z][a-z0-9\-]*$'
+    ConstraintDescription: Must start with a lowercase letter, contain only lowercase letters, numbers, and hyphens.
+
+  SourceType:
+    Description: Source type for the CDK code
+    Type: String
+    Default: Git
+    AllowedValues:
+      - Git
+      - S3PresignedURL
+
+  GitRepositoryUrl:
+    Description: URL of the public Git repository (e.g., https://github.com/username/repository.git)
+    Type: String
+    Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
+
+  S3PresignedURL:
+    Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
+    Type: String
+    Default: ''
+
+  InitialUserEmail:
+    Description: Initial Media Lake administrator user email
+    Type: String
+    AllowedPattern: '[^@]+@[^@]+\.[^@]+'
+
+  InitialUserFirstName:
+    Description: Initial Media Lake administrator first name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
+
+  InitialUserLastName:
+    Description: Initial Media Lake administrator last name
+    Type: String
+    MinLength: 1
+    MaxLength: 50
+    AllowedPattern: '^[a-zA-Z\s\-\.]+$'
+
+  MediaLakeEnvironmentName:
+    Description: Media Lake environment name (dev, prd, ...)
+    Type: String
+    MinLength: 1
+    MaxLength: 10
+    AllowedPattern: ^[a-zA-Z0-9]*$
+    Default: dev
+
+  OpenSearchDeploymentSize:
+    Description: OpenSearch deployment size
+    Type: String
+    Default: small
+    AllowedValues:
+      - small
+      - medium
+      - large
+
+  ExternalS3Bucket:
+    Description: (Optional) Name of an external S3 bucket containing custom pipeline nodes. Leave empty to skip.
+    Type: String
+    Default: ''
+    MaxLength: 63
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Deployment Identity
+        Parameters:
+          - DeploymentName
+      -
+        Label:
+          default: Initial Media Lake User
+        Parameters:
+          - InitialUserEmail
+          - InitialUserFirstName
+          - InitialUserLastName
+      -
+        Label:
+          default: Media Lake Configuration
+        Parameters:
+          - MediaLakeEnvironmentName
+          - OpenSearchDeploymentSize
+          - ExternalS3Bucket
+      -
+        Label:
+          default: Media Lake Deployment Configuration
+        Parameters:
+          - SourceType
+          - GitRepositoryUrl
+          - S3PresignedURL
+    ParameterLabels:
+      DeploymentName:
+        default: Deployment Name (unique per instance)
+      InitialUserEmail:
+        default: Email
+      InitialUserFirstName:
+        default: First Name
+      InitialUserLastName:
+        default: Last Name
+      MediaLakeEnvironmentName:
+        default: Media Lake Environment Name
+      OpenSearchDeploymentSize:
+        default: OpenSearch Deployment Size
+      ExternalS3Bucket:
+        default: External S3 Bucket (Optional)
+      SourceType:
+        default: Source Type
+      GitRepositoryUrl:
+        default: Git Repository URL
+      S3PresignedURL:
+        default: S3 Presigned URL
+
+Conditions:
+  IsGitSource: !Equals [!Ref SourceType, 'Git']
+  IsS3PresignedURLSource: !Equals [!Ref SourceType, 'S3PresignedURL']
+  NeedsInitialSourcePackage: !Or [!Equals [!Ref SourceType, 'Git'], !Equals [!Ref SourceType, 'S3PresignedURL']]
+  HasExternalS3Bucket: !Not [!Equals [!Ref ExternalS3Bucket, '']]
+  IsDefaultDeployment: !Equals [!Ref DeploymentName, 'medialake']
+
+Resources:
+  # CIDR Allocator - finds an unused /16 CIDR block in the 10.0.0.0/8 range
+  CidrAllocatorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt CidrAllocatorRole.Arn
+      Runtime: python3.12
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              logger.info(f"Received event: {event}")
+              response_data = {}
+
+              if event['RequestType'] == 'Delete':
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  return
+
+              try:
+                  ec2 = boto3.client('ec2')
+
+                  # Get all VPC CIDRs in the account/region
+                  used_cidrs = set()
+                  paginator = ec2.get_paginator('describe_vpcs')
+                  for page in paginator.paginate():
+                      for vpc in page['Vpcs']:
+                          cidr = vpc['CidrBlock']
+                          # Extract the second octet from 10.X.0.0/16 patterns
+                          parts = cidr.split('.')
+                          if parts[0] == '10' and cidr.endswith('/16'):
+                              used_cidrs.add(int(parts[1]))
+                          # Also check CIDR association sets for secondary CIDRs
+                          for assoc in vpc.get('CidrBlockAssociationSet', []):
+                              cidr2 = assoc.get('CidrBlock', '')
+                              parts2 = cidr2.split('.')
+                              if parts2[0] == '10' and cidr2.endswith('/16'):
+                                  used_cidrs.add(int(parts2[1]))
+
+                  logger.info(f"Used second octets in 10.x.0.0/16 range: {sorted(used_cidrs)}")
+
+                  # Find first available /16 in 10.0.0.0/8, starting from 10.1.0.0/16
+                  # Skip 10.0.0.0/16 as it's commonly used as default
+                  allocated_cidr = None
+                  for second_octet in range(1, 256):
+                      if second_octet not in used_cidrs:
+                          allocated_cidr = f"10.{second_octet}.0.0/16"
+                          break
+
+                  if not allocated_cidr:
+                      raise Exception("No available /16 CIDR blocks in 10.0.0.0/8 range")
+
+                  logger.info(f"Allocated CIDR: {allocated_cidr}")
+                  response_data['Cidr'] = allocated_cidr
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+              except Exception as e:
+                  logger.error(f"Error allocating CIDR: {str(e)}")
+                  response_data['Error'] = str(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+
+  CidrAllocatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: DescribeVpcs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeVpcs'
+                Resource: '*'
+
+  CidrAllocation:
+    Type: Custom::CidrAllocator
+    Properties:
+      ServiceToken: !GetAtt CidrAllocatorFunction.Arn
+      # Force re-evaluation on each stack update by including deployment name
+      DeploymentName: !Ref DeploymentName
+
+  # Add the Service Linked Role Manager resources first
+  ServiceLinkedRoleFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt ServiceLinkedRoleManagerRole.Arn
+      Runtime: python3.12
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def check_and_create_role(service_name):
+              """Check if service-linked role exists and create if it doesn't"""
+              iam = boto3.client('iam')
+              role_name = f"AWSServiceRoleFor{service_name.split('.')[0].upper()}"
+
+              try:
+                  # Check if role exists
+                  iam.get_role(RoleName=role_name)
+                  logger.info(f"Role {role_name} already exists")
+                  return True
+              except iam.exceptions.NoSuchEntityException:
+                  try:
+                      # Create service-linked role
+                      iam.create_service_linked_role(AWSServiceName=service_name)
+                      logger.info(f"Created service-linked role for {service_name}")
+                      return True
+                  except Exception as e:
+                      error_message = str(e).lower()
+                      if 'role already exists' in error_message or 'has been taken in this account' in error_message:
+                          logger.info(f"Role already exists for {service_name}")
+                          return True
+                      logger.error(f"Error creating role for {service_name}: {str(e)}")
+                      return False
+              except Exception as e:
+                  logger.error(f"Error checking role {role_name}: {str(e)}")
+                  return False
+
+          def handler(event, context):
+              logger.info(f"Received event: {event}")
+
+              # List of services that need service-linked roles
+              services = [
+                  'es.amazonaws.com',
+                  'opensearchservice.amazonaws.com',
+                  'osis.amazonaws.com'
+              ]
+
+              response_data = {}
+
+              if event['RequestType'] in ['Create', 'Update']:
+                  success = True
+                  for service in services:
+                      if not check_and_create_role(service):
+                          success = False
+                          response_data['Error'] = f"Failed to create role for {service}"
+                          break
+
+                  status = cfnresponse.SUCCESS if success else cfnresponse.FAILED
+                  cfnresponse.send(event, context, status, response_data)
+              else:
+                  # Delete event - nothing to clean up as service-linked roles are managed by AWS
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+  ServiceLinkedRoleManagerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: ServiceLinkedRoleManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:CreateServiceLinkedRole'
+                  - 'iam:GetRole'
+                Resource: '*'
+
+  ServiceLinkedRoleManager:
+    Type: Custom::ServiceLinkedRoleManager
+    DependsOn: ServiceLinkedRoleFunction
+    Properties:
+      ServiceToken: !GetAtt ServiceLinkedRoleFunction.Arn
+
+  # Modify existing IAM roles to depend on ServiceLinkedRoleManager
+  CodeBuildServiceRole:
+    Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:GetObjectVersion'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'ecr:InitiateLayerUpload'
+                  - 'ecr:UploadLayerPart'
+                  - 'ecr:CompleteLayerUpload'
+                  - 'ecr:PutImage'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeAvailabilityZones'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'kms:ListAliases'
+                  - 'kms:DescribeKey'
+                  - 'kms:ListKeys'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:ListBucket'
+                  - 's3:GetBucketLocation'
+                Resource:
+                  - !Sub 'arn:aws:s3:::*'
+
+  ExternalS3BucketAccessPolicy:
+    Type: 'AWS::IAM::Policy'
+    Condition: HasExternalS3Bucket
+    Properties:
+      PolicyName: ExternalS3BucketAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ExternalS3Bucket}'
+              - !Sub 'arn:aws:s3:::${ExternalS3Bucket}/*'
+      Roles:
+        - !Ref CodeBuildServiceRole
+        - !Ref CDKDeployRole
+
+  CDKDeployRole:
+    Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    DependsOn: ServiceLinkedRoleManager
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess'
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}'
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+  # S3 Bucket for Artifacts
+  ArtifactBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldPipelineArtifacts
+            Status: Enabled
+            Prefix: !Sub '${DeploymentName}-pipeline/'
+            ExpirationInDays: 30
+          - Id: CleanupBeforeDeletion
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+            ExpiredObjectDeleteMarker: true
+
+  # Initial source package for S3-based and Git-based pipelines
+  InitialSourcePackage:
+    Type: 'Custom::S3InitialFile'
+    Condition: NeedsInitialSourcePackage
+    Properties:
+      ServiceToken: !GetAtt InitialSourceFunction.Arn
+      BucketName: !Ref ArtifactBucket
+      SourceKey: 'source-package.zip'
+      Content: !Sub |
+        This is a source placeholder for the ${DeploymentName} pipeline.
+        Created on ${AWS::StackName} in ${AWS::Region}.
+        Timestamp: ${AWS::AccountId}
+
+  InitialSourceFunction:
+    Type: 'AWS::Lambda::Function'
+    Condition: NeedsInitialSourcePackage
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.12
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import io
+          import zipfile
+          import time
+
+          def handler(event, context):
+              if event['RequestType'] in ['Create', 'Update']:
+                  try:
+                      s3 = boto3.client('s3')
+                      bucket_name = event['ResourceProperties']['BucketName']
+                      source_key = event['ResourceProperties']['SourceKey']
+                      content = event['ResourceProperties']['Content']
+
+                      # Create a simple ZIP file in memory
+                      buffer = io.BytesIO()
+                      with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as z:
+                          # Add a README file
+                          z.writestr('README.md', content)
+                          # Add a timestamp file
+                          z.writestr('timestamp.txt', str(time.time()))
+
+                      buffer.seek(0)
+
+                      # Upload the ZIP file to S3
+                      s3.put_object(
+                          Bucket=bucket_name,
+                          Key=source_key,
+                          Body=buffer.getvalue()
+                      )
+
+                      response_data = {'Message': 'Initial source package created'}
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  except Exception as e:
+                      print(f"Error: {str(e)}")
+                      response_data = {'Error': str(e)}
+                      cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+              else:  # Delete
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Condition: NeedsInitialSourcePackage
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+  # CodeBuild Projects
+  GitCloneProject:
+    Type: 'AWS::CodeBuild::Project'
+    Condition: IsGitSource
+    DependsOn:
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
+    Properties:
+      Name: !Sub '${DeploymentName}-CDKPipeline-GitClone'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: GIT_REPOSITORY_URL
+            Value: !Ref GitRepositoryUrl
+          - Name: GIT_BRANCH
+            Value: main
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - 'echo "Cloning repository from $GIT_REPOSITORY_URL branch $GIT_BRANCH"'
+                - 'git clone --depth 1 --branch $GIT_BRANCH $GIT_REPOSITORY_URL source/'
+                - 'cp -r source/* .'
+          artifacts:
+            files:
+              - "**/*"
+              - "!source/**/*"
+
+  DownloadSourceProject:
+    Type: 'AWS::CodeBuild::Project'
+    Condition: IsS3PresignedURLSource
+    DependsOn:
+      - ServiceLinkedRoleManager
+      - InitialSourcePackage
+    Properties:
+      Name: !Sub '${DeploymentName}-CDKPipeline-DownloadSource'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - 'echo "Downloading source code from presigned URL"'
+                - 'curl -L "${S3PresignedURL}" -o source-code.zip'
+                - 'mkdir -p source'
+                - 'unzip -o source-code.zip -d source/'
+                - 'cp -r source/* .'
+          artifacts:
+            files:
+              - '**/*'
+              - '!source-code.zip'
+              - '!source/**/*'
+
+  BuildAndDeployProject:
+    Type: 'AWS::CodeBuild::Project'
+    DependsOn: ServiceLinkedRoleManager
+    Properties:
+      Name: !Sub '${DeploymentName}-CDKPipeline-BuildAndDeploy'
+      ServiceRole: !GetAtt CDKDeployRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/build-cache'
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: DEPLOYMENT_NAME
+            Value: !Ref DeploymentName
+          - Name: IS_DEFAULT_DEPLOYMENT
+            Value: !If [IsDefaultDeployment, 'true', 'false']
+          - Name: VPC_CIDR
+            Value: !GetAtt CidrAllocation.Cidr
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          env:
+            variables:
+              CI: CODEBUILD
+              CDK_DEFAULT_ACCOUNT: ${AWS::AccountId}
+              CDK_DEFAULT_REGION: ${AWS::Region}
+          cache:
+            paths:
+              - 'medialake_user_interface/node_modules/**/*'
+              - '/root/.npm/**/*'
+              - '/root/.cache/pip/**/*'
+              - 'dist/lambdas/layers/ffprobe/**/*'
+              - 'dist/lambdas/layers/ffmpeg/**/*'
+              - 'dist/lambdas/layers/resvg/**/*'
+              - 'dist/lambdas/layers/numpy/**/*'
+              - 'dist/lambdas/layers/openexr/**/*'
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+                nodejs: 20
+              commands:
+                - echo "Installing dependencies"
+                - yum install jq
+                - npm install -g aws-cdk esbuild
+                - pip install -U pip
+                - export CDK_DIR=$(if [ -d "./cdk" ]; then echo "./cdk"; else find . -type f -name "cdk.json" -o -name "app.py" | grep -v "node_modules" | head -1 | xargs dirname; fi)
+                - export FRONTEND_DIR=$(if [ -d "./medialake_user_interface" ]; then echo "./medialake_user_interface"; elif [ -d "./frontend" ]; then echo "./frontend"; else find . -name "package.json" -not -path "*/node_modules/*" | head -1 | xargs dirname; fi)
+                - echo "CDK directory $CDK_DIR"
+                - echo "Frontend directory $FRONTEND_DIR"
+                - if [ -z "$CDK_DIR" ]; then echo "Could not find CDK directory"; exit 1; fi
+                - if [ -z "$FRONTEND_DIR" ]; then echo "Could not find frontend directory"; exit 1; fi
+                # Install Python and Node deps in parallel
+                - |
+                  (
+                    cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                    if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+                    if [ -f "requirements-dev.txt" ]; then pip install -r requirements-dev.txt; fi
+                    if [ -f "package.json" ]; then npm install; fi
+                  ) &
+                  PIP_PID=$!
+                  (
+                    cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                    if [ -f "package.json" ]; then npm install; fi
+                  ) &
+                  NPM_PID=$!
+                  wait $PIP_PID || exit 1
+                  wait $NPM_PID || exit 1
+            pre_build:
+              commands:
+                - echo "Preparing config file for deployment '$DEPLOYMENT_NAME'"
+                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                - if [ -f "config.json" ]; then echo "Using existing config file"; else echo "Creating config file"; cp .cicd/config.json-template config.json; fi
+                - echo "$( jq --arg e "${MediaLakeEnvironmentName}" '.environment = $e' config.json )" > config.json
+                - echo "$( jq --arg a "${AWS::AccountId}" '.account_id = $a' config.json )" > config.json
+                - echo "$( jq --arg r "${AWS::Region}" '.primary_region = $r' config.json )" > config.json
+                - echo "$( jq --arg u "${InitialUserEmail}" '.initial_user.email = $u' config.json )" > config.json
+                - echo "$( jq --arg f "${InitialUserFirstName}" '.initial_user.first_name = $f' config.json )" > config.json
+                - echo "$( jq --arg l "${InitialUserLastName}" '.initial_user.last_name = $l' config.json )" > config.json
+                - echo "$( jq --arg s "${OpenSearchDeploymentSize}" '.opensearch_deployment_size = $s' config.json )" > config.json
+                - echo "$( jq --arg b "${ExternalS3Bucket}" '.external_nodes_bucket = $b' config.json )" > config.json
+                # Set resource_prefix and use_prefixed_names based on DeploymentName
+                - echo "$( jq --arg p "$DEPLOYMENT_NAME" '.resource_prefix = $p' config.json )" > config.json
+                - echo "$( jq --arg t "$DEPLOYMENT_NAME" '.resource_application_tag = $t' config.json )" > config.json
+                - |
+                  if [ "$IS_DEFAULT_DEPLOYMENT" = "true" ]; then
+                    echo "Default deployment - using legacy naming (use_prefixed_names=false)"
+                    echo "$( jq '.use_prefixed_names = false' config.json )" > config.json
+                  else
+                    echo "Additional deployment '$DEPLOYMENT_NAME' - using prefixed naming"
+                    echo "$( jq '.use_prefixed_names = true' config.json )" > config.json
+                  fi
+                # Set VPC CIDR from auto-allocated block (avoids collisions with existing VPCs)
+                - echo "Setting VPC CIDR to $VPC_CIDR"
+                - echo "$( jq --arg c "$VPC_CIDR" '.vpc.new_vpc.cidr = $c' config.json )" > config.json
+                - echo "Final config.json:"
+                - cat config.json
+            build:
+              commands:
+                - cd $CODEBUILD_SRC_DIR/$CDK_DIR
+                # Start frontend build in background
+                - |
+                  (
+                    echo "Building frontend"
+                    cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
+                    if [ -f "package.json" ]; then npm run build; fi
+                  ) &
+                  FRONTEND_PID=$!
+                # Build native layers in parallel (skip if cached)
+                - |
+                  echo "Building native layers in parallel..."
+                  LAYER_PIDS=""
+                  if [ -d "dist/lambdas/layers/ffprobe/bin" ] && [ -d "dist/lambdas/layers/ffmpeg/bin" ]; then
+                    echo "FFmpeg/FFprobe layers cached, skipping"
+                  else
+                    (bash .cicd/build_ffmpeg_ffprobe.sh 2>&1 || (bash .cicd/build_ffprobe.sh 2>&1 && bash .cicd/build_ffmpeg.sh 2>&1)) &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/resvg/bin" ]; then
+                    echo "Resvg layer cached, skipping"
+                  else
+                    bash .cicd/build_resvg.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/numpy/python" ]; then
+                    echo "NumPy layer cached, skipping"
+                  else
+                    bash .cicd/build_numpy.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  if [ -d "dist/lambdas/layers/openexr/python" ]; then
+                    echo "OpenEXR layer cached, skipping"
+                  else
+                    bash .cicd/build_openexr.sh 2>&1 &
+                    LAYER_PIDS="$LAYER_PIDS $!"
+                  fi
+                  LAYER_FAIL=0
+                  for PID in $LAYER_PIDS; do
+                    wait $PID || LAYER_FAIL=1
+                  done
+                  if [ $LAYER_FAIL -ne 0 ]; then echo "One or more native layer builds failed"; exit 1; fi
+                - test -d dist/lambdas/layers/numpy || (echo "NumPy layer directory not found after build" && exit 1)
+                - test -d dist/lambdas/layers/openexr || (echo "OpenEXR layer directory not found after build" && exit 1)
+                - echo "Building Lambda functions"
+                - python3 .cicd/build_lambdas.py build
+                # Wait for frontend build to finish
+                - |
+                  wait $FRONTEND_PID || (echo "Frontend build failed" && exit 1)
+                  export BUILD_DIR=$(cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR && if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
+                  if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p $CODEBUILD_SRC_DIR/$FRONTEND_DIR/build; export BUILD_DIR="build"; fi
+                  echo "Build output directory $BUILD_DIR"
+                  mkdir -p assets/dist
+                  if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
+                - echo "Checking CDK bootstrap status"
+                - |
+                  cleanup_and_bootstrap() {
+                    local ACCOUNT_ID=$1
+                    local REGION=$2
+                    local QUALIFIER="hnb659fds"
+
+                    STACK_STATUS=$(aws cloudformation describe-stacks --stack-name CDKToolkit --region "${!REGION}" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+
+                    if [ "${!STACK_STATUS}" = "ROLLBACK_COMPLETE" ] || [ "${!STACK_STATUS}" = "DELETE_FAILED" ]; then
+                      echo "CDKToolkit stack in ${!REGION} is in ${!STACK_STATUS} state, cleaning up..."
+                      aws cloudformation delete-stack --stack-name CDKToolkit --region "${!REGION}"
+                      aws cloudformation wait stack-delete-complete --stack-name CDKToolkit --region "${!REGION}" || true
+                      STACK_STATUS="NOT_FOUND"
+                    fi
+
+                    if [ "${!STACK_STATUS}" = "NOT_FOUND" ]; then
+                      echo "Cleaning up any orphaned CDK bootstrap roles in ${!REGION}..."
+                      for ROLE_SUFFIX in cfn-exec-role deploy-role file-publishing-role image-publishing-role lookup-role; do
+                        ROLE_NAME="cdk-${!QUALIFIER}-${!ROLE_SUFFIX}-${!ACCOUNT_ID}-${!REGION}"
+                        ATTACHED=$(aws iam list-attached-role-policies --role-name "${!ROLE_NAME}" --query "AttachedPolicies[].PolicyArn" --output text 2>/dev/null || true)
+                        for POLICY_ARN in ${!ATTACHED}; do
+                          aws iam detach-role-policy --role-name "${!ROLE_NAME}" --policy-arn "${!POLICY_ARN}" 2>/dev/null || true
+                        done
+                        INLINE=$(aws iam list-role-policies --role-name "${!ROLE_NAME}" --query "PolicyNames[]" --output text 2>/dev/null || true)
+                        for POLICY_NAME in ${!INLINE}; do
+                          aws iam delete-role-policy --role-name "${!ROLE_NAME}" --policy-name "${!POLICY_NAME}" 2>/dev/null || true
+                        done
+                        aws iam delete-role --role-name "${!ROLE_NAME}" 2>/dev/null || true
+                      done
+                      echo "Bootstrapping CDK in ${!REGION}"
+                      cdk bootstrap "aws://${!ACCOUNT_ID}/${!REGION}"
+                    else
+                      echo "CDK already bootstrapped in ${!REGION} (stack status: ${!STACK_STATUS})"
+                    fi
+                  }
+
+                  cleanup_and_bootstrap "${AWS::AccountId}" "${AWS::Region}"
+
+                  if [ "${AWS::Region}" != "us-east-1" ]; then
+                    cleanup_and_bootstrap "${AWS::AccountId}" "us-east-1"
+                  fi
+                - echo "Synthesizing CDK stacks"
+                - cdk synth
+                - echo "Deploying CDK stacks"
+                - cdk deploy --all --app cdk.out --require-approval never --concurrency 3 || (echo "CDK deploy failed" && exit 1)
+            post_build:
+              commands:
+                - echo "Build and deploy completed"
+          artifacts:
+            files:
+              - "**/*"
+            base-directory: '.'
+      TimeoutInMinutes: 180
+
+  # Pipeline with Git Source
+  GitSourcePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Condition: IsGitSource
+    DependsOn:
+      - InitialSourcePackage
+      - GitCloneProject
+      - BuildAndDeployProject
+    Properties:
+      Name: !Sub '${DeploymentName}-CDKPipeline'
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: 'source-package.zip'
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: PlaceholderSource
+
+        - Name: Clone
+          Actions:
+            - Name: CloneFromGitHub
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref GitCloneProject
+              InputArtifacts:
+                - Name: PlaceholderSource
+              OutputArtifacts:
+                - Name: SourceCode
+
+        - Name: BuildAndDeploy
+          Actions:
+            - Name: BuildAndDeployCDK
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildAndDeployProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+
+  # Pipeline with S3 PresignedURL Source
+  S3SourcePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Condition: IsS3PresignedURLSource
+    DependsOn:
+      - InitialSourcePackage
+      - DownloadSourceProject
+      - BuildAndDeployProject
+    Properties:
+      Name: !Sub '${DeploymentName}-CDKPipeline'
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: 'source-package.zip'
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: PlaceholderSource
+
+        - Name: Download
+          Actions:
+            - Name: DownloadFromPresignedURL
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DownloadSourceProject
+              InputArtifacts:
+                - Name: PlaceholderSource
+              OutputArtifacts:
+                - Name: SourceCode
+
+        - Name: BuildAndDeploy
+          Actions:
+            - Name: BuildAndDeployCDK
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BuildAndDeployProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BuildOutput
+
+  # Custom resource to empty the S3 bucket on deletion
+  S3BucketCleanup:
+    Type: Custom::S3BucketCleanup
+    Properties:
+      ServiceToken: !GetAtt S3BucketCleanupFunction.Arn
+      BucketName: !Ref ArtifactBucket
+
+  S3BucketCleanupFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ArtifactBucket
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt S3BucketCleanupRole.Arn
+      Runtime: python3.12
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def delete_bucket_contents(bucket_name):
+              """Delete all objects and object versions from the bucket"""
+              try:
+                  s3 = boto3.resource('s3')
+                  bucket = s3.Bucket(bucket_name)
+
+                  # Delete all object versions
+                  logger.info(f"Deleting all object versions from {bucket_name}")
+                  bucket.object_versions.all().delete()
+
+                  # Delete all objects (in case versioning is not enabled)
+                  logger.info(f"Deleting all objects from {bucket_name}")
+                  bucket.objects.all().delete()
+
+                  return True
+              except Exception as e:
+                  logger.error(f"Error emptying bucket {bucket_name}: {str(e)}")
+                  return False
+
+          def handler(event, context):
+              logger.info(f"Received event: {json.dumps(event)}")
+
+              # Extract the bucket name from the event
+              bucket_name = event['ResourceProperties']['BucketName']
+              response_data = {}
+
+              if event['RequestType'] == 'Delete':
+                  logger.info(f"Emptying bucket {bucket_name}")
+                  success = delete_bucket_contents(bucket_name)
+
+                  if success:
+                      logger.info(f"Successfully emptied bucket {bucket_name}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  else:
+                      logger.error(f"Failed to empty bucket {bucket_name}")
+                      cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+              else:
+                  # For Create and Update events, just succeed
+                  logger.info(f"No action needed for {event['RequestType']} event")
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+  S3BucketCleanupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: S3BucketCleanupPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:ListBucket'
+                  - 's3:ListBucketVersions'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}'
+              - Effect: Allow
+                Action:
+                  - 's3:DeleteObject'
+                  - 's3:DeleteObjectVersion'
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                Resource: !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+Outputs:
+  PipelineUrl:
+    Description: URL to the CodePipeline console
+    Value: !If
+      - IsGitSource
+      - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${GitSourcePipeline}
+      - !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${S3SourcePipeline}
+
+  ArtifactBucketName:
+    Description: Name of the S3 bucket used to store pipeline artifacts
+    Value: !Ref ArtifactBucket
+
+  DeploymentNameOutput:
+    Description: The deployment name used for this MediaLake instance
+    Value: !Ref DeploymentName

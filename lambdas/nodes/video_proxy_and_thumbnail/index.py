@@ -1,0 +1,501 @@
+"""
+Video-proxy + thumbnail trigger Lambda with MediaConvert endpoint caching
+
+• Accepts modern {"payload": {"assets": […]} events
+• Renders a MediaConvert job (proxy MP4 + FRAME_CAPTURE JPEG) from Jinja in S3
+• Uses cached MediaConvert endpoints from DynamoDB to minimize API calls
+• Implements intelligent retry logic with timeout awareness
+• Emits CloudWatch metrics for monitoring
+• Cleans up any existing proxy or thumbnail before submitting a new job
+"""
+
+import decimal
+import importlib.util
+import json
+import os
+import os.path
+from typing import Any, Dict, List
+
+import audio_track_selection as ats
+import boto3
+from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.exceptions import ClientError
+from jinja2 import Environment, FileSystemLoader
+from lambda_middleware import lambda_middleware
+from mediaconvert_utils import (
+    MediaConvertEndpointError,
+    MediaConvertThrottlingError,
+    MediaConvertTimeoutError,
+    emit_mediaconvert_metrics,
+    get_mediaconvert_client_with_cache,
+)
+
+# ── Powertools & clients ─────────────────────────────────────────────────────
+logger = Logger()
+tracer = Tracer()
+s3 = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
+asset_table = dynamodb.Table(os.environ["MEDIALAKE_ASSET_TABLE"])
+
+
+def _raise(msg: str):
+    raise RuntimeError(msg)
+
+
+def _strip_decimals(obj):
+    """Recursively convert Decimal → int/float so the Lambda JSON encoder is happy."""
+    if isinstance(obj, list):
+        return [_strip_decimals(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, decimal.Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
+
+
+def _calculate_thumbnail_frame_denominator(
+    duration_seconds: float, num_captures: int = 5
+) -> int:
+    """
+    Calculate frame capture denominator for evenly spaced thumbnails.
+    For 5 captures, generates thumbnails at 10%, 30%, 50%, 70%, 90% of duration.
+
+    Args:
+        duration_seconds: Total video duration in seconds
+        num_captures: Number of thumbnails to generate (default: 5)
+
+    Returns: denominator value (interval in seconds between captures)
+    """
+    if duration_seconds <= 0 or num_captures <= 0:
+        return 2
+
+    # Calculate interval to space captures evenly across the video
+    # Skip first 10% and last 10% to avoid black frames
+    usable_duration = duration_seconds * 0.8
+    start_offset = duration_seconds * 0.1
+
+    if num_captures == 1:
+        # Single capture at 10% into video (legacy behavior)
+        return max(2, int(start_offset))
+
+    # Calculate interval between captures
+    interval = (
+        usable_duration / (num_captures - 1) if num_captures > 1 else usable_duration
+    )
+
+    # Ensure minimum 2 second interval
+    return max(2, int(interval))
+
+
+def _extract_video_duration(event: dict) -> float:
+    """
+    Extract video duration from event payload.
+    Returns 0.0 if duration not found.
+    """
+    try:
+        asset = event.get("input", {})
+        duration = (
+            asset.get("DigitalSourceAsset", {})
+            .get("MainRepresentation", {})
+            .get("DigitalSourceMediaInfo", {})
+            .get("VideoDuration")
+        )
+        return float(duration) if duration else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
+# Removed: get_mediaconvert_endpoint() - now using get_mediaconvert_client_with_cache() from mediaconvert_utils
+
+
+def create_job_with_retry(
+    mc_client, job_settings: Dict[str, Any], max_retries: int = 5
+) -> Dict[str, Any]:
+    """
+    Wrap mc.create_job() in exponential-backoff on TooManyRequestsException.
+    Emits CloudWatch metrics for monitoring.
+    """
+    import random
+    import time
+
+    attempt = 0
+    while True:
+        try:
+            start_time = time.time()
+            response = mc_client.create_job(**job_settings)
+            latency_ms = (time.time() - start_time) * 1000
+
+            # Emit success metrics
+            emit_mediaconvert_metrics(
+                "JobCreationLatency",
+                latency_ms,
+                unit="Milliseconds",
+                dimensions={"Operation": "CreateJob"},
+            )
+
+            if attempt > 0:
+                logger.info(
+                    f"create_job succeeded after {attempt} retries",
+                    extra={"attempt": attempt, "latency_ms": latency_ms},
+                )
+
+            return response
+
+        except ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code == "TooManyRequestsException" and attempt < max_retries:
+                attempt += 1
+                backoff = (2**attempt) + random.random()
+
+                # Emit throttling metric
+                emit_mediaconvert_metrics(
+                    "JobCreationThrottled", 1, dimensions={"Operation": "CreateJob"}
+                )
+
+                logger.warning(
+                    "create_job throttled (attempt %d/%d), retrying in %.2fs",
+                    attempt,
+                    max_retries,
+                    backoff,
+                )
+                time.sleep(backoff)
+                continue
+            logger.error("create_job failed: %s", e)
+            raise
+
+
+def _exec_s3_py(bucket: str, key: str, fn: str, arg: dict) -> dict:
+    obj = s3.get_object(Bucket=bucket, Key=f"api_templates/{key}")
+    code = obj["Body"].read().decode()
+    spec = importlib.util.spec_from_loader("dyn_mod", loader=None)
+    mod = importlib.util.module_from_spec(spec)
+    exec(
+        code, mod.__dict__
+    )  # nosec B102 - Controlled execution of trusted S3 templates
+    return getattr(mod, fn)(arg)
+
+
+def _dl_s3(bucket: str, key: str) -> str:
+    return s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode()
+
+
+def _tmpl_paths(service: str, resource: str, method: str) -> Dict[str, str]:
+    base = f"{resource.split('/')[-1]}_{method.lower()}"
+    return {
+        "request_template": f"{service}/{resource}/{base}_request.jinja",
+        "mapping_file": f"{service}/{resource}/{base}_request_mapping.py",
+        "response_template": f"{service}/{resource}/{base}_response.jinja",
+        "response_mapping_file": f"{service}/{resource}/{base}_response_mapping.py",
+    }
+
+
+def _render_request(paths: dict, bucket: str, event: dict) -> dict:
+    tmpl = _dl_s3(bucket, f"api_templates/{paths['request_template']}")
+    mapping = _exec_s3_py(
+        bucket, paths["mapping_file"], "translate_event_to_request", event
+    )
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
+    env.filters["jsonify"] = json.dumps
+    rendered = env.from_string(tmpl).render(variables=mapping)
+    try:
+        return json.loads(rendered)
+    except json.JSONDecodeError:
+        logger.error("Broken job-settings JSON ↓\n%s", rendered)
+        raise
+
+
+def _render_response(paths: dict, bucket: str, resp: dict, event: dict) -> dict:
+    tmpl = _dl_s3(bucket, f"api_templates/{paths['response_template']}")
+    mapping = _exec_s3_py(
+        bucket,
+        paths["response_mapping_file"],
+        "translate_event_to_request",
+        {"response_body": resp, "event": event},
+    )
+    env = Environment(
+        loader=FileSystemLoader("/tmp/")
+    )  # nosec B701 - Controlled template rendering with trusted input
+    env.filters["jsonify"] = json.dumps
+    return json.loads(env.from_string(tmpl).render(variables=mapping))
+
+
+def _normalize_event(evt: dict) -> dict:
+    assets: List[dict] = evt.get("payload", {}).get("assets", [])
+    if not assets:
+        _raise("Event missing payload.assets list")
+    evt["input"] = assets[0]
+    return assets[0]
+
+
+@lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
+    try:
+        # Calculate timeout buffer based on remaining Lambda execution time
+        remaining_time_ms = context.get_remaining_time_in_millis()
+        timeout_buffer_seconds = 30  # Reserve 30 seconds before timeout
+
+        logger.info(
+            "Lambda execution started",
+            extra={
+                "remaining_time_ms": remaining_time_ms,
+                "timeout_buffer_seconds": timeout_buffer_seconds,
+            },
+        )
+
+        asset = _normalize_event(event)
+        primary = asset["DigitalSourceAsset"]["MainRepresentation"]["StorageInfo"][
+            "PrimaryLocation"
+        ]
+        in_bucket = primary["Bucket"]
+        in_key = primary["ObjectKey"]["FullPath"]
+
+        out_bucket = os.getenv("MEDIA_ASSETS_BUCKET_NAME") or _raise(
+            "MEDIA_ASSETS_BUCKET_NAME env-var missing"
+        )
+
+        # mirror source bucket + path (without extension), include original extension
+        # to prevent naming collisions (e.g., video.mp4 vs video.mov)
+        input_key_no_ext, orig_ext = os.path.splitext(in_key)
+        orig_ext = orig_ext.lstrip(".").lower() if orig_ext else "unknown"
+        output_key = f"{in_bucket}/{input_key_no_ext}-{orig_ext}"
+
+        # ── AUDIO TRACK SELECTION ────────────────────────────────────────────────
+        # EmbeddedMetadata is NOT propagated through the Step Functions event —
+        # only ObjectMetadata is. Fetch the full record from DynamoDB to get
+        # Metadata.EmbeddedMetadata.audio.
+        inv_id_for_meta = asset.get("InventoryID")
+        audio_streams = []
+        if inv_id_for_meta:
+            try:
+                ddb_resp = asset_table.get_item(Key={"InventoryID": inv_id_for_meta})
+                fetched = ddb_resp.get("Item", {})
+                audio_streams = (
+                    fetched.get("Metadata", {})
+                    .get("EmbeddedMetadata", {})
+                    .get("audio", [])
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch full asset record for audio metadata",
+                    extra={"inventory_id": inv_id_for_meta, "error": str(e)},
+                )
+        track_count = len(audio_streams) if isinstance(audio_streams, list) else 0
+        logger.info("Audio track count extracted", extra={"track_count": track_count})
+
+        raw_rules = os.getenv("AUDIO_TRACK_SELECTION_RULES", "") or event.get(
+            "parameters", {}
+        ).get("Audio Track Selection Rules", "")
+
+        if raw_rules and raw_rules.strip():
+            rules = ats.parse_rules(raw_rules)
+            if rules:
+                matched = ats.match_rule(rules, track_count)
+                if matched is not None:
+                    rule_index = rules.index(matched)
+                    tracks = ats.resolve_tracks(matched, track_count)
+                    ats.validate_track_bounds(tracks, track_count, rule_index, in_key)
+                    logger.info(
+                        "Audio track selection rule matched",
+                        extra={
+                            "rule_index": rule_index,
+                            "condition": matched["condition"],
+                            "tracks_selector": matched["tracks"],
+                            "resolved_tracks": tracks,
+                        },
+                    )
+                    event["audio_tracks"] = tracks
+                    event["use_track_selection"] = True
+                else:
+                    logger.warning(
+                        "No audio track selection rule matched",
+                        extra={
+                            "track_count": track_count,
+                            "rules_evaluated": len(rules),
+                        },
+                    )
+                    event["audio_tracks"] = None
+                    event["use_track_selection"] = False
+            else:
+                logger.info(
+                    "Audio track selection rules parsed to empty list, using default behavior"
+                )
+                event["audio_tracks"] = None
+                event["use_track_selection"] = False
+        else:
+            logger.info(
+                "No audio track selection rules configured, using default behavior"
+            )
+            event["audio_tracks"] = None
+            event["use_track_selection"] = False
+
+        # delete existing proxy (.mp4) and thumbnails (.jpg, numbered variants)
+        # Clean up proxy
+        proxy_key = f"{output_key}.mp4"
+        try:
+            s3.delete_object(Bucket=out_bucket, Key=proxy_key)
+            logger.info("Deleted existing proxy: s3://%s/%s", out_bucket, proxy_key)
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "NoSuchKey":
+                logger.warning("Failed deleting proxy %s: %s", proxy_key, e)
+
+        # Clean up thumbnails (handle both single and multiple thumbnail patterns)
+        # MediaConvert generates: filename_thumbnail.0000000.jpg, filename_thumbnail.0000001.jpg, etc.
+        try:
+            # List all objects with the thumbnail prefix
+            prefix = f"{output_key}_thumbnail"
+            response = s3.list_objects_v2(Bucket=out_bucket, Prefix=prefix)
+            if "Contents" in response:
+                for obj in response["Contents"]:
+                    if obj["Key"].endswith(".jpg"):
+                        s3.delete_object(Bucket=out_bucket, Key=obj["Key"])
+                        logger.info(
+                            "Deleted existing thumbnail: s3://%s/%s",
+                            out_bucket,
+                            obj["Key"],
+                        )
+        except ClientError as e:
+            logger.warning("Failed cleaning up thumbnails: %s", e)
+
+        # calculate dynamic thumbnail timing based on video duration
+        duration = _extract_video_duration(event)
+        num_captures = event.get("thumbnail_max_captures", 5)
+
+        if duration > 0:
+            frame_denom = _calculate_thumbnail_frame_denominator(duration, num_captures)
+            logger.info(
+                "Calculated %d thumbnail captures at %d second intervals for %.2fs video",
+                num_captures,
+                frame_denom,
+                duration,
+            )
+        else:
+            frame_denom = 2
+            logger.info(
+                "Using default thumbnail capture: %d captures at %d second intervals",
+                num_captures,
+                frame_denom,
+            )
+
+        # inject into event for Jinja template
+        event.update(
+            {
+                "output_bucket": out_bucket,
+                "output_key": output_key,
+                "mediaconvert_role_arn": os.environ["MEDIACONVERT_ROLE_ARN"],
+                "mediaconvert_queue_arn": os.environ["MEDIACONVERT_QUEUE_ARN"],
+                "thumbnail_width": event.get("thumbnail_width", 640),
+                "thumbnail_height": event.get("thumbnail_height", 360),
+                "thumbnail_max_captures": num_captures,
+                "thumbnail_frame_denominator": event.get(
+                    "thumbnail_frame_denominator", frame_denom
+                ),
+            }
+        )
+
+        tmpl_bucket = os.getenv("API_TEMPLATE_BUCKET", "medialake-assets")
+        paths = _tmpl_paths("mediaconvert", "video_proxy_thumbnail", "post")
+        job_settings = _render_request(paths, tmpl_bucket, event)
+
+        dest = job_settings["Settings"]["OutputGroups"][0]["OutputGroupSettings"][
+            "FileGroupSettings"
+        ]["Destination"]
+        logger.info("Rendered MediaConvert destination: %s", dest)
+        if not dest.startswith("s3://") or "None" in dest:
+            _raise(f"Invalid destination rendered: {dest}")
+
+        # Get MediaConvert client with cached endpoint lookup
+        # This uses DynamoDB cache to minimize describe_endpoints API calls
+        try:
+            region = os.environ.get("AWS_REGION", "us-east-1")
+            mc = get_mediaconvert_client_with_cache(
+                region=region, timeout_buffer_seconds=timeout_buffer_seconds
+            )
+            logger.info(
+                "Successfully obtained MediaConvert client",
+                extra={"region": region, "cache_enabled": True},
+            )
+        except MediaConvertEndpointError as e:
+            logger.error(
+                "Failed to get MediaConvert endpoint",
+                extra={"error": str(e), "region": region},
+            )
+            emit_mediaconvert_metrics(
+                "EndpointLookupFailure", 1, dimensions={"Region": region}
+            )
+            raise RuntimeError(f"Failed to obtain MediaConvert endpoint: {e}") from e
+        except MediaConvertTimeoutError as e:
+            logger.error(
+                "Approaching Lambda timeout while getting MediaConvert client",
+                extra={"remaining_time_ms": e.remaining_time_ms},
+            )
+            raise RuntimeError(f"Lambda timeout approaching: {e}") from e
+        except MediaConvertThrottlingError as e:
+            logger.error(
+                "MediaConvert API throttled",
+                extra={"error": str(e), "retry_after": e.retry_after},
+            )
+            emit_mediaconvert_metrics(
+                "ThrottlingError", 1, dimensions={"Region": region}
+            )
+            # Re-raise the original exception so Step Functions can retry
+            raise
+
+        job_response = create_job_with_retry(mc, job_settings)
+
+        # render the API response
+        result = _render_response(paths, tmpl_bucket, job_response, event)
+
+        # ── FETCH UPDATED DYNAMODB RECORD ────────────────────────────────────
+        try:
+            inv_id = asset["InventoryID"]
+            ddb_resp = asset_table.get_item(Key={"InventoryID": inv_id})
+            updated_item = ddb_resp.get("Item", {})
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch updated DynamoDB item", extra={"error": str(e)}
+            )
+            updated_item = {}
+
+        # cleanse Decimals so the Lambda JSON encoder won’t choke
+        result["updatedAsset"] = _strip_decimals(updated_item)
+        return result
+
+    except MediaConvertTimeoutError as e:
+        logger.error(
+            "Lambda timeout approaching during video processing",
+            extra={"remaining_time_ms": e.remaining_time_ms, "error": str(e)},
+        )
+        emit_mediaconvert_metrics(
+            "LambdaTimeout", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"Lambda timeout approaching: {e}") from e
+    except MediaConvertThrottlingError as e:
+        logger.error(
+            "MediaConvert API throttled during video processing",
+            extra={"retry_after": e.retry_after, "error": str(e)},
+        )
+        emit_mediaconvert_metrics(
+            "ThrottlingFailure", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"MediaConvert API throttled: {e}") from e
+    except MediaConvertEndpointError as e:
+        logger.error("Failed to obtain MediaConvert endpoint", extra={"error": str(e)})
+        emit_mediaconvert_metrics(
+            "EndpointError", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"MediaConvert endpoint error: {e}") from e
+    except Exception as e:
+        logger.exception("Video proxy + thumbnail failed", extra={"error": str(e)})
+        emit_mediaconvert_metrics(
+            "UnexpectedError", 1, dimensions={"Operation": "VideoProxyThumbnail"}
+        )
+        # Raise exception to stop pipeline execution
+        raise RuntimeError(f"Error processing video: {e}") from e

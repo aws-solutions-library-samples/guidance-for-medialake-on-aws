@@ -1,0 +1,943 @@
+# middleware.py
+import copy
+import json
+import os
+import time
+import uuid
+from collections.abc import Mapping
+from decimal import Decimal
+from typing import Any, Callable, Dict, Optional, TypeVar
+
+import boto3
+from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
+
+R = TypeVar("R")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def _json_default(o):
+    if isinstance(o, Decimal):
+        return int(o) if o % 1 == 0 else float(o)
+    raise TypeError
+
+
+def safe_pop(d: Any, key: str, default: Any = "") -> Any:
+    if isinstance(d, Mapping):
+        return d.pop(key, default)
+    return default
+
+
+def _pick_pipeline_ids(ev: Dict[str, Any]) -> tuple[str, str]:
+    """
+    Extract pipelineExecutionId / pipelineId from any wrapper shape.
+    Priority:
+        1. Explicit keys already present (pipelineExecutionId, pipelineId)
+        2. Step‑Functions fields   (executionName, stateMachineArn)
+    """
+    exec_id = ev.get("pipelineExecutionId") or ev.get("executionName") or ""
+    pipe_id = ev.get("pipelineId") or ev.get("stateMachineArn") or ""
+    return exec_id, pipe_id
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Middleware
+# ──────────────────────────────────────────────────────────────────────────────
+class LambdaMiddleware:
+    """
+    Normalises *any* incoming event into
+        {metadata, payload:{data, assets, map:{item}}}
+    and guarantees that metadata.pipelineExecutionId / metadata.pipelineId
+    survive every hop (Step Functions wrappers, Map iterators, etc.).
+    """
+
+    # --------------------------------------------------------------------- init
+    def __init__(
+        self,
+        event_bus_name: Optional[str] = None,
+        max_response_size: int = 240 * 1024,
+        external_payload_bucket: Optional[str] = None,
+        max_retries: int = 3,
+        assets_table_name: Optional[str] = None,
+    ):
+        self.event_bus_name = event_bus_name or os.getenv("EVENT_BUS_NAME")
+        if not self.event_bus_name:
+            raise ValueError("EVENT_BUS_NAME env‑var (or arg) required")
+
+        self.external_payload_bucket = external_payload_bucket or os.getenv(
+            "EXTERNAL_PAYLOAD_BUCKET"
+        )
+        if not self.external_payload_bucket:
+            raise ValueError("EXTERNAL_PAYLOAD_BUCKET env‑var required")
+
+        self.max_response_size = max_response_size
+        self.max_retries = max_retries
+
+        self.eb = boto3.client("events")
+        self.s3 = boto3.client("s3")
+
+        # Service metadata
+        self.service = os.getenv("SERVICE", "undefined_service")
+        self.step_name = os.getenv("STEP_NAME", "undefined_step")
+        self.pipe_name = os.getenv("PIPELINE_NAME", "undefined_pipeline")
+        self.is_first = os.getenv("IS_FIRST", "false").lower() == "true"
+        self.is_last = os.getenv("IS_LAST", "false").lower() == "true"
+
+        # Observability
+        self.logger = Logger(service=self.service)
+        self.metrics = Metrics(namespace="MediaLake", service=self.service)
+        self.tracer = Tracer(service=self.service)
+
+        # DynamoDB (optional)
+        self.assets_table_name = assets_table_name or os.getenv("MEDIALAKE_ASSET_TABLE")
+        if self.assets_table_name:
+            self.ddb = boto3.resource("dynamodb")
+            self.assets_table = self.ddb.Table(self.assets_table_name)
+        else:
+            self.ddb = self.assets_table = None
+
+    # ---------------------------------------------------------- private helpers
+    @staticmethod
+    def _true_original(ev: Dict[str, Any]) -> Dict[str, Any]:
+        cur = ev.get("originalEvent", ev)
+        while (
+            isinstance(cur, dict)
+            and isinstance(cur.get("payload"), dict)
+            and isinstance(cur["payload"].get("event"), dict)
+        ):
+            cur = cur["payload"]["event"]
+        return cur
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Chunk proxy injection
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @staticmethod
+    def _inject_chunk_proxy(
+        asset_rec: Optional[Dict[str, Any]], item_obj: Dict[str, Any]
+    ) -> None:
+        if not asset_rec:
+            return
+        if item_obj.get("is_chunk") is not True or item_obj.get("mediaType") != "Video":
+            return
+
+        url = item_obj.get("url", "")
+        if url.startswith("s3://"):
+            parts = url[5:].split("/", 1)
+            chunk_bucket, chunk_key = parts[0], parts[1] if len(parts) > 1 else ""
+        else:
+            chunk_bucket = item_obj.get("bucket", "")
+            chunk_key = item_obj.get("key", "")
+
+        if not chunk_bucket or not chunk_key:
+            return
+
+        for rep in asset_rec.get("DerivedRepresentations", []):
+            if isinstance(rep, dict) and rep.get("Purpose") == "proxy":
+                loc = rep.setdefault("StorageInfo", {}).setdefault(
+                    "PrimaryLocation", {}
+                )
+                loc["Bucket"] = chunk_bucket
+                loc.setdefault("ObjectKey", {})["FullPath"] = chunk_key
+                loc["Key"] = chunk_key
+                break
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # DDB asset fetch
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def _fetch_asset_record(self, inventory_id: str) -> Optional[Dict[str, Any]]:
+        if not self.assets_table:
+            return None
+        try:
+            resp = self.assets_table.get_item(Key={"InventoryID": inventory_id})
+            return resp.get("Item")
+        except Exception as exc:  # noqa: BLE001
+            self.logger.error(f"DDB lookup failed for {inventory_id}: {exc}")
+            return None
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Input standardisation
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def _standardize_input(self, ev: Dict[str, Any]) -> Dict[str, Any]:
+        # ── Handle external payload offload ─────────────────────────────────
+        meta = ev.get("metadata", {})
+        if meta.get("stepExternalPayload") == "True":
+            self.logger.info(
+                "MIDDLEWARE: Handling external payload offload (top-level)"
+            )
+            loc = meta.get("stepExternalPayloadLocation", {})
+            bucket = loc.get("bucket")
+            key = loc.get("key")
+
+            # Preserve existing payload fields in case downloaded content is data-only
+            existing_payload = ev.get("payload", {})
+            existing_assets = existing_payload.get("assets", [])
+            existing_map = existing_payload.get("map")
+            existing_history = existing_payload.get("payload_history")
+
+            result_payload: Dict[str, Any] = {"data": {}, "assets": existing_assets}
+            if existing_map:
+                result_payload["map"] = existing_map
+            if existing_history:
+                result_payload["payload_history"] = existing_history
+
+            if bucket and key:
+                # pull the actual payload from S3
+                obj = self.s3.get_object(Bucket=bucket, Key=key)
+                body = obj["Body"].read().decode("utf-8")
+                parsed = json.loads(body)
+
+                if isinstance(parsed, list):
+                    # prepare for Map: one entry per list item
+                    result_payload["data"] = [
+                        {"s3_bucket": bucket, "s3_key": key, "index": idx}
+                        for idx in range(len(parsed))
+                    ]
+                elif (
+                    isinstance(parsed, dict) and "data" in parsed and "assets" in parsed
+                ):
+                    # Full payload structure was offloaded (from _publish when EventBridge > 256KB)
+                    result_payload = parsed
+                    self.logger.info(
+                        "MIDDLEWARE: Downloaded full payload structure (top-level)",
+                        extra={
+                            "payload_type": "full_payload",
+                            "downloaded_assets_count": len(parsed.get("assets", [])),
+                        },
+                    )
+                else:
+                    # Just data was offloaded (from _make_output when data > 240KB)
+                    result_payload["data"] = parsed
+                    self.logger.info(
+                        "MIDDLEWARE: Downloaded data-only payload (top-level), preserved existing fields",
+                        extra={
+                            "payload_type": "data_only",
+                            "preserved_assets_count": len(existing_assets),
+                        },
+                    )
+
+            return {
+                "metadata": meta,
+                "payload": result_payload,
+            }
+        self.logger.info("Original input event", extra={"event": ev})
+
+        # ── 0) Step‑Functions top‑level wrapper (payload present) ─────────────
+        if (
+            isinstance(ev.get("executionName"), str)
+            and isinstance(ev.get("stateMachineArn"), str)
+            and isinstance(ev.get("payload"), dict)
+        ):
+            exec_id, pipe_id = _pick_pipeline_ids(ev)
+
+            inner_event = copy.deepcopy(ev["payload"])
+            std_inner = self._standardize_input(inner_event)
+
+            std_inner.setdefault("metadata", {})
+            std_inner["metadata"]["pipelineExecutionId"] = exec_id
+            std_inner["metadata"]["pipelineId"] = pipe_id
+            return std_inner
+        # ───────────────────────────────────────────────────────────────────────
+
+        # ── 1) Map/Task wrapper containing inventory_id ───────────────────────────
+        if isinstance(ev.get("item"), dict) and ev["item"].get("inventory_id"):
+            # mutable copy of the incoming item
+            item_obj = copy.deepcopy(ev["item"])
+            inventory_id = item_obj["inventory_id"]
+
+            # extract any offload flags and the map index
+            step_ext = item_obj.pop("stepExternalPayload", False)
+            step_ext_loc = item_obj.pop("stepExternalPayloadLocation", {})
+            item_index = item_obj.get("index", 0)
+
+            # ---- external-payload placeholder path ----
+            if step_ext:
+                bucket = step_ext_loc.get("bucket")
+                key = step_ext_loc.get("key")
+                data = None
+
+                if bucket and key:
+                    # pull the actual payload from S3
+                    obj = self.s3.get_object(Bucket=bucket, Key=key)
+                    body = obj["Body"].read().decode("utf-8")
+                    parsed = json.loads(body)
+
+                    if isinstance(parsed, list):
+                        # select just the one entry at item_index
+                        try:
+                            data = parsed[item_index]
+                        except (IndexError, TypeError):
+                            # fallback to empty dict if index is bad
+                            data = {}
+                    else:
+                        # single object, pass straight through
+                        data = parsed
+
+                # rebuild metadata exactly as your top‐level offload branch
+                meta = {
+                    "service": self.service,
+                    "stepName": self.step_name,
+                    "pipelineName": self.pipe_name,
+                    "pipelineTraceId": str(uuid.uuid4()),
+                    "stepExternalPayload": "True",
+                    "stepExternalPayloadLocation": step_ext_loc,
+                }
+                asset_rec_ext = self._fetch_asset_record(inventory_id)
+                if isinstance(data, dict):
+                    self._inject_chunk_proxy(asset_rec_ext, data)
+                return {
+                    "metadata": meta,
+                    "payload": {
+                        "data": {"item": data},
+                        "assets": (
+                            [asset_rec_ext]
+                            if asset_rec_ext
+                            else ev.get("payload", {}).get("assets", [])
+                        ),
+                    },
+                }
+
+            # ---- normal Map/Task path ----
+            asset_rec = self._fetch_asset_record(inventory_id)
+            self._inject_chunk_proxy(asset_rec, item_obj)
+            exec_id, pipe_id = _pick_pipeline_ids(ev)
+
+            meta = {
+                "service": self.service,
+                "stepName": self.step_name,
+                "pipelineName": self.pipe_name,
+                "pipelineTraceId": str(uuid.uuid4()),
+                "pipelineExecutionId": exec_id,
+                "pipelineId": pipe_id,
+            }
+            return {
+                "metadata": meta,
+                "payload": {
+                    "data": item_obj,
+                    "assets": [asset_rec] if asset_rec else [],
+                    "map": {"item": item_obj},
+                },
+            }
+
+        # ── 2) Already‑standardised top‑level object ──────────────────────────
+        if (
+            isinstance(ev, dict)
+            and isinstance(ev.get("metadata"), dict)
+            and isinstance(ev.get("payload"), dict)
+            and "data" in ev["payload"]
+        ):
+            # Check if payload was offloaded to S3 (must check BEFORE checking assets)
+            meta = ev.get("metadata", {})
+            if meta.get("stepExternalPayload") == "True":
+                ext_loc = meta.get("stepExternalPayloadLocation", {})
+                bucket = ext_loc.get("bucket")
+                key = ext_loc.get("key")
+
+                if bucket and key:
+                    self.logger.info(
+                        "MIDDLEWARE: Downloading external payload from S3",
+                        extra={
+                            "bucket": bucket,
+                            "key": key,
+                        },
+                    )
+                    try:
+                        obj = self.s3.get_object(Bucket=bucket, Key=key)
+                        body = obj["Body"].read().decode("utf-8")
+                        downloaded = json.loads(body)
+
+                        # Preserve existing assets when merging downloaded payload
+                        existing_assets = ev["payload"].get("assets", [])
+
+                        # Check if downloaded content is full payload structure or just data
+                        if (
+                            isinstance(downloaded, dict)
+                            and "data" in downloaded
+                            and "assets" in downloaded
+                        ):
+                            # Full payload structure was offloaded, replace entirely
+                            ev["payload"] = downloaded
+                            self.logger.info(
+                                "MIDDLEWARE: Downloaded full payload structure",
+                                extra={
+                                    "payload_type": "full_payload",
+                                    "downloaded_assets_count": len(
+                                        downloaded.get("assets", [])
+                                    ),
+                                },
+                            )
+                        else:
+                            # Just data was offloaded (line 593 only uploads payload["data"])
+                            # Merge while preserving existing assets
+                            ev["payload"]["data"] = downloaded
+                            # Restore assets that were in the original event
+                            if existing_assets:
+                                ev["payload"]["assets"] = existing_assets
+                            self.logger.info(
+                                "MIDDLEWARE: Downloaded data-only payload, preserved existing assets",
+                                extra={
+                                    "payload_type": "data_only",
+                                    "preserved_assets_count": len(existing_assets),
+                                },
+                            )
+
+                        self.logger.info(
+                            "MIDDLEWARE: Successfully downloaded external payload",
+                            extra={
+                                "payload_keys": (
+                                    list(ev["payload"].keys())
+                                    if isinstance(ev["payload"], dict)
+                                    else "N/A"
+                                ),
+                                "data_keys": (
+                                    list(ev["payload"].get("data", {}).keys())
+                                    if isinstance(ev["payload"].get("data"), dict)
+                                    else "N/A"
+                                ),
+                                "final_assets_count": len(
+                                    ev["payload"].get("assets", [])
+                                ),
+                            },
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            f"MIDDLEWARE: Failed to download external payload: {e}",
+                            extra={
+                                "bucket": bucket,
+                                "key": key,
+                            },
+                        )
+                        raise
+
+            return ev
+
+        # ── 2b) EventBridge envelope whose detail is already standardised ────
+        if isinstance(ev.get("detail"), dict):
+            detail = ev["detail"]
+            if (
+                isinstance(detail.get("metadata"), dict)
+                and isinstance(detail.get("payload"), dict)
+                and "data" in detail["payload"]
+                and "assets" in detail["payload"]
+            ):
+                # Check if payload was offloaded to S3
+                meta = detail.get("metadata", {})
+                if meta.get("stepExternalPayload") == "True":
+                    ext_loc = meta.get("stepExternalPayloadLocation", {})
+                    bucket = ext_loc.get("bucket")
+                    key = ext_loc.get("key")
+
+                    if bucket and key:
+                        self.logger.info(
+                            "MIDDLEWARE: Downloading external payload from S3 (EventBridge envelope)",
+                            extra={
+                                "bucket": bucket,
+                                "key": key,
+                            },
+                        )
+                        try:
+                            obj = self.s3.get_object(Bucket=bucket, Key=key)
+                            body = obj["Body"].read().decode("utf-8")
+                            downloaded = json.loads(body)
+
+                            # Preserve existing assets when merging downloaded payload
+                            existing_assets = detail["payload"].get("assets", [])
+
+                            # Check if downloaded content is full payload structure or just data
+                            if (
+                                isinstance(downloaded, dict)
+                                and "data" in downloaded
+                                and "assets" in downloaded
+                            ):
+                                # Full payload structure was offloaded, replace entirely
+                                detail["payload"] = downloaded
+                                self.logger.info(
+                                    "MIDDLEWARE: Downloaded full payload structure (EventBridge envelope)",
+                                    extra={
+                                        "payload_type": "full_payload",
+                                        "downloaded_assets_count": len(
+                                            downloaded.get("assets", [])
+                                        ),
+                                    },
+                                )
+                            else:
+                                # Just data was offloaded (line 628 only uploads payload["data"])
+                                # Merge while preserving existing assets
+                                detail["payload"]["data"] = downloaded
+                                # Restore assets that were in the original event
+                                if existing_assets:
+                                    detail["payload"]["assets"] = existing_assets
+                                self.logger.info(
+                                    "MIDDLEWARE: Downloaded data-only payload, preserved existing assets (EventBridge envelope)",
+                                    extra={
+                                        "payload_type": "data_only",
+                                        "preserved_assets_count": len(existing_assets),
+                                    },
+                                )
+
+                            self.logger.info(
+                                "MIDDLEWARE: Successfully downloaded external payload (EventBridge envelope)",
+                                extra={
+                                    "payload_keys": (
+                                        list(detail["payload"].keys())
+                                        if isinstance(detail["payload"], dict)
+                                        else "N/A"
+                                    ),
+                                    "data_keys": (
+                                        list(detail["payload"].get("data", {}).keys())
+                                        if isinstance(
+                                            detail["payload"].get("data"), dict
+                                        )
+                                        else "N/A"
+                                    ),
+                                    "final_assets_count": len(
+                                        detail["payload"].get("assets", [])
+                                    ),
+                                },
+                            )
+                        except Exception as e:
+                            self.logger.error(
+                                f"MIDDLEWARE: Failed to download external payload (EventBridge envelope): {e}",
+                                extra={
+                                    "bucket": bucket,
+                                    "key": key,
+                                },
+                            )
+                            raise
+
+                exec_id, pipe_id = _pick_pipeline_ids(ev)
+                detail.setdefault("pipelineExecutionId", exec_id)
+                detail.setdefault("pipelineId", pipe_id)
+                return detail
+
+        # ── 3) Plain EventBridge envelope (detail *not* standardised) ─────────
+        if (
+            isinstance(ev.get("detail"), dict)
+            and not ev.get("payload")
+            and not ev.get("assets")
+        ):
+            exec_id, pipe_id = _pick_pipeline_ids(ev)
+            meta = {
+                "service": self.service,
+                "stepName": self.step_name,
+                "pipelineName": self.pipe_name,
+                "pipelineTraceId": str(uuid.uuid4()),
+                "pipelineExecutionId": exec_id,
+                "pipelineId": pipe_id,
+            }
+            return {
+                "metadata": meta,
+                "payload": {
+                    "data": {},
+                    "assets": [copy.deepcopy(ev["detail"])],
+                },
+            }
+
+        # ── 4) Fallback – wrap full event, still keep IDs if present ──────────
+        exec_id, pipe_id = _pick_pipeline_ids(ev)
+        meta = {
+            "service": self.service,
+            "stepName": self.step_name,
+            "pipelineName": self.pipe_name,
+            "pipelineTraceId": ev.get("metadata", {}).get(
+                "pipelineTraceId", str(uuid.uuid4())
+            ),
+            "pipelineExecutionId": exec_id,
+            "pipelineId": pipe_id,
+        }
+        payload: Dict[str, Any] = {"data": ev, "assets": []}
+
+        if isinstance(ev.get("payload"), dict) and isinstance(
+            ev["payload"].get("assets"), list
+        ):
+            payload["assets"] = copy.deepcopy(ev["payload"]["assets"])
+        elif isinstance(ev.get("assets"), list):
+            payload["assets"] = copy.deepcopy(ev["assets"])
+
+        if isinstance(ev.get("payload"), dict) and isinstance(
+            ev["payload"].get("map"), dict
+        ):
+            payload["map"] = copy.deepcopy(ev["payload"]["map"])
+        elif isinstance(ev.get("map"), dict):
+            payload["map"] = copy.deepcopy(ev["map"])
+
+        return {"metadata": meta, "payload": payload}
+
+    # ---------------------------------------------------------------- make_out
+    def _make_output(
+        self, result: Any, orig: Dict[str, Any], step_start: float
+    ) -> Dict[str, Any]:
+        """
+        Construct and publish the standardized output event, handling large payloads by offloading
+        to S3 and embedding or listing external payload references for downstream Map states.
+        """
+        now = time.time()
+
+        self.logger.info(
+            "MIDDLEWARE: _make_output called",
+            extra={
+                "step_name": self.step_name,
+                "result_type": type(result).__name__,
+                "result_keys": (
+                    list(result.keys()) if isinstance(result, dict) else "N/A"
+                ),
+                "orig_keys": list(orig.keys()) if isinstance(orig, dict) else "N/A",
+                "has_externalJobStatus_in_result": isinstance(result, dict)
+                and "externalJobStatus" in result,
+                "has_externalJobStatus_in_orig_metadata": isinstance(
+                    orig.get("metadata"), dict
+                )
+                and "externalJobStatus" in orig["metadata"],
+            },
+        )
+
+        data = result
+
+        # Extract external job fields
+        ext_id = safe_pop(data, "externalJobId") or orig.get("metadata", {}).get(
+            "externalJobId", ""
+        )
+        ext_st = safe_pop(data, "externalJobStatus") or orig.get("metadata", {}).get(
+            "externalJobStatus", ""
+        )
+        ext_rs = safe_pop(data, "externalJobResult") or orig.get("metadata", {}).get(
+            "externalJobResult", ""
+        )
+
+        self.logger.info(
+            "MIDDLEWARE: Extracted external job fields",
+            extra={
+                "externalJobId": ext_id,
+                "externalJobStatus": ext_st,
+                "externalJobResult": ext_rs,
+                "data_keys_after_extraction": (
+                    list(data.keys()) if isinstance(data, dict) else type(data).__name__
+                ),
+            },
+        )
+
+        prev_meta = orig.get("metadata", {})
+        status_is_complete = self.is_last and (
+            ext_st == "" or ext_st.lower() == "completed"
+        )
+
+        # Determine pipeline status.
+        # When a node is both first AND last (single-node workflow),
+        # the final output is "Completed"; a separate "Started" event
+        # is emitted by __call__ before this one.
+        if status_is_complete:
+            pipeline_status = "Completed"
+        elif self.is_first:
+            pipeline_status = "Started"
+        else:
+            pipeline_status = "InProgress"
+
+        # Build metadata
+        meta = {
+            "service": self.service,
+            "stepName": self.step_name,
+            "stepStatus": "Completed",
+            "stepResult": "Success",
+            "pipelineTraceId": prev_meta.get("pipelineTraceId", str(uuid.uuid4())),
+            "stepExecutionStartTime": prev_meta.get(
+                "stepExecutionStartTime", step_start
+            ),
+            "stepExecutionEndTime": now,
+            "stepExecutionDuration": round(now - step_start, 3),
+            "pipelineExecutionStartTime": orig.get("pipelineExecutionStartTime", ""),
+            "pipelineExecutionEndTime": now if self.is_last else "",
+            "pipelineName": self.pipe_name,
+            "pipelineStatus": pipeline_status,
+            "pipelineId": prev_meta.get("pipelineId", ""),
+            "pipelineExecutionId": prev_meta.get("pipelineExecutionId", ""),
+            "externalJobResult": ext_rs,
+            "externalJobId": ext_id,
+            "externalJobStatus": ext_st,
+            "stepExternalPayload": "False",
+            "stepExternalPayloadLocation": {},
+        }
+
+        # Check if result contains distributedMapConfig from Results lambda
+        if isinstance(result, dict) and "distributedMapConfig" in result:
+            dmap_cfg = result["distributedMapConfig"]
+            meta["distributedMapConfig"] = dmap_cfg
+
+        # Gather previous assets
+        def _inner_assets(obj: Any) -> list:
+            if (
+                isinstance(obj, dict)
+                and isinstance(obj.get("metadata"), dict)
+                and isinstance(obj.get("payload"), dict)
+                and isinstance(obj["payload"].get("assets"), list)
+            ):
+                return copy.deepcopy(obj["payload"]["assets"])
+            return [copy.deepcopy(obj)]
+
+        if isinstance(result, dict) and "updatedAsset" in result:
+            assets = [copy.deepcopy(result.pop("updatedAsset"))]
+        else:
+            asset_from_detail = (
+                orig.get("input", {}).get("detail")
+                if isinstance(orig, dict) and "input" in orig
+                else orig.get("detail") if isinstance(orig, dict) else orig
+            )
+            prev_assets = []
+            if isinstance(orig, dict):
+                if isinstance(orig.get("payload"), dict) and isinstance(
+                    orig["payload"].get("assets"), list
+                ):
+                    prev_assets = copy.deepcopy(orig["payload"]["assets"])
+                elif isinstance(orig.get("assets"), list):
+                    prev_assets = copy.deepcopy(orig["assets"])
+            assets = prev_assets + (
+                _inner_assets(asset_from_detail) if asset_from_detail else []
+            )
+
+        # Preserve map block if present
+        map_block = None
+        if isinstance(orig.get("payload"), dict) and isinstance(
+            orig["payload"].get("map"), dict
+        ):
+            map_block = copy.deepcopy(orig["payload"]["map"])
+
+        # Prepare payload
+        self.logger.info(
+            "MIDDLEWARE: Preparing payload",
+            extra={
+                "step_name": self.step_name,
+                "data_keys": (
+                    list(data.keys()) if isinstance(data, dict) else type(data).__name__
+                ),
+                "assets_count": len(assets) if isinstance(assets, list) else 0,
+                "has_map_block": map_block is not None,
+            },
+        )
+
+        payload: Dict[str, Any] = {"data": data, "assets": assets}
+        if map_block:
+            payload["map"] = map_block
+
+        # Preserve payload.data from previous step in payload_history for pipeline continuity
+        # This ensures that data from previous steps (like dataset_id) flows through the pipeline
+        if isinstance(orig.get("payload"), dict) and "data" in orig["payload"]:
+            original_data = orig["payload"]["data"]
+            if original_data:  # Only preserve if there's actual data
+                payload["payload_history"] = copy.deepcopy(original_data)
+                self.logger.info(
+                    "MIDDLEWARE: Preserved original payload.data in payload_history",
+                    extra={
+                        "payload_history_keys": (
+                            list(original_data.keys())
+                            if isinstance(original_data, dict)
+                            else type(original_data).__name__
+                        ),
+                    },
+                )
+
+        # Serialize and offload if too large
+        raw = json.dumps(payload["data"], default=_json_default).encode()
+        self.logger.info(
+            "MIDDLEWARE: Checking payload size",
+            extra={
+                "payload_data_size": len(raw),
+                "max_size": self.max_response_size,
+                "will_offload": len(raw) > self.max_response_size,
+            },
+        )
+
+        if len(raw) > self.max_response_size:
+            key = f"{meta['pipelineExecutionId']}/{self.step_name}_{uuid.uuid4()}.json"
+
+            self.s3.put_object(Bucket=self.external_payload_bucket, Key=key, Body=raw)
+            meta["stepExternalPayload"] = "True"
+            meta["stepExternalPayloadLocation"] = {
+                "bucket": self.external_payload_bucket,
+                "key": key,
+            }
+            payload["data"] = {}
+
+            # pull inventory_id from the first asset, if present
+            assets = orig.get("payload", {}).get("assets", [])
+            inventory_id = None
+            if isinstance(assets, list) and assets:
+                inventory_id = assets[0].get("InventoryID")
+
+            # Fetch external list file references
+            loc = meta["stepExternalPayloadLocation"]
+            try:
+                resp = self.s3.get_object(Bucket=loc["bucket"], Key=loc["key"])
+                body_text = resp["Body"].read().decode("utf-8")
+                external_json = json.loads(body_text)
+
+                # Auto-set distributedMapConfig for list payloads (enables Distributed Map ItemReader)
+                # Only set if not already provided by the node (preserve explicit node config)
+                if (
+                    isinstance(external_json, list)
+                    and "distributedMapConfig" not in meta
+                ):
+                    meta["distributedMapConfig"] = {
+                        "s3_bucket": loc["bucket"],
+                        "s3_key": loc["key"],
+                    }
+
+                payload["data"] = [
+                    {
+                        "inventory_id": inventory_id,
+                        "stepExternalPayload": True,
+                        "stepExternalPayloadLocation": loc,
+                        "index": idx,
+                    }
+                    for idx in range(len(external_json))
+                ]
+            except Exception as exc:
+                self.logger.error(
+                    f"MIDDLEWARE: Failed to fetch external payload: {exc}"
+                )
+
+        self.logger.info(
+            "MIDDLEWARE: Returning final response",
+            extra={
+                "metadata_keys": list(meta.keys()),
+                "payload_keys": list(payload.keys()),
+                "payload_data_keys": (
+                    list(payload["data"].keys())
+                    if isinstance(payload.get("data"), dict)
+                    else type(payload.get("data")).__name__
+                ),
+                "has_itemReaderBucket_in_metadata": "itemReaderBucket" in meta,
+                "has_itemReaderBucket_in_payload_data": isinstance(
+                    payload.get("data"), dict
+                )
+                and "itemReaderBucket" in payload.get("data", {}),
+            },
+        )
+
+        return {"metadata": meta, "payload": payload}
+
+    # ---------------------------------------------------------------- publish
+    def _publish(self, out: Dict[str, Any]):
+        # EventBridge has a 256KB limit per event
+        MAX_EVENTBRIDGE_SIZE = 256 * 1024
+
+        try:
+            # Serialize the full output to check size
+            detail_json = json.dumps(out, default=_json_default)
+            detail_size = len(detail_json.encode("utf-8"))
+
+            # If the event is too large, offload entire payload to S3
+            if detail_size > MAX_EVENTBRIDGE_SIZE:
+                self.logger.warning(
+                    f"EventBridge payload too large ({detail_size} bytes), offloading to S3"
+                )
+
+                # Generate S3 key for the full payload
+                event_key = f"eventbridge/{out['metadata']['pipelineExecutionId']}/{self.step_name}/{uuid.uuid4()}.json"
+
+                # Upload full payload to S3
+                payload_json = json.dumps(out["payload"], default=_json_default)
+                self.s3.put_object(
+                    Bucket=self.external_payload_bucket,
+                    Key=event_key,
+                    Body=payload_json.encode("utf-8"),
+                )
+
+                # Update metadata to indicate external payload
+                out["metadata"]["stepExternalPayload"] = "True"
+                out["metadata"]["stepExternalPayloadLocation"] = {
+                    "bucket": self.external_payload_bucket,
+                    "key": event_key,
+                }
+
+                # Clear the payload data and assets to reduce size
+                out["payload"] = {"data": {}, "assets": []}
+
+                # Re-serialize with offloaded payload
+                detail_json = json.dumps(out, default=_json_default)
+
+            self.eb.put_events(
+                Entries=[
+                    {
+                        "Source": self.service,
+                        "DetailType": f"{self.step_name}Output",
+                        "Detail": detail_json,
+                        "EventBusName": self.event_bus_name,
+                    }
+                ]
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.logger.error(f"EventBridge publish failed: {exc}")
+
+    # ----------------------------------------------------------------- caller
+    def __call__(self, handler: Callable[..., R]) -> Callable[..., R]:
+        @lambda_handler_decorator
+        def wrap(inner, event, ctx):
+            raw = self._true_original(event)
+            standard_event = self._standardize_input(copy.deepcopy(raw))
+
+            start = time.time()
+            retries = 0
+            while True:
+                try:
+                    result = inner(standard_event, ctx)
+                    break
+                except Exception:  # noqa: BLE001
+                    if retries < self.max_retries:
+                        retries += 1
+                        time.sleep(min(2**retries, 30))
+                        continue
+                    raise
+
+            out = self._make_output(result, standard_event, start)
+
+            # Single-node workflow: both first and last — emit a "Started"
+            # event first so downstream consumers see the full lifecycle.
+            if (
+                self.is_first
+                and self.is_last
+                and out.get("metadata", {}).get("pipelineStatus") == "Completed"
+            ):
+                started_out = copy.deepcopy(out)
+                started_out["metadata"]["pipelineStatus"] = "Started"
+                started_out["metadata"]["pipelineExecutionEndTime"] = ""
+                self._publish(started_out)
+
+            self._publish(out)
+            return out
+
+        return wrap(handler)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Factory helper
+# ──────────────────────────────────────────────────────────────────────────────
+def lambda_middleware(**kw):
+    mw = LambdaMiddleware(**kw)
+    return lambda handler: mw(handler)
+
+
+def is_lambda_warmer_event(event: dict) -> bool:
+    """
+    Returns True if the event is a lambda warmer event (
+                                                            e.g.,
+                                                            triggered by the EventBridge rule for warming
+                                                        ).
+    Usage (at the top of your lambda):
+        if is_lambda_warmer_event(event):
+            return {"warmed": True}
+    """
+    # Check for a custom key or recognizable pattern
+    if isinstance(event, dict):
+        if event.get("lambda_warmer") is True:
+            return True
+        # Optionally, check for EventBridge scheduled event pattern
+        if (
+            event.get("source") == "aws.events"
+            and event.get("detail-type") == "Scheduled Event"
+        ):
+            # Optionally, check for a custom resource or id
+            if event.get("resources") and any(
+                "lambda-warmer" in r for r in event["resources"]
+            ):
+                return True
+    return False

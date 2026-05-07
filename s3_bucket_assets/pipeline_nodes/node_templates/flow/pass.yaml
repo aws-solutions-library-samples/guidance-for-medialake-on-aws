@@ -1,0 +1,28 @@
+spec: v1.0.0
+node:
+  id: pass
+  title: Pass
+  description: Pass its input to its output
+  version: 1.0.0
+  type: flow
+  integration:
+    config:
+      aws_stepfunction:
+        step_name: pass
+actions:
+  pass:
+    summary: Pass its input to its output
+    description: This step will pass its input to its output, optionally with a result
+    operationId: pass
+    parameters:
+      - in: body
+        name: Result
+        required: false
+        schema:
+          type: object
+          description: Optional result to include in the output
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

@@ -1,0 +1,4 @@
+/* Theme CSS — intentionally minimal.
+ * All design tokens live in tokens.ts and are consumed via the MUI theme.
+ * This file is kept for any future non-MUI CSS variable needs.
+ */

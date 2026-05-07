@@ -1,0 +1,4 @@
+opensearch-py>=2.0.0
+pydantic>=2.0.0
+twelvelabs
+boto3

@@ -1,0 +1,10 @@
+body {
+  margin: 0;
+  /* Font family is controlled by MUI theme (tokens.ts) — do not override here */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+}

@@ -1,0 +1,14 @@
+{
+  "advanced-permissions-enabled": {
+    "value": false
+  },
+  "chat-enabled": {
+    "value": false
+  },
+  "manual-pipeline-trigger-enabled": {
+    "value": false
+  },
+  "system-upgrades-enabled": {
+    "value": false
+  }
+}

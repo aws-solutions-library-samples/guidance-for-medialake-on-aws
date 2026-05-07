@@ -1,0 +1,59 @@
+spec: v1.0.0
+node:
+  id: audio_transcription_transcribe
+  title: Transcribe Audio using Amazon Transcribe
+  description: Create an audio transcription using Amazon Transcribe
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/AudioTranscriptionTranscribeLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - transcribe:StartTranscriptionJob
+              resources:
+                - arn:aws:transcribe:${AWS::Region}:${AWS::AccountId}:transcription-job/*
+            - effect: Allow
+              actions:
+                - iam:PassRole
+              resources:
+                - arn:aws:iam::${AWS::AccountId}:role/*_audio_transcription_transcribe_*
+
+      service_roles:
+        - name: transcribe_service_role
+          service: transcribe.amazonaws.com
+          policies:
+            - name: s3
+              statements:
+                - effect: Allow
+                  actions:
+                    - s3:PutObject
+                    - s3:GetObject
+                  resources:
+                    - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}/*
+                - effect: Allow
+                  actions:
+                    - s3:ListBucket
+                  resources:
+                    - arn:aws:s3:::${MEDIA_ASSETS_BUCKET_NAME}
+                - effect: Allow
+                  actions:
+                    - kms:Decrypt
+                    - kms:GenerateDataKey
+                  resources:
+                    - ${MEDIA_ASSETS_BUCKET_ARN_KMS_KEY}
+
+actions:
+  transcribe:
+    summary: Transcribe Audio using Amazon Transcribe
+    description: Create an audio transcription using Amazon Transcribe
+    operationId: audioTranscriptionTranscribe
+    connections:
+      incoming:
+        type: [audio, video]
+      outgoing:
+        type: [metadata]

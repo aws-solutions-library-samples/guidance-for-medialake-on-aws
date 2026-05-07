@@ -1,0 +1,55 @@
+spec: v1.0.0
+node:
+  id: generate_portal_link
+  title: Generate Portal Link
+  description: Generate a shareable upload portal link with a secure token
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/GeneratePortalLinkLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              resources:
+                - ${SYSTEM_SETTINGS_TABLE_ARN}
+actions:
+  generate:
+    summary: Generate portal link
+    description: Generate a shareable upload portal link with a secure token
+    operationId: generatePortalLink
+    parameters:
+      - in: body
+        name: Portal Slug
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: Field Mapping
+        required: false
+        default: {}
+        schema:
+          type: object
+      - in: body
+        name: Token Expiry Days
+        required: false
+        default: 7
+        schema:
+          type: number
+      - in: body
+        name: Email Field
+        required: false
+        schema:
+          type: string
+    x-requestMapping: utility/generate_portal_link/generate/
+    x-responseMapping: utility/generate_portal_link/generate/
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [portal_link]

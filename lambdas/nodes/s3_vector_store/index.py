@@ -1,0 +1,1318 @@
+"""
+Store embedding vectors in S3 Vector Store.
+
+This Lambda function provides operations to store, retrieve, and search vector embeddings
+using the new S3 Vector Store service with the custom unreleased boto3 SDK.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import boto3
+from aws_lambda_powertools import Logger, Tracer
+from aws_lambda_powertools.utilities.typing import LambdaContext
+from botocore.config import Config
+from distributed_map_utils import download_s3_external_payload, is_s3_reference
+from lambda_middleware import lambda_middleware
+from lambda_utils import _truncate_floats
+from nodes_utils import seconds_to_smpte
+
+# S3 client for downloading external payloads
+s3_client = boto3.client("s3")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Powertools
+logger = Logger()
+tracer = Tracer(disabled=False)
+
+# Environment
+VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "media-vectors")
+INDEX_NAME = os.getenv("INDEX_NAME", "media-vectors")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+EVENT_BUS_NAME = os.getenv("EVENT_BUS_NAME", "default-event-bus")
+
+# Vector batch configuration
+# AWS S3 Vectors API Limits (per vector index):
+# - Maximum 500 vectors per PutVectors call (hard limit)
+# - Maximum 1,000 combined Put/Delete requests per second
+# - Maximum 2,500 combined vectors inserted/deleted per second
+# See: https://docs.aws.amazon.com/AmazonS3/latest/API/API_s3vectors_PutVectors.html
+#
+# With 500 vectors/batch:
+# - 5 batches = 1,000 TPS limit (2,500 vectors/sec)
+# - Optimal balance between throughput and API limits
+VECTOR_BATCH_SIZE = int(os.getenv("VECTOR_BATCH_SIZE", "500"))
+MAX_VECTOR_BATCH_SIZE = 500  # AWS service hard limit - DO NOT EXCEED
+
+# Request throttling configuration
+# Add delays between operations to avoid overwhelming the S3 Vectors service
+# Helps prevent ServiceUnavailableException during high-concurrency scenarios
+REQUEST_THROTTLE_MS = int(os.getenv("S3_VECTORS_THROTTLE_MS", "100"))  # 100ms default
+
+# Graceful degradation configuration
+# Allow pipeline to continue even if vector storage fails (non-critical operation)
+ALLOW_VECTOR_STORAGE_FAILURE = (
+    os.getenv("ALLOW_VECTOR_STORAGE_FAILURE", "true").lower() == "true"
+)
+
+# Content type will be determined dynamically from payload data
+
+
+def detect_content_type(
+    payload: Dict[str, Any], embedding_data: Dict[str, Any] = None
+) -> str:
+    """Dynamically detect content type from payload data."""
+    # Check for explicit content type in embedding data
+    if embedding_data and embedding_data.get("content_type"):
+        return embedding_data.get("content_type").lower()
+
+    # Check for explicit content type in payload
+    if payload.get("content_type"):
+        return payload.get("content_type").lower()
+
+    # Check for input_type from TwelveLabs Bedrock data
+    if embedding_data and embedding_data.get("input_type"):
+        input_type = embedding_data.get("input_type").lower()
+        if input_type in ["audio", "video", "image"]:
+            logger.info(
+                f"[CONTENT_TYPE] Detected from TwelveLabs input_type: {input_type}"
+            )
+            return input_type
+
+    # Check embedding_data for image scope (TwelveLabs Bedrock sets this for images)
+    if embedding_data and embedding_data.get("embedding_scope") == "image":
+        logger.info(
+            "[CONTENT_TYPE] Detected from embedding_data.embedding_scope: image"
+        )
+        return "image"
+
+    # Check for image-specific indicators (embedding scope = "image")
+    data = payload.get("data", {})
+    if isinstance(data, dict):
+        if data.get("embedding_scope") == "image":
+            logger.info("[CONTENT_TYPE] Detected from data.embedding_scope: image")
+            return "image"
+        if data.get("content_type"):
+            return data.get("content_type").lower()
+
+    # Check for image scope in other locations
+    if payload.get("embedding_scope") == "image":
+        return "image"
+
+    # Check for audio-specific indicators (timing data from audio splitter)
+    if (
+        payload.get("map", {}).get("item", {}).get("start_time") is not None
+        and payload.get("map", {}).get("item", {}).get("end_time") is not None
+    ):
+        return "audio"
+
+    # Check for audio indicators in data structure
+    if isinstance(data, dict):
+        if data.get("start_time") is not None and data.get("end_time") is not None:
+            return "audio"
+
+    # Default to video if no specific indicators found
+    return "video"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Extraction helpers
+def _item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if isinstance(container.get("data"), dict):
+        itm = container["data"].get("item")
+        if isinstance(itm, dict):
+            return itm
+    return None
+
+
+def _map_item(container: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    m = container.get("map")
+    if isinstance(m, dict) and isinstance(m.get("item"), dict):
+        return m["item"]
+    return None
+
+
+def extract_scope(container: Dict[str, Any]) -> Optional[str]:
+    """Extract embedding scope with validation."""
+    if not isinstance(container, dict):
+        raise ValueError("Container must be a dictionary")
+
+    def validate_scope(scope, source: str) -> str:
+        if not isinstance(scope, str):
+            raise ValueError(
+                f"Embedding scope from {source} must be a string, got {type(scope)}"
+            )
+        scope = scope.strip()
+        if not scope:
+            raise ValueError(f"Embedding scope from {source} cannot be empty")
+        valid_scopes = {"clip", "video", "audio", "image"}
+        if scope not in valid_scopes:
+            raise ValueError(
+                f"Invalid embedding scope '{scope}' from {source}. Must be one of: {valid_scopes}"
+            )
+        return scope
+
+    itm = _item(container)
+    if itm and itm.get("embedding_scope"):
+        return validate_scope(itm["embedding_scope"], "item.embedding_scope")
+
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("embedding_scope"):
+        return validate_scope(data["embedding_scope"], "data.embedding_scope")
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("embedding_scope"):
+        return validate_scope(m_itm["embedding_scope"], "map.item.embedding_scope")
+
+    if container.get("embedding_scope"):
+        return validate_scope(container["embedding_scope"], "container.embedding_scope")
+
+    for i, res in enumerate(container.get("externalTaskResults", [])):
+        if not isinstance(res, dict):
+            continue
+        if res.get("embedding_scope"):
+            return validate_scope(
+                res["embedding_scope"], f"externalTaskResults[{i}].embedding_scope"
+            )
+
+    return None
+
+
+def extract_embedding_option(container: Dict[str, Any]) -> Optional[str]:
+    """Extract embedding option with validation."""
+    if not isinstance(container, dict):
+        raise ValueError("Container must be a dictionary")
+
+    def validate_option(option, source: str) -> str:
+        if not isinstance(option, str):
+            raise ValueError(
+                f"Embedding option from {source} must be a string, got {type(option)}"
+            )
+        option = option.strip()
+        if not option:
+            raise ValueError(f"Embedding option from {source} cannot be empty")
+        return option
+
+    itm = _item(container)
+    if itm and itm.get("embedding_option"):
+        return validate_option(itm["embedding_option"], "item.embedding_option")
+
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("embedding_option"):
+        return validate_option(data["embedding_option"], "data.embedding_option")
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("embedding_option"):
+        return validate_option(m_itm["embedding_option"], "map.item.embedding_option")
+
+    if container.get("embedding_option"):
+        return validate_option(
+            container["embedding_option"], "container.embedding_option"
+        )
+
+    for i, res in enumerate(container.get("externalTaskResults", [])):
+        if not isinstance(res, dict):
+            continue
+        if res.get("embedding_option"):
+            return validate_option(
+                res["embedding_option"], f"externalTaskResults[{i}].embedding_option"
+            )
+
+    return None
+
+
+def extract_inventory_id(container: Dict[str, Any]) -> Optional[str]:
+    """Extract inventory ID with validation."""
+    if not isinstance(container, dict):
+        raise ValueError("Container must be a dictionary")
+
+    if isinstance(container.get("data"), list) and container["data"]:
+        first_item = container["data"][0]
+        if isinstance(first_item, dict) and first_item.get("inventory_id"):
+            inventory_id = first_item["inventory_id"]
+            if not isinstance(inventory_id, str) or not inventory_id.strip():
+                raise ValueError("Inventory ID must be a non-empty string")
+            return inventory_id.strip()
+
+    itm = _item(container)
+    if itm and itm.get("inventory_id"):
+        inventory_id = itm["inventory_id"]
+        if not isinstance(inventory_id, str) or not inventory_id.strip():
+            raise ValueError("Inventory ID must be a non-empty string")
+        return inventory_id.strip()
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("inventory_id"):
+        inventory_id = m_itm["inventory_id"]
+        if not isinstance(inventory_id, str) or not inventory_id.strip():
+            raise ValueError("Inventory ID must be a non-empty string")
+        return inventory_id.strip()
+
+    for asset in container.get("assets", []):
+        if not isinstance(asset, dict):
+            continue
+        inv = asset.get("InventoryID")
+        if inv:
+            if not isinstance(inv, str) or not inv.strip():
+                raise ValueError("Inventory ID must be a non-empty string")
+            return inv.strip()
+
+    inventory_id = container.get("InventoryID")
+    if inventory_id:
+        if not isinstance(inventory_id, str) or not inventory_id.strip():
+            raise ValueError("Inventory ID must be a non-empty string")
+        return inventory_id.strip()
+
+    return None
+
+
+def extract_asset_id(container: Dict[str, Any]) -> Optional[str]:
+    # alias for compatibility
+    return extract_inventory_id(container)
+
+
+def extract_embedding_vector(container: Dict[str, Any]) -> Optional[List[float]]:
+    """Extract embedding vector with validation."""
+    if not isinstance(container, dict):
+        raise ValueError("Container must be a dictionary")
+
+    def validate_vector(vector, source: str) -> List[float]:
+        if not isinstance(vector, list):
+            raise ValueError(f"Embedding vector from {source} must be a list")
+        if not vector:
+            raise ValueError(f"Embedding vector from {source} cannot be empty")
+        for i, val in enumerate(vector):
+            if not isinstance(val, (int, float)):
+                raise ValueError(
+                    f"Embedding vector element {i} from {source} must be a number, got {type(val)}"
+                )
+        return [float(v) for v in vector]
+
+    itm = _item(container)
+    if itm and isinstance(itm.get("float"), list) and itm["float"]:
+        return validate_vector(itm["float"], "item.float")
+
+    if (
+        isinstance(container.get("data"), dict)
+        and isinstance(container["data"].get("float"), list)
+        and container["data"]["float"]
+    ):
+        return validate_vector(container["data"]["float"], "data.float")
+
+    if isinstance(container.get("float"), list) and container["float"]:
+        return validate_vector(container["float"], "container.float")
+
+    for i, res in enumerate(container.get("externalTaskResults", [])):
+        if not isinstance(res, dict):
+            continue
+        if isinstance(res.get("float"), list) and res["float"]:
+            return validate_vector(res["float"], f"externalTaskResults[{i}].float")
+
+    return None
+
+
+def extract_framerate(container: Dict[str, Any]) -> Optional[float]:
+    """Extract framerate with validation."""
+    if not isinstance(container, dict):
+        raise ValueError("Container must be a dictionary")
+
+    def validate_framerate(framerate, source: str) -> float:
+        if not isinstance(framerate, (int, float)):
+            raise ValueError(
+                f"Framerate from {source} must be a number, got {type(framerate)}"
+            )
+        framerate = float(framerate)
+        if framerate <= 0:
+            raise ValueError(
+                f"Framerate from {source} must be positive, got {framerate}"
+            )
+        if framerate > 1000:  # Reasonable upper bound
+            raise ValueError(
+                f"Framerate from {source} seems unreasonably high: {framerate}"
+            )
+        return framerate
+
+    # Check if data is an array (batch processing) - get from first item
+    if isinstance(container.get("data"), list) and container["data"]:
+        first_item = container["data"][0]
+        if isinstance(first_item, dict) and first_item.get("framerate"):
+            return validate_framerate(first_item["framerate"], "data[0].framerate")
+
+    itm = _item(container)
+    if itm and itm.get("framerate"):
+        return validate_framerate(itm["framerate"], "item.framerate")
+
+    data = container.get("data")
+    if isinstance(data, dict) and data.get("framerate"):
+        return validate_framerate(data["framerate"], "data.framerate")
+
+    m_itm = _map_item(container)
+    if m_itm and m_itm.get("framerate"):
+        return validate_framerate(m_itm["framerate"], "map.item.framerate")
+
+    if container.get("framerate"):
+        return validate_framerate(container["framerate"], "container.framerate")
+
+    return None
+
+
+def _get_segment_bounds(payload: Dict[str, Any]) -> Tuple[int, int]:
+    """Extract segment bounds with validation."""
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary")
+
+    candidates: List[Dict[str, Any]] = []
+    if isinstance(payload.get("data"), dict):
+        candidates.append(payload["data"])
+    if isinstance(payload.get("item"), dict):
+        candidates.append(payload["item"])
+    if isinstance(payload.get("map"), dict) and isinstance(
+        payload["map"].get("item"), dict
+    ):
+        candidates.append(payload["map"]["item"])
+    itm = _item(payload)
+    if itm:
+        candidates.append(itm)
+    m_itm = _map_item(payload)
+    if m_itm:
+        candidates.append(m_itm)
+    candidates.append(payload)
+
+    for i, c in enumerate(candidates):
+        if not isinstance(c, dict):
+            logger.info(f"Candidate {i} is not a dict: {type(c)}")
+            continue
+        start = c.get("start_offset_sec")
+        if start is None:
+            start = c.get("start_time")
+        end = c.get("end_offset_sec")
+        if end is None:
+            end = c.get("end_time")
+        logger.info(
+            f"Candidate {i}: start={start}, end={end}, keys={list(c.keys()) if c else 'None'}"
+        )
+        if start is not None and end is not None:
+            try:
+                start_int = int(float(start))
+                end_int = int(float(end))
+                if start_int < 0:
+                    raise ValueError(f"Start offset cannot be negative: {start_int}")
+                if end_int < 0:
+                    raise ValueError(f"End offset cannot be negative: {end_int}")
+                if start_int > end_int:
+                    raise ValueError(
+                        f"Start offset ({start_int}) cannot be greater than end offset ({end_int})"
+                    )
+                logger.info(f"Found segment bounds: {start_int}-{end_int}")
+                return start_int, end_int
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Invalid segment bounds - start: {start}, end: {end}. Error: {e}"
+                )
+
+    logger.warning(
+        f"Segment bounds not found in {len(candidates)} candidates – defaulting to 0-0"
+    )
+    return 0, 0
+
+
+def _extract_embedding_metadata(embedding_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract embedding metadata from embedding data for storage in S3 vector metadata.
+
+    Returns metadata including:
+    - model_provider: e.g., "twelvelabs", "openai", "coactive"
+    - model_name: e.g., "Marengo-retrieval-3.0", "text-embedding-3-large"
+    - model_version: e.g., "3.0", "2.7"
+    """
+    metadata = {}
+
+    if not isinstance(embedding_data, dict):
+        return metadata
+
+    # Direct metadata fields
+    if embedding_data.get("model_provider"):
+        metadata["model_provider"] = embedding_data["model_provider"]
+    if embedding_data.get("model_name"):
+        metadata["model_name"] = embedding_data["model_name"]
+    if embedding_data.get("model_version"):
+        metadata["model_version"] = embedding_data["model_version"]
+
+    # Check nested data structure
+    if isinstance(embedding_data.get("data"), dict):
+        nested = embedding_data["data"]
+        if nested.get("model_provider") and "model_provider" not in metadata:
+            metadata["model_provider"] = nested["model_provider"]
+        if nested.get("model_name") and "model_name" not in metadata:
+            metadata["model_name"] = nested["model_name"]
+        if nested.get("model_version") and "model_version" not in metadata:
+            metadata["model_version"] = nested["model_version"]
+
+    # Set defaults only if no metadata was found
+    if not metadata.get("model_provider"):
+        metadata["model_provider"] = "unknown"
+    if not metadata.get("model_name"):
+        metadata["model_name"] = "unknown"
+    if not metadata.get("model_version"):
+        model_name = metadata.get("model_name", "")
+        if "3.0" in model_name or "3-0" in model_name:
+            metadata["model_version"] = "3.0"
+        elif "2.7" in model_name or "2-7" in model_name:
+            metadata["model_version"] = "2.7"
+        else:
+            metadata["model_version"] = "unknown"
+
+    logger.info(
+        "Extracted embedding metadata for S3 Vector Store",
+        extra={
+            "model_provider": metadata.get("model_provider"),
+            "model_name": metadata.get("model_name"),
+            "model_version": metadata.get("model_version"),
+        },
+    )
+
+    return metadata
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# S3 Vector Store client
+def get_s3_vector_client():
+    """
+    Initialize S3 Vector client with retry configuration for transient errors.
+
+    Configures exponential backoff retry logic to handle ServiceUnavailableException
+    and other transient service errors that may occur with the S3 Vectors service.
+    """
+    try:
+        # Configure retry strategy with exponential backoff
+        retry_config = Config(
+            retries={
+                "max_attempts": 10,  # Increased from default 4 to handle service unavailability
+                "mode": "adaptive",  # Adaptive mode adjusts retry behavior based on service responses
+            },
+            connect_timeout=5,
+            read_timeout=60,
+        )
+
+        session = boto3.Session()
+        client = session.client(
+            "s3vectors", region_name=AWS_REGION, config=retry_config
+        )
+
+        logger.info(
+            "S3 Vector client initialized with retry configuration",
+            extra={"region": AWS_REGION, "max_attempts": 10, "retry_mode": "adaptive"},
+        )
+
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize S3 Vector client: {e}")
+        raise
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Early-exit helpers
+def _bad_request(msg: str):
+    logger.warning(msg)
+    return {"statusCode": 400, "body": json.dumps({"error": msg})}
+
+
+def _ok_no_op(vector_len: int, inventory_id: Optional[str]):
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {
+                "message": "Embedding processed (S3 Vector Store not available)",
+                "inventory_id": inventory_id,
+                "vector_length": vector_len,
+            }
+        ),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+def ensure_vector_bucket_exists(client, bucket_name: str) -> None:
+    """
+    Ensure vector bucket exists or raise exception.
+
+    This function checks if the S3 Vector bucket exists and creates it if not found.
+    The boto3 client is configured with retry logic to handle transient service errors.
+
+    Args:
+        client: Boto3 S3 Vectors client with retry configuration
+        bucket_name: Name of the vector bucket to ensure exists
+
+    Raises:
+        RuntimeError: If bucket cannot be accessed or created after retries
+    """
+    if not bucket_name:
+        raise RuntimeError(
+            "Vector bucket name cannot be empty - check VECTOR_BUCKET_NAME environment variable"
+        )
+
+    try:
+        client.get_vector_bucket(vectorBucketName=bucket_name)
+        logger.info(
+            "Vector bucket exists and is accessible", extra={"bucket_name": bucket_name}
+        )
+        # Add throttling delay after successful operation
+        if REQUEST_THROTTLE_MS > 0:
+            time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+    except client.exceptions.NotFoundException:
+        logger.info(
+            "Vector bucket not found, attempting to create",
+            extra={"bucket_name": bucket_name},
+        )
+        try:
+            # Add throttling delay before create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
+            client.create_vector_bucket(
+                vectorBucketName=bucket_name,
+                encryptionConfiguration={"sseType": "AES256"},
+            )
+            logger.info(
+                "Successfully created vector bucket", extra={"bucket_name": bucket_name}
+            )
+            # Add throttling delay after create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+        except Exception as e:
+            error_msg = f"Failed to create vector bucket {bucket_name}: {str(e)}"
+            logger.error(
+                error_msg,
+                extra={
+                    "bucket_name": bucket_name,
+                    "error_type": type(e).__name__,
+                    "error_details": str(e),
+                },
+                exc_info=True,
+            )
+            raise RuntimeError(error_msg) from e
+    except Exception as e:
+        error_msg = (
+            f"Cannot access vector bucket {bucket_name}. "
+            f"The S3 Vectors service may be experiencing issues. "
+            f"Error: {str(e)}"
+        )
+        logger.error(
+            error_msg,
+            extra={
+                "bucket_name": bucket_name,
+                "error_type": type(e).__name__,
+                "error_details": str(e),
+                "region": AWS_REGION,
+            },
+            exc_info=True,
+        )
+        raise RuntimeError(error_msg) from e
+
+
+def ensure_index_exists(
+    client, bucket_name: str, index_name: str, vector_dimension: int
+) -> None:
+    """Ensure vector index exists or raise exception."""
+    if not bucket_name:
+        raise RuntimeError(
+            "Vector bucket name cannot be empty - check VECTOR_BUCKET_NAME environment variable"
+        )
+    if not index_name:
+        raise RuntimeError(
+            "Vector index name cannot be empty - check INDEX_NAME environment variable"
+        )
+    if vector_dimension <= 0:
+        raise ValueError(f"Invalid vector dimension: {vector_dimension}")
+
+    try:
+        client.get_index(vectorBucketName=bucket_name, indexName=index_name)
+        logger.info(f"Index {index_name} already exists in bucket {bucket_name}")
+        # Add throttling delay after successful operation
+        if REQUEST_THROTTLE_MS > 0:
+            time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+    except client.exceptions.NotFoundException:
+        try:
+            # Add throttling delay before create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
+            client.create_index(
+                vectorBucketName=bucket_name,
+                indexName=index_name,
+                dimension=vector_dimension,
+                dataType="float32",
+                distanceMetric="cosine",
+            )
+            logger.info(f"Created index {index_name} (dim={vector_dimension})")
+            # Add throttling delay after create operation
+            if REQUEST_THROTTLE_MS > 0:
+                time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+        except Exception as e:
+            logger.error(f"Failed to create index {index_name}: {e}")
+            raise RuntimeError(f"Cannot create index {index_name}: {e}") from e
+    except Exception as e:
+        logger.error(f"Error checking index {index_name}: {e}")
+        raise RuntimeError(f"Cannot access index {index_name}: {e}") from e
+
+
+def store_vectors(
+    client, bucket_name: str, index_name: str, vectors_data: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Store vectors in S3 Vector Store with strict validation."""
+    if not bucket_name:
+        raise RuntimeError(
+            "Vector bucket name cannot be empty - check VECTOR_BUCKET_NAME environment variable"
+        )
+    if not index_name:
+        raise RuntimeError(
+            "Vector index name cannot be empty - check INDEX_NAME environment variable"
+        )
+    if not vectors_data:
+        raise ValueError("No vectors provided for storage")
+
+    try:
+        vectors = []
+        for i, vd in enumerate(vectors_data):
+            if not isinstance(vd, dict):
+                raise ValueError(f"Vector data at index {i} must be a dictionary")
+            if "vector" not in vd:
+                raise ValueError(f"Vector data at index {i} missing 'vector' field")
+            if "metadata" not in vd:
+                raise ValueError(f"Vector data at index {i} missing 'metadata' field")
+
+            vector = vd["vector"]
+            meta = vd["metadata"]
+
+            if not isinstance(vector, list) or not vector:
+                raise ValueError(f"Vector at index {i} must be a non-empty list")
+            if not isinstance(meta, dict):
+                raise ValueError(f"Metadata at index {i} must be a dictionary")
+            if not meta.get("inventory_id"):
+                raise ValueError(
+                    f"Metadata at index {i} missing required 'inventory_id'"
+                )
+
+            embedding_option = meta.get("embedding_option", "default")
+
+            # Start with inventory_id, only add embedding_option if it's not "default"
+            if embedding_option == "default":
+                key = meta["inventory_id"]
+            else:
+                key = f"{meta['inventory_id']}_{embedding_option}"
+
+            scope = meta.get("embedding_scope")
+            content_type = meta.get("content_type", "video")
+
+            # Handle different content types and scopes
+            if content_type == "audio":
+                # Audio content: always include time segments with audio_clip prefix
+                start_sec = meta.get("start_offset_sec")
+                end_sec = meta.get("end_offset_sec")
+                if start_sec is None or end_sec is None:
+                    raise ValueError(
+                        f"Audio embedding at index {i} missing start/end offset seconds"
+                    )
+                key = f"{key}_audio_clip_{start_sec}_{end_sec}"
+            elif content_type == "video" and scope == "clip":
+                # Video clip content: include time segments with video_clip prefix
+                start_sec = meta.get("start_offset_sec")
+                end_sec = meta.get("end_offset_sec")
+                if start_sec is None or end_sec is None:
+                    raise ValueError(
+                        f"Video clip embedding at index {i} missing start/end offset seconds"
+                    )
+                key = f"{key}_video_clip_{start_sec}_{end_sec}"
+            elif content_type == "image":
+                # Image content: just add image suffix, no time segments
+                key = f"{key}_image"
+            # For video master/other scopes, keep the key as is (inventory_id or inventory_id_embedding_option)
+
+            # Log the constructed key for this vector
+            logger.info(
+                f"[VECTOR_KEY] Constructed key for storage: '{key}' "
+                f"(content_type={content_type}, scope={scope}, "
+                f"inventory_id={meta.get('inventory_id')}, "
+                f"embedding_option={embedding_option})"
+            )
+
+            vectors.append(
+                {
+                    "key": key,
+                    "data": {"float32": vector},
+                    "metadata": meta,
+                }
+            )
+
+        # Validate and cap batch size for safety
+        batch_size = min(VECTOR_BATCH_SIZE, MAX_VECTOR_BATCH_SIZE)
+        if batch_size != VECTOR_BATCH_SIZE:
+            logger.warning(
+                f"Configured batch size {VECTOR_BATCH_SIZE} exceeds maximum {MAX_VECTOR_BATCH_SIZE}. "
+                f"Using maximum batch size of {MAX_VECTOR_BATCH_SIZE}."
+            )
+
+        logger.info(
+            f"[VECTOR_STORAGE] Processing {len(vectors)} vectors in batches of {batch_size}"
+        )
+
+        stored_keys = []
+        for i in range(0, len(vectors), batch_size):
+            batch = vectors[i : i + batch_size]
+            batch_number = i // batch_size + 1
+            total_batches = (len(vectors) + batch_size - 1) // batch_size
+
+            try:
+                # Add throttling delay before PUT operation (except first batch)
+                if i > 0 and REQUEST_THROTTLE_MS > 0:
+                    time.sleep(REQUEST_THROTTLE_MS / 1000.0)
+
+                client.put_vectors(
+                    vectorBucketName=bucket_name,
+                    indexName=index_name,
+                    vectors=batch,
+                )
+                batch_keys = [v["key"] for v in batch]
+                stored_keys.extend(batch_keys)
+                logger.info(
+                    f"[VECTOR_STORAGE] Stored batch {batch_number}/{total_batches}: "
+                    f"{len(batch)} vectors to bucket='{bucket_name}', index='{index_name}'. "
+                    f"Keys: {batch_keys[:5]}{'...' if len(batch_keys) > 5 else ''}"
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to store batch {batch_number}/{total_batches}",
+                    extra={
+                        "batch_number": batch_number,
+                        "total_batches": total_batches,
+                        "batch_size": len(batch),
+                        "error": str(e),
+                    },
+                )
+                raise RuntimeError(
+                    f"Failed to store vector batch {batch_number}/{total_batches}: {e}"
+                ) from e
+
+        return {"stored_keys": stored_keys}
+    except Exception as e:
+        if isinstance(e, (ValueError, RuntimeError)):
+            raise
+        logger.error(f"Unexpected error storing vectors: {e}")
+        raise RuntimeError(f"Unexpected error storing vectors: {e}") from e
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+def process_single_embedding(
+    payload: Dict[str, Any],
+    embedding_data: Dict[str, Any],
+    client,
+    inventory_id: str,
+) -> Dict[str, Any]:
+    """Process single embedding with strict validation."""
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary")
+    if not isinstance(embedding_data, dict):
+        raise ValueError("Embedding data must be a dictionary")
+    if not inventory_id:
+        raise ValueError("Inventory ID cannot be empty")
+
+    embedding_vector = embedding_data.get("float")
+    if not embedding_vector:
+        raise ValueError("No embedding vector found in embedding data")
+    if not isinstance(embedding_vector, list) or not embedding_vector:
+        raise ValueError("Embedding vector must be a non-empty list")
+
+    temp = {"data": embedding_data, **{k: v for k, v in payload.items() if k != "data"}}
+    scope = embedding_data.get("embedding_scope") or extract_scope(temp)
+    opt = embedding_data.get("embedding_option") or extract_embedding_option(temp)
+
+    if not scope:
+        raise ValueError("Cannot determine embedding scope from payload")
+
+    start_sec, end_sec = _get_segment_bounds(temp)
+
+    # Dynamically detect content type
+    content_type = detect_content_type(payload, embedding_data)
+    is_audio_content = content_type == "audio"
+
+    # Extract framerate from input data (only for video content)
+    if content_type == "video":
+        framerate = embedding_data.get("framerate") or extract_framerate(temp)
+        fps = int(round(framerate)) if framerate else 30
+    else:
+        fps = 30
+
+    start_tc = seconds_to_smpte(start_sec, fps)
+    end_tc = seconds_to_smpte(end_sec, fps)
+
+    # Extract embedding metadata for enriched storage
+    embedding_metadata = _extract_embedding_metadata(embedding_data)
+
+    metadata = {
+        "inventory_id": inventory_id,
+        "content_type": content_type,
+        "embedding_scope": "clip" if is_audio_content else scope,
+        "timestamp": datetime.utcnow().isoformat(),
+        "start_offset_sec": start_sec,
+        "end_offset_sec": end_sec,
+        "start_timecode": start_tc,
+        "end_timecode": end_tc,
+        "embedding_dimension": len(embedding_vector),
+        "space_type": "cosine",
+        "model_provider": embedding_metadata.get("model_provider", "unknown"),
+        "model_name": embedding_metadata.get("model_name", "unknown"),
+        "model_version": embedding_metadata.get("model_version", "unknown"),
+    }
+    if opt is not None:
+        metadata["embedding_option"] = opt
+
+    vectors_data = [{"vector": embedding_vector, "metadata": metadata}]
+
+    # These now raise exceptions instead of returning booleans
+    ensure_vector_bucket_exists(client, VECTOR_BUCKET_NAME)
+    dim = len(embedding_vector)
+    ensure_index_exists(client, VECTOR_BUCKET_NAME, INDEX_NAME, dim)
+    store_result = store_vectors(client, VECTOR_BUCKET_NAME, INDEX_NAME, vectors_data)
+
+    return {
+        "document_id": f"{inventory_id}_{int(datetime.utcnow().timestamp())}",
+        "start_sec": start_sec,
+        "end_sec": end_sec,
+        **store_result,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+def process_store_action(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Process store action with strict validation."""
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary")
+
+    client = get_s3_vector_client()
+    bucket = payload.get("vector_bucket_name", VECTOR_BUCKET_NAME)
+    index = payload.get("index_name", INDEX_NAME)
+
+    if not bucket:
+        raise ValueError("Vector bucket name cannot be empty")
+    if not index:
+        raise ValueError("Index name cannot be empty")
+
+    inventory_id = extract_inventory_id(payload)
+    if not inventory_id:
+        raise ValueError("Unable to determine inventory_id from payload")
+
+    # Check if this is batch processing (array of embeddings)
+    if isinstance(payload.get("data"), list):
+        data_list = payload["data"]
+        if not data_list:
+            raise ValueError("Data list cannot be empty")
+
+        results = []
+        video_scope = []
+        for i, emb in enumerate(data_list):
+            if not isinstance(emb, dict):
+                raise ValueError(f"Embedding data at index {i} must be a dictionary")
+
+            # Check if this is a lightweight reference that needs to be downloaded
+            if is_s3_reference(emb):
+                logger.info(
+                    f"Detected lightweight reference at index {i}, downloading from S3"
+                )
+                emb = download_s3_external_payload(s3_client, emb, logger)
+
+            tmp = {"data": emb, **{k: v for k, v in payload.items() if k != "data"}}
+            sc = emb.get("embedding_scope") or extract_scope(tmp)
+
+            if not sc:
+                raise ValueError(f"Cannot determine embedding scope for item {i}")
+
+            # Dynamically detect content type for this embedding
+            content_type = detect_content_type(payload, emb)
+            is_audio_content = content_type == "audio"
+
+            if sc == "video" and not is_audio_content:
+                video_scope.append((i, emb))
+            else:
+                try:
+                    res = process_single_embedding(payload, emb, client, inventory_id)
+                    results.append(res)
+                except Exception as e:
+                    logger.error(f"Failed to process embedding {i}: {e}")
+                    raise RuntimeError(f"Failed to process embedding {i}: {e}") from e
+
+        # Check if this is primarily audio content processing
+        first_embedding = data_list[0] if data_list else {}
+        primary_content_type = detect_content_type(payload, first_embedding)
+        if primary_content_type == "audio":
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message": "Batch processed (audio only)",
+                        "inventory_id": inventory_id,
+                        "processed_count": len(results),
+                        "total_count": len(payload["data"]),
+                    }
+                ),
+            }
+
+        # video-level embeddings → simple put with video scope
+        for i, emb in video_scope:
+            vector = emb.get("float")
+            if not vector:
+                raise ValueError(f"No vector in video embedding {i}")
+            if not isinstance(vector, list) or not vector:
+                raise ValueError(
+                    f"Vector in video embedding {i} must be a non-empty list"
+                )
+
+            tmp = {"data": emb, **{k: v for k, v in payload.items() if k != "data"}}
+            opt = emb.get("embedding_option") or extract_embedding_option(tmp)
+
+            # Dynamically detect content type for this video embedding
+            video_content_type = detect_content_type(payload, emb)
+
+            # Extract framerate from input data (only for video content)
+            if video_content_type == "video":
+                framerate = emb.get("framerate") or extract_framerate(tmp)
+                int(round(framerate)) if framerate else 30
+            else:
+                pass
+
+            # Extract embedding metadata for enriched storage
+            embedding_metadata = _extract_embedding_metadata(emb)
+
+            # video-level has no start/end
+            metadata = {
+                "inventory_id": inventory_id,
+                "content_type": video_content_type,
+                "embedding_scope": "video",
+                "timestamp": datetime.utcnow().isoformat(),
+                "embedding_dimension": len(vector),
+                "space_type": "cosine",
+                "model_provider": embedding_metadata.get("model_provider", "unknown"),
+                "model_name": embedding_metadata.get("model_name", "unknown"),
+                "model_version": embedding_metadata.get("model_version", "unknown"),
+            }
+            if opt is not None:
+                metadata["embedding_option"] = opt
+
+            vectors_data = [{"vector": vector, "metadata": metadata}]
+
+            # These now raise exceptions instead of returning booleans
+            ensure_vector_bucket_exists(client, bucket)
+            dim = len(vector)
+            ensure_index_exists(client, bucket, index, dim)
+            store_vectors(client, bucket, index, vectors_data)
+
+            results.append(
+                {
+                    "document_id": f"{inventory_id}_video_{i}_{int(datetime.utcnow().timestamp())}",
+                    "type": "video_scope",
+                }
+            )
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": f"Batch processed {len(results)} embeddings",
+                    "inventory_id": inventory_id,
+                    "processed_count": len(results),
+                    "total_count": len(payload["data"]),
+                }
+            ),
+        }
+
+    # Single embedding - extract from data.item structure or direct data
+    embedding_data = None
+
+    # Check payload.data.data for S3 reference (Bedrock Results nested structure for images)
+    data_field = payload.get("data", {})
+    if isinstance(data_field, dict) and isinstance(data_field.get("data"), dict):
+        nested_data = data_field["data"]
+        if is_s3_reference(nested_data):
+            logger.info(
+                "Detected S3 reference in payload.data.data (Bedrock Results), downloading from S3"
+            )
+            logger.info(
+                f"S3 reference: bucket={nested_data.get('s3_bucket')}, key={nested_data.get('s3_key')}"
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, nested_data, logger
+            )
+            logger.info(f"Downloaded embedding type: {type(embedding_data)}")
+
+            # Handle list of embeddings (images return a list with 1 item)
+            if isinstance(embedding_data, list):
+                if len(embedding_data) == 1:
+                    logger.info(
+                        "Downloaded embedding is a list with 1 item (image), extracting it"
+                    )
+                    embedding_data = embedding_data[0]
+                elif len(embedding_data) > 1:
+                    logger.warning(
+                        f"Downloaded embedding is a list with {len(embedding_data)} items. "
+                        "This should be handled by distributed map. Using first item only."
+                    )
+                    embedding_data = embedding_data[0]
+                else:
+                    logger.error("Downloaded embedding is an empty list")
+                    embedding_data = None
+
+            # Check if the downloaded data is itself another S3 reference (nested reference)
+            if (
+                embedding_data
+                and isinstance(embedding_data, dict)
+                and is_s3_reference(embedding_data)
+            ):
+                logger.info(
+                    "Downloaded data contains another S3 reference (nested), downloading again"
+                )
+                logger.info(
+                    f"Nested S3 reference: bucket={embedding_data.get('s3_bucket')}, key={embedding_data.get('s3_key')}"
+                )
+                embedding_data = download_s3_external_payload(
+                    s3_client, embedding_data, logger
+                )
+                logger.info(f"Downloaded nested embedding type: {type(embedding_data)}")
+
+    # Check payload_history.data for S3 reference (alternative location)
+    if not embedding_data:
+        payload_history = payload.get("payload_history", {})
+        if isinstance(payload_history.get("data"), dict) and is_s3_reference(
+            payload_history["data"]
+        ):
+            logger.info(
+                "Detected lightweight reference in payload_history.data, downloading from S3"
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, payload_history["data"], logger
+            )
+
+    # Check payload.data for S3 reference (distributed map: video/audio)
+    if (
+        not embedding_data
+        and isinstance(payload.get("data"), dict)
+        and is_s3_reference(payload["data"])
+    ):
+        logger.info(
+            "Detected S3 reference in data (distributed map), downloading from S3"
+        )
+        embedding_data = download_s3_external_payload(
+            s3_client, payload["data"], logger
+        )
+
+        # Check if downloaded data is itself another S3 reference (lightweight reference pattern)
+        # This happens when TwelveLabs Bedrock Results returns a reference file that points to embeddings file
+        if (
+            embedding_data
+            and isinstance(embedding_data, dict)
+            and is_s3_reference(embedding_data)
+        ):
+            logger.info(
+                "Downloaded data is a lightweight reference, downloading actual embeddings",
+                extra={
+                    "reference_bucket": embedding_data.get("s3_bucket"),
+                    "reference_key": embedding_data.get("s3_key"),
+                },
+            )
+            embedding_data = download_s3_external_payload(
+                s3_client, embedding_data, logger
+            )
+            logger.info(f"Downloaded actual embeddings, type: {type(embedding_data)}")
+
+    # Try new structure: data.item
+    if not embedding_data and isinstance(payload.get("data"), dict):
+        item = payload["data"].get("item")
+        if isinstance(item, dict):
+            embedding_data = item
+
+    # Fallback to old structure: data directly contains embedding
+    if not embedding_data and isinstance(payload.get("data"), dict):
+        data = payload["data"]
+        if data.get("float"):  # Has embedding vector directly
+            embedding_data = data
+
+    if not embedding_data:
+        error_details = {
+            "payload_keys": list(payload.keys()),
+            "data_keys": (
+                list(payload.get("data", {}).keys())
+                if isinstance(payload.get("data"), dict)
+                else "N/A"
+            ),
+            "has_data_data": isinstance(payload.get("data", {}).get("data"), dict),
+            "has_payload_history": bool(payload.get("payload_history")),
+            "data_type": (
+                type(payload.get("data")).__name__ if payload.get("data") else None
+            ),
+        }
+        logger.error(f"No embedding data found in payload. Details: {error_details}")
+        raise RuntimeError(
+            f"No embedding data found in payload - expected data.data with S3 reference, data.item, or data with float field. Details: {error_details}"
+        )
+
+    # Log the actual structure to diagnose field name
+    logger.info(f"Embedding data keys: {list(embedding_data.keys())}")
+
+    # Try multiple possible field names for the embedding vector
+    embedding_vector = (
+        embedding_data.get("float")
+        or embedding_data.get("embedding")
+        or embedding_data.get("vector")
+    )
+
+    if not embedding_vector:
+        error_details = {
+            "embedding_data_keys": list(embedding_data.keys()),
+            "embedding_data_sample": {
+                k: type(v).__name__ for k, v in list(embedding_data.items())[:5]
+            },
+        }
+        logger.error(
+            f"No embedding vector found in embedding data. Details: {error_details}"
+        )
+        raise ValueError(
+            f"No embedding vector found in embedding data - tried 'float', 'embedding', 'vector'. "
+            f"Available keys: {list(embedding_data.keys())}"
+        )
+    if not isinstance(embedding_vector, list) or not embedding_vector:
+        raise ValueError("Embedding vector must be a non-empty list")
+
+    # Create temp payload for extraction functions
+    temp_payload = {
+        "data": embedding_data,
+        **{k: v for k, v in payload.items() if k != "data"},
+    }
+
+    scope = embedding_data.get("embedding_scope") or extract_scope(temp_payload)
+    if not scope:
+        raise ValueError("Cannot determine embedding scope from payload")
+
+    # Get embedding_option from embedding data or extract from payload
+    opt_from_data = embedding_data.get("embedding_option")
+    logger.info(f"[EMBEDDING_OPTION] From embedding_data: {repr(opt_from_data)}")
+
+    opt = opt_from_data or extract_embedding_option(temp_payload)
+    logger.info(f"[EMBEDDING_OPTION] Final value after extraction: {repr(opt)}")
+
+    # Dynamically detect content type
+    content_type = detect_content_type(payload, embedding_data)
+    is_audio_content = content_type == "audio"
+
+    # clip, audio, or image
+    if scope in {"clip", "audio", "image"} or is_audio_content:
+        result = process_single_embedding(payload, embedding_data, client, inventory_id)
+        return {"statusCode": 200, "body": json.dumps(result)}
+
+    # master/video - extract framerate from input data (only for video content)
+    if content_type == "video":
+        framerate = embedding_data.get("framerate") or extract_framerate(temp_payload)
+        int(round(framerate)) if framerate else 30
+
+    # Extract embedding metadata for enriched storage
+    embedding_metadata = _extract_embedding_metadata(embedding_data)
+
+    metadata = {
+        "inventory_id": inventory_id,
+        "content_type": content_type,
+        "embedding_scope": scope,
+        "timestamp": datetime.utcnow().isoformat(),
+        "embedding_dimension": len(embedding_vector),
+        "space_type": "cosine",
+        "model_provider": embedding_metadata.get("model_provider", "unknown"),
+        "model_name": embedding_metadata.get("model_name", "unknown"),
+        "model_version": embedding_metadata.get("model_version", "unknown"),
+    }
+    if opt is not None:
+        metadata["embedding_option"] = opt
+
+    vectors_data = [{"vector": embedding_vector, "metadata": metadata}]
+
+    ensure_vector_bucket_exists(client, VECTOR_BUCKET_NAME)
+    dim = len(embedding_vector)
+    ensure_index_exists(client, VECTOR_BUCKET_NAME, INDEX_NAME, dim)
+    store_vectors(client, VECTOR_BUCKET_NAME, INDEX_NAME, vectors_data)
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {
+                "message": "Embedding stored successfully",
+                "inventory_id": inventory_id,
+            }
+        ),
+    }
+
+
+@lambda_middleware(event_bus_name=EVENT_BUS_NAME)
+@logger.inject_lambda_context
+@tracer.capture_lambda_handler
+def lambda_handler(event: Dict[str, Any], _context: LambdaContext):
+    """
+    Main Lambda handler with graceful degradation support.
+
+    If ALLOW_VECTOR_STORAGE_FAILURE is enabled, the Lambda will return success
+    even if vector storage fails, allowing the pipeline to continue.
+    """
+    try:
+        if not isinstance(event, dict):
+            raise ValueError("Event must be a dictionary")
+
+        truncated = _truncate_floats(event, max_items=10)
+        logger.info("Received event", extra={"event": truncated})
+        # Content type will be determined dynamically per request
+        logger.info("S3 Vector Store Lambda - Content type determined dynamically")
+
+        payload = event.get("payload")
+        if not payload:
+            raise ValueError("Event missing required 'payload' field")
+        if not isinstance(payload, dict):
+            raise ValueError("Payload must be a dictionary")
+
+        # Attempt vector storage with graceful degradation support
+        try:
+            return process_store_action(payload)
+        except Exception as storage_error:
+            # If graceful degradation is enabled, log error and continue
+            if ALLOW_VECTOR_STORAGE_FAILURE:
+                logger.warning(
+                    "Vector storage failed but graceful degradation is enabled. "
+                    "Pipeline will continue without vector storage.",
+                    extra={
+                        "error": str(storage_error),
+                        "error_type": type(storage_error).__name__,
+                        "graceful_degradation": True,
+                    },
+                )
+                # Return success response indicating vectors were not stored
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(
+                        {
+                            "message": "Processing completed without vector storage (service unavailable)",
+                            "vector_storage_skipped": True,
+                            "error": str(storage_error),
+                        }
+                    ),
+                }
+            else:
+                # Graceful degradation disabled - fail hard
+                raise
+
+    except ValueError as e:
+        # Client errors - return 400
+        logger.error(f"Validation error: {e}")
+        return {"statusCode": 400, "body": json.dumps({"error": str(e)})}
+    except Exception as e:
+        # All other errors - return 500 and re-raise to fail the Lambda
+        logger.error(f"Lambda handler error: {e}")
+        error_response = {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+        # Re-raise the exception to ensure Lambda fails hard
+        raise RuntimeError(f"Lambda execution failed: {e}") from e

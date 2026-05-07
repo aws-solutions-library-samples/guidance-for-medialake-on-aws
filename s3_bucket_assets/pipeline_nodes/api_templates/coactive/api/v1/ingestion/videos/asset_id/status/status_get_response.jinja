@@ -1,0 +1,46 @@
+{
+    "status": "{{ variables.status }}",
+    "progress": {{ variables.progress | default(0) }},
+    "message": "{{ variables.message | default('') }}",
+    "completed_at": "{{ variables.completed_at | default('') }}",
+    "externalJobId": "{{ variables.externalJobId }}",
+    "externalJobStatus": "{{ variables.externalJobStatus }}"
+    {% if variables.externalJobResult %}
+    ,
+    "externalJobResult": "{{ variables.externalJobResult }}"
+    {% endif %}
+    {% if variables.dataset_id %}
+    ,
+    "dataset_id": "{{ variables.dataset_id }}"
+    {% endif %}
+    {% if variables.error_code %}
+    ,
+    "error_code": "{{ variables.error_code }}"
+    {% endif %}
+    {% if variables.error_reason %}
+    ,
+    "error_reason": "{{ variables.error_reason }}"
+    {% endif %}
+    {% if variables.source_path %}
+    ,
+    "source_path": "{{ variables.source_path }}"
+    {% endif %}
+    {% if variables.asset_type %}
+    ,
+    "asset_type": "{{ variables.asset_type }}"
+    {% endif %}
+    {% if variables.latest_event_type %}
+    ,
+    "latest_event": {
+        "event_type": "{{ variables.latest_event_type }}"
+        {% if variables.latest_event_entity %}
+        ,
+        "event_entity": "{{ variables.latest_event_entity }}"
+        {% endif %}
+        {% if variables.latest_event_timestamp %}
+        ,
+        "timestamp_dt": "{{ variables.latest_event_timestamp }}"
+        {% endif %}
+    }
+    {% endif %}
+}

@@ -1,0 +1,112 @@
+spec: v1.0.0
+node:
+  id: trigger_webhook
+  title: Webhook Trigger
+  description: Trigger a pipeline run via an external HTTP webhook call
+  version: 1.0.0
+  type: trigger
+
+actions:
+  trigger:
+    summary: Trigger via webhook
+    description: Configure authentication for the inbound webhook that starts this pipeline
+    operationId: triggerWebhook
+    parameters:
+      - in: body
+        name: authMethod
+        label: Auth Method
+        required: true
+        schema:
+          type: select
+          options:
+            - label: API Key / Bearer Token
+              value: api_key
+            - label: Basic Auth
+              value: basic_auth
+            - label: HMAC SHA-256
+              value: hmac_sha256
+        description: Choose the authentication method for the webhook endpoint
+
+      - in: body
+        name: token
+        label: Token
+        required: true
+        schema:
+          type: password
+        description: API key token used to authenticate incoming webhook requests
+        showWhen:
+          field: parameters.authMethod
+          value: api_key
+
+      - in: body
+        name: username
+        label: Username
+        required: true
+        schema:
+          type: string
+        description: Username for Basic Auth on the webhook endpoint
+        showWhen:
+          field: parameters.authMethod
+          value: basic_auth
+
+      - in: body
+        name: password
+        label: Password
+        required: true
+        schema:
+          type: password
+        description: Password for Basic Auth on the webhook endpoint
+        showWhen:
+          field: parameters.authMethod
+          value: basic_auth
+
+      - in: body
+        name: secret
+        label: Signing Secret
+        required: true
+        schema:
+          type: password
+        description: Shared secret used to compute the HMAC SHA-256 signature of the request body
+        showWhen:
+          field: parameters.authMethod
+          value: hmac_sha256
+
+      - in: body
+        name: signatureHeader
+        label: Signature Header
+        required: false
+        schema:
+          type: string
+          default: X-Hub-Signature-256
+        description: HTTP header name where the caller sends the HMAC signature (default X-Hub-Signature-256)
+        showWhen:
+          field: parameters.authMethod
+          value: hmac_sha256
+
+      - in: body
+        name: webhookUrl
+        label: Webhook URL
+        required: false
+        schema:
+          type: string
+          readOnly: true
+        description: The generated URL to send webhook requests to
+        showWhen:
+          field: parameters.webhookUrl
+          operator: exists
+
+      - in: body
+        name: webhookCredentialHint
+        label: Credential Hint
+        required: false
+        schema:
+          type: string
+          readOnly: true
+        description: A hint showing the stored credential for this webhook
+        showWhen:
+          field: parameters.webhookCredentialHint
+          operator: exists
+
+    connections:
+      outgoing:
+        type: [any]

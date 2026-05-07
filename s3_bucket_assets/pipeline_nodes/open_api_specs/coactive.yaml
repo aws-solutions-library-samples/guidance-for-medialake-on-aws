@@ -1,0 +1,90 @@
+openapi: 3.0.0
+info:
+  title: Coactive API
+  version: 1.0
+  description: Coactive AI platform for multimodal asset ingestion and semantic search
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Dataset Management
+  - name: Asset Ingestion
+  - name: Status Monitoring
+
+servers:
+  - url: https://{subdomain}.coactive.ai/
+    path: api/v1
+    description: Production API Server
+    x-server-environment: Production
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    Content-Type:
+      description: content type
+      schema:
+        type: string
+    Authorization:
+      description: Bearer token authorization
+      schema:
+        type: string
+
+paths:
+  /datasets:
+    get:
+      summary: List all datasets
+      description: Lists all available datasets to check if MediaLake_Dataset_{ENVIRONMENT} exists
+      operationId: listDatasets
+      tags:
+        - Dataset Management
+      x-requestMapping: api/v1/datasets
+      x-responseMapping: api/v1/datasets
+      security:
+        - bearerAuth: []
+    post:
+      summary: Create a new dataset
+      description: Creates a new dataset in Coactive for asset ingestion
+      operationId: createDataset
+      tags:
+        - Dataset Management
+      x-requestMapping: api/v1/datasets
+      x-responseMapping: api/v1/datasets
+      security:
+        - bearerAuth: []
+  /ingestion/assets:
+    post:
+      summary: Ingest assets from public URLs
+      description: Ingests media assets into Coactive from public URLs
+      operationId: ingestAssets
+      tags:
+        - Asset Ingestion
+      x-requestMapping: api/v1/ingestion/assets
+      x-responseMapping: api/v1/ingestion/assets
+      security:
+        - bearerAuth: []
+  /ingestion/videos/{asset_id}/status:
+    get:
+      summary: Get video asset ingestion status
+      description: Returns the ingestion status of a video asset
+      operationId: getVideoAssetStatus
+      tags:
+        - Status Monitoring
+      x-requestMapping: api/v1/ingestion/videos/status
+      x-responseMapping: api/v1/ingestion/videos/status
+      security:
+        - bearerAuth: []
+  /ingestion/images/{asset_id}/status:
+    get:
+      summary: Get image asset ingestion status
+      description: Returns the ingestion status of an image asset
+      operationId: getImageAssetStatus
+      tags:
+        - Status Monitoring
+      x-requestMapping: api/v1/ingestion/images/status
+      x-responseMapping: api/v1/ingestion/images/status
+      security:
+        - bearerAuth: []

@@ -1,0 +1,51 @@
+spec: v1.0.0
+node:
+  id: trigger_eventbridge
+  title: EventBridge Trigger
+  description: Trigger for AWS EventBridge events with custom event patterns
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: eventbridge_rule
+        event_pattern: {}
+
+actions:
+  trigger:
+    summary: Trigger on EventBridge events
+    description: Configure custom event patterns to trigger this pipeline
+    operationId: triggerEventBridge
+    parameters:
+      - in: body
+        name: event_bus_arn
+        label: EventBridge Event Bus ARN
+        required: true
+        schema:
+          type: string
+        description: Enter the EventBridge Event Bus ARN (e.g., "arn:aws:events:us-east-1:123456789012:event-bus/default" or "default" for default bus)
+
+      - in: body
+        name: event_pattern
+        label: Event Pattern (JSON)
+        required: true
+        schema:
+          type: json_editor
+          validation: eventbridge_pattern
+        description: Define the event pattern using EventBridge JSON syntax
+        placeholder: |
+          {
+            "source": ["aws.s3"],
+            "detail-type": ["Object Created"],
+            "detail": {
+              "bucket": {
+                "name": ["my-bucket"]
+              }
+            }
+          }
+
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]
