@@ -197,7 +197,7 @@ const SearchPage: React.FC = () => {
     pageSize: pageSize,
     isSemantic: currentSemantic,
     searchModes: searchModes,
-    fields: isCoactiveProvider ? [] : debouncedSelectedFields,
+    fields: debouncedSelectedFields,
     ...facetFilters,
   });
 

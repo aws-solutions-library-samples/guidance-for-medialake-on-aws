@@ -67,7 +67,12 @@ if hasattr(config, "logging") and hasattr(config.logging, "level"):
 logger = get_logger("CDKApp")
 logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.level}")
 
-app = cdk.App()
+if config.deployment_options.use_cli_credentials:
+    app = cdk.App(default_stack_synthesizer=cdk.CliCredentialsStackSynthesizer())
+    logger.info("Using CliCredentialsStackSynthesizer (local credentials)")
+else:
+    app = cdk.App()
+    logger.info("Using DefaultStackSynthesizer (bootstrap roles)")
 
 # us-east-1 environment, required for the WAF, webACL configuration has to be deployed in us-east-1
 env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")

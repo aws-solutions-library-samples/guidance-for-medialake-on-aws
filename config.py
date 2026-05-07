@@ -528,6 +528,18 @@ class CloudFrontCustomDomainConfig(BaseModel):
         return self
 
 
+class DeploymentOptionsConfig(BaseModel):
+    """Configuration for CDK deployment behavior.
+
+    Controls how the CDK app is synthesized and deployed. Add new deployment-related
+    options here to keep them grouped under a single config section.
+    """
+
+    use_cli_credentials: bool = (
+        False  # Use CliCredentialsStackSynthesizer instead of default bootstrap roles
+    )
+
+
 class CDKConfig(BaseModel):
     """Configuration for CDK Application.
 
@@ -564,6 +576,9 @@ class CDKConfig(BaseModel):
     video_download_enabled: bool = True
     external_nodes_bucket: Optional[str] = None
     use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
+    deployment_options: DeploymentOptionsConfig = Field(
+        default_factory=DeploymentOptionsConfig
+    )
     container_nodes_enabled: bool = False  # Opt-in for container-based pipeline nodes
 
     # ── Multi-deployment naming helpers ──────────────────────────────────

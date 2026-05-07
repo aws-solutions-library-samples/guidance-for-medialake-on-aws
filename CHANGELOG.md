@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.14.4] - 2026-05-07
+
+### Bug Fixes
+
+- fix: Allow custom metadata to render properly when Coactive is selected as a search provider
+
+### Code Refactoring
+
+- refactor: add deployment_options in the config.json and move CliCredentialsStackSynthesizer support using "use_cli_credentials": true option under deployment_options
+- refactor: Ability to use CLI credentials with CDK for deployment
+
 ## [1.14.3] - 2026-05-06
 
 ### Code Refactoring
