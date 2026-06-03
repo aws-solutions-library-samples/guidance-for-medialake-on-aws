@@ -4,6 +4,9 @@
     "account_id": "<aws_account_id>",
     "resource_prefix": "medialake",
     "resource_application_tag": "medialake",
+    "deployment_options": {
+        "use_cli_credentials": false
+    },
     "api_path": "v1",
     "primary_region": "<aws_region>",
     "initial_user": {

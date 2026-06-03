@@ -71,6 +71,14 @@ Parameters:
     Default: ''
     MaxLength: 63
 
+  UseCliCredentials:
+    Description: Use CDK CliCredentialsStackSynthesizer instead of default bootstrap role synthesizer.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -95,6 +103,11 @@ Metadata:
           - ExternalS3Bucket
       -
         Label:
+          default: Deployment Options
+        Parameters:
+          - UseCliCredentials
+      -
+        Label:
           default: Media Lake Deployment Configuration
         Parameters:
           - SourceType
@@ -115,6 +128,8 @@ Metadata:
         default: OpenSearch Deployment Size
       ExternalS3Bucket:
         default: External S3 Bucket (Optional)
+      UseCliCredentials:
+        default: Use CLI Credentials Synthesizer
       SourceType:
         default: Source Type
       GitRepositoryUrl:
@@ -653,6 +668,8 @@ Resources:
             Value: !Ref DeploymentName
           - Name: IS_DEFAULT_DEPLOYMENT
             Value: !If [IsDefaultDeployment, 'true', 'false']
+          - Name: USE_CLI_CREDENTIALS
+            Value: !Ref UseCliCredentials
           - Name: VPC_CIDR
             Value: !GetAtt CidrAllocation.Cidr
       Source:
@@ -729,6 +746,14 @@ Resources:
                   else
                     echo "Additional deployment '$DEPLOYMENT_NAME' - using prefixed naming"
                     echo "$( jq '.use_prefixed_names = true' config.json )" > config.json
+                  fi
+                - |
+                  if [ "$USE_CLI_CREDENTIALS" = "true" ]; then
+                    echo "Using CLI credentials synthesizer"
+                    echo "$( jq '.deployment_options.use_cli_credentials = true' config.json )" > config.json
+                  else
+                    echo "Using default bootstrap role synthesizer"
+                    echo "$( jq '.deployment_options.use_cli_credentials = false' config.json )" > config.json
                   fi
                 # Set VPC CIDR from auto-allocated block (avoids collisions with existing VPCs)
                 - echo "Setting VPC CIDR to $VPC_CIDR"
