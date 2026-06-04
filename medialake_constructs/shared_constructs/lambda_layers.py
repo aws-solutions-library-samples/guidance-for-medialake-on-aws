@@ -613,6 +613,7 @@ class FFProbeLayer(Construct):
                             tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
                             mkdir -p ffprobe/bin
                             cp ffmpeg-extracted/*/bin/ffprobe ffprobe/bin/
+                            strip --strip-all ffprobe/bin/ffprobe
                             cd ffprobe
                             zip -9 -r $TEMP_DIR/ffprobe.zip .
                             cp $TEMP_DIR/ffprobe.zip /asset-output/
