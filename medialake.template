@@ -24,6 +24,11 @@ Parameters:
     Type: String
     Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
 
+  GitBranch:
+    Description: Git branch to clone from the repository
+    Type: String
+    Default: main
+
   S3PresignedURL:
     Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
     Type: String
@@ -112,6 +117,7 @@ Metadata:
         Parameters:
           - SourceType
           - GitRepositoryUrl
+          - GitBranch
           - S3PresignedURL
     ParameterLabels:
       DeploymentName:
@@ -134,6 +140,8 @@ Metadata:
         default: Source Type
       GitRepositoryUrl:
         default: Git Repository URL
+      GitBranch:
+        default: Git Branch
       S3PresignedURL:
         default: S3 Presigned URL
 
@@ -598,7 +606,7 @@ Resources:
           - Name: GIT_REPOSITORY_URL
             Value: !Ref GitRepositoryUrl
           - Name: GIT_BRANCH
-            Value: main
+            Value: !Ref GitBranch
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
