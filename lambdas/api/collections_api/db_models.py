@@ -20,6 +20,7 @@ from pynamodb.attributes import (
     NumberAttribute,
     UnicodeAttribute,
 )
+from pynamodb.indexes import AllProjection, GlobalSecondaryIndex
 from pynamodb.models import Model
 
 
@@ -115,6 +116,17 @@ class UserRelationshipModel(Model):
         table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
         region = os.environ.get("AWS_REGION", "us-east-1")
 
+    class ItemCollectionsIndex(GlobalSecondaryIndex):
+        """GSI2 (ItemCollectionsGSI) — find every user-relationship row for a
+        given collection. Keyed on GSI2_PK=COLL#{collection_id}."""
+
+        class Meta:
+            index_name = "ItemCollectionsGSI"
+            projection = AllProjection()
+
+        GSI2_PK = UnicodeAttribute(hash_key=True)
+        GSI2_SK = UnicodeAttribute(range_key=True)
+
     # Primary keys
     PK = UnicodeAttribute(hash_key=True)  # USER#{user_id}
     SK = UnicodeAttribute(range_key=True)  # COLL#{collection_id}
@@ -132,6 +144,9 @@ class UserRelationshipModel(Model):
     # GSI2 - Collection's users
     GSI2_PK = UnicodeAttribute()  # COLL#{collection_id}
     GSI2_SK = UnicodeAttribute()  # USER#{user_id}
+
+    # Index handle for querying GSI2 by collection (see ItemCollectionsIndex).
+    GSI2_PK_index = ItemCollectionsIndex()
 
 
 class CollectionItemModel(Model):

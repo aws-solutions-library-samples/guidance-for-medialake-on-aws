@@ -5,6 +5,7 @@ from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -30,6 +31,9 @@ class CollectionsStackProps:
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
     asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
+    # Internal application-service-events bus that delivers AssetDeleted events
+    # so orphaned collection items can be cleaned up automatically.
+    asset_events_bus: events.IEventBus
 
 
 class CollectionsStack(cdk.NestedStack):
@@ -69,6 +73,7 @@ class CollectionsStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket,
                 asset_table=props.asset_table,
                 cognito_user_pool=props.cognito_user_pool,
+                asset_events_bus=props.asset_events_bus,
             ),
         )
 

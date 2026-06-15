@@ -296,6 +296,7 @@ class MediaLakeStack(cdk.Stack):
                 asset_table_asset_id_index_arn=props.base_infrastructure.asset_table_asset_id_index_arn,
                 asset_table_s3_path_index_arn=props.base_infrastructure.asset_table_s3_path_index_arn,
                 pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
+                application_service_events_internal_event_bus=props.base_infrastructure.application_service_events_internal_event_bus,
                 asset_table=props.base_infrastructure.asset_table,
                 vpc=props.base_infrastructure.vpc,
                 security_group=props.base_infrastructure.security_group,
@@ -359,12 +360,26 @@ class MediaLakeStack(cdk.Stack):
                 security_group=props.base_infrastructure.security_group,
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
                 asset_table=props.base_infrastructure.asset_table,
+                asset_events_bus=props.base_infrastructure.application_service_events_internal_event_bus,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)
 
         # Store reference to collections_stack
         self._collections_stack = collections_stack
+
+        # Allow the users Lambda to migrate collections owned by a deleted user
+        # to the deleting administrator (instead of orphaning them). The users
+        # stack is created before the collections stack, so the table reference
+        # and IAM grant are wired up here once both exist.
+        users_groups_roles_stack.users_api.users_lambda.function.add_environment(
+            "COLLECTIONS_TABLE_NAME",
+            collections_stack.collections_table.table_name,
+        )
+        collections_stack.collections_table.grant_read_write_data(
+            users_groups_roles_stack.users_api.users_lambda.function
+        )
+        users_groups_roles_stack.add_dependency(collections_stack)
 
         # Create the Dashboard Stack
         dashboard_stack = DashboardStack(

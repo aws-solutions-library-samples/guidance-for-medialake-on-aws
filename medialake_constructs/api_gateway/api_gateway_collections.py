@@ -56,6 +56,8 @@ class CollectionsApiProps:
     security_group: ec2.SecurityGroup
     media_assets_bucket: S3Bucket
     asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
+    # Internal application-service-events bus delivering AssetDeleted events.
+    asset_events_bus: events.IEventBus
     cognito_user_pool: Optional[cognito.UserPool] = (
         None  # For /collections/users endpoint
     )
@@ -223,6 +225,49 @@ class CollectionsApi(Construct):
 
         # Grant read access to asset table (for copying asset thumbnails)
         props.asset_table.grant_read_data(collections_lambda.function)
+
+        # ------------------------------------------------------------------
+        # Asset deletion cleanup consumer
+        # ------------------------------------------------------------------
+        # When an asset is deleted elsewhere in MediaLake an "AssetDeleted"
+        # event is published to the internal application-service-events bus.
+        # This Lambda removes the asset (full file + any clips) from every
+        # collection that referenced it, preventing orphaned collection items.
+        asset_cleanup_lambda = Lambda(
+            self,
+            "CollectionsAssetCleanupLambda",
+            config=LambdaConfig(
+                name="collections_asset_deleted_cleanup",
+                entry="lambdas/collections/asset_deleted_cleanup",
+                memory_size=256,
+                timeout_minutes=5,
+                environment_variables={
+                    "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
+                },
+            ),
+        )
+
+        # Cleanup Lambda scans the collections table by asset id and deletes
+        # matching item rows.
+        self._collections_table.table.grant_read_write_data(
+            asset_cleanup_lambda.function
+        )
+
+        # Route AssetDeleted events from the internal bus to the cleanup Lambda
+        events.Rule(
+            self,
+            "CollectionsAssetDeletedRule",
+            event_bus=props.asset_events_bus,
+            description=(
+                "Removes deleted assets from all collections when an "
+                "AssetDeleted event is published to the internal bus."
+            ),
+            event_pattern=events.EventPattern(
+                source=["medialake.assets"],
+                detail_type=["AssetDeleted"],
+            ),
+            targets=[targets.LambdaFunction(asset_cleanup_lambda.function)],
+        )
 
         # Grant Cognito permissions for /collections/users endpoint
         if props.cognito_user_pool:

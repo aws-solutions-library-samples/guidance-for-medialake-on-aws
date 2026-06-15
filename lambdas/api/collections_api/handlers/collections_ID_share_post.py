@@ -5,13 +5,24 @@ import os
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    NotFoundError,
+)
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
-from collections_utils import COLLECTION_PK_PREFIX, PERM_SK_PREFIX, USER_PK_PREFIX
-from db_models import ShareModel, UserRelationshipModel
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    PERM_SK_PREFIX,
+    USER_PK_PREFIX,
+    get_user_collection_role,
+)
+from custom_exceptions import ForbiddenError
+from db_models import CollectionModel, ShareModel, UserRelationshipModel
 from models import ShareCollectionRequest
 from pynamodb.connection import Connection
+from pynamodb.exceptions import DoesNotExist
 from pynamodb.transactions import TransactWrite
 from user_auth import extract_user_context
 from utils.formatting_utils import format_share
@@ -49,6 +60,26 @@ def register_route(app):
             role = request_data.accessLevel.value
 
             granter_id = user_context.get("user_id")
+            if not granter_id:
+                raise BadRequestError("Authentication required")
+
+            # Authorize: the collection must exist and only its owner may
+            # manage who it is shared with.
+            try:
+                collection = CollectionModel.get(
+                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+                )
+            except DoesNotExist:
+                raise NotFoundError(f"Collection '{collection_id}' not found")
+
+            if get_user_collection_role(collection, granter_id) != "OWNER":
+                logger.warning(
+                    f"User {granter_id} attempted to share collection "
+                    f"{collection_id} they do not own"
+                )
+                raise ForbiddenError(
+                    "Only the collection owner can share this collection"
+                )
 
             # Create permission model instance
             permission = ShareModel()
@@ -122,7 +153,7 @@ def register_route(app):
                 ),
             )
 
-        except BadRequestError:
+        except (BadRequestError, ForbiddenError, NotFoundError):
             raise
         except Exception as e:
             logger.exception("Error sharing collection", exc_info=e)

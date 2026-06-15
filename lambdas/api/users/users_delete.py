@@ -6,6 +6,7 @@ from typing import Any, Dict
 from aws_lambda_powertools.metrics import MetricUnit
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
+from collections_migration import trigger_collection_migration
 
 
 def _cleanup_user_data(dynamodb, table_name: str, user_id: str, logger) -> int:
@@ -86,9 +87,15 @@ def handle_delete_user(
     tracer,
     dynamodb=None,
     user_table_name: str = None,
+    collections_table_name: str = None,
+    new_collection_owner_id: str = None,
 ) -> Dict[str, Any]:
     """
     Delete a user from Cognito user pool and clean up their DynamoDB data.
+
+    Collections owned by the deleted user are migrated to
+    ``new_collection_owner_id`` (the administrator performing the deletion) so
+    they are not orphaned.
     """
     try:
         if not user_id:
@@ -99,6 +106,25 @@ def handle_delete_user(
             return {
                 "statusCode": 400,
                 "body": json.dumps({"message": "Missing user_id parameter"}),
+            }
+
+        # Refuse self-deletion. Besides being a footgun, deleting the calling
+        # admin would leave their owned collections with nobody to migrate to
+        # (the migration's new owner is the caller), orphaning them.
+        if new_collection_owner_id and new_collection_owner_id == user_id:
+            logger.warning(
+                {
+                    "message": "User attempted to delete their own account",
+                    "user_id": user_id,
+                    "operation": "delete_user",
+                }
+            )
+            metrics.add_metric(
+                name="SelfDeletionBlocked", unit=MetricUnit.Count, value=1
+            )
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "You cannot delete your own account."}),
             }
 
         # Delete user from Cognito
@@ -116,6 +142,18 @@ def handle_delete_user(
                 "status": "success",
             }
         )
+
+        # Migrate collections owned by the deleted user to a new owner so they
+        # are not orphaned. Offloaded to an async self-invocation so the API
+        # call returns promptly regardless of how many collections are owned;
+        # failures there are logged and retried by Lambda, never failing the
+        # delete (the Cognito user is already gone).
+        if collections_table_name:
+            trigger_collection_migration(
+                user_id,
+                new_collection_owner_id,
+                logger,
+            )
 
         # Clean up DynamoDB user data if table info is available
         if dynamodb and user_table_name:

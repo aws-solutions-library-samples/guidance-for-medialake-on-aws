@@ -50,6 +50,12 @@ VECTOR_BUCKET_NAME = os.getenv("VECTOR_BUCKET_NAME", "")
 VECTOR_INDEX_NAME = os.getenv("VECTOR_INDEX_NAME", "media-vectors")
 DYNAMODB_TABLE_NAME = os.getenv("MEDIALAKE_ASSET_TABLE", "")
 
+# Custom MediaLake EventBridge bus that asset lifecycle events are published to.
+# Custom rules (e.g. collection cleanup) can only be attached to a custom bus,
+# not the account default bus. When unset, events fall back to the default bus
+# to preserve backward compatibility in environments without the variable.
+EVENT_BUS_NAME = os.getenv("ASSET_EVENT_BUS_NAME", "")
+
 _session = boto3.Session()
 _credentials = _session.get_credentials()
 
@@ -616,23 +622,31 @@ class AssetDeletionService:
 
     @tracer.capture_method
     def _publish_deletion_event(self, inventory_id: str) -> None:
-        """Publish asset deletion event to EventBridge"""
+        """Publish asset deletion event to EventBridge.
+
+        Publishes to the custom MediaLake bus (PIPELINES_EVENT_BUS_NAME) when
+        configured so downstream consumers (e.g. collection cleanup) can attach
+        rules. Falls back to the default bus when the variable is unset.
+        """
         try:
-            eventbridge.put_events(
-                Entries=[
+            entry = {
+                "Source": "medialake.assets",
+                "DetailType": "AssetDeleted",
+                "Detail": json.dumps(
                     {
-                        "Source": "medialake.assets",
-                        "DetailType": "AssetDeleted",
-                        "Detail": json.dumps(
-                            {
-                                "inventoryId": inventory_id,
-                                "timestamp": self._get_timestamp(),
-                            }
-                        ),
+                        "inventoryId": inventory_id,
+                        "timestamp": self._get_timestamp(),
                     }
-                ]
+                ),
+            }
+            if EVENT_BUS_NAME:
+                entry["EventBusName"] = EVENT_BUS_NAME
+
+            eventbridge.put_events(Entries=[entry])
+            self.logger.info(
+                f"Published deletion event for {inventory_id}",
+                extra={"event_bus": EVENT_BUS_NAME or "default"},
             )
-            self.logger.info(f"Published deletion event for {inventory_id}")
         except Exception as e:
             self.logger.error(f"Failed to publish deletion event: {e}")
             # Don't fail the entire deletion for event publishing errors

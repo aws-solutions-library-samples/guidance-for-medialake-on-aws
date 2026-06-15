@@ -72,6 +72,9 @@ class AssetsProps:
     opensearch_index: str
     open_search_arn: str
     system_settings_table: str
+    # Internal application-service-events bus that AssetDeleted events are
+    # published to (consumed by collection cleanup and other downstream rules).
+    asset_events_bus: events.IEventBus
     # user_table: (
     #     dynamodb.Table
     # )
@@ -240,9 +243,14 @@ class AssetsConstruct(Construct):
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
                     "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
+                    "ASSET_EVENT_BUS_NAME": props.asset_events_bus.event_bus_name,
                 },
             ),
         )
+
+        # Allow the delete Lambda to publish AssetDeleted events to the internal
+        # application-service-events bus so downstream consumers can react.
+        props.asset_events_bus.grant_put_events_to(delete_asset_lambda.function)
 
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -2459,6 +2467,7 @@ class AssetsConstruct(Construct):
             "S3_VECTOR_INDEX": props.s3_vector_index_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,  # For TwelveLabs plugin
             "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
+            "ASSET_EVENT_BUS_NAME": props.asset_events_bus.event_bus_name,
         }
 
         # Create the batch delete processor Lambda (worker)
@@ -2640,13 +2649,10 @@ class AssetsConstruct(Construct):
         )
 
         # Grant EventBridge permissions to processor Lambda (for publishing deletion events)
-        self._batch_delete_processor_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["events:PutEvents"],
-                resources=[
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
-                ],
-            )
+        # Publishes AssetDeleted to the internal application-service-events bus so
+        # that custom rules (e.g. collection cleanup) can consume the events.
+        props.asset_events_bus.grant_put_events_to(
+            self._batch_delete_processor_lambda.function
         )
 
     def _create_batch_delete_state_machine(self, props: AssetsProps):

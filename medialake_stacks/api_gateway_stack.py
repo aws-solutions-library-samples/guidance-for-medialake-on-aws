@@ -55,6 +55,7 @@ class ApiGatewayStackProps:
     asset_table_asset_id_index_arn: str
     asset_table_s3_path_index_arn: str
     pipelines_event_bus: events.EventBus
+    application_service_events_internal_event_bus: events.IEventBus
     vpc: ec2.Vpc
     security_group: ec2.SecurityGroup
     collection_endpoint: str
@@ -278,6 +279,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 video_download_enabled=config.video_download_enabled,
+                asset_events_bus=props.application_service_events_internal_event_bus,
             ),
         )
 

@@ -14,6 +14,10 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from collections_migration import (
+    ASYNC_MIGRATE_EVENT_KEY,
+    migrate_user_collections,
+)
 
 # Import route handlers
 from favorites_delete import handle_delete_favorite
@@ -67,6 +71,20 @@ dynamodb = boto3.resource("dynamodb")
 # Get environment variables
 USER_POOL_ID = os.environ["COGNITO_USER_POOL_ID"]
 USER_TABLE_NAME = os.environ["USER_TABLE_NAME"]
+# Optional — when configured, collections owned by a deleted user are migrated
+# to the deleting administrator instead of being orphaned.
+COLLECTIONS_TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME")
+
+
+def _get_requesting_user_id(event: Dict[str, Any]) -> Any:
+    """Extract the Cognito sub of the caller from API Gateway JWT claims."""
+    try:
+        claims = event["requestContext"]["authorizer"]["claims"]
+        if isinstance(claims, str):
+            claims = json.loads(claims)
+        return claims.get("sub")
+    except (KeyError, TypeError, AttributeError, json.JSONDecodeError):
+        return None
 
 
 # Register routes
@@ -98,6 +116,7 @@ def put_user(user_id: str):
 @tracer.capture_method
 def delete_user(user_id: str):
     """DELETE /users/{user_id} - Delete a user"""
+    requesting_user_id = _get_requesting_user_id(app.current_event.raw_event)
     return handle_delete_user(
         user_id,
         cognito,
@@ -107,6 +126,8 @@ def delete_user(user_id: str):
         tracer,
         dynamodb=dynamodb,
         user_table_name=USER_TABLE_NAME,
+        collections_table_name=COLLECTIONS_TABLE_NAME,
+        new_collection_owner_id=requesting_user_id,
     )
 
 
@@ -228,6 +249,33 @@ def _sanitize_event(event: Dict[str, Any]) -> Dict[str, Any]:
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
     """Lambda handler"""
+    # Async self-invocation: migrate collections owned by a deleted user.
+    # This path is reached only via the fire-and-forget invoke triggered from
+    # the DELETE /users handler, never from API Gateway.
+    if isinstance(event, dict) and event.get(ASYNC_MIGRATE_EVENT_KEY):
+        deleted_user_id = event.get("deleted_user_id")
+        new_owner_id = event.get("new_owner_id")
+        if not COLLECTIONS_TABLE_NAME:
+            logger.warning(
+                {
+                    "message": "COLLECTIONS_TABLE_NAME unset — cannot migrate",
+                    "operation": "async_migrate_collections",
+                }
+            )
+            return {"statusCode": 200, "body": "Collections table not configured"}
+        migrated = migrate_user_collections(
+            dynamodb,
+            COLLECTIONS_TABLE_NAME,
+            deleted_user_id,
+            new_owner_id,
+            logger,
+            metrics,
+        )
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"collectionsMigrated": migrated}),
+        }
+
     logger.debug(
         {
             "message": "Lambda handler invoked",

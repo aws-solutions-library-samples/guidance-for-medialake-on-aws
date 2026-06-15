@@ -35,6 +35,8 @@ const PERMISSION_CATEGORIES: Record<string, { label: string; permissions: string
       "collections:create",
       "collections:edit",
       "collections:delete",
+      "collections:add_assets",
+      "collections:remove_assets",
     ],
   },
   connectors: {
@@ -111,7 +113,11 @@ const PERMISSION_CATEGORIES: Record<string, { label: string; permissions: string
 /** Extract the action part from a resource:action key */
 const getActionLabel = (permission: string): string => {
   const action = permission.split(":")[1] || permission;
-  return action.charAt(0).toUpperCase() + action.slice(1);
+  // Split snake_case into words and title-case each (e.g. "add_assets" -> "Add Assets")
+  return action
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 /** Get the resource prefix for display */

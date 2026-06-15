@@ -689,6 +689,31 @@ class BaseInfrastructureStack(Stack):
         return self._pipelines_event_bus.event_bus_name
 
     @property
+    def application_service_events_internal_event_bus(self) -> events.EventBus:
+        """
+        Returns the internal application-service-events EventBridge bus.
+
+        This bus carries internal application lifecycle events (e.g. AssetDeleted)
+        that downstream resources consume via custom rules.
+
+        Returns:
+            events.EventBus: The internal application service events bus
+        """
+
+        return self._application_service_events_internal_event_bus.event_bus
+
+    @property
+    def application_service_events_internal_event_bus_name(self) -> str:
+        """
+        Returns the name of the internal application-service-events bus.
+
+        Returns:
+            str: Name of the EventBridge event bus
+        """
+
+        return self._application_service_events_internal_event_bus.event_bus_name
+
+    @property
     def asset_table(self) -> dynamodb.ITable:
         """
         Returns the DynamoDB table used for storing media asset metadata.

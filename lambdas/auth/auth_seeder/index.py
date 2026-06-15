@@ -85,7 +85,14 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
-            "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "collections": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+                "add_assets": True,
+                "remove_assets": True,
+            },
             # Dashboard permissions
             "dashboard": {"view": True, "create": True, "edit": True, "delete": True},
             "defaultDashboard": {
@@ -231,7 +238,14 @@ DEFAULT_PERMISSION_SETS = [
             "pipelines": {"create": True, "view": True, "edit": True, "delete": True},
             "pipelinesExecutions": {"view": True, "retry": True, "cancel": True},
             # Collection permissions
-            "collections": {"create": True, "view": True, "edit": True, "delete": True},
+            "collections": {
+                "create": True,
+                "view": True,
+                "edit": True,
+                "delete": True,
+                "add_assets": True,
+                "remove_assets": True,
+            },
             # Dashboard permissions
             "dashboard": {"view": True, "create": True, "edit": True, "delete": True},
             # Collection types (view only - needed to work with collections)

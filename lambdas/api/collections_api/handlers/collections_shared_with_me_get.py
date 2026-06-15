@@ -43,19 +43,28 @@ def register_route(app):
             if not user_id:
                 raise BadRequestError("Authentication required")
 
-            # Query user's shared collections via UserRelationshipModel
-            # Using GSI1 (UserCollectionsGSI) to find all collections user has access to
-            response = collections_table.query(
-                IndexName="UserCollectionsGSI",
-                KeyConditionExpression="GSI1_PK = :user_pk",
-                FilterExpression="relationship <> :owner",
-                ExpressionAttributeValues={
+            # Query user's shared collections via UserRelationshipModel.
+            # Using GSI1 (UserCollectionsGSI) to find all collections the user
+            # has access to. Paginate so users with more than one page (>1MB)
+            # of shares get a complete list rather than a silently truncated one.
+            query_kwargs = {
+                "IndexName": "UserCollectionsGSI",
+                "KeyConditionExpression": "GSI1_PK = :user_pk",
+                "FilterExpression": "relationship <> :owner",
+                "ExpressionAttributeValues": {
                     ":user_pk": f"{USER_PK_PREFIX}{user_id}",
                     ":owner": "OWNER",
                 },
-            )
+            }
 
-            user_relationships = response.get("Items", [])
+            user_relationships = []
+            while True:
+                response = collections_table.query(**query_kwargs)
+                user_relationships.extend(response.get("Items", []))
+                last_key = response.get("LastEvaluatedKey")
+                if not last_key:
+                    break
+                query_kwargs["ExclusiveStartKey"] = last_key
 
             logger.info(
                 "Found shared collections for user",

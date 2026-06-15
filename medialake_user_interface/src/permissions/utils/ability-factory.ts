@@ -111,7 +111,9 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
           action === "download" ||
           action === "retry" ||
           action === "cancel" ||
-          action === "manage"
+          action === "manage" ||
+          action === "add_assets" ||
+          action === "remove_assets"
         ) {
           // Map plural resource names to singular for CASL
           const resourceMapping: { [key: string]: string } = {
@@ -173,6 +175,9 @@ export function defineAbilityFor(user: User, permissions: Permission[]): AppAbil
     can("manage", "pipeline");
     can("create", "pipeline");
     can("edit", "pipeline");
+
+    // Collection management (full admins can add/remove assets to/from collections)
+    can("manage", "collection");
 
     // System settings
     can("manage", "settings");

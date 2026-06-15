@@ -13,6 +13,7 @@ from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
     METADATA_SK,
+    USER_PK_PREFIX,
     create_error_response,
 )
 from db_models import (
@@ -78,18 +79,16 @@ def _delete_collection_recursive(collection_id, user_id, depth=0):
     except Exception as e:
         logger.warning(f"[CASCADE] Error querying collection items: {e}")
 
-    # Step 4: Query user relationships (GSI2) - users who have access to this collection
+    # Step 4: Query user relationships (GSI2) - users who have access to this
+    # collection. These rows live in each user's partition
+    # (PK=USER#{user_id}, SK=COLL#{collection_id}) and are only reachable via
+    # the ItemCollectionsGSI keyed on GSI2_PK=COLL#{collection_id}.
     try:
-        # UserRelationshipModel has GSI2_PK = COLL#{collection_id}
-        # We need to query the GSI to find all user relationships
         for user_rel in UserRelationshipModel.GSI2_PK_index.query(
             f"{COLLECTION_PK_PREFIX}{collection_id}"
         ):
             items_to_delete.append((user_rel.PK, user_rel.SK))
             deleted_count += 1
-    except AttributeError:
-        # GSI2 index not defined, query directly
-        logger.warning("[CASCADE] GSI2 index not available for user relationships")
     except Exception as e:
         logger.warning(f"[CASCADE] Error querying user relationships: {e}")
 
@@ -101,11 +100,14 @@ def _delete_collection_recursive(collection_id, user_id, depth=0):
             batch = items_to_delete[i : i + batch_size]
             with CollectionModel.batch_write() as batch_writer:
                 for pk, sk in batch:
-                    # Determine which model to use based on SK prefix
-                    if sk == METADATA_SK:
-                        batch_writer.delete(CollectionModel(pk, sk))
-                    elif sk.startswith("USER#"):
+                    # Determine which model to use. User-relationship rows are
+                    # identified by their PK (USER#...) since their SK is
+                    # COLL#{id}; everything else lives in the COLL# partition
+                    # and is identified by its SK prefix.
+                    if pk.startswith(USER_PK_PREFIX):
                         batch_writer.delete(UserRelationshipModel(pk, sk))
+                    elif sk == METADATA_SK:
+                        batch_writer.delete(CollectionModel(pk, sk))
                     elif sk.startswith(CHILD_SK_PREFIX):
                         batch_writer.delete(ChildReferenceModel(pk, sk))
                     elif sk.startswith("ASSET#") or sk.startswith("ITEM#"):

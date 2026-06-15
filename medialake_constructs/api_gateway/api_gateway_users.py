@@ -42,8 +42,10 @@ class UsersApi(Construct):
     ) -> None:
         super().__init__(scope, constructor_id)
 
-        # Get the current account ID
-        Stack.of(self).account
+        from config import config
+
+        # Get the current account/region for constructed ARNs
+        stack = Stack.of(self)
 
         # Create unified users Lambda function
         users_lambda = Lambda(
@@ -65,6 +67,21 @@ class UsersApi(Construct):
         # Grant permissions to the unified Lambda
         props.user_table.grant_read_write_data(users_lambda.function)
         props.x_origin_verify_secret.grant_read(users_lambda.function)
+
+        # Allow the users Lambda to invoke itself asynchronously so that
+        # migrating the (potentially large) set of collections owned by a
+        # deleted user happens in the background instead of blocking the
+        # DELETE /users API call. A constructed ARN pattern is used to avoid a
+        # circular dependency between the Lambda, its role, and this policy.
+        users_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    f"arn:aws:lambda:{stack.region}:{stack.account}:function:"
+                    f"{config.resource_prefix}_users_{config.environment}"
+                ],
+            )
+        )
 
         # Grant Cognito permissions
         users_lambda.function.add_to_role_policy(

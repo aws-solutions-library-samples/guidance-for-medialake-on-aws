@@ -464,7 +464,6 @@ def remove_collection_from_all_groups(table, collection_id: str) -> None:
 
         # Update each group
         for group in groups_to_update:
-            group["PK"].replace(GROUP_PK_PREFIX, "")
             current_ids = group.get("collectionIds", [])
             updated_ids = [cid for cid in current_ids if cid != collection_id]
 

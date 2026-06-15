@@ -44,9 +44,6 @@ ACTIVE_STATUS = "ACTIVE"
 # Valid item types for collections
 VALID_ITEM_TYPES = ["asset", "workflow", "collection"]
 
-# Access levels
-ACCESS_LEVELS = {"READ": "read", "WRITE": "write", "DELETE": "delete", "SHARE": "share"}
-
 # Cached DynamoDB resource and collections table for permission lookups.
 # Initialised at module level so they are reused across invocations within
 # the same Lambda execution environment.
@@ -255,116 +252,6 @@ def _count_items_with_prefix(table, pk_value: str, sk_prefix: str) -> int:
 
 
 @tracer.capture_method
-def validate_collection_access(
-    table,
-    collection_id: str,
-    user_id: Optional[str],
-    required_access: str = ACCESS_LEVELS["READ"],
-) -> Dict[str, Any]:
-    """
-    Validate that a collection exists and user has the required access level.
-
-    This function provides standardized collection access validation across
-    all collections Lambda functions with consistent return format.
-
-    Args:
-        table: DynamoDB table resource
-        collection_id: Collection ID to validate
-        user_id: User ID requesting access (None for anonymous)
-        required_access: Required access level ('read', 'write', 'delete', 'share')
-
-    Returns:
-        Dictionary with validation results:
-        {
-            "valid": bool,
-            "collection": dict (if valid),
-            "error": str (if not valid),
-            "error_code": str (if not valid)
-        }
-    """
-    try:
-        # Get collection metadata
-        collection = get_collection_metadata(table, collection_id)
-
-        if not collection:
-            logger.warning(
-                {
-                    "message": "Collection not found",
-                    "collection_id": collection_id,
-                    "operation": "validate_collection_access",
-                }
-            )
-            return {
-                "valid": False,
-                "error": "Collection not found",
-                "error_code": "COLLECTION_NOT_FOUND",
-            }
-
-        # Check if collection is active
-        if collection.get("status") != ACTIVE_STATUS:
-            logger.warning(
-                {
-                    "message": "Collection is not active",
-                    "collection_id": collection_id,
-                    "status": collection.get("status"),
-                    "operation": "validate_collection_access",
-                }
-            )
-            return {
-                "valid": False,
-                "error": "Collection is not active",
-                "error_code": "COLLECTION_NOT_ACTIVE",
-            }
-
-        # Check access permissions
-        access_granted = _check_collection_permissions(
-            collection, user_id, required_access
-        )
-
-        if access_granted:
-            logger.debug(
-                {
-                    "message": "Collection access granted",
-                    "collection_id": collection_id,
-                    "user_id": user_id,
-                    "required_access": required_access,
-                    "operation": "validate_collection_access",
-                }
-            )
-            return {"valid": True, "collection": collection}
-        else:
-            logger.warning(
-                {
-                    "message": "Collection access denied",
-                    "collection_id": collection_id,
-                    "user_id": user_id,
-                    "required_access": required_access,
-                    "operation": "validate_collection_access",
-                }
-            )
-            return {
-                "valid": False,
-                "error": "Insufficient permissions to access collection",
-                "error_code": "ACCESS_DENIED",
-            }
-
-    except Exception as e:
-        logger.error(
-            {
-                "message": "Failed to validate collection access",
-                "collection_id": collection_id,
-                "error": str(e),
-                "operation": "validate_collection_access",
-            }
-        )
-        return {
-            "valid": False,
-            "error": "Internal error validating collection access",
-            "error_code": "VALIDATION_ERROR",
-        }
-
-
-@tracer.capture_method
 def get_user_collection_role(collection: Any, user_id: Optional[str]) -> Optional[str]:
     """
     Look up the user's role for a collection by querying the ShareModel.
@@ -413,54 +300,6 @@ def get_user_collection_role(collection: Any, user_id: Optional[str]) -> Optiona
         )
 
     return None
-
-
-@tracer.capture_method
-def _check_collection_permissions(
-    collection: Dict[str, Any], user_id: Optional[str], required_access: str
-) -> bool:
-    """
-    Internal function to check if user has required permissions for collection.
-
-    Args:
-        collection: Collection metadata
-        user_id: User ID requesting access
-        required_access: Required access level
-
-    Returns:
-        True if access is granted, False otherwise
-    """
-    # Public collections allow read access to everyone
-    if required_access == ACCESS_LEVELS["READ"] and collection.get("isPublic", False):
-        return True
-
-    # No user ID provided - deny access for non-public collections
-    if not user_id:
-        return False
-
-    # Owner has all permissions
-    if collection.get("ownerId") == user_id:
-        return True
-
-    # Check shared collection permissions via UserRelationshipModel
-    user_role = get_user_collection_role(collection, user_id)
-
-    if user_role:
-        role_upper = user_role.upper()
-        if required_access == ACCESS_LEVELS["READ"]:
-            return True
-        if required_access == ACCESS_LEVELS["WRITE"] and role_upper == "EDITOR":
-            return True
-        # VIEWER role only gets read access
-        # DELETE and SHARE access restricted to owners
-        return False
-
-    # Authenticated users get read access to all collections
-    if required_access == ACCESS_LEVELS["READ"]:
-        return True
-
-    # Write, delete, and share access restricted to owners
-    return False
 
 
 @tracer.capture_method

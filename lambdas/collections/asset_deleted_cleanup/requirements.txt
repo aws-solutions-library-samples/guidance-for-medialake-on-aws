@@ -1,0 +1,5 @@
+# AWS Lambda Powertools for structured logging, tracing, and metrics
+aws-lambda-powertools>=2.0.0
+
+# AWS SDK (also present in the runtime; pinned for local bundling parity)
+boto3>=1.28.0

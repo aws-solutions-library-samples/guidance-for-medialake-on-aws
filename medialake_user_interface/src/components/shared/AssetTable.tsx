@@ -7,9 +7,11 @@ import {
   TableContainer,
   Checkbox,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import { InlineTextEditor } from "../common/InlineTextEditor";
 import InlineEditActions from "../common/InlineEditActions";
+import { useCollectionAssetPermissions } from "@/permissions";
 import {
   useReactTable,
   getCoreRowModel,
@@ -138,6 +140,7 @@ export function AssetTable<T>({
   canDelete = true,
 }: AssetTableProps<T>): React.ReactElement {
   const { t } = useTranslation();
+  const { canAdd, addTooltip } = useCollectionAssetPermissions();
   const containerRef = useRef<HTMLDivElement>(null);
   const columnHelper = createColumnHelper<T>();
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -524,16 +527,21 @@ export function AssetTable<T>({
               <DownloadIcon fontSize="small" />
             </IconButton>
             {onAddToCollectionClick && (
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCollectionClick(info.row.original, e);
-                }}
-                title={t("common.actions.addToCollection")}
-              >
-                <AddIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title={canAdd ? t("common.actions.addToCollection") : addTooltip}>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={!canAdd}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToCollectionClick(info.row.original, e);
+                    }}
+                    aria-label={t("common.actions.addToCollection")}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
             )}
           </Box>
         ),
@@ -555,6 +563,8 @@ export function AssetTable<T>({
     columnHelper,
     selectedSearchFields,
     availableFields,
+    canAdd,
+    addTooltip,
   ]);
 
   const table = useReactTable({
