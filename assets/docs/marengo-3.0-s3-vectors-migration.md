@@ -1,8 +1,9 @@
-# Migrating S3 Vectors from Marengo 2.7 to 3.0
+# Upgrading to Marengo 3.0 with S3 Vectors
 
-This guide walks through migrating an existing MediaLake deployment from
+This guide walks through upgrading an existing MediaLake deployment from
 TwelveLabs **Marengo 2.7** (1024‑dimension) to **Marengo 3.0** (512‑dimension)
-embeddings when using the **S3 Vectors** store.
+embeddings when using the **S3 Vectors** store. Existing embeddings are **not**
+converted — they are regenerated from the source assets with the 3.0 pipelines.
 
 ## Table of Contents
 
