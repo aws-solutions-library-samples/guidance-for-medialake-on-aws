@@ -1,6 +1,5 @@
 """DELETE /collections/<collection_id> - Delete collection (hard delete)."""
 
-import json
 import os
 from datetime import datetime
 
@@ -14,6 +13,7 @@ from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
     METADATA_SK,
+    USER_PK_PREFIX,
     create_error_response,
 )
 from db_models import (
@@ -24,6 +24,7 @@ from db_models import (
 )
 from pynamodb.exceptions import DoesNotExist
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import delete_collection_document
 
 logger = Logger(
     service="collections-ID-delete", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -32,8 +33,16 @@ tracer = Tracer(service="collections-ID-delete")
 metrics = Metrics(namespace="medialake", service="collection-detail")
 
 
-def _delete_collection_recursive(collection_id, user_id, current_timestamp):
+MAX_DELETE_DEPTH = 20
+
+
+def _delete_collection_recursive(collection_id, user_id, depth=0):
     """Recursively delete a collection and all its children using PynamoDB"""
+    if depth > MAX_DELETE_DEPTH:
+        raise ValueError(
+            f"Maximum collection nesting depth ({MAX_DELETE_DEPTH}) exceeded during delete"
+        )
+
     logger.info(f"[CASCADE] Deleting collection: {collection_id}")
 
     # Step 1: Query for child collections using CHILD# references
@@ -54,7 +63,7 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
         child_id = child_ref.childCollectionId
         if child_id:
             logger.info(f"[CASCADE] Recursively deleting child: {child_id}")
-            _delete_collection_recursive(child_id, user_id, current_timestamp)
+            _delete_collection_recursive(child_id, user_id, depth=depth + 1)
 
     # Step 3: Delete this collection's items (query all items in partition)
     deleted_count = 0
@@ -70,18 +79,16 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
     except Exception as e:
         logger.warning(f"[CASCADE] Error querying collection items: {e}")
 
-    # Step 4: Query user relationships (GSI2) - users who have access to this collection
+    # Step 4: Query user relationships (GSI2) - users who have access to this
+    # collection. These rows live in each user's partition
+    # (PK=USER#{user_id}, SK=COLL#{collection_id}) and are only reachable via
+    # the ItemCollectionsGSI keyed on GSI2_PK=COLL#{collection_id}.
     try:
-        # UserRelationshipModel has GSI2_PK = COLL#{collection_id}
-        # We need to query the GSI to find all user relationships
         for user_rel in UserRelationshipModel.GSI2_PK_index.query(
             f"{COLLECTION_PK_PREFIX}{collection_id}"
         ):
             items_to_delete.append((user_rel.PK, user_rel.SK))
             deleted_count += 1
-    except AttributeError:
-        # GSI2 index not defined, query directly
-        logger.warning("[CASCADE] GSI2 index not available for user relationships")
     except Exception as e:
         logger.warning(f"[CASCADE] Error querying user relationships: {e}")
 
@@ -93,11 +100,14 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
             batch = items_to_delete[i : i + batch_size]
             with CollectionModel.batch_write() as batch_writer:
                 for pk, sk in batch:
-                    # Determine which model to use based on SK prefix
-                    if sk == METADATA_SK:
-                        batch_writer.delete(CollectionModel(pk, sk))
-                    elif sk.startswith("USER#"):
+                    # Determine which model to use. User-relationship rows are
+                    # identified by their PK (USER#...) since their SK is
+                    # COLL#{id}; everything else lives in the COLL# partition
+                    # and is identified by its SK prefix.
+                    if pk.startswith(USER_PK_PREFIX):
                         batch_writer.delete(UserRelationshipModel(pk, sk))
+                    elif sk == METADATA_SK:
+                        batch_writer.delete(CollectionModel(pk, sk))
                     elif sk.startswith(CHILD_SK_PREFIX):
                         batch_writer.delete(ChildReferenceModel(pk, sk))
                     elif sk.startswith("ASSET#") or sk.startswith("ITEM#"):
@@ -122,6 +132,11 @@ def _delete_collection_recursive(collection_id, user_id, current_timestamp):
     logger.info(
         f"[CASCADE] Deleted {deleted_count} items from collection {collection_id}"
     )
+
+    # Write-through: remove from OpenSearch immediately so the collection
+    # disappears from list/search results without waiting for stream sync.
+    delete_collection_document(collection_id)
+
     return deleted_count
 
 
@@ -159,9 +174,7 @@ def register_route(app):
                 )
 
             # Step 2: Recursively delete this collection and all children
-            total_deleted = _delete_collection_recursive(
-                collection_id, user_id, current_timestamp
-            )
+            total_deleted = _delete_collection_recursive(collection_id, user_id)
 
             # Step 2.5: Remove this collection from all collection groups (cascade)
             try:
@@ -229,23 +242,18 @@ def register_route(app):
             )
 
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": {
-                            "id": collection_id,
-                            "status": "DELETED",
-                            "itemsDeleted": total_deleted,
-                            "deletionType": "CASCADE",
-                        },
-                        "meta": {
-                            "timestamp": current_timestamp,
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": {
+                    "id": collection_id,
+                    "status": "DELETED",
+                    "itemsDeleted": total_deleted,
+                    "deletionType": "CASCADE",
+                },
+                "meta": {
+                    "timestamp": current_timestamp,
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except (BadRequestError, NotFoundError):

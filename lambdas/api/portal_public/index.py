@@ -14,6 +14,7 @@ Handles all public-facing portal routes:
 import json
 import os
 import re
+from decimal import Decimal
 from typing import Any, Dict, List
 
 import boto3
@@ -68,6 +69,32 @@ METADATA_SK = "METADATA"
 DEST_SK_PREFIX = "DEST#"
 INDEX_SK = "INDEX"
 
+
+def _json_default(value):
+    """JSON serializer default hook for the public API responses.
+
+    boto3's DynamoDB *resource* deserializes every Number attribute into a
+    ``decimal.Decimal``. The previous ``default=str`` hook stringified those
+    into quoted JSON strings (e.g. ``"680"``), which broke the frontend: the
+    public ``UploadPortalPage`` passes ``appearance.layout.cardMaxWidth``
+    straight into MUI's ``sx`` ``maxWidth``. A numeric ``680`` renders as
+    ``max-width: 680px``, but the string ``"680"`` is invalid CSS and the
+    browser silently drops it (``max-width: none``) — the reported
+    "max width setting doesn't work" bug. The same stringification affected
+    every other numeric appearance field (``cardBorderRadius``,
+    ``cardPadding``, ``pageVerticalPadding``, ``logoSize``, ``bannerHeight``,
+    ``baseFontSize``, ``headingFontWeight``) plus ``maxFileSizeBytes`` /
+    ``maxFilesPerSession``.
+
+    Convert ``Decimal`` to a native ``int`` (integral values) or ``float`` so
+    the JSON carries real numbers; fall back to ``str`` for any other
+    non-JSON-native type to preserve the previous behavior.
+    """
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    return str(value)
+
+
 cors_config = CORSConfig(
     allow_origin="*",
     allow_headers=[
@@ -76,13 +103,14 @@ cors_config = CORSConfig(
         "Authorization",
         "X-Api-Key",
         "X-Amz-Security-Token",
+        "X-Portal-Session",
     ],
     expose_headers=["X-Request-Id"],
     max_age=300,
 )
 
 app = APIGatewayRestResolver(
-    serializer=lambda x: json.dumps(x, default=str),
+    serializer=lambda x: json.dumps(x, default=_json_default),
     strip_prefixes=["/portal"],
     cors=cors_config,
 )
@@ -216,6 +244,99 @@ def create_multipart_upload(
         kwargs["Metadata"] = metadata
     response = s3_client.create_multipart_upload(**kwargs)
     return response["UploadId"]
+
+
+# ---------------------------------------------------------------------------
+# Portal metadata → automation namespace resolution
+# ---------------------------------------------------------------------------
+#
+# See .kiro/specs/multi-page-upload-portals/portal-metadata-automation-design.md
+#
+# The client submits raw form values keyed by each field's slug. The SERVER is
+# the source of truth for automation: it (1) drops any client-supplied `ml-*`
+# key (directives are never trusted from the client), (2) resolves the
+# collection-picker field's value against the portal's SAVED allow-list and
+# unions the fixed ids into the `ml-collection-ids` directive, (3) prefixes the
+# remaining user fields with `ml-usr-`, and (4) stamps provenance. A user
+# field's slug matches ^[a-z0-9_]+$ (no hyphen) so it can never collide with a
+# bare `ml-` directive.
+
+ML_DIRECTIVE_PREFIX = "ml-"
+ML_USER_PREFIX = "ml-usr-"
+COLLECTION_IDS_DIRECTIVE = "ml-collection-ids"
+SOURCE_DIRECTIVE = "ml-source"
+PORTAL_ID_DIRECTIVE = "ml-portal-id"
+PORTAL_SOURCE_VALUE = "upload-portal"
+
+
+def _slug(label: Any) -> str:
+    """Slugify a label exactly like the frontend `slug()` helper: lowercase,
+    non-alphanumeric runs → `_`, trim leading/trailing `_`."""
+    s = re.sub(r"[^a-z0-9]+", "_", str(label).strip().lower())
+    return s.strip("_")
+
+
+def _resolve_portal_metadata(
+    portal: Dict[str, Any], portal_id: str, submitted: Dict[str, Any] | None
+) -> Dict[str, str]:
+    """Translate client-submitted form metadata into the server-trusted S3
+    user-metadata namespace.
+
+    Returns the dict of metadata keys/values to attach as `x-amz-meta-*`.
+    """
+    submitted = submitted or {}
+    fields = portal.get("metadataFields") or []
+
+    # Locate the (at most one) collection-picker field and its submitted key.
+    picker = next(
+        (f for f in fields if (f or {}).get("role") == "collection-picker"), None
+    )
+    picker_key = _slug(picker["label"]) if picker and picker.get("label") else None
+
+    result: Dict[str, str] = {}
+
+    # User fields → ml-usr-*, dropping any client-sent directive keys and the
+    # collection-picker key (consumed into the directive below).
+    for key, value in submitted.items():
+        key_str = str(key)
+        if key_str.lower().startswith(ML_DIRECTIVE_PREFIX):
+            logger.warning(
+                "Dropping client-supplied reserved metadata key: %s", key_str
+            )
+            continue
+        if picker_key and key_str == picker_key:
+            continue
+        if value is None:
+            continue
+        result[f"{ML_USER_PREFIX}{key_str}"] = str(value)
+
+    # Resolve collection ids server-side against the saved allow-list.
+    if picker:
+        cfg = picker.get("roleConfig") or {}
+        allowed_ids = {
+            c.get("id")
+            for c in (cfg.get("allowedCollections") or [])
+            if isinstance(c, dict) and c.get("id")
+        }
+        raw = submitted.get(picker_key, "") if picker_key else ""
+        # The client comma-joins multi-select arrays (", "); split + trim.
+        chosen = [s.strip() for s in str(raw).split(",") if s.strip()]
+        valid = [cid for cid in chosen if cid in allowed_ids]
+        if len(valid) != len(chosen):
+            dropped = [cid for cid in chosen if cid not in allowed_ids]
+            logger.warning(
+                "Dropped collection ids not in portal allow-list: %s", dropped
+            )
+        fixed = [c for c in (cfg.get("fixedCollectionIds") or []) if c]
+        # Union, preserving order and de-duplicating.
+        final_ids = list(dict.fromkeys([*valid, *fixed]))
+        if final_ids:
+            result[COLLECTION_IDS_DIRECTIVE] = ",".join(final_ids)
+
+    # Provenance directives (always present for portal uploads).
+    result[SOURCE_DIRECTIVE] = PORTAL_SOURCE_VALUE
+    result[PORTAL_ID_DIRECTIVE] = str(portal_id)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +487,47 @@ def _validate_content_type(content_type):
 
 
 # ---------------------------------------------------------------------------
+# Appearance asset resolution
+# ---------------------------------------------------------------------------
+
+
+def _resolve_appearance_asset_urls(appearance):
+    """Resolve the read-time-only `bannerUrl`/`faviconUrl` from their stored S3
+    keys so the public portal page can render the admin-configured banner and
+    favicon (Requirement 7.7).
+
+    The visual editor persists `bannerS3Key` and `faviconS3Key` inside
+    `appearance.branding`; the resolved URLs are intentionally NOT stored (they
+    are derived from the CloudFront domain at read time, exactly like the
+    portal `logoUrl`). Without this resolution the public renderer never
+    receives a `bannerUrl`/`faviconUrl` and silently drops the banner/favicon
+    even though the admin configured them.
+
+    Returns a shallow copy of `appearance` with the URLs populated; passes the
+    value through unchanged when there is no appearance, no branding map, or no
+    CloudFront domain configured.
+    """
+    if not isinstance(appearance, dict):
+        return appearance
+
+    branding = appearance.get("branding")
+    if not isinstance(branding, dict) or not CLOUDFRONT_DOMAIN:
+        return appearance
+
+    resolved_branding = dict(branding)
+    banner_key = branding.get("bannerS3Key")
+    if banner_key:
+        resolved_branding["bannerUrl"] = f"https://{CLOUDFRONT_DOMAIN}/{banner_key}"
+    favicon_key = branding.get("faviconS3Key")
+    if favicon_key:
+        resolved_branding["faviconUrl"] = f"https://{CLOUDFRONT_DOMAIN}/{favicon_key}"
+
+    resolved = dict(appearance)
+    resolved["branding"] = resolved_branding
+    return resolved
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -394,6 +556,7 @@ def get_portal(slug: str):
                 "allowFolderCreation": item.get("allowFolderCreation", False),
                 "order": item.get("order", 0),
                 "pathSegments": item.get("pathSegments", []),
+                "pageNumber": item.get("pageNumber"),
             }
         )
 
@@ -413,6 +576,8 @@ def get_portal(slug: str):
         "maxFilesPerSession": portal.get("maxFilesPerSession"),
         "structuredPathMode": portal.get("structuredPathMode", False),
         "captchaEnabled": portal.get("captchaEnabled", False),
+        "appearance": _resolve_appearance_asset_urls(portal.get("appearance")),
+        "pages": portal.get("pages", []),
     }
 
 
@@ -493,10 +658,14 @@ def post_upload(slug: str):
 
     bucket = connector["storageIdentifier"]
 
+    # Resolve the client-submitted form metadata into the server-trusted
+    # namespace (ml-usr-* user fields, ml-collection-ids directive validated
+    # against the saved allow-list, provenance). See _resolve_portal_metadata.
+    s3_metadata = _resolve_portal_metadata(portal, portal_id, metadata)
+
     if is_multipart_upload_required(file_size):
-        s3_metadata = {k: v for k, v in metadata.items()} if metadata else None
         upload_id = create_multipart_upload(
-            bucket, s3_key, content_type, metadata=s3_metadata
+            bucket, s3_key, content_type, metadata=s3_metadata or None
         )
         part_size, total_parts = _calculate_part_size(file_size)
         return {
@@ -512,7 +681,7 @@ def post_upload(slug: str):
         bucket,
         s3_key,
         content_type,
-        metadata=metadata if metadata else None,
+        metadata=s3_metadata or None,
         max_size_bytes=portal.get("maxFileSizeBytes"),
     )
     return {

@@ -17,6 +17,7 @@ import {
   Alert,
   Breadcrumbs,
   Link,
+  Chip,
   useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -29,6 +30,9 @@ import {
   ChevronLeft,
   ChevronRight,
   AccountTree as CollectionsTreeIcon,
+  Public as PublicIcon,
+  Lock as PrivateIcon,
+  People as SharedIcon,
 } from "@mui/icons-material";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
@@ -45,7 +49,10 @@ import {
   useGetCollectionTypes,
 } from "@/api/hooks/useCollections";
 import { useGetCollectionAssets } from "@/api/hooks/useCollections";
-import { CollectionCardSimple } from "@/features/dashboard/components/CollectionCardSimple";
+import { CollectionCard } from "@/components/collections/CollectionCard";
+import { ALL_ICONS } from "@/components/collections/ThumbnailSelector";
+import { useCollectionUsers } from "@/api/hooks/useCollectionUsers";
+import { useCollectionViewPreferences } from "@/hooks/useCollectionViewPreferences";
 import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import AssetResultsView from "../components/shared/AssetResultsView";
@@ -150,14 +157,26 @@ const CollectionViewPage: React.FC = () => {
   const searchMetadata = assetsData?.searchMetadata;
 
   // Get child collections for sub-collection cards (backend returns all, up to 1,000)
-  const { data: childCollectionsResponse, isLoading: isLoadingChildren } = useGetChildCollections(
-    id!
-  );
+  const { data: childCollectionsResponse } = useGetChildCollections(id!);
   const childCollections = childCollectionsResponse?.data || [];
 
   // Get collection types for sub-collection card icons/colors
   const { data: collectionTypesResponse } = useGetCollectionTypes();
   const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Resolve owner UID → friendly display name via the collections users endpoint.
+  // Falls back to the raw ownerId when the user list isn't available (e.g. no
+  // `collections:edit` permission) or the owner isn't in the list.
+  const { data: collectionUsers } = useCollectionUsers();
+  const ownerDisplayName = React.useMemo(() => {
+    if (!collection?.ownerId) return "—";
+    const user = collectionUsers?.find((u) => u.username === collection.ownerId);
+    if (user) {
+      const parts = [user.given_name, user.family_name].filter(Boolean);
+      return parts.length > 0 ? parts.join(" ") : user.email || collection.ownerId;
+    }
+    return collection.ownerId;
+  }, [collection?.ownerId, collectionUsers]);
 
   // Get ancestors from collection data (now included in collection response)
   const ancestors = collection?.ancestors || [];
@@ -171,6 +190,13 @@ const CollectionViewPage: React.FC = () => {
     initialShowMetadata: true,
     initialGroupByType: false,
   });
+
+  // Card display preferences — shared with the main Collections page through
+  // localStorage, so a user's preset/field/size choice persists across surfaces.
+  // No availableMetadataKeys here: the detail page doesn't fetch the keys
+  // endpoint; if the user hasn't saved prefs yet, the hook's DEFAULT_PREFS (rich
+  // with an empty visibleMetadataKeys list) is exactly what we want.
+  const { prefs: cardDisplayPrefs } = useCollectionViewPreferences();
 
   const [editingAssetId, setEditingAssetId] = useState<string>();
   const [editedName, setEditedName] = useState<string>();
@@ -265,6 +291,7 @@ const CollectionViewPage: React.FC = () => {
 
       // Use the collectionItemId (SK) if available, otherwise fall back to InventoryID
       // The collectionItemId is the SK from DynamoDB (e.g., "ITEM#uuid" or "ASSET#uuid")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const itemId = (asset as any).collectionItemId || asset.InventoryID;
 
       if (id && itemId) {
@@ -282,6 +309,7 @@ const CollectionViewPage: React.FC = () => {
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
       // Check if this asset has clip data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const clipData = (selectedAssetForCollection as any).clipData;
       let clipBoundary = undefined;
 
@@ -519,6 +547,7 @@ const CollectionViewPage: React.FC = () => {
           newFilters.time[key as keyof typeof newFilters.time] = false;
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (newFilters[section] as any)[filter] = !(prev[section] as any)[filter];
       return newFilters;
     });
@@ -772,34 +801,386 @@ const CollectionViewPage: React.FC = () => {
               {/* Action Buttons */}
               {collection && (
                 <Box sx={{ display: "flex", gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setIsCreateSubCollectionOpen(true)}
-                    size="small"
-                  >
-                    Create Sub-Collection
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    onClick={handleEditClick}
-                    size="small"
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={handleCollectionDeleteClick}
-                    size="small"
-                  >
-                    Delete
-                  </Button>
+                  {(collection.userRole === "owner" || collection.userRole === "editor") && (
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => setIsCreateSubCollectionOpen(true)}
+                      size="small"
+                    >
+                      Create Sub-Collection
+                    </Button>
+                  )}
+                  {(collection.userRole === "owner" || collection.userRole === "editor") && (
+                    <Button
+                      variant="outlined"
+                      startIcon={<EditIcon />}
+                      onClick={handleEditClick}
+                      size="small"
+                    >
+                      Edit
+                    </Button>
+                  )}
+                  {collection.userRole === "owner" && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={handleCollectionDeleteClick}
+                      size="small"
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </Box>
               )}
             </Box>
+
+            {/* Summary band — thumbnail tile + title + description + tags + info grid.
+                Replaces the previous bare-title layout so the page has a proper
+                overview without relying on the Edit modal to surface owner/dates. */}
+            {collection && (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "220px 1fr auto" },
+                  gap: 2.5,
+                  mb: 3,
+                  alignItems: "flex-start",
+                }}
+              >
+                {/* Thumbnail tile — uses the same landscape aspect ratio as the
+                    collection cards on the list page so uploaded images render
+                    with an identical crop on both surfaces. */}
+                <Box
+                  sx={{
+                    width: { xs: "100%", md: 220 },
+                    height: 140,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    bgcolor: alpha(theme.palette.primary.main, 0.06),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  }}
+                >
+                  {(() => {
+                    if (
+                      collection.thumbnailUrl &&
+                      collection.thumbnailType &&
+                      collection.thumbnailType !== "icon"
+                    ) {
+                      return (
+                        <Box
+                          component="img"
+                          src={collection.thumbnailUrl}
+                          alt={collection.name}
+                          sx={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      );
+                    }
+                    if (collection.thumbnailType === "icon" && collection.thumbnailValue) {
+                      const IconCmp = ALL_ICONS[collection.thumbnailValue];
+                      if (IconCmp) {
+                        return (
+                          <IconCmp
+                            sx={{
+                              fontSize: 64,
+                              color: alpha(theme.palette.primary.main, 0.55),
+                            }}
+                          />
+                        );
+                      }
+                    }
+                    return (
+                      <FolderIcon
+                        sx={{
+                          fontSize: 64,
+                          color: alpha(theme.palette.primary.main, 0.3),
+                        }}
+                      />
+                    );
+                  })()}
+                </Box>
+
+                {/* Title + description + tags + info grid */}
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "1.5rem",
+                      letterSpacing: "-0.01em",
+                      mb: collection.description ? 0.75 : 1.25,
+                    }}
+                  >
+                    {collection.name}
+                  </Typography>
+                  {collection.description && (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: "text.secondary",
+                        fontSize: "0.875rem",
+                        lineHeight: 1.55,
+                        mb: 1.5,
+                        maxWidth: 720,
+                      }}
+                    >
+                      {collection.description}
+                    </Typography>
+                  )}
+                  {Array.isArray(collection.tags) && collection.tags.length > 0 && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 0.75,
+                        mb: 1.75,
+                      }}
+                    >
+                      {collection.tags.map((tag) => (
+                        <Chip
+                          key={tag}
+                          label={`#${tag}`}
+                          size="small"
+                          sx={{
+                            height: 22,
+                            fontSize: "0.72rem",
+                            fontFamily:
+                              'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+                            // Same primary tint as the card tags — keeps the two
+                            // surfaces visually consistent and marks tags as
+                            // interactive tokens (filterable in v1.1) rather than
+                            // passive metadata.
+                            bgcolor: alpha(theme.palette.primary.main, 0.08),
+                            color: theme.palette.primary.main,
+                            border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                            "& .MuiChip-label": { px: 0.9 },
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                  {/* Info grid — inline "Label: Value" pairs in a compact 2-column
+                      layout so each pair reads as one unit with no dead space. */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "auto auto",
+                      },
+                      columnGap: 4,
+                      rowGap: 0.5,
+                    }}
+                  >
+                    {[
+                      {
+                        label: t("collectionsPage.detail.owner", "Owner"),
+                        value: ownerDisplayName,
+                      },
+                      {
+                        label: t("collectionsPage.detail.created", "Created"),
+                        value: collection.createdAt ? formatDate(collection.createdAt) : "—",
+                      },
+                      {
+                        label: t("collectionsPage.detail.items", "Items"),
+                        value: `${collection.itemCount} ${
+                          collection.itemCount === 1 ? "asset" : "assets"
+                        }${
+                          collection.childCollectionCount > 0
+                            ? ` · ${collection.childCollectionCount} sub`
+                            : ""
+                        }`,
+                      },
+                      {
+                        label: t("collectionsPage.detail.updated", "Updated"),
+                        value: collection.updatedAt ? formatDate(collection.updatedAt) : "—",
+                      },
+                    ].map(({ label, value }) => (
+                      <Box
+                        key={label}
+                        sx={{
+                          display: "flex",
+                          alignItems: "baseline",
+                          gap: 0.5,
+                        }}
+                      >
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            color: "text.secondary",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {label}:
+                        </Typography>
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: "0.8125rem",
+                            color: "text.primary",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            minWidth: 0,
+                          }}
+                        >
+                          {value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Visibility pill — anchors to the top-right of the summary band */}
+                <Chip
+                  icon={
+                    collection.sharedWithMe ? (
+                      <SharedIcon sx={{ fontSize: 14 }} />
+                    ) : collection.isPublic ? (
+                      <PublicIcon sx={{ fontSize: 14 }} />
+                    ) : (
+                      <PrivateIcon sx={{ fontSize: 14 }} />
+                    )
+                  }
+                  label={
+                    collection.sharedWithMe
+                      ? t("collectionsPage.labels.shared", "Shared")
+                      : collection.isPublic
+                        ? t("collectionsPage.labels.public", "Public")
+                        : t("collectionsPage.labels.private", "Private")
+                  }
+                  size="small"
+                  sx={{
+                    height: 26,
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                    borderRadius: 999,
+                    bgcolor: collection.isPublic
+                      ? alpha(theme.palette.success.main, 0.12)
+                      : alpha(theme.palette.text.secondary, 0.08),
+                    color: collection.isPublic
+                      ? theme.palette.success.main
+                      : theme.palette.text.secondary,
+                    border: collection.isPublic
+                      ? `1px solid ${alpha(theme.palette.success.main, 0.24)}`
+                      : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    "& .MuiChip-icon": {
+                      color: "inherit",
+                      ml: 0.5,
+                    },
+                  }}
+                />
+              </Box>
+            )}
+
+            {/* Custom Metadata tile grid — replaces the previous Key/Value table.
+                Reads better at any scale (1 entry or 40) and echoes the chip
+                vocabulary used for tags. */}
+            {collection &&
+              collection.customMetadata &&
+              Object.keys(collection.customMetadata).length > 0 && (
+                <Box
+                  sx={{
+                    mb: 3,
+                    p: 2,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 1.5,
+                    }}
+                  >
+                    <Typography
+                      variant="overline"
+                      sx={{
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        fontSize: "0.7rem",
+                        color: "text.secondary",
+                      }}
+                    >
+                      {t("collectionsPage.detail.metadata", "Metadata")}
+                    </Typography>
+                    {(collection.userRole === "owner" || collection.userRole === "editor") && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<EditIcon sx={{ fontSize: 14 }} />}
+                        onClick={handleEditClick}
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.72rem",
+                          py: 0.25,
+                          px: 1,
+                        }}
+                      >
+                        {t("collectionsPage.detail.editMetadata", "Edit metadata")}
+                      </Button>
+                    )}
+                  </Box>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                      gap: 1,
+                    }}
+                  >
+                    {Object.entries(collection.customMetadata).map(([key, value]) => (
+                      <Box
+                        key={key}
+                        sx={{
+                          px: 1.5,
+                          py: 1,
+                          borderRadius: 1.5,
+                          bgcolor: alpha(theme.palette.text.primary, 0.02),
+                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: "0.625rem",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            fontWeight: 700,
+                            color: "text.disabled",
+                            mb: 0.25,
+                          }}
+                        >
+                          {key}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontFamily:
+                              'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
+                            fontSize: "0.82rem",
+                            color: "text.primary",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
 
             {/* Sub-Collections Cards */}
             {childCollections.length > 0 && (
@@ -821,11 +1202,21 @@ const CollectionViewPage: React.FC = () => {
                   sx={{
                     display: "grid",
                     gridTemplateColumns: {
-                      xs: "repeat(1, 1fr)",
-                      sm: "repeat(2, 1fr)",
-                      md: "repeat(3, 1fr)",
-                      lg: "repeat(4, 1fr)",
-                      xl: "repeat(5, 1fr)",
+                      xs: "1fr",
+                      sm: `repeat(auto-fill, minmax(${
+                        cardDisplayPrefs.cardSize === "small"
+                          ? 220
+                          : cardDisplayPrefs.cardSize === "large"
+                            ? 340
+                            : 280
+                      }px, 1fr))`,
+                      md: `repeat(auto-fill, minmax(${
+                        cardDisplayPrefs.cardSize === "small"
+                          ? 220
+                          : cardDisplayPrefs.cardSize === "large"
+                            ? 340
+                            : 280
+                      }px, 1fr))`,
                     },
                     gap: 2,
                   }}
@@ -833,18 +1224,13 @@ const CollectionViewPage: React.FC = () => {
                   {childCollections.map((child) => {
                     const typeInfo = getCollectionTypeInfo(child.collectionTypeId);
                     return (
-                      <CollectionCardSimple
+                      <CollectionCard
                         key={child.id}
-                        name={child.name}
-                        itemCount={child.itemCount}
-                        childCollectionCount={child.childCollectionCount}
-                        isPublic={child.isPublic}
-                        iconName={typeInfo.iconName}
-                        color={typeInfo.color}
-                        thumbnailType={child.thumbnailType}
-                        thumbnailValue={child.thumbnailValue}
-                        thumbnailUrl={child.thumbnailUrl}
-                        onClick={() => navigate(`/collections/${child.id}/view`)}
+                        collection={child}
+                        onClick={(c) => navigate(`/collections/${c.id}/view`)}
+                        accentColor={typeInfo.color}
+                        placeholderIconName={typeInfo.iconName}
+                        display={cardDisplayPrefs}
                       />
                     );
                   })}
@@ -934,7 +1320,9 @@ const CollectionViewPage: React.FC = () => {
                   error={
                     error
                       ? {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           status: (error as any).apiResponse?.status || error.name,
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           message: (error as any).apiResponse?.message || error.message,
                         }
                       : undefined

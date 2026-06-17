@@ -19,6 +19,8 @@ export type Actions =
   | "manage"
   | "run"
   | "add"
+  | "add_assets"
+  | "remove_assets"
   | "disable"
   | "admin";
 

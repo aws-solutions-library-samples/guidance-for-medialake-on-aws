@@ -607,7 +607,7 @@ class FFProbeLayer(Construct):
                             # Create temporary workspace
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
+                            wget --tries=3 --retry-connrefused --waitretry=5 --timeout=30 https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
                             echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
                             mkdir ffmpeg-extracted
                             tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted
@@ -679,7 +679,7 @@ class FFmpegLayer(Construct):
                             # Create temporary workspace
                             TEMP_DIR=$(mktemp -d)
                             cd $TEMP_DIR
-                            wget https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
+                            wget --tries=3 --retry-connrefused --waitretry=5 --timeout=30 https://github.com/BtbN/FFmpeg-Builds/releases/download/{self.FFMPEG_VERSION}/{self.FFMPEG_FILENAME}
                             echo "{self.FFMPEG_SHA256}  {self.FFMPEG_FILENAME}" | sha256sum -c
                             mkdir ffmpeg-extracted
                             tar xvf {self.FFMPEG_FILENAME} -C ffmpeg-extracted

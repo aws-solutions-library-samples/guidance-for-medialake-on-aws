@@ -35,8 +35,7 @@ import type {
  * on hex digits. Invalid lengths (4-digit without alpha, 5, 7) are
  * explicitly rejected so ``#12345`` can't slip past validation.
  */
-export const HEX_COLOR_RE =
-  /^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+export const HEX_COLOR_RE = /^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
 
 /**
  * Matches `rgb(r, g, b)` and `rgba(r, g, b, a)` with an optional alpha in
@@ -91,6 +90,10 @@ export const layoutSchema = z.object({
 
 /** Branding block. Mirrors `PortalAppearanceBranding`. */
 export const brandingSchema = z.object({
+  // `.default(true)` keeps legacy appearance payloads (saved before the
+  // show-logo toggle existed) valid: they parse to `showLogo: true`, matching
+  // the prior always-show behavior.
+  showLogo: z.boolean().default(true),
   logoSize: z.number().int().min(24).max(120),
   logoAlignment: z.enum(["left", "center"]),
   showPoweredBy: z.boolean(),

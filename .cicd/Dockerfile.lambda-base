@@ -1,0 +1,28 @@
+# Base Dockerfile template for Lambda container nodes.
+#
+# IMPORTANT: ContainerImageDeployment copies node source files into a src/
+# subdirectory within the Docker build context. All COPY commands must
+# reference src/ as the source path.
+#
+# Build context layout:
+#   /build-context/
+#   ├── Dockerfile
+#   └── src/
+#       ├── index.py
+#       ├── requirements.txt
+#       └── ... (other source files)
+
+FROM public.ecr.aws/lambda/python:3.12
+
+# Install Python dependencies (if requirements.txt exists)
+COPY src/ /tmp/src/
+RUN if [ -f /tmp/src/requirements.txt ]; then \
+        pip install --no-cache-dir -r /tmp/src/requirements.txt \
+        -t ${LAMBDA_TASK_ROOT}/; \
+    fi && rm -rf /tmp/src
+
+# Copy function code
+COPY src/ ${LAMBDA_TASK_ROOT}/
+
+# Set the Lambda handler
+CMD ["index.lambda_handler"]

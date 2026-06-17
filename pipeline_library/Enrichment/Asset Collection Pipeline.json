@@ -1,0 +1,170 @@
+{
+  "name": "Asset Collection Pipeline",
+  "description": "Creates a collection and adds processed assets to it. Triggered manually or after pipeline completion.",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "dndnode_0",
+        "type": "custom",
+        "position": { "x": 320, "y": 200 },
+        "data": {
+          "nodeId": "trigger_manual",
+          "label": "Manual Trigger (trigger)",
+          "description": "Manually trigger the pipeline for selected assets",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": { "size": 20 },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Supported Content Types": ["video", "audio", "image"]
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_1",
+        "type": "custom",
+        "position": { "x": 600, "y": 200 },
+        "data": {
+          "nodeId": "collection_manager",
+          "label": "Collection Manager (manage)",
+          "description": "Create or update a collection",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": { "size": 20 },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "manageCollection",
+            "method": "manage",
+            "parameters": {
+              "Operation": "create",
+              "Collection Name": "Pipeline Assets",
+              "Description": "Auto-generated collection from pipeline",
+              "Is Public": "false"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_2",
+        "type": "custom",
+        "position": { "x": 880, "y": 200 },
+        "data": {
+          "nodeId": "collection_assets",
+          "label": "Collection Assets (manage_assets)",
+          "description": "Add assets to the collection",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": { "size": 20 },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [{ "name": "any", "description": "Output type: any" }],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "manageCollectionAssets",
+            "method": "manage_assets",
+            "parameters": {
+              "Operation": "add",
+              "Collection ID": "{{collection_manager.output.createdCollection.id}}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "dndnode_3",
+        "type": "custom",
+        "position": { "x": 1160, "y": 200 },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "Pipeline completed successfully",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": { "size": 20 },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": { "method": "success", "parameters": {} }
+        },
+        "width": 200,
+        "height": 113
+      }
+    ],
+    "edges": [
+      {
+        "id": "dndnode_0-dndnode_1",
+        "source": "dndnode_0",
+        "target": "dndnode_1",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_0-dndnode_1"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_1-dndnode_2",
+        "source": "dndnode_1",
+        "target": "dndnode_2",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_1-dndnode_2"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "dndnode_2-dndnode_3",
+        "source": "dndnode_2",
+        "target": "dndnode_3",
+        "type": "custom",
+        "data": {
+          "type": "custom",
+          "text": "Connected",
+          "id": "dndnode_2-dndnode_3"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

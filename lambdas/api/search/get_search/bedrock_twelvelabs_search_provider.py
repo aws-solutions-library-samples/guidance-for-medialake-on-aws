@@ -2,12 +2,10 @@
 Bedrock TwelveLabs search provider implementation for provider+store architecture.
 """
 
-import json
 import os
 import time
 from typing import Dict, List
 
-import boto3
 from opensearchpy import (
     OpenSearch,
     RequestsAWSV4SignerAuth,
@@ -22,6 +20,16 @@ from unified_search_models import (
     SearchResult,
 )
 from unified_search_provider import ProviderPlusStoreSearchProvider
+
+# Keys already present in the result dict when merging extra parent-doc fields
+_PARENT_KNOWN_KEYS = frozenset(
+    {
+        "InventoryID",
+        "DigitalSourceAsset",
+        "DerivedRepresentations",
+        "Metadata",
+    }
+)
 
 
 class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
@@ -145,14 +153,20 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
         return ProviderLocation.INTERNAL
 
     def _get_opensearch_client(self) -> OpenSearch:
-        """Create and return a cached OpenSearch client"""
+        """Create and return a cached OpenSearch client.
+
+        Uses refreshable credentials so that long-lived Lambda containers
+        never sign requests with expired IAM tokens.
+        """
         if self._opensearch_client is None:
+            from refreshable_auth import get_refreshable_credentials
+
             host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
             region = os.environ["AWS_REGION"]
             service_scope = os.environ["SCOPE"]
 
             auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
+                get_refreshable_credentials(), region, service_scope
             )
 
             self._opensearch_client = OpenSearch(
@@ -191,12 +205,9 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             # Check if Bedrock service is available
             try:
-                bedrock_runtime = boto3.client(
-                    "bedrock-runtime", region_name=os.environ["AWS_REGION"]
-                )
                 # This is a simple check to see if we can create the client
                 # In a production environment, you might want to make a test call
-                self.logger.info("Bedrock runtime client created successfully")
+                self.logger.info("Bedrock runtime client available")
             except Exception as e:
                 self.logger.warning(
                     f"Failed to create Bedrock runtime client: {str(e)}"
@@ -304,8 +315,10 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
         """
         import json
 
+        from base_embedding_store import _bedrock_runtime_client
+
         try:
-            bedrock_client = boto3.client("bedrock-runtime")
+            bedrock_client = _bedrock_runtime_client
             inference_profile_id = self._get_regional_inference_profile()
 
             self.logger.info(f"Using Bedrock inference profile: {inference_profile_id}")
@@ -474,18 +487,12 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                     if clips and len(clips) == 1:
                         image_clip = clips[0]
                         source_data["embedding_info"] = {
-                            "model_provider": image_clip.get(
-                                "model_provider", "twelvelabs"
-                            ),
-                            "model_name": image_clip.get("model_name", "marengo"),
-                            "model_version": image_clip.get("model_version", "3.0"),
                             "embedding_representation": image_clip.get(
                                 "embedding_representation", "visual"
                             ),
                             "embedding_granularity": image_clip.get(
                                 "embedding_granularity", "asset"
                             ),
-                            "type": image_clip.get("type", "image"),
                         }
                     # else: no clips for this image, no embedding_info either — that's fine
                 elif "clips" in hit:
@@ -682,7 +689,9 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 )
 
             # Add filters based on query parameters
-            self._add_filters_to_opensearch_query(opensearch_query, query)
+            deferred_filters = self._add_filters_to_opensearch_query(
+                opensearch_query, query
+            )
 
             self.logger.info(
                 "Executing Bedrock TwelveLabs semantic query via OpenSearch"
@@ -702,14 +711,9 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 f"Bedrock TwelveLabs search returned {len(hits)} raw hits from {total_results} total"
             )
 
-            # Debug: Log sample hits to see actual document structure
-            if hits:
-                self.logger.info(
-                    f"[DEBUG] Sample hit structure: {json.dumps(hits[0], indent=2)}"
-                )
-            else:
+            if not hits:
                 self.logger.warning(
-                    "[DEBUG] No hits returned - query may be too restrictive or no matching documents in index"
+                    "No hits returned - query may be too restrictive or no matching documents in index"
                 )
 
             # Process results differently based on model version
@@ -717,7 +721,7 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
 
             if self.model_version == "3.0":
                 # Marengo 3.0: Extract clips from inner_hits (nested asset_embeddings)
-                processed_results = self._process_marengo_30_results(hits)
+                processed_results = self._process_marengo_30_results(hits, query)
                 self.logger.info(
                     f"[PERF] Marengo 3.0 clip processing took: {time.time() - processing_start:.3f}s"
                 )
@@ -748,13 +752,6 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 if "embedding_info" in result:
                     filtered_results.append(result)
                     continue
-
-                # Debug: Log clip embedding_option values before filtering
-                if clips:
-                    clip_options = [clip.get("embedding_option") for clip in clips]
-                    self.logger.info(
-                        f"[DEBUG] Clips before filtering: {len(clips)} clips with embedding_options: {clip_options}, allowed: {allowed_types}"
-                    )
 
                 # Filter clips to only include allowed embedding types
                 # When allowed_types is None (all modes), keep all clips
@@ -830,14 +827,18 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                 provider_location=ProviderLocation.INTERNAL,
             )
 
-    def _process_marengo_30_results(self, hits: List[Dict]) -> List[Dict]:
+    def _process_marengo_30_results(
+        self, hits: List[Dict], query: SearchQuery = None
+    ) -> List[Dict]:
         """
         Process Marengo 3.0 search results from separate clip documents.
 
         For Marengo 3.0, clips are stored as separate documents with inventory_id reference.
         We need to group clips by inventory_id and fetch parent document details.
         """
-        from url_utils import generate_cloudfront_url
+        import re
+
+        from url_utils import generate_cloudfront_urls_batch
 
         # Group clips by inventory_id (parent asset reference)
         clips_by_parent = {}
@@ -846,27 +847,6 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             source = hit.get("_source", {})
             parent_id = source.get("inventory_id") or source.get("InventoryID", "")
             embedding_type = source.get("embedding_type", "video")
-
-            # Log the raw asset-embeddings document (excluding vector fields)
-            source_for_logging = {
-                k: v
-                for k, v in source.items()
-                if not k.startswith("embedding_")
-                or k
-                in (
-                    "embedding_type",
-                    "embedding_granularity",
-                    "embedding_representation",
-                    "embedding_dimension",
-                )
-            }
-            self.logger.info(
-                f"[ASSET-EMBEDDINGS] Raw hit for {parent_id}",
-                extra={
-                    "score": hit.get("_score", 0.0),
-                    "document": source_for_logging,
-                },
-            )
 
             # Skip asset-granularity embeddings for videos (they represent the whole video, not clips)
             # BUT keep asset-granularity embeddings for images (images only have asset-level embeddings)
@@ -881,25 +861,13 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             # Use embedding_granularity (not embedding_scope) and embedding_representation (not embedding_type)
             clip = {
                 "score": hit.get("_score", 0.0),
-                "InventoryID": source.get("InventoryID", parent_id),
-                "embedding_scope": embedding_granularity,  # Map to legacy field for UI compatibility
-                "embedding_option": source.get(
-                    "embedding_representation", "visual"
-                ),  # Use representation for UI
+                "embedding_option": source.get("embedding_representation", "visual"),
                 "start_timecode": source.get("start_timecode", "")
                 or source.get("start_smpte_timecode", ""),
                 "end_timecode": source.get("end_timecode", "")
                 or source.get("end_smpte_timecode", ""),
                 "start_seconds": source.get("start_seconds"),
                 "end_seconds": source.get("end_seconds"),
-                "type": source.get("embedding_type") or source.get("type", "video"),
-                "model_provider": source.get("model_provider", "twelvelabs"),
-                "model_name": source.get("model_name", "marengo"),
-                "model_version": source.get("model_version", "3.0"),
-                "embedding_representation": source.get(
-                    "embedding_representation", "visual"
-                ),
-                "embedding_granularity": embedding_granularity,
             }
 
             if parent_id not in clips_by_parent:
@@ -910,184 +878,187 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
             f"Grouped {len(hits)} clip documents into {len(clips_by_parent)} parent assets"
         )
 
-        # Now fetch parent documents for each parent_id
-        # Use the existing OpenSearch client
+        # Batch-fetch all parent documents in a single query using shared utility.
+        # Deferred metadata filters are applied at query time by OpenSearch so
+        # non-matching parents are excluded without Python post-processing.
+        from metadata_filter_utils import fetch_parent_docs_batch
+
         client = self._get_opensearch_client()
-        index_name = os.environ["OPENSEARCH_INDEX"]
+        # Parent asset documents always live in the main 'media' index,
+        # NOT the asset-embeddings index used for KNN search.
+        parent_index = os.environ.get("OPENSEARCH_INDEX", "media")
+
+        # Extract deferred filters and UI fields from the query
+        deferred_filters = getattr(self, "_deferred_filters", None) or []
+        ui_fields = query.fields if query else None
+
+        parent_lookup = fetch_parent_docs_batch(
+            client=client,
+            index_name=parent_index,
+            inventory_ids=list(clips_by_parent.keys()),
+            filters=deferred_filters if deferred_filters else None,
+            ui_fields=ui_fields,
+        )
+
+        self.logger.info(
+            f"Batch-fetched {len(parent_lookup)} parent docs "
+            f"(requested {len(clips_by_parent)}, {len(clips_by_parent) - len(parent_lookup)} filtered out)"
+        )
 
         processed_results = []
 
         for parent_id, clips in clips_by_parent.items():
-            # Fetch parent document
-            try:
-                search_resp = client.search(
-                    index=index_name,
-                    body={
-                        "query": {
-                            "bool": {
-                                "filter": [
-                                    {"match_phrase": {"InventoryID": parent_id}},
-                                    {
-                                        "nested": {
-                                            "path": "DerivedRepresentations",
-                                            "query": {
-                                                "exists": {
-                                                    "field": "DerivedRepresentations.ID"
-                                                }
-                                            },
-                                        }
-                                    },
-                                ]
-                            }
-                        }
-                    },
-                    size=1,
+            parent_source = parent_lookup.get(parent_id)
+            if not parent_source:
+                self.logger.warning(
+                    f"Parent document not found or filtered out for {parent_id}, skipping"
+                )
+                continue
+
+            # Determine asset type from parent document
+            asset_type = (
+                parent_source.get("DigitalSourceAsset", {}).get("Type", "").lower()
+            )
+
+            # Build result from parent document
+            result = {
+                "InventoryID": parent_id,
+                "DigitalSourceAsset": parent_source.get("DigitalSourceAsset", {}),
+                "DerivedRepresentations": parent_source.get(
+                    "DerivedRepresentations", []
+                ),
+                "score": max(clip["score"] for clip in clips),
+            }
+
+            # Include Metadata fields that were requested by the UI
+            if "Metadata" in parent_source:
+                result["Metadata"] = parent_source["Metadata"]
+
+            # Include any extra top-level fields from _source
+            for key, value in parent_source.items():
+                if key not in _PARENT_KNOWN_KEYS and key not in result:
+                    result[key] = value
+
+            # For images, promote embedding metadata to top level
+            if asset_type == "image" and len(clips) == 1:
+                image_embedding = clips[0]
+                result["embedding_info"] = {
+                    "embedding_representation": image_embedding.get(
+                        "embedding_option", "visual"
+                    ),
+                    "embedding_granularity": image_embedding.get(
+                        "embedding_granularity", "asset"
+                    ),
+                }
+            else:
+                result["clips"] = sorted(
+                    clips, key=lambda x: x.get("score", 0), reverse=True
                 )
 
-                if search_resp["hits"]["total"]["value"] > 0:
-                    parent_source = search_resp["hits"]["hits"][0]["_source"]
+            # Add common ID field
+            if parent_id and ":" in parent_id:
+                result["id"] = parent_id.split(":")[-1]
+            else:
+                result["id"] = parent_id
 
-                    # Determine asset type from parent document
-                    asset_type = (
-                        parent_source.get("DigitalSourceAsset", {})
-                        .get("Type", "")
-                        .lower()
-                    )
+            processed_results.append(result)
 
-                    # Build result from parent document
-                    result = {
-                        "InventoryID": parent_id,
-                        "DigitalSourceAsset": parent_source.get(
-                            "DigitalSourceAsset", {}
-                        ),
-                        "DerivedRepresentations": parent_source.get(
-                            "DerivedRepresentations", []
-                        ),
-                        "FileHash": parent_source.get("FileHash", ""),
-                        "Metadata": parent_source.get("Metadata", {}),
-                        "score": max(clip["score"] for clip in clips),
-                    }
+        # Batch-generate CloudFront URLs for all results at once
+        _THUMBNAIL_PATTERN = re.compile(r"\.(\d{7})\.jpg$")
+        url_requests = []
+        result_url_map = []
 
-                    # For images, promote embedding metadata to top level instead of wrapping in clips
-                    # Images have a single asset-level embedding — the clips wrapper is misleading
-                    if asset_type == "image" and len(clips) == 1:
-                        image_embedding = clips[0]
-                        result["embedding_info"] = {
-                            "model_provider": image_embedding.get(
-                                "model_provider", "twelvelabs"
-                            ),
-                            "model_name": image_embedding.get("model_name", "marengo"),
-                            "model_version": image_embedding.get(
-                                "model_version", "3.0"
-                            ),
-                            "embedding_representation": image_embedding.get(
-                                "embedding_representation", "visual"
-                            ),
-                            "embedding_granularity": image_embedding.get(
-                                "embedding_granularity", "asset"
-                            ),
-                            "type": image_embedding.get("type", "image"),
-                        }
-                    else:
-                        result["clips"] = sorted(
-                            clips, key=lambda x: x.get("score", 0), reverse=True
+        for idx, result in enumerate(processed_results):
+            thumb_req_id = None
+            proxy_req_id = None
+            for rep in result.get("DerivedRepresentations", []):
+                purpose = rep.get("Purpose", "")
+                storage_info = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                if storage_info.get("StorageType") == "s3":
+                    bucket = storage_info.get("Bucket", "")
+                    key = storage_info.get("ObjectKey", {}).get("FullPath", "")
+                    if bucket and key:
+                        req_id = f"m30_{idx}_{purpose}_{len(url_requests)}"
+                        url_requests.append(
+                            {"request_id": req_id, "bucket": bucket, "key": key}
                         )
+                        if purpose == "thumbnail":
+                            thumb_req_id = req_id
+                        elif purpose == "proxy":
+                            proxy_req_id = req_id
+            result_url_map.append((thumb_req_id, proxy_req_id))
 
-                    # Generate URLs for derived representations
-                    derived_reps = parent_source.get("DerivedRepresentations", [])
-                    for rep in derived_reps:
-                        purpose = rep.get("Purpose", "")
-                        storage_info = rep.get("StorageInfo", {}).get(
-                            "PrimaryLocation", {}
-                        )
-
-                        if storage_info.get("StorageType") == "s3":
-                            bucket = storage_info.get("Bucket", "")
-                            key = storage_info.get("ObjectKey", {}).get("FullPath", "")
-
-                            if bucket and key:
-                                url = generate_cloudfront_url(bucket=bucket, key=key)
-                                if purpose == "thumbnail":
-                                    # Use indexed thumbnail (middle frame)
-                                    import re
-
-                                    if ".jpg" in url:
-                                        pattern = r"\.(\d{7})\.jpg$"
-                                        match = re.search(pattern, url)
-                                        if match:
-                                            url = re.sub(pattern, ".0000002.jpg", url)
-                                        else:
-                                            url = url.replace(".jpg", ".0000002.jpg")
-                                    result["thumbnailUrl"] = url
-                                elif purpose == "proxy":
-                                    result["proxyUrl"] = url
-
-                    # Add common ID field
-                    if parent_id and ":" in parent_id:
-                        result["id"] = parent_id.split(":")[-1]
-                    else:
-                        result["id"] = parent_id
-
-                    processed_results.append(result)
-
-                    # Log the processed result (what gets sent to the API response)
-                    result_summary = {
-                        "InventoryID": result.get("InventoryID"),
-                        "asset_type": asset_type,
-                        "score": result.get("score"),
-                        "has_clips": "clips" in result,
-                        "clip_count": len(result["clips"]) if "clips" in result else 0,
-                        "has_embedding_info": "embedding_info" in result,
-                        "embedding_info": result.get("embedding_info"),
-                        "has_thumbnailUrl": "thumbnailUrl" in result,
-                        "has_proxyUrl": "proxyUrl" in result,
-                    }
-                    self.logger.info(
-                        f"[ASSET-EMBEDDINGS] Processed result for {parent_id}",
-                        extra={"result_summary": result_summary},
-                    )
-                else:
-                    self.logger.warning(
-                        f"Parent document not found for {parent_id}, skipping clips"
-                    )
-            except Exception as e:
-                self.logger.error(
-                    f"Error fetching parent document for {parent_id}: {str(e)}"
-                )
+        if url_requests:
+            cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
+            for idx, result in enumerate(processed_results):
+                thumb_req_id, proxy_req_id = result_url_map[idx]
+                if thumb_req_id:
+                    url = cloudfront_urls.get(thumb_req_id)
+                    if url and ".jpg" in url:
+                        match = _THUMBNAIL_PATTERN.search(url)
+                        if match:
+                            url = _THUMBNAIL_PATTERN.sub(".0000002.jpg", url)
+                        else:
+                            url = url.replace(".jpg", ".0000002.jpg")
+                    if url:
+                        result["thumbnailUrl"] = url
+                if proxy_req_id:
+                    url = cloudfront_urls.get(proxy_req_id)
+                    if url:
+                        result["proxyUrl"] = url
 
         # Sort results by score
         processed_results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
         return processed_results
 
-    def _add_filters_to_opensearch_query(self, query: Dict, search_query: SearchQuery):
-        """Add filters to OpenSearch query based on search parameters"""
+    def _add_filters_to_opensearch_query(
+        self, query: Dict, search_query: SearchQuery
+    ) -> List[Dict]:
+        """Add filters to OpenSearch query based on search parameters.
+
+        For Marengo 3.0, the KNN search runs against the asset-embeddings index
+        which only has embedding-level fields. Filters referencing parent-document
+        fields (Metadata.*, format, fileSize, etc.) are deferred and applied at
+        the batched parent-doc fetch step via ``fetch_parent_docs_batch``.
+
+        For Marengo 2.7, all filters can be applied at query time since the KNN
+        runs against the main index.
+
+        Returns:
+            A list of deferred filter dicts (stored on self._deferred_filters
+            for use by _process_marengo_30_results).
+        """
+        from metadata_filter_utils import (
+            build_opensearch_filters,
+            classify_filters_for_embedding_index,
+        )
+
+        self._deferred_filters = []
+
         if not search_query.filters:
-            return
+            return self._deferred_filters
 
-        filters_to_add = []
+        if self.model_version == "3.0":
+            # Split: embedding-index filters run at query time,
+            # everything else deferred to parent-doc fetch
+            embedding_filters, self._deferred_filters = (
+                classify_filters_for_embedding_index(search_query.filters)
+            )
 
-        for filter_item in search_query.filters:
-            field_key = filter_item.get("key")
-            operator = filter_item.get("operator")
-            value = filter_item.get("value")
+            # Translate type filters to embedding_type for the embeddings index
+            filters_to_add = []
+            for f in embedding_filters:
+                key = f.get("key", "")
+                op = f.get("operator", "")
+                value = f.get("value")
 
-            if operator == "in" and isinstance(value, list):
-                if field_key == "mediaType" or field_key == "DigitalSourceAsset.Type":
-                    if self.model_version == "3.0":
-                        # Marengo 3.0 separate documents use embedding_type instead of DigitalSourceAsset.Type
+                if key in ("mediaType", "DigitalSourceAsset.Type"):
+                    if op == "in" and isinstance(value, list):
                         filters_to_add.append(
                             {"terms": {"embedding_type": [v.lower() for v in value]}}
                         )
-                    else:
-                        filters_to_add.append(
-                            {"terms": {"DigitalSourceAsset.Type": value}}
-                        )
-                elif field_key == "DigitalSourceAsset.MainRepresentation.Format":
-                    filters_to_add.append({"terms": {field_key: value}})
-            elif operator == "==" or operator == "eq":
-                if field_key in ("mediaType", "DigitalSourceAsset.Type"):
-                    if self.model_version == "3.0":
+                    elif op in ("term", "==", "eq"):
                         filters_to_add.append(
                             {
                                 "term": {
@@ -1100,29 +1071,36 @@ class BedrockTwelveLabsSearchProvider(ProviderPlusStoreSearchProvider):
                             }
                         )
                     else:
-                        filters_to_add.append(
-                            {"term": {"DigitalSourceAsset.Type": value}}
-                        )
+                        _converted = build_opensearch_filters([f])
+                        if _converted:
+                            filters_to_add.append(_converted[0])
+                elif key in (
+                    "embedding_type",
+                    "embedding_representation",
+                    "embedding_granularity",
+                ):
+                    filters_to_add.extend(build_opensearch_filters([f]))
                 else:
-                    filters_to_add.append({"term": {field_key: value}})
-            elif operator == "range" and isinstance(value, dict):
-                range_filter = {"range": {field_key: {}}}
-                if "gte" in value:
-                    range_filter["range"][field_key]["gte"] = value["gte"]
-                if "lte" in value:
-                    range_filter["range"][field_key]["lte"] = value["lte"]
-                if "gt" in value:
-                    range_filter["range"][field_key]["gt"] = value["gt"]
-                if "lt" in value:
-                    range_filter["range"][field_key]["lt"] = value["lt"]
-                filters_to_add.append(range_filter)
+                    filters_to_add.extend(build_opensearch_filters([f]))
 
-        # Add all filters to the query
-        # Ensure the 'must' array exists in the filter bool (Marengo 3.0 queries may only have 'should')
+            filters_to_add = [f for f in filters_to_add if f is not None]
+
+            if self._deferred_filters:
+                self.logger.info(
+                    f"[FILTER] Deferring {len(self._deferred_filters)} filters to parent-doc fetch: "
+                    f"{[f.get('key') for f in self._deferred_filters]}"
+                )
+        else:
+            # Marengo 2.7: all filters apply at query time (main index has all fields)
+            filters_to_add = build_opensearch_filters(search_query.filters)
+
+        # Append to the query's filter bool
         filter_bool = query["query"]["bool"]["filter"]["bool"]
         if "must" not in filter_bool:
             filter_bool["must"] = []
         filter_bool["must"].extend(filters_to_add)
+
+        return self._deferred_filters
 
     def search(self, query: SearchQuery) -> SearchResult:
         """Execute the complete search process"""

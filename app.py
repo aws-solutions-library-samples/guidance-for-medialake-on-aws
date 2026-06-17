@@ -47,6 +47,7 @@ from medialake_stacks.integrations_environment_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.pipeline_stack import PipelineStack, PipelineStackProps
+from medialake_stacks.portal_api_stack import PortalApiStack, PortalApiStackProps
 
 # from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps  # Deprecated - now using CollectionTypesStack
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
@@ -67,7 +68,12 @@ if hasattr(config, "logging") and hasattr(config.logging, "level"):
 logger = get_logger("CDKApp")
 logger.info(f"Initializing MediaLake CDK App with log level: {config.logging.level}")
 
-app = cdk.App()
+if config.deployment_options.use_cli_credentials:
+    app = cdk.App(default_stack_synthesizer=cdk.CliCredentialsStackSynthesizer())
+    logger.info("Using CliCredentialsStackSynthesizer (local credentials)")
+else:
+    app = cdk.App()
+    logger.info("Using DefaultStackSynthesizer (bootstrap roles)")
 
 # us-east-1 environment, required for the WAF, webACL configuration has to be deployed in us-east-1
 env_us_east_1 = cdk.Environment(account=app.account, region="us-east-1")
@@ -218,7 +224,6 @@ class MediaLakeStackProps:
     cognito_stack: CognitoStack
     resource_collector: ApiResourceCollector
     cloudfront_domain: str  # CloudFront distribution domain for CORS configuration
-    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class MediaLakeStack(cdk.Stack):
@@ -292,6 +297,7 @@ class MediaLakeStack(cdk.Stack):
                 asset_table_asset_id_index_arn=props.base_infrastructure.asset_table_asset_id_index_arn,
                 asset_table_s3_path_index_arn=props.base_infrastructure.asset_table_s3_path_index_arn,
                 pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
+                application_service_events_internal_event_bus=props.base_infrastructure.application_service_events_internal_event_bus,
                 asset_table=props.base_infrastructure.asset_table,
                 vpc=props.base_infrastructure.vpc,
                 security_group=props.base_infrastructure.security_group,
@@ -316,12 +322,26 @@ class MediaLakeStack(cdk.Stack):
                 identity_pool=props.cognito_stack.identity_pool,
                 user_pool_client=props.cognito_stack.user_pool_client,
                 waf_acl_arn=ResourceImporter.get_waf_acl_arn(),  # Use importer instead of direct access
-                cloudfront_domain=props.cloudfront_domain,  # CloudFront domain passed from UserInterfaceStack
                 # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
-                ui_origin_host=props.ui_origin_host,  # Custom UI origin host, if configured
             ),
         )
+
+        # Portal (public upload-portal) API — hosted in its own nested stack to
+        # stay under CloudFormation's 500-resource per-stack limit. Imports the
+        # same shared REST API and reuses the connector table from the API stack.
+        portal_api_stack = PortalApiStack(
+            self,
+            "MediaLakePortalApiStack",
+            props=PortalApiStackProps(
+                system_settings_table=settings_stack.system_settings_table_name,
+                cognito_user_pool_id=props.cognito_stack.user_pool_id,
+                connector_table=api_gateway_stack.connector_table,
+                iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
+                cloudfront_domain=props.cloudfront_domain,
+            ),
+        )
+        portal_api_stack.add_dependency(api_gateway_stack)
 
         users_groups_roles_stack = UsersGroupsStack(
             self,
@@ -357,12 +377,26 @@ class MediaLakeStack(cdk.Stack):
                 security_group=props.base_infrastructure.security_group,
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
                 asset_table=props.base_infrastructure.asset_table,
+                asset_events_bus=props.base_infrastructure.application_service_events_internal_event_bus,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)
 
         # Store reference to collections_stack
         self._collections_stack = collections_stack
+
+        # Allow the users Lambda to migrate collections owned by a deleted user
+        # to the deleting administrator (instead of orphaning them). The users
+        # stack is created before the collections stack, so the table reference
+        # and IAM grant are wired up here once both exist.
+        users_groups_roles_stack.users_api.users_lambda.function.add_environment(
+            "COLLECTIONS_TABLE_NAME",
+            collections_stack.collections_table.table_name,
+        )
+        collections_stack.collections_table.grant_read_write_data(
+            users_groups_roles_stack.users_api.users_lambda.function
+        )
+        users_groups_roles_stack.add_dependency(collections_stack)
 
         # Create the Dashboard Stack
         dashboard_stack = DashboardStack(
@@ -392,11 +426,12 @@ class MediaLakeStack(cdk.Stack):
                 collections_table=collections_stack.collections_table,
                 system_settings_table=settings_stack.system_settings_table.table,
                 api_keys_table=settings_stack.api_keys_table.table,
-                portal_settings_integration_lambda=api_gateway_stack.portal_management_lambda,
+                portal_settings_integration_lambda=portal_api_stack.portal_management_lambda,
             ),
         )
         collection_types_stack.add_dependency(collections_stack)
         collection_types_stack.add_dependency(api_gateway_stack)
+        collection_types_stack.add_dependency(portal_api_stack)
         collection_types_stack.add_dependency(settings_stack)
 
         # Store reference to collection_types_stack
@@ -601,7 +636,6 @@ medialake_stack = MediaLakeStack(
         cognito_stack=cognito_stack,
         resource_collector=api_resource_collector,  # Pass the resource collector
         cloudfront_domain="",  # Will be set after UI stack is created
-        ui_origin_host=None,  # Will be set after UI stack is created
     ),
     env=env,
 )

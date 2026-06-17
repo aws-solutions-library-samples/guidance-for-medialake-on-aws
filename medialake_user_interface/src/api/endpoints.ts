@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
     BASE: (id: string) => `/pipelines/executions/${id}/retry`,
   },
   SEARCH: "/search",
+  SEARCH_FIELDS_MAPPING: "/search/fields/mapping",
+  SEARCH_FIELDS_VALUES: "/search/fields/values",
   SEARCH_CONNECTORS: "/search/connectors",
   ASSETS: {
     GET: (id: string) => `/assets/${id}`,
@@ -58,9 +60,12 @@ export const API_ENDPOINTS = {
 
   DISABLE_USER: (userId: string) => `/users/${userId}/disable`,
   ENABLE_USER: (userId: string) => `/users/${userId}/enable`,
+  RESET_PASSWORD: (userId: string) => `/users/${userId}/reset-password`,
+  CHANGE_PASSWORD: "/users/profile/change-password",
   SYSTEM_SETTINGS: {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",
+    METADATA_FIELDS: "/settings/system/metadata-fields",
   },
   FAVORITES: {
     BASE: "/users/favorites",
@@ -82,6 +87,7 @@ export const API_ENDPOINTS = {
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
     THUMBNAIL: (id: string) => `/collections/${id}/thumbnail`,
+    METADATA_KEYS: "/collections/metadata-keys",
   },
   PORTALS: {
     BASE: "/settings/portals",
@@ -93,6 +99,18 @@ export const API_ENDPOINTS = {
     FAVICON: (id: string) => `/settings/portals/${id}/favicon`,
     TOKENS: (id: string) => `/settings/portals/${id}/tokens`,
     TOKEN_DELETE: (id: string, tokenId: string) => `/settings/portals/${id}/tokens/${tokenId}`,
+  },
+  PORTAL_THEMES: {
+    BASE: "/settings/portal-themes",
+    GET: (id: string) => `/settings/portal-themes/${id}`,
+    UPDATE: (id: string) => `/settings/portal-themes/${id}`,
+    DELETE: (id: string) => `/settings/portal-themes/${id}`,
+  },
+  PORTAL_TEMPLATES: {
+    BASE: "/settings/portal-templates",
+    GET: (id: string) => `/settings/portal-templates/${id}`,
+    UPDATE: (id: string) => `/settings/portal-templates/${id}`,
+    DELETE: (id: string) => `/settings/portal-templates/${id}`,
   },
   COLLECTION_TYPES: {
     BASE: "/settings/collection-types",

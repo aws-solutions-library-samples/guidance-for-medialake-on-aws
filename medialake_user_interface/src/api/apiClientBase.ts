@@ -16,5 +16,6 @@ export abstract class ApiClientBase {
     if (token) {
       return token;
     }
+    throw new Error("No authentication token available");
   }
 }

@@ -19,6 +19,8 @@ VALID_ACTIONS = {
     "upload",
     "download",
     "publish",
+    "add_assets",
+    "remove_assets",
 }
 
 VALID_RESOURCES = {

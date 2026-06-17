@@ -10,7 +10,6 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from boto3.dynamodb.types import TypeDeserializer
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from opensearchpy.helpers import bulk
-from requests_aws4auth import AWS4Auth
 
 logger = Logger(service="ddb-to-os-index")
 tracer = Tracer()
@@ -167,19 +166,17 @@ class DecimalEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+from opensearchpy import RequestsAWSV4SignerAuth as _StreamSignerAuth
+
 # Initialize AWS credentials and clients
-credentials = boto3.Session().get_credentials()
-awsauth = AWS4Auth(
-    credentials.access_key,
-    credentials.secret_key,
-    REGION,
-    "es",
-    session_token=credentials.token,
-)
+# Use RequestsAWSV4SignerAuth with refreshable credentials so that
+# long-lived Lambda containers never sign requests with expired tokens.
+from refreshable_auth import get_refreshable_credentials
+
 sqs = boto3.client("sqs")
 opensearch_client = OpenSearch(
     hosts=[{"host": HOST, "port": 443}],
-    http_auth=awsauth,
+    http_auth=_StreamSignerAuth(get_refreshable_credentials(), REGION, "es"),
     use_ssl=True,
     verify_certs=True,
     connection_class=RequestsHttpConnection,

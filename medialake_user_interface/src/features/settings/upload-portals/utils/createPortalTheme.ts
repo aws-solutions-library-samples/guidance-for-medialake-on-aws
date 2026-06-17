@@ -16,7 +16,7 @@ import type { PortalAppearance } from "../types/appearance.types";
 export function pickContrastingText(
   backgroundColor: string,
   lightText = "#ffffff",
-  darkText = "#000000",
+  darkText = "#000000"
 ): string {
   const { r, g, b } = parseRgbChannels(backgroundColor) ?? { r: 0, g: 0, b: 0 };
 
@@ -43,17 +43,13 @@ function parseRgbChannels(value: string): { r: number; g: number; b: number } | 
       const r = parseInt(hex.charAt(0) + hex.charAt(0), 16);
       const g = parseInt(hex.charAt(1) + hex.charAt(1), 16);
       const b = parseInt(hex.charAt(2) + hex.charAt(2), 16);
-      return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)
-        ? { r, g, b }
-        : null;
+      return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) ? { r, g, b } : null;
     }
     if (hex.length === 6 || hex.length === 8) {
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
-      return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)
-        ? { r, g, b }
-        : null;
+      return Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) ? { r, g, b } : null;
     }
     return null;
   }

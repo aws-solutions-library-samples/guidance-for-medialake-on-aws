@@ -31,6 +31,8 @@ VALID_PERMISSION_KEYS = {
     "collections:create",
     "collections:edit",
     "collections:delete",
+    "collections:add_assets",
+    "collections:remove_assets",
     # Connectors
     "connectors:view",
     "connectors:create",

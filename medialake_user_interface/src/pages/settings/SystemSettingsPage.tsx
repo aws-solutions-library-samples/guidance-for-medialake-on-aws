@@ -28,6 +28,9 @@ import {
   Chip,
   IconButton,
   InputAdornment,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +39,8 @@ import {
   Cancel as CancelIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
+  ExpandMore as ExpandMoreIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import ApiStatusModal from "@/components/ApiStatusModal";
 import { useSemanticSearchSettings } from "@/features/settings/system/hooks/useSystemSettings";
@@ -44,6 +49,7 @@ import { ApiKeyManagement } from "@/components/settings/api-keys";
 import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
 import CollectionTypesManagement from "@/components/settings/CollectionTypesManagement";
+import MetadataFieldsSettings from "@/components/settings/MetadataFieldsSettings";
 import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 
 // Fallback notification hook
@@ -145,6 +151,7 @@ const SystemSettingsPage: React.FC = () => {
     isApiKeyDialogOpen,
     apiKeyInput,
     isEditingApiKey,
+    availableProviders,
     handleToggleChange,
     handleProviderTypeChange,
     handleEmbeddingStoreChange,
@@ -152,6 +159,7 @@ const SystemSettingsPage: React.FC = () => {
     handleOpenApiKeyDialog,
     handleCloseApiKeyDialog,
     handleSaveApiKey,
+    handleCoactiveAdvancedChange,
     handleSave,
     handleCancel,
     isSaving,
@@ -329,6 +337,7 @@ const SystemSettingsPage: React.FC = () => {
             }}
           >
             <Tab label={t("settings.systemSettings.tabs.search", "Search")} />
+            <Tab label={t("settings.systemSettings.tabs.metadataFields", "Metadata Fields")} />
             <Tab label={t("settings.systemSettings.tabs.apiKeys", "API Keys")} />
             <Tab label={t("settings.systemSettings.tabs.collections", "Collections")} />
             {systemUpgradesEnabled && (
@@ -337,414 +346,568 @@ const SystemSettingsPage: React.FC = () => {
           </Tabs>
         </Box>
 
-        <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <TabPanel value={tabValue} index={0}>
-            <Typography variant="h6" gutterBottom>
-              {t("settings.systemSettings.search.title", "Search Configuration")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {t(
-                "settings.systemSettings.search.description",
-                "Configure the search provider for enhanced search capabilities across your media assets."
-              )}
-            </Typography>
-            <Divider sx={{ my: 3 }} />
+            <Box sx={{ height: "100%", overflow: "auto" }}>
+              <Typography variant="h6" gutterBottom>
+                {t("settings.systemSettings.search.title", "Search Configuration")}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                {t(
+                  "settings.systemSettings.search.description",
+                  "Configure the search provider for enhanced search capabilities across your media assets."
+                )}
+              </Typography>
+              <Divider sx={{ my: 3 }} />
 
-            {isLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error" sx={{ my: 2 }}>
-                {t("settings.systemSettings.search.errorLoading", "Error loading settings")}
-              </Alert>
-            ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {/* 1. Semantic Search Enabled */}
-                <Card
-                  elevation={0}
-                  sx={{
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                  }}
-                >
-                  <CardContent>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="h6" sx={{ mb: 1 }}>
-                          {t(
-                            "settings.systemSettings.search.semanticEnabled",
-                            "Semantic Search Enabled"
-                          )}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {t(
-                            "settings.systemSettings.search.semanticEnabledDesc",
-                            "Enable or disable semantic search functionality"
-                          )}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <Chip
-                          label={settings.isEnabled ? "ON" : "OFF"}
-                          color={settings.isEnabled ? "success" : "error"}
-                          size="small"
-                        />
-                        <Switch
-                          checked={settings.isEnabled}
-                          onChange={(_evt, checked) => handleToggleChange(checked)}
-                          disabled={false}
-                          color="success"
-                          size="medium"
-                        />
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-
-                {/* 2. Semantic Search Provider */}
-                <Card
-                  elevation={0}
-                  sx={{
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                    opacity: settings.isEnabled ? 1 : 0.5,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                      {t("settings.systemSettings.search.provider", "Semantic Search Provider")}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                      {t(
-                        "settings.systemSettings.search.providerDesc",
-                        "Select the AI provider for semantic search capabilities"
-                      )}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <FormControl sx={{ minWidth: 400 }} disabled={!settings.isEnabled}>
-                        <InputLabel>
-                          {t("settings.systemSettings.search.selectProvider", "Select Provider")}
-                        </InputLabel>
-                        <Select
-                          value={settings.provider.type}
-                          label={t(
-                            "settings.systemSettings.search.selectProvider",
-                            "Select Provider"
-                          )}
-                          onChange={(e) => handleProviderTypeChange(e.target.value as any)}
-                        >
-                          <MenuItem value="none">
+              {isLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : error ? (
+                <Alert severity="error" sx={{ my: 2 }}>
+                  {t("settings.systemSettings.search.errorLoading", "Error loading settings")}
+                </Alert>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {/* 1. Semantic Search Enabled */}
+                  <Card
+                    elevation={0}
+                    sx={{
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="h6" sx={{ mb: 1 }}>
                             {t(
-                              "settings.systemSettings.search.selectProviderOption",
-                              "Select a provider..."
+                              "settings.systemSettings.search.semanticEnabled",
+                              "Semantic Search Enabled"
                             )}
-                          </MenuItem>
-                          <MenuItem value="twelvelabs-api">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Typography>
-                                  {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name}
-                                </Typography>
-                                <Chip
-                                  label={t("settings.systemSettings.search.external", "External")}
-                                  size="small"
-                                  color="success"
-                                  sx={{ height: 20, fontSize: "0.7rem" }}
-                                />
-                              </Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video, Audio • 1024D embeddings
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="twelvelabs-bedrock">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Typography>
-                                  {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
-                                </Typography>
-                                <Chip
-                                  label={t("settings.systemSettings.search.internal", "Internal")}
-                                  size="small"
-                                  color="success"
-                                  sx={{ height: 20, fontSize: "0.7rem" }}
-                                />
-                              </Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video, Audio • 1024D embeddings
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="twelvelabs-bedrock-3-0">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Typography>
-                                  {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK_3_0.name}
-                                </Typography>
-                                <Chip
-                                  label={t("settings.systemSettings.search.internal", "Internal")}
-                                  size="small"
-                                  color="success"
-                                  sx={{ height: 20, fontSize: "0.7rem" }}
-                                />
-                              </Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video, Audio • 512D embeddings
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                          <MenuItem value="coactive">
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                <Typography>
-                                  {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
-                                </Typography>
-                                <Chip
-                                  label={t("settings.systemSettings.search.external", "External")}
-                                  size="small"
-                                  color="info"
-                                  sx={{ height: 20, fontSize: "0.7rem" }}
-                                />
-                              </Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Supports: Image, Video
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                      {(settings.provider.type === "twelvelabs-api" ||
-                        settings.provider.type === "coactive") &&
-                        settings.provider.config?.isConfigured && (
-                          <Button
-                            variant="outlined"
-                            startIcon={<EditIcon />}
-                            onClick={() => handleOpenApiKeyDialog(true)}
-                            disabled={false}
-                          >
-                            {t("settings.systemSettings.search.editApiKey", "Edit")}
-                          </Button>
-                        )}
-                      {settings.provider.config?.isConfigured && (
-                        <Chip
-                          icon={<CheckCircleIcon />}
-                          label={t("settings.systemSettings.search.configured", "Configured")}
-                          color="success"
-                          variant="outlined"
-                        />
-                      )}
-                    </Box>
-
-                    {/* Embedding Dimension Information */}
-                    {settings.provider.type !== "none" && settings.provider.type !== "coactive" && (
-                      <Box sx={{ mt: 3 }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          {t(
-                            "settings.systemSettings.search.embeddingDimension",
-                            "Embedding Dimension"
-                          )}
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                          }}
-                        >
-                          <Chip
-                            label={`${
-                              SYSTEM_SETTINGS_CONFIG.PROVIDERS[
-                                settings.provider.type === "twelvelabs-api"
-                                  ? "TWELVE_LABS_API"
-                                  : settings.provider.type === "twelvelabs-bedrock"
-                                    ? "TWELVE_LABS_BEDROCK"
-                                    : "TWELVE_LABS_BEDROCK_3_0"
-                              ]?.dimensions?.[0] || "Unknown"
-                            }D`}
-                            color="primary"
-                            variant="outlined"
-                            size="small"
-                          />
-                          <Typography variant="caption" color="text.secondary">
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
                             {t(
-                              "settings.systemSettings.search.embeddingDimensionDesc",
-                              "Vector space dimension for embeddings"
+                              "settings.systemSettings.search.semanticEnabledDesc",
+                              "Enable or disable semantic search functionality"
                             )}
                           </Typography>
                         </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <Chip
+                            label={settings.isEnabled ? "ON" : "OFF"}
+                            color={settings.isEnabled ? "success" : "error"}
+                            size="small"
+                          />
+                          <Switch
+                            checked={settings.isEnabled}
+                            onChange={(_evt, checked) => handleToggleChange(checked)}
+                            disabled={false}
+                            color="success"
+                            size="medium"
+                          />
+                        </Box>
                       </Box>
-                    )}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                {/* 3. Semantic Search Embedding Store */}
-                <Card
-                  elevation={0}
-                  sx={{
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                    opacity: settings.isEnabled && settings.provider.type !== "coactive" ? 1 : 0.5,
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                      {t(
-                        "settings.systemSettings.search.embeddingStore",
-                        "Semantic Search Embedding Store"
-                      )}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                      {settings.provider.type === "coactive"
-                        ? t(
-                            "settings.systemSettings.search.embeddingStoreCoactiveDesc",
-                            "Coactive AI uses its own external search service and does not require an embedding store configuration."
-                          )
-                        : t(
-                            "settings.systemSettings.search.embeddingStoreDesc",
-                            "Choose where to store and search vector embeddings"
-                          )}
-                    </Typography>
-
-                    {settings.provider.type !== "coactive" ? (
+                  {/* 2. Semantic Search Provider */}
+                  <Card
+                    elevation={0}
+                    sx={{
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 2,
+                      opacity: settings.isEnabled ? 1 : 0.5,
+                    }}
+                  >
+                    <CardContent>
+                      <Typography variant="h6" sx={{ mb: 2 }}>
+                        {t("settings.systemSettings.search.provider", "Semantic Search Provider")}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        {t(
+                          "settings.systemSettings.search.providerDesc",
+                          "Select the AI provider for semantic search capabilities"
+                        )}
+                      </Typography>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                        <FormControl sx={{ minWidth: 400 }} disabled={!settings.isEnabled}>
                           <InputLabel>
-                            {t("settings.systemSettings.search.selectStore", "Select Store")}
+                            {t("settings.systemSettings.search.selectProvider", "Select Provider")}
                           </InputLabel>
                           <Select
-                            value={settings.embeddingStore.type}
-                            label={t("settings.systemSettings.search.selectStore", "Select Store")}
-                            onChange={(e) =>
-                              handleEmbeddingStoreChange(
-                                e.target.value as "opensearch" | "s3-vector"
-                              )
-                            }
+                            value={settings.provider.type}
+                            label={t(
+                              "settings.systemSettings.search.selectProvider",
+                              "Select Provider"
+                            )}
+                            onChange={(e) => handleProviderTypeChange(e.target.value as any)}
                           >
-                            <MenuItem value="opensearch">
-                              {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
+                            <MenuItem value="none">
+                              {t(
+                                "settings.systemSettings.search.selectProviderOption",
+                                "Select a provider..."
+                              )}
                             </MenuItem>
-                            <MenuItem value="s3-vector">
-                              <Typography>
-                                {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
-                              </Typography>
+                            <MenuItem value="twelvelabs-api">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Typography>
+                                    {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_API.name}
+                                  </Typography>
+                                  <Chip
+                                    label={t("settings.systemSettings.search.external", "External")}
+                                    size="small"
+                                    color="success"
+                                    sx={{ height: 20, fontSize: "0.7rem" }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Supports: Image, Video, Audio • 1024D embeddings
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                            <MenuItem value="twelvelabs-bedrock">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Typography>
+                                    {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
+                                  </Typography>
+                                  <Chip
+                                    label={t("settings.systemSettings.search.internal", "Internal")}
+                                    size="small"
+                                    color="success"
+                                    sx={{ height: 20, fontSize: "0.7rem" }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Supports: Image, Video, Audio • 1024D embeddings
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                            <MenuItem value="twelvelabs-bedrock-3-0">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Typography>
+                                    {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK_3_0.name}
+                                  </Typography>
+                                  <Chip
+                                    label={t("settings.systemSettings.search.internal", "Internal")}
+                                    size="small"
+                                    color="success"
+                                    sx={{ height: 20, fontSize: "0.7rem" }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Supports: Image, Video, Audio • 512D embeddings
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                            <MenuItem value="coactive">
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Typography>
+                                    {SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.name}
+                                  </Typography>
+                                  <Chip
+                                    label={t("settings.systemSettings.search.external", "External")}
+                                    size="small"
+                                    color="info"
+                                    sx={{ height: 20, fontSize: "0.7rem" }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Supports: Image, Video
+                                </Typography>
+                              </Box>
                             </MenuItem>
                           </Select>
                         </FormControl>
-
-                        <Button
-                          variant="contained"
-                          onClick={handleSaveEmbeddingStoreSettings}
-                          disabled={!settings.isEnabled || isSaving}
-                          startIcon={
-                            isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />
-                          }
-                        >
-                          {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save")}
-                        </Button>
-                      </Box>
-                    ) : (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <Chip
-                          label={t(
-                            "settings.systemSettings.search.externalService",
-                            "External Service"
+                        {(settings.provider.type === "twelvelabs-api" ||
+                          settings.provider.type === "coactive") &&
+                          settings.provider.config?.isConfigured && (
+                            <Button
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={() => handleOpenApiKeyDialog(true)}
+                              disabled={false}
+                            >
+                              {t("settings.systemSettings.search.editApiKey", "Edit")}
+                            </Button>
                           )}
-                          color="info"
-                          variant="outlined"
-                        />
+                        {settings.provider.config?.isConfigured && (
+                          <Chip
+                            icon={<CheckCircleIcon />}
+                            label={t("settings.systemSettings.search.configured", "Configured")}
+                            color="success"
+                            variant="outlined"
+                          />
+                        )}
                       </Box>
-                    )}
-                  </CardContent>
-                </Card>
 
-                {/* Save & Cancel */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 2,
-                    mt: 4,
-                    pt: 3,
-                    borderTop: `1px solid ${theme.palette.divider}`,
-                  }}
-                >
-                  <Button
-                    variant="outlined"
-                    onClick={handleCancelSettings}
-                    disabled={!hasChanges || isSaving}
-                    startIcon={<CancelIcon />}
+                      {/* Embedding Dimension Information */}
+                      {settings.provider.type !== "none" &&
+                        settings.provider.type !== "coactive" && (
+                          <Box sx={{ mt: 3 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                              {t(
+                                "settings.systemSettings.search.embeddingDimension",
+                                "Embedding Dimension"
+                              )}
+                            </Typography>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Chip
+                                label={`${
+                                  SYSTEM_SETTINGS_CONFIG.PROVIDERS[
+                                    settings.provider.type === "twelvelabs-api"
+                                      ? "TWELVE_LABS_API"
+                                      : settings.provider.type === "twelvelabs-bedrock"
+                                        ? "TWELVE_LABS_BEDROCK"
+                                        : "TWELVE_LABS_BEDROCK_3_0"
+                                  ]?.dimensions?.[0] || "Unknown"
+                                }D`}
+                                color="primary"
+                                variant="outlined"
+                                size="small"
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {t(
+                                  "settings.systemSettings.search.embeddingDimensionDesc",
+                                  "Vector space dimension for embeddings"
+                                )}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+
+                      {/* Coactive Advanced Configuration */}
+                      {settings.provider.type === "coactive" &&
+                        settings.provider.config?.isConfigured && (
+                          <Accordion
+                            elevation={0}
+                            sx={{
+                              mt: 3,
+                              border: `1px solid ${theme.palette.divider}`,
+                              borderRadius: "8px !important",
+                              "&:before": { display: "none" },
+                            }}
+                          >
+                            <AccordionSummary
+                              expandIcon={<ExpandMoreIcon />}
+                              sx={{ borderRadius: 2 }}
+                            >
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <SettingsIcon fontSize="small" color="action" />
+                                <Typography variant="subtitle2">
+                                  {t(
+                                    "settings.systemSettings.search.advancedConfig",
+                                    "Advanced Configuration"
+                                  )}
+                                </Typography>
+                              </Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                {t(
+                                  "settings.systemSettings.search.advancedConfigDesc",
+                                  "Override default Coactive API endpoints and response format. Leave blank to use defaults."
+                                )}
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 2,
+                                }}
+                              >
+                                <TextField
+                                  label={t(
+                                    "settings.systemSettings.search.searchEndpoint",
+                                    "Search Endpoint"
+                                  )}
+                                  value={settings.provider.config?.searchEndpoint || ""}
+                                  onChange={(e) =>
+                                    handleCoactiveAdvancedChange("searchEndpoint", e.target.value)
+                                  }
+                                  placeholder={
+                                    availableProviders?.coactive?.defaultSearchEndpoint ||
+                                    SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.defaultSearchEndpoint
+                                  }
+                                  fullWidth
+                                  size="small"
+                                  helperText={t(
+                                    "settings.systemSettings.search.searchEndpointHelp",
+                                    "Coactive search API URL"
+                                  )}
+                                />
+                                <TextField
+                                  label={t(
+                                    "settings.systemSettings.search.datasetId",
+                                    "Dataset ID"
+                                  )}
+                                  value={settings.provider.config?.datasetId || ""}
+                                  onChange={(e) =>
+                                    handleCoactiveAdvancedChange("datasetId", e.target.value)
+                                  }
+                                  fullWidth
+                                  size="small"
+                                  helperText={t(
+                                    "settings.systemSettings.search.datasetIdHelp",
+                                    "Coactive dataset identifier used for search queries"
+                                  )}
+                                />
+                                <TextField
+                                  label={t(
+                                    "settings.systemSettings.search.authEndpoint",
+                                    "Auth Endpoint"
+                                  )}
+                                  value={settings.provider.config?.authEndpoint || ""}
+                                  onChange={(e) =>
+                                    handleCoactiveAdvancedChange("authEndpoint", e.target.value)
+                                  }
+                                  placeholder={
+                                    availableProviders?.coactive?.defaultAuthEndpoint ||
+                                    SYSTEM_SETTINGS_CONFIG.PROVIDERS.COACTIVE.defaultAuthEndpoint
+                                  }
+                                  fullWidth
+                                  size="small"
+                                  helperText={t(
+                                    "settings.systemSettings.search.authEndpointHelp",
+                                    "Coactive authentication/login URL"
+                                  )}
+                                />
+                                <FormControl size="small" sx={{ maxWidth: 200 }}>
+                                  <InputLabel id="coactive-response-format-label" shrink>
+                                    {t(
+                                      "settings.systemSettings.search.responseFormat",
+                                      "Response Format"
+                                    )}
+                                  </InputLabel>
+                                  <Select
+                                    labelId="coactive-response-format-label"
+                                    value={settings.provider.config?.responseFormat || ""}
+                                    label={t(
+                                      "settings.systemSettings.search.responseFormat",
+                                      "Response Format"
+                                    )}
+                                    onChange={(e) =>
+                                      handleCoactiveAdvancedChange("responseFormat", e.target.value)
+                                    }
+                                    displayEmpty
+                                    notched
+                                  >
+                                    <MenuItem value="">
+                                      <em>
+                                        {t(
+                                          "settings.systemSettings.search.responseFormatAuto",
+                                          "Auto-detect"
+                                        )}
+                                      </em>
+                                    </MenuItem>
+                                    <MenuItem value="v1">
+                                      {t(
+                                        "settings.systemSettings.search.responseFormatV1",
+                                        "V1 (Original)"
+                                      )}
+                                    </MenuItem>
+                                    <MenuItem value="v2">
+                                      {t(
+                                        "settings.systemSettings.search.responseFormatV2",
+                                        "V2 (New flat format)"
+                                      )}
+                                    </MenuItem>
+                                  </Select>
+                                </FormControl>
+                              </Box>
+                            </AccordionDetails>
+                          </Accordion>
+                        )}
+                    </CardContent>
+                  </Card>
+
+                  {/* 3. Semantic Search Embedding Store */}
+                  <Card
+                    elevation={0}
+                    sx={{
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: 2,
+                      opacity:
+                        settings.isEnabled && settings.provider.type !== "coactive" ? 1 : 0.5,
+                    }}
                   >
-                    {t("common.cancel", "Cancel")}
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={handleSaveSettings}
-                    disabled={!hasChanges || isSaving}
-                    startIcon={isSaving ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                    <CardContent>
+                      <Typography variant="h6" sx={{ mb: 2 }}>
+                        {t(
+                          "settings.systemSettings.search.embeddingStore",
+                          "Semantic Search Embedding Store"
+                        )}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        {settings.provider.type === "coactive"
+                          ? t(
+                              "settings.systemSettings.search.embeddingStoreCoactiveDesc",
+                              "Coactive AI uses its own external search service and does not require an embedding store configuration."
+                            )
+                          : t(
+                              "settings.systemSettings.search.embeddingStoreDesc",
+                              "Choose where to store and search vector embeddings"
+                            )}
+                      </Typography>
+
+                      {settings.provider.type !== "coactive" ? (
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <FormControl sx={{ minWidth: 200 }} disabled={!settings.isEnabled}>
+                            <InputLabel>
+                              {t("settings.systemSettings.search.selectStore", "Select Store")}
+                            </InputLabel>
+                            <Select
+                              value={settings.embeddingStore.type}
+                              label={t(
+                                "settings.systemSettings.search.selectStore",
+                                "Select Store"
+                              )}
+                              onChange={(e) =>
+                                handleEmbeddingStoreChange(
+                                  e.target.value as "opensearch" | "s3-vector"
+                                )
+                              }
+                            >
+                              <MenuItem value="opensearch">
+                                {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.OPENSEARCH.name}
+                              </MenuItem>
+                              <MenuItem value="s3-vector">
+                                <Typography>
+                                  {SYSTEM_SETTINGS_CONFIG.EMBEDDING_STORES.S3_VECTOR.name}
+                                </Typography>
+                              </MenuItem>
+                            </Select>
+                          </FormControl>
+
+                          <Button
+                            variant="contained"
+                            onClick={handleSaveEmbeddingStoreSettings}
+                            disabled={!settings.isEnabled || isSaving}
+                            startIcon={
+                              isSaving ? <CircularProgress size={16} /> : <CheckCircleIcon />
+                            }
+                          >
+                            {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save")}
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <Chip
+                            label={t(
+                              "settings.systemSettings.search.externalService",
+                              "External Service"
+                            )}
+                            color="info"
+                            variant="outlined"
+                          />
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Save & Cancel */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 2,
+                      mt: 4,
+                      pt: 3,
+                      borderTop: `1px solid ${theme.palette.divider}`,
+                    }}
                   >
-                    {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save")}
-                  </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={handleCancelSettings}
+                      disabled={!hasChanges || isSaving}
+                      startIcon={<CancelIcon />}
+                    >
+                      {t("common.cancel", "Cancel")}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveSettings}
+                      disabled={!hasChanges || isSaving}
+                      startIcon={isSaving ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+                    >
+                      {isSaving ? t("common.saving", "Saving...") : t("common.save", "Save")}
+                    </Button>
+                  </Box>
                 </Box>
-              </Box>
-            )}
+              )}
+            </Box>
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
+            <MetadataFieldsSettings />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
             <Can I="view" a="api-key">
               <ApiKeyManagement />
             </Can>
@@ -777,7 +940,7 @@ const SystemSettingsPage: React.FC = () => {
             </Can>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={3}>
             <Can I="manage" a="collection-types">
               <CollectionTypesManagement />
             </Can>
@@ -810,7 +973,7 @@ const SystemSettingsPage: React.FC = () => {
             </Can>
           </TabPanel>
           {systemUpgradesEnabled && (
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={4}>
               <Can I="manage" a="system-settings">
                 <UpgradeSection />
               </Can>

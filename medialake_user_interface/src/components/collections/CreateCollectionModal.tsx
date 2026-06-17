@@ -32,13 +32,14 @@ import {
 } from "@mui/icons-material";
 import {
   useCreateCollection,
-  useGetCollections,
+  useGetAllCollections,
   useSetCollectionThumbnail,
   useSetCollectionIcon,
   type Collection,
 } from "../../api/hooks/useCollections";
 import { useCollectionCollectionTypes } from "../../api/hooks/useCollectionCollectionTypes";
 import { ThumbnailSelector } from "./ThumbnailSelector";
+import { KeyValueEditor } from "./KeyValueEditor";
 
 interface CreateCollectionModalProps {
   open: boolean;
@@ -66,18 +67,22 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   const [showParentPicker, setShowParentPicker] = useState(false);
   const [parentSearch, setParentSearch] = useState("");
 
+  // Metadata rows
+  const [metadataRows, setMetadataRows] = useState<Array<{ key: string; value: string }>>([]);
+
   // Pending thumbnail
   const [pendingThumbnail, setPendingThumbnail] = useState<{
     type: "icon" | "upload";
     value: string;
   } | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [thumbnailUploadError, setThumbnailUploadError] = useState<string | null>(null);
 
   // API hooks
   const createCollectionMutation = useCreateCollection();
   const setThumbnailMutation = useSetCollectionThumbnail();
   const setIconMutation = useSetCollectionIcon();
-  const { data: collectionsResponse } = useGetCollections();
+  const { data: collectionsResponse } = useGetAllCollections();
   const { data: collectionTypesResponse } = useCollectionCollectionTypes();
 
   const collections = collectionsResponse?.data || [];
@@ -191,12 +196,20 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   const handleSubmit = async () => {
     if (!validateForm()) return;
     try {
+      const metadata: Record<string, string> = {};
+      metadataRows.forEach((row) => {
+        if (row.key.trim()) {
+          metadata[row.key.trim()] = row.value.trim();
+        }
+      });
+
       const createData = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         parentId: formData.parentId || undefined,
         isPublic: formData.isPublic,
         collectionTypeId: formData.collectionTypeId || undefined,
+        ...(Object.keys(metadata).length > 0 && { metadata }),
       };
       const result = await createCollectionMutation.mutateAsync(createData);
       const newCollectionId = extractCollectionId(result);
@@ -214,7 +227,14 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
             });
           }
         } catch (thumbnailError) {
+          const msg =
+            thumbnailError instanceof Error
+              ? thumbnailError.message
+              : "Failed to set thumbnail. The collection was created but the thumbnail could not be applied.";
           console.error("Failed to set thumbnail after collection creation:", thumbnailError);
+          setThumbnailUploadError(msg);
+          // Don't close — let the user see the error
+          return;
         }
       }
       resetAndClose();
@@ -224,6 +244,7 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
   };
 
   const resetAndClose = () => {
+    createCollectionMutation.reset();
     setFormData({
       name: "",
       description: "",
@@ -231,8 +252,10 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
       isPublic: false,
       collectionTypeId: "",
     });
+    setMetadataRows([]);
     setPendingThumbnail(null);
     setUploadPreviewUrl(null);
+    setThumbnailUploadError(null);
     setErrors({});
     setShowParentPicker(false);
     setParentSearch("");
@@ -652,6 +675,13 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
             </Box>
           )}
 
+          {/* Metadata */}
+          <KeyValueEditor
+            rows={metadataRows}
+            onChange={setMetadataRows}
+            label={t("collectionsPage.form.metadata", "Custom Metadata")}
+          />
+
           {/* Visibility */}
           <Box
             sx={{
@@ -700,6 +730,16 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
               sx={{ borderRadius: 2, fontSize: "0.82rem" }}
             >
               {t("collectionsPage.createFailed", "Failed to create collection. Please try again.")}
+            </Alert>
+          )}
+          {thumbnailUploadError && (
+            <Alert
+              severity="warning"
+              variant="outlined"
+              onClose={() => setThumbnailUploadError(null)}
+              sx={{ borderRadius: 2, fontSize: "0.82rem" }}
+            >
+              {thumbnailUploadError}
             </Alert>
           )}
         </Box>

@@ -102,6 +102,7 @@ const makePortalFixture = (): Portal => ({
       order: 0,
     },
   ],
+  pages: [],
   captchaEnabled: false,
   createdBy: "test-user",
   createdAt: "2024-01-01T00:00:00Z",
@@ -184,13 +185,19 @@ describe("PortalEditorPage (integration)", () => {
     // observable signal that (a) the fetch resolved and (b) the store
     // initialized with the portal payload. Scoping the query to the
     // toolbar avoids colliding with the preview mock which also renders
-    // the portal name inside its mock header.
-    await waitFor(() => {
-      const toolbar = screen.getByRole("toolbar", {
-        name: "Editor actions",
-      });
-      expect(within(toolbar).getByText("My Test Portal")).toBeInTheDocument();
-    });
+    // the portal name inside its mock header. A generous timeout keeps
+    // this resilient when the full suite runs in parallel and the MSW +
+    // React Query + store-init chain competes for the event loop (the
+    // default 1000ms window can be exceeded under heavy load).
+    await waitFor(
+      () => {
+        const toolbar = screen.getByRole("toolbar", {
+          name: "Editor actions",
+        });
+        expect(within(toolbar).getByText("My Test Portal")).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
 
     // Store-side postcondition: `initialize(portal)` ran.
     expect(usePortalEditorStore.getState().isInitialized).toBe(true);
@@ -198,5 +205,5 @@ describe("PortalEditorPage (integration)", () => {
     // The preview region mounts (Requirement 3.1 — preview must be
     // wired so appearance changes can reflect).
     expect(screen.getByRole("region", { name: "Portal preview" })).toBeInTheDocument();
-  });
+  }, 15000);
 });

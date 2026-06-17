@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDate } from "@/utils/dateFormat";
 import { formatFileSize } from "@/utils/fileSize";
@@ -24,7 +24,6 @@ import MasterResultsView from "../components/search/MasterResultsView";
 import NoResultsFound from "../components/search/NoResultsFound";
 import { zIndexTokens } from "@/theme/tokens";
 import { useSearch } from "../api/hooks/useSearch";
-import { useSearchFields } from "../api/hooks/useSearchFields";
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
 import { type CellContext } from "@tanstack/react-table";
@@ -48,8 +47,11 @@ import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
 import { useSemanticMode, useSearchModes } from "@/stores/searchStore";
+import { useUIActions as useSearchUIActions } from "@/stores/searchStore";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
 import { getThresholdsForModel } from "@/components/common/utils";
+import { useMetadataFieldPreferences } from "@/hooks/useMetadataFieldPreferences";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface LocationState {
   query?: string;
@@ -116,30 +118,46 @@ const SearchPage: React.FC = () => {
   );
 
   // Initialize facet filters from URL params first, then fall back to location state
-  const initialFacetFilters: FacetFilters = {
-    // Get values from URL params first, then fall back to location state
-    type: searchParams.get("type") || type,
-    extension: searchParams.get("extension") || extension,
-    LargerThan: searchParams.has("LargerThan")
-      ? parseInt(searchParams.get("LargerThan") || "0", 10)
-      : LargerThan,
-    asset_size_lte: searchParams.has("asset_size_lte")
-      ? parseInt(searchParams.get("asset_size_lte") || "0", 10)
-      : asset_size_lte,
-    asset_size_gte: searchParams.has("asset_size_gte")
-      ? parseInt(searchParams.get("asset_size_gte") || "0", 10)
-      : asset_size_gte,
-    ingested_date_lte: searchParams.get("ingested_date_lte") || ingested_date_lte,
-    ingested_date_gte: searchParams.get("ingested_date_gte") || ingested_date_gte,
-    filename: searchParams.get("filename") || filename,
-  };
+  // Memoized to avoid recomputing a new object on every render — only recalculates
+  // when the URL search string or location state values actually change.
+  const initialFacetFilters: FacetFilters = useMemo(() => {
+    const result: FacetFilters = {
+      type: searchParams.get("type") || type,
+      extension: searchParams.get("extension") || extension,
+      LargerThan: searchParams.has("LargerThan")
+        ? parseInt(searchParams.get("LargerThan") || "0", 10)
+        : LargerThan,
+      asset_size_lte: searchParams.has("asset_size_lte")
+        ? parseInt(searchParams.get("asset_size_lte") || "0", 10)
+        : asset_size_lte,
+      asset_size_gte: searchParams.has("asset_size_gte")
+        ? parseInt(searchParams.get("asset_size_gte") || "0", 10)
+        : asset_size_gte,
+      ingested_date_lte: searchParams.get("ingested_date_lte") || ingested_date_lte,
+      ingested_date_gte: searchParams.get("ingested_date_gte") || ingested_date_gte,
+      filename: searchParams.get("filename") || filename,
+    };
 
-  // Remove undefined values
-  Object.keys(initialFacetFilters).forEach((key) => {
-    if (initialFacetFilters[key as keyof FacetFilters] === undefined) {
-      delete initialFacetFilters[key as keyof FacetFilters];
-    }
-  });
+    // Remove undefined values
+    Object.keys(result).forEach((key) => {
+      if (result[key as keyof FacetFilters] === undefined) {
+        delete result[key as keyof FacetFilters];
+      }
+    });
+
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    searchParams.toString(),
+    type,
+    extension,
+    LargerThan,
+    asset_size_lte,
+    asset_size_gte,
+    ingested_date_lte,
+    ingested_date_gte,
+    filename,
+  ]);
 
   // Use the new search state hook that integrates with Zustand
   const searchState = useSearchState({
@@ -155,13 +173,16 @@ const SearchPage: React.FC = () => {
   const searchModes = useSearchModes();
   const facetFilters = searchState.filters;
 
-  // State for selected fields
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  // State for selected fields — synced with localStorage via hook
+  const { selectedFields, setSelectedFields } = useMetadataFieldPreferences();
+  // Debounce field changes to coalesce rapid toggles into a single search re-fetch
+  const debouncedSelectedFields = useDebounce(selectedFields, 200);
 
   // State for confidence threshold (semantic search) — default based on configured model
   const { providerData: searchProviderData } = useSemanticSearchStatus();
   const modelVersion =
     searchProviderData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0" ? "3.0" : "2.7";
+  const isCoactiveProvider = searchProviderData?.data?.searchProvider?.type === "coactive";
   const [confidenceThreshold, setConfidenceThreshold] = useState<number>(
     getThresholdsForModel(modelVersion).DEFAULT_CONFIDENCE
   );
@@ -176,14 +197,42 @@ const SearchPage: React.FC = () => {
     pageSize: pageSize,
     isSemantic: currentSemantic,
     searchModes: searchModes,
-    fields: selectedFields,
-    ...facetFilters, // Include facet filters in the search
+    fields: debouncedSelectedFields,
+    ...facetFilters,
   });
 
+  // Detect when the search mode (keyword ↔ semantic) has changed.
+  // During the transition, keepPreviousData shows stale results from the
+  // old mode which causes a visual flash (keyword results with semantic UI
+  // or vice versa). We suppress stale results until the new query resolves.
+  const lastResolvedSemantic = useRef(currentSemantic);
+  if (!isFetching) {
+    lastResolvedSemantic.current = currentSemantic;
+  }
+  const isModeTransition = lastResolvedSemantic.current !== currentSemantic;
+
   // Access the nested data structure correctly
-  const searchData = data?.data;
+  const searchData = isModeTransition ? null : data?.data;
   const searchResults = searchData?.results || [];
   const searchMetadata = searchData?.searchMetadata;
+
+  // Sync aggregations from search response into the Zustand store for FilterModal.
+  // Use a ref to track the previous value and skip store writes when the reference
+  // is the same — this prevents the extra render cycle that occurred because
+  // setAggregations would notify all store subscribers even when data was identical.
+  const prevFacetsRef = useRef<any>(null);
+  const prevFacetsInfoRef = useRef<any>(null);
+  const { setAggregations, setFacetsInfo } = useSearchUIActions();
+  useEffect(() => {
+    if (searchMetadata?.facets && searchMetadata.facets !== prevFacetsRef.current) {
+      prevFacetsRef.current = searchMetadata.facets;
+      setAggregations(searchMetadata.facets);
+    }
+    if (searchData?.facetsInfo && searchData.facetsInfo !== prevFacetsInfoRef.current) {
+      prevFacetsInfoRef.current = searchData.facetsInfo;
+      setFacetsInfo(searchData.facetsInfo);
+    }
+  }, [searchMetadata?.facets, searchData?.facetsInfo, setAggregations, setFacetsInfo]);
 
   // Store search results in sessionStorage for access by other components
   useEffect(() => {
@@ -197,19 +246,6 @@ const SearchPage: React.FC = () => {
       }
     }
   }, [searchResults]);
-
-  // Fetch search fields
-  const { data: fieldsData } = useSearchFields();
-
-  // Extract fields data
-  const defaultFields = fieldsData?.data?.defaultFields || [];
-
-  // Initialize selected fields with default fields when data is loaded
-  useEffect(() => {
-    if (defaultFields.length > 0 && selectedFields.length === 0) {
-      setSelectedFields(defaultFields.map((field) => field.name));
-    }
-  }, [defaultFields, selectedFields.length]);
 
   const [filters, setFilters] = useState<Filters>({
     mediaTypes: {
@@ -544,9 +580,10 @@ const SearchPage: React.FC = () => {
     setPageSize(newPageSize);
     // Reset to first page when changing page size
     setSearchParams((prev) => {
-      prev.set("pageSize", newPageSize.toString());
-      prev.set("page", "1");
-      return prev;
+      const next = new URLSearchParams(prev);
+      next.set("pageSize", newPageSize.toString());
+      next.set("page", "1");
+      return next;
     });
   };
 
@@ -644,6 +681,8 @@ const SearchPage: React.FC = () => {
                 isRenaming={assetOperationsLoading.rename}
                 renamingAssetId={renamingAssetId}
                 canDelete={deleteAssetPermission.allowed}
+                selectedFields={selectedFields}
+                onSelectedFieldsChange={setSelectedFields}
                 error={
                   error
                     ? {

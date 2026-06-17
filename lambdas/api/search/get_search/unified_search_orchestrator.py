@@ -9,7 +9,9 @@ Index Routing Logic (Phase 3):
 - coactive → Query 'media' index
 """
 
+import json
 import os
+import sys
 import time
 from typing import Any, Dict, List, Optional
 
@@ -30,6 +32,12 @@ from unified_search_provider import (
     SearchProviderFactory,
     create_search_provider_config,
 )
+
+# Global DynamoDB resource — reused across all orchestrator methods
+_dynamodb_resource = boto3.resource("dynamodb")
+
+# Global Secrets Manager client — reused across all orchestrator methods
+_secretsmanager_client = boto3.client("secretsmanager")
 
 # Provider type to index mapping constants
 PROVIDER_INDEX_MAPPING = {
@@ -172,9 +180,8 @@ class UnifiedSearchOrchestrator:
     def _get_search_provider_configs(self) -> List[Dict[str, Any]]:
         """Get search provider configurations from DynamoDB system settings"""
         try:
-            dynamodb = boto3.resource("dynamodb")
-            system_settings_table = dynamodb.Table(
-                os.environ.get("SYSTEM_SETTINGS_TABLE")
+            system_settings_table = _dynamodb_resource.Table(
+                os.environ.get("SYSTEM_SETTINGS_TABLE_NAME")
             )
 
             # Try to get unified search provider configurations
@@ -195,10 +202,6 @@ class UnifiedSearchOrchestrator:
             # Check for Coactive configuration with correct DynamoDB key
             coactive_response = system_settings_table.get_item(
                 Key={"PK": "SYSTEM_SETTINGS", "SK": "SEARCH_PROVIDER"}
-            )
-
-            self.logger.info(
-                f"DynamoDB response for SEARCH_PROVIDER: {coactive_response}"
             )
 
             if coactive_response.get("Item") and coactive_response["Item"].get(
@@ -226,6 +229,11 @@ class UnifiedSearchOrchestrator:
                         "metadata_mapping": item.get("metadataMapping", {}),
                         "name": item.get("name", "Coactive AI"),
                         "id": item.get("id"),
+                        # Configurable Coactive endpoints
+                        "search_endpoint": item.get("searchEndpoint"),
+                        "dataset_endpoint": item.get("datasetEndpoint"),
+                        "auth_endpoint": item.get("authEndpoint"),
+                        "response_format": item.get("responseFormat"),
                     }
                 elif provider_type in [
                     "bedrock twelvelabs",
@@ -361,12 +369,9 @@ class UnifiedSearchOrchestrator:
             return None
 
         try:
-            secretsmanager = boto3.client("secretsmanager")
-            response = secretsmanager.get_secret_value(SecretId=secret_arn)
+            response = _secretsmanager_client.get_secret_value(SecretId=secret_arn)
 
             if response and "SecretString" in response:
-                import json
-
                 secret_data = json.loads(response["SecretString"])
                 return secret_data.get("api_key") or secret_data.get("token")
 
@@ -441,15 +446,24 @@ class UnifiedSearchOrchestrator:
         start_time = time.time()
 
         try:
-            # Ensure providers are initialized (lazy initialization)
-            self._ensure_providers_initialized()
-
-            # Parse query parameters into unified SearchQuery
+            # Parse query parameters into unified SearchQuery first
+            # so we can skip provider initialization for keyword searches
             search_query = create_search_query_from_params(query_params)
 
             self.logger.info(f"Processing search query: {search_query.query_text}")
             self.logger.info(f"Search type: {search_query.search_type.value}")
-            self.logger.info(f"Filters: {search_query.filters}")
+
+            # Keyword searches go straight to OpenSearch — no provider needed
+            if search_query.search_type.value == "keyword":
+                result = self._execute_opensearch_search(query_params)
+                self._add_presigned_urls_to_search_results(result)
+
+                total_time = time.time() - start_time
+                self.logger.info(f"Keyword search completed in {total_time:.3f}s")
+                return result
+
+            # Semantic search — ensure providers are loaded
+            self._ensure_providers_initialized()
 
             # Route to appropriate provider
             provider = self._select_provider(search_query)
@@ -470,26 +484,13 @@ class UnifiedSearchOrchestrator:
 
                 return response
             else:
-                # No suitable provider found - handle based on search type
-                if search_query.search_type.value == "keyword":
-                    # Keyword search always works with OpenSearch directly
-                    self.logger.info(
-                        "Executing keyword search using OpenSearch directly"
-                    )
-                    result = self._execute_opensearch_search(query_params)
-
-                    # Add presigned URLs to keyword search results (same as semantic search)
-                    self._add_presigned_urls_to_search_results(result)
-
-                    return result
-                else:
-                    # For semantic searches, we need a configured provider
-                    available_providers = (
-                        list(self._providers.keys()) if self._providers else []
-                    )
-                    error_msg = f"No suitable search provider found for semantic search. Available providers: {available_providers}"
-                    self.logger.error(error_msg)
-                    raise RuntimeError(error_msg)
+                # For semantic searches, we need a configured provider
+                available_providers = (
+                    list(self._providers.keys()) if self._providers else []
+                )
+                error_msg = f"No suitable search provider found for semantic search. Available providers: {available_providers}"
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
         except Exception as e:
             self.logger.error(f"Unified search failed: {str(e)}")
@@ -568,14 +569,15 @@ class UnifiedSearchOrchestrator:
             result = self._convert_search_hit_to_medialake_format(hit)
             results.append(result)
 
+        # Batch-add CloudFront URLs to all results at once
+        self._add_presigned_urls_batch(results)
+
         # Create search metadata in expected MediaLake format
         search_metadata = {
             "totalResults": search_result.total_results,
             "page": (query.page_offset // query.page_size) + 1,
             "pageSize": query.page_size,
-            "searchTerm": query.query_text,
             "facets": search_result.facets if search_result.facets else None,
-            "suggestions": None,
         }
 
         return {
@@ -585,87 +587,99 @@ class UnifiedSearchOrchestrator:
         }
 
     def _convert_search_hit_to_medialake_format(self, hit: SearchHit) -> Dict[str, Any]:
-        """Convert SearchHit to MediaLake result format"""
-        # Return the OpenSearch record exactly as it is
+        """Convert SearchHit to MediaLake result format (without URLs — added in batch later)"""
         if hit.source:
-            result = hit.source.copy()
-
-            # Add presigned URLs for thumbnails and proxies
-            self._add_presigned_urls(result)
-
-            return result
+            return hit.source.copy()
         else:
-            # Fallback if no source data
             return {"InventoryID": hit.asset_id}
 
-    def _add_presigned_urls(self, result: Dict[str, Any]) -> None:
-        """Add presigned URLs for thumbnail and proxy representations"""
+    def _add_presigned_urls_batch(self, results: List[Dict[str, Any]]) -> None:
+        """Add CloudFront URLs to a list of results using batch generation.
+
+        Skips results that already have thumbnailUrl/proxyUrl set (e.g. from
+        provider-level processing like Marengo 3.0's _process_marengo_30_results).
+        """
         try:
-            # Import here to avoid circular imports
             from index import get_indexed_thumbnail_url
-            from url_utils import generate_cloudfront_url
+            from url_utils import generate_cloudfront_urls_batch
 
-            derived_representations = result.get("DerivedRepresentations", [])
-            thumbnail_url = None
-            proxy_url = None
+            # Step 1: Collect URL requests only for results missing URLs
+            url_requests = []
+            result_url_map: List[Dict[str, Optional[str]]] = [
+                {"thumbnail_request_id": None, "proxy_request_id": None}
+                for _ in results
+            ]
 
-            # Process derived representations for thumbnails and proxies
-            for representation in derived_representations:
-                purpose = representation.get("Purpose")
-                rep_storage_info = representation.get("StorageInfo", {}).get(
-                    "PrimaryLocation", {}
-                )
+            for idx, result in enumerate(results):
+                has_thumbnail = result.get("thumbnailUrl")
+                has_proxy = result.get("proxyUrl")
+                if has_thumbnail and has_proxy:
+                    continue  # Already has both URLs — skip
 
-                if rep_storage_info.get("StorageType") == "s3":
-                    presigned_url = generate_cloudfront_url(
-                        bucket=rep_storage_info.get("Bucket", ""),
-                        key=rep_storage_info.get("ObjectKey", {}).get("FullPath", ""),
+                derived_representations = result.get("DerivedRepresentations", [])
+                for representation in derived_representations:
+                    purpose = representation.get("Purpose")
+                    # Skip purposes we already have
+                    if purpose == "thumbnail" and has_thumbnail:
+                        continue
+                    if purpose == "proxy" and has_proxy:
+                        continue
+
+                    rep_storage_info = representation.get("StorageInfo", {}).get(
+                        "PrimaryLocation", {}
                     )
 
-                    if purpose == "thumbnail":
-                        # Use shared function to convert to indexed thumbnail URL
-                        thumbnail_url = get_indexed_thumbnail_url(presigned_url)
-                    elif purpose == "proxy":
-                        proxy_url = presigned_url
+                    if rep_storage_info.get("StorageType") == "s3":
+                        bucket = rep_storage_info.get("Bucket", "")
+                        key = rep_storage_info.get("ObjectKey", {}).get("FullPath", "")
+                        if bucket and key:
+                            request_id = f"batch_{idx}_{purpose}_{len(url_requests)}"
+                            url_requests.append(
+                                {
+                                    "request_id": request_id,
+                                    "bucket": bucket,
+                                    "key": key,
+                                }
+                            )
+                            if purpose == "thumbnail":
+                                result_url_map[idx]["thumbnail_request_id"] = request_id
+                            elif purpose == "proxy":
+                                result_url_map[idx]["proxy_request_id"] = request_id
 
-                if thumbnail_url and proxy_url:
-                    break
+            if not url_requests:
+                return
 
-            # Add URLs to result
-            if thumbnail_url:
-                result["thumbnailUrl"] = thumbnail_url
-            if proxy_url:
-                result["proxyUrl"] = proxy_url
+            # Step 2: Generate all URLs in one batch call
+            cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
+
+            # Step 3: Assign URLs back to results
+            for idx, result in enumerate(results):
+                mapping = result_url_map[idx]
+                if mapping["thumbnail_request_id"]:
+                    url = cloudfront_urls.get(mapping["thumbnail_request_id"])
+                    if url:
+                        result["thumbnailUrl"] = get_indexed_thumbnail_url(url)
+                if mapping["proxy_request_id"]:
+                    url = cloudfront_urls.get(mapping["proxy_request_id"])
+                    if url:
+                        result["proxyUrl"] = url
 
         except Exception as e:
-            self.logger.warning(f"Failed to generate presigned URLs: {str(e)}")
-            # Continue without URLs rather than failing the entire request
+            self.logger.warning(f"Failed to batch generate presigned URLs: {str(e)}")
 
     def _add_presigned_urls_to_search_results(
         self, search_response: Dict[str, Any]
     ) -> None:
-        """Add presigned URLs to all results in a search response"""
+        """Add presigned URLs to all results in a search response using batch generation"""
         try:
-            # Navigate to the results array in the search response
             results = search_response.get("data", {}).get("results", [])
-
             if not results:
-                self.logger.debug("No results found to add presigned URLs to")
                 return
-
-            # Process each result to add presigned URLs
-            for result in results:
-                self._add_presigned_urls(result)
-
-            self.logger.info(
-                f"Added presigned URLs to {len(results)} keyword search results"
-            )
-
+            self._add_presigned_urls_batch(results)
         except Exception as e:
             self.logger.warning(
                 f"Failed to add presigned URLs to search results: {str(e)}"
             )
-            # Continue without URLs rather than failing the entire request
 
     def _execute_opensearch_search(
         self, query_params: Dict[str, Any]
@@ -674,10 +688,6 @@ class UnifiedSearchOrchestrator:
         self.logger.info("Executing keyword search using OpenSearch directly")
 
         try:
-            # Import here to avoid circular imports
-            import os
-            import sys
-
             # Add current directory to path for imports
             current_dir = os.path.dirname(os.path.abspath(__file__))
             if current_dir not in sys.path:
@@ -707,6 +717,24 @@ class UnifiedSearchOrchestrator:
                 search_params["filters"] = query_params["filters"]
             if "search_fields" in query_params:
                 search_params["search_fields"] = query_params["search_fields"]
+            if "fields" in query_params and "search_fields" not in search_params:
+                fields_val = query_params["fields"]
+                if isinstance(fields_val, list):
+                    parsed_fields = [
+                        token.strip()
+                        for entry in fields_val
+                        if isinstance(entry, str)
+                        for token in entry.split(",")
+                        if token.strip()
+                    ]
+                elif isinstance(fields_val, str):
+                    parsed_fields = [
+                        f.strip() for f in fields_val.split(",") if f.strip()
+                    ]
+                else:
+                    parsed_fields = []
+                if parsed_fields:
+                    search_params["search_fields"] = parsed_fields
             if "type" in query_params:
                 search_params["type"] = query_params["type"]
             if "extension" in query_params:

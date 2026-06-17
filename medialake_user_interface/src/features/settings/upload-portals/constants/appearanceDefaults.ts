@@ -38,6 +38,7 @@ export const DEFAULT_PORTAL_APPEARANCE: PortalAppearance = {
     pageVerticalPadding: 40,
   },
   branding: {
+    showLogo: true,
     logoSize: 48,
     logoAlignment: "left",
     showPoweredBy: true,

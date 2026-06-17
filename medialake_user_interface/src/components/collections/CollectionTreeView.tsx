@@ -3,7 +3,7 @@ import { Box, Typography, Paper } from "@mui/material";
 import { RichTreeView } from "@mui/x-tree-view/RichTreeView";
 import { TreeViewBaseItem } from "@mui/x-tree-view/models";
 import { useNavigate } from "react-router";
-import { useGetCollections, Collection } from "@/api/hooks/useCollections";
+import { useGetAllCollections, Collection } from "@/api/hooks/useCollections";
 
 interface CollectionTreeViewProps {
   currentCollectionId?: string;
@@ -24,7 +24,7 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   // Get all collections (not just root)
-  const { data: allCollectionsResponse, isLoading: isLoadingRoot } = useGetCollections();
+  const { data: allCollectionsResponse, isLoading: isLoadingRoot } = useGetAllCollections();
 
   // Build tree structure recursively
   const buildTree = (collection: Collection, allCollections: Collection[]): TreeNode => {
@@ -33,9 +33,7 @@ export const CollectionTreeView: React.FC<CollectionTreeViewProps> = ({
 
     const node: TreeNode = {
       id: collection.id,
-      label: `${collection.name}${
-        collection.childCollectionCount > 0 ? ` (${collection.childCollectionCount})` : ""
-      }`,
+      label: `${collection.name}${children.length > 0 ? ` (${children.length})` : ""}`, // i18n-ignore
     };
 
     // Recursively build children

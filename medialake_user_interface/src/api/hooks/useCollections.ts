@@ -6,6 +6,96 @@ import { QUERY_KEYS } from "@/api/queryKeys";
 import { logger } from "../../common/helpers/logger";
 import { useErrorModal } from "../../hooks/useErrorModal";
 
+/**
+ * Extract a human-readable error message from an API failure.
+ *
+ * Backend error envelope is `{"statusCode": <int>, "message": "..."}` (AWS Powertools).
+ * Falls back through common shapes so we surface something useful in the UI instead of
+ * a generic "Failed to ..." string that hides 4xx permission/validation reasons.
+ */
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as
+      | { message?: string; error?: string; detail?: string }
+      | undefined;
+    const message = data?.message || data?.error || data?.detail;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+};
+
+/**
+ * Apply a partial patch to a collection across every cached query that contains it:
+ * all paginated list queries (including `allCollections` which nests under `lists()`),
+ * any cached `children(parentId)` queries, and the single `detail(id)` cache.
+ * Used by mutations to reflect server changes immediately without waiting for a refetch.
+ *
+ * The backend appends a `?v=<updatedAt>` cache-bust token to every
+ * `thumbnailUrl`, so the URL naturally changes after an upload even though the
+ * S3 key is stable — no extra client-side busting needed here.
+ */
+export const patchCollectionInCache = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  collectionId: string,
+  patch: Partial<Collection>
+) => {
+  const effectivePatch: Partial<Collection> = { ...patch };
+
+  // Helper that maps an array-shaped response to a new object with the target
+  // collection's fields merged. Guards on the array element's own `id` being
+  // a string so we don't corrupt neighboring cache types (e.g. ancestors,
+  // which share a prefix in the key tree) — if the shape doesn't match, we
+  // leave the cache alone.
+  const applyToArrayResponse = <T extends { data: unknown }>(old: T | undefined): T | undefined => {
+    if (!old || !Array.isArray((old as { data: unknown }).data)) return old;
+    const arr = (old as unknown as { data: Array<Record<string, unknown>> }).data;
+    // Only touch the cache if at least one element actually matches — avoids
+    // pointlessly cloning large lists.
+    const idx = arr.findIndex((c) => typeof c?.id === "string" && c.id === collectionId);
+    if (idx === -1) return old;
+    const next = arr.map((c) =>
+      typeof c?.id === "string" && c.id === collectionId ? { ...c, ...effectivePatch } : c
+    );
+    return { ...(old as object), data: next } as T;
+  };
+
+  // Paginated lists + allCollections (nested under lists())
+  queryClient.setQueriesData<PaginatedCollectionsResponse>(
+    { queryKey: QUERY_KEYS.COLLECTIONS.lists() },
+    applyToArrayResponse
+  );
+
+  // Shared tabs — siblings of `lists()`, not covered by the prefix match above.
+  queryClient.setQueriesData<CollectionsResponse>(
+    { queryKey: QUERY_KEYS.COLLECTIONS.sharedWithMe() },
+    applyToArrayResponse
+  );
+  queryClient.setQueriesData<CollectionsResponse>(
+    { queryKey: QUERY_KEYS.COLLECTIONS.sharedByMe() },
+    applyToArrayResponse
+  );
+
+  // Every children(parentId) cache, nested under details().
+  queryClient.setQueriesData<PaginatedCollectionsResponse>(
+    { queryKey: QUERY_KEYS.COLLECTIONS.details() },
+    applyToArrayResponse
+  );
+
+  // Single-detail cache for the updated collection.
+  queryClient.setQueryData<CollectionResponse>(
+    QUERY_KEYS.COLLECTIONS.detail(collectionId),
+    (old) => {
+      if (!old) return old;
+      return { ...old, data: { ...old.data, ...effectivePatch } };
+    }
+  );
+};
+
 // Thumbnail types matching the backend enum
 export type ThumbnailType = "icon" | "upload" | "asset" | "frame";
 
@@ -48,6 +138,11 @@ export interface Collection {
     name: string;
     parentId?: string;
   }>;
+  customMetadata?: Record<string, string>;
+  // Free-form tag array backed by the OpenSearch `tags` keyword field.
+  // Backend has always populated this; it's surfaced on the UI starting with the
+  // collections redesign so cards, detail pages, and filters can use it.
+  tags?: string[];
 }
 
 export interface CollectionType {
@@ -89,6 +184,7 @@ export interface CreateCollectionRequest {
   isPublic?: boolean;
   type?: string;
   collectionTypeId?: string;
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateCollectionRequest {
@@ -97,6 +193,7 @@ export interface UpdateCollectionRequest {
   parentId?: string;
   isPublic?: boolean;
   collectionTypeId?: string;
+  metadata?: Record<string, string>;
 }
 
 export interface ShareCollectionRequest {
@@ -116,6 +213,7 @@ export interface AddItemToCollectionRequest {
   type?: "asset" | "workflow" | "collection";
   id?: string;
   sortOrder?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -150,6 +248,44 @@ export interface CollectionsResponse {
     version: string;
     request_id: string;
   };
+}
+
+export interface PaginatedCollectionsResponse {
+  success: boolean;
+  data: Collection[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
+export interface UseGetCollectionsParams {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  sortDirection?: "asc" | "desc";
+  search?: string;
+  filterOwnerId?: string;
+  includeChildren?: boolean;
+  groupIds?: string;
+  enabled?: boolean;
+  metadataFilters?: Record<string, string>;
+  // Filter by tag values (OR semantics). Each value becomes a repeated
+  // `filter[tag]=<value>` query param — matches the backend's multi-value parser.
+  tagFilters?: string[];
+  // Filter by visibility facet. Values: "public" | "shared" | "private".
+  visibilityFilters?: string[];
+  // Bucketed "updated within last N" filter. Values: "24h" | "7d" | "30d".
+  updatedWithin?: string;
 }
 
 export interface CollectionResponse {
@@ -221,6 +357,7 @@ export interface CollectionSharesResponse {
 export interface CollectionAssetsResponse {
   success: boolean;
   data: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     results: any[]; // Using any[] to match search results format
     searchMetadata: {
       totalResults: number;
@@ -235,34 +372,136 @@ export interface CollectionAssetsResponse {
   };
 }
 
-// Hook to get all collections for the current user
-export const COLLECTIONS_PAGE_SIZE = 1000;
-
-export const useGetCollections = (filters?: Record<string, any>) => {
+// Hook to get all collections for the current user (paginated, server-side)
+export const useGetCollections = (params: UseGetCollectionsParams = {}) => {
   const { showError } = useErrorModal();
+  const { enabled = true, ...queryParams } = params;
 
-  return useQuery<CollectionsResponse, Error>({
-    queryKey: QUERY_KEYS.COLLECTIONS.list(filters),
+  return useQuery<PaginatedCollectionsResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.list(queryParams),
+    placeholderData: keepPreviousData,
+    enabled,
     queryFn: async ({ signal }) => {
       try {
-        const params = new URLSearchParams();
-        params.append("limit", String(COLLECTIONS_PAGE_SIZE));
-        if (filters) {
-          Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-              params.append(key, String(value));
-            }
-          });
+        const urlParams = new URLSearchParams();
+        if (params.page !== undefined) urlParams.append("page", String(params.page));
+        if (params.pageSize !== undefined) urlParams.append("pageSize", String(params.pageSize));
+        if (params.sort !== undefined) urlParams.append("sort", params.sort);
+        if (params.sortDirection !== undefined)
+          urlParams.append("sortDirection", params.sortDirection);
+        if (params.search) urlParams.append("filter[search]", params.search);
+        if (params.filterOwnerId) urlParams.append("filter[ownerId]", params.filterOwnerId);
+        if (params.includeChildren !== undefined)
+          urlParams.append("includeChildren", String(params.includeChildren));
+        if (params.groupIds !== undefined) urlParams.append("groupIds", params.groupIds);
+        if (params.metadataFilters) {
+          for (const [key, value] of Object.entries(params.metadataFilters)) {
+            urlParams.append(`filter[metadata.${key}]`, value);
+          }
+        }
+        if (params.tagFilters && params.tagFilters.length > 0) {
+          for (const tag of params.tagFilters) {
+            urlParams.append("filter[tag]", tag);
+          }
+        }
+        if (params.visibilityFilters && params.visibilityFilters.length > 0) {
+          for (const v of params.visibilityFilters) {
+            urlParams.append("filter[visibility]", v);
+          }
+        }
+        if (params.updatedWithin) {
+          urlParams.append("filter[updatedWithin]", params.updatedWithin);
         }
 
-        const url = `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`;
+        const url = `${API_ENDPOINTS.COLLECTIONS.BASE}?${urlParams}`;
 
-        const response = await apiClient.get<CollectionsResponse>(url, {
-          signal,
-        });
+        const response = await apiClient.get<PaginatedCollectionsResponse>(url, { signal });
         return response.data;
       } catch (error) {
         logger.error("Fetch collections error:", error);
+        showError("Failed to fetch collections");
+        throw error;
+      }
+    },
+  });
+};
+
+// Hook to get ALL collections (roots + children) for tree views, dropdowns, and modals.
+// Pages through the backend until every collection is loaded so tree views are complete
+// regardless of tenant size. The backend caps pageSize at 1000 and enforces
+// (page - 1) * pageSize < 10000 (OpenSearch max_result_window), giving us a hard ceiling
+// of 10,000 collections per call. If a tenant exceeds that, we surface a warning so the
+// issue is visible in the console rather than silently truncating the tree.
+const ALL_COLLECTIONS_PAGE_SIZE = 1000;
+const ALL_COLLECTIONS_MAX_PAGES = 10; // 10 * 1000 = 10,000 (OpenSearch max_result_window)
+
+export const useGetAllCollections = () => {
+  const { showError } = useErrorModal();
+
+  return useQuery<PaginatedCollectionsResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.allCollections(),
+    queryFn: async ({ signal }) => {
+      try {
+        const aggregated: Collection[] = [];
+        let page = 1;
+        let lastResponse: PaginatedCollectionsResponse | undefined;
+
+        while (page <= ALL_COLLECTIONS_MAX_PAGES) {
+          const urlParams = new URLSearchParams();
+          urlParams.append("page", String(page));
+          urlParams.append("pageSize", String(ALL_COLLECTIONS_PAGE_SIZE));
+          urlParams.append("includeChildren", "true");
+          // Stable sort so paging across requests is deterministic
+          urlParams.append("sort", "name");
+          urlParams.append("sortDirection", "asc");
+
+          const url = `${API_ENDPOINTS.COLLECTIONS.BASE}?${urlParams}`;
+          const response = await apiClient.get<PaginatedCollectionsResponse>(url, { signal });
+          lastResponse = response.data;
+
+          if (lastResponse?.data?.length) {
+            aggregated.push(...lastResponse.data);
+          }
+
+          if (!lastResponse?.pagination?.hasNextPage) {
+            break;
+          }
+          page += 1;
+        }
+
+        if (!lastResponse) {
+          throw new Error("useGetAllCollections: no response received");
+        }
+
+        const totalResults = lastResponse.pagination?.totalResults ?? aggregated.length;
+        if (aggregated.length < totalResults) {
+          console.warn(
+            `useGetAllCollections: fetched ${aggregated.length} of ${totalResults} collections. ` +
+              `OpenSearch max_result_window (${
+                ALL_COLLECTIONS_MAX_PAGES * ALL_COLLECTIONS_PAGE_SIZE
+              }) reached — ` +
+              `tree views may be incomplete.`
+          );
+        }
+
+        return {
+          ...lastResponse,
+          data: aggregated,
+          pagination: {
+            ...lastResponse.pagination,
+            page: 1,
+            pageSize: aggregated.length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        };
+      } catch (error) {
+        // Silently ignore aborted requests (expected during unmount / refetch)
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
+          throw error;
+        }
+        logger.error("Fetch all collections error:", error);
         showError("Failed to fetch collections");
         throw error;
       }
@@ -352,7 +591,7 @@ export const useGetCollection = (id: string, enabled = true) => {
 export const useGetChildCollections = (parentId: string, enabled = true) => {
   const { showError } = useErrorModal();
 
-  return useQuery<CollectionsResponse, Error>({
+  return useQuery<PaginatedCollectionsResponse, Error>({
     queryKey: QUERY_KEYS.COLLECTIONS.children(parentId),
     enabled: enabled && !!parentId,
     placeholderData: keepPreviousData, // Keep previous children visible during navigation
@@ -361,7 +600,7 @@ export const useGetChildCollections = (parentId: string, enabled = true) => {
         const params = new URLSearchParams();
         params.append("filter[parentId]", parentId);
 
-        const response = await apiClient.get<CollectionsResponse>(
+        const response = await apiClient.get<PaginatedCollectionsResponse>(
           `${API_ENDPOINTS.COLLECTIONS.BASE}?${params}`,
           { signal }
         );
@@ -394,12 +633,14 @@ export const useCreateCollection = () => {
         throw error;
       }
     },
-    onSuccess: (_data, variables) => {
-      // Invalidate and refetch collections list
+    onSuccess: (result, variables) => {
+      // Backend write-through ensures OpenSearch is immediately consistent.
+      // Invalidate all relevant caches so React Query refetches sorted data.
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.COLLECTIONS.lists() });
       queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+        queryKey: QUERY_KEYS.COLLECTIONS.allCollections(),
       });
-      // If a sub-collection was created, also invalidate the parent's children and detail queries
+
       if (variables.parentId) {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.COLLECTIONS.children(variables.parentId),
@@ -427,14 +668,19 @@ export const useUpdateCollection = () => {
         return response.data;
       } catch (error) {
         logger.error("Update collection error:", error);
-        showError("Failed to update collection");
-        throw error;
+        const message = getApiErrorMessage(error, "Failed to update collection");
+        showError(message);
+        throw new Error(message);
       }
     },
-    onSuccess: (data, { id }) => {
-      // Invalidate collections list and specific collection
+    onSuccess: (result, { id }) => {
+      // Backend write-through ensures OpenSearch is immediately consistent.
+      // Invalidate all relevant caches so React Query refetches fresh data.
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.allCollections(),
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.detail(id),
@@ -458,13 +704,85 @@ export const useDeleteCollection = () => {
         throw error;
       }
     },
-    onSuccess: () => {
-      // Invalidate collections list
+    onSuccess: (_, deletedId) => {
+      // Find the deleted collection's parentId from the cache (if it's a sub-collection)
+      let parentId: string | undefined;
+      const allCollData = queryClient.getQueryData<PaginatedCollectionsResponse>(
+        QUERY_KEYS.COLLECTIONS.allCollections()
+      );
+      if (allCollData) {
+        const deleted = allCollData.data.find((c) => c.id === deletedId);
+        parentId = deleted?.parentId;
+      }
+
+      // Fall back to the single-collection detail cache if allCollections didn't have it
+      if (!parentId) {
+        const detailData = queryClient.getQueryData<CollectionResponse>(
+          QUERY_KEYS.COLLECTIONS.detail(deletedId)
+        );
+        parentId = detailData?.data?.parentId;
+      }
+
+      // Optimistically remove from all list caches
+      queryClient.setQueriesData<PaginatedCollectionsResponse>(
+        { queryKey: QUERY_KEYS.COLLECTIONS.lists() },
+        (old) => {
+          if (!old) return old;
+          const filtered = old.data.filter((c) => c.id !== deletedId);
+          return {
+            ...old,
+            data: filtered,
+            pagination: {
+              ...old.pagination,
+              totalResults: Math.max(0, old.pagination.totalResults - 1),
+            },
+          };
+        }
+      );
+
+      // If it was a sub-collection, also remove from parent's children cache
+      if (parentId) {
+        queryClient.setQueryData<PaginatedCollectionsResponse>(
+          QUERY_KEYS.COLLECTIONS.children(parentId),
+          (old) => {
+            if (!old) return old;
+            const filtered = old.data.filter((c) => c.id !== deletedId);
+            return {
+              ...old,
+              data: filtered,
+              pagination: {
+                ...old.pagination,
+                totalResults: Math.max(0, old.pagination.totalResults - 1),
+              },
+            };
+          }
+        );
+
+        // Decrement parent's childCollectionCount
+        queryClient.setQueryData<CollectionResponse>(
+          QUERY_KEYS.COLLECTIONS.detail(parentId),
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                childCollectionCount: Math.max(0, (old.data.childCollectionCount || 0) - 1),
+              },
+            };
+          }
+        );
+      }
+
+      // Invalidate to get fresh data
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.shared(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.allCollections(),
       });
     },
   });
@@ -564,7 +882,31 @@ export const useAddItemToCollection = () => {
       }
     },
     onSuccess: (data, { collectionId }) => {
-      // Invalidate collections list and specific collection details
+      // Optimistically increment itemCount so the card updates immediately
+      // without waiting for the refetch (which may still show the old count
+      // due to OpenSearch eventual consistency).
+      const detail = queryClient.getQueryData<CollectionResponse>(
+        QUERY_KEYS.COLLECTIONS.detail(collectionId)
+      );
+      let currentCount = detail?.data?.itemCount;
+      if (currentCount === undefined) {
+        // Fall back to finding the count from any list cache
+        const lists = queryClient.getQueriesData<PaginatedCollectionsResponse>({
+          queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+        });
+        for (const [, listData] of lists) {
+          const match = listData?.data?.find((c) => c.id === collectionId);
+          if (match) {
+            currentCount = match.itemCount;
+            break;
+          }
+        }
+      }
+      patchCollectionInCache(queryClient, collectionId, {
+        itemCount: (currentCount ?? 0) + 1,
+      });
+
+      // Invalidate so the next natural refetch reconciles with the server.
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
       });
@@ -678,12 +1020,49 @@ export const useGetCollectionAncestors = (id: string, enabled = true) => {
 };
 
 // =============================================================================
+// Metadata Keys Hook
+// =============================================================================
+
+export interface MetadataKeysResponse {
+  success: boolean;
+  data: { keys: string[] };
+  meta: { timestamp: string; version: string; request_id: string };
+}
+
+/**
+ * Hook to fetch all distinct metadata key names for the filter dropdown.
+ * Uses a 60-second staleTime to avoid redundant API calls.
+ */
+export const useGetMetadataKeys = () => {
+  const { showError } = useErrorModal();
+
+  return useQuery<MetadataKeysResponse, Error>({
+    queryKey: QUERY_KEYS.COLLECTIONS.metadataKeys(),
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await apiClient.get<MetadataKeysResponse>(
+          API_ENDPOINTS.COLLECTIONS.METADATA_KEYS,
+          { signal }
+        );
+        return response.data;
+      } catch (error) {
+        logger.error("Fetch metadata keys error:", error);
+        showError("Failed to fetch metadata keys");
+        throw error;
+      }
+    },
+  });
+};
+
+// =============================================================================
 // Collection Types Hooks
 // =============================================================================
 
 /**
  * Hook to fetch all collection types
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const useGetCollectionTypes = (filters?: Record<string, any>) => {
   const { showError } = useErrorModal();
 
@@ -880,6 +1259,13 @@ export interface SetCollectionThumbnailResponse {
     thumbnailType: ThumbnailType;
     thumbnailValue?: string;
     thumbnailUrl: string;
+    /**
+     * ISO-8601 timestamp. Bumps whenever the thumbnail is replaced so the
+     * `?v=<token>` cache-bust query string in `thumbnailUrl` changes too.
+     * Consumers that display `updatedAt` should patch it on success so the
+     * meta row stays in sync with the new URL.
+     */
+    updatedAt?: string;
   };
   meta: {
     timestamp: string;
@@ -910,14 +1296,39 @@ export const useSetCollectionThumbnail = () => {
         return response.data;
       } catch (error) {
         logger.error("Set collection thumbnail error:", error);
-        showError("Failed to set collection thumbnail");
-        throw error;
+        const message = getApiErrorMessage(error, "Failed to set collection thumbnail");
+        showError(message);
+        throw new Error(message);
       }
     },
-    onSuccess: (_, { collectionId }) => {
-      // Invalidate collections list and specific collection
+    onSuccess: (response, { collectionId }) => {
+      // Optimistic cache patch — reflects the thumbnail change immediately in every
+      // visible list/tree/detail view without waiting for the refetch to complete.
+      // Backend now write-through updates OpenSearch, so subsequent refetches are
+      // consistent as well.
+      const { thumbnailType, thumbnailValue, thumbnailUrl, updatedAt } = response.data;
+      patchCollectionInCache(queryClient, collectionId, {
+        thumbnailType,
+        thumbnailValue: thumbnailValue ?? undefined,
+        thumbnailUrl,
+        ...(updatedAt ? { updatedAt } : {}),
+      });
+
+      // Invalidate so natural refetches pull any server-side derived fields
+      // we didn't patch locally. Covers the paginated `list(...)` caches,
+      // `allCollections()`, shared-with-me / shared-by-me siblings, and the
+      // single-detail cache for this collection.
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.shared(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedWithMe(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedByMe(),
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
@@ -939,14 +1350,30 @@ export const useDeleteCollectionThumbnail = () => {
         await apiClient.delete(API_ENDPOINTS.COLLECTIONS.THUMBNAIL(collectionId));
       } catch (error) {
         logger.error("Delete collection thumbnail error:", error);
-        showError("Failed to remove collection thumbnail");
-        throw error;
+        const message = getApiErrorMessage(error, "Failed to remove collection thumbnail");
+        showError(message);
+        throw new Error(message);
       }
     },
     onSuccess: (_, collectionId) => {
-      // Invalidate collections list and specific collection
+      // Optimistic cache patch — clear thumbnail fields everywhere it's visible.
+      patchCollectionInCache(queryClient, collectionId, {
+        thumbnailType: undefined,
+        thumbnailValue: undefined,
+        thumbnailUrl: undefined,
+      });
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.shared(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedWithMe(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedByMe(),
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
@@ -976,14 +1403,34 @@ export const useSetCollectionIcon = () => {
         return response.data;
       } catch (error) {
         logger.error("Set collection icon error:", error);
-        showError("Failed to set collection icon");
-        throw error;
+        const message = getApiErrorMessage(error, "Failed to set collection icon");
+        showError(message);
+        throw new Error(message);
       }
     },
-    onSuccess: (_, { collectionId }) => {
-      // Invalidate collections list and specific collection
+    onSuccess: (response, { collectionId, iconName }) => {
+      // Optimistic cache patch — icons render from (thumbnailType=icon, thumbnailValue=name)
+      // in the frontend without needing a thumbnailUrl. Clear any prior thumbnailUrl so
+      // the `<img>` doesn't keep pointing at the old upload.
+      const updatedAt = response?.data?.updatedAt;
+      patchCollectionInCache(queryClient, collectionId, {
+        thumbnailType: "icon",
+        thumbnailValue: iconName,
+        thumbnailUrl: undefined,
+        ...(updatedAt ? { updatedAt } : {}),
+      });
+
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.lists(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.shared(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedWithMe(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.COLLECTIONS.sharedByMe(),
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),

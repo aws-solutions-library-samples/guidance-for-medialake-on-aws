@@ -3,7 +3,7 @@
  * Download, Collection, Detail, Favorite, Delete buttons.
  */
 import React from "react";
-import { Box, IconButton, Button } from "@mui/material";
+import { Box, IconButton, Button, Tooltip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -12,6 +12,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
+import { useCollectionAssetPermissions } from "@/permissions";
 
 interface AssetCardActionsProps {
   isClipMode: boolean;
@@ -43,6 +44,19 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
     onFavoriteToggle,
   }) => {
     const { t } = useTranslation();
+    const { canAdd, canRemove, addTooltip, removeTooltip } = useCollectionAssetPermissions();
+
+    // The collection button toggles between add/remove depending on context;
+    // gate it with the matching permission (with collections:edit fallback).
+    const collectionActionAllowed = showRemoveButton ? canRemove : canAdd;
+    const collectionActionLabel = showRemoveButton
+      ? t("common.actions.removeFromCollection")
+      : t("common.actions.addToCollection");
+    const collectionActionTooltip = collectionActionAllowed
+      ? collectionActionLabel
+      : showRemoveButton
+        ? removeTooltip
+        : addTooltip;
 
     return (
       <Box
@@ -72,21 +86,22 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
             <DownloadIcon fontSize="small" />
           </IconButton>
         )}
-        <IconButton
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToCollectionClick?.(e);
-          }}
-          sx={actionBtnSx}
-          title={
-            showRemoveButton
-              ? t("common.actions.removeFromCollection")
-              : t("common.actions.addToCollection")
-          }
-        >
-          {showRemoveButton ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
-        </IconButton>
+        <Tooltip title={collectionActionTooltip}>
+          <span>
+            <IconButton
+              size="small"
+              disabled={!collectionActionAllowed}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCollectionClick?.(e);
+              }}
+              sx={actionBtnSx}
+              aria-label={collectionActionLabel}
+            >
+              {showRemoveButton ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+            </IconButton>
+          </span>
+        </Tooltip>
         <Button
           size="small"
           variant="outlined"

@@ -55,7 +55,9 @@ describe("Feature: portal-visual-editor, Property 9: Dirty-flag monotonicity", (
     "layout",
     "access",
     "destinations",
-    "metadata"
+    "metadata",
+    "pages",
+    "fields"
   );
 
   const previewArb: fc.Arbitrary<PreviewMode> = fc.constantFrom<PreviewMode>(
@@ -289,6 +291,7 @@ describe("Feature: portal-visual-editor, Property 8: Validation payload round-tr
       pageVerticalPadding: fc.integer({ min: 0, max: 120 }),
     }),
     branding: fc.record({
+      showLogo: fc.boolean(),
       logoSize: fc.integer({ min: 24, max: 120 }),
       logoAlignment: fc.constantFrom("left", "center") as fc.Arbitrary<"left" | "center">,
       showPoweredBy: fc.boolean(),

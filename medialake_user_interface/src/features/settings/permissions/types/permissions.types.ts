@@ -5,7 +5,9 @@ export type PermissionType =
   | "delete"
   | "upload"
   | "download"
-  | "publish";
+  | "publish"
+  | "add_assets"
+  | "remove_assets";
 
 export type AreaId =
   | "dashboard"
@@ -36,6 +38,8 @@ export const PERMISSION_TYPES: { id: PermissionType; label: string }[] = [
   { id: "upload", label: "Upload" },
   { id: "download", label: "Download" },
   { id: "publish", label: "Publish" },
+  { id: "add_assets", label: "Add Assets" },
+  { id: "remove_assets", label: "Remove Assets" },
 ];
 
 // Define which permissions apply to which areas
@@ -80,6 +84,10 @@ export const PERMISSION_APPLICABILITY: Record<PermissionType, AreaId[] | "all"> 
   upload: ["assets"],
   download: ["assets"],
   publish: ["assets"],
+  // Collection-specific granular actions for adding/removing assets to/from
+  // collections. Only applicable to the Collections area.
+  add_assets: ["collections"],
+  remove_assets: ["collections"],
 };
 
 // Helper function to check if a permission applies to an area

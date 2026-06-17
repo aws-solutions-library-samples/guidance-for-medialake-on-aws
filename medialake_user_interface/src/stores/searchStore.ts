@@ -1,6 +1,18 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { FacetFilters } from "../types/facetSearch";
+import { useShallow } from "zustand/react/shallow";
+import { FacetFilters, CustomMetadataApiFilter } from "../types/facetSearch";
+import { FieldAggregation } from "../api/hooks/useSearch";
+
+// Custom metadata field draft for the filter modal
+export interface CustomMetadataFieldDraft {
+  fieldName: string;
+  type: "string" | "number" | "date";
+  selectedFacetValues: string[];
+  textValue: string;
+  rangeMin: string | null;
+  rangeMax: string | null;
+}
 
 // Define the filter modal form state interface
 interface FilterModalFormState {
@@ -12,6 +24,7 @@ interface FilterModalFormState {
   dateRangeOption: string | null;
   startDate: Date | null;
   endDate: Date | null;
+  customMetadataFilters: CustomMetadataFieldDraft[];
 }
 
 // Initial state for the filter modal form
@@ -24,6 +37,7 @@ const initialFilterModalState: FilterModalFormState = {
   dateRangeOption: null,
   startDate: null,
   endDate: null,
+  customMetadataFilters: [],
 };
 
 // File size units for conversion
@@ -33,6 +47,30 @@ const FILE_SIZE_UNITS = [
   { value: 1024 * 1024, label: "MB" },
   { value: 1024 * 1024 * 1024, label: "GB" },
 ];
+
+/**
+ * Serialize a FacetFilters object into URL search params (mutating `params`).
+ *
+ * Regular filters become their own query params; custom metadata filters are
+ * JSON-encoded under `custom_md` so they round-trip cleanly through the URL
+ * and persist across search submissions (matching the behavior of regular
+ * filters like type/extension).
+ */
+export function appendFiltersToUrlParams(params: URLSearchParams, filters: FacetFilters): void {
+  if (filters.type) params.set("type", filters.type);
+  if (filters.extension) params.set("extension", filters.extension);
+  if (filters.filename) params.set("filename", filters.filename);
+  if (filters.asset_size_gte !== undefined)
+    params.set("asset_size_gte", filters.asset_size_gte.toString());
+  if (filters.asset_size_lte !== undefined)
+    params.set("asset_size_lte", filters.asset_size_lte.toString());
+  if (filters.ingested_date_gte) params.set("ingested_date_gte", filters.ingested_date_gte);
+  if (filters.ingested_date_lte) params.set("ingested_date_lte", filters.ingested_date_lte);
+  if (filters.date_range_option) params.set("date_range_option", filters.date_range_option);
+  if (filters.customMetadataFilters && filters.customMetadataFilters.length > 0) {
+    params.set("custom_md", JSON.stringify(filters.customMetadataFilters));
+  }
+}
 
 // Helper function to convert bytes to appropriate unit for display
 const convertBytesToDisplayUnit = (bytes: number) => {
@@ -144,6 +182,47 @@ function convertFiltersToFormState(filters: FacetFilters): FilterModalFormState 
     dateRangeOption: newDateRangeOption,
     startDate: newStartDate,
     endDate: newEndDate,
+    customMetadataFilters: (filters.customMetadataFilters ?? []).reduce<CustomMetadataFieldDraft[]>(
+      (drafts, f) => {
+        let draft = drafts.find((d) => d.fieldName === f.field);
+        if (!draft) {
+          let inferredType: CustomMetadataFieldDraft["type"] = "string";
+          if (f.operator === "range") {
+            if (f.type) {
+              // Prefer the explicit type carried on the filter
+              inferredType = f.type;
+            } else {
+              // Fallback: sniff whether the range values look like ISO-8601 dates
+              const sample = f.gte ?? f.lte;
+              const looksLikeDate =
+                typeof sample === "string" &&
+                !isNaN(Date.parse(sample)) &&
+                /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/.test(
+                  sample
+                );
+              inferredType = looksLikeDate ? "date" : "number";
+            }
+          }
+          draft = {
+            fieldName: f.field,
+            type: inferredType,
+            selectedFacetValues: [],
+            textValue: "",
+            rangeMin: null,
+            rangeMax: null,
+          };
+          drafts.push(draft);
+        }
+        if (f.operator === "term" && f.value) draft.selectedFacetValues.push(f.value);
+        if (f.operator === "match" && f.value) draft.textValue = f.value;
+        if (f.operator === "range") {
+          if (f.gte !== undefined) draft.rangeMin = String(f.gte);
+          if (f.lte !== undefined) draft.rangeMax = String(f.lte);
+        }
+        return drafts;
+      },
+      []
+    ),
   };
 }
 
@@ -184,6 +263,36 @@ function convertFormStateToFilters(formState: FilterModalFormState): FacetFilter
     filters.ingested_date_lte = formState.endDate.toISOString();
   }
 
+  // Build custom metadata filters
+  const customFilters: CustomMetadataApiFilter[] = [];
+  for (const draft of formState.customMetadataFilters) {
+    for (const val of draft.selectedFacetValues) {
+      customFilters.push({ field: draft.fieldName, operator: "term", value: val });
+    }
+    if (draft.textValue.trim()) {
+      customFilters.push({
+        field: draft.fieldName,
+        operator: "match",
+        value: draft.textValue.trim(),
+      });
+    }
+    if (draft.rangeMin !== null || draft.rangeMax !== null) {
+      const isNumber = draft.type === "number";
+      customFilters.push({
+        field: draft.fieldName,
+        operator: "range",
+        type: draft.type,
+        gte:
+          draft.rangeMin != null ? (isNumber ? Number(draft.rangeMin) : draft.rangeMin) : undefined,
+        lte:
+          draft.rangeMax != null ? (isNumber ? Number(draft.rangeMax) : draft.rangeMax) : undefined,
+      });
+    }
+  }
+  if (customFilters.length > 0) {
+    filters.customMetadataFilters = customFilters;
+  }
+
   return filters;
 }
 
@@ -196,6 +305,10 @@ export interface SearchState {
   semanticMode: "full" | "clip";
   searchModes: SearchMode[];
   filters: FacetFilters;
+
+  // Search response data
+  aggregations: Record<string, FieldAggregation>;
+  facetsInfo: { limited: boolean } | null;
 
   // UI state
   ui: {
@@ -216,6 +329,10 @@ export interface SearchState {
     setFilters: (filters: FacetFilters) => void;
     updateFilter: <K extends keyof FacetFilters>(key: K, value: FacetFilters[K]) => void;
     clearFilters: () => void;
+
+    // Search data actions
+    setAggregations: (aggregations: Record<string, FieldAggregation>) => void;
+    setFacetsInfo: (facetsInfo: { limited: boolean } | null) => void;
 
     // UI actions
     openFilterModal: () => void;
@@ -238,9 +355,13 @@ export const useSearchStore = create<SearchState>()(
       // Domain state
       query: "",
       isSemantic: false,
-      semanticMode: "full",
+      semanticMode: "clip",
       searchModes: ["visual"] as SearchMode[],
       filters: {},
+
+      // Search response data
+      aggregations: {},
+      facetsInfo: null,
 
       // UI state
       ui: {
@@ -307,6 +428,10 @@ export const useSearchStore = create<SearchState>()(
               filterModalDraft: initialFilterModalState,
             },
           }),
+
+        // Search data actions
+        setAggregations: (aggregations) => set({ aggregations }),
+        setFacetsInfo: (facetsInfo) => set({ facetsInfo }),
 
         // UI actions
         openFilterModal: () => {
@@ -376,26 +501,34 @@ export const useSearchStore = create<SearchState>()(
 
         // Computed values
         hasActiveFilters: () => {
-          const filters = get().filters;
-          return Object.values(filters).filter(Boolean).length > 0;
+          return get().actions.activeFilterCount() > 0;
         },
 
         activeFilterCount: () => {
           const filters = get().filters;
-          return Object.values(filters).filter(Boolean).length;
+          const hasDate = Boolean(filters.ingested_date_gte || filters.ingested_date_lte);
+          const hasSize = Boolean(
+            filters.asset_size_gte !== undefined || filters.asset_size_lte !== undefined
+          );
+          const hasType = Boolean(filters.type);
+          const hasExtension = Boolean(filters.extension);
+          const customFilters = filters.customMetadataFilters ?? [];
+          const activeCustomFields = new Set(customFilters.map((f) => f.field)).size;
+          return +hasDate + +hasSize + +hasType + +hasExtension + activeCustomFields;
         },
       },
     }),
     {
       name: "search-store",
       storage: createJSONStorage(() => sessionStorage),
-      // Only persist domain state, not UI state
+      // Only persist domain state, not UI state or filters.
+      // Filters are derived from URL params on each page load — persisting them
+      // causes stale filters to survive across navigations.
       partialize: (state) => ({
         query: state.query,
         isSemantic: state.isSemantic,
         semanticMode: state.semanticMode,
         searchModes: state.searchModes,
-        filters: state.filters,
       }),
     }
   )
@@ -408,51 +541,54 @@ export const useSemanticMode = () => useSearchStore((state) => state.semanticMod
 export const useSearchModes = () => useSearchStore((state) => state.searchModes);
 export const useSearchFilters = () => useSearchStore((state) => state.filters);
 
+// Search data selectors
+export const useAggregations = () => useSearchStore((state) => state.aggregations);
+export const useFacetsInfo = () => useSearchStore((state) => state.facetsInfo);
+export const useActiveFilterCount = () =>
+  useSearchStore((state) => {
+    const filters = state.filters;
+    const hasDate = Boolean(filters.ingested_date_gte || filters.ingested_date_lte);
+    const hasSize = Boolean(
+      filters.asset_size_gte !== undefined || filters.asset_size_lte !== undefined
+    );
+    const hasType = Boolean(filters.type);
+    const hasExtension = Boolean(filters.extension);
+    const customFilters = filters.customMetadataFilters ?? [];
+    const activeCustomFields = new Set(customFilters.map((f) => f.field)).size;
+    return +hasDate + +hasSize + +hasType + +hasExtension + activeCustomFields;
+  });
+
 // UI state selectors
 export const useFilterModalOpen = () => useSearchStore((state) => state.ui.filterModalOpen);
-export const useFilterModalDraft = () => useSearchStore((state) => state.ui.filterModalDraft);
+export const useFilterModalDraft = () =>
+  useSearchStore(useShallow((state) => state.ui.filterModalDraft));
 
 // Action selectors
 export const useSearchActions = () => useSearchStore((state) => state.actions);
-export const useDomainActions = () => {
-  const {
-    setQuery,
-    setIsSemantic,
-    setSemanticMode,
-    setSearchModes,
-    toggleSearchMode,
-    setFilters,
-    updateFilter,
-    clearFilters,
-  } = useSearchStore((state) => state.actions);
-  return {
-    setQuery,
-    setIsSemantic,
-    setSemanticMode,
-    setSearchModes,
-    toggleSearchMode,
-    setFilters,
-    updateFilter,
-    clearFilters,
-  };
-};
-export const useUIActions = () => {
-  const {
-    openFilterModal,
-    closeFilterModal,
-    updateFilterModalDraft,
-    applyFilterModalDraft,
-    resetFilterModalDraft,
-    setLoading,
-    setError,
-  } = useSearchStore((state) => state.actions);
-  return {
-    openFilterModal,
-    closeFilterModal,
-    updateFilterModalDraft,
-    applyFilterModalDraft,
-    resetFilterModalDraft,
-    setLoading,
-    setError,
-  };
-};
+export const useDomainActions = () =>
+  useSearchStore(
+    useShallow((state) => ({
+      setQuery: state.actions.setQuery,
+      setIsSemantic: state.actions.setIsSemantic,
+      setSemanticMode: state.actions.setSemanticMode,
+      setSearchModes: state.actions.setSearchModes,
+      toggleSearchMode: state.actions.toggleSearchMode,
+      setFilters: state.actions.setFilters,
+      updateFilter: state.actions.updateFilter,
+      clearFilters: state.actions.clearFilters,
+    }))
+  );
+export const useUIActions = () =>
+  useSearchStore(
+    useShallow((state) => ({
+      openFilterModal: state.actions.openFilterModal,
+      closeFilterModal: state.actions.closeFilterModal,
+      updateFilterModalDraft: state.actions.updateFilterModalDraft,
+      applyFilterModalDraft: state.actions.applyFilterModalDraft,
+      resetFilterModalDraft: state.actions.resetFilterModalDraft,
+      setLoading: state.actions.setLoading,
+      setError: state.actions.setError,
+      setAggregations: state.actions.setAggregations,
+      setFacetsInfo: state.actions.setFacetsInfo,
+    }))
+  );

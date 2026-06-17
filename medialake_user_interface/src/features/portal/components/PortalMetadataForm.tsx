@@ -20,10 +20,7 @@ interface Props {
 const PortalMetadataForm: React.FC<Props> = ({ fields, prePopulatedValues, onChange }) => {
   // Memoize the sorted array so `sorted` is stable across renders and
   // doesn't cause the `useEffect` below to re-run on every render.
-  const sorted = useMemo(
-    () => [...fields].sort((a, b) => a.order - b.order),
-    [fields],
-  );
+  const sorted = useMemo(() => [...fields].sort((a, b) => a.order - b.order), [fields]);
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     sorted.forEach((f) => {

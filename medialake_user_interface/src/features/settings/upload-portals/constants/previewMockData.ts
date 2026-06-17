@@ -14,7 +14,7 @@ import type { PortalDestination, PortalMetadataField } from "@/api/types/api.typ
  */
 export const PREVIEW_MOCK_METADATA_FIELDS: PortalMetadataField[] = [
   { label: "Your Name", type: "text", required: true, order: 0 },
-  { label: "Email", type: "email", required: true, order: 1 },
+  { label: "Project Code", type: "text", required: true, order: 1 },
   { label: "Department", type: "text", required: false, order: 2 },
 ];
 

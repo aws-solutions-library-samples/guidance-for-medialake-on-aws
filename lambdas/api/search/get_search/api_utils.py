@@ -17,7 +17,9 @@ def get_search_provider_config() -> Dict[str, Any]:
     Get the search provider configuration from DynamoDB
     """
     try:
-        system_settings_table = dynamodb.Table(os.environ.get("SYSTEM_SETTINGS_TABLE"))
+        system_settings_table = dynamodb.Table(
+            os.environ.get("SYSTEM_SETTINGS_TABLE_NAME")
+        )
 
         # Get search provider settings
         response = system_settings_table.get_item(

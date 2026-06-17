@@ -92,7 +92,7 @@ const makePortalFixture = (): Portal => ({
   ipAllowlist: [],
   structuredPathMode: false,
   isActive: true,
-  metadataFields: [{ label: "Your Name", type: "text", required: true, order: 0 }],
+  metadataFields: [{ label: "Your Name", type: "text", required: true, order: 0, pageNumber: 1 }],
   destinations: [
     {
       destinationId: "dest-1",
@@ -102,6 +102,23 @@ const makePortalFixture = (): Portal => ({
       allowBrowsing: false,
       allowFolderCreation: false,
       order: 0,
+      pageNumber: 1,
+    },
+  ],
+  // A structurally valid single-page layout: page 1 hosts the metadata field,
+  // the destination selector, and the uploader. `store.validate()` (task 12.2)
+  // now enforces the same single-uploader / contiguity / reference-integrity
+  // invariants as the server, so the fixture must carry a real `pages` array
+  // for the Save path to fire the PUT (an empty array fails single-uploader).
+  pages: [
+    {
+      pageNumber: 1,
+      title: "Upload",
+      elements: [
+        { kind: "metadata-field", fieldKey: "your_name" },
+        { kind: "destination-selector" },
+        { kind: "uploader" },
+      ],
     },
   ],
   captchaEnabled: false,
@@ -183,10 +200,16 @@ describe("PortalEditorPage save flow (integration)", () => {
 
     renderPage();
 
-    // Wait for the fetch to resolve and the store to initialize.
-    await waitFor(() => {
-      expect(usePortalEditorStore.getState().isInitialized).toBe(true);
-    });
+    // Wait for the fetch to resolve and the store to initialize. A
+    // generous timeout keeps this deterministic under full-suite parallel
+    // load, where the MSW + React Query + store-init chain can exceed the
+    // default 1000ms waitFor window.
+    await waitFor(
+      () => {
+        expect(usePortalEditorStore.getState().isInitialized).toBe(true);
+      },
+      { timeout: 5000 }
+    );
 
     // Store should be clean immediately after `initialize(portal)`.
     expect(usePortalEditorStore.getState().isDirty).toBe(false);
@@ -195,9 +218,12 @@ describe("PortalEditorPage save flow (integration)", () => {
     // `updateColor` marks the store dirty, which enables the Save button.
     usePortalEditorStore.getState().updateColor("primary", "#ff0000");
 
-    await waitFor(() => {
-      expect(usePortalEditorStore.getState().isDirty).toBe(true);
-    });
+    await waitFor(
+      () => {
+        expect(usePortalEditorStore.getState().isDirty).toBe(true);
+      },
+      { timeout: 5000 }
+    );
 
     // Click Save.
     const user = userEvent.setup();
@@ -233,9 +259,12 @@ describe("PortalEditorPage save flow (integration)", () => {
     expect(body).not.toHaveProperty("logoFile");
 
     // Store-side postcondition: `markClean()` ran on save success.
-    await waitFor(() => {
-      expect(usePortalEditorStore.getState().isDirty).toBe(false);
-    });
+    await waitFor(
+      () => {
+        expect(usePortalEditorStore.getState().isDirty).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     // Optional: assert the success toast surfaced. Toast mounting is
     // async and MUI Snackbar timing in jsdom can vary; we only assert
@@ -251,5 +280,5 @@ describe("PortalEditorPage save flow (integration)", () => {
       // Toast didn't render in the waitFor window — this is not a
       // contract violation, so we skip the assertion.
     }
-  });
+  }, 15000);
 });

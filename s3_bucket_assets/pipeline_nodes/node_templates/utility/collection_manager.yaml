@@ -1,0 +1,134 @@
+spec: v1.0.0
+node:
+  id: collection_manager
+  title: Collection Manager
+  description: Create or update collections in MediaLake. Supports creating new collections and updating existing ones with metadata from pipeline assets.
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/CollectionManagerLambdaDeployment
+        runtime: python3.12
+        timeout: 300
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              resources:
+                - ${COLLECTIONS_TABLE_ARN}
+            - effect: Allow
+              actions:
+                - events:PutEvents
+              resources:
+                - arn:aws:events:${AWS_REGION}:${ACCOUNT_ID}:event-bus/${PIPELINES_EVENT_BUS_NAME}
+actions:
+  manage:
+    summary: Manage Collection
+    description: Create a new collection or update an existing one
+    operationId: manageCollection
+    parameters:
+      - in: body
+        name: Operation
+        label: Operation
+        description: Whether to create a new collection or update an existing one
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "Create Collection"
+              value: "create"
+            - label: "Update Collection"
+              value: "update"
+          default: create
+      - in: body
+        name: Collection ID
+        label: Target Collection (for update)
+        description: Select the collection to update. Required for update operation.
+        required: false
+        requiredWhen:
+          field: parameters.Operation
+          value: update
+        schema:
+          type: select
+        showWhen:
+          field: parameters.Operation
+          value: update
+      - in: body
+        name: Collection Name
+        label: Collection Name
+        description: Name for the collection. For create, this is the new collection name. For update, leave empty to keep existing name.
+        placeholder: "My Pipeline Collection"
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Description
+        label: Description
+        description: Description for the collection
+        placeholder: "Auto-generated collection from pipeline"
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Collection Type ID
+        label: Collection Type ID
+        description: Optional collection type identifier
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Is Public
+        label: Public Collection
+        description: Whether the collection should be publicly accessible
+        required: false
+        schema:
+          type: select
+          options:
+            - label: "No"
+              value: "false"
+            - label: "Yes"
+              value: "true"
+          default: "false"
+      - in: body
+        name: Owner ID
+        label: Owner ID
+        description: User ID of the collection owner. If empty, uses 'system' as the owner.
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Metadata
+        label: Custom Metadata
+        description: >-
+          Custom key-value metadata pairs for the collection.
+          Format as JSON object, e.g. {"project": "alpha", "region": "us-west-2"}.
+        required: false
+        schema:
+          type: keyvalue
+      - in: body
+        name: Tags
+        label: Tags
+        description: >-
+          Comma-separated tags for the collection. Tags are free-form labels
+          used for filtering and organisation, e.g. "q1, french, 2026".
+        placeholder: "q1, french, 2026"
+        required: false
+        schema:
+          type: string
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

@@ -1,3 +1,29 @@
+# Known node categories whose YAML may contain lambda configuration.
+# All categories are checked when resolving config, so a container node
+# under "utility/" or any other category is handled automatically.
+NODE_CATEGORIES = ("integration", "utility", "trigger")
+
+
+def get_node_lambda_config(yaml_data: dict) -> dict:
+    """
+    Extract ``node.<category>.config.lambda`` from a node template YAML,
+    checking all known node categories in order.
+
+    Returns the first non-empty lambda config dict found, or ``{}`` if none.
+
+    Example YAML paths checked:
+        - node.integration.config.lambda
+        - node.utility.config.lambda
+        - node.trigger.config.lambda
+    """
+    node = yaml_data.get("node", {})
+    for category in NODE_CATEGORIES:
+        lambda_config = node.get(category, {}).get("config", {}).get("lambda", {})
+        if lambda_config:
+            return lambda_config
+    return {}
+
+
 def generate_derived_filename(original_key: str, suffix: str, output_ext: str) -> str:
     """
     Generate a unique derived filename that includes the original extension

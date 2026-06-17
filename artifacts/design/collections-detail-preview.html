@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collection Detail — Redesign Preview</title>
+<link rel="stylesheet" href="data:text/css;base64,"> <!-- placeholder -->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-elevated: rgba(15, 23, 42, 0.02);
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.12);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-tertiary: #94a3b8;
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, 0.08);
+    --accent-hover: rgba(37, 99, 235, 0.12);
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-card-hover: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --collection-card-min-width: 220px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1020;
+      --surface: #111827;
+      --surface-elevated: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-tertiary: #64748b;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.12);
+      --accent-hover: rgba(96, 165, 250, 0.18);
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.4);
+      --shadow-card-hover: 0 6px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell { max-width: 1440px; margin: 0 auto; padding: 32px 40px 64px; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Breadcrumbs ── */
+  .breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+  .breadcrumbs .sep { color: var(--text-tertiary); }
+  .breadcrumbs .current { color: var(--text-primary); font-weight: 600; }
+
+  /* ── Action cluster ── */
+  .action-cluster { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, color 120ms, border-color 120ms;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-outline { background: transparent; border-color: var(--border-strong); color: var(--text-primary); }
+  .btn-outline:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    color: var(--text-secondary);
+    background: transparent;
+    border-color: var(--border-strong);
+  }
+  .btn-icon:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Summary band ── */
+  .summary {
+    display: grid;
+    grid-template-columns: 192px 1fr auto;
+    gap: 24px;
+    align-items: start;
+    margin-bottom: 28px;
+  }
+  .summary-thumb {
+    width: 192px;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(37,99,235,0.03));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+  }
+  .summary-thumb svg { width: 72px; height: 72px; color: var(--accent); opacity: 0.4; }
+  .summary-info h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .summary-info .description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .tag-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 120ms ease;
+  }
+  .tag-chip:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tag-chip .hash {
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+  .tag-chip:hover .hash { color: var(--accent); }
+
+  .info-grid {
+    display: grid;
+    /* Two key/value column-pairs side-by-side.
+       Keys hug their label ("auto"), values fill the remaining space
+       in each pair ("1fr") so the second pair starts right next to the
+       first value instead of floating to the end of the row. */
+    grid-template-columns: auto 1fr auto 1fr;
+    column-gap: 16px;
+    row-gap: 10px;
+    font-size: 13px;
+    max-width: 560px;
+  }
+  .info-grid dt {
+    color: var(--text-tertiary);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    align-self: center;
+  }
+  .info-grid dd {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: var(--mono);
+    font-size: 13px;
+    /* Cap value width so long owners/dates don't widen the column;
+       overflow elipses keep the grid tidy. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .visibility-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    border: 1px solid rgba(22, 163, 74, 0.24);
+    align-self: start;
+  }
+  @media (prefers-color-scheme: dark) {
+    .visibility-pill {
+      background: rgba(74, 222, 128, 0.14);
+      color: #4ade80;
+      border-color: rgba(74, 222, 128, 0.3);
+    }
+  }
+  .visibility-pill svg { width: 12px; height: 12px; }
+
+  /* ── Metadata band ── */
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .metadata-tile {
+    padding: 12px 14px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: border-color 120ms;
+  }
+  .metadata-tile:hover { border-color: var(--border-strong); }
+  .metadata-tile .key {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+  .metadata-tile .value {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-word;
+  }
+
+  /* ── Sub-collections grid (same card as list page) ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--collection-card-min-width), 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    box-shadow: var(--shadow-card);
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--border-strong);
+  }
+  .card-thumb {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    margin: 10px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-thumb svg.placeholder { width: 48px; height: 48px; color: var(--accent); opacity: 0.4; }
+  .card-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 7px;
+    background: rgba(15, 23, 42, 0.72);
+    color: white;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    backdrop-filter: blur(6px);
+  }
+  .card-badge svg { width: 11px; height: 11px; }
+  .card-body { padding: 4px 14px 14px; }
+  .card-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .card-name {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 8px;
+  }
+  .action-menu {
+    all: unset;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .action-menu:hover { background: var(--accent-soft); color: var(--text-primary); }
+  .card-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .card-tag {
+    padding: 2px 8px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+  .card-tag.overflow { color: var(--text-tertiary); }
+  .card-meta-divider { height: 1px; background: var(--border); margin-bottom: 8px; }
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  svg { display: inline-block; }
+
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Breadcrumbs + action cluster -->
+  <div class="top-row">
+    <nav class="breadcrumbs" aria-label="breadcrumb">
+      <a href="#">Home</a>
+      <span class="sep">›</span>
+      <a href="#">Collections</a>
+      <span class="sep">›</span>
+      <span class="current">Accessibility</span>
+    </nav>
+    <div class="action-cluster">
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Create Sub-Collection
+      </button>
+      <button class="btn btn-outline">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Edit
+      </button>
+      <button class="btn btn-icon" aria-label="More actions">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary band -->
+  <section class="summary">
+    <div class="summary-thumb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <div class="summary-info">
+      <h1>Accessibility</h1>
+      <p class="description">Accessibility department — all accessibility projects and assets, including captions, audio descriptions, alternative formats, and compliance documentation for regional broadcast partners.</p>
+      <div class="tag-row">
+        <span class="tag-chip"><span class="hash">#</span>surround</span>
+        <span class="tag-chip"><span class="hash">#</span>french</span>
+        <span class="tag-chip"><span class="hash">#</span>2026</span>
+        <span class="tag-chip"><span class="hash">#</span>captions</span>
+        <span class="tag-chip"><span class="hash">#</span>compliance</span>
+      </div>
+      <dl class="info-grid">
+        <dt>Owner</dt>
+        <dd>@medialake+dev3</dd>
+        <dt>Created</dt>
+        <dd>Apr 28, 2026</dd>
+
+        <dt>Items</dt>
+        <dd>0 assets · 10 sub</dd>
+        <dt>Updated</dt>
+        <dd>Apr 28, 2026</dd>
+      </dl>
+    </div>
+    <span class="visibility-pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Public
+    </span>
+  </section>
+
+  <!-- Metadata card -->
+  <section class="section-card">
+    <div class="section-header">
+      <span class="section-title">Metadata</span>
+      <button class="btn btn-outline" style="padding:5px 10px;font-size:12px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Edit metadata
+      </button>
+    </div>
+    <div class="metadata-grid">
+      <div class="metadata-tile"><div class="key">priority</div><div class="value">P1</div></div>
+      <div class="metadata-tile"><div class="key">campaign</div><div class="value">Q1-2026-Brand</div></div>
+      <div class="metadata-tile"><div class="key">department</div><div class="value">Creative</div></div>
+      <div class="metadata-tile"><div class="key">budget</div><div class="value">$42,000</div></div>
+      <div class="metadata-tile"><div class="key">owner-contact</div><div class="value">jane@example.com</div></div>
+      <div class="metadata-tile"><div class="key">region</div><div class="value">EMEA</div></div>
+      <div class="metadata-tile"><div class="key">compliance</div><div class="value">WCAG 2.2 AA</div></div>
+      <div class="metadata-tile"><div class="key">external-ref</div><div class="value">JIRA-4892</div></div>
+    </div>
+  </section>
+
+  <!-- Sub-collections — using the SAME card as the list page -->
+  <section>
+    <div class="section-header">
+      <span class="section-title">Sub-Collections (10)</span>
+    </div>
+    <div class="grid">
+
+      <article class="card">
+        <div class="card-thumb">
+          <svg class="placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="card-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Public</span>
+        </div>
+        <div class="card-body">
+          <div class="card-top">
+            <div style="min-width:0;flex:1;">
+              <h3 class="card-name">Accessibility — Batch 9</h3>
+              <div class="card-desc">Weekly delivery batch</div>
+            </div>
+            <button class="action-menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+          </div>
+          <div class="card-tags">
+            <span class="card-tag">2025</span>
+            <span class="card-tag">8k</span>
+          </div>
+          <div class="card-meta-divider"></div>
+          <div class="card-meta"><span>0 sub · 0 assets</span><span>Apr 27</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-thumb" style="background: rgba(245,158,11,0.12);">
+          <svg class="placeholder" style="color:#f59e0b;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span class="card-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Public</span>
+        </div>
+        <div class="card-body">
+          <div class="card-top">
+            <div style="min-width:0;flex:1;">
+              <h3 class="card-name">Accessibility — Campaign 1</h3>
+              <div class="card-desc">Q1 2026 accessibility campaign</div>
+            </div>
+            <button class="action-menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+          </div>
+          <div class="card-tags">
+            <span class="card-tag">english</span>
+            <span class="card-tag">2025</span>
+            <span class="card-tag">q1</span>
+            <span class="card-tag overflow">+2</span>
+          </div>
+          <div class="card-meta-divider"></div>
+          <div class="card-meta"><span>0 sub · 142 assets</span><span>Apr 26</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-thumb" style="background: rgba(16,185,129,0.1);">
+          <svg class="placeholder" style="color:#10b981;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span class="card-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Public</span>
+        </div>
+        <div class="card-body">
+          <div class="card-top">
+            <div style="min-width:0;flex:1;">
+              <h3 class="card-name">Accessibility — Collection 10</h3>
+              <div class="card-desc">Reference library</div>
+            </div>
+            <button class="action-menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+          </div>
+          <div class="card-tags">
+            <span class="card-tag">spanish</span>
+            <span class="card-tag">2026</span>
+          </div>
+          <div class="card-meta-divider"></div>
+          <div class="card-meta"><span>0 sub · 57 assets</span><span>Apr 25</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-thumb" style="background: rgba(217,70,239,0.1);">
+          <svg class="placeholder" style="color:#d946ef;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+          <span class="card-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Public</span>
+        </div>
+        <div class="card-body">
+          <div class="card-top">
+            <div style="min-width:0;flex:1;">
+              <h3 class="card-name">Accessibility — Initiative 7</h3>
+              <div class="card-desc">Strategic accessibility initiative</div>
+            </div>
+            <button class="action-menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+          </div>
+          <div class="card-tags">
+            <span class="card-tag">q2</span>
+            <span class="card-tag">german</span>
+          </div>
+          <div class="card-meta-divider"></div>
+          <div class="card-meta"><span>0 sub · 0 assets</span><span>Apr 24</span></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

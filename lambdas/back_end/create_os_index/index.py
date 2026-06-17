@@ -27,6 +27,10 @@ VECTOR_DIMENSION = 1024  # Twelve Labs embeddings dimension
 # Index name for the separate asset embeddings index (Marengo 3.0)
 ASSET_EMBEDDINGS_INDEX = "asset-embeddings"
 
+# Prefix for the collections index — the full name is "{prefix}_collections_{env}"
+# passed via INDEX_NAMES env var. We match by checking if the name contains "_collections_".
+COLLECTIONS_INDEX_MARKER = "_collections_"
+
 
 def index_exists(
     host: str, index_name: str, credentials, service: str, region: str
@@ -425,7 +429,11 @@ def handler(event, context):
                 "end_timecode": {
                     "type": "keyword"
                 },  # LEGACY: Use end_smpte_timecode instead
-                "timestamp": {"type": "date"},  # LEGACY: Use created_at instead
+                "end_timecode": {
+                    "type": "keyword"
+                },  # LEGACY: Use end_smpte_timecode instead
+                # NOTE: "timestamp" field is already defined in COMMON FIELDS above (line 394).
+                # LEGACY: Use created_at instead.
                 # ═══════════════════════════════════════════════════════════
                 # EMBEDDING VECTOR FIELDS (multiple dimensions supported)
                 # ═══════════════════════════════════════════════════════════
@@ -820,6 +828,49 @@ def handler(event, context):
         },
     }
 
+    # Mapping for the collections index — stores collection metadata for listing/search.
+    # Uses keyword types for all ID/filter fields to support term queries.
+    #
+    # WARNING: This mapping is an inline copy. The canonical version is maintained in
+    # lambdas/sync/collections_sync/collections_index_mapping.json (also used by
+    # collections_backfill). If you change the mapping here, update the JSON file too
+    # and vice versa. A future refactor should load from a single shared source.
+    collections_payload = {
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 1,
+            "index.max_result_window": 100000,
+        },
+        "mappings": {
+            "properties": {
+                "id": {"type": "keyword"},
+                "name": {
+                    "type": "text",
+                    "fields": {"keyword": {"type": "keyword"}},
+                },
+                "description": {"type": "text"},
+                "ownerId": {"type": "keyword"},
+                "status": {"type": "keyword"},
+                "isPublic": {"type": "boolean"},
+                "collectionTypeId": {"type": "keyword"},
+                "parentId": {"type": "keyword"},
+                "tags": {"type": "keyword"},
+                "childCollectionCount": {"type": "integer"},
+                "itemCount": {"type": "integer"},
+                "collectionIds": {"type": "keyword"},
+                "sharedWithUserIds": {"type": "keyword"},
+                "createdAt": {"type": "date"},
+                "updatedAt": {"type": "date"},
+                "thumbnailType": {"type": "keyword"},
+                "thumbnailValue": {"type": "keyword"},
+                "thumbnailS3Key": {"type": "keyword"},
+                "customMetadata": {"type": "object", "dynamic": True},
+                "expiresAt": {"type": "date"},
+                "documentType": {"type": "keyword"},
+            }
+        },
+    }
+
     logger.info(
         "Preparing to create indexes",
         extra={
@@ -833,48 +884,71 @@ def handler(event, context):
     logger.info(f"Creating {len(indexes)} indexes", extra={"indexes": indexes})
 
     if req_type == "Update":
-        # On Update: only create the asset-embeddings index if it doesn't exist.
-        # Never delete or recreate existing indexes.
+        # On Update: safely create asset-embeddings and collections indexes
+        # if they don't exist. Never delete or recreate existing indexes.
         logger.info(
-            "Update request – safely creating asset-embeddings index only",
+            "Update request – safely creating new indexes only",
         )
-        if ASSET_EMBEDDINGS_INDEX not in [i.strip() for i in indexes]:
-            logger.info(
-                "asset-embeddings not in INDEX_NAMES, adding it for Update",
-            )
-            indexes.append(ASSET_EMBEDDINGS_INDEX)
 
         for index_name in indexes:
             index_name = index_name.strip()
-            if index_name != ASSET_EMBEDDINGS_INDEX:
+
+            if index_name == ASSET_EMBEDDINGS_INDEX:
+                logger.info(
+                    "Safely creating asset-embeddings index if not exists",
+                    extra={"index_name": index_name},
+                )
+                success = create_index_if_not_exists(
+                    host,
+                    index_name,
+                    asset_embeddings_payload,
+                    headers,
+                    credentials,
+                    service,
+                    region,
+                )
+                if not success:
+                    msg = f"Failed to create index {index_name} after multiple retries"
+                    logger.error(msg)
+                    raise Exception(msg)
+            elif COLLECTIONS_INDEX_MARKER in index_name:
+                logger.info(
+                    "Safely creating collections index if not exists",
+                    extra={"index_name": index_name},
+                )
+                success = create_index_if_not_exists(
+                    host,
+                    index_name,
+                    collections_payload,
+                    headers,
+                    credentials,
+                    service,
+                    region,
+                )
+                if not success:
+                    msg = f"Failed to create index {index_name} after multiple retries"
+                    logger.error(msg)
+                    raise Exception(msg)
+            else:
                 logger.info(
                     "Skipping existing index on Update (no changes)",
                     extra={"index_name": index_name},
                 )
-                continue
 
-            logger.info(
-                "Safely creating asset-embeddings index if not exists",
-                extra={"index_name": index_name},
-            )
-            success = create_index_if_not_exists(
-                host,
-                index_name,
-                asset_embeddings_payload,
-                headers,
-                credentials,
-                service,
-                region,
-            )
-            if not success:
-                msg = f"Failed to create index {index_name} after multiple retries"
-                logger.error(msg)
-                raise Exception(msg)
-
-        logger.info("Update completed – asset-embeddings index ensured")
+        logger.info("Update completed – all new indexes ensured")
         return {"statusCode": 200, "body": "Update completed successfully"}
 
-    # Create: create all indexes (original behavior)
+    # Create: create indexes safely — only recreate if FORCE_RECREATE is set.
+    # Default behavior uses create_index_if_not_exists to prevent accidental
+    # data loss when CloudFormation replaces the custom resource (new logical ID).
+    force_recreate = event.get("ResourceProperties", {}).get("ForceRecreate", "false")
+    use_destructive_create = force_recreate.lower() == "true"
+
+    if use_destructive_create:
+        logger.warning(
+            "FORCE_RECREATE is set — indexes will be deleted and recreated",
+        )
+
     for index_name in indexes:
         index_name = index_name.strip()
         logger.info("Processing index", extra={"index_name": index_name})
@@ -886,15 +960,26 @@ def handler(event, context):
                 "Using asset-embeddings specific mapping",
                 extra={"index_name": index_name},
             )
+        elif COLLECTIONS_INDEX_MARKER in index_name:
+            index_payload = collections_payload
+            logger.info(
+                "Using collections specific mapping",
+                extra={"index_name": index_name},
+            )
         else:
             index_payload = payload
             logger.info(
                 "Using default media index mapping", extra={"index_name": index_name}
             )
 
-        success = create_index_with_retry(
-            host, index_name, index_payload, headers, credentials, service, region
-        )
+        if use_destructive_create:
+            success = create_index_with_retry(
+                host, index_name, index_payload, headers, credentials, service, region
+            )
+        else:
+            success = create_index_if_not_exists(
+                host, index_name, index_payload, headers, credentials, service, region
+            )
         if not success:
             msg = f"Failed to create index {index_name} after multiple retries"
             logger.error(msg)

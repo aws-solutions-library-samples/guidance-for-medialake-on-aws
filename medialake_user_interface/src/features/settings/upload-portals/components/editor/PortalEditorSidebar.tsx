@@ -18,8 +18,10 @@ import AppearanceSection from "./sections/AppearanceSection";
 import BrandingSection from "./sections/BrandingSection";
 import ContentSection from "./sections/ContentSection";
 import DestinationsSection from "./sections/DestinationsSection";
+import FieldConfigurationSection from "./sections/FieldConfigurationSection";
 import LayoutSection from "./sections/LayoutSection";
 import MetadataSection from "./sections/MetadataSection";
+import PagesWorkflowSection from "./sections/PagesWorkflowSection";
 import TypographySection from "./sections/TypographySection";
 
 /**
@@ -36,19 +38,24 @@ export interface PortalEditorSidebarProps {
 /**
  * Ordered section list for the sidebar accordion.
  *
- * Order is locked by Requirement 9.5:
- *   Branding → Content → Appearance → Typography → Layout → Access Control
- *   → Destinations → Metadata & Limits
+ * Order: Branding → Content → Pages & Workflow → Field Configuration →
+ * Appearance → Typography → Layout → Access Control → Destinations →
+ * Upload Limits & File Settings. "Field Configuration" sits directly under
+ * "Pages & Workflow" so fields are configured next to where they are placed,
+ * and "Upload Limits & File Settings" (the former "Metadata & Limits") holds the
+ * upload-limit controls.
  */
 const SECTIONS: { key: EditorSection; label: string }[] = [
   { key: "branding", label: "Branding" },
   { key: "content", label: "Content" },
+  { key: "pages", label: "Pages & Workflow" },
+  { key: "fields", label: "Field Configuration" },
   { key: "appearance", label: "Appearance" },
   { key: "typography", label: "Typography" },
   { key: "layout", label: "Layout" },
   { key: "access", label: "Access Control" },
   { key: "destinations", label: "Destinations" },
-  { key: "metadata", label: "Metadata & Limits" },
+  { key: "metadata", label: "Upload Limits & File Settings" },
 ];
 
 /**
@@ -172,6 +179,17 @@ const PortalEditorSidebar: React.FC<PortalEditorSidebarProps> = ({
         return <DestinationsSection />;
       case "metadata":
         return <MetadataSection />;
+      case "fields":
+        // Field Configuration section: the metadata field builder (label /
+        // type / required / choices). Sits under "Pages & Workflow" so fields
+        // are configured next to where they are dragged onto pages.
+        return <FieldConfigurationSection />;
+      case "pages":
+        // Pages & Workflow section: page CRUD/reorder, drag-and-drop field
+        // placement, and uploader-page assignment. Wired in task 13.3. The
+        // per-section validation Alert above this body surfaces structural
+        // violations recorded under the "pages" bucket (Requirement 10.5).
+        return <PagesWorkflowSection />;
       default: {
         // Exhaustiveness check: if a new section key is added to the union
         // but not to this switch, TypeScript will flag the missing arm.

@@ -611,6 +611,12 @@ def create_lambda_execution_policy(
             .get("config", {})
             .get("lambda", {})
             .get("iam_policy")
+        ) or (
+            yaml_data.get("node", {})
+            .get("utility", {})
+            .get("config", {})
+            .get("lambda", {})
+            .get("iam_policy")
         )
 
         logger.info(f"Has IAM policy in YAML: {has_iam_policy is not None}")
@@ -879,24 +885,81 @@ def create_lambda_role(
                     PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
                 )
 
+                # Add ECR pull permissions for container-based Lambda nodes
+                lambda_config_for_ecr = (
+                    yaml_data.get("node", {})
+                    .get("integration", {})
+                    .get("config", {})
+                    .get("lambda", {})
+                )
+                if not lambda_config_for_ecr:
+                    # Also check utility nodes
+                    lambda_config_for_ecr = (
+                        yaml_data.get("node", {})
+                        .get("utility", {})
+                        .get("config", {})
+                        .get("lambda", {})
+                    )
+                pkg_type = (lambda_config_for_ecr or {}).get("package_type", "Zip")
+                if isinstance(pkg_type, str) and pkg_type.lower() == "image":
+                    # Container Lambdas pull images from the CDK bootstrap ECR
+                    # repository (cdk-hnb659fds-container-assets-*). Scope pull
+                    # permissions to the deploying account.
+                    account_id = os.environ.get("ACCOUNT_ID", "")
+                    region = os.environ.get("AWS_REGION", "us-east-1")
+                    if not account_id:
+                        raise ValueError(
+                            f"ACCOUNT_ID environment variable is required "
+                            f"for container-based node role '{role_name}' but is not set."
+                        )
+                    ecr_resource = f"arn:aws:ecr:{region}:{account_id}:repository/cdk-*"
+                    ecr_policy = {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "ecr:GetDownloadUrlForLayer",
+                                    "ecr:BatchGetImage",
+                                    "ecr:BatchCheckLayerAvailability",
+                                ],
+                                "Resource": ecr_resource,
+                            },
+                            {
+                                "Effect": "Allow",
+                                "Action": "ecr:GetAuthorizationToken",
+                                "Resource": "*",
+                            },
+                        ],
+                    }
+                    iam.put_role_policy(
+                        RoleName=role_name,
+                        PolicyName="ECRPullPolicy",
+                        PolicyDocument=json.dumps(ecr_policy),
+                    )
+                    logger.info(
+                        f"Added ECR pull permissions to role {role_name} "
+                        f"for container Lambda (scoped to {ecr_resource})"
+                    )
+
                 # Check if VPC access is needed based on YAML config
                 try:
-                    lambda_config = (
+                    vpc_lambda_config = (
                         yaml_data.get("node", {})
                         .get("integration", {})
                         .get("config", {})
                         .get("lambda", {})
                     )
-                    if not lambda_config:
+                    if not vpc_lambda_config:
                         # Also check utility nodes
-                        lambda_config = (
+                        vpc_lambda_config = (
                             yaml_data.get("node", {})
                             .get("utility", {})
                             .get("config", {})
                             .get("lambda", {})
                         )
 
-                    if lambda_config and lambda_config.get("vpc", False):
+                    if vpc_lambda_config and vpc_lambda_config.get("vpc", False):
                         logger.info(
                             f"Attaching AWSLambdaVPCAccessExecutionRole to {role_name} for VPC access"
                         )

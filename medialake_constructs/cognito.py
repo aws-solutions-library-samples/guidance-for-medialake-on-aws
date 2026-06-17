@@ -101,24 +101,24 @@ class CognitoConstruct(Construct):
                     <html>
                     <body>
                         <p>Hello,</p>
-                        <p>Welcome to MediaLake! Your account has been created successfully.</p>
+                        <p>Welcome to Media Lake! Your account has been created successfully.</p>
                         <p><strong>Your login credentials:</strong><br/>
                         Username: {username}<br/>
                         Temporary Password: {####}</p>
                         <p><strong>To get started:</strong></p>
                         <ol>
-                            <li>Sign in at the MediaLake portal</li>
-                            <li>Sign in with your credentials</li>
+                            <li>Go to your Media Lake portal URL</li>
+                            <li>Sign in with your credentials above</li>
                             <li>You'll be prompted to create a new password on your first login</li>
                         </ol>
                         <p><em>For security reasons, please change your password immediately upon signing in.</em></p>
-                        <p>If you need assistance, please contact your MediaLake administrator.</p>
+                        <p>If you need assistance, please contact your Media Lake administrator.</p>
                         <p>Best regards,<br/>
-                        The MediaLake Team</p>
+                        The Media Lake Team</p>
                     </body>
                     </html>
                     """,
-                    email_subject="Welcome to MediaLake",
+                    email_subject="Welcome to Media Lake",
                 ),
             ),
             "auto_verified_attributes": (
@@ -126,21 +126,21 @@ class CognitoConstruct(Construct):
             ),
             "username_attributes": ["email"] if self.props.sign_in_with_email else None,
             "verification_message_template": cognito.CfnUserPool.VerificationMessageTemplateProperty(
-                default_email_option="CONFIRM_WITH_LINK",
-                email_message_by_link="""
+                default_email_option="CONFIRM_WITH_CODE",
+                email_message="""
                 <html>
                 <body>
                     <p>Hello,</p>
-                    <p>You have requested to reset your MediaLake password.</p>
-                    <p>Click the link below to set a new password:</p>
-                    <p>{##Click here to reset your password##}</p>
+                    <p>You have requested to reset your Media Lake password.</p>
+                    <p>Your verification code is: <strong>{####}</strong></p>
+                    <p>Enter this code in the Media Lake password reset form to set a new password.</p>
                     <p>If you did not request this password reset, please ignore this email.</p>
                     <p>Best regards,<br/>
-                    The MediaLake Team</p>
+                    The Media Lake Team</p>
                 </body>
                 </html>
                 """,
-                email_subject_by_link="Reset your MediaLake password",
+                email_subject="Media Lake - Password Reset Code",
             ),
             "policies": cognito.CfnUserPool.PoliciesProperty(
                 password_policy=cognito.CfnUserPool.PasswordPolicyProperty(

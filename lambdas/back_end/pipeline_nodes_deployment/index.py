@@ -557,13 +557,79 @@ def process_standard_node(node_data: dict) -> Dict[str, list]:
                 }
                 items.append(outgoing_item)
 
-        # Process Lambda layers if they exist in the node configuration
-        if (
-            "integration" in node_data.get("node", {})
-            and "config" in node_data["node"]["integration"]
-        ):
-            lambda_config = node_data["node"]["integration"]["config"].get("lambda", {})
-            if "layers" in lambda_config and isinstance(lambda_config["layers"], list):
+        # Process Lambda config if it exists in any node category (integration, utility, trigger)
+        lambda_config = {}
+        for _category in ("integration", "utility", "trigger"):
+            _cat_data = node_data.get("node", {}).get(_category, {})
+            if "config" in _cat_data and _cat_data["config"].get("lambda"):
+                lambda_config = _cat_data["config"]["lambda"]
+                break
+
+        if lambda_config:
+
+            # Determine package type (Zip or Image)
+            package_type = lambda_config.get("package_type", "Zip")
+            if isinstance(package_type, str):
+                package_type = package_type.capitalize()
+            else:
+                package_type = "Zip"
+
+            # Store deployment configuration for runtime Lambda creation
+            deployment_config_item = {
+                "pk": f"NODE#{node_id}",
+                "sk": "DEPLOYMENT_CONFIG",
+                "packageType": package_type,
+                "entityType": "NODE",
+                "nodeId": f"NODE#{node_id}",
+            }
+
+            if package_type == "Image":
+                image_tag = lambda_config.get("image_tag", node_id)
+                # Image URI comes from a per-node env var set by the CDK stack
+                # (e.g. LANCE_CONVERTER_IMAGE_URI) and points at the CDK
+                # bootstrap ECR repo where DockerImageAsset publishes the image.
+                env_var_name = f"{image_tag.upper().replace('-', '_')}_IMAGE_URI"
+                image_uri = os.environ.get(env_var_name, "")
+
+                # Resolve target architecture (defaults to arm64 / Graviton).
+                # Must match the Docker image platform built by
+                # ContainerImageDeployment or the Lambda will fail with
+                # Runtime.InvalidEntrypoint.
+                raw_arch = str(lambda_config.get("architecture", "arm64")).lower()
+                if raw_arch in ("x86_64", "amd64", "x86", "x64"):
+                    architecture = "x86_64"
+                else:
+                    architecture = "arm64"
+
+                if image_uri:
+                    deployment_config_item["imageUri"] = image_uri
+                    deployment_config_item["imageTag"] = image_tag
+                    deployment_config_item["architecture"] = architecture
+                    logger.info(
+                        f"Container node {node_id}: package_type=Image, "
+                        f"image_uri={image_uri}, architecture={architecture}"
+                    )
+                else:
+                    raise ValueError(
+                        f"Container node '{node_id}': unable to resolve image URI. "
+                        f"Env var '{env_var_name}' is not set. "
+                        f"image_tag={image_tag}. Ensure the node's ContainerImageDeployment "
+                        f"exports the image URI to the nodes processor Lambda."
+                    )
+            else:
+                deployment_config_item["handler"] = lambda_config.get("handler", "")
+                deployment_config_item["runtime"] = lambda_config.get(
+                    "runtime", "python3.12"
+                )
+
+            items.append(deployment_config_item)
+
+            # Only process layers for Zip-based nodes (container nodes bake deps into image)
+            if (
+                package_type != "Image"
+                and "layers" in lambda_config
+                and isinstance(lambda_config["layers"], list)
+            ):
                 # Create a layers item to store the layer ARNs
                 layers_item = {
                     "pk": f"NODE#{node_id}",

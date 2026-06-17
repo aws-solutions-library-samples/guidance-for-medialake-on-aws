@@ -70,7 +70,6 @@ class ConnectorsProps:
     pipelines_event_bus: str | None
     vpc_subnet_ids: str
     security_group_id: str
-    cloudfront_domain: str  # CloudFront distribution domain for CORS AllowedOrigins
 
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
@@ -82,7 +81,6 @@ class ConnectorsProps:
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
-    ui_origin_host: str | None = None  # Custom domain for UI, if configured
 
 
 class ConnectorsConstruct(Construct):
@@ -489,7 +487,14 @@ class ConnectorsConstruct(Construct):
             "INDEX_NAME": props.opensearch_index,
             "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
             "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
-            "SYSTEM_SETTINGS_TABLE": props.system_settings_table_name or "",
+            "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
+            # Collections table — passed through to each dynamically-provisioned
+            # S3 ingest (connector) Lambda so the upload-portal collection-add
+            # automation (Layer C) can write membership rows. The name is
+            # deterministic (mirrors CollectionsStack), so referencing it here
+            # avoids a cross-stack dependency on the later-created collections
+            # stack. `post_s3` derives the ARN from this name for the IAM grant.
+            "COLLECTIONS_TABLE_NAME": f"{config.resource_prefix}_collections_{config.environment}",
             # S3 Vector Store configuration
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,
@@ -498,6 +503,8 @@ class ConnectorsConstruct(Construct):
             "CLOUDFRONT_DOMAIN_SSM_PARAM": config.ssm_param(
                 "cloudfront-distribution-domain"
             ),
+            # SSM Parameter name for custom domain (read at runtime by Lambda for CORS)
+            "CUSTOM_DOMAIN_SSM_PARAM": config.ssm_param("cloudfront-custom-domain"),
             # Environment flag for development-specific behavior
             "ENVIRONMENT": config.environment,
         }
@@ -513,12 +520,13 @@ class ConnectorsConstruct(Construct):
             ),
         )
 
-        # Grant SSM read permission for CloudFront domain parameter
+        # Grant SSM read permission for CloudFront domain and custom domain parameters
         connector_s3_post_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["ssm:GetParameter"],
                 resources=[
-                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}"
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}",
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-custom-domain')}",
                 ],
             )
         )

@@ -39,7 +39,7 @@ const PortalPathBuilder: React.FC<Props> = ({
   // underlying `pathSegments` reference actually changes.
   const sorted = useMemo(
     () => [...pathSegments].sort((a, b) => a.position - b.position),
-    [pathSegments],
+    [pathSegments]
   );
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};

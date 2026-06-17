@@ -10,7 +10,7 @@ This stack defines the AWS resources for the permissions system, including:
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import Duration, Fn
+from aws_cdk import Fn
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
@@ -81,21 +81,6 @@ class PermissionsStack(cdk.NestedStack):
             "AUTH_TABLE_NAME": props.auth_table.table_name,
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
-
-        # Set up common CORS configuration
-        cors_config = apigateway.CorsOptions(
-            allow_origins=["http://localhost:5173"],
-            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=[
-                "Content-Type",
-                "Authorization",
-                "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
-            ],
-            allow_credentials=True,
-            max_age=Duration.seconds(300),
-        )
 
         # POST /permissions - Create a new custom Permission Set
         create_permission_set_lambda = Lambda(

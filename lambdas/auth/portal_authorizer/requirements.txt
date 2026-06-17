@@ -1,2 +1,4 @@
+# boto3: provided by the Lambda Python runtime (not bundled). This authorizer
+# uses the stdlib `logging` (not Powertools). Only python-jose (JWT verify) is
+# not in the runtime, so it is the sole bundled dependency.
 python-jose[cryptography]
-bcrypt

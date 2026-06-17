@@ -10,8 +10,6 @@ import { zIndexTokens } from "@/theme/tokens";
 
 interface BreadcrumbNavigationProps {
   searchTerm: string;
-  currentResult: number;
-  totalResults: number;
   onBack: () => void;
   onPrevious?: () => void;
   onNext?: () => void;

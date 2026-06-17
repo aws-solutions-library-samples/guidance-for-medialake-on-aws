@@ -26,7 +26,7 @@ interface CollectionUsersResponse {
 
 export const useCollectionUsers = (enabled = true) => {
   return useQuery<User[], Error>({
-    queryKey: [...QUERY_KEYS.COLLECTIONS.lists(), "users"],
+    queryKey: QUERY_KEYS.COLLECTIONS.users(),
     enabled,
     queryFn: async ({ signal }) => {
       try {

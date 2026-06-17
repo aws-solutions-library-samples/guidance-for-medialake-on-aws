@@ -2,7 +2,6 @@
 
 import base64
 import io
-import json
 import os
 from datetime import datetime
 from enum import Enum
@@ -14,11 +13,17 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
-from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    create_error_response,
+    get_user_collection_role,
+)
 from db_models import CollectionModel
 from PIL import Image
 from pynamodb.exceptions import DoesNotExist, UpdateError
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import update_collection_document
 
 logger = Logger(
     service="collections-ID-thumbnail-post", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -77,9 +82,12 @@ def register_route(app):
             except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
-            # Check ownership (only owner can set thumbnail)
-            if collection.ownerId != user_id:
-                raise BadRequestError("Only the collection owner can set the thumbnail")
+            # Check permission (owner or editor can set thumbnail)
+            user_role = get_user_collection_role(collection, user_id)
+            if user_role is None or user_role == "VIEWER":
+                raise BadRequestError(
+                    "You do not have permission to set the thumbnail for this collection"
+                )
 
             # Parse request body
             body = app.current_event.json_body
@@ -159,29 +167,45 @@ def register_route(app):
                 name="SuccessfulThumbnailUpdates", unit=MetricUnit.Count, value=1
             )
 
-            # Generate CloudFront URL for response
-            from url_utils import generate_cloudfront_url
+            # Generate CloudFront URL for response, including the updatedAt
+            # cache-bust token so the client fetches the newly-uploaded image
+            # instead of a cached copy at the same S3 key.
+            from collections_utils import _resolve_collection_thumbnail_url
 
-            thumbnail_url = generate_cloudfront_url(media_bucket, thumbnail_s3_key)
+            thumbnail_url = _resolve_collection_thumbnail_url(
+                thumbnail_s3_key, updated_at=current_timestamp
+            )
+
+            # Write-through to OpenSearch so the thumbnail is immediately visible in
+            # list/search results without waiting for the DynamoDB stream sync. Stream
+            # sync remains as safety net. Failure here is non-fatal — the write has
+            # already succeeded in DynamoDB.
+            os_updates = {
+                "thumbnailType": source_type.value,
+                "thumbnailS3Key": thumbnail_s3_key,
+                "updatedAt": current_timestamp,
+            }
+            if thumbnail_value is not None:
+                os_updates["thumbnailValue"] = thumbnail_value
+            else:
+                # Explicitly clear prior asset references on upload/frame
+                os_updates["thumbnailValue"] = None
+            update_collection_document(collection_id, os_updates)
 
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": {
-                            "id": collection_id,
-                            "thumbnailType": source_type.value,
-                            "thumbnailUrl": thumbnail_url,
-                            "updatedAt": current_timestamp,
-                        },
-                        "meta": {
-                            "timestamp": current_timestamp,
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": {
+                    "id": collection_id,
+                    "thumbnailType": source_type.value,
+                    "thumbnailValue": thumbnail_value,
+                    "thumbnailUrl": thumbnail_url,
+                    "updatedAt": current_timestamp,
+                },
+                "meta": {
+                    "timestamp": current_timestamp,
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except (BadRequestError, NotFoundError):

@@ -1015,7 +1015,7 @@ def create_eventbridge_rule(
         logger.info(f"Created EventBridge rule with ARN: {rule_arn}")
 
         # Create or get IAM role for EventBridge to invoke Lambda
-        role_arn = get_events_role_arn(sanitized_pipeline_name)
+        eventbridge_role_arn = get_events_role_arn(sanitized_pipeline_name)
 
         # Create a unique trigger lambda name for this pipeline
 
@@ -1109,7 +1109,7 @@ def create_eventbridge_rule(
                     RoleName=role_name,
                     AssumeRolePolicyDocument=json.dumps(trust_policy),
                 )
-                role_arn = response["Role"]["Arn"]
+                trigger_lambda_role_arn = response["Role"]["Arn"]
                 logger.info(f"Successfully created role {role_name}")
 
                 # Attach policies
@@ -1179,7 +1179,7 @@ def create_eventbridge_rule(
                 create_function_params = {
                     "FunctionName": trigger_lambda_name,
                     "Runtime": "python3.12",
-                    "Role": role_arn,
+                    "Role": trigger_lambda_role_arn,
                     "Handler": "index.lambda_handler",
                     "Code": {"S3Bucket": IAC_ASSETS_BUCKET, "S3Key": zip_file_key},
                     "Timeout": 300,
@@ -1251,7 +1251,8 @@ def create_eventbridge_rule(
         # Create an SQS queue for the pipeline
         sqs_client = boto3.client("sqs")
         # Build queue name and ensure it doesn't exceed 80 characters (SQS limit)
-        queue_suffix = "_trigger_queue"
+        # Include node.id to ensure each trigger node gets its own unique queue
+        queue_suffix = f"_{node.id}_trigger_queue"
         max_pipeline_length = (
             80 - len(resource_prefix) - len(queue_suffix) - 2
         )  # -2 for underscores
@@ -1476,7 +1477,7 @@ def create_eventbridge_rule(
         logger.info(f"Created EventBridge rule {unique_rule_name} for node {node.id}")
         return {
             "rule_arn": rule_arn,
-            "role_arn": role_arn,
+            "role_arn": eventbridge_role_arn,
             "trigger_lambda_arn": trigger_lambda_arn,
             "queue_arn": queue_arn,
             "event_source_mapping_uuid": event_source_mapping_uuid,
@@ -1565,91 +1566,70 @@ def delete_eventbridge_rule(
                 event_bus_name = PIPELINES_EVENT_BUS_NAME
 
     try:
-        # Extract the pipeline name from the rule name (it's usually the first part)
-        parts = rule_name.split("-")
-        if len(parts) > 0:
-            # Use just the first part (pipeline name) for the target ID and queue name
-            pipeline_part = parts[0]
-            target_id = f"{pipeline_part}-target"
-            # Build queue name and ensure it doesn't exceed 80 characters (SQS limit)
-            queue_suffix = "_trigger_queue"
-            max_pipeline_length = (
-                80 - len(resource_prefix) - len(queue_suffix) - 2
-            )  # -2 for underscores
-            truncated_pipeline_part = (
-                pipeline_part[:max_pipeline_length]
-                if len(pipeline_part) > max_pipeline_length
-                else pipeline_part
-            )
-            queue_name = f"{resource_prefix}_{truncated_pipeline_part}{queue_suffix}"
-        else:
-            # Fallback to a simple target ID if we can't extract the pipeline name
-            target_id = "rule-target"
-            queue_name = f"{resource_prefix}_trigger_queue"
-
-        logger.info(f"Removing target with ID: {target_id} from rule: {rule_name}")
-
-        # Find and delete the SQS queue
+        # Use list_targets_by_rule to reliably find all targets instead of
+        # reconstructing names from the rule name (which breaks for hyphenated
+        # pipeline names).
         try:
-            # Find the queue URL
-            response = sqs_client.list_queues(QueueNamePrefix=queue_name)
-            if "QueueUrls" in response and response["QueueUrls"]:
-                queue_url = response["QueueUrls"][0]
+            targets_response = events_client.list_targets_by_rule(
+                Rule=rule_name, EventBusName=event_bus_name
+            )
+            target_ids = [t["Id"] for t in targets_response.get("Targets", [])]
+            # Collect any SQS queue ARNs from targets for cleanup
+            sqs_target_arns = [
+                t["Arn"]
+                for t in targets_response.get("Targets", [])
+                if ":sqs:" in t.get("Arn", "")
+            ]
+        except Exception as list_err:
+            logger.warning(f"Could not list targets for rule {rule_name}: {list_err}")
+            target_ids = []
+            sqs_target_arns = []
 
-                # Get the queue ARN
-                queue_attrs = sqs_client.get_queue_attributes(
-                    QueueUrl=queue_url, AttributeNames=["QueueArn"]
-                )
-                queue_arn = queue_attrs["Attributes"]["QueueArn"]
+        # Find and delete SQS queues that were targets of this rule
+        for queue_arn in sqs_target_arns:
+            try:
+                # Get queue URL from ARN — queue name is the last segment
+                queue_name_from_arn = queue_arn.split(":")[-1]
+                response = sqs_client.list_queues(QueueNamePrefix=queue_name_from_arn)
+                if "QueueUrls" in response and response["QueueUrls"]:
+                    queue_url = response["QueueUrls"][0]
 
-                # Find and delete any event source mappings to Lambda functions
-                try:
-                    # List event source mappings for this queue
-                    response = lambda_client.list_event_source_mappings(
-                        EventSourceArn=queue_arn
-                    )
-
-                    # Delete each event source mapping
-                    for mapping in response.get("EventSourceMappings", []):
-                        mapping_uuid = mapping["UUID"]
-                        lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
-                        logger.info(
-                            f"Deleted event source mapping {mapping_uuid} for queue {queue_arn}"
+                    # Find and delete any event source mappings to Lambda functions
+                    try:
+                        response = lambda_client.list_event_source_mappings(
+                            EventSourceArn=queue_arn
                         )
-                except Exception as mapping_error:
-                    logger.warning(
-                        f"Error deleting event source mappings for queue {queue_arn}: {mapping_error}"
-                    )
+                        for mapping in response.get("EventSourceMappings", []):
+                            mapping_uuid = mapping["UUID"]
+                            lambda_client.delete_event_source_mapping(UUID=mapping_uuid)
+                            logger.info(
+                                f"Deleted event source mapping {mapping_uuid} for queue {queue_arn}"
+                            )
+                    except Exception as mapping_error:
+                        logger.warning(
+                            f"Error deleting event source mappings for queue {queue_arn}: {mapping_error}"
+                        )
 
-                # Delete the queue
-                sqs_client.delete_queue(QueueUrl=queue_url)
-                logger.info(f"Deleted SQS queue: {queue_url}")
-            else:
-                logger.info(f"No SQS queue found with name prefix: {queue_name}")
-        except Exception as queue_error:
-            logger.warning(f"Error deleting SQS queue: {queue_error}")
+                    # Delete the queue
+                    sqs_client.delete_queue(QueueUrl=queue_url)
+                    logger.info(f"Deleted SQS queue: {queue_url}")
+                else:
+                    logger.info(f"No SQS queue found for ARN: {queue_arn}")
+            except Exception as queue_error:
+                logger.warning(f"Error deleting SQS queue {queue_arn}: {queue_error}")
 
-        # Remove targets from the rule
-        try:
-            events_client.remove_targets(
-                Rule=rule_name, EventBusName=event_bus_name, Ids=[target_id]
-            )
-        except events_client.exceptions.ResourceNotFoundException:
-            logger.info(
-                f"No targets found for rule {rule_name}, proceeding with deletion"
-            )
-        except Exception as target_error:
-            logger.warning(
-                f"Error removing targets for rule {rule_name}: {target_error}"
-            )
-            # Try with a simpler target ID as a fallback
+        # Remove all targets from the rule
+        if target_ids:
             try:
                 events_client.remove_targets(
-                    Rule=rule_name, EventBusName=event_bus_name, Ids=["target"]
+                    Rule=rule_name, EventBusName=event_bus_name, Ids=target_ids
                 )
-            except Exception as simple_target_error:
+                logger.info(
+                    f"Removed {len(target_ids)} target(s) from rule {rule_name}"
+                )
+            except Exception as target_error:
                 logger.warning(
-                    f"Error removing simple target for rule {rule_name}: {simple_target_error}"
+                    f"Error removing targets for rule {rule_name}: {target_error}"
                 )
 
         # Delete the rule

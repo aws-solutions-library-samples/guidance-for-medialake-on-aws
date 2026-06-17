@@ -38,6 +38,16 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
+import portal_templates_get  # noqa: E402
+import portal_templates_ID_delete  # noqa: E402
+import portal_templates_ID_get  # noqa: E402
+import portal_templates_ID_put  # noqa: E402
+import portal_templates_post  # noqa: E402
+import portal_themes_get  # noqa: E402
+import portal_themes_ID_delete  # noqa: E402
+import portal_themes_ID_get  # noqa: E402
+import portal_themes_ID_put  # noqa: E402
+import portal_themes_post  # noqa: E402
 import portals_get  # noqa: E402
 import portals_ID_banner_post  # noqa: E402
 import portals_ID_delete  # noqa: E402
@@ -61,6 +71,20 @@ portals_ID_tokens_ID_delete.register_route(app)
 portals_ID_logo_post.register_route(app)
 portals_ID_banner_post.register_route(app)
 portals_ID_favicon_post.register_route(app)
+
+# Portal themes (reusable appearance) routes — task 16.2.
+portal_themes_get.register_route(app)
+portal_themes_post.register_route(app)
+portal_themes_ID_get.register_route(app)
+portal_themes_ID_put.register_route(app)
+portal_themes_ID_delete.register_route(app)
+
+# Portal templates (reusable full-structure snapshots) routes — task 16.3.
+portal_templates_get.register_route(app)
+portal_templates_post.register_route(app)
+portal_templates_ID_get.register_route(app)
+portal_templates_ID_put.register_route(app)
+portal_templates_ID_delete.register_route(app)
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

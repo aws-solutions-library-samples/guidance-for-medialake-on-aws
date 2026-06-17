@@ -162,6 +162,17 @@ class UserInterfaceStack(Stack):
             description="CloudFront distribution domain for MediaLake UI",
         )
 
+        # If a custom domain is configured, store it in a separate SSM parameter
+        # so Lambdas can include it in CORS allowed origins alongside the CloudFront domain
+        if custom_domain_name and custom_domain_name.strip():
+            ssm.StringParameter(
+                self,
+                "CloudFrontCustomDomainParameter",
+                parameter_name=config.ssm_param("cloudfront-custom-domain"),
+                string_value=custom_domain_name.strip(),
+                description="Custom domain name for MediaLake UI (used for CORS origins)",
+            )
+
         # Export SSM parameter name as CloudFormation output
         CfnOutput(
             self,
@@ -310,10 +321,6 @@ class UserInterfaceStack(Stack):
         self.cloudfront_domain = (
             self._ui.cloudfront_distribution.distribution_domain_name
         )
-
-        # Optional custom UI origin host (can be set to a custom domain in the future)
-        # For now, defaults to None - will fall back to CloudFront domain
-        self.ui_origin_host = None
 
         # Add the initial user to the administrators group
         add_to_admin_group_handler = cr.AwsCustomResource(

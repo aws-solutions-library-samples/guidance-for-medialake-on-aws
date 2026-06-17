@@ -13,7 +13,7 @@ import secrets
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
@@ -1034,12 +1034,18 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
 
 
 @tracer.capture_method
-def create_permission_mapping() -> Dict[str, Dict[str, str]]:
+def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
     """
     Create a mapping between HTTP methods/resource paths and required permissions.
     Updated to match the flat JWT permission format (resource:action).
 
     NOTE: API Gateway paths do NOT include /api prefix - they start directly with the resource name.
+
+    A mapping value may be:
+        - a single permission string (e.g., "assets:view")
+        - a list of permission strings, granting access if the caller holds ANY
+          of them (OR semantics, used for backward-compatible fallbacks)
+        - None, meaning no specific permission is required
 
     Returns:
         Dictionary mapping resource patterns to required permissions
@@ -1073,8 +1079,14 @@ def create_permission_mapping() -> Dict[str, Dict[str, str]]:
         "delete /collections/{collectionId}": "collections:delete",
         "get /collections/{collectionId}/assets": "collections:view",
         "get /collections/{collectionId}/items": "collections:view",
-        "post /collections/{collectionId}/items": "collections:edit",
-        "delete /collections/{collectionId}/items/{itemId}": "collections:edit",
+        "post /collections/{collectionId}/items": [
+            "collections:add_assets",
+            "collections:edit",
+        ],
+        "delete /collections/{collectionId}/items/{itemId}": [
+            "collections:remove_assets",
+            "collections:edit",
+        ],
         "get /collections/{collectionId}/rules": "collections:view",
         "post /collections/{collectionId}/rules": "collections:edit",
         "put /collections/{collectionId}/rules/{ruleId}": "collections:edit",
@@ -1240,7 +1252,7 @@ def normalize_resource_path(
 @tracer.capture_method
 def get_required_permission(
     http_method: str, resource_path: str, path_parameters: Dict[str, str] = None
-) -> Optional[str]:
+) -> Optional[Union[str, List[str]]]:
     """
     Get the required permission for a given HTTP method and resource path.
 
@@ -1250,7 +1262,8 @@ def get_required_permission(
         path_parameters: Dictionary of path parameters
 
     Returns:
-        Required permission string or None if no specific permission is required
+        Required permission string, a list of acceptable permissions (OR
+        semantics), or None if no specific permission is required.
     """
     permission_mapping = create_permission_mapping()
 
@@ -1318,15 +1331,55 @@ def _paths_match(path1: str, path2: str) -> bool:
 
 
 @tracer.capture_method
+def _jwt_permission_present(
+    required_permission: str,
+    custom_permissions: List[str],
+    correlation_id: str,
+) -> bool:
+    """
+    Check whether a single required permission is present in a user's JWT
+    custom permissions list, including the settings.* prefixed fallback.
+
+    Args:
+        required_permission: A single permission string (e.g., "collections:edit")
+        custom_permissions: List of permission strings from the JWT claim
+        correlation_id: Request correlation ID for tracing
+
+    Returns:
+        True if the permission (or its settings.* equivalent) is present.
+    """
+    if required_permission in custom_permissions:
+        return True
+
+    # Check for settings.* prefixed version for backward compatibility
+    # e.g., "connectors:view" should also match "settings.connectors:view"
+    if ":" in required_permission:
+        resource, action = required_permission.split(":", 1)
+        settings_permission = f"settings.{resource}:{action}"
+        if settings_permission in custom_permissions:
+            logger.info(
+                f"Permission granted via settings prefix: {settings_permission}",
+                extra={"correlation_id": correlation_id},
+            )
+            return True
+
+    return False
+
+
+@tracer.capture_method
 def validate_jwt_permissions(
-    parsed_token: Dict[str, Any], required_permission: str, correlation_id: str
+    parsed_token: Dict[str, Any],
+    required_permission: Union[str, List[str]],
+    correlation_id: str,
 ) -> Tuple[bool, Optional[str]]:
     """
     Validate that a JWT token has the required permission in its custom claims.
 
     Args:
         parsed_token: Decoded JWT token claims
-        required_permission: The permission required for this action (e.g., "assets:view")
+        required_permission: The permission(s) required for this action. May be a
+            single permission string (e.g., "assets:view") or a list of acceptable
+            permissions (OR semantics) — access is granted if the user holds ANY.
         correlation_id: Request correlation ID for tracing
 
     Returns:
@@ -1382,28 +1435,30 @@ def validate_jwt_permissions(
                 extra={"correlation_id": correlation_id},
             )
 
-        # Check if user has the required permission
+        # Normalize the required permission(s) to a list. A route may declare
+        # multiple acceptable permissions (OR semantics) — access is granted if
+        # the user holds ANY of them. This supports backward-compatible fallbacks
+        # (e.g. "collections:add_assets" OR the broader "collections:edit").
+        required_permissions = (
+            [required_permission]
+            if isinstance(required_permission, str)
+            else list(required_permission)
+        )
+
+        # Check if user has any of the required permissions.
         # Also check for settings.* prefixed version for backward compatibility
         # e.g., "connectors:view" should also match "settings.connectors:view"
-        has_permission = required_permission in custom_permissions
-
-        # If not found, check for settings.* prefixed version
-        if not has_permission:
-            # Parse the required permission to get resource and action
-            if ":" in required_permission:
-                resource, action = required_permission.split(":", 1)
-                # Check if settings.{resource}:{action} exists in permissions
-                settings_permission = f"settings.{resource}:{action}"
-                has_permission = settings_permission in custom_permissions
-                if has_permission:
-                    logger.info(
-                        f"Permission granted via settings prefix: {settings_permission}",
-                        extra={"correlation_id": correlation_id},
-                    )
+        has_permission = False
+        matched_permission = None
+        for candidate in required_permissions:
+            if _jwt_permission_present(candidate, custom_permissions, correlation_id):
+                has_permission = True
+                matched_permission = candidate
+                break
 
         if has_permission:
             logger.info(
-                f"User has required permission: {required_permission}",
+                f"User has required permission: {matched_permission}",
                 extra={"correlation_id": correlation_id},
             )
             metrics.add_metric(
@@ -1421,7 +1476,7 @@ def validate_jwt_permissions(
             return True, None
         else:
             logger.warning(
-                f"User lacks required permission: {required_permission}. "
+                f"User lacks required permission: {required_permissions}. "
                 f"Available permissions: {custom_permissions}",
                 extra={"correlation_id": correlation_id},
             )
@@ -1438,7 +1493,8 @@ def validate_jwt_permissions(
             )
 
             error_msg = (
-                f"Access denied: Missing required permission '{required_permission}'"
+                "Access denied: Missing required permission "
+                f"'{', '.join(required_permissions)}'"
             )
             return False, error_msg
 
@@ -1493,8 +1549,75 @@ def _flatten_nested_permissions(permissions: Dict[str, Any]) -> list:
 
 
 @tracer.capture_method
+def _api_key_permission_present(
+    required_permission: str,
+    permissions: Dict[str, Any],
+    correlation_id: str,
+) -> bool:
+    """
+    Check whether a single required permission is granted by an API key's
+    permission map, supporting flat, settings.* prefixed, and nested formats.
+
+    Args:
+        required_permission: A single permission string (e.g., "collections:edit")
+        permissions: The API key's permissions dict
+        correlation_id: Request correlation ID for tracing
+
+    Returns:
+        True if the permission is granted by the API key.
+    """
+    # 1. Check flat format first (e.g., {"assets:view": True})
+    if permissions.get(required_permission, False) is True:
+        logger.info(
+            f"Permission granted via flat lookup: {required_permission}",
+            extra={"correlation_id": correlation_id},
+        )
+        return True
+
+    # 2. Check with settings. prefix for backward compatibility
+    #    e.g., required "api-keys:view" might be stored as "settings.api-keys:view"
+    settings_key = f"settings.{required_permission}"
+    if permissions.get(settings_key, False) is True:
+        logger.info(
+            f"Permission granted via settings prefix lookup: {settings_key}",
+            extra={"correlation_id": correlation_id},
+        )
+        return True
+
+    # 3. If required_permission has settings. prefix, try without it
+    if required_permission.startswith("settings."):
+        stripped = required_permission[len("settings.") :]
+        if permissions.get(stripped, False) is True:
+            logger.info(
+                f"Permission granted via stripped settings prefix: {stripped}",
+                extra={"correlation_id": correlation_id},
+            )
+            return True
+
+    # 4. Flatten nested permissions and check against those
+    flattened = _flatten_nested_permissions(permissions)
+    if flattened:
+        if required_permission in flattened:
+            logger.info(
+                f"Permission granted via flattened nested lookup: {required_permission}",
+                extra={"correlation_id": correlation_id},
+            )
+            return True
+        if f"settings.{required_permission}" in flattened:
+            logger.info(
+                f"Permission granted via flattened nested settings prefix: settings.{required_permission}",
+                extra={"correlation_id": correlation_id},
+            )
+            return True
+
+    return False
+
+
+@tracer.capture_method
 def validate_api_key_permissions(
-    api_key_item: Dict[str, Any], required_permission: str, correlation_id: str
+    api_key_item: Dict[str, Any],
+    required_permission: Union[str, List[str]],
+    correlation_id: str,
 ) -> bool:
     """
     Validate that an API key has the required permission for the requested action.
@@ -1505,7 +1628,9 @@ def validate_api_key_permissions(
 
     Args:
         api_key_item: API key item from DynamoDB
-        required_permission: The permission required for this action (e.g., "assets:view")
+        required_permission: The permission(s) required for this action. May be a
+            single permission string (e.g., "assets:view") or a list of acceptable
+            permissions (OR semantics) — access is granted if the key holds ANY.
         correlation_id: Request correlation ID for tracing
 
     Returns:
@@ -1542,57 +1667,17 @@ def validate_api_key_permissions(
             )
             return False
 
-        permission_granted = False
+        # Normalize required permission(s) to a list (OR semantics).
+        required_permissions = (
+            [required_permission]
+            if isinstance(required_permission, str)
+            else list(required_permission)
+        )
 
-        # 1. Check flat format first (e.g., {"assets:view": True})
-        if permissions.get(required_permission, False) is True:
-            permission_granted = True
-            logger.info(
-                f"Permission granted via flat lookup: {required_permission}",
-                extra={"correlation_id": correlation_id},
-            )
-
-        # 2. Check with settings. prefix for backward compatibility
-        #    e.g., required "api-keys:view" might be stored as "settings.api-keys:view"
-        if not permission_granted:
-            settings_key = f"settings.{required_permission}"
-            if permissions.get(settings_key, False) is True:
-                permission_granted = True
-                logger.info(
-                    f"Permission granted via settings prefix lookup: {settings_key}",
-                    extra={"correlation_id": correlation_id},
-                )
-
-        # 3. If required_permission has settings. prefix, try without it
-        if not permission_granted and required_permission.startswith("settings."):
-            stripped = required_permission[len("settings.") :]
-            if permissions.get(stripped, False) is True:
-                permission_granted = True
-                logger.info(
-                    f"Permission granted via stripped settings prefix: {stripped}",
-                    extra={"correlation_id": correlation_id},
-                )
-
-        # 4. Flatten nested permissions and check against those
-        if not permission_granted:
-            flattened = _flatten_nested_permissions(permissions)
-            if flattened:
-                logger.info(
-                    f"Flattened nested permissions: {flattened}",
-                    extra={"correlation_id": correlation_id},
-                )
-                if required_permission in flattened:
-                    permission_granted = True
-                    logger.info(
-                        f"Permission granted via flattened nested lookup: {required_permission}",
-                        extra={"correlation_id": correlation_id},
-                    )
-                elif f"settings.{required_permission}" in flattened:
-                    permission_granted = True
-                    logger.info(
-                        f"Permission granted via flattened nested settings prefix: settings.{required_permission}",
-                        extra={"correlation_id": correlation_id},
-                    )
+        permission_granted = any(
+            _api_key_permission_present(candidate, permissions, correlation_id)
+            for candidate in required_permissions
+        )
 
         if permission_granted:
             metrics.add_metric(
@@ -1602,7 +1687,7 @@ def validate_api_key_permissions(
             )
         else:
             logger.warning(
-                f"API key {api_key_item['id']} lacks required permission: {required_permission}. "
+                f"API key {api_key_item['id']} lacks required permission: {required_permissions}. "
                 f"Available permissions: {list(permissions.keys())}",
                 extra={"correlation_id": correlation_id},
             )

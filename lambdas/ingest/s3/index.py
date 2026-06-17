@@ -47,6 +47,12 @@ CONNECTOR_STORAGE_IDENTIFIER_INDEX = os.environ.get(
     "CONNECTOR_STORAGE_IDENTIFIER_INDEX", "StorageIdentifierIndex"
 )
 
+# Collections table — used by the upload-portal collection-add automation
+# (Layer C). When unset, the automation is a silent no-op so this critical
+# ingest path is never affected by the portal feature being unconfigured.
+# See .kiro/specs/multi-page-upload-portals/portal-metadata-automation-design.md
+COLLECTIONS_TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME", "")
+
 # Re-use boto3's session credentials
 _session = boto3.Session()
 _credentials = _session.get_credentials()
@@ -58,6 +64,117 @@ dynamodb_client = None
 eventbridge_client = None
 s3_vector_client = None
 connector_dynamodb_client = None
+# Lazily-initialized DynamoDB Table resource for the collections table (Layer C
+# upload-portal collection-add). Cached for container reuse.
+collections_table = None
+
+
+# ---------------------------------------------------------------------------
+# Upload-portal collection-add automation (Layer C)
+#
+# When an object uploaded through an upload portal carries the server-stamped
+# `ml-source: upload-portal` + `ml-collection-ids` user-metadata directives,
+# add the freshly-created asset to those collections. This runs AFTER the asset
+# id exists (the directive only rides on the S3 object; the asset record is
+# minted here in ingest). It is idempotent and SILENT-FAIL: any error is logged
+# and ingest continues unaffected.
+# ---------------------------------------------------------------------------
+
+PORTAL_SOURCE_VALUE = "upload-portal"
+ML_SOURCE_KEY = "ml-source"
+ML_COLLECTION_IDS_KEY = "ml-collection-ids"
+COLLECTION_PK_PREFIX = "COLL#"
+ASSET_SK_PREFIX = "ASSET#"
+# Full-file membership SK suffix used by the collections API (clip-less item):
+# `ASSET#{inventoryId}#FULL`. Mirrors `generate_asset_sk` in collections_api.
+ASSET_SK_FULL_SUFFIX = "#FULL"
+
+
+def _find_portal_user_metadata(obj) -> Dict[str, str]:
+    """Locate the S3 user-metadata dict carrying the portal directives.
+
+    The asset metadata structure nests the raw S3 user metadata under varying
+    paths across code paths, so we recursively search for the dict that
+    contains the `ml-source` marker key (case-insensitive) and return it. S3
+    lowercases user-metadata keys, so a case-insensitive match is robust.
+    Returns an empty dict when no portal directives are present.
+    """
+    if isinstance(obj, dict):
+        # Direct hit: this dict carries the portal directives.
+        lowered = {k.lower(): v for k, v in obj.items() if isinstance(k, str)}
+        if ML_SOURCE_KEY in lowered:
+            return lowered
+        for value in obj.values():
+            found = _find_portal_user_metadata(value)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for value in obj:
+            found = _find_portal_user_metadata(value)
+            if found:
+                return found
+    return {}
+
+
+def _add_asset_to_portal_collections(inventory_id: str, asset_metadata) -> None:
+    """Add the asset (identified by its ``inventory_id``) to the collections named
+    by the portal ``ml-collection-ids`` directive, if present.
+
+    The membership row is written in the exact shape the collections API uses
+    (PK=``COLL#{id}``, SK=``ASSET#{inventoryId}#FULL``, GSI2 reverse lookup),
+    so it is consistent with API-created memberships and the collections
+    DynamoDB→OpenSearch stream picks it up automatically. The collections API
+    keys assets by their InventoryID (it treats the stored ``assetId`` as the
+    InventoryID), so we use ``inventory_id`` here — NOT the DigitalSourceAsset
+    ID. Idempotent (PutItem) and silent-fail (logs and returns).
+    """
+    if not COLLECTIONS_TABLE_NAME:
+        # Automation not configured for this deployment — no-op.
+        return
+    try:
+        user_md = _find_portal_user_metadata(asset_metadata)
+        if user_md.get(ML_SOURCE_KEY) != PORTAL_SOURCE_VALUE:
+            return
+        raw_ids = user_md.get(ML_COLLECTION_IDS_KEY, "")
+        collection_ids = [c.strip() for c in str(raw_ids).split(",") if c.strip()]
+        if not collection_ids:
+            return
+
+        global collections_table
+        if collections_table is None:
+            collections_table = boto3.resource("dynamodb").Table(COLLECTIONS_TABLE_NAME)
+
+        asset_sk = f"{ASSET_SK_PREFIX}{inventory_id}{ASSET_SK_FULL_SUFFIX}"
+        added_at = utc_now_z()
+        for collection_id in collection_ids:
+            try:
+                collections_table.put_item(
+                    Item={
+                        "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+                        "SK": asset_sk,
+                        "itemType": "asset",
+                        "assetId": inventory_id,
+                        "clipBoundary": {},
+                        "sortOrder": 0,
+                        "metadata": {},
+                        "addedAt": added_at,
+                        "addedBy": PORTAL_SOURCE_VALUE,
+                        # GSI2 reverse lookup (asset → collections); matches the
+                        # collections API: GSI2_PK = SK, GSI2_SK = COLL#{id}.
+                        "GSI2_PK": asset_sk,
+                        "GSI2_SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+                    }
+                )
+                logger.info(
+                    f"Added asset {inventory_id} to collection {collection_id} (upload-portal)"
+                )
+            except Exception as item_error:  # noqa: BLE001 — silent-fail per item
+                logger.warning(
+                    f"Failed to add asset {inventory_id} to collection {collection_id}: {item_error}"
+                )
+    except Exception as e:  # noqa: BLE001 — never break ingest
+        logger.warning(f"Portal collection-add skipped for asset {inventory_id}: {e}")
+
 
 # Environment configuration
 DO_NOT_INGEST_DUPLICATES = (
@@ -139,7 +256,7 @@ def acquire_processing_lock(
                 "ProcessingStatus": {"S": "in-progress"},
                 "ProcessingStartTime": {"N": str(current_time)},
                 "LockExpiry": {"N": str(lock_expiry)},
-                "StoragePath": {"S": f"{bucket}:{key}"},
+                "StoragePath": {"S": f"LOCK::{bucket}:{key}"},
             },
             ConditionExpression="attribute_not_exists(InventoryID) OR LockExpiry < :current_time",
             ExpressionAttributeValues={":current_time": {"N": str(current_time)}},
@@ -1242,10 +1359,21 @@ class AssetProcessor:
                     ExpressionAttributeValues={":path": storage_path},
                 )
                 if path_query_response.get("Items"):
-                    existing_at_path = path_query_response["Items"][0]
-                    logger.info(
-                        f"Found existing record at StoragePath {storage_path}: InventoryID={existing_at_path['InventoryID']}, FileHash={existing_at_path.get('FileHash')}"
-                    )
+                    # Filter out LOCK records - they are processing locks, not real assets
+                    real_items = [
+                        item
+                        for item in path_query_response["Items"]
+                        if not item["InventoryID"].startswith("LOCK#")
+                    ]
+                    existing_at_path = real_items[0] if real_items else None
+                    if existing_at_path:
+                        logger.info(
+                            f"Found existing record at StoragePath {storage_path}: InventoryID={existing_at_path['InventoryID']}, FileHash={existing_at_path.get('FileHash')}"
+                        )
+                    elif path_query_response["Items"]:
+                        logger.info(
+                            f"Only LOCK records found at StoragePath {storage_path} - no real asset record"
+                        )
             except Exception as e:
                 logger.warning(f"Error checking StoragePath index: {str(e)}")
 
@@ -1719,6 +1847,11 @@ class AssetProcessor:
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
         """Publish event to EventBridge with optimized serialization"""
         with self.asset_context(asset_id=asset_id, inventory_id=inventory_id):
+            # Upload-portal automation (Layer C): if this asset arrived through
+            # an upload portal with a server-stamped `ml-collection-ids`
+            # directive, add it to those collections now that the asset exists.
+            # Silent-fail — never blocks event publication or ingest.
+            _add_asset_to_portal_collections(inventory_id, metadata)
             try:
                 # Extract content type information
                 content_type = (
@@ -1857,9 +1990,16 @@ class AssetProcessor:
             inventory_id = None
             asset_data = None
 
-            if response["Items"]:
+            # Filter out LOCK records - they are processing locks, not real assets
+            real_items = [
+                item
+                for item in response.get("Items", [])
+                if not item["InventoryID"].startswith("LOCK#")
+            ]
+
+            if real_items:
                 # Found the item in DynamoDB
-                asset_data = response["Items"][0]
+                asset_data = real_items[0]
                 inventory_id = asset_data["InventoryID"]
                 logger.info(f"Found item in DynamoDB by S3 path: {inventory_id}")
 

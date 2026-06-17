@@ -84,6 +84,9 @@ export const QUERY_KEYS = {
         { query, page, pageSize, isSemantic, fields, facetParams, sort, searchModes },
       ] as const,
     fields: () => [...QUERY_KEYS.SEARCH.all, "fields"] as const,
+    fieldValues: (fieldNames: string[]) =>
+      [...QUERY_KEYS.SEARCH.all, "fieldValues", [...fieldNames].sort()] as const,
+    mapping: () => [...QUERY_KEYS.SEARCH.all, "mapping"] as const,
   },
   ASSETS: {
     all: ["assets"] as const,
@@ -144,6 +147,7 @@ export const QUERY_KEYS = {
   SYSTEM_SETTINGS: {
     all: ["system-settings"] as const,
     search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "search"] as const,
+    metadataFields: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "metadata-fields"] as const,
   },
   COLLECTIONS: {
     all: ["collections"] as const,
@@ -159,9 +163,13 @@ export const QUERY_KEYS = {
     items: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
     assets: (id: string, filters?: Record<string, any>) =>
       [...QUERY_KEYS.COLLECTIONS.detail(id), "assets", { filters }] as const,
+    allCollections: () => [...QUERY_KEYS.COLLECTIONS.lists(), "all"] as const,
     children: (parentId: string) =>
       [...QUERY_KEYS.COLLECTIONS.detail(parentId), "children"] as const,
     ancestors: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "ancestors"] as const,
+    metadataKeys: () => ["collections", "metadata-keys"] as const,
+    collectionTypes: () => [...QUERY_KEYS.COLLECTIONS.all, "collection-types"] as const,
+    users: () => [...QUERY_KEYS.COLLECTIONS.all, "users"] as const,
   },
   PORTALS: {
     all: ["portals"] as const,
@@ -169,6 +177,18 @@ export const QUERY_KEYS = {
     details: () => [...QUERY_KEYS.PORTALS.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.PORTALS.details(), id] as const,
     tokens: (id: string) => [...QUERY_KEYS.PORTALS.detail(id), "tokens"] as const,
+  },
+  PORTAL_THEMES: {
+    all: ["portal-themes"] as const,
+    lists: () => [...QUERY_KEYS.PORTAL_THEMES.all, "list"] as const,
+    details: () => [...QUERY_KEYS.PORTAL_THEMES.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.PORTAL_THEMES.details(), id] as const,
+  },
+  PORTAL_TEMPLATES: {
+    all: ["portal-templates"] as const,
+    lists: () => [...QUERY_KEYS.PORTAL_TEMPLATES.all, "list"] as const,
+    details: () => [...QUERY_KEYS.PORTAL_TEMPLATES.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.PORTAL_TEMPLATES.details(), id] as const,
   },
   COLLECTION_TYPES: {
     all: ["collection-types"] as const,

@@ -1,6 +1,5 @@
 """DELETE /collections/<collection_id>/thumbnail - Remove collection thumbnail."""
 
-import json
 import os
 from datetime import datetime
 
@@ -11,10 +10,16 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
-from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    create_error_response,
+    get_user_collection_role,
+)
 from db_models import CollectionModel
 from pynamodb.exceptions import DoesNotExist, UpdateError
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import update_collection_document
 
 logger = Logger(
     service="collections-ID-thumbnail-delete",
@@ -51,10 +56,11 @@ def register_route(app):
             except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
 
-            # Check ownership (only owner can remove thumbnail)
-            if collection.ownerId != user_id:
+            # Check permission (owner or editor can remove thumbnail)
+            user_role = get_user_collection_role(collection, user_id)
+            if user_role is None or user_role == "VIEWER":
                 raise BadRequestError(
-                    "Only the collection owner can remove the thumbnail"
+                    "You do not have permission to remove the thumbnail for this collection"
                 )
 
             # Check if collection has a thumbnail
@@ -107,23 +113,31 @@ def register_route(app):
                 name="SuccessfulThumbnailDeletions", unit=MetricUnit.Count, value=1
             )
 
+            # Write-through to OpenSearch so the thumbnail removal is immediately
+            # reflected in list/search results. Stream sync remains as safety net;
+            # failures here are non-fatal since DynamoDB is already updated.
+            update_collection_document(
+                collection_id,
+                {
+                    "thumbnailType": None,
+                    "thumbnailValue": None,
+                    "thumbnailS3Key": None,
+                    "updatedAt": current_timestamp,
+                },
+            )
+
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": {
-                            "id": collection_id,
-                            "thumbnailRemoved": True,
-                            "updatedAt": current_timestamp,
-                        },
-                        "meta": {
-                            "timestamp": current_timestamp,
-                            "version": "v1",
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": {
+                    "id": collection_id,
+                    "thumbnailRemoved": True,
+                    "updatedAt": current_timestamp,
+                },
+                "meta": {
+                    "timestamp": current_timestamp,
+                    "version": "v1",
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except (BadRequestError, NotFoundError):

@@ -1,6 +1,5 @@
 """GET /collections/<collection_id>/ancestors - Get collection ancestor chain."""
 
-import json
 import os
 
 from aws_lambda_powertools import Logger, Tracer
@@ -68,16 +67,11 @@ def register_route(app):
             )
 
             return {
-                "statusCode": 200,
-                "body": json.dumps(
-                    {
-                        "success": True,
-                        "data": ancestors,
-                        "meta": {
-                            "request_id": app.current_event.request_context.request_id,
-                        },
-                    }
-                ),
+                "success": True,
+                "data": ancestors,
+                "meta": {
+                    "request_id": app.current_event.request_context.request_id,
+                },
             }
 
         except NotFoundError:

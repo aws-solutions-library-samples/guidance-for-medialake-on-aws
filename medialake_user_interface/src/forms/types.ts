@@ -30,7 +30,8 @@ export interface FormFieldDefinition {
     | "switch"
     | "number"
     | "password"
-    | "json_editor";
+    | "json_editor"
+    | "keyvalue";
   label: string;
   tooltip?: string;
   placeholder?: string;

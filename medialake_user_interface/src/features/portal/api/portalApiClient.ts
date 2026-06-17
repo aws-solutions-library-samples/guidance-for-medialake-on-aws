@@ -60,7 +60,9 @@ async function wafFetchAdapter(config: InternalAxiosRequestConfig): Promise<Axio
     const text = await response.text();
     if (!response.ok) {
       throw new Error(
-        `Request to ${url.toString()} failed with ${response.status} ${response.statusText}: ${text}`,
+        `Request to ${url.toString()} failed with ${response.status} ${
+          response.statusText
+        }: ${text}`
       );
     }
     data = text;
@@ -71,9 +73,9 @@ async function wafFetchAdapter(config: InternalAxiosRequestConfig): Promise<Axio
       // Clone would be cleaner but `response.json()` has already consumed
       // the body; surface the status details so the caller can react.
       throw new Error(
-        `Request to ${url.toString()} returned invalid JSON (${response.status} ${response.statusText}): ${
-          (parseError as Error).message
-        }`,
+        `Request to ${url.toString()} returned invalid JSON (${response.status} ${
+          response.statusText
+        }): ${(parseError as Error).message}`
       );
     }
   }

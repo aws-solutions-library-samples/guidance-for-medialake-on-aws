@@ -6,7 +6,6 @@ configuration, logging, IAM roles, and other AWS resources. It implements best p
 Lambda deployment including standardized naming conventions and resource validation.
 """
 
-import datetime
 import os
 import re
 from dataclasses import dataclass
@@ -427,12 +426,18 @@ class Lambda(Construct):
                 env_config.resource_prefix
             )
 
-        # --- SnapStart: Force new version on each deployment ---
-        if config.snap_start:
-            lambda_environment_variables["DEPLOYMENT_TIMESTAMP"] = (
-                datetime.datetime.utcnow().isoformat()
-            )
-        # --- End SnapStart versioning ---
+        # --- SnapStart / Provisioned Concurrency: Force new version on each deployment ---
+        # When either SnapStart or provisioned concurrency is enabled, we need a new
+        # Lambda version on every deploy. A changing env var forces CDK to create one.
+        # Use a hash of the Lambda source code so the version only changes when code changes.
+        if config.snap_start or config.provisioned_concurrent_executions is not None:
+            import hashlib
+
+            source_hash = hashlib.md5(
+                str(config.entry).encode() + str(config.name).encode()
+            ).hexdigest()[:12]
+            lambda_environment_variables["DEPLOYMENT_HASH"] = source_hash
+        # --- End versioning ---
 
         common_lambda_props["environment"] = lambda_environment_variables
 
@@ -535,10 +540,10 @@ class Lambda(Construct):
                     f"Setting up provisioned concurrent executions: {config.provisioned_concurrent_executions}"
                 )
 
-                # Create a version for provisioned concurrency
+                # 1. Force a Version resource from the function
                 self._function_version = self._function.current_version
 
-                # Create an alias pointing to the current version
+                # 2. Create an alias pointing to that version with provisioned concurrency
                 self._function_alias = lambda_.Alias(
                     self,
                     "ProvisionedAlias",
@@ -546,6 +551,12 @@ class Lambda(Construct):
                     version=self._function_version,
                     provisioned_concurrent_executions=config.provisioned_concurrent_executions,
                 )
+
+                # 3. Explicit dependency chain: Function → Version → Alias
+                #    Prevents CloudFormation from creating the alias before the
+                #    version exists, which causes "resource not found" or timeouts.
+                self._function_version.node.add_dependency(self._function)
+                self._function_alias.node.add_dependency(self._function_version)
 
                 logger.info(
                     f"Provisioned concurrency configured with {config.provisioned_concurrent_executions} instances"

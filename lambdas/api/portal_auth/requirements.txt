@@ -1,5 +1,7 @@
-python-jose[cryptography]>=3.4.0,<4.0.0
+# boto3/botocore: provided by the Lambda Python runtime (not bundled).
+# aws-lambda-powertools: provided by the auto-attached AWS-managed Powertools
+# layer (see medialake_constructs/shared_constructs/lambda_base.py), so it is
+# not bundled here.
+# Only deps NOT in the runtime or layer are bundled:
 bcrypt>=4.3.0,<5.0.0
-aws-lambda-powertools[all]>=2.31.0
-boto3>=1.34.0
-botocore>=1.34.0
+python-jose[cryptography]>=3.4.0,<4.0.0

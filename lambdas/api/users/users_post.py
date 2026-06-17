@@ -1,20 +1,19 @@
 """POST /users - Create a new user"""
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
+from cognito_utils import list_all_groups
 
 
-def validate_groups_exist(
-    cognito, user_pool_id: str, group_ids: list, logger, tracer
-) -> tuple[list, list]:
+def _validate_groups_exist(
+    cognito, user_pool_id: str, group_ids: List[str], logger, tracer
+) -> Tuple[List[str], List[str]]:
     """
-    Validate that the specified groups exist in Cognito
-
-    Args:
-        group_ids: List of group IDs to validate
+    Validate that the specified groups exist in Cognito.
+    Uses paginated listing to handle pools with 60+ groups.
 
     Returns:
         Tuple of (valid_groups, invalid_groups)
@@ -22,30 +21,11 @@ def validate_groups_exist(
     if not group_ids:
         return [], []
 
-    valid_groups = []
-    invalid_groups = []
-
     try:
-        # Get all groups in the user pool
-        response = cognito.list_groups(UserPoolId=user_pool_id)
-        existing_group_names = {
-            group["GroupName"] for group in response.get("Groups", [])
-        }
+        existing_group_names = list_all_groups(cognito, user_pool_id, logger)
 
-        logger.debug(
-            {
-                "message": "Retrieved existing groups from Cognito",
-                "existing_groups": list(existing_group_names),
-                "requested_groups": group_ids,
-                "operation": "validate_groups_exist",
-            }
-        )
-
-        for group_id in group_ids:
-            if group_id in existing_group_names:
-                valid_groups.append(group_id)
-            else:
-                invalid_groups.append(group_id)
+        valid_groups = [g for g in group_ids if g in existing_group_names]
+        invalid_groups = [g for g in group_ids if g not in existing_group_names]
 
         logger.info(
             {
@@ -56,20 +36,18 @@ def validate_groups_exist(
             }
         )
 
+        return valid_groups, invalid_groups
+
     except ClientError as e:
-        logger.error(
+        logger.warning(
             {
-                "message": "Failed to validate groups",
-                "error_code": e.response["Error"]["Code"],
-                "error_message": e.response["Error"]["Message"],
+                "message": "list_all_groups validation failed, falling back to assuming all groups valid",
+                "error": str(e),
+                "group_ids": group_ids,
                 "operation": "validate_groups_exist",
             }
         )
-        # If we can't validate, assume all groups are valid and let Cognito handle the errors
-        valid_groups = group_ids
-        invalid_groups = []
-
-    return valid_groups, invalid_groups
+        return list(group_ids), []
 
 
 def handle_create_user(
@@ -77,12 +55,10 @@ def handle_create_user(
 ) -> Dict[str, Any]:
     """Create a new user in Cognito user pool"""
     try:
-        # Get request body from the event
         request_data = app.current_event.json_body
         logger.debug(
             {
                 "message": "Processing user creation request",
-                "request_data": request_data,
                 "operation": "create_user",
             }
         )
@@ -93,7 +69,6 @@ def handle_create_user(
             {"Name": "email_verified", "Value": "true"},
         ]
 
-        # Add optional attributes if they exist
         if "given_name" in request_data:
             user_attributes.append(
                 {"Name": "given_name", "Value": request_data["given_name"]}
@@ -102,14 +77,6 @@ def handle_create_user(
             user_attributes.append(
                 {"Name": "family_name", "Value": request_data["family_name"]}
             )
-
-        logger.debug(
-            {
-                "message": "Prepared user attributes",
-                "attributes": user_attributes,
-                "operation": "attribute_preparation",
-            }
-        )
 
         # Create user in Cognito using the configured invitation template
         response = cognito.admin_create_user(
@@ -131,21 +98,10 @@ def handle_create_user(
         groups_failed = []
         invalid_groups = []
         if "groups" in request_data and request_data["groups"]:
-            logger.info(
-                {
-                    "message": "Starting group assignment process",
-                    "username": request_data["email"],
-                    "total_groups": len(request_data["groups"]),
-                    "group_list": request_data["groups"],
-                    "operation": "group_assignment_start",
-                }
-            )
-
-            valid_groups, invalid_groups = validate_groups_exist(
+            valid_groups, invalid_groups = _validate_groups_exist(
                 cognito, user_pool_id, request_data["groups"], logger, tracer
             )
 
-            # Log about invalid groups
             if invalid_groups:
                 logger.warning(
                     {
@@ -157,14 +113,6 @@ def handle_create_user(
                 )
 
             for group_id in valid_groups:
-                logger.info(
-                    {
-                        "message": "Attempting to add user to group",
-                        "username": request_data["email"],
-                        "group_id": group_id,
-                        "operation": "add_user_to_group_attempt",
-                    }
-                )
                 try:
                     cognito.admin_add_user_to_group(
                         UserPoolId=user_pool_id,
@@ -172,32 +120,20 @@ def handle_create_user(
                         GroupName=group_id,
                     )
                     groups_added.append(group_id)
-                    logger.info(
-                        {
-                            "message": "User added to group successfully",
-                            "username": request_data["email"],
-                            "group_id": group_id,
-                            "operation": "add_user_to_group_success",
-                        }
-                    )
                 except ClientError as group_error:
-                    error_code = group_error.response["Error"]["Code"]
-                    error_message = group_error.response["Error"]["Message"]
                     groups_failed.append(
                         {
                             "group_id": group_id,
-                            "error_code": error_code,
-                            "error_message": error_message,
+                            "error_code": group_error.response["Error"]["Code"],
+                            "error_message": group_error.response["Error"]["Message"],
                         }
                     )
-
                     logger.error(
                         {
                             "message": "Failed to add user to group",
                             "username": request_data["email"],
                             "group_id": group_id,
-                            "error_code": error_code,
-                            "error_message": error_message,
+                            "error_code": group_error.response["Error"]["Code"],
                             "operation": "add_user_to_group_failed",
                         }
                     )
@@ -209,34 +145,17 @@ def handle_create_user(
                             "error_message": str(unexpected_error),
                         }
                     )
-
                     logger.error(
                         {
                             "message": "Unexpected error adding user to group",
                             "username": request_data["email"],
                             "group_id": group_id,
                             "error_type": type(unexpected_error).__name__,
-                            "error_message": str(unexpected_error),
                             "operation": "add_user_to_group_unexpected_error",
                         }
                     )
 
-            # Final summary of group assignment
-            logger.info(
-                {
-                    "message": "Group assignment process completed",
-                    "username": request_data["email"],
-                    "groups_added_count": len(groups_added),
-                    "groups_failed_count": len(groups_failed),
-                    "invalid_groups_count": len(invalid_groups),
-                    "groups_added": groups_added,
-                    "groups_failed": groups_failed,
-                    "invalid_groups": invalid_groups,
-                    "operation": "group_assignment_complete",
-                }
-            )
-
-        # Log success metrics
+        # Log metrics
         metrics.add_metric(
             name="SuccessfulUserCreations", unit=MetricUnit.Count, value=1
         )
@@ -259,19 +178,15 @@ def handle_create_user(
                 value=len(invalid_groups),
             )
 
-        # Include group assignment details in response
+        # Build response data (preserving existing API contract)
         response_data = {
             "username": request_data["email"],
             "userStatus": response["User"]["UserStatus"],
             "groupsAdded": groups_added,
         }
-
-        # Include failed groups in response if any failed
         if groups_failed:
             response_data["groupsFailed"] = groups_failed
             response_data["groupsFailedCount"] = len(groups_failed)
-
-        # Include invalid groups in response if any were invalid
         if invalid_groups:
             response_data["invalidGroups"] = invalid_groups
             response_data["invalidGroupsCount"] = len(invalid_groups)
@@ -291,29 +206,23 @@ def handle_create_user(
         error_code = e.response["Error"]["Code"]
         error_message = e.response["Error"]["Message"]
 
-        (
+        if error_code in ["UsernameExistsException", "InvalidParameterException"]:
             logger.warning(
                 {
                     "message": "Cognito client error during user creation",
                     "error_code": error_code,
-                    "error_message": error_message,
-                    "user_email": request_data.get("email"),
                     "operation": "cognito_create_user",
-                    "status": "failed",
                 }
             )
-            if error_code in ["UsernameExistsException", "InvalidParameterException"]
-            else logger.error(
+        else:
+            logger.error(
                 {
                     "message": "Severe Cognito client error during user creation",
                     "error_code": error_code,
                     "error_message": error_message,
-                    "user_email": request_data.get("email"),
                     "operation": "cognito_create_user",
-                    "status": "failed",
                 }
             )
-        )
 
         metrics.add_metric(name="FailedUserCreations", unit=MetricUnit.Count, value=1)
 
@@ -327,16 +236,8 @@ def handle_create_user(
             "body": json.dumps({"error": error_code, "message": error_message}),
         }
 
-    except Exception as e:
-        logger.error(
-            {
-                "message": "Unexpected error during user creation",
-                "error_type": type(e).__name__,
-                "error_message": str(e),
-                "operation": "create_user",
-                "status": "failed",
-            }
-        )
+    except Exception:
+        logger.exception("Unexpected error during user creation")
         metrics.add_metric(name="UnexpectedErrors", unit=MetricUnit.Count, value=1)
 
         return {

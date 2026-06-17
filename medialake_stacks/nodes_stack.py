@@ -27,9 +27,13 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
 from aws_cdk import custom_resources as cr
+from aws_cdk.aws_ecr_assets import Platform
 from constructs import Construct
 
 from config import config
+from medialake_constructs.shared_constructs.container_image_deployment import (
+    ContainerImageDeployment,
+)
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.external_nodes_synth_helper import (
     ExternalNodesSynthHelper,
@@ -54,6 +58,18 @@ from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvertProps,
 )
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
+
+
+def _resolve_platform(architecture: str) -> Platform:
+    """Map a YAML ``architecture`` string to a CDK ``Platform``.
+
+    Defaults to ``LINUX_ARM64`` (Graviton Lambda) for unrecognized values
+    so customers get the cheaper runtime by default.
+    """
+    arch = (architecture or "arm64").lower()
+    if arch in ("x86_64", "amd64", "x86", "x64"):
+        return Platform.LINUX_AMD64
+    return Platform.LINUX_ARM64
 
 
 @dataclass
@@ -383,6 +399,42 @@ class NodesStack(cdk.NestedStack):
         )
 
         # ========================================
+        # Container Image Deployments
+        # ========================================
+        # Container-based pipeline nodes use CDK's DockerImageAsset, which
+        # pushes to the CDK bootstrap ECR repo (cdk-hnb659fds-container-assets-*).
+        # No dedicated ECR repository is needed — the bootstrap repo handles
+        # storage, tagging, and lifecycle automatically.
+        if config.container_nodes_enabled:
+            # Resolve Lance Converter architecture from its YAML template
+            lance_yaml_path = (
+                "s3_bucket_assets/pipeline_nodes/node_templates/"
+                "utility/lance_converter.yaml"
+            )
+            try:
+                with open(lance_yaml_path, "r") as _f:
+                    _lance_yaml = yaml.safe_load(_f) or {}
+                _lance_arch = (
+                    _lance_yaml.get("node", {})
+                    .get("integration", {})
+                    .get("config", {})
+                    .get("lambda", {})
+                    .get("architecture", "arm64")
+                )
+            except (OSError, yaml.YAMLError):
+                _lance_arch = "arm64"
+
+            # Lance Converter — uses pylance (native Rust bindings) for Lance columnar format
+            self.lance_converter_container_deployment = ContainerImageDeployment(
+                self,
+                "LanceConverterContainerDeployment",
+                code_path=["lambdas", "nodes", "lance_converter"],
+                image_tag="lance_converter",
+                dockerfile_path="lambdas/nodes/lance_converter/Dockerfile",
+                platform=_resolve_platform(_lance_arch),
+            )
+
+        # ========================================
         # External Nodes Integration
         # ========================================
         external_lambda_deployments = []
@@ -403,11 +455,12 @@ class NodesStack(cdk.NestedStack):
                     except (yaml.YAMLError, KeyError, TypeError, AttributeError):
                         continue
 
-            # Derive built-in construct IDs from actual LambdaDeployment instances
+            # Derive built-in construct IDs from actual LambdaDeployment
+            # and ContainerImageDeployment instances
             built_in_construct_ids = {
                 child.id
                 for child in self.node.children
-                if isinstance(child, LambdaDeployment)
+                if isinstance(child, (LambdaDeployment, ContainerImageDeployment))
             }
 
             # Populate collision-check sets on the helper created earlier for template staging
@@ -585,6 +638,17 @@ class NodesStack(cdk.NestedStack):
         self.resource.node.add_dependency(self._pipelines_nodes_table.table)
         for ext_deploy in external_lambda_deployments:
             self.resource.node.add_dependency(ext_deploy.deployment)
+
+        # ========================================
+        # Container Image Env Vars
+        # ========================================
+        # Expose per-node image URIs so the runtime Lambda can reference them.
+        if config.container_nodes_enabled:
+            self._nodes_processor_lambda.add_environment_variables(
+                {
+                    "LANCE_CONVERTER_IMAGE_URI": self.lance_converter_container_deployment.image_uri,
+                }
+            )
 
         # ========================================
         # MediaConvert Resources

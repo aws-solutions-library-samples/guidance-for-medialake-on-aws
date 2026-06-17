@@ -52,6 +52,11 @@ interface Props {
    * `"center"` stacks the logo above the text, both centered.
    */
   logoAlignment?: "left" | "center";
+  /**
+   * When false, the logo (uploaded image or fallback icon) is not rendered
+   * at all. Defaults to true to preserve the prior always-show behavior.
+   */
+  showLogo?: boolean;
 }
 
 const PortalHeader: React.FC<Props> = ({
@@ -62,6 +67,7 @@ const PortalHeader: React.FC<Props> = ({
   descriptionHtml,
   logoSize,
   logoAlignment,
+  showLogo = true,
 }) => {
   const resolvedLogoSize = logoSize ?? DEFAULT_LOGO_SIZE;
   const isCentered = logoAlignment === "center";
@@ -93,28 +99,29 @@ const PortalHeader: React.FC<Props> = ({
         borderColor: "divider",
       }}
     >
-      {logoUrl ? (
-        <Box
-          component="img"
-          src={logoUrl}
-          alt=""
-          sx={{
-            width: resolvedLogoSize,
-            height: resolvedLogoSize,
-            objectFit: "contain",
-            borderRadius: 1,
-            flexShrink: 0,
-          }}
-        />
-      ) : (
-        <CloudUploadIcon
-          sx={{
-            fontSize: resolvedLogoSize,
-            color: "primary.main",
-            flexShrink: 0,
-          }}
-        />
-      )}
+      {showLogo &&
+        (logoUrl ? (
+          <Box
+            component="img"
+            src={logoUrl}
+            alt=""
+            sx={{
+              width: resolvedLogoSize,
+              height: resolvedLogoSize,
+              objectFit: "contain",
+              borderRadius: 1,
+              flexShrink: 0,
+            }}
+          />
+        ) : (
+          <CloudUploadIcon
+            sx={{
+              fontSize: resolvedLogoSize,
+              color: "primary.main",
+              flexShrink: 0,
+            }}
+          />
+        ))}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {hasTitleHtml ? (
           <Box

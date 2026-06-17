@@ -3,21 +3,10 @@
 import time
 from typing import Any, Dict
 
+from auth_utils import get_authenticated_user_id
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
-
-
-class ErrorResponse(BaseModel):
-    status: str = Field(..., description="Error status code")
-    message: str = Field(..., description="Error message")
-    data: Dict = Field(default={}, description="Empty data object for errors")
-
-
-class FavoriteResponse(BaseModel):
-    status: str = Field(..., description="Success status code")
-    message: str = Field(..., description="Success message")
-    data: Dict[str, Any] = Field(..., description="Added favorite data")
+from response_utils import error_response, success_response
 
 
 def _add_favorite(
@@ -34,17 +23,12 @@ def _add_favorite(
     Add a favorite item for a user in DynamoDB
     """
     try:
-        # Format the userId according to the schema
         formatted_user_id = f"USER#{user_id}"
 
-        # Generate a reverse timestamp for sorting (newest first)
         current_time_ms = int(time.time() * 1000)
         reverse_timestamp = str(9999999999999 - current_time_ms)
 
-        # Format the itemKey according to the schema
         item_key = f"FAV#{item_type}#{reverse_timestamp}"
-
-        # Format GSI keys
         gsi1_sk = f"ITEM_TYPE#{item_type}#{reverse_timestamp}"
         gsi2_pk = f"ITEM_TYPE#{item_type}"
         gsi2_sk = f"USER#{user_id}#{reverse_timestamp}"
@@ -52,7 +36,6 @@ def _add_favorite(
         table = dynamodb.Table(table_name)
         added_at = int(time.time())
 
-        # Create the item to be saved
         item = {
             "userId": formatted_user_id,
             "itemKey": item_key,
@@ -64,14 +47,11 @@ def _add_favorite(
             "gsi2Sk": gsi2_sk,
         }
 
-        # Add metadata if provided
         if metadata:
             item["metadata"] = metadata
 
-        # Save the item
         table.put_item(Item=item)
 
-        # Return the favorite data without the DynamoDB keys
         result = {
             "userId": user_id,
             "itemId": item_id,
@@ -86,22 +66,9 @@ def _add_favorite(
         return result
 
     except ClientError as e:
-        logger.error(f"DynamoDB error", extra={"error": str(e)})
+        logger.error("DynamoDB error", extra={"error": str(e)})
         metrics.add_metric(name="DynamoDBError", unit=MetricUnit.Count, value=1)
         raise
-
-
-def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
-    """
-    Create standardized error response
-    """
-    error_response = ErrorResponse(status=str(status_code), message=message, data={})
-
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": error_response.model_dump_json(),
-    }
 
 
 def handle_post_favorite(
@@ -111,28 +78,21 @@ def handle_post_favorite(
     Lambda handler to add a favorite item for a user in DynamoDB
     """
     try:
-        # Extract user ID from Cognito authorizer context
-        request_context = app.current_event.raw_event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-
-        # Get the user ID directly from the authorizer context
-        user_id = authorizer.get("userId")
+        user_id = get_authenticated_user_id(app, logger)
 
         if not user_id:
-            logger.error("Missing user_id in authorizer context")
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user")
+            return error_response(400, "Unable to identify user")
 
         if not user_table_name:
             logger.error("USER_TABLE_NAME environment variable not set")
             metrics.add_metric(
                 name="MissingConfigError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(500, "Internal configuration error")
+            return error_response(500, "Internal configuration error")
 
-        # Parse the request body
         try:
             favorite_data = app.current_event.json_body
         except Exception:
@@ -140,17 +100,15 @@ def handle_post_favorite(
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Invalid request body format")
+            return error_response(400, "Invalid request body format")
 
-        # Validate the favorite data
         if not isinstance(favorite_data, dict):
             logger.error("Request body is not a JSON object")
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Request body must be a JSON object")
+            return error_response(400, "Request body must be a JSON object")
 
-        # Check required fields
         required_fields = ["itemId", "itemType"]
         for field in required_fields:
             if field not in favorite_data:
@@ -158,20 +116,18 @@ def handle_post_favorite(
                 metrics.add_metric(
                     name="InvalidRequestError", unit=MetricUnit.Count, value=1
                 )
-                return _create_error_response(400, f"Missing required field: {field}")
+                return error_response(400, f"Missing required field: {field}")
 
-        # Validate itemType
         valid_item_types = ["ASSET", "PIPELINE", "COLLECTION"]
         if favorite_data["itemType"] not in valid_item_types:
             logger.error(f"Invalid itemType: {favorite_data['itemType']}")
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(
+            return error_response(
                 400, f"Invalid itemType. Must be one of: {', '.join(valid_item_types)}"
             )
 
-        # Add the favorite to DynamoDB
         added_favorite = _add_favorite(
             dynamodb,
             user_table_name,
@@ -181,13 +137,6 @@ def handle_post_favorite(
             favorite_data.get("metadata", {}),
             logger,
             metrics,
-        )
-
-        # Create success response
-        response = FavoriteResponse(
-            status="201",
-            message="Favorite added successfully",
-            data=added_favorite,
         )
 
         logger.info(
@@ -200,7 +149,6 @@ def handle_post_favorite(
         )
         metrics.add_metric(name="SuccessfulFavoriteAdd", unit=MetricUnit.Count, value=1)
 
-        # Audit event for favorite addition
         logger.info(
             "Audit: User favorite added",
             extra={
@@ -212,13 +160,9 @@ def handle_post_favorite(
             },
         )
 
-        return {
-            "statusCode": 201,
-            "headers": {"Content-Type": "application/json"},
-            "body": response.model_dump_json(),
-        }
+        return success_response(201, "Favorite added successfully", added_favorite)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
+        return error_response(500, "Internal server error")

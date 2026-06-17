@@ -1,7 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { useSearchStore, useDomainActions } from "../stores/searchStore";
-import { FacetFilters } from "../types/facetSearch";
+import {
+  useSearchQuery,
+  useSemanticSearch,
+  useSearchFilters,
+  useDomainActions,
+} from "../stores/searchStore";
+import { FacetFilters, CustomMetadataApiFilter } from "../types/facetSearch";
 
 interface UseSearchStateProps {
   initialQuery?: string;
@@ -10,8 +15,68 @@ interface UseSearchStateProps {
 }
 
 /**
- * Hook that manages search state using Zustand store and URL synchronization
- * This replaces the old useFacetSearch hook and provides better state persistence
+ * Parse filter-related search params into a FacetFilters object.
+ */
+function parseFiltersFromParams(searchParams: URLSearchParams): FacetFilters {
+  const filters: FacetFilters = {};
+
+  if (searchParams.has("type")) filters.type = searchParams.get("type") || undefined;
+  if (searchParams.has("extension")) filters.extension = searchParams.get("extension") || undefined;
+  if (searchParams.has("filename")) filters.filename = searchParams.get("filename") || undefined;
+
+  if (searchParams.has("LargerThan")) {
+    const v = searchParams.get("LargerThan");
+    filters.LargerThan = v ? parseInt(v, 10) : undefined;
+  }
+  if (searchParams.has("asset_size_lte")) {
+    const v = searchParams.get("asset_size_lte");
+    filters.asset_size_lte = v ? parseInt(v, 10) : undefined;
+  }
+  if (searchParams.has("asset_size_gte")) {
+    const v = searchParams.get("asset_size_gte");
+    filters.asset_size_gte = v ? parseInt(v, 10) : undefined;
+  }
+
+  if (searchParams.has("ingested_date_lte"))
+    filters.ingested_date_lte = searchParams.get("ingested_date_lte") || undefined;
+  if (searchParams.has("ingested_date_gte"))
+    filters.ingested_date_gte = searchParams.get("ingested_date_gte") || undefined;
+  if (searchParams.has("date_range_option"))
+    filters.date_range_option = searchParams.get("date_range_option") || undefined;
+
+  // Custom metadata filters are serialized as a JSON array under `custom_md`.
+  // These originate from the FilterModal and must round-trip through the URL
+  // so they persist across search submissions (alongside regular filters).
+  if (searchParams.has("custom_md")) {
+    const raw = searchParams.get("custom_md");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as CustomMetadataApiFilter[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          filters.customMetadataFilters = parsed;
+        }
+      } catch {
+        // Malformed custom_md param — ignore and continue without custom filters
+      }
+    }
+  }
+
+  return filters;
+}
+
+/**
+ * Hook that manages search state using Zustand store and URL synchronization.
+ *
+ * The hook computes the "effective" query, semantic flag, and filters by merging
+ * URL params with the Zustand store. URL params always win — this prevents stale
+ * store state from persisting across URL navigations.
+ *
+ * Uses targeted selectors (useSearchQuery, useSemanticSearch, useSearchFilters)
+ * instead of subscribing to the entire store, so unrelated store changes (e.g.
+ * filterModalDraft, aggregations, loading) do not trigger re-renders here.
+ *
+ * Store sync is performed in useEffect (not during render) to avoid the
+ * side-effect-during-render anti-pattern that caused guaranteed double-renders.
  */
 export const useSearchState = ({
   initialQuery = "",
@@ -19,94 +84,115 @@ export const useSearchState = ({
   initialFilters = {},
 }: UseSearchStateProps = {}) => {
   const [searchParams] = useSearchParams();
-  const isInitialized = useRef(false);
+  const isFirstMount = useRef(true);
+  const prevParamsRef = useRef<string>("");
 
-  // Get state from Zustand store
-  const searchStore = useSearchStore();
+  // Targeted selectors — only re-render when these specific slices change
+  const storeQuery = useSearchQuery();
+  const storeIsSemantic = useSemanticSearch();
+  const storeFilters = useSearchFilters();
   const { setQuery, setIsSemantic, setFilters, updateFilter, clearFilters } = useDomainActions();
 
-  // Initialize state from URL params or initial values - only run once
+  // ── Compute effective state from URL (pure computation, no side effects) ──
+  const currentParamsKey = searchParams.toString();
+
+  const { effectiveQuery, effectiveSemantic, effectiveFilters } = useMemo(() => {
+    const urlQuery = searchParams.get("q");
+    const urlSemantic = searchParams.get("semantic") === "true";
+    const urlFilters = parseFiltersFromParams(searchParams);
+    const hasUrlFilters = Object.keys(urlFilters).length > 0;
+
+    // URL params take precedence over store values
+    let query = storeQuery;
+    let semantic = storeIsSemantic;
+    let filters = storeFilters;
+
+    if (urlQuery !== null) {
+      query = urlQuery;
+    } else if (isFirstMount.current && initialQuery) {
+      query = initialQuery;
+    }
+
+    if (searchParams.has("semantic")) {
+      semantic = urlSemantic;
+    } else if (isFirstMount.current && initialSemantic) {
+      semantic = initialSemantic;
+    }
+
+    if (hasUrlFilters) {
+      filters = urlFilters;
+    } else if (isFirstMount.current && Object.keys(initialFilters).length > 0) {
+      filters = initialFilters;
+    } else if (!isFirstMount.current && !hasUrlFilters) {
+      filters = {};
+    }
+
+    return { effectiveQuery: query, effectiveSemantic: semantic, effectiveFilters: filters };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentParamsKey, storeQuery, storeIsSemantic, storeFilters]);
+
+  // ── Sync store from URL in useEffect (not during render) ──
   useEffect(() => {
-    if (isInitialized.current) return;
+    const urlChanged = currentParamsKey !== prevParamsRef.current;
+    if (!urlChanged) return;
+
+    prevParamsRef.current = currentParamsKey;
 
     const urlQuery = searchParams.get("q");
     const urlSemantic = searchParams.get("semantic") === "true";
+    const urlFilters = parseFiltersFromParams(searchParams);
+    const hasUrlFilters = Object.keys(urlFilters).length > 0;
 
-    // Initialize query if not already set
-    if ((urlQuery || initialQuery) && !searchStore.query) {
-      setQuery(urlQuery || initialQuery);
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+
+      if (urlQuery !== null) {
+        setQuery(urlQuery);
+      } else if (initialQuery) {
+        setQuery(initialQuery);
+      }
+
+      if (searchParams.has("semantic")) {
+        setIsSemantic(urlSemantic);
+      } else if (initialSemantic) {
+        setIsSemantic(initialSemantic);
+      }
+
+      if (hasUrlFilters) {
+        setFilters(urlFilters);
+      } else if (Object.keys(initialFilters).length > 0) {
+        setFilters(initialFilters);
+      }
+    } else {
+      if (urlQuery !== null) {
+        setQuery(urlQuery);
+      }
+
+      if (searchParams.has("semantic")) {
+        setIsSemantic(urlSemantic);
+      }
+
+      if (hasUrlFilters) {
+        setFilters(urlFilters);
+      } else {
+        clearFilters();
+      }
     }
-
-    // Initialize semantic search if not already set
-    if ((urlSemantic || initialSemantic) && !searchStore.isSemantic) {
-      setIsSemantic(urlSemantic || initialSemantic);
-    }
-
-    // Initialize filters from URL params
-    const urlFilters: FacetFilters = {};
-
-    // Extract facet parameters from URL
-    if (searchParams.has("type")) urlFilters.type = searchParams.get("type") || undefined;
-    if (searchParams.has("extension"))
-      urlFilters.extension = searchParams.get("extension") || undefined;
-    if (searchParams.has("filename"))
-      urlFilters.filename = searchParams.get("filename") || undefined;
-
-    // Parse numeric values
-    if (searchParams.has("LargerThan")) {
-      const largerThan = searchParams.get("LargerThan");
-      urlFilters.LargerThan = largerThan ? parseInt(largerThan, 10) : undefined;
-    }
-
-    if (searchParams.has("asset_size_lte")) {
-      const assetSizeLte = searchParams.get("asset_size_lte");
-      urlFilters.asset_size_lte = assetSizeLte ? parseInt(assetSizeLte, 10) : undefined;
-    }
-
-    if (searchParams.has("asset_size_gte")) {
-      const assetSizeGte = searchParams.get("asset_size_gte");
-      urlFilters.asset_size_gte = assetSizeGte ? parseInt(assetSizeGte, 10) : undefined;
-    }
-
-    // Date values
-    if (searchParams.has("ingested_date_lte")) {
-      urlFilters.ingested_date_lte = searchParams.get("ingested_date_lte") || undefined;
-    }
-
-    if (searchParams.has("ingested_date_gte")) {
-      urlFilters.ingested_date_gte = searchParams.get("ingested_date_gte") || undefined;
-    }
-
-    if (searchParams.has("date_range_option")) {
-      urlFilters.date_range_option = searchParams.get("date_range_option") || undefined;
-    }
-
-    // Use URL filters if available, otherwise use initial filters
-    const filtersToUse = Object.keys(urlFilters).length > 0 ? urlFilters : initialFilters;
-
-    // Initialize filters if store is empty and we have filters to set
-    if (Object.keys(searchStore.filters).length === 0 && Object.keys(filtersToUse).length > 0) {
-      setFilters(filtersToUse);
-    }
-
-    isInitialized.current = true;
-  }, []); // Empty dependency array - only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentParamsKey]);
 
   return {
-    // Current state
-    query: searchStore.query,
-    isSemantic: searchStore.isSemantic,
-    filters: searchStore.filters,
+    query: effectiveQuery,
+    isSemantic: effectiveSemantic,
+    filters: effectiveFilters,
 
-    // Actions
     setQuery,
     setIsSemantic,
     setFilters,
     updateFilter,
     clearFilters,
 
-    // Computed values
-    hasActiveFilters: searchStore.actions.hasActiveFilters(),
-    activeFilterCount: searchStore.actions.activeFilterCount(),
+    hasActiveFilters: Object.keys(effectiveFilters).length > 0,
+    activeFilterCount: Object.keys(effectiveFilters).length,
   };
 };

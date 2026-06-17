@@ -7,7 +7,7 @@ and associated Lambda functions for managing Permission Sets and other authoriza
 
 from dataclasses import dataclass
 
-from aws_cdk import Duration, Fn
+from aws_cdk import Fn
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
@@ -88,21 +88,6 @@ class AuthorizationApi(Construct):
             "AUTH_TABLE_NAME": props.auth_table.table_name,
             "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
         }
-
-        # Set up common CORS configuration
-        cors_config = api_gateway.CorsOptions(
-            allow_origins=["http://localhost:5173"],
-            allow_methods=["GET", "PUT", "OPTIONS", "DELETE", "POST"],
-            allow_headers=[
-                "Content-Type",
-                "Authorization",
-                "X-Amz-Date",
-                "X-Api-Key",
-                "X-Amz-Security-Token",
-            ],
-            allow_credentials=True,
-            max_age=Duration.seconds(300),
-        )
 
         # 1. Permission Sets Endpoints
         permission_sets_resource = authorization_resource.add_resource(

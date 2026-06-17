@@ -11,6 +11,12 @@ export interface SearchProvider {
   dimensions?: number;
   createdAt?: string;
   updatedAt?: string;
+  // Coactive advanced configuration
+  searchEndpoint?: string;
+  datasetEndpoint?: string;
+  authEndpoint?: string;
+  responseFormat?: string;
+  datasetId?: string;
 }
 
 export interface SearchProviderCreate {
@@ -25,6 +31,12 @@ export interface SearchProviderCreate {
     isEnabled?: boolean;
     config?: object;
   };
+  // Coactive advanced configuration
+  searchEndpoint?: string;
+  datasetEndpoint?: string;
+  authEndpoint?: string;
+  responseFormat?: string;
+  datasetId?: string;
 }
 
 export interface EmbeddingStore {
@@ -48,6 +60,12 @@ export interface ProviderMetadata {
   isExternal: boolean;
   supportedMediaTypes: string[];
   dimensions?: number[];
+  // Coactive advanced endpoint defaults
+  defaultSearchEndpoint?: string;
+  defaultDatasetEndpoint?: string;
+  defaultAuthEndpoint?: string;
+  defaultResponseFormat?: string;
+  supportedResponseFormats?: string[];
 }
 
 export interface EmbeddingStoreMetadata {
@@ -67,6 +85,12 @@ export interface SearchProviderUpdate {
     isEnabled?: boolean;
     config?: object;
   };
+  // Coactive advanced configuration
+  searchEndpoint?: string;
+  datasetEndpoint?: string;
+  authEndpoint?: string;
+  responseFormat?: string;
+  datasetId?: string;
 }
 
 // New types for the three-part settings structure

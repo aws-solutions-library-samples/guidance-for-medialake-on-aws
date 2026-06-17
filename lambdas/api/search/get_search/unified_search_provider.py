@@ -195,4 +195,8 @@ def create_search_provider_config(
         type=provider_data.get("type"),
         dimensions=provider_data.get("dimensions"),
         target_index=provider_data.get("target_index"),
+        search_endpoint=provider_data.get("search_endpoint"),
+        dataset_endpoint=provider_data.get("dataset_endpoint"),
+        auth_endpoint=provider_data.get("auth_endpoint"),
+        response_format=provider_data.get("response_format"),
     )

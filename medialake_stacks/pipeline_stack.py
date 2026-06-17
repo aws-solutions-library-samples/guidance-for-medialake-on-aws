@@ -1,9 +1,9 @@
 import glob
+import hashlib
 import json
 import os
 
 # from jinja2 import Environment, FileSystemLoader
-import time
 from dataclasses import dataclass
 
 import aws_cdk as cdk
@@ -44,7 +44,6 @@ class PipelineStackProps:
     node_table: dynamodb.TableV2
     pipeline_table: dynamodb.TableV2
     integrations_table: dynamodb.TableV2
-    iac_assets_bucket: s3.IBucket
     external_payload_bucket: s3.IBucket
     pipelines_nodes_templates_bucket: s3.IBucket
     open_search_endpoint: str
@@ -147,14 +146,15 @@ class PipelineStack(cdk.NestedStack):
         pipeline_files = glob.glob(os.path.join(pipeline_library_dir, "*.json"))
 
         for pipeline_file in pipeline_files:
-            timestamp = int(time.time())
+            # Use a content-based hash instead of wall-clock time to avoid
+            # unnecessary custom resource replacement on every deploy.
+            with open(pipeline_file, "r") as file:
+                pipeline_content = file.read()
+
+            content_hash = hashlib.md5(pipeline_content.encode()).hexdigest()[:12]
 
             # Get the filename without path
             pipeline_filename = os.path.basename(pipeline_file)
-
-            # Read the file content
-            with open(pipeline_file, "r") as file:
-                pipeline_content = file.read()
 
             # Parse the JSON to extract the pipeline name
             pipeline_data_json = json.loads(pipeline_content)
@@ -176,7 +176,7 @@ class PipelineStack(cdk.NestedStack):
                         "ContentType": "application/json",
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"Create{pipeline_name.replace(' ', '')}Json-{timestamp}"
+                        f"Create{pipeline_name.replace(' ', '')}Json-{content_hash}"
                     ),
                 ),
                 on_update=cr.AwsSdkCall(
@@ -189,7 +189,7 @@ class PipelineStack(cdk.NestedStack):
                         "ContentType": "application/json",
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"Create{pipeline_name.replace(' ', '')}Json-{timestamp}"
+                        f"Create{pipeline_name.replace(' ', '')}Json-{content_hash}"
                     ),
                 ),
                 policy=cr.AwsCustomResourcePolicy.from_statements(
@@ -252,7 +252,7 @@ class PipelineStack(cdk.NestedStack):
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"InvokeLambda{pipeline_name.replace(' ', '')}-{timestamp}"
+                        f"InvokeLambda{pipeline_name.replace(' ', '')}-{content_hash}"
                     ),
                 ),
                 on_update=cr.AwsSdkCall(
@@ -263,7 +263,7 @@ class PipelineStack(cdk.NestedStack):
                         "Payload": json.dumps(lambda_payload),
                     },
                     physical_resource_id=cr.PhysicalResourceId.of(
-                        f"UpdateLambda{pipeline_name.replace(' ', '')}-{timestamp}"
+                        f"UpdateLambda{pipeline_name.replace(' ', '')}-{content_hash}"
                     ),
                 ),
                 on_delete=cr.AwsSdkCall(

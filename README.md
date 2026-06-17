@@ -11,19 +11,18 @@
 > - [Development Environment Setup and CDK Deployment](#development-environment-setup-and-cdk-deployment)
 >   - [Clone the repository](#1-clone-the-repository)
 >   - [Prepare the environment](#2-prepare-the-environment)
->   - [Configure AWS account and region](#3-configure-aws-account-and-region)
->   - [Configuration Setup](#4-configuration-setup)
->   - [Deploy using AWS CDK](#5-deploy-using-aws-cdk)
-> - [Development](#development)
->   - [Prerequisites](#prerequisites)
->   - [Operating System](#operating-system)
+>   - [Configuration Setup](#3-configuration-setup)
+>   - [Create the required roles](#4-create-the-required-roles)
+>   - [Configure AWS account and region](#5-configure-aws-account-and-region)
+>   - [Deploy using AWS CDK](#6-deploy-using-aws-cdk)
 > - [Deployment Validation](#deployment-validation)
+> - [Custom Domain Setup (Optional)](#custom-domain-setup-optional)
 > - [External Pipeline Nodes (Optional)](#external-pipeline-nodes-optional)
 > - [Running the Guidance](#running-the-guidance)
 >   - [Login](#1-login)
 >   - [Connect Storage](#2-connect-storage)
->   - [Ingest Media](#3-ingest-media)
->   - [Enable Semantic Search and Integrations](#4-enable-semantic-search-and-integrations)
+>   - [Enable Semantic Search and Integrations](#3-enable-semantic-search-and-integrations)
+>   - [Ingest Media](#4-ingest-media)
 >   - [Process and Retrieve Assets](#5-process-and-retrieve-assets)
 > - [Next Steps](#next-steps)
 > - [Project Structure](#project-structure)
@@ -47,7 +46,7 @@
 
 ## Overview
 
-**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, metadata management, and workflow orchestration on AWS. Media lake enables you to connect multiple storage sources, known as connectors, ingest and organize media at scale, creating a unified search space for your media. Workflows, knows as pipelines, run customizable processing workflows (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
+**Guidance for a Media Lake on AWS** provides a comprehensive, serverless, and scalable platform for media ingestion, processing, management, metadata management, and workflow orchestration on AWS. Media lake enables you to connect multiple storage sources, known as connectors, ingest and organize media at scale, creating a unified search space for your media. Workflows, known as pipelines, run customizable processing workflows (such as proxy/thumbnail generation and AI enrichment), and integrate with both AWS native and partner services.
 
 ### High-Level Overview
 
@@ -81,7 +80,7 @@ Additional costs will be incurred based on actual usage:
 
 - Media processing and enrichment services (Lambda, Step Functions, MediaConvert, TwelveLabs, Transcription)
 - Media and Metadata storage (OpenSearch, DynamoDB, S3)
-- Interfactions with the user interface and viewing media(CloudFront, Data Transfer Out, Step Functions, Lambda, OpenSearch and DynamoDB queries)
+- Interactions with the user interface and viewing media (CloudFront, Data Transfer Out, Step Functions, Lambda, OpenSearch and DynamoDB queries)
 
 The total monthly cost will vary based on the volume of media processed, storage requirements, and usage patterns.
 
@@ -119,7 +118,7 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 | **Message Queues (SQS)**                      | 10,000 standard and 1,000 FIFO auto-messages per month                                                            | Standard: \$0.002<br>FIFO: \$0.0005                                                     |
 | **Workflow Automations (Step Functions)**     | 1,000 automated workflows (pipelines), 20 steps each every month                                                  | \$2.40                                                                                  |
 | **WAF (Web Application Firewall)**            | API & web protection (rules + ACLs + requests)                                                                    | Requests: \$0.30                                                                        |
-| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$15.00.00                                                                              |
+| **Encryption (KMS)**                          | 311,000 encryption/decryption actions per month                                                                   | \$15.00                                                                                 |
 | **Monitoring/Logging (CloudWatch)**           | Storage, metrics, logs for all services                                                                           | Data: \$7.50<br>Storage: \$0.07                                                         |
 | **EventBridge**                               | Event-driven triggers                                                                                             | \$0.01                                                                                  |
 | **X-Ray (Tracing)**                           | Distributed trace monitoring                                                                                      | \$5.00                                                                                  |
@@ -173,17 +172,14 @@ We recommend creating a **Budget through AWS Cost Explorer** to help manage cost
 
    > **Note:** You can use the default deployment configuration settings without making any changes. The defaults are configured to deploy from the official AWS Solutions Library repository.
 
-4. **Complete deployment**
+4. **Initiate deployment**
 
-   - Accept the required IAM capabilities and deploy
-   - Monitor the stack creation progress in the CloudFormation console
-
-5. **Initiate deployment**
-
+   - Accept the required IAM capabilities
    - Click "Create stack" to begin the deployment process
    - The initial CloudFormation stack will be created first
+   - Monitor the stack creation progress in the CloudFormation console
 
-6. **Monitor CodePipeline deployment**
+5. **Monitor CodePipeline deployment**
    - A CodePipeline will be automatically created to deploy the CDK code
    - This deployment process will take approximately 1 hour to complete
    - You will receive a welcome email at the address you provided once deployment is finished
@@ -288,12 +284,12 @@ Key configuration parameters include:
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
-### 4. \*\*Create the required roles
+### 4. **Create the required roles**
 
 OpenSearch Provisioned CDK creates service-linked roles, but these may not be immediately recognized during a first-time deployment. You might encounter the following error:
 "Invalid request provided: Before you can proceed, you must enable a service-linked role to give Amazon OpenSearch Service permissions to access your VPC."
 
-To make sure this doesn't happens, manually create the required roles using the following AWS CLI commands:
+To make sure this doesn't happen, manually create the required roles using the following AWS CLI commands:
 
 ```bash
 aws iam create-service-linked-role --aws-service-name es.amazonaws.com
@@ -301,7 +297,7 @@ aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaw
 aws iam create-service-linked-role --aws-service-name osis.amazonaws.com
 ```
 
-- **Note**: If you recive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
+- **Note**: If you receive an error "An error occurred (InvalidInput) when calling the CreateServiceLinkedRole operation: Service role name XXXXX has been taken in this account, please try a different suffix." this means that the service-linked-role for the service XXXXX already exists and you can move to the next instruction.
 - **Note**: If you are new to IAM: These roles are not user roles nor allow general access to your account. A service-linked role is a special type of IAM role that's directly associated with an AWS service. For more information, see this [AWS re:Post article](https://repost.aws/articles/ARtUa9sqlFR02vngsy1zgmHg/what-s-special-about-aws-service-linked-iam-roles) or the [AWS Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create-service-linked-role.html).
 
 ### 5. **Configure AWS account and region**
@@ -677,17 +673,21 @@ guidance-for-medialake-on-aws/
 │   ├── api/                         # API endpoint handlers
 │   ├── auth/                        # Authentication functions
 │   ├── back_end/                    # Backend processing functions
+│   ├── custom_resources/            # CloudFormation custom resources
+│   ├── edge/                        # CloudFront edge functions
+│   ├── ingest/                      # Media ingestion functions
+│   ├── layers/                      # Lambda layers
 │   ├── nodes/                       # Pipeline processing nodes
 │   ├── pipelines/                   # Pipeline orchestration
 │   └── common_libraries/            # Shared Lambda utilities
 ├── pipeline_library/               # Default pipeline templates
 ├── s3_bucket_assets/               # S3 deployment assets
-│   ├── pipeline_library/           # Pipeline definitions
 │   └── pipeline_nodes/             # Node templates and specs
+├── tests/                          # Unit and integration tests
 ├── app.py                          # Main CDK application entry point
 ├── cdk.json                        # CDK configuration and settings
 ├── config_utils.py                 # Configuration utilities
-├── config-dev.json                 # Development configuration example
+├── config-example.json              # Configuration example
 ├── requirements.txt                # Python dependencies
 ├── requirements-dev.txt            # Development Python dependencies
 ├── package.json                    # Node.js dependencies for CDK
@@ -821,7 +821,7 @@ To remove all media lake resources:
 ## FAQ, Known Issues, and Additional Considerations
 
 - **S3 bucket sharing across instances**: Do NOT connect the same S3 bucket with the same prefixes to multiple Media Lake instances. Each instance creates EventBridge rules and Lambda triggers on the bucket — overlapping paths will cause duplicate processing, event conflicts, and data corruption. You CAN connect the same bucket to multiple instances if each instance uses different, non-overlapping object prefixes (e.g., instance 1 uses `team-a/` prefix and instance 2 uses `team-b/` prefix).
-- For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake/issues).
+- For feedback, questions, or suggestions, please use the [GitHub Issues page](https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws/issues).
 - Known issues and deployment tips will be tracked in the Issues section.
 - Service quotas: media lake relies on OpenSearch, DynamoDB, Lambda, and S3 limits; monitor and request increases if needed for large-scale deployments.
 - For SAML integration and advanced identity provider setup, refer to the SAML instructions in [MediaLake-Installation-Guide.md](assets/docs/MediaLake-Installation-Guide.md).

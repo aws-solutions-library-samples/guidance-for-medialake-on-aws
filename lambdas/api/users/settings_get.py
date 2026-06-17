@@ -2,21 +2,10 @@
 
 from typing import Any, Dict, Optional
 
+from auth_utils import get_authenticated_user_id
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
-
-
-class ErrorResponse(BaseModel):
-    status: str = Field(..., description="Error status code")
-    message: str = Field(..., description="Error message")
-    data: Dict = Field(default={}, description="Empty data object for errors")
-
-
-class SettingsResponse(BaseModel):
-    status: str = Field(..., description="Success status code")
-    message: str = Field(..., description="Success message")
-    data: Dict[str, Any] = Field(..., description="User settings data")
+from response_utils import error_response, success_response
 
 
 def _get_user_settings(
@@ -26,41 +15,23 @@ def _get_user_settings(
     Fetch user settings from DynamoDB
     """
     try:
-        # Format the userId according to the schema
         formatted_user_id = f"USER#{user_id}"
-
         table = dynamodb.Table(table_name)
 
-        # If namespace is provided, filter by the specific namespace
-        if namespace:
-            # Query for settings with the specific namespace
-            query_params = {
-                "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
-                "ExpressionAttributeValues": {
-                    ":userId": formatted_user_id,
-                    ":prefix": f"SETTING#{namespace}#",
-                },
-            }
-            response = table.query(**query_params)
-            items = response.get("Items", [])
-        else:
-            # Query for all settings
-            query_params = {
-                "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
-                "ExpressionAttributeValues": {
-                    ":userId": formatted_user_id,
-                    ":prefix": "SETTING#",
-                },
-            }
-            response = table.query(**query_params)
-            items = response.get("Items", [])
+        prefix = f"SETTING#{namespace}#" if namespace else "SETTING#"
 
-        # Process the settings into a structured format
+        query_params = {
+            "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
+            "ExpressionAttributeValues": {
+                ":userId": formatted_user_id,
+                ":prefix": prefix,
+            },
+        }
+        response = table.query(**query_params)
+        items = response.get("Items", [])
+
         settings = {}
-
         for item in items:
-            # Extract namespace and key from the itemKey
-            # Format: SETTING#{namespace}#{key}
             item_key = item.get("itemKey", "")
             parts = item_key.split("#")
 
@@ -68,33 +39,17 @@ def _get_user_settings(
                 setting_namespace = parts[1]
                 setting_key = parts[2]
 
-                # Initialize namespace dictionary if it doesn't exist
                 if setting_namespace not in settings:
                     settings[setting_namespace] = {}
 
-                # Add the setting value to the namespace
-                setting_value = item.get("value")
-                settings[setting_namespace][setting_key] = setting_value
+                settings[setting_namespace][setting_key] = item.get("value")
 
         return {"userId": user_id, "settings": settings}
 
     except ClientError as e:
-        logger.error(f"DynamoDB error", extra={"error": str(e)})
+        logger.error("DynamoDB error", extra={"error": str(e)})
         metrics.add_metric(name="DynamoDBError", unit=MetricUnit.Count, value=1)
         raise
-
-
-def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
-    """
-    Create standardized error response
-    """
-    error_response = ErrorResponse(status=str(status_code), message=message, data={})
-
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": error_response.model_dump_json(),
-    }
 
 
 def handle_get_settings(
@@ -104,42 +59,26 @@ def handle_get_settings(
     Lambda handler to fetch user settings from DynamoDB
     """
     try:
-        # Extract user ID from Cognito authorizer context
-        request_context = app.current_event.raw_event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
-
-        # Get the user ID from the Cognito claims
-        user_id = claims.get("sub")
+        user_id = get_authenticated_user_id(app, logger)
 
         if not user_id:
-            logger.error("Missing user_id in Cognito claims")
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user")
+            return error_response(400, "Unable to identify user")
 
         if not user_table_name:
             logger.error("USER_TABLE_NAME environment variable not set")
             metrics.add_metric(
                 name="MissingConfigError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(500, "Internal configuration error")
+            return error_response(500, "Internal configuration error")
 
-        # Check if namespace filter is provided in query parameters
         query_params = app.current_event.query_string_parameters or {}
         namespace = query_params.get("namespace")
 
-        # Fetch user settings from DynamoDB
         user_settings = _get_user_settings(
             dynamodb, user_table_name, user_id, namespace, logger, metrics
-        )
-
-        # Create success response
-        response = SettingsResponse(
-            status="200",
-            message="User settings retrieved successfully",
-            data=user_settings,
         )
 
         logger.info("Successfully retrieved user settings", extra={"user_id": user_id})
@@ -147,13 +86,11 @@ def handle_get_settings(
             name="SuccessfulSettingsLookup", unit=MetricUnit.Count, value=1
         )
 
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": response.model_dump_json(),
-        }
+        return success_response(
+            200, "User settings retrieved successfully", user_settings
+        )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
+        return error_response(500, "Internal server error")

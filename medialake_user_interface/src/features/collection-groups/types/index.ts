@@ -39,11 +39,13 @@ export interface RemoveCollectionsRequest {
 export interface CollectionGroupListResponse {
   success: boolean;
   data: CollectionGroup[];
-  pagination?: {
-    has_next_page: boolean;
-    has_prev_page: boolean;
-    limit: number;
-    next_cursor?: string;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalResults: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   };
   meta: {
     timestamp: string;

@@ -1,5 +1,6 @@
 """Send an upload portal link via email using SES."""
 
+import html
 import os
 
 import boto3
@@ -32,10 +33,10 @@ def _mask_email(email: str) -> str:
 def _resolve_param(name, data, payload_history, env_key):
     """Resolve a parameter from data, then payload_history, then env var."""
     val = data.get(name)
-    if val:
+    if val is not None:
         return val
     val = payload_history.get(name)
-    if val:
+    if val is not None:
         return val
     return os.environ.get(env_key, "")
 
@@ -79,21 +80,25 @@ def lambda_handler(event, context: LambdaContext):
         )
 
     # Build email — mirrors _send_token_email from portals_ID_tokens_post.py
-    subject = f"You've been invited to upload to {portal_name}"
+    subject = f"You've been invited to upload to {html.escape(portal_name)}"
 
     dataset_line = (
-        f"<p><strong>Dataset:</strong> {dataset_name}</p>" if dataset_name else ""
+        f"<p><strong>Dataset:</strong> {html.escape(dataset_name)}</p>"
+        if dataset_name
+        else ""
     )
     expires_line = (
-        f"<p><strong>Expires:</strong> {expires_at}</p>" if expires_at else ""
+        f"<p><strong>Expires:</strong> {html.escape(expires_at)}</p>"
+        if expires_at
+        else ""
     )
 
     html_body = (
         f"<h2>Upload Portal Invitation</h2>"
-        f"<p>You have been invited to upload files to <strong>{portal_name}</strong>.</p>"
+        f"<p>You have been invited to upload files to <strong>{html.escape(portal_name)}</strong>.</p>"
         f"{dataset_line}"
         f"{expires_line}"
-        f'<p><a href="{portal_url}">Click here to upload</a></p>'
+        f'<p><a href="{html.escape(portal_url, quote=True)}">Click here to upload</a></p>'
     )
 
     text_body = (

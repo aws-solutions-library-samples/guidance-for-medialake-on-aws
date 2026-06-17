@@ -11,13 +11,6 @@ class EnableUserRequest(BaseModel):
     user_id: str = Field(..., min_length=1, description="The user ID to enable")
 
 
-class CognitoError(Exception):
-    def __init__(self, message: str, status_code: int = 500):
-        self.message = message
-        self.status_code = status_code
-        super().__init__(self.message)
-
-
 def handle_enable_user(
     user_id: str, cognito, user_pool_id: str, logger, metrics, tracer
 ) -> Dict[str, Any]:
@@ -32,7 +25,6 @@ def handle_enable_user(
                 "body": '{"message": "Missing user_id parameter"}',
             }
 
-        # Validate user_id using Pydantic
         EnableUserRequest(user_id=user_id)
 
         logger.debug(
@@ -43,11 +35,8 @@ def handle_enable_user(
             }
         )
 
-        # Enable user in Cognito
-        response = cognito.admin_enable_user(UserPoolId=user_pool_id, Username=user_id)
-        logger.info(response)
+        cognito.admin_enable_user(UserPoolId=user_pool_id, Username=user_id)
 
-        # Add custom metrics
         metrics.add_metric(name="UserEnabled", unit=MetricUnit.Count, value=1)
 
         logger.info(
@@ -63,13 +52,12 @@ def handle_enable_user(
 
     except ClientError as e:
         error_code = e.response["Error"]["Code"]
-        error_message = e.response["Error"]["Message"]
 
         logger.error(
             {
                 "message": "Cognito client error",
                 "error_code": error_code,
-                "error_message": error_message,
+                "error_message": e.response["Error"]["Message"],
                 "user_id": user_id,
             }
         )
@@ -79,15 +67,10 @@ def handle_enable_user(
             return {"statusCode": 404, "body": '{"message": "User not found"}'}
         return {"statusCode": 500, "body": '{"message": "Internal server error"}'}
 
-    except Exception as e:
-        logger.error(
-            {
-                "message": "Unexpected error while enabling user",
-                "error": str(e),
-                "user_id": user_id,
-            }
+    except Exception:
+        logger.exception(
+            "Unexpected error while enabling user",
+            extra={"user_id": user_id},
         )
-
         metrics.add_metric(name="UnexpectedError", unit=MetricUnit.Count, value=1)
-
         return {"statusCode": 500, "body": '{"message": "Internal server error"}'}

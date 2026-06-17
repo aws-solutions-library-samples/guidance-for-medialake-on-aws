@@ -7,6 +7,7 @@ export * from "./types/permission.types";
 // Export hooks
 export * from "./hooks/usePermission";
 export * from "./hooks/useActionPermission";
+export * from "./hooks/useCollectionAssetPermissions";
 
 // Export components
 export * from "./components/Can";

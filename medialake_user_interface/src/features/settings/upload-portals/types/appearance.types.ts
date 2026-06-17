@@ -50,6 +50,8 @@ export interface PortalAppearanceLayout {
 }
 
 export interface PortalAppearanceBranding {
+  /** When false, the logo (and its fallback icon) is hidden entirely. */
+  showLogo: boolean;
   logoSize: number; // 24–120 px
   logoAlignment: "left" | "center";
   showPoweredBy: boolean;

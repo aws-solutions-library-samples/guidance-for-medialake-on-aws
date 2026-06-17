@@ -13,6 +13,33 @@ logger = Logger(service="portals-id-get", level=os.environ.get("LOG_LEVEL", "INF
 tracer = Tracer(service="portals-id-get")
 
 
+def _attr_to_plain(value):
+    """Recursively convert PynamoDB attribute values into plain, JSON-serializable
+    Python structures.
+
+    PynamoDB returns ``MapAttribute`` instances for schemaless maps (``appearance``)
+    and ``PortalPageMap`` instances for each entry in ``pages``. The response
+    serializer uses ``json.dumps(..., default=str)``, which would otherwise
+    stringify those objects into their Python ``repr`` (e.g. ``"MapAttribute(...)"``
+    / ``"PortalPageMap(elements=[...], pageNumber=1)"``) — values the frontend
+    cannot parse, surfacing as pages with an ``undefined`` ``pageNumber`` and
+    missing ``elements`` (and a downstream "Cannot read properties of undefined
+    (reading 'length')" crash in the editor). Converting to dicts/lists first
+    keeps the response valid JSON. Plain ``list``/``dict`` inputs are walked
+    recursively; scalars (and ``None``) pass through unchanged.
+    """
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [_attr_to_plain(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _attr_to_plain(item) for key, item in value.items()}
+    as_dict = getattr(value, "as_dict", None)
+    if callable(as_dict):
+        return {key: _attr_to_plain(item) for key, item in as_dict().items()}
+    return value
+
+
 def register_route(app):
     @app.get("/settings/portals/<portal_id>")
     @tracer.capture_method
@@ -49,7 +76,9 @@ def register_route(app):
                 "maxFilesPerSession": getattr(item, "maxFilesPerSession", None),
                 "allowedGroups": getattr(item, "allowedGroups", None),
                 "ipAllowlist": getattr(item, "ipAllowlist", None),
-                "metadataFields": getattr(item, "metadataFields", None),
+                "metadataFields": _attr_to_plain(getattr(item, "metadataFields", None)),
+                "appearance": _attr_to_plain(getattr(item, "appearance", None)),
+                "pages": _attr_to_plain(getattr(item, "pages", None)),
                 "createdBy": getattr(item, "createdBy", None),
                 "createdAt": getattr(item, "createdAt", None),
                 "updatedAt": getattr(item, "updatedAt", None),
@@ -71,6 +100,7 @@ def register_route(app):
                         "allowFolderCreation": dest.allowFolderCreation,
                         "order": dest.order,
                         "pathSegments": getattr(dest, "pathSegments", None),
+                        "pageNumber": getattr(dest, "pageNumber", None),
                     }
                 )
 

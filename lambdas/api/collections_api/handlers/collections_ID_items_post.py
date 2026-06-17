@@ -10,7 +10,6 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import (
     COLLECTION_PK_PREFIX,
-    COLLECTIONS_GSI5_PK,
     METADATA_SK,
     create_error_response,
 )
@@ -144,8 +143,6 @@ def register_route(app):
                         CollectionModel.itemCount.set(
                             (CollectionModel.itemCount + len(added_items))
                         ),
-                        CollectionModel.GSI5_PK.set(COLLECTIONS_GSI5_PK),
-                        CollectionModel.GSI5_SK.set(current_timestamp),
                     ]
                 )
             except Exception as e:
@@ -160,9 +157,12 @@ def register_route(app):
                 value=len(added_items),
             )
 
-            return {
-                "statusCode": 201,
-                "body": json.dumps(
+            from aws_lambda_powertools.event_handler import Response, content_types
+
+            return Response(
+                status_code=201,
+                content_type=content_types.APPLICATION_JSON,
+                body=json.dumps(
                     {
                         "success": True,
                         "data": {
@@ -178,7 +178,7 @@ def register_route(app):
                         },
                     }
                 ),
-            }
+            )
 
         except BadRequestError:
             raise

@@ -14,7 +14,7 @@ import type { CollectionTypesResponse } from "@/api/hooks/useCollections";
 
 export const useCollectionCollectionTypes = () => {
   return useQuery<CollectionTypesResponse, Error>({
-    queryKey: [...QUERY_KEYS.COLLECTIONS.lists(), "collection-types"],
+    queryKey: QUERY_KEYS.COLLECTIONS.collectionTypes(),
     queryFn: async ({ signal }) => {
       try {
         const response = await apiClient.get<CollectionTypesResponse>(

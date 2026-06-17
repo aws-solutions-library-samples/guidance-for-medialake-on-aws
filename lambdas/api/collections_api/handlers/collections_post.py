@@ -12,7 +12,6 @@ from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
-    COLLECTIONS_GSI5_PK,
     METADATA_SK,
     USER_PK_PREFIX,
     format_collection_item,
@@ -20,8 +19,10 @@ from collections_utils import (
 from db_models import ChildReferenceModel, CollectionModel, UserRelationshipModel
 from models import CreateCollectionRequest
 from pynamodb.connection import Connection
+from pynamodb.exceptions import DoesNotExist
 from pynamodb.transactions import TransactWrite
 from user_auth import extract_user_context
+from utils.collections_opensearch_write import index_collection
 
 logger = Logger(service="collections-post", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="collections-post")
@@ -73,17 +74,21 @@ def register_route(app):
             collection.isPublic = request_data.isPublic
             collection.createdAt = current_timestamp
             collection.updatedAt = current_timestamp
-            collection.GSI5_PK = COLLECTIONS_GSI5_PK
-            collection.GSI5_SK = current_timestamp
 
             # Add optional fields from Pydantic model
             if request_data.description:
                 collection.description = request_data.description
             if request_data.collectionTypeId:
                 collection.collectionTypeId = request_data.collectionTypeId
-                collection.GSI3_PK = request_data.collectionTypeId
-                collection.GSI3_SK = f"{COLLECTION_PK_PREFIX}{collection_id}"
             if request_data.parentId:
+                # Validate parent collection exists before proceeding
+                parent_pk = f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
+                try:
+                    CollectionModel.get(parent_pk, METADATA_SK)
+                except DoesNotExist:
+                    raise BadRequestError(
+                        f"Parent collection '{request_data.parentId}' not found"
+                    )
                 collection.parentId = request_data.parentId
             if request_data.metadata:
                 collection.customMetadata = request_data.metadata
@@ -148,6 +153,32 @@ def register_route(app):
                 name="SuccessfulCollectionCreations", unit=MetricUnit.Count, value=1
             )
 
+            # Write-through to OpenSearch so the collection is immediately
+            # searchable in the correct sort position. The DynamoDB stream
+            # sync remains as a redundant safety net.
+            os_doc = {
+                "name": collection.name,
+                "ownerId": collection.ownerId,
+                "status": collection.status,
+                "itemCount": collection.itemCount,
+                "childCollectionCount": collection.childCollectionCount,
+                "isPublic": collection.isPublic,
+                "createdAt": collection.createdAt,
+                "updatedAt": collection.updatedAt,
+            }
+            if collection.description:
+                os_doc["description"] = collection.description
+            if collection.collectionTypeId:
+                os_doc["collectionTypeId"] = collection.collectionTypeId
+            if request_data.parentId:
+                os_doc["parentId"] = request_data.parentId
+            if request_data.metadata:
+                os_doc["customMetadata"] = request_data.metadata
+            if request_data.tags:
+                os_doc["tags"] = list(request_data.tags)
+
+            index_collection(collection_id, os_doc)
+
             # Format response - convert PynamoDB model to dict for formatting
             collection_dict = {
                 "PK": collection.PK,
@@ -168,15 +199,26 @@ def register_route(app):
             if collection.parentId:
                 collection_dict["parentId"] = collection.parentId
             if collection.customMetadata:
-                collection_dict["customMetadata"] = dict(collection.customMetadata)
+                # Use PynamoDB public serializer for MapAttribute conversion
+                try:
+                    collection_dict["customMetadata"] = (
+                        collection.customMetadata.as_dict()
+                        if hasattr(collection.customMetadata, "as_dict")
+                        else collection.customMetadata.attribute_values
+                    )
+                except (AttributeError, ValueError):
+                    collection_dict["customMetadata"] = request_data.metadata
             if collection.tags:
                 collection_dict["tags"] = list(collection.tags)
 
             response_data = format_collection_item(collection_dict, user_context)
 
-            return {
-                "statusCode": 201,
-                "body": json.dumps(
+            from aws_lambda_powertools.event_handler import Response, content_types
+
+            return Response(
+                status_code=201,
+                content_type=content_types.APPLICATION_JSON,
+                body=json.dumps(
                     {
                         "success": True,
                         "data": response_data,
@@ -187,7 +229,7 @@ def register_route(app):
                         },
                     }
                 ),
-            }
+            )
 
         except BadRequestError:
             raise

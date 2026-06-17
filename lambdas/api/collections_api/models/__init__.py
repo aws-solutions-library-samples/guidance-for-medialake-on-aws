@@ -15,6 +15,7 @@ from .common_models import (
     CollectionStatus,
     GetCollectionAssetsQueryParams,
     ListCollectionsQueryParams,
+    ListGroupsQueryParams,
     RelationshipType,
     SortDirection,
 )
@@ -43,5 +44,6 @@ __all__ = [
     "RelationshipType",
     "SortDirection",
     "ListCollectionsQueryParams",
+    "ListGroupsQueryParams",
     "GetCollectionAssetsQueryParams",
 ]

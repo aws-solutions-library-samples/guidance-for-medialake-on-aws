@@ -6,7 +6,6 @@ import os
 import time
 from typing import Any, Dict
 
-import boto3
 from base_embedding_store import BaseEmbeddingStore, SearchResult
 from opensearchpy import (
     NotFoundError,
@@ -31,14 +30,20 @@ class OpenSearchEmbeddingStore(BaseEmbeddingStore):
         )
 
     def _get_client(self) -> OpenSearch:
-        """Create and return a cached OpenSearch client with optimized settings."""
+        """Create and return a cached OpenSearch client with optimized settings.
+
+        Uses refreshable credentials so that long-lived Lambda containers
+        never sign requests with expired IAM tokens.
+        """
         if self._client is None:
+            from refreshable_auth import get_refreshable_credentials
+
             host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
             region = os.environ["AWS_REGION"]
             service_scope = os.environ["SCOPE"]
 
             auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
+                get_refreshable_credentials(), region, service_scope
             )
 
             self._client = OpenSearch(

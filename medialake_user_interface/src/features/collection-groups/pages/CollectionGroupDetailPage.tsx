@@ -49,7 +49,7 @@ import {
   useAddCollectionsToGroup,
   useRemoveCollectionsFromGroup,
 } from "../hooks/useCollectionGroups";
-import { useGetCollections } from "@/api/hooks/useCollections";
+import { useGetAllCollections } from "@/api/hooks/useCollections";
 import { useCollectionCollectionTypes } from "@/api/hooks/useCollectionCollectionTypes";
 import { CollectionGroupForm } from "../components/CollectionGroupForm";
 import { formatDate } from "@/utils/dateFormat";
@@ -71,7 +71,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: groupData, isLoading, error } = useCollectionGroup(groupId!);
-  const { data: collectionsData, isLoading: isLoadingCollections } = useGetCollections();
+  const { data: collectionsData, isLoading: isLoadingCollections } = useGetAllCollections();
   const { data: collectionTypesResponse, isLoading: isLoadingTypes } =
     useCollectionCollectionTypes();
   const deleteGroup = useDeleteCollectionGroup();
@@ -259,17 +259,20 @@ export const CollectionGroupDetailPage: React.FC = () => {
                     icon={group.isPublic ? <PublicIcon /> : <PrivateIcon />}
                     sx={{
                       height: 22,
-                      color: group.isPublic ? "success.dark" : theme.palette.primary.main,
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.02em",
+                      color: theme.palette.primary.contrastText,
                       bgcolor: group.isPublic
-                        ? alpha(theme.palette.success.main, 0.08)
-                        : alpha(theme.palette.primary.main, 0.1),
-                      border: `1px solid ${
-                        group.isPublic ? theme.palette.success.dark : theme.palette.primary.main
-                      }`,
+                        ? theme.palette.primary.main
+                        : theme.palette.primary.dark,
+                      border: "none",
+                      boxShadow: `0 1px 3px ${alpha(theme.palette.primary.main, 0.3)}`,
                       "& .MuiChip-icon": {
-                        color: group.isPublic ? "success.dark" : theme.palette.primary.main,
+                        color: theme.palette.primary.contrastText,
                         fontSize: 14,
                       },
+                      "& .MuiChip-label": { px: 0.8 },
                     }}
                   />
                 </Box>
@@ -300,7 +303,11 @@ export const CollectionGroupDetailPage: React.FC = () => {
           )}
         </Box>
 
-        {groupCollections.length === 0 ? (
+        {isLoadingCollections ? (
+          <Box display="flex" justifyContent="center" py={4}>
+            <CircularProgress />
+          </Box>
+        ) : groupCollections.length === 0 ? (
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
               <Box textAlign="center" py={4}>
@@ -395,23 +402,20 @@ export const CollectionGroupDetailPage: React.FC = () => {
                             icon={collection.isPublic ? <PublicIcon /> : <PrivateIcon />}
                             sx={{
                               height: 22,
-                              color: collection.isPublic
-                                ? "success.dark"
-                                : theme.palette.primary.main,
+                              fontSize: "0.68rem",
+                              fontWeight: 600,
+                              letterSpacing: "0.02em",
+                              color: theme.palette.primary.contrastText,
                               bgcolor: collection.isPublic
-                                ? alpha(theme.palette.success.main, 0.08)
-                                : alpha(theme.palette.primary.main, 0.1),
-                              border: `1px solid ${
-                                collection.isPublic
-                                  ? theme.palette.success.dark
-                                  : theme.palette.primary.main
-                              }`,
+                                ? theme.palette.primary.main
+                                : theme.palette.primary.dark,
+                              border: "none",
+                              boxShadow: `0 1px 3px ${alpha(theme.palette.primary.main, 0.3)}`,
                               "& .MuiChip-icon": {
-                                color: collection.isPublic
-                                  ? "success.dark"
-                                  : theme.palette.primary.main,
+                                color: theme.palette.primary.contrastText,
                                 fontSize: 14,
                               },
+                              "& .MuiChip-label": { px: 0.8 },
                             }}
                           />
                           {collection.collectionTypeId &&

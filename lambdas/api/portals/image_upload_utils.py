@@ -66,10 +66,14 @@ def validate_and_decode_image(
     content_type = body.get("contentType", "")
 
     if content_type not in allowed_types:
-        return None, None, ImageUploadError(
-            code="VALIDATION_ERROR",
-            message=f"contentType must be one of: {', '.join(allowed_types)}",
-            status_code=400,
+        return (
+            None,
+            None,
+            ImageUploadError(
+                code="VALIDATION_ERROR",
+                message=f"contentType must be one of: {', '.join(allowed_types)}",
+                status_code=400,
+            ),
         )
 
     # Strip data-URL prefix if present (e.g. "data:image/png;base64,...")
@@ -79,10 +83,14 @@ def validate_and_decode_image(
     try:
         image_bytes = base64.b64decode(image_data, validate=True)
     except (binascii.Error, ValueError):
-        return None, None, ImageUploadError(
-            code="VALIDATION_ERROR",
-            message="Invalid base64 image data",
-            status_code=400,
+        return (
+            None,
+            None,
+            ImageUploadError(
+                code="VALIDATION_ERROR",
+                message="Invalid base64 image data",
+                status_code=400,
+            ),
         )
 
     return image_bytes, content_type, None

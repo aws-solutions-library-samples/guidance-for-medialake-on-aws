@@ -44,16 +44,25 @@ def register_route(app):
             if not user_id:
                 raise BadRequestError("Authentication required")
 
-            # Query GSI6 to find all shares granted by this user
-            response = collections_table.query(
-                IndexName="SharesGrantedByGSI",
-                KeyConditionExpression="GSI6_PK = :grantor_pk",
-                ExpressionAttributeValues={
+            # Query GSI6 to find all shares granted by this user. Paginate so
+            # users who have granted more than one page (>1MB) of shares get a
+            # complete list rather than a silently truncated one.
+            query_kwargs = {
+                "IndexName": "SharesGrantedByGSI",
+                "KeyConditionExpression": "GSI6_PK = :grantor_pk",
+                "ExpressionAttributeValues": {
                     ":grantor_pk": f"{GRANTOR_PREFIX}{user_id}",
                 },
-            )
+            }
 
-            shares = response.get("Items", [])
+            shares = []
+            while True:
+                response = collections_table.query(**query_kwargs)
+                shares.extend(response.get("Items", []))
+                last_key = response.get("LastEvaluatedKey")
+                if not last_key:
+                    break
+                query_kwargs["ExclusiveStartKey"] = last_key
 
             logger.info(
                 "Found shares granted by user",

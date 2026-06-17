@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { Alert, Box, Button, Paper, Typography } from "@mui/material";
+import { Alert, Box, Paper, Typography } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import DOMPurify from "dompurify";
+
+import { Model } from "survey-core";
+import { Survey } from "survey-react-ui";
+// SurveyJS default theme stylesheet. Global import (same one the live preview
+// uses in `PortalPreviewRenderer`) so the public survey DOM renders styled.
+// The scoped `createPortalTheme` + the card chrome still own the surrounding
+// branding; this only styles the SurveyJS body itself.
+import "survey-core/survey-core.min.css";
 
 import type { PortalConfig } from "@/features/portal/types/portal.types";
 import { createPortalApiClient } from "@/features/portal/api/portalApiClient";
 import PortalAccessGate from "@/features/portal/components/PortalAccessGate";
 import PortalHeader from "@/features/portal/components/PortalHeader";
-import PortalDestinationSelector from "@/features/portal/components/PortalDestinationSelector";
-import PortalPathBrowser from "@/features/portal/components/PortalPathBrowser";
-import PortalPathBuilder from "@/features/portal/components/PortalPathBuilder";
-import PortalMetadataForm from "@/features/portal/components/PortalMetadataForm";
-import PortalUploader from "@/features/portal/components/PortalUploader";
 import CaptchaGate from "@/features/portal/components/CaptchaGate";
 
 import { DEFAULT_PORTAL_APPEARANCE } from "@/features/settings/upload-portals/constants/appearanceDefaults";
@@ -20,6 +23,21 @@ import type { PortalAppearance } from "@/features/settings/upload-portals/types/
 import { createPortalTheme } from "@/features/settings/upload-portals/utils/createPortalTheme";
 import { deepMerge } from "@/features/settings/upload-portals/utils/deepMerge";
 import { loadGoogleFont } from "@/features/settings/upload-portals/utils/loadGoogleFont";
+
+// Req 11.3 / 6.2: the public renderer builds its schema EXCLUSIVELY through the
+// shared `buildSurveyJson` + `registerPortalQuestions` — the SAME modules the
+// admin live preview uses (Task 14) — so there is no second schema path.
+import { buildSurveyJson } from "@/features/settings/upload-portals/shared/portalSurveyModel";
+import { registerPortalQuestions } from "@/features/settings/upload-portals/shared/registerPortalQuestions";
+// Side-effect import: binds the four custom question React renderers (incl. the
+// LIVE Uppy uploader, which renders for real in `mode: "public"`). The module
+// self-registers at import and the registration is idempotent.
+import "@/features/settings/upload-portals/shared/questions/registerPortalQuestionRenderers";
+import {
+  PortalRuntimeContext,
+  type PortalRuntimeValue,
+  CURRENT_PATH_KEY,
+} from "@/features/settings/upload-portals/shared/PortalRuntimeContext";
 
 type AccessGateState = "gate" | "authenticated" | "unavailable";
 
@@ -41,11 +59,6 @@ const UploadPortalPage: React.FC = () => {
 
   const [sessionJwt, setSessionJwt] = useState<string | null>(null);
   const [portalConfig, setPortalConfig] = useState<PortalConfig | null>(null);
-  const [selectedDestinationId, setSelectedDestinationId] = useState("");
-  const [currentPath, setCurrentPath] = useState("");
-  const [metadataValues, setMetadataValues] = useState<Record<string, string>>({});
-  const [pathSegmentValues, setPathSegmentValues] = useState<Record<string, string>>({});
-  const [isPathBrowserOpen, setIsPathBrowserOpen] = useState(false);
   const [accessGateState, setAccessGateState] = useState<AccessGateState>("gate");
   const [unavailableReason, setUnavailableReason] = useState<string>("");
   const [captchaVerified, setCaptchaVerified] = useState(false);
@@ -153,19 +166,6 @@ const UploadPortalPage: React.FC = () => {
         const { data } = await client.get(`/portal/${slug}`);
         const config = data as PortalConfig;
         setPortalConfig(config);
-        const firstDest = [...config.destinations].sort((a, b) => a.order - b.order)[0];
-        if (firstDest) {
-          setSelectedDestinationId(firstDest.destinationId);
-          const resolved = await resolveInitialPath(
-            client,
-            firstDest.destinationId,
-            firstDest.rootPath,
-            searchParams.get("prefix") ?? ""
-          );
-          setCurrentPath(resolved);
-        }
-        setMetadataValues(prePopulatedValues);
-        setPathSegmentValues(prePopulatedValues);
         setAccessGateState("authenticated");
       } catch (err) {
         console.error("Failed to load portal config:", err);
@@ -173,9 +173,14 @@ const UploadPortalPage: React.FC = () => {
         setAccessGateState("gate");
       }
     },
-    [slug, prePopulatedValues, searchParams, resolveInitialPath]
+    [slug]
   );
 
+  // Session-expiry handler (Requirement 15.2). Resetting to the gate clears the
+  // live session and unmounts the survey host below, discarding the in-progress
+  // `survey.data` (a fresh survey is built on re-authentication). The live
+  // uploader question invokes this through `runtime.onSessionExpired` on a 401,
+  // so a mid-flow expiry resets to the gate exactly like the legacy behavior.
   const handleSessionExpired = useCallback(() => {
     setSessionJwt(null);
     setAccessGateState("gate");
@@ -190,26 +195,112 @@ const UploadPortalPage: React.FC = () => {
     setAccessGateState("unavailable");
   }, []);
 
-  const selectedDestination = portalConfig?.destinations.find(
-    (d) => d.destinationId === selectedDestinationId
+  // ----- SurveyJS multi-page flow (Requirements 11.3 / 11.4 / 5.5) --------
+  //
+  // Build the SurveyJS model from the persisted pages via the shared
+  // `buildSurveyJson`, in EDIT (interactive) mode with the LIVE Uppy uploader.
+  // Keyed on `sessionJwt` + `portalConfig` so a session expiry → re-auth cycle
+  // produces a fresh model with empty `survey.data` (Requirement 15.2). URL
+  // params are seeded into `survey.data` so pre-populated metadata answers and
+  // any pre-selected reserved keys carry into the flow.
+  const survey = useMemo(() => {
+    if (!sessionJwt || !portalConfig) return null;
+    // Idempotent — guarantees the custom question MODELS exist even if the
+    // renderer side-effect import was tree-shaken in some build path.
+    registerPortalQuestions();
+    const model = new Model(buildSurveyJson(portalConfig));
+    model.mode = "edit";
+    // The card chrome (PortalHeader) renders the portal title; suppress the
+    // survey's own title so it is not duplicated.
+    model.showTitle = false;
+    // Render the per-page title ourselves (as a heading above the body, under
+    // the logo) so the public page matches the admin live preview exactly.
+    // Without this, SurveyJS renders its native page title in a different
+    // position (Requirement: preview ↔ public parity).
+    model.showPageTitles = false;
+    // The upload itself is the completion — there is no separate "submit the
+    // survey" step. Remove the Complete button and never navigate to the
+    // built-in "Thank you for completing the survey" page, so a user can keep
+    // adding more files after an upload finishes.
+    model.showCompleteButton = false;
+    model.showCompletedPage = false;
+    if (Object.keys(prePopulatedValues).length > 0) {
+      // Seed pre-populated answers without discarding any SurveyJS defaults.
+      model.data = { ...model.data, ...prePopulatedValues };
+    }
+    return model;
+  }, [sessionJwt, portalConfig, prePopulatedValues]);
+
+  // Track the survey's current page so the heading we render (below) matches
+  // the page actually shown — multi-page surveys display one page at a time.
+  const [currentPageNo, setCurrentPageNo] = useState(0);
+  useEffect(() => {
+    if (!survey) return;
+    setCurrentPageNo(survey.currentPageNo);
+    const handler = (sender: Model) => setCurrentPageNo(sender.currentPageNo);
+    survey.onCurrentPageChanged.add(handler);
+    return () => survey.onCurrentPageChanged.remove(handler);
+  }, [survey]);
+
+  // The current page's title, rendered as a heading above the survey body so
+  // the public page mirrors the admin live preview (title under the logo).
+  // `buildSurveyJson` sorts pages by ascending pageNumber, so the survey's page
+  // index aligns with the sorted order here.
+  const currentPageTitle = useMemo(() => {
+    const pages = portalConfig?.pages ?? [];
+    const sorted = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
+    return sorted[currentPageNo]?.title ?? "";
+  }, [portalConfig, currentPageNo]);
+
+  // Resolve the initial upload path when a destination is selected
+  // (auto-selected on a single-destination page, or chosen by the user). The
+  // destination-selector question writes `__selectedDestinationId` and then
+  // calls this; we resolve the prefix exactly as the legacy page did and thread
+  // it through `survey.data` under `__currentPath`. The path-browser /
+  // path-builder questions overwrite `__currentPath` when the user refines it.
+  const handleDestinationChange = useCallback(
+    async (destinationId: string) => {
+      if (!survey || !portalConfig || !sessionJwt) return;
+      const dest = portalConfig.destinations?.find((d) => d.destinationId === destinationId);
+      if (!dest) return;
+      const client = createPortalApiClient(sessionJwt);
+      const resolved = await resolveInitialPath(
+        client,
+        dest.destinationId,
+        dest.rootPath,
+        searchParams.get("prefix") ?? ""
+      );
+      survey.setValue(CURRENT_PATH_KEY, resolved);
+    },
+    [survey, portalConfig, sessionJwt, resolveInitialPath, searchParams]
   );
 
-  const handleDestinationChange = useCallback(
-    async (destId: string) => {
-      setSelectedDestinationId(destId);
-      const dest = portalConfig?.destinations.find((d) => d.destinationId === destId);
-      if (dest && sessionJwt) {
-        const client = createPortalApiClient(sessionJwt);
-        const resolved = await resolveInitialPath(
-          client,
-          dest.destinationId,
-          dest.rootPath,
-          searchParams.get("prefix") ?? ""
-        );
-        setCurrentPath(resolved);
-      }
-    },
-    [portalConfig, sessionJwt, resolveInitialPath, searchParams]
+  // The path questions already write `__currentPath` into `survey.data`
+  // themselves; the survey owns that state, so the page does not need to mirror
+  // it. Provided for the runtime contract / future extensibility.
+  const handlePathChange = useCallback(() => {}, []);
+
+  // Runtime surface shared with every custom SurveyJS question (Req 11.3). Live
+  // mode wires the real API session + Uppy and threads `onSessionExpired` so a
+  // mid-flow 401 resets to the gate (Requirement 15.2).
+  const runtimeValue = useMemo<PortalRuntimeValue>(
+    () => ({
+      mode: "public",
+      slug: slug ?? "",
+      sessionJwt,
+      config: portalConfig,
+      onSessionExpired: handleSessionExpired,
+      onDestinationChange: handleDestinationChange,
+      onPathChange: handlePathChange,
+    }),
+    [
+      slug,
+      sessionJwt,
+      portalConfig,
+      handleSessionExpired,
+      handleDestinationChange,
+      handlePathChange,
+    ]
   );
 
   // Sanitized footer HTML — memoized so rapid re-renders don't re-run
@@ -245,7 +336,7 @@ const UploadPortalPage: React.FC = () => {
           elevation={CARD_SHADOW_ELEVATION[appearance.layout.cardShadow]}
           sx={{
             width: "100%",
-            maxWidth: appearance.layout.cardMaxWidth,
+            maxWidth: `${appearance.layout.cardMaxWidth}px`,
             borderRadius: `${appearance.layout.cardBorderRadius}px`,
             overflow: "hidden",
             backgroundColor: appearance.colors.cardBackground,
@@ -265,6 +356,10 @@ const UploadPortalPage: React.FC = () => {
             </Box>
           )}
 
+          {/*
+           * Until a session exists, render ONLY the access gate — no page
+           * content, no multi-page flow (Requirement 11.2).
+           */}
           {accessGateState === "gate" && (
             <PortalAccessGate
               slug={slug}
@@ -274,10 +369,7 @@ const UploadPortalPage: React.FC = () => {
             />
           )}
 
-          {accessGateState === "authenticated" &&
-            sessionJwt &&
-            portalConfig &&
-            selectedDestination && (
+          {accessGateState === "authenticated" && sessionJwt && portalConfig && survey && (
             <>
               {/*
                * Banner (Requirement 12.6 / 7.7). Rendered inside the card
@@ -307,6 +399,7 @@ const UploadPortalPage: React.FC = () => {
                 descriptionHtml={appearance.content.descriptionHtml}
                 logoSize={appearance.branding.logoSize}
                 logoAlignment={appearance.branding.logoAlignment}
+                showLogo={appearance.branding.showLogo}
               />
               <CaptchaGate
                 captchaEnabled={portalConfig.captchaEnabled}
@@ -321,83 +414,44 @@ const UploadPortalPage: React.FC = () => {
                     // to the configured value makes the card padding
                     // adjustable end-to-end.
                     p: `${appearance.layout.cardPadding}px`,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2.5,
+                    // Navigation button alignment. SurveyJS hides inactive nav
+                    // actions with `.sv-action--hidden` (zero-size but still a
+                    // flex item); drop them from layout so alignment is exact.
+                    "& .sd-body__navigation .sv-action--hidden": {
+                      display: "none",
+                    },
+                    // A lone visible button (first page = Next only; last page =
+                    // Complete only) is centered.
+                    "& .sd-action-bar.sd-body__navigation": {
+                      justifyContent: "center",
+                    },
+                    // When both Previous and a forward action (Next/Complete)
+                    // are visible (middle/last pages), group them bottom-right.
+                    "& .sd-action-bar.sd-body__navigation:has(#sv-nav-prev:not(.sv-action--hidden)):has(#sv-nav-next:not(.sv-action--hidden)), & .sd-action-bar.sd-body__navigation:has(#sv-nav-prev:not(.sv-action--hidden)):has(#sv-nav-complete:not(.sv-action--hidden))":
+                      {
+                        justifyContent: "flex-end",
+                      },
                   }}
                 >
-                  {portalConfig.destinations.length > 1 && (
-                    <PortalDestinationSelector
-                      destinations={portalConfig.destinations}
-                      selectedDestinationId={selectedDestinationId}
-                      onChange={handleDestinationChange}
-                    />
-                  )}
-
-                  {selectedDestination.allowBrowsing && (
-                    <>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => setIsPathBrowserOpen(true)}
-                        sx={{ alignSelf: "flex-start" }}
-                      >
-                        Browse: {currentPath || "/"}
-                      </Button>
-                      <PortalPathBrowser
-                        open={isPathBrowserOpen}
-                        onClose={() => setIsPathBrowserOpen(false)}
-                        slug={slug}
-                        sessionJwt={sessionJwt}
-                        destination={selectedDestination}
-                        currentPath={currentPath}
-                        onPathSelect={(path) => {
-                          setCurrentPath(path);
-                          setIsPathBrowserOpen(false);
-                        }}
-                      />
-                    </>
-                  )}
-
-                  {portalConfig.structuredPathMode &&
-                    selectedDestination.pathSegments &&
-                    selectedDestination.pathSegments.length > 0 && (
-                      <PortalPathBuilder
-                        pathSegments={selectedDestination.pathSegments}
-                        prePopulatedValues={pathSegmentValues}
-                        onChange={(path, isValid) => {
-                          if (isValid) {
-                            setCurrentPath((selectedDestination.rootPath ?? "") + path + "/");
-                          }
-                        }}
-                      />
+                  {/*
+                   * SurveyJS-driven multi-page flow (Requirement 11.3).
+                   * Replaces the legacy hard-coded
+                   * destination → path → metadata → uploader stack. The custom
+                   * questions thread the selected destination, current path, and
+                   * metadata through `survey.data` (Requirements 7.3 / 7.5 /
+                   * 11.4) — the page no longer drives that state. The provider
+                   * supplies the live `mode: "public"` runtime (real API + i18n-ignore
+                   * Uppy) and wires `onSessionExpired` so a mid-flow expiry
+                   * resets to the gate (Requirement 15.2).
+                   */}
+                  <PortalRuntimeContext.Provider value={runtimeValue}>
+                    {currentPageTitle && (
+                      <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+                        {currentPageTitle}
+                      </Typography>
                     )}
-
-                  {portalConfig.metadataFields.length > 0 && (
-                    <PortalMetadataForm
-                      fields={portalConfig.metadataFields}
-                      prePopulatedValues={prePopulatedValues}
-                      onChange={(values) => setMetadataValues(values)}
-                    />
-                  )}
-
-                  <PortalUploader
-                    portalSlug={slug}
-                    sessionJwt={sessionJwt}
-                    destination={selectedDestination}
-                    currentPath={currentPath}
-                    metadataFields={metadataValues}
-                    maxFileSizeBytes={portalConfig.maxFileSizeBytes}
-                    maxFilesPerSession={portalConfig.maxFilesPerSession}
-                    onSessionExpired={handleSessionExpired}
-                    useCaptchaIntegration={portalConfig.captchaEnabled}
-                    submitButtonText={appearance.content.submitButtonText}
-                    successMessage={appearance.content.successMessage}
-                    dropZoneText={appearance.content.dropZoneText}
-                    allowedFileTypes={portalConfig.allowedFileTypes ?? []}
-                    buttonStyle={appearance.content.buttonStyle}
-                    buttonRounding={appearance.content.buttonRounding}
-                  />
+                    <Survey model={survey} />
+                  </PortalRuntimeContext.Provider>
                 </Box>
                 {/*
                  * Footer (Requirements 12.12 / 12.13 / 12.14):
@@ -406,7 +460,7 @@ const UploadPortalPage: React.FC = () => {
                  *   - "Powered by MediaLake" renders when
                  *     `showPoweredBy === true`. When both are absent, // i18n-ignore
                  *     skip the footer container entirely so the card
-                 *     ends cleanly on the upload button.
+                 *     ends cleanly on the survey body.
                  */}
                 {(hasFooterHtml || appearance.branding.showPoweredBy) && (
                   <Box

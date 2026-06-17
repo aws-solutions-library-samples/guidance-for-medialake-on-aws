@@ -8,7 +8,6 @@ Handles endpoints for retrieving collection assets with full OpenSearch data:
 import os
 from typing import Any, Dict, List, Optional
 
-import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
@@ -27,61 +26,16 @@ from collections_utils import (
 
 # Import Pydantic models
 from models import GetCollectionAssetsQueryParams
-from opensearchpy import OpenSearch, RequestsAWSV4SignerAuth, RequestsHttpConnection
 from pynamodb.exceptions import DoesNotExist
 from url_utils import generate_cloudfront_urls_batch
 from user_auth import extract_user_context
+from utils.opensearch_utils import OPENSEARCH_INDEX, get_opensearch_client
 
 logger = Logger(
     service="collection-assets-handler", level=os.environ.get("LOG_LEVEL", "INFO")
 )
 tracer = Tracer(service="collection-assets-handler")
 metrics = Metrics(namespace="medialake", service="collection-assets")
-
-# Environment variables
-OPENSEARCH_ENDPOINT = os.environ.get("OPENSEARCH_ENDPOINT", "")
-OPENSEARCH_INDEX = os.environ.get("OPENSEARCH_INDEX", "")
-
-# Cache for OpenSearch client
-_opensearch_client = None
-
-
-def get_opensearch_client() -> Optional[OpenSearch]:
-    """Create and return a cached OpenSearch client"""
-    global _opensearch_client
-
-    if not OPENSEARCH_ENDPOINT or not OPENSEARCH_INDEX:
-        logger.warning("[OPENSEARCH_INIT] OpenSearch not configured")
-        return None
-
-    if _opensearch_client is None:
-        try:
-            host = OPENSEARCH_ENDPOINT.replace("https://", "")
-            region = os.environ["AWS_REGION"]
-            service_scope = os.environ.get("SCOPE", "es")
-
-            auth = RequestsAWSV4SignerAuth(
-                boto3.Session().get_credentials(), region, service_scope
-            )
-
-            _opensearch_client = OpenSearch(
-                hosts=[{"host": host, "port": 443}],
-                http_auth=auth,
-                use_ssl=True,
-                verify_certs=True,
-                connection_class=RequestsHttpConnection,
-                region=region,
-                timeout=30,
-                max_retries=2,
-                retry_on_timeout=True,
-            )
-
-            logger.info("[OPENSEARCH_INIT] OpenSearch client initialized successfully")
-        except Exception as e:
-            logger.error(f"[OPENSEARCH_INIT] Failed to initialize client: {str(e)}")
-            return None
-
-    return _opensearch_client
 
 
 def collect_cloudfront_url_requests(

@@ -475,6 +475,12 @@ export const useSemanticSearchSettings = () => {
           endpoint: metadata.defaultEndpoint,
           isConfigured: true,
           isEnabled: true,
+          // Preserve any existing advanced config
+          searchEndpoint: settings.current.provider.config?.searchEndpoint,
+          datasetEndpoint: settings.current.provider.config?.datasetEndpoint,
+          authEndpoint: settings.current.provider.config?.authEndpoint,
+          responseFormat: settings.current.provider.config?.responseFormat,
+          datasetId: settings.current.provider.config?.datasetId,
         };
         providerTypeForState = "coactive";
       } else if (availableProviders?.["twelvelabs-api"]) {
@@ -535,6 +541,18 @@ export const useSemanticSearchSettings = () => {
           updatePayload.inference_provider = metadata.inference_provider;
         }
 
+        // Include Coactive advanced configuration if present
+        if (providerConfig.type === "coactive") {
+          if (providerConfig.searchEndpoint)
+            updatePayload.searchEndpoint = providerConfig.searchEndpoint;
+          if (providerConfig.datasetEndpoint)
+            updatePayload.datasetEndpoint = providerConfig.datasetEndpoint;
+          if (providerConfig.authEndpoint) updatePayload.authEndpoint = providerConfig.authEndpoint;
+          if (providerConfig.responseFormat)
+            updatePayload.responseFormat = providerConfig.responseFormat;
+          if (providerConfig.datasetId) updatePayload.datasetId = providerConfig.datasetId;
+        }
+
         await updateProvider.mutateAsync(updatePayload);
       } else {
         // Create new provider (first time setup)
@@ -553,6 +571,18 @@ export const useSemanticSearchSettings = () => {
           createPayload.inference_provider = metadata.inference_provider;
         }
 
+        // Include Coactive advanced configuration if present
+        if (providerConfig.type === "coactive") {
+          if (providerConfig.searchEndpoint)
+            createPayload.searchEndpoint = providerConfig.searchEndpoint;
+          if (providerConfig.datasetEndpoint)
+            createPayload.datasetEndpoint = providerConfig.datasetEndpoint;
+          if (providerConfig.authEndpoint) createPayload.authEndpoint = providerConfig.authEndpoint;
+          if (providerConfig.responseFormat)
+            createPayload.responseFormat = providerConfig.responseFormat;
+          if (providerConfig.datasetId) createPayload.datasetId = providerConfig.datasetId;
+        }
+
         await createProvider.mutateAsync(createPayload);
       }
 
@@ -566,6 +596,28 @@ export const useSemanticSearchSettings = () => {
       return true;
     }
     return false;
+  };
+
+  // Handle updating Coactive advanced configuration fields
+  const handleCoactiveAdvancedChange = (
+    field: "searchEndpoint" | "datasetEndpoint" | "authEndpoint" | "responseFormat" | "datasetId",
+    value: string
+  ) => {
+    setSettings((prev) => ({
+      ...prev,
+      current: {
+        ...prev.current,
+        provider: {
+          ...prev.current.provider,
+          config: prev.current.provider.config
+            ? {
+                ...prev.current.provider.config,
+                [field]: value || undefined,
+              }
+            : null,
+        },
+      },
+    }));
   };
 
   // Handle save all changes
@@ -590,16 +642,41 @@ export const useSemanticSearchSettings = () => {
           // Update existing provider
           const updatePayload: any = {
             type: current.provider.config.type,
-            apiKey: current.provider.config.apiKey,
-            endpoint: current.provider.config.endpoint,
             isEnabled: current.isEnabled,
             embeddingStore: embeddingStorePayload,
           };
+
+          // Only include apiKey if it was actually changed (not the masked placeholder)
+          if (
+            current.provider.config.apiKey &&
+            current.provider.config.apiKey !== "••••••••••••••••"
+          ) {
+            updatePayload.apiKey = current.provider.config.apiKey;
+          }
+
+          // Only include endpoint if set
+          if (current.provider.config.endpoint) {
+            updatePayload.endpoint = current.provider.config.endpoint;
+          }
 
           // Include inference_provider if available from metadata
           const metadata = providerData?.data?.availableProviders?.[current.provider.config.type];
           if (metadata && "inference_provider" in metadata) {
             updatePayload.inference_provider = metadata.inference_provider;
+          }
+
+          // Include Coactive advanced configuration if present
+          if (current.provider.type === "coactive") {
+            if (current.provider.config.searchEndpoint)
+              updatePayload.searchEndpoint = current.provider.config.searchEndpoint;
+            if (current.provider.config.datasetEndpoint)
+              updatePayload.datasetEndpoint = current.provider.config.datasetEndpoint;
+            if (current.provider.config.authEndpoint)
+              updatePayload.authEndpoint = current.provider.config.authEndpoint;
+            if (current.provider.config.responseFormat)
+              updatePayload.responseFormat = current.provider.config.responseFormat;
+            if (current.provider.config.datasetId)
+              updatePayload.datasetId = current.provider.config.datasetId;
           }
 
           await updateProvider.mutateAsync(updatePayload);
@@ -618,6 +695,20 @@ export const useSemanticSearchSettings = () => {
           const metadata = providerData?.data?.availableProviders?.[current.provider.config.type];
           if (metadata && "inference_provider" in metadata) {
             createPayload.inference_provider = metadata.inference_provider;
+          }
+
+          // Include Coactive advanced configuration if present
+          if (current.provider.type === "coactive") {
+            if (current.provider.config.searchEndpoint)
+              createPayload.searchEndpoint = current.provider.config.searchEndpoint;
+            if (current.provider.config.datasetEndpoint)
+              createPayload.datasetEndpoint = current.provider.config.datasetEndpoint;
+            if (current.provider.config.authEndpoint)
+              createPayload.authEndpoint = current.provider.config.authEndpoint;
+            if (current.provider.config.responseFormat)
+              createPayload.responseFormat = current.provider.config.responseFormat;
+            if (current.provider.config.datasetId)
+              createPayload.datasetId = current.provider.config.datasetId;
           }
 
           await createProvider.mutateAsync(createPayload);
@@ -722,6 +813,7 @@ export const useSemanticSearchSettings = () => {
     handleOpenApiKeyDialog,
     handleCloseApiKeyDialog,
     handleSaveApiKey,
+    handleCoactiveAdvancedChange,
     handleSave,
     handleCancel,
 

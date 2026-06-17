@@ -25,6 +25,12 @@ export interface PortalEditorToolbarProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  /**
+   * Optional extra controls rendered in the right-hand action group, left of
+   * Preview. Task 17.3 uses this slot for the "Apply theme" / "Save as…"
+   * (Template/Theme) controls so the toolbar stays agnostic of that feature.
+   */
+  extraActions?: React.ReactNode;
 }
 
 /**
@@ -64,6 +70,7 @@ const PortalEditorToolbar: React.FC<PortalEditorToolbarProps> = ({
   canRedo = false,
   onUndo,
   onRedo,
+  extraActions,
 }) => {
   const breadcrumbText = isCreateMode ? "New Portal" : portalName || "Untitled Portal";
 
@@ -143,6 +150,7 @@ const PortalEditorToolbar: React.FC<PortalEditorToolbarProps> = ({
             </IconButton>
           </span>
         </Tooltip>
+        {extraActions}
         <Tooltip
           title={isPreviewDisabled ? "Save the portal first to preview" : ""}
           disableHoverListener={!isPreviewDisabled}

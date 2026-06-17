@@ -98,6 +98,7 @@ const BrandingSection: React.FC = () => {
 
   const logoSize = usePortalEditorStore((s) => s.appearance.branding.logoSize);
   const logoAlignment = usePortalEditorStore((s) => s.appearance.branding.logoAlignment);
+  const showLogo = usePortalEditorStore((s) => s.appearance.branding.showLogo);
   const showPoweredBy = usePortalEditorStore((s) => s.appearance.branding.showPoweredBy);
   const bannerS3Key = usePortalEditorStore((s) => s.appearance.branding.bannerS3Key);
   const bannerHeight = usePortalEditorStore((s) => s.appearance.branding.bannerHeight);
@@ -313,6 +314,13 @@ const BrandingSection: React.FC = () => {
     [updateBranding]
   );
 
+  const handleShowLogoChange = useCallback(
+    (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      updateBranding({ showLogo: checked });
+    },
+    [updateBranding]
+  );
+
   const handleRemoveLogo = useCallback(() => {
     clearLogo();
   }, [clearLogo]);
@@ -350,100 +358,117 @@ const BrandingSection: React.FC = () => {
     <Stack spacing={2}>
       {/* Logo uploader */}
       <Stack spacing={1}>
-        <Typography variant="caption" color="text.secondary">
-          Logo
-        </Typography>
-        {displayLogoSrc && (
-          <Box
-            component="img"
-            src={displayLogoSrc}
-            alt="Logo preview"
-            sx={{
-              width: logoSize,
-              height: logoSize,
-              objectFit: "contain",
-              borderRadius: 1,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          />
+        <FormControlLabel
+          control={<Switch checked={showLogo} onChange={handleShowLogoChange} size="small" />}
+          label="Show logo"
+        />
+        {showLogo && (
+          <>
+            <Typography variant="caption" color="text.secondary">
+              Logo
+            </Typography>
+            {displayLogoSrc && (
+              <Box
+                component="img"
+                src={displayLogoSrc}
+                alt="Logo preview"
+                sx={{
+                  width: logoSize,
+                  height: logoSize,
+                  objectFit: "contain",
+                  borderRadius: 1,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              />
+            )}
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                disabled={uploadLogo.isPending}
+              >
+                {hasLogo ? "Replace logo" : "Upload logo"}
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleLogoSelect}
+                />
+              </Button>
+              {hasLogo && (
+                <Button
+                  onClick={handleRemoveLogo}
+                  variant="text"
+                  size="small"
+                  color="inherit"
+                  sx={{ textTransform: "none" }}
+                >
+                  Remove logo
+                </Button>
+              )}
+            </Stack>
+            {isCreateMode && logoFile && (
+              <Typography variant="caption" color="text.secondary">
+                Logo will upload on Save
+              </Typography>
+            )}
+            <Typography variant="caption" color="text.secondary">
+              Recommended: square PNG or SVG, at least 96×96 px, under 5 MB.
+            </Typography>
+          </>
         )}
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Button component="label" variant="outlined" size="small" disabled={uploadLogo.isPending}>
-            {hasLogo ? "Replace logo" : "Upload logo"}
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={handleLogoSelect}
-            />
-          </Button>
-          {hasLogo && (
-            <Button
-              onClick={handleRemoveLogo}
-              variant="text"
-              size="small"
-              color="inherit"
-              sx={{ textTransform: "none" }}
-            >
-              Remove logo
-            </Button>
-          )}
-        </Stack>
-        {isCreateMode && logoFile && (
-          <Typography variant="caption" color="text.secondary">
-            Logo will upload on Save
-          </Typography>
-        )}
-        <Typography variant="caption" color="text.secondary">
-          Recommended: square PNG or SVG, at least 96×96 px, under 5 MB.
-        </Typography>
       </Stack>
 
       {/* Logo alignment */}
-      <Box>
-        <Typography variant="caption" color="text.secondary" component="div">
-          Logo alignment
-        </Typography>
-        <ToggleButtonGroup
-          value={logoAlignment}
-          exclusive
-          onChange={handleLogoAlignmentChange}
-          size="small"
-          aria-label="Logo alignment"
-          sx={{ mt: 0.5 }}
-        >
-          <ToggleButton value="left" aria-label="Align left">
-            <FormatAlignLeftIcon fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="center" aria-label="Align center">
-            <FormatAlignCenterIcon fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
+      {showLogo && (
+        <Box>
+          <Typography variant="caption" color="text.secondary" component="div">
+            Logo alignment
+          </Typography>
+          <ToggleButtonGroup
+            value={logoAlignment}
+            exclusive
+            onChange={handleLogoAlignmentChange}
+            size="small"
+            aria-label="Logo alignment"
+            sx={{ mt: 0.5 }}
+          >
+            <ToggleButton value="left" aria-label="Align left">
+              <FormatAlignLeftIcon fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="center" aria-label="Align center">
+              <FormatAlignCenterIcon fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
 
       {/* Logo size slider */}
-      <Box>
-        <Stack direction="row" alignItems="baseline" justifyContent="space-between">
-          <Typography variant="caption" color="text.secondary">
-            Logo size
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {logoSize}px
-          </Typography>
-        </Stack>
-        <Slider
-          value={logoSize}
-          onChange={handleLogoSizeChange}
-          min={24}
-          max={120}
-          step={4}
-          size="small"
-          aria-label="Logo size"
-          valueLabelDisplay="auto"
-        />
-      </Box>
+      {showLogo && (
+        <Box>
+          <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+            <Typography variant="caption" color="text.secondary">
+              Logo size
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {logoSize}px
+            </Typography>
+          </Stack>
+          <Slider
+            value={logoSize}
+            onChange={handleLogoSizeChange}
+            min={24}
+            max={120}
+            step={4}
+            size="small"
+            aria-label="Logo size"
+            valueLabelDisplay="auto"
+          />
+        </Box>
+      )}
 
       {/* Show Powered By toggle */}
       <FormControlLabel

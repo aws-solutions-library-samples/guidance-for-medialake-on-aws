@@ -1,5 +1,6 @@
 """DELETE /groups/{groupId} - Delete a group"""
 
+import time
 from typing import Any, Dict
 
 from aws_lambda_powertools.metrics import MetricUnit
@@ -20,6 +21,31 @@ class SuccessResponse(BaseModel):
     data: Dict[str, Any] = Field(
         default={}, description="Empty data object for success"
     )
+
+
+def _batch_write_with_retry(
+    dynamodb, table_name: str, requests: list, logger, max_attempts: int = 5
+) -> int:
+    """Run BatchWriteItem, retrying any UnprocessedItems with backoff.
+
+    DynamoDB can return some requests as ``UnprocessedItems`` under throttling
+    even on a successful (200) call. Without retrying them the corresponding
+    rows are silently left behind. Returns the number of requests still
+    unprocessed after all attempts (0 on full success).
+    """
+    pending = requests
+    for attempt in range(max_attempts):
+        response = dynamodb.batch_write_item(RequestItems={table_name: pending})
+        unprocessed = response.get("UnprocessedItems", {}).get(table_name, [])
+        if not unprocessed:
+            return 0
+        pending = unprocessed
+        logger.warning(
+            f"BatchWriteItem left {len(unprocessed)} unprocessed item(s); "
+            f"retrying (attempt {attempt + 1}/{max_attempts})"
+        )
+        time.sleep(min(2**attempt * 0.05, 1.0))
+    return len(pending)
 
 
 def _delete_group_with_rollback(
@@ -136,26 +162,60 @@ def _delete_group_with_rollback(
                         extra={"group_id": group_id},
                     )
 
-        # Step 5: Delete from DynamoDB in batches
+        # Step 5: Delete from DynamoDB in batches.
+        # Memberships are stored as a pair: a forward row under the group
+        # partition (PK=GROUP#{id}, SK=MEMBERSHIP#USER#{user}) and a reverse row
+        # under the user's partition (PK=USER#{user}, SK=MEMBERSHIP#GROUP#{id}).
+        # The query above only returned the forward rows, so we derive and delete
+        # the matching reverse rows too — otherwise they orphan in each member's
+        # partition and keep showing up in that user's group listings.
+        delete_keys = [{"PK": item["PK"], "SK": item["SK"]} for item in items]
+
+        membership_prefix = "MEMBERSHIP#USER#"
+        for item in items:
+            sk = item.get("SK", "")
+            if sk.startswith(membership_prefix):
+                member_user_id = item.get("userId") or sk[len(membership_prefix) :]
+                if member_user_id:
+                    delete_keys.append(
+                        {
+                            "PK": f"USER#{member_user_id}",
+                            "SK": f"MEMBERSHIP#GROUP#{group_id}",
+                        }
+                    )
+
         logger.info(f"Deleting DynamoDB items for group: {group_id}")
         batch_size = 25  # DynamoDB batch write limit
 
-        for i in range(0, len(items), batch_size):
-            batch_items = items[i : i + batch_size]
+        unprocessed_total = 0
+        for i in range(0, len(delete_keys), batch_size):
+            batch_keys = delete_keys[i : i + batch_size]
 
             # Prepare batch delete request
-            delete_requests = []
-            for item in batch_items:
-                delete_requests.append(
-                    {"DeleteRequest": {"Key": {"PK": item["PK"], "SK": item["SK"]}}}
+            delete_requests = [{"DeleteRequest": {"Key": key}} for key in batch_keys]
+
+            # Execute batch delete, retrying any throttled (unprocessed) items
+            if delete_requests:
+                unprocessed_total += _batch_write_with_retry(
+                    dynamodb, table_name, delete_requests, logger
                 )
 
-            # Execute batch delete
-            if delete_requests:
-                dynamodb.batch_write_item(RequestItems={table_name: delete_requests})
+        if unprocessed_total:
+            # Best-effort cleanup: don't fail the whole deletion (and trigger a
+            # confusing rollback) over a few throttled rows, but make the gap
+            # visible via logs + a metric instead of silently dropping them.
+            logger.error(
+                f"{unprocessed_total} item(s) could not be deleted for group "
+                f"{group_id} after retries"
+            )
+            metrics.add_metric(
+                name="GroupDeleteUnprocessedItems",
+                unit=MetricUnit.Count,
+                value=unprocessed_total,
+            )
 
         logger.info(
-            f"Successfully deleted group and {len(items)} related items from DynamoDB",
+            f"Successfully deleted group and {len(delete_keys)} item(s) from DynamoDB",
             extra={"group_id": group_id},
         )
         metrics.add_metric(name="DynamoDBGroupDeleted", unit=MetricUnit.Count, value=1)

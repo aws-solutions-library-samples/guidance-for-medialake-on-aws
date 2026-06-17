@@ -27,6 +27,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
+import LockResetIcon from "@mui/icons-material/LockReset";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import GroupIcon from "@mui/icons-material/Group";
 import { User } from "@/api/types/api.types";
@@ -47,6 +48,7 @@ interface UserListProps {
   onEditUser: (user: User) => void;
   onDeleteUser: (username: string) => void;
   onToggleUserStatus: (username: string, newStatus: boolean) => void;
+  onResetPassword?: (username: string) => void;
   activeFilters?: { columnId: string; value: string }[];
   activeSorting?: { columnId: string; desc: boolean }[];
   onRemoveFilter?: (columnId: string) => void;
@@ -188,6 +190,7 @@ const UserList: React.FC<UserListProps> = ({
   onEditUser,
   onDeleteUser,
   onToggleUserStatus,
+  onResetPassword,
   activeFilters = [],
   activeSorting = [],
   onRemoveFilter,
@@ -472,6 +475,25 @@ const UserList: React.FC<UserListProps> = ({
                 )}
               </IconButton>
             </Tooltip>
+            {onResetPassword && (
+              <Tooltip title={t("users.actions.resetPassword", "Reset Password")}>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResetPassword(row.original.username);
+                  }}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.2),
+                    },
+                  }}
+                >
+                  <LockResetIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title={t("common.actions.delete")}>
               <IconButton
                 size="small"
@@ -499,6 +521,7 @@ const UserList: React.FC<UserListProps> = ({
     onEditUser,
     onDeleteUser,
     onToggleUserStatus,
+    onResetPassword,
     groups,
     isLoadingGroups,
     handleMutation,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
@@ -8,34 +8,18 @@ import {
   useTheme,
   alpha,
   Button,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  Card,
-  CardContent,
   Snackbar,
   Alert,
-  TextField,
-  InputAdornment,
-  IconButton,
-  Tooltip,
-  FormControl,
-  Select,
-  MenuItem,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
   Add as AddIcon,
-  Public as PublicIcon,
-  Lock as PrivateIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   PhotoLibrary as PhotoLibraryIcon,
   Work,
   Campaign,
@@ -54,19 +38,17 @@ import {
   People as PeopleIcon,
   PersonOutline as PersonIcon,
   FolderSpecial as FolderSpecialIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
-  ArrowUpward as AscIcon,
-  ArrowDownward as DescIcon,
 } from "@mui/icons-material";
 import type { SvgIconComponent } from "@mui/icons-material";
 import { PageContent } from "@/components/common/layout";
 import { RefreshButton } from "@/components/common";
 import {
   useGetCollections,
+  useGetAllCollections,
   useGetCollectionsSharedWithMe,
   useGetCollectionsSharedByMe,
   useDeleteCollection,
+  useGetMetadataKeys,
   type Collection,
 } from "../api/hooks/useCollections";
 import { useCollectionCollectionTypes } from "../api/hooks/useCollectionCollectionTypes";
@@ -74,11 +56,48 @@ import { CreateCollectionModal } from "../components/collections/CreateCollectio
 import { EditCollectionModal } from "../components/collections/EditCollectionModal";
 import { ShareManagementModal } from "../components/collections/ShareManagementModal";
 import { ALL_ICONS } from "../components/collections/ThumbnailSelector";
+import { CollectionCard } from "../components/collections/CollectionCard";
+import { CollectionCardViewControls } from "../components/collections/CollectionCardViewControls";
+import { useCollectionViewPreferences } from "../hooks/useCollectionViewPreferences";
+import {
+  CollectionViewControls,
+  type CollectionSortOption,
+  type SortDirection,
+} from "../components/collections/CollectionViewControls";
+import {
+  CollectionFilterDrawer,
+  EMPTY_FILTER_STATE,
+  countActiveFilters,
+  type CollectionFilterState,
+} from "../components/collections/CollectionFilterDrawer";
+import { ActiveFilterChips } from "../components/collections/ActiveFilterChips";
 import { CollectionGroupsList, CollectionGroupForm } from "@/features/collection-groups";
 import type { CollectionGroup } from "@/features/collection-groups";
-import { sortCollections } from "@/features/dashboard/utils/collectionFilters";
-import { formatDateOnly } from "@/utils/dateFormat";
-import type { SortBy, SortOrder } from "@/features/dashboard/types";
+import AssetPagination from "@/components/shared/AssetPagination";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { jwtDecode } from "jwt-decode";
+
+const COLLECTIONS_DEFAULT_PAGE_SIZE = 100;
+
+interface JwtPayload {
+  sub?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+async function getCurrentUserId(): Promise<string> {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    if (token) {
+      const decoded = jwtDecode<JwtPayload>(token);
+      return decoded.sub || "";
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
 
 type FilterTab = "all" | "myCollections" | "sharedWithMe" | "sharedByMe" | "groups";
 
@@ -167,16 +186,105 @@ const CollectionsPage: React.FC = () => {
   const [groupFormOpen, setGroupFormOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<CollectionGroup | null>(null);
 
-  // Sorting state — defaults match the dashboard widget (name, asc)
-  const [sortBy, setSortBy] = useState<SortBy>("name");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  // Sorting state — sort field is a free-form string because the Sort popover
+  // can select `customMetadata.<key>` values. Default stays `name asc`.
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  // Filter popover state — anchor element for the popover; null when closed.
+  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
+  const [appliedFilters, setAppliedFilters] = useState<CollectionFilterState>(EMPTY_FILTER_STATE);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(COLLECTIONS_DEFAULT_PAGE_SIZE);
+
+  // Current user ID for myCollections tab
+  const [currentUserId, setCurrentUserId] = useState("");
+  useEffect(() => {
+    getCurrentUserId().then(setCurrentUserId);
+  }, []);
+
+  // Debounced search — updates 300ms after searchText changes
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchText), 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   // Get filter from URL params
   const filterParam = searchParams.get("filter") as FilterTab | null;
   const activeTab: FilterTab = filterParam || "all";
 
+  // Fetch metadata keys for filter dropdown
+  const { data: metadataKeysResponse } = useGetMetadataKeys();
+  const metadataKeys = useMemo(
+    () => metadataKeysResponse?.data?.keys || [],
+    [metadataKeysResponse]
+  );
+
+  // Card display preferences (preset, card size, visible fields/metadata keys).
+  // Persists to localStorage and seeds `visibleMetadataKeys` with the first 3
+  // alphabetical keys the first time the user lands on the page.
+  const {
+    prefs: cardDisplayPrefs,
+    setPreset: setCardPreset,
+    setCardSize: setCardSize,
+    toggleCoreField: toggleCardCoreField,
+    toggleMetadataKey: toggleCardMetadataKey,
+  } = useCollectionViewPreferences({ availableMetadataKeys: metadataKeys });
+
+  // Build the metadataFilters dict the API hook expects from the committed drawer rows
+  const activeMetadataFilters = useMemo<Record<string, string> | undefined>(() => {
+    const entries: Record<string, string> = {};
+    for (const f of appliedFilters.metadataFilters) {
+      if (f.key.trim() && f.value.trim()) entries[f.key.trim()] = f.value.trim();
+    }
+    return Object.keys(entries).length > 0 ? entries : undefined;
+  }, [appliedFilters.metadataFilters]);
+
+  const activeTagFilters = useMemo(
+    () => (appliedFilters.tags.length > 0 ? appliedFilters.tags : undefined),
+    [appliedFilters.tags]
+  );
+
+  const activeVisibilityFilters = useMemo(
+    () => (appliedFilters.visibility.length > 0 ? appliedFilters.visibility : undefined),
+    [appliedFilters.visibility]
+  );
+
+  const activeUpdatedWithin = appliedFilters.updatedWithin ?? undefined;
+
+  // Determine if we're actively searching or filtering — include children so nested
+  // collections surface in results.
+  const isSearchingOrFiltering = !!(
+    debouncedSearch ||
+    activeMetadataFilters ||
+    activeTagFilters ||
+    appliedFilters.visibility.length > 0 ||
+    appliedFilters.updatedWithin
+  );
+
   // API hooks
-  const { data: collectionsResponse, isLoading, error, refetch } = useGetCollections();
+  const {
+    data: collectionsResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useGetCollections({
+    page,
+    pageSize,
+    sort: sortField,
+    sortDirection,
+    search: debouncedSearch || undefined,
+    filterOwnerId: activeTab === "myCollections" ? currentUserId || undefined : undefined,
+    enabled: activeTab !== "myCollections" || !!currentUserId,
+    metadataFilters: activeMetadataFilters,
+    tagFilters: activeTagFilters,
+    visibilityFilters: activeVisibilityFilters,
+    updatedWithin: activeUpdatedWithin,
+    includeChildren: isSearchingOrFiltering || undefined,
+  });
   const { data: sharedWithMeResponse, isLoading: isLoadingSharedWithMe } =
     useGetCollectionsSharedWithMe();
   const { data: sharedByMeResponse, isLoading: isLoadingSharedByMe } =
@@ -185,10 +293,69 @@ const CollectionsPage: React.FC = () => {
     useCollectionCollectionTypes();
   const deleteCollectionMutation = useDeleteCollection();
 
+  // All collections (for parent name lookup when search results include children)
+  const { data: allCollectionsLookupResponse } = useGetAllCollections();
+  const parentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of allCollectionsLookupResponse?.data || []) {
+      map.set(c.id, c.name);
+    }
+    return map;
+  }, [allCollectionsLookupResponse]);
+
   const allCollections = collectionsResponse?.data || [];
   const sharedWithMeCollections = sharedWithMeResponse?.data || [];
   const sharedByMeCollections = sharedByMeResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Sort options for the toolbar — standard fields always visible; custom
+  // metadata keys are appended by `CollectionViewControls` from the
+  // `customMetadataKeys` prop.
+  const standardSortOptions = useMemo<CollectionSortOption[]>(
+    () => [
+      {
+        id: "name",
+        label: t("collectionsPage.sort.name", "Name"),
+        defaultDirection: "asc",
+      },
+      {
+        id: "createdAt",
+        label: t("collectionsPage.sort.createdAt", "Created"),
+        defaultDirection: "desc",
+      },
+      {
+        id: "updatedAt",
+        label: t("collectionsPage.sort.updatedAt", "Updated"),
+        defaultDirection: "desc",
+      },
+    ],
+    [t]
+  );
+
+  // Collection type name lookup for the filter chip row
+  const collectionTypeNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const ct of collectionTypes) {
+      map[ct.id] = ct.name;
+    }
+    return map;
+  }, [collectionTypes]);
+
+  // Available tag list for the filter drawer — derived from the all-collections
+  // lookup cache. Deduped and sorted alphabetically.
+  const availableTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of allCollectionsLookupResponse?.data || []) {
+      if (Array.isArray(c.tags)) {
+        for (const tag of c.tags) {
+          if (tag) set.add(tag);
+        }
+      }
+    }
+    return Array.from(set).sort();
+  }, [allCollectionsLookupResponse]);
+
+  const activeFilterCount = useMemo(() => countActiveFilters(appliedFilters), [appliedFilters]);
 
   // Handle tab change
   const handleTabChange = (newValue: FilterTab) => {
@@ -271,62 +438,47 @@ const CollectionsPage: React.FC = () => {
     };
   };
 
-  // Calculate total descendant count recursively
-  const calculateTotalDescendants = (collectionId: string, collections: Collection[]): number => {
-    const children = collections.filter((c) => c.parentId === collectionId);
-    let count = children.length;
-    children.forEach((child) => {
-      count += calculateTotalDescendants(child.id, collections);
-    });
-    return count;
-  };
-
-  // Get filtered collections based on active tab + search
+  // Get collections for the current tab
+  // "all" and "myCollections" use server-side pagination via useGetCollections
+  // "sharedWithMe" and "sharedByMe" use their own hooks
   const filteredCollections = useMemo(() => {
-    let collections: Collection[] = [];
-
     switch (activeTab) {
-      case "myCollections":
-        collections = allCollections.filter((c) => !c.parentId && !c.sharedWithMe);
-        break;
       case "sharedWithMe":
-        collections = sharedWithMeCollections;
-        break;
+        return sharedWithMeCollections;
       case "sharedByMe":
-        collections = sharedByMeCollections;
-        break;
+        return sharedByMeCollections;
       case "all":
+      case "myCollections":
       default:
-        collections = allCollections.filter((c) => !c.parentId);
-        break;
+        return allCollections;
     }
-
-    // Apply search filter
-    if (searchText.trim()) {
-      const query = searchText.toLowerCase();
-      collections = collections.filter(
-        (c) => c.name.toLowerCase().includes(query) || c.description?.toLowerCase().includes(query)
-      );
-    }
-
-    return sortCollections(
-      collections.map((c) => ({
-        ...c,
-        totalDescendants: calculateTotalDescendants(c.id, allCollections),
-      })),
-      { sortBy, sortOrder }
-    );
-  }, [
-    activeTab,
-    allCollections,
-    sharedWithMeCollections,
-    sharedByMeCollections,
-    searchText,
-    sortBy,
-    sortOrder,
-  ]);
+  }, [activeTab, allCollections, sharedWithMeCollections, sharedByMeCollections]);
 
   const rootCollections = filteredCollections;
+
+  // Total count: use API pagination for all/myCollections tabs, local count for shared tabs
+  const totalCollections = useMemo(() => {
+    if (activeTab === "sharedWithMe" || activeTab === "sharedByMe") {
+      return rootCollections.length;
+    }
+    return collectionsResponse?.pagination?.totalResults ?? 0;
+  }, [activeTab, rootCollections.length, collectionsResponse]);
+
+  // Reset to page 1 when filters, search, sort, or pageSize changes
+  React.useEffect(() => {
+    setPage(1);
+  }, [activeTab, searchText, sortField, sortDirection, pageSize, appliedFilters]);
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+    // Scroll to top of the collections grid
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setPage(1);
+  };
 
   // Badge counts for tabs
   const tabBadgeCounts: Partial<Record<FilterTab, number>> = {
@@ -540,23 +692,29 @@ const CollectionsPage: React.FC = () => {
                   }}
                   endIcon={
                     badgeCount ? (
-                      <Chip
-                        label={badgeCount}
-                        size="small"
+                      <Box
+                        component="span"
                         sx={{
-                          height: 20,
-                          minWidth: 20,
-                          fontSize: "0.7rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: 18,
+                          minWidth: 18,
+                          px: 0.5,
+                          borderRadius: 0.75,
+                          fontSize: "0.6rem",
                           fontWeight: 600,
+                          lineHeight: 1,
                           bgcolor: isActive
-                            ? alpha(theme.palette.common.white, 0.25)
-                            : alpha(theme.palette.primary.main, 0.12),
+                            ? alpha(theme.palette.common.white, 0.22)
+                            : alpha(theme.palette.primary.main, 0.1),
                           color: isActive
                             ? theme.palette.primary.contrastText
                             : theme.palette.primary.main,
-                          "& .MuiChip-label": { px: 0.6 },
                         }}
-                      />
+                      >
+                        {badgeCount}
+                      </Box>
                     ) : undefined
                   }
                 >
@@ -566,87 +724,91 @@ const CollectionsPage: React.FC = () => {
             })}
           </Box>
 
-          {/* Search + Sort controls */}
-          {!isGroupsTab && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              {/* Sort by */}
-              <FormControl size="small" sx={{ minWidth: 130 }}>
-                <Select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  sx={{
-                    borderRadius: 2,
-                    height: 36,
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  <MenuItem value="name">{t("collectionsPage.sort.name", "Name")}</MenuItem>
-                  <MenuItem value="createdAt">
-                    {t("collectionsPage.sort.createdAt", "Created")}
-                  </MenuItem>
-                  <MenuItem value="updatedAt">
-                    {t("collectionsPage.sort.updatedAt", "Updated")}
-                  </MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Sort order toggle */}
-              <ToggleButtonGroup
-                value={sortOrder}
-                exclusive
-                onChange={(_e, val) => {
-                  if (val) setSortOrder(val as SortOrder);
-                }}
-                size="small"
-                sx={{ height: 36 }}
-              >
-                <ToggleButton
-                  value="asc"
-                  aria-label={t("collectionsPage.sort.ascending", "Ascending")}
-                >
-                  <AscIcon sx={{ fontSize: 18 }} />
-                </ToggleButton>
-                <ToggleButton
-                  value="desc"
-                  aria-label={t("collectionsPage.sort.descending", "Descending")}
-                >
-                  <DescIcon sx={{ fontSize: 18 }} />
-                </ToggleButton>
-              </ToggleButtonGroup>
-
-              {/* Search */}
-              <TextField
-                size="small"
-                placeholder={t("collectionsPage.searchPlaceholder", "Search collections...")}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                sx={{
-                  width: 260,
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                    height: 36,
-                    fontSize: "0.85rem",
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ fontSize: 18, color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchText ? (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setSearchText("")} sx={{ p: 0.25 }}>
-                        <ClearIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </InputAdornment>
-                  ) : null,
-                }}
-              />
-            </Box>
-          )}
+          {/* Toolbar rendered below via CollectionViewControls + ActiveFilterChips */}
         </Box>
       </Box>
+
+      {/* Toolbar strip — mirrors the Search page's AssetViewControls pattern so the
+          two list surfaces share the same visual language. No horizontal padding
+          here; the AppLayout already pads the page so this row lines up with the
+          header action cluster above it and the card grid below it. */}
+      {!isGroupsTab && (
+        <Box>
+          <CollectionViewControls
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortChange={(field, direction) => {
+              setSortField(field);
+              setSortDirection(direction);
+            }}
+            standardSortOptions={standardSortOptions}
+            customMetadataKeys={metadataKeys}
+            onOpenFilters={(e) => setFilterAnchor(e.currentTarget)}
+            activeFilterCount={activeFilterCount}
+            endSlot={
+              <CollectionCardViewControls
+                prefs={cardDisplayPrefs}
+                onPresetChange={setCardPreset}
+                onCardSizeChange={setCardSize}
+                onCoreFieldToggle={toggleCardCoreField}
+                onMetadataKeyToggle={toggleCardMetadataKey}
+                availableMetadataKeys={metadataKeys}
+              />
+            }
+          />
+          <ActiveFilterChips
+            search={debouncedSearch}
+            sortLabel={
+              standardSortOptions.find((o) => o.id === sortField)?.label ??
+              (sortField.startsWith("customMetadata.")
+                ? sortField.substring("customMetadata.".length)
+                : sortField)
+            }
+            sortDirection={sortDirection}
+            sortIsDefault={sortField === "name" && sortDirection === "asc"}
+            filters={appliedFilters}
+            collectionTypeNameById={collectionTypeNameById}
+            onClearSearch={() => setSearchText("")}
+            onClearSort={() => {
+              setSortField("name");
+              setSortDirection("asc");
+            }}
+            onRemoveVisibility={(v) =>
+              setAppliedFilters((s) => ({
+                ...s,
+                visibility: s.visibility.filter((x) => x !== v),
+              }))
+            }
+            onRemoveType={(id) =>
+              setAppliedFilters((s) => ({
+                ...s,
+                collectionTypeIds: s.collectionTypeIds.filter((x) => x !== id),
+              }))
+            }
+            onRemoveTag={(tag) =>
+              setAppliedFilters((s) => ({
+                ...s,
+                tags: s.tags.filter((t) => t !== tag),
+              }))
+            }
+            onRemoveMetadata={(id) =>
+              setAppliedFilters((s) => ({
+                ...s,
+                metadataFilters: s.metadataFilters.filter((f) => f.id !== id),
+              }))
+            }
+            onClearUpdatedWithin={() => setAppliedFilters((s) => ({ ...s, updatedWithin: null }))}
+            onClearAll={() => {
+              setAppliedFilters(EMPTY_FILTER_STATE);
+              setSearchText("");
+              setSortField("name");
+              setSortDirection("asc");
+            }}
+          />
+        </Box>
+      )}
 
       {/* Main content */}
       <PageContent
@@ -755,14 +917,27 @@ const CollectionsPage: React.FC = () => {
             )}
           </Box>
         ) : (
-          /* Card grid */
+          /* Card grid — column min-width scales with card size so S/M/L all stay
+             uniformly-packed without gutters blowing out on small screens. */
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                sm: "repeat(auto-fill, minmax(280px, 1fr))",
-                md: "repeat(auto-fill, minmax(300px, 1fr))",
+                sm: `repeat(auto-fill, minmax(${
+                  cardDisplayPrefs.cardSize === "small"
+                    ? 220
+                    : cardDisplayPrefs.cardSize === "large"
+                      ? 340
+                      : 280
+                }px, 1fr))`,
+                md: `repeat(auto-fill, minmax(${
+                  cardDisplayPrefs.cardSize === "small"
+                    ? 220
+                    : cardDisplayPrefs.cardSize === "large"
+                      ? 340
+                      : 280
+                }px, 1fr))`,
               },
               gap: 2.5,
               pt: 0.5,
@@ -770,221 +945,53 @@ const CollectionsPage: React.FC = () => {
           >
             {rootCollections.map((collection) => {
               const style = getCollectionStyle(collection);
+              const sortedMetadataKey = sortField.startsWith("customMetadata.")
+                ? sortField.substring("customMetadata.".length)
+                : undefined;
+              const parentName =
+                collection.parentId && isSearchingOrFiltering
+                  ? parentNameMap.get(collection.parentId)
+                  : undefined;
+              // Fall back to the collection-type icon name (via the typeInfo lookup)
+              // when the collection doesn't have its own thumbnail, so the placeholder
+              // reads as the type instead of a generic folder.
+              const collectionType = collection.collectionTypeId
+                ? collectionTypes.find((ct) => ct.id === collection.collectionTypeId)
+                : undefined;
+              const placeholderIconName = collectionType?.icon;
               return (
-                <Card
+                <CollectionCard
                   key={collection.id}
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    border: "1px solid",
-                    borderColor: alpha(theme.palette.divider, 0.1),
-                    bgcolor: "background.paper",
-                    transition:
-                      "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.2)}`,
-                      cursor: "pointer",
-                      "& .card-actions-overlay": {
-                        opacity: 1,
-                      },
-                    },
-                  }}
-                  onClick={() => handleViewCollection(collection)}
-                >
-                  {/* Thumbnail area */}
-                  <Box sx={{ p: 1.25, pb: 0 }}>
-                    <Box
-                      sx={{
-                        height: 180,
-                        borderRadius: 2.5,
-                        overflow: "hidden",
-                        position: "relative",
-                        bgcolor: style.thumbnailUrl
-                          ? "transparent"
-                          : alpha(theme.palette.primary.main, 0.04),
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {style.thumbnailUrl ? (
-                        <Box
-                          component="img"
-                          src={style.thumbnailUrl}
-                          alt={collection.name}
-                          sx={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : style.IconComponent ? (
-                        <style.IconComponent
-                          sx={{
-                            fontSize: 56,
-                            color: alpha(theme.palette.primary.main, 0.18),
-                          }}
-                        />
-                      ) : (
-                        <FolderIcon
-                          sx={{
-                            fontSize: 56,
-                            color: alpha(theme.palette.primary.main, 0.18),
-                          }}
-                        />
-                      )}
-
-                      {/* Action buttons overlay */}
-                      {!collection.sharedWithMe && (
-                        <Box
-                          className="card-actions-overlay"
-                          sx={{
-                            position: "absolute",
-                            top: 8,
-                            right: 8,
-                            display: "flex",
-                            gap: 0.5,
-                            opacity: 0,
-                            transition: "opacity 0.15s ease",
-                          }}
-                        >
-                          {[
-                            {
-                              icon: <ShareIcon sx={{ fontSize: 15 }} />,
-                              tip: t("common.share", "Share"),
-                              handler: handleShareClick,
-                              color: "text.primary",
-                              disabled: false,
-                            },
-                            {
-                              icon: <EditIcon sx={{ fontSize: 15 }} />,
-                              tip: editCollectionPermission.disabled
-                                ? editCollectionPermission.tooltip
-                                : t("common.edit", "Edit"),
-                              handler: handleEditClick,
-                              color: "text.primary",
-                              disabled: editCollectionPermission.disabled,
-                            },
-                            {
-                              icon: <DeleteIcon sx={{ fontSize: 15 }} />,
-                              tip: deleteCollectionPermission.disabled
-                                ? deleteCollectionPermission.tooltip
-                                : t("common.delete", "Delete"),
-                              handler: handleDeleteClick,
-                              color: "error.main",
-                              disabled: deleteCollectionPermission.disabled,
-                            },
-                          ].map(({ icon, tip, handler, color, disabled }) => (
-                            <Tooltip key={tip} title={tip}>
-                              <Button
-                                size="small"
-                                disabled={disabled}
-                                sx={{
-                                  minWidth: 0,
-                                  p: 0.6,
-                                  borderRadius: 1.5,
-                                  bgcolor: alpha(theme.palette.background.paper, 0.85),
-                                  backdropFilter: "blur(8px)",
-                                  color,
-                                  border: "1px solid",
-                                  borderColor: alpha(theme.palette.divider, 0.12),
-                                  "&:hover": {
-                                    bgcolor: theme.palette.background.paper,
-                                  },
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handler(collection);
-                                }}
-                              >
-                                {icon}
-                              </Button>
-                            </Tooltip>
-                          ))}
-                        </Box>
-                      )}
-                    </Box>
-                  </Box>
-
-                  {/* Info section */}
-                  <CardContent sx={{ px: 1.75, pt: 1.25, pb: 1.25, "&:last-child": { pb: 1.25 } }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
-                      <FolderIcon
-                        sx={{
-                          fontSize: 18,
-                          color: alpha(theme.palette.primary.main, 0.5),
-                        }}
-                      />
-                      <Typography
-                        variant="subtitle2"
-                        component="h3"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: "0.9rem",
-                          lineHeight: 1.4,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          flex: 1,
-                        }}
-                      >
-                        {collection.name}
-                      </Typography>
-                    </Box>
-
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontSize: "0.75rem" }}
-                      >
-                        {collection.itemCount} asset{collection.itemCount !== 1 ? "s" : ""}
-                        {collection.childCollectionCount > 0 &&
-                          ` · ${collection.childCollectionCount} sub`}
-                        {collection.createdAt && ` · ${formatDateOnly(collection.createdAt)}`}
-                      </Typography>
-                      <Chip
-                        label={
-                          collection.isPublic
-                            ? t("collectionsPage.collectionTypes.public", "Public")
-                            : t("collectionsPage.collectionTypes.private", "Private")
-                        }
-                        size="small"
-                        icon={collection.isPublic ? <PublicIcon /> : <PrivateIcon />}
-                        variant="outlined"
-                        sx={{
-                          height: 22,
-                          fontSize: "0.68rem",
-                          fontWeight: 500,
-                          color: collection.isPublic ? "success.main" : "text.secondary",
-                          borderColor: collection.isPublic
-                            ? alpha(theme.palette.success.main, 0.35)
-                            : alpha(theme.palette.text.secondary, 0.15),
-                          bgcolor: collection.isPublic
-                            ? alpha(theme.palette.success.main, 0.06)
-                            : "transparent",
-                          "& .MuiChip-icon": {
-                            color: collection.isPublic ? "success.main" : "text.secondary",
-                            fontSize: 13,
-                          },
-                        }}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
+                  collection={collection}
+                  onClick={handleViewCollection}
+                  onShareClick={handleShareClick}
+                  onEditClick={handleEditClick}
+                  onDeleteClick={handleDeleteClick}
+                  editPermission={editCollectionPermission}
+                  deletePermission={deleteCollectionPermission}
+                  accentColor={style.color}
+                  placeholderIconName={placeholderIconName}
+                  sortedMetadataKey={sortedMetadataKey}
+                  parentName={parentName}
+                  display={cardDisplayPrefs}
+                />
               );
             })}
           </Box>
         )}
+        {/* Pagination — only for tabs with server-side pagination */}
+        {totalCollections > 0 &&
+          activeTab !== "sharedWithMe" &&
+          activeTab !== "sharedByMe" &&
+          !isGroupsTab && (
+            <AssetPagination
+              page={page}
+              pageSize={pageSize}
+              totalResults={totalCollections}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
       </PageContent>
 
       {/* Edit Collection Modal */}
@@ -1012,14 +1019,6 @@ const CollectionsPage: React.FC = () => {
             Are you sure you want to delete &ldquo;{selectedCollection?.name}&rdquo;? This will
             permanently delete the collection and all its contents. This action cannot be undone.
           </DialogContentText>
-          {selectedCollection && (selectedCollection as any).totalDescendants > 0 && (
-            <DialogContentText sx={{ mt: 2, color: "warning.main" }}>
-              Warning: This collection has {(selectedCollection as any).totalDescendants}{" "}
-              sub-collection
-              {(selectedCollection as any).totalDescendants !== 1 ? "s" : ""} that will also be
-              deleted.
-            </DialogContentText>
-          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={handleDeleteCancel} sx={{ textTransform: "none" }}>
@@ -1052,6 +1051,21 @@ const CollectionsPage: React.FC = () => {
         open={shareModalOpen}
         onClose={handleShareModalClose}
         collection={selectedCollection}
+      />
+
+      {/* Filter popover — anchored to the Filters toolbar button like the Sort popover.
+          Closing via `onClose` or Apply discards/commits the local draft. */}
+      <CollectionFilterDrawer
+        anchorEl={filterAnchor}
+        onClose={() => setFilterAnchor(null)}
+        applied={appliedFilters}
+        onApply={setAppliedFilters}
+        availableCollectionTypes={collectionTypes.map((ct) => ({
+          id: ct.id,
+          name: ct.name,
+        }))}
+        availableTags={availableTags}
+        availableMetadataKeys={metadataKeys}
       />
 
       {/* Alert Snackbar */}

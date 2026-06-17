@@ -39,6 +39,11 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
           fieldSchema = field.type === "multiselect" ? z.array(z.string()) : z.string();
         }
         break;
+      case "keyvalue":
+        // Key-value editor stores an object { key: value, ... } or an array of rows.
+        // Accept any record shape so the form doesn't reject the intermediate state.
+        fieldSchema = z.record(z.string(), z.string()).or(z.array(z.any()));
+        break;
       case "password":
       case "email":
       case "text":

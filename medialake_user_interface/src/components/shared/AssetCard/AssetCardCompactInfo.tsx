@@ -12,6 +12,7 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Tooltip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
@@ -26,6 +27,7 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import { InlineTextEditor } from "../../common/InlineTextEditor";
 import InlineEditActions from "../../common/InlineEditActions";
 import type { AssetField } from "@/types/shared/assetComponents";
+import { useCollectionAssetPermissions } from "@/permissions";
 
 interface AssetCardCompactInfoProps {
   id: string;
@@ -76,6 +78,13 @@ const AssetCardCompactInfo: React.FC<AssetCardCompactInfoProps> = React.memo(
     const menuOpen = Boolean(menuAnchor);
     const preventCommitRef = useRef(false);
     const commitRef = useRef<(() => void) | null>(null);
+    const { canAdd, canRemove, addTooltip, removeTooltip } = useCollectionAssetPermissions();
+
+    const collectionActionAllowed = showRemoveButton ? canRemove : canAdd;
+    const collectionActionLabel = showRemoveButton
+      ? t("common.actions.removeFromCollection")
+      : t("common.actions.addToCollection");
+    const collectionActionTooltip = showRemoveButton ? removeTooltip : addTooltip;
 
     return (
       <Box sx={{ px: 1.5, pt: 1, pb: 1, cursor: "pointer" }} onClick={onAssetClick}>
@@ -249,26 +258,27 @@ const AssetCardCompactInfo: React.FC<AssetCardCompactInfoProps> = React.memo(
                   <ListItemText>{t("common.actions.download")}</ListItemText>
                 </MenuItem>
               )}
-              <MenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuAnchor(null);
-                  onAddToCollectionClick?.(e);
-                }}
-              >
-                <ListItemIcon>
-                  {showRemoveButton ? (
-                    <RemoveIcon fontSize="small" />
-                  ) : (
-                    <AddIcon fontSize="small" />
-                  )}
-                </ListItemIcon>
-                <ListItemText>
-                  {showRemoveButton
-                    ? t("common.actions.removeFromCollection")
-                    : t("common.actions.addToCollection")}
-                </ListItemText>
-              </MenuItem>
+              <Tooltip title={collectionActionAllowed ? "" : collectionActionTooltip}>
+                <span>
+                  <MenuItem
+                    disabled={!collectionActionAllowed}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuAnchor(null);
+                      onAddToCollectionClick?.(e);
+                    }}
+                  >
+                    <ListItemIcon>
+                      {showRemoveButton ? (
+                        <RemoveIcon fontSize="small" />
+                      ) : (
+                        <AddIcon fontSize="small" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText>{collectionActionLabel}</ListItemText>
+                  </MenuItem>
+                </span>
+              </Tooltip>
               {!isClipMode && canDelete && (
                 <MenuItem
                   onClick={(e) => {

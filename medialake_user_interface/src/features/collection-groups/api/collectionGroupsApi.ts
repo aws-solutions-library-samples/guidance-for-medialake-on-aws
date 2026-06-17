@@ -19,8 +19,10 @@ export const collectionGroupsApi = {
    */
   list: async (params?: {
     search?: string;
-    limit?: number;
-    cursor?: string;
+    page?: number;
+    pageSize?: number;
+    sort?: string;
+    sortDirection?: "asc" | "desc";
   }): Promise<CollectionGroupListResponse> => {
     const response = await apiClient.get<CollectionGroupListResponse>("/collections/groups", {
       params,

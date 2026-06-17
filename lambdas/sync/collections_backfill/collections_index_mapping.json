@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1,
+    "index.max_result_window": 100000
+  },
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword" } }
+      },
+      "description": { "type": "text" },
+      "ownerId": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "isPublic": { "type": "boolean" },
+      "collectionTypeId": { "type": "keyword" },
+      "parentId": { "type": "keyword" },
+      "tags": { "type": "keyword" },
+      "childCollectionCount": { "type": "integer" },
+      "itemCount": { "type": "integer" },
+      "collectionIds": { "type": "keyword" },
+      "sharedWithUserIds": { "type": "keyword" },
+      "createdAt": { "type": "date" },
+      "updatedAt": { "type": "date" },
+      "thumbnailType": { "type": "keyword" },
+      "thumbnailValue": { "type": "keyword" },
+      "thumbnailS3Key": { "type": "keyword" },
+      "customMetadata": { "type": "object", "dynamic": true },
+      "expiresAt": { "type": "date" },
+      "documentType": { "type": "keyword" }
+    }
+  }
+}

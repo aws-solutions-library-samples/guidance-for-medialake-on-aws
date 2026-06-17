@@ -17,13 +17,19 @@ import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
 
-import {
-  PREVIEW_MOCK_DESTINATIONS,
-  PREVIEW_MOCK_METADATA_FIELDS,
-} from "../../constants/previewMockData";
 import { usePortalEditorStore, type PreviewMode } from "../../stores/usePortalEditorStore";
 import { loadGoogleFont } from "../../utils/loadGoogleFont";
 import PortalPreviewRenderer from "./PortalPreviewRenderer";
+import type { PortalDestination, PortalMetadataField } from "@/api/types/api.types";
+
+/**
+ * Stable empty-array defaults. The portal editor preview reflects ONLY the
+ * fields/destinations the admin has actually configured — there is no mock
+ * fallback, so an unconfigured portal previews as an empty form rather than
+ * showing phantom fields that don't exist in Field Configuration.
+ */
+const EMPTY_METADATA_FIELDS: PortalMetadataField[] = [];
+const EMPTY_DESTINATIONS: PortalDestination[] = [];
 
 /**
  * Props for {@link PortalEditorPreview}.
@@ -98,10 +104,11 @@ const CHECKER_BACKGROUND = {
  *   - The outer wrapper is a `role="region"` with
  *     `aria-label="Portal preview"` so screen reader users can jump to it
  *     via rotor navigation.
- *   - The rendered preview subtree is `aria-hidden="true"` — it's a visual
- *     preview only; screen reader users interact with the sidebar, not the
- *     mock. Keeping it hidden also prevents duplicate readings of the
- *     portal title, metadata labels, etc.
+ *   - The authenticated preview renders the form interactively so admins can
+ *     try the field controls before publishing; its subtree is therefore part
+ *     of the accessibility tree (not `aria-hidden`). The custom questions
+ *     (uploader, destination picker, path questions) stay non-functional via
+ *     their runtime `mode: "preview"` branches. // i18n-ignore
  */
 const PortalEditorPreview: React.FC<PortalEditorPreviewProps> = ({
   previewMode,
@@ -168,11 +175,8 @@ const PortalEditorPreview: React.FC<PortalEditorPreviewProps> = ({
       name: (portalName as string | undefined) ?? "Your portal",
       logoUrl: logoPreviewUrl ?? (portalLogoUrl as string | undefined),
       metadataFields:
-        (portalMetadataFields as typeof PREVIEW_MOCK_METADATA_FIELDS | undefined) ??
-        PREVIEW_MOCK_METADATA_FIELDS,
-      destinations:
-        (portalDestinations as typeof PREVIEW_MOCK_DESTINATIONS | undefined) ??
-        PREVIEW_MOCK_DESTINATIONS,
+        (portalMetadataFields as PortalMetadataField[] | undefined) ?? EMPTY_METADATA_FIELDS,
+      destinations: (portalDestinations as PortalDestination[] | undefined) ?? EMPTY_DESTINATIONS,
     }),
     [
       portalName,
@@ -263,10 +267,11 @@ const PortalEditorPreview: React.FC<PortalEditorPreviewProps> = ({
 
       {/* Preview frame. Centered card with a checkered canvas behind it
           (Requirement 11.4) and vertical scrolling when the mock overflows
-          the viewport (Requirement 11.5). `aria-hidden` on the inner
-          subtree keeps screen readers out of the mock content. */}
+          the viewport (Requirement 11.5). The authenticated preview is now
+          interactive (admins can try dropdowns/checkboxes/etc. before
+          publishing), so this subtree is intentionally NOT aria-hidden — the
+          operable controls must stay in the accessibility tree. */}
       <Box
-        aria-hidden="true"
         sx={{
           flex: 1,
           minHeight: 0,

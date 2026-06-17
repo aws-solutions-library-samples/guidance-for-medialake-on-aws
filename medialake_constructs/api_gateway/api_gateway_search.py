@@ -70,11 +70,14 @@ class SearchConstruct(Construct):
             config=LambdaConfig(
                 name="search_get",
                 vpc=props.vpc,
-                security_groups=[props.security_group],
+                security_groups=(
+                    [props.security_group] if props.security_group else None
+                ),
                 entry="lambdas/api/search/get_search",
                 layers=[search_layer.layer],
-                memory_size=9000,  # High memory for vector/semantic search operations
+                memory_size=4096,  # 2 full vCPUs — sufficient for I/O-bound search ops
                 timeout_minutes=10,
+                provisioned_concurrent_executions=1,  # Eliminate cold starts
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
@@ -85,7 +88,7 @@ class SearchConstruct(Construct):
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
                     "MEDIA_ASSETS_BUCKET": props.media_assets_bucket.bucket_name,
-                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
                     "S3_VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "S3_VECTOR_INDEX_NAME": "media-vectors",
                     # CLOUDFRONT_DISTRIBUTION_DOMAIN removed to break circular dependency
@@ -108,8 +111,14 @@ class SearchConstruct(Construct):
             ),
         )
 
-        # Lambda warming for search API (replaces provisioned concurrency)
-        events.Rule(
+        # Resolve the integration target: use the provisioned alias if available,
+        # otherwise fall back to the raw function
+        search_integration_target = (
+            search_get_lambda.function_alias or search_get_lambda.function
+        )
+
+        # Lambda warming for search API (supplements provisioned concurrency)
+        warmer_rule = events.Rule(
             self,
             "SearchLambdaWarmerRule",
             schedule=events.Schedule.rate(
@@ -117,12 +126,16 @@ class SearchConstruct(Construct):
             ),
             targets=[
                 targets.LambdaFunction(
-                    search_get_lambda.function,
+                    search_integration_target,
                     event=events.RuleTargetInput.from_object({"lambda_warmer": True}),
                 ),
             ],
             description="Keeps search API Lambda warm via scheduled EventBridge rule.",
         )
+
+        # Explicit dependency: warmer rule must wait for the alias to exist
+        if search_get_lambda.function_alias:
+            warmer_rule.node.add_dependency(search_get_lambda.function_alias)
 
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -273,29 +286,6 @@ class SearchConstruct(Construct):
             )
         )
 
-        # Add Bedrock InvokeModel permissions for TwelveLabs embedding generation (both 2.7 and 3.0)
-        # Using system-defined cross-Region inference profiles
-        search_get_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "bedrock:InvokeModel",
-                ],
-                resources=[
-                    # Foundation model ARNs - required for InvokeModel calls (both 2.7 and 3.0)
-                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
-                    "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
-                    # System-defined cross-Region inference profiles for TwelveLabs Marengo (all regions, both versions)
-                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-2-7-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/us.twelvelabs.marengo-embed-3-0-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-2-7-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/eu.twelvelabs.marengo-embed-3-0-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-2-7-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/apac.twelvelabs.marengo-embed-3-0-v1:0",
-                ],
-            )
-        )
-
         # Add permissions to list and get inference profiles (for debugging/monitoring)
         search_get_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -341,7 +331,7 @@ class SearchConstruct(Construct):
 
         search_get = search_resource.add_method(
             "GET",
-            apigateway.LambdaIntegration(search_get_lambda.function),
+            apigateway.LambdaIntegration(search_integration_target),
         )
         apply_custom_authorization(search_get, props.authorizer)
 
@@ -350,9 +340,14 @@ class SearchConstruct(Construct):
         connectors_resource = search_resource.add_resource("connectors")
         search_connectors_get = connectors_resource.add_method(
             "GET",
-            apigateway.LambdaIntegration(search_get_lambda.function),
+            apigateway.LambdaIntegration(search_integration_target),
         )
         apply_custom_authorization(search_connectors_get, props.authorizer)
+
+        # Explicit dependency: API Gateway methods must wait for the alias
+        if search_get_lambda.function_alias:
+            search_get.node.add_dependency(search_get_lambda.function_alias)
+            search_connectors_get.node.add_dependency(search_get_lambda.function_alias)
 
         # Add CORS support
 
@@ -360,19 +355,39 @@ class SearchConstruct(Construct):
         fields_resource = search_resource.add_resource("fields")
 
         # Create Lambda for search fields endpoint
+        # Requires VPC access to reach the OpenSearch domain
         search_fields_lambda = Lambda(
             self,
             "SearchFieldsLambda",
             config=LambdaConfig(
                 name="get_search_fields",
+                vpc=props.vpc,
+                security_groups=(
+                    [props.security_group] if props.security_group else None
+                ),
                 entry="lambdas/api/search/fields/get_fields",
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": (
                         props.x_origin_verify_secret.secret_arn
                     ),
-                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
+                    "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
+                    "OPENSEARCH_INDEX": props.open_search_index,
+                    "SCOPE": "es",
                 },
             ),
+        )
+
+        # VPC ENI management permissions (required for VPC-deployed Lambdas)
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                ],
+                resources=["*"],
+            )
         )
 
         # Add permissions to access Secrets Manager
@@ -402,6 +417,15 @@ class SearchConstruct(Construct):
             )
         )
 
+        # Add OpenSearch read permissions for fields mapping endpoint
+        search_fields_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["es:ESHttpGet", "es:ESHttpPost"],
+                resources=[props.open_search_arn, f"{props.open_search_arn}/*"],
+            )
+        )
+
         # Add the GET method to the fields resource
         search_fields_get = fields_resource.add_method(
             "GET",
@@ -409,35 +433,24 @@ class SearchConstruct(Construct):
         )
         apply_custom_authorization(search_fields_get, props.authorizer)
 
+        # Add /search/fields/mapping sub-resource
+        mapping_resource = fields_resource.add_resource("mapping")
+        search_fields_mapping_get = mapping_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(search_fields_lambda.function),
+        )
+        apply_custom_authorization(search_fields_mapping_get, props.authorizer)
+
+        # Add /search/fields/values sub-resource for fetching distinct field values
+        values_resource = fields_resource.add_resource("values")
+        search_fields_values_post = values_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(search_fields_lambda.function),
+        )
+        apply_custom_authorization(search_fields_values_post, props.authorizer)
+
         add_cors_options_method(search_resource)
         add_cors_options_method(connectors_resource)
         add_cors_options_method(fields_resource)
-
-    def _get_regional_inference_profile_id(self) -> str:
-        """
-        Get the appropriate TwelveLabs Marengo Embed v2.7 inference profile ID based on deployment region.
-
-        Returns:
-            Regional inference profile ID for TwelveLabs Marengo Embed v2.7
-        """
-        # Get the deployment region from the stack
-        deployment_region = Stack.of(self).region
-
-        # Common suffix for all TwelveLabs Marengo Embed v2.7 inference profiles
-        model_suffix = ".twelvelabs.marengo-embed-2-7-v1:0"
-
-        # Map regions to regional prefixes based on AWS documentation
-        if deployment_region.startswith("us-"):
-            # US regions: us-east-1, us-east-2, us-west-1, us-west-2
-            regional_prefix = "us"
-        elif deployment_region.startswith("eu-"):
-            # EU regions: eu-central-1, eu-central-2, eu-north-1, eu-south-1, eu-south-2, eu-west-1, eu-west-2, eu-west-3
-            regional_prefix = "eu"
-        elif deployment_region.startswith("ap-"):
-            # APAC regions: ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-south-1, ap-south-2, ap-southeast-1, ap-southeast-2, ap-southeast-3, ap-southeast-4
-            regional_prefix = "apac"
-        else:
-            # Default to US profile for unknown regions
-            regional_prefix = "us"
-
-        return f"{regional_prefix}{model_suffix}"
+        add_cors_options_method(mapping_resource)
+        add_cors_options_method(values_resource)

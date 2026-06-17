@@ -1,9 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { Box, MenuItem, Select, Stack, TextField, Typography } from "@mui/material";
 
-import type { PortalMetadataField } from "@/api/types/api.types";
-
-import MetadataFieldBuilder from "../../MetadataFieldBuilder";
 import { usePortalEditorStore } from "../../../stores/usePortalEditorStore";
 
 /**
@@ -15,13 +12,6 @@ type SizeUnit = "MB" | "GB";
 
 const BYTES_PER_MB = 1024 * 1024;
 const BYTES_PER_GB = 1024 * 1024 * 1024;
-
-/**
- * Module-level empty array used as the fallback when the store has no
- * metadata fields. A shared reference keeps the Zustand selector stable so
- * unrelated store writes do not trigger a re-render here.
- */
-const EMPTY_METADATA_FIELDS: readonly PortalMetadataField[] = [];
 
 /** Stable empty-array default for the allowedFileTypes selector. */
 const EMPTY_FILE_TYPES: string[] = [];
@@ -50,26 +40,24 @@ const bytesToDisplayValue = (bytes: number | undefined, unit: SizeUnit): string 
 };
 
 /**
- * MetadataSection
+ * MetadataSection ("Upload Limits & File Settings")
  *
- * Ports the legacy `PortalFormStep4MetadataLimits` dialog step into the
- * visual editor sidebar. Embeds the existing {@link MetadataFieldBuilder}
- * unmodified, a file-size-limit input with an MB / GB unit selector, and
- * a files-per-session limit input (Requirement 9.3).
+ * Owns the upload-limit controls for a portal: max file size (with an MB / GB
+ * unit selector), max files per session, and the allowed file types list.
+ *
+ * The metadata field builder previously lived here too; it now has its own
+ * "Field Configuration" section directly under "Pages & Workflow" so fields are
+ * configured next to where they are placed. This section is intentionally
+ * limited to asset upload constraints.
  *
  * Store integration:
- *   Reads `metadataFields`, `maxFileSizeBytes`, and `maxFilesPerSession`
+ *   Reads `maxFileSizeBytes`, `maxFilesPerSession`, and `allowedFileTypes`
  *   via narrow selectors on `portalData`; writes each field back through
  *   `updatePortalData`. Local React state tracks the size input's display
  *   value and unit so the user can switch between MB and GB without losing
- *   typed digits. Field-level error rendering wires up in task 5.9.
+ *   typed digits.
  */
 const MetadataSection: React.FC = () => {
-  const metadataFields = usePortalEditorStore(
-    (s) =>
-      (s.portalData?.metadataFields as PortalMetadataField[] | undefined) ??
-      (EMPTY_METADATA_FIELDS as PortalMetadataField[])
-  );
   const maxFileSizeBytes = usePortalEditorStore(
     (s) => s.portalData?.maxFileSizeBytes as number | undefined
   );
@@ -134,13 +122,6 @@ const MetadataSection: React.FC = () => {
     [commitSize, sizeValue]
   );
 
-  const handleMetadataFieldsChange = useCallback(
-    (fields: PortalMetadataField[]) => {
-      updatePortalData({ metadataFields: fields });
-    },
-    [updatePortalData]
-  );
-
   const handleMaxFilesPerSessionChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const raw = event.target.value;
@@ -172,13 +153,6 @@ const MetadataSection: React.FC = () => {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>
-          Metadata Fields
-        </Typography>
-        <MetadataFieldBuilder fields={metadataFields} onChange={handleMetadataFieldsChange} />
-      </Box>
-
       <Stack direction="row" spacing={2} alignItems="flex-end">
         <TextField
           label="Max file size"

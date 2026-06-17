@@ -33,10 +33,9 @@ from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.shared_constructs.lambda_layers import (
+from medialake_constructs.shared_constructs.lambda_layers import (  # ZipmergeLayer,  # Disabled: layer build bypassed (see _create_bulk_download_lambda_functions)
     CommonLibrariesLayer,
     SearchLayer,
-    ZipmergeLayer,
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
@@ -72,6 +71,9 @@ class AssetsProps:
     opensearch_index: str
     open_search_arn: str
     system_settings_table: str
+    # Internal application-service-events bus that AssetDeleted events are
+    # published to (consumed by collection cleanup and other downstream rules).
+    asset_events_bus: events.IEventBus
     # user_table: (
     #     dynamodb.Table
     # )
@@ -239,10 +241,15 @@ class AssetsConstruct(Construct):
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
-                    "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+                    "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
+                    "ASSET_EVENT_BUS_NAME": props.asset_events_bus.event_bus_name,
                 },
             ),
         )
+
+        # Allow the delete Lambda to publish AssetDeleted events to the internal
+        # application-service-events bus so downstream consumers can react.
+        props.asset_events_bus.grant_put_events_to(delete_asset_lambda.function)
 
         delete_asset_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -1255,7 +1262,13 @@ class AssetsConstruct(Construct):
     def _create_bulk_download_lambda_functions(self, props: AssetsProps):
         """Create Lambda functions for bulk download processing."""
         # Create the ZipmergeLayer for fast ZIP merging
-        ZipmergeLayer(self, "ZipmergeLayer")
+        # NOTE: Disabled to bypass the Go/Docker bundling build (requires network
+        # access to the Go module proxy, which is unreachable in some environments).
+        # The zipmerge binary is not currently used at runtime — bulk download zip
+        # operations are handled in pure Python via the standard-library `zipfile`
+        # module (see lambdas/.../append_to_zip/index.py). Re-enable and wire the
+        # layer into the relevant Lambda functions if/when zipmerge is actually used.
+        # ZipmergeLayer(self, "ZipmergeLayer")
 
         # Create SQS queue for multipart upload parts
         self._multipart_upload_queue = sqs.Queue(
@@ -2458,7 +2471,8 @@ class AssetsConstruct(Construct):
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,  # For TwelveLabs plugin
             "S3_VECTOR_INDEX": props.s3_vector_index_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,  # For TwelveLabs plugin
-            "SYSTEM_SETTINGS_TABLE": props.system_settings_table,
+            "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
+            "ASSET_EVENT_BUS_NAME": props.asset_events_bus.event_bus_name,
         }
 
         # Create the batch delete processor Lambda (worker)
@@ -2640,13 +2654,10 @@ class AssetsConstruct(Construct):
         )
 
         # Grant EventBridge permissions to processor Lambda (for publishing deletion events)
-        self._batch_delete_processor_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["events:PutEvents"],
-                resources=[
-                    f"arn:aws:events:{Stack.of(self).region}:{Stack.of(self).account}:event-bus/default"
-                ],
-            )
+        # Publishes AssetDeleted to the internal application-service-events bus so
+        # that custom rules (e.g. collection cleanup) can consume the events.
+        props.asset_events_bus.grant_put_events_to(
+            self._batch_delete_processor_lambda.function
         )
 
     def _create_batch_delete_state_machine(self, props: AssetsProps):

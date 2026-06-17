@@ -29,14 +29,28 @@ describe("usePortalEditorStore", () => {
   });
 
   describe("initialize", () => {
-    it("initialize() with no arg seeds defaults and clears dirty flag", () => {
+    it("initialize() with no arg seeds a default uploader page and clears dirty flag", () => {
       usePortalEditorStore.getState().initialize();
 
       const state = usePortalEditorStore.getState();
 
       expect(state.isInitialized).toBe(true);
       expect(state.isDirty).toBe(false);
-      expect(state.portalData).toBeNull();
+      // Create mode seeds a single Page 1 with the uploader (the only visible
+      // widget) plus an invisible destination-selector that auto-selects the
+      // sole destination, with empty fields/destinations — so the editor never
+      // starts from a "zero pages" state and the preview shows no phantom
+      // mock fields.
+      expect(state.portalData).not.toBeNull();
+      expect(state.portalData?.pages).toEqual([
+        {
+          pageNumber: 1,
+          title: "Page 1",
+          elements: [{ kind: "uploader" }],
+        },
+      ]);
+      expect(state.portalData?.metadataFields).toEqual([]);
+      expect(state.portalData?.destinations).toEqual([]);
       expect(state.appearance).toEqual(DEFAULT_PORTAL_APPEARANCE);
     });
 

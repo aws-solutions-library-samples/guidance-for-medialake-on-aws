@@ -182,6 +182,17 @@ class SettingsApi(Construct):
         add_cors_options_method(system_resource)
         add_cors_options_method(system_search_resource)
 
+        # /settings/system/metadata-fields resource
+        metadata_fields_resource = system_resource.add_resource("metadata-fields")
+
+        for method in ["GET", "PUT"]:
+            m = metadata_fields_resource.add_method(method, lambda_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        add_cors_options_method(metadata_fields_resource)
+
         # ===================================================================
         # /settings/api-keys resource and methods
         # ===================================================================
@@ -270,12 +281,44 @@ class SettingsApi(Construct):
             cfn_method.authorization_type = "CUSTOM"
             cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+            # /settings/portal-themes and /settings/portal-templates
+            portal_themes_resource = settings_resource.add_resource("portal-themes")
+            portal_theme_id_resource = portal_themes_resource.add_resource("{id}")
+            portal_templates_resource = settings_resource.add_resource(
+                "portal-templates"
+            )
+            portal_template_id_resource = portal_templates_resource.add_resource("{id}")
+
+            for collection_res in [
+                portal_themes_resource,
+                portal_templates_resource,
+            ]:
+                for method in ["GET", "POST"]:
+                    m = collection_res.add_method(method, portal_integration)
+                    cfn_method = m.node.default_child
+                    cfn_method.authorization_type = "CUSTOM"
+                    cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            for item_res in [
+                portal_theme_id_resource,
+                portal_template_id_resource,
+            ]:
+                for method in ["GET", "PUT", "DELETE"]:
+                    m = item_res.add_method(method, portal_integration)
+                    cfn_method = m.node.default_child
+                    cfn_method.authorization_type = "CUSTOM"
+                    cfn_method.authorizer_id = props.authorizer.authorizer_id
+
             for res in [
                 portals_resource,
                 portal_id_resource,
                 tokens_resource,
                 token_id_resource,
                 logo_resource,
+                portal_themes_resource,
+                portal_theme_id_resource,
+                portal_templates_resource,
+                portal_template_id_resource,
             ]:
                 add_cors_options_method(res)
 

@@ -86,7 +86,9 @@ def register_route(app):
                     IAC_ASSETS_BUCKET_NAME, result.s3_key
                 )
             except Exception:
-                logger.warning("Could not resolve logo URL", extra={"key": result.s3_key})
+                logger.warning(
+                    "Could not resolve logo URL", extra={"key": result.s3_key}
+                )
 
             return create_success_response(
                 data={"logoS3Key": result.s3_key, "logoUrl": logo_url},

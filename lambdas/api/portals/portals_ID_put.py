@@ -2,13 +2,26 @@
 
 import os
 import re
+import uuid
 
 import bcrypt
 from aws_lambda_powertools import Logger, Tracer
 from custom_exceptions import ForbiddenError
-from db_models import PortalMetadataModel, PortalSlugIndexModel
+from db_models import (
+    PortalDestinationModel,
+    PortalMetadataModel,
+    PortalSlugIndexModel,
+)
 from permission_utils import check_admin_permission, extract_user_context
-from portal_utils import INDEX_SK, METADATA_SK, get_portal_pk, get_slug_pk
+from portal_utils import (
+    DEST_SK_PREFIX,
+    INDEX_SK,
+    METADATA_SK,
+    _validate_portal_structure,
+    get_dest_sk,
+    get_portal_pk,
+    get_slug_pk,
+)
 from response_utils import create_error_response, create_success_response, now_iso
 
 logger = Logger(service="portals-id-put", level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -25,6 +38,66 @@ ACCESS_CONTROL_FIELDS = {
     "passphrase",
     "tokenBypassesPassphrase",
 }
+
+
+def _reconcile_destinations(portal_id: str, incoming: list[dict]) -> None:
+    """Diff-based reconcile of ``DEST#`` items for a portal.
+
+    Preconditions:  ``incoming`` is the full desired destination set (each
+                    item may carry a ``destinationId`` and ``pageNumber``).
+    Postconditions: every incoming destination is created or overwritten;
+                    every pre-existing ``DEST#`` item whose id is not in
+                    ``incoming`` is deleted; the portal is never left with
+                    zero destinations mid-operation because all upserts run
+                    strictly before any delete (Req 4.3 / Property 4).
+
+    The reconcile is idempotent: re-running with the same payload converges to
+    the same stored set (Req 4.6). It is NOT transactional across items, which
+    is acceptable for an admin-only config write. If any ``save()`` or
+    ``delete()`` raises partway through, the ids reconciled so far are logged
+    and the exception propagates so the handler returns 500 (Req 15.5).
+    """
+    pk = get_portal_pk(portal_id)
+    existing = {
+        d.destinationId: d
+        for d in PortalDestinationModel.query(
+            pk, PortalDestinationModel.SK.startswith(DEST_SK_PREFIX)
+        )
+    }
+    incoming_ids: set[str] = set()
+    succeeded_ids: list[str] = []
+
+    try:
+        # 1) Upsert every incoming destination FIRST (no zero-destination window).
+        for dest in incoming:
+            dest_id = dest.get("destinationId") or str(uuid.uuid4())
+            incoming_ids.add(dest_id)
+            d = PortalDestinationModel()
+            d.PK = pk
+            d.SK = get_dest_sk(dest_id)
+            d.destinationId = dest_id
+            d.friendlyName = dest.get("friendlyName", "")
+            d.connectorId = dest.get("connectorId", "")
+            d.rootPath = dest.get("rootPath", "/")
+            d.allowBrowsing = dest.get("allowBrowsing", False)
+            d.allowFolderCreation = dest.get("allowFolderCreation", False)
+            d.order = dest.get("order", 0)
+            d.pathSegments = dest.get("pathSegments")
+            d.pageNumber = dest.get("pageNumber")
+            d.save()  # full overwrite by PK+SK
+            succeeded_ids.append(dest_id)
+
+        # 2) Delete dest items no longer present — only after all upserts succeed.
+        for dest_id, item in existing.items():
+            if dest_id not in incoming_ids:
+                item.delete()
+                succeeded_ids.append(dest_id)
+    except Exception:
+        logger.exception(
+            "Destination reconcile failed partway through; succeeded ids=%s",
+            succeeded_ids,
+        )
+        raise
 
 
 def register_route(app):
@@ -48,6 +121,29 @@ def register_route(app):
                 )
 
             body = app.current_event.json_body or {}
+
+            # Reject a non-object appearance before any write (Req 14.6).
+            appearance = body.get("appearance")
+            if appearance is not None and not isinstance(appearance, dict):
+                return create_error_response(
+                    code="VALIDATION_ERROR",
+                    message="appearance must be an object",
+                    status_code=400,
+                    request_id=request_id,
+                )
+
+            # Enforce structural invariants server-side before any write, but
+            # only when structure-bearing fields are present in this update.
+            if any(k in body for k in ("pages", "destinations", "metadataFields")):
+                structure_error = _validate_portal_structure(body)
+                if structure_error:
+                    return create_error_response(
+                        code="VALIDATION_ERROR",
+                        message=structure_error,
+                        status_code=400,
+                        request_id=request_id,
+                    )
+
             now = now_iso()
             actions = [PortalMetadataModel.updatedAt.set(now)]
 
@@ -93,6 +189,8 @@ def register_route(app):
                 "maxFileSizeBytes": PortalMetadataModel.maxFileSizeBytes,
                 "maxFilesPerSession": PortalMetadataModel.maxFilesPerSession,
                 "captchaEnabled": PortalMetadataModel.captchaEnabled,
+                "appearance": PortalMetadataModel.appearance,
+                "pages": PortalMetadataModel.pages,
             }
             for field_name, attr in field_map.items():
                 if field_name in body:
@@ -112,6 +210,14 @@ def register_route(app):
                 actions.append(PortalMetadataModel.accessVersion.add(1))
 
             existing.update(actions=actions)
+
+            # Diff-based destination reconcile — only after metadata update
+            # succeeds, and only when destinations are part of this update.
+            # Upserts run strictly before deletes so a concurrent reader never
+            # observes zero destinations (Req 4.3). A mid-reconcile failure
+            # propagates to the outer handler and returns 500 (Req 15.5).
+            if "destinations" in body:
+                _reconcile_destinations(portal_id, body["destinations"])
 
             # Slug index operations — only after metadata update succeeds
             if old_slug and new_slug_value:

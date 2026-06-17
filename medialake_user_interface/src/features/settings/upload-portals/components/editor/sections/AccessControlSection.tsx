@@ -192,12 +192,20 @@ const AccessControlSection: React.FC = () => {
         <Box>
           <FormLabel>{t("uploadPortals.form.accessMode")}</FormLabel>
           <RadioGroup value={accessMode} onChange={handleAccessModeChange}>
-            <FormControlLabel value="public" control={<Radio />} label="Public" />
-            <FormControlLabel value="token-protected" control={<Radio />} label="Token Protected" />
+            <FormControlLabel
+              value="public"
+              control={<Radio />}
+              label={t("uploadPortals.form.accessModes.public")}
+            />
+            <FormControlLabel
+              value="token-protected"
+              control={<Radio />}
+              label={t("uploadPortals.form.accessModes.tokenProtected")}
+            />
             <FormControlLabel
               value="cognito-groups"
               control={<Radio />}
-              label="Authenticated (Cognito)"
+              label={t("uploadPortals.form.accessModes.cognitoGroups")}
             />
           </RadioGroup>
         </Box>
@@ -206,7 +214,7 @@ const AccessControlSection: React.FC = () => {
         {accessMode === "token-protected" && (
           <Stack spacing={2} sx={{ pl: 2 }}>
             <TextField
-              label="Passphrase"
+              label={t("uploadPortals.form.passphrase")}
               type={showPassword ? "text" : "password"}
               value={passphrase}
               onChange={handlePassphraseChange}
@@ -223,7 +231,7 @@ const AccessControlSection: React.FC = () => {
                       }}
                       onClick={() => setShowPassword((prev) => !prev)}
                     >
-                      {showPassword ? "Hide" : "Show"}
+                      {showPassword ? t("uploadPortals.form.hide") : t("uploadPortals.form.show")}
                     </Typography>
                   ),
                 },
@@ -233,7 +241,7 @@ const AccessControlSection: React.FC = () => {
               control={
                 <Switch checked={tokenBypassesPassphrase} onChange={handleTokenBypassChange} />
               }
-              label="Token bypasses passphrase"
+              label={t("uploadPortals.form.tokenBypassesPassphrase")}
             />
           </Stack>
         )}
@@ -248,7 +256,7 @@ const AccessControlSection: React.FC = () => {
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Allowed Groups"
+                label={t("uploadPortals.form.allowedGroups")}
                 placeholder={t("uploadPortals.form.selectGroups")}
                 size="small"
               />
@@ -260,7 +268,7 @@ const AccessControlSection: React.FC = () => {
         <Box>
           <FormControlLabel
             control={<Switch checked={ipEnabled} onChange={handleIpEnabledChange} />}
-            label="IP Allowlist"
+            label={t("uploadPortals.form.ipAllowlist")}
           />
           {ipEnabled && (
             <TextField
@@ -280,14 +288,14 @@ const AccessControlSection: React.FC = () => {
         <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControlLabel
             control={<Switch checked={isActive} onChange={handleIsActiveChange} />}
-            label="Active"
+            label={t("uploadPortals.form.active")}
           />
           <FormControlLabel
             control={<Switch checked={captchaEnabled} onChange={handleCaptchaEnabledChange} />}
-            label="CAPTCHA"
+            label={t("uploadPortals.form.captcha")}
           />
           <DatePicker
-            label="Expiry (optional)"
+            label={t("uploadPortals.form.expiryOptional")}
             value={expiresAtDate}
             onChange={handleExpiresAtChange}
             slotProps={{ textField: { size: "small" } }}

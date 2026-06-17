@@ -121,6 +121,7 @@ class LambdaDeployment(Construct):
                 destination_bucket=destination_bucket,
                 destination_key_prefix=destination_key_prefix,
                 extract=False,
+                prune=False,  # Disable pruning to avoid S3 50-tag limit on shared bucket
             )
 
     def _package_python_lambda(self, source_path, package_path, zip_path):

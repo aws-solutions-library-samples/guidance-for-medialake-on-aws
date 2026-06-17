@@ -27,6 +27,8 @@ const mapParameterTypeToFormType = (type: string): FormFieldDefinition["type"] =
       return "password";
     case "json_editor":
       return "json_editor";
+    case "keyvalue":
+      return "keyvalue";
     default:
       return "text";
   }

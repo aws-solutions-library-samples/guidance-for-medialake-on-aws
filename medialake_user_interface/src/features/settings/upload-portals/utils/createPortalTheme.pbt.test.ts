@@ -61,6 +61,7 @@ const appearanceArb: fc.Arbitrary<PortalAppearance> = fc.record({
     pageVerticalPadding: fc.integer({ min: 0, max: 120 }),
   }),
   branding: fc.record({
+    showLogo: fc.boolean(),
     logoSize: fc.integer({ min: 24, max: 120 }),
     logoAlignment: fc.constantFrom("left", "center") as fc.Arbitrary<"left" | "center">,
     showPoweredBy: fc.boolean(),

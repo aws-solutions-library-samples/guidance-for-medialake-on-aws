@@ -52,14 +52,26 @@ def register_route(app):
             # Delete group
             delete_collection_group(groups_table, groupId)
 
+            # Write-through delete to OpenSearch for immediate removal
+            try:
+                from utils.collections_opensearch_write import (
+                    delete_collection_group_document,
+                )
+
+                delete_collection_group_document(groupId)
+            except Exception as os_err:
+                logger.warning(
+                    "OpenSearch write-through delete failed for group — stream sync will retry",
+                    extra={"group_id": groupId, "error": str(os_err)},
+                )
+
             metrics.add_metric(
                 name="SuccessfulGroupDeletions", unit=MetricUnit.Count, value=1
             )
 
-            return {
-                "statusCode": 204,
-                "body": "",
-            }
+            from aws_lambda_powertools.event_handler import Response
+
+            return Response(status_code=204, body="")
 
         except (BadRequestError, ForbiddenError, NotFoundError):
             raise

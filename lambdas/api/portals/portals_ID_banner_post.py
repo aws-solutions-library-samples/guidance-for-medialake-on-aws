@@ -67,7 +67,9 @@ def register_route(app):
 
             # Update metadata; if this fails, clean up the uploaded object
             try:
-                item.update(actions=[PortalMetadataModel.bannerS3Key.set(result.s3_key)])
+                item.update(
+                    actions=[PortalMetadataModel.bannerS3Key.set(result.s3_key)]
+                )
             except Exception:
                 logger.warning("Metadata update failed after S3 upload, cleaning up")
                 delete_s3_object(result.s3_key)
@@ -86,7 +88,9 @@ def register_route(app):
                     IAC_ASSETS_BUCKET_NAME, result.s3_key
                 )
             except Exception:
-                logger.warning("Could not resolve banner URL", extra={"key": result.s3_key})
+                logger.warning(
+                    "Could not resolve banner URL", extra={"key": result.s3_key}
+                )
 
             return create_success_response(
                 data={"bannerS3Key": result.s3_key, "bannerUrl": banner_url},

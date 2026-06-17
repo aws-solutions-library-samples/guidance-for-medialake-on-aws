@@ -35,6 +35,23 @@ const localStorageMock = (() => {
 Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
 Object.defineProperty(globalThis, "sessionStorage", { value: localStorageMock });
 
+// --- ResizeObserver polyfill ---
+// jsdom does not implement ResizeObserver. SurveyJS's scroll component (mounted
+// whenever a full `<Survey>` renders, e.g. the live preview) calls it on mount,
+// so provide a no-op stub. Purely additive — jsdom defines no ResizeObserver.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    writable: true,
+    configurable: true,
+    value: ResizeObserverStub,
+  });
+}
+
 beforeEach(() => {
   localStorageMock.clear();
 });

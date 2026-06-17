@@ -1,10 +1,11 @@
 import hashlib
 import hmac as hmac_mod
 import json
+import logging
 import os
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 
@@ -214,7 +215,7 @@ def lambda_handler(event, context):
         detail = {
             "pipelineId": pipeline_id,
             "webhookRequestId": webhook_request_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "payload": parsed_body,
         }
         response = events.put_events(
@@ -232,6 +233,8 @@ def lambda_handler(event, context):
             raise RuntimeError(entry.get("ErrorMessage", "EventBridge error"))
         event_id = entry["EventId"]
     except Exception:
+        logger = logging.getLogger(__name__)
+        logger.exception("EventBridge publish failed")
         return {
             "statusCode": 502,
             "headers": CORS_HEADERS,

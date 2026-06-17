@@ -222,13 +222,24 @@ class SearchProviderConfig:
     type: Optional[str] = None
     dimensions: Optional[int] = None
     target_index: Optional[str] = None  # Target OpenSearch index for search queries
+    # Configurable Coactive endpoints (override defaults per response format)
+    search_endpoint: Optional[str] = None  # Coactive search API URL
+    dataset_endpoint: Optional[str] = None  # Coactive dataset management base URL
+    auth_endpoint: Optional[str] = None  # Coactive auth/login URL
+    response_format: Optional[str] = None  # Response format version ("v1" or "v2")
 
 
 def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:
     """
     Parse filters from query parameters into unified filter format.
     Handles both new unified filters and legacy parameters.
+
+    All filters are normalized so that:
+    - ``field`` is renamed to ``key`` (frontend sends ``field``, providers expect ``key``)
+    - Multiple ``term`` filters on the same key are grouped into a single ``in`` (OR)
     """
+    from metadata_filter_utils import normalize_filters
+
     filters = []
 
     # Parse JSON filters if provided
@@ -244,7 +255,7 @@ def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:
                         filters.append(
                             {"key": "mediaType", "operator": "in", "value": value}
                         )
-                    elif isinstance(value, dict) and "gte" in value or "lte" in value:
+                    elif isinstance(value, dict) and ("gte" in value or "lte" in value):
                         # Range filter
                         filters.append(
                             {"key": key, "operator": "range", "value": value}
@@ -253,7 +264,8 @@ def parse_filters_from_query_params(query_params: Dict[str, Any]) -> List[Dict]:
                         # Exact match filter
                         filters.append({"key": key, "operator": "==", "value": value})
             elif isinstance(parsed_filters, list):
-                filters.extend(parsed_filters)
+                # Normalize: field→key, group term→in
+                filters.extend(normalize_filters(parsed_filters))
         except (json.JSONDecodeError, TypeError):
             pass
 

@@ -3,21 +3,10 @@
 import time
 from typing import Any, Dict
 
+from auth_utils import get_authenticated_user_id
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
-
-
-class ErrorResponse(BaseModel):
-    status: str = Field(..., description="Error status code")
-    message: str = Field(..., description="Error message")
-    data: Dict = Field(default={}, description="Empty data object for errors")
-
-
-class SettingResponse(BaseModel):
-    status: str = Field(..., description="Success status code")
-    message: str = Field(..., description="Success message")
-    data: Dict[str, Any] = Field(..., description="Updated setting data")
+from response_utils import error_response, success_response
 
 
 def _update_user_setting(
@@ -34,14 +23,12 @@ def _update_user_setting(
     Update a specific user setting in DynamoDB
     """
     try:
-        # Format the userId and itemKey according to the schema
         formatted_user_id = f"USER#{user_id}"
         item_key = f"SETTING#{namespace}#{key}"
 
         table = dynamodb.Table(table_name)
         current_time = int(time.time())
 
-        # Create the item to be saved
         item = {
             "userId": formatted_user_id,
             "itemKey": item_key,
@@ -51,10 +38,8 @@ def _update_user_setting(
             "updatedAt": current_time,
         }
 
-        # Save the item
         table.put_item(Item=item)
 
-        # Return the setting data without the DynamoDB keys
         return {
             "userId": user_id,
             "namespace": namespace,
@@ -64,22 +49,9 @@ def _update_user_setting(
         }
 
     except ClientError as e:
-        logger.error(f"DynamoDB error", extra={"error": str(e)})
+        logger.error("DynamoDB error", extra={"error": str(e)})
         metrics.add_metric(name="DynamoDBError", unit=MetricUnit.Count, value=1)
         raise
-
-
-def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
-    """
-    Create standardized error response
-    """
-    error_response = ErrorResponse(status=str(status_code), message=message, data={})
-
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": error_response.model_dump_json(),
-    }
 
 
 def handle_put_setting(
@@ -96,36 +68,28 @@ def handle_put_setting(
     Lambda handler to update a specific user setting in DynamoDB
     """
     try:
-        # Extract user ID from Cognito authorizer context
-        request_context = app.current_event.raw_event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-        claims = authorizer.get("claims", {})
-
-        # Get the user ID from the Cognito claims
-        user_id = claims.get("sub")
+        user_id = get_authenticated_user_id(app, logger)
 
         if not user_id:
-            logger.error("Missing user_id in Cognito claims")
             metrics.add_metric(
                 name="MissingUserIdError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Unable to identify user")
+            return error_response(400, "Unable to identify user")
 
         if not user_table_name:
             logger.error("USER_TABLE_NAME environment variable not set")
             metrics.add_metric(
                 name="MissingConfigError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(500, "Internal configuration error")
+            return error_response(500, "Internal configuration error")
 
         if not namespace or not key:
             logger.error("Missing namespace or key in path parameters")
             metrics.add_metric(
                 name="MissingParametersError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Missing namespace or key parameters")
+            return error_response(400, "Missing namespace or key parameters")
 
-        # Parse the request body
         try:
             setting_data = app.current_event.json_body
         except Exception:
@@ -133,19 +97,15 @@ def handle_put_setting(
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(400, "Invalid request body format")
+            return error_response(400, "Invalid request body format")
 
-        # Validate the setting data
         if not isinstance(setting_data, dict) or "value" not in setting_data:
             logger.error("Request body is missing 'value' field")
             metrics.add_metric(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
-            return _create_error_response(
-                400, "Request body must contain a 'value' field"
-            )
+            return error_response(400, "Request body must contain a 'value' field")
 
-        # Update the user setting in DynamoDB
         updated_setting = _update_user_setting(
             dynamodb,
             user_table_name,
@@ -157,13 +117,6 @@ def handle_put_setting(
             metrics,
         )
 
-        # Create success response
-        response = SettingResponse(
-            status="200",
-            message="User setting updated successfully",
-            data=updated_setting,
-        )
-
         logger.info(
             "Successfully updated user setting",
             extra={"user_id": user_id, "namespace": namespace, "key": key},
@@ -172,7 +125,6 @@ def handle_put_setting(
             name="SuccessfulSettingUpdate", unit=MetricUnit.Count, value=1
         )
 
-        # Audit event for setting update
         logger.info(
             "Audit: User setting updated",
             extra={
@@ -184,13 +136,11 @@ def handle_put_setting(
             },
         )
 
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": response.model_dump_json(),
-        }
+        return success_response(
+            200, "User setting updated successfully", updated_setting
+        )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error processing request")
         metrics.add_metric(name="UnhandledError", unit=MetricUnit.Count, value=1)
-        return _create_error_response(500, f"Internal server error: {str(e)}")
+        return error_response(500, "Internal server error")

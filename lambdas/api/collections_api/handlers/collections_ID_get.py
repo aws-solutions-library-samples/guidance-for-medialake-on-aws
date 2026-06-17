@@ -4,7 +4,9 @@ import os
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import (
+    NotFoundError,
+)
 from aws_lambda_powertools.metrics import MetricUnit
 from collections_utils import (
     COLLECTION_PK_PREFIX,
@@ -13,6 +15,7 @@ from collections_utils import (
     create_success_response,
     format_collection_item,
     get_collection_item_count,
+    get_user_collection_role,
 )
 from db_models import CollectionModel
 from pynamodb.exceptions import DoesNotExist
@@ -69,6 +72,7 @@ def register_route(app):
         """Get collection details with optional includes"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
 
             # Get collection from DynamoDB using PynamoDB
             try:
@@ -77,6 +81,14 @@ def register_route(app):
                 )
             except DoesNotExist:
                 raise NotFoundError(f"Collection '{collection_id}' not found")
+
+            # Access control: only owner, public, or shared-with users can view
+            if not collection.isPublic:
+                if collection.ownerId != user_id:
+                    # Check PERM# record in DynamoDB for shared access
+                    role = get_user_collection_role(collection, user_id)
+                    if role is None:
+                        raise NotFoundError(f"Collection '{collection_id}' not found")
 
             # Get dynamic item count (returns -1 on error)
             dynamic_item_count = get_collection_item_count(
@@ -104,7 +116,12 @@ def register_route(app):
             if collection.parentId:
                 collection_dict["parentId"] = collection.parentId
             if collection.customMetadata:
-                collection_dict["customMetadata"] = dict(collection.customMetadata)
+                try:
+                    collection_dict["customMetadata"] = dict(
+                        collection.customMetadata.attribute_values
+                    )
+                except (AttributeError, ValueError):
+                    collection_dict["customMetadata"] = dict(collection.customMetadata)
             if collection.tags:
                 collection_dict["tags"] = list(collection.tags)
             if collection.expiresAt:
@@ -118,6 +135,15 @@ def register_route(app):
                 collection_dict["thumbnailS3Key"] = collection.thumbnailS3Key
 
             formatted_collection = format_collection_item(collection_dict, user_context)
+
+            # Enrich with the requesting user's role on this collection
+            if user_id:
+                user_role = get_user_collection_role(collection, user_id)
+                if user_role:
+                    formatted_collection["userRole"] = user_role.lower()
+                    if user_role not in ("OWNER",):
+                        formatted_collection["sharedWithMe"] = True
+                        formatted_collection["myRole"] = user_role
 
             # Add ancestors to the response
             ancestors = get_collection_ancestors(collection_id)

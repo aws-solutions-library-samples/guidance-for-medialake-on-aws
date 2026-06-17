@@ -21,9 +21,17 @@ import {
   useUpdatePortal,
   useUploadPortalLogo,
 } from "@/api/hooks/usePortals";
-import type { Portal } from "@/api/types/api.types";
+import { useGetTemplate } from "@/api/hooks/useTemplates";
+import { useGetTheme } from "@/api/hooks/useThemes";
+import { useGetConnectors } from "@/api/hooks/useConnectors";
+import type { Portal, PortalDestination, PortalTemplate, PortalTheme } from "@/api/types/api.types";
 import { usePortalEditorStore } from "../stores/usePortalEditorStore";
+import {
+  describeDestination,
+  findMissingConnectorDestinations,
+} from "../utils/findMissingConnectorDestinations";
 import PortalEditorToolbar from "../components/editor/PortalEditorToolbar";
+import PortalEditorThemeTemplateActions from "../components/editor/PortalEditorThemeTemplateActions";
 import PortalEditorSidebar from "../components/editor/PortalEditorSidebar";
 import PortalEditorPreview from "../components/editor/PortalEditorPreview";
 import { readFileAsBase64 } from "../utils/readFileAsBase64";
@@ -38,6 +46,8 @@ import type { EditorSection, PreviewMode } from "../stores/usePortalEditorStore"
 const SECTION_ORDER: EditorSection[] = [
   "branding",
   "content",
+  "pages",
+  "fields",
   "appearance",
   "typography",
   "layout",
@@ -135,6 +145,13 @@ const PortalEditorPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isCreateMode = !id || id === "new";
   const duplicateId = isCreateMode ? searchParams.get("duplicate") ?? "" : "";
+  // Create-from-template / apply-theme seeding (task 17.3). When the create
+  // route carries `?template=<id>` and/or `?theme=<id>`, we fetch the full
+  // entities and seed the editor via `store.initializeFromSources` (snapshot,
+  // copy-on-create — Requirements 16.5, 17.4). These are ignored outside
+  // create mode.
+  const seedTemplateId = isCreateMode ? searchParams.get("template") ?? "" : "";
+  const seedThemeId = isCreateMode ? searchParams.get("theme") ?? "" : "";
 
   // Skip the request in create mode by passing an empty string (the hook is
   // gated on `enabled: !!id`).
@@ -145,7 +162,20 @@ const PortalEditorPage: React.FC = () => {
   const duplicateQuery = useGetPortal(duplicateId);
   const duplicatePortal = duplicateQuery.data?.data as Portal | undefined;
 
+  // Fetch the seed template/theme when creating-from (task 17.3).
+  const seedTemplateQuery = useGetTemplate(seedTemplateId);
+  const seedTemplate = seedTemplateQuery.data?.data as PortalTemplate | undefined;
+  const seedThemeQuery = useGetTheme(seedThemeId);
+  const seedTheme = seedThemeQuery.data?.data as PortalTheme | undefined;
+
+  // Current connector list (task 17.4). Used AFTER create-from-template
+  // seeding to detect seeded destinations whose `connectorId` no longer
+  // resolves to a real connector. We always run the query (the hook is
+  // cheap and shared) but only act on it in create-from-template mode.
+  const connectorsQuery = useGetConnectors();
+
   const initialize = usePortalEditorStore((s) => s.initialize);
+  const initializeFromSources = usePortalEditorStore((s) => s.initializeFromSources);
   const acknowledgeRestoredDraft = usePortalEditorStore((s) => s.acknowledgeRestoredDraft);
   const hasRestoredDraft = usePortalEditorStore((s) => s.hasRestoredDraft);
   const portalName = usePortalEditorStore((s) => (s.portalData?.name as string | undefined) ?? "");
@@ -160,6 +190,13 @@ const PortalEditorPage: React.FC = () => {
   const undo = usePortalEditorStore((s) => s.undo);
   const redo = usePortalEditorStore((s) => s.redo);
 
+  // Subscribe to the seeded destinations so the missing-connector check
+  // (task 17.4) re-runs when the admin reselects a connector. Typed loosely
+  // on the store, so narrow back to `PortalDestination[]` here.
+  const destinations = usePortalEditorStore(
+    (s) => (s.portalData?.destinations as PortalDestination[] | undefined) ?? undefined
+  );
+
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < historyLength - 1;
 
@@ -172,6 +209,16 @@ const PortalEditorPage: React.FC = () => {
     message: "",
     severity: "success",
   });
+
+  /**
+   * Create-from-template missing-connector warning (task 17.4 / Requirement
+   * 17.8). Holds the friendly names of seeded destinations whose `connectorId`
+   * is not present in the current connector list, or `null` when there is
+   * nothing to warn about. This is a NON-BLOCKING, informational prompt — it
+   * never blocks Save and never mutates the seeded snapshot. The admin can
+   * dismiss it; reselecting a connector recomputes it automatically.
+   */
+  const [missingConnectorNames, setMissingConnectorNames] = useState<string[] | null>(null);
 
   // `useBlocker` needs a stable predicate; capture the latest `isDirty`
   // through a ref so the predicate never has to be re-registered just
@@ -195,6 +242,33 @@ const PortalEditorPage: React.FC = () => {
           logoFile: null,
         });
         usePortalEditorStore.setState({ isDirty: true });
+        return;
+      }
+
+      // Handle create-from-template / apply-theme seeding (task 17.3). We wait
+      // until any requested source has resolved before seeding so the snapshot
+      // is complete. `initializeFromSources` resolves the appearance layering
+      // (DEFAULT → template/its theme → selected theme) and deep-clones the
+      // template structure (snapshot, no live link — Property 11).
+      //
+      // Task 17.4 (create-from-template MISSING-CONNECTOR warning) runs in a
+      // SEPARATE effect below, AFTER this seeding: it compares each seeded
+      // destination's `connectorId` against the current connector list and
+      // surfaces a non-blocking warning. The check is intentionally NOT done
+      // here so it can also re-run when the admin reselects a connector or the
+      // connector query resolves late — and so seeding stays purely a snapshot
+      // (no mutation of the seeded destinations).
+      if (seedTemplateId || seedThemeId) {
+        const templateReady = !seedTemplateId || !!seedTemplate;
+        const themeReady = !seedThemeId || !!seedTheme;
+        if (!templateReady || !themeReady) {
+          // Still loading the source(s); don't seed defaults yet.
+          return;
+        }
+        initializeFromSources({
+          template: seedTemplate,
+          theme: seedTheme,
+        });
         return;
       }
 
@@ -228,7 +302,61 @@ const PortalEditorPage: React.FC = () => {
       if (draftMatchesPortal) return;
       initialize(portal as unknown as Parameters<typeof initialize>[0]);
     }
-  }, [isCreateMode, portal, initialize, duplicateId, duplicatePortal]);
+  }, [
+    isCreateMode,
+    portal,
+    initialize,
+    initializeFromSources,
+    duplicateId,
+    duplicatePortal,
+    seedTemplateId,
+    seedTemplate,
+    seedThemeId,
+    seedTheme,
+  ]);
+
+  // ---- Create-from-template missing-connector warning (task 17.4) ------
+  //
+  // Requirement 17.8: a Template captures each destination's `connectorId`
+  // verbatim, so a Portal seeded from a Template can reference a connector
+  // that does not exist in this environment (templates may be authored in a
+  // different account/region, or the connector may have been deleted). After
+  // seeding, we compare each seeded destination's `connectorId` against the
+  // CURRENT connector list and surface a NON-BLOCKING warning naming the
+  // affected destination(s), prompting the admin to reselect before saving.
+  //
+  // Snapshot semantics are unchanged (Property 11): this effect is purely
+  // informational — it never mutates the seeded destinations or clears a
+  // `connectorId`; it only computes a list of names for the banner.
+  //
+  // We gate on the connectors query having RESOLVED (`isSuccess`) so we don't
+  // false-positive while the list is still fetching. Reselecting a connector
+  // updates `destinations`, which re-runs this effect and clears the warning
+  // once every destination resolves.
+  const fromTemplate = isCreateMode && !!seedTemplateId;
+  const connectorsResolved = connectorsQuery.isSuccess;
+  const availableConnectorIds = connectorsQuery.data?.data?.connectors;
+
+  useEffect(() => {
+    // Only meaningful when creating from a template and the connector list
+    // has resolved. Outside that path, ensure no stale warning lingers.
+    if (!fromTemplate || !connectorsResolved) {
+      return;
+    }
+
+    const connectorIds = (availableConnectorIds ?? []).map((connector) => connector.id);
+    const missing = findMissingConnectorDestinations(destinations, connectorIds);
+
+    if (missing.length === 0) {
+      setMissingConnectorNames(null);
+      return;
+    }
+
+    const names = missing.map((destination) =>
+      describeDestination(destination, (destinations ?? []).indexOf(destination))
+    );
+    setMissingConnectorNames(names);
+  }, [fromTemplate, connectorsResolved, availableConnectorIds, destinations]);
 
   // ---- Focus management (task 5.14) ------------------------------------
   //
@@ -595,6 +723,11 @@ const PortalEditorPage: React.FC = () => {
           canRedo={canRedo}
           onUndo={undo}
           onRedo={redo}
+          extraActions={
+            <PortalEditorThemeTemplateActions
+              onNotify={(message, severity) => setToast({ open: true, message, severity })}
+            />
+          }
         />
       </Box>
 
@@ -611,6 +744,30 @@ const PortalEditorPage: React.FC = () => {
         <Box sx={{ flexShrink: 0, px: 2, pt: 1 }}>
           <Alert severity="info" onClose={acknowledgeRestoredDraft} role="status">
             Restored unsaved changes from your last session.
+          </Alert>
+        </Box>
+      ) : null}
+
+      {/*
+       * Create-from-template missing-connector warning (Requirement 17.8 /
+       * task 17.4).
+       *
+       * Shown when a Portal was seeded from a Template and one or more seeded
+       * destinations reference a `connectorId` that is not in the current
+       * connector list. It is NON-BLOCKING: the admin can still edit and save
+       * — this only prompts them to reselect a connector for the named
+       * destination(s) before saving. Reselecting a valid connector (or
+       * dismissing) clears the banner. The seeded snapshot is never mutated by
+       * this warning.
+       */}
+      {missingConnectorNames && missingConnectorNames.length > 0 ? (
+        <Box sx={{ flexShrink: 0, px: 2, pt: 1 }}>
+          <Alert severity="warning" role="alert" onClose={() => setMissingConnectorNames(null)}>
+            {missingConnectorNames.length === 1
+              ? `The connector for "${missingConnectorNames[0]}" isn't available in this environment. Reselect a connector for this destination before saving.`
+              : `The connectors for these destinations aren't available in this environment: ${missingConnectorNames
+                  .map((name) => `"${name}"`)
+                  .join(", ")}. Reselect a connector for each before saving.`}
           </Alert>
         </Box>
       ) : null}

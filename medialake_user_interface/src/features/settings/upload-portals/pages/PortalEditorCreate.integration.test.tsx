@@ -165,6 +165,7 @@ describe("PortalEditorPage create flow (integration)", () => {
           isActive: false,
           metadataFields: (sent.metadataFields as Portal["metadataFields"]) ?? [],
           destinations: (sent.destinations as Portal["destinations"]) ?? [],
+          pages: (sent.pages as Portal["pages"]) ?? [],
           captchaEnabled: false,
           createdBy: "test-user",
           createdAt: "2024-01-01T00:00:00Z",
@@ -179,9 +180,12 @@ describe("PortalEditorPage create flow (integration)", () => {
     // In create mode `PortalEditorPage` seeds defaults synchronously via
     // `store.initialize()`. Wait for that before seeding required fields
     // so our `setState` patch doesn't get blown away by `initialize`.
-    await waitFor(() => {
-      expect(usePortalEditorStore.getState().isInitialized).toBe(true);
-    });
+    await waitFor(
+      () => {
+        expect(usePortalEditorStore.getState().isInitialized).toBe(true);
+      },
+      { timeout: 5000 }
+    );
 
     // Seed required fields so `store.validate()` passes on Save.
     // Using `setState` directly (wrapped in `act` for React's sake)
@@ -192,6 +196,18 @@ describe("PortalEditorPage create flow (integration)", () => {
           name: "New Portal",
           slug: "new-portal",
           destinations: [SEED_DESTINATION],
+          // `store.validate()` (task 12.2) enforces the page-structure
+          // invariants (contiguous pageNumbers, exactly one uploader,
+          // reference integrity) before the POST fires. Seed a minimal valid
+          // single-page layout hosting the uploader so validation passes and
+          // the create request is sent.
+          pages: [
+            {
+              pageNumber: 1,
+              title: "Upload",
+              elements: [{ kind: "destination-selector" }, { kind: "uploader" }],
+            },
+          ],
         },
       });
       // Save is gated on `isDirty`. A real user interaction would flip
@@ -200,9 +216,12 @@ describe("PortalEditorPage create flow (integration)", () => {
       usePortalEditorStore.getState().updateColor("primary", "#ff0000");
     });
 
-    await waitFor(() => {
-      expect(usePortalEditorStore.getState().isDirty).toBe(true);
-    });
+    await waitFor(
+      () => {
+        expect(usePortalEditorStore.getState().isDirty).toBe(true);
+      },
+      { timeout: 5000 }
+    );
 
     // Click Save.
     const user = userEvent.setup();
@@ -244,8 +263,11 @@ describe("PortalEditorPage create flow (integration)", () => {
 
     // After the mutation resolves, the editor navigates to `/:id/edit`.
     // The stub renders `edit-route-{id}` so we can pin the exact target.
-    await waitFor(() => {
-      expect(screen.getByTestId(`edit-route-${NEW_PORTAL_ID}`)).toBeInTheDocument();
-    });
-  });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId(`edit-route-${NEW_PORTAL_ID}`)).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
+  }, 15000);
 });

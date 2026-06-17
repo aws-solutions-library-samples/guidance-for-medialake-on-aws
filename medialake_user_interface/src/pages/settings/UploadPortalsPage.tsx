@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { Alert, Box, Button, Snackbar } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { Alert, Box, Snackbar } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import PortalsList from "@/features/settings/upload-portals/components/PortalsList";
 import TokenManager from "@/features/settings/upload-portals/components/TokenManager";
+import CreatePortalMenu from "@/features/settings/upload-portals/components/CreatePortalMenu";
+import UploadPortalsSubNav from "@/features/settings/upload-portals/components/UploadPortalsSubNav";
 import type { PortalListItem } from "@/api/types/api.types";
 
 /**
@@ -22,7 +22,6 @@ import type { PortalListItem } from "@/api/types/api.types";
  */
 const UploadPortalsPage: React.FC = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const createPermission = useActionPermission("manage", "settings");
 
   const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
@@ -34,8 +33,6 @@ const UploadPortalsPage: React.FC = () => {
   const [alert, setAlert] = useState<{ message: string; severity: "success" | "error" } | null>(
     null
   );
-
-  const handleCreateClick = () => navigate("/settings/upload-portals/new");
 
   const handleOpenTokenManager = (
     portalId: string,
@@ -52,19 +49,12 @@ const UploadPortalsPage: React.FC = () => {
         title={t("uploadPortals.pageTitle")}
         description={t("uploadPortals.pageDescription")}
         action={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreateClick}
-            disabled={createPermission.disabled}
-            title={createPermission.tooltip}
-          >
-            {t("uploadPortals.createPortal")}
-          </Button>
+          <CreatePortalMenu disabled={createPermission.disabled} title={createPermission.tooltip} />
         }
       />
 
       <PageContent>
+        <UploadPortalsSubNav active="portals" />
         <PortalsList onOpenTokenManager={handleOpenTokenManager} />
       </PageContent>
 

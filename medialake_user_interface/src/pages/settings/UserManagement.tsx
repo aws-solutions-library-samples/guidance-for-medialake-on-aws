@@ -19,6 +19,7 @@ import {
   useDeleteUser,
   useDisableUser,
   useEnableUser,
+  useResetPassword,
 } from "@/api/hooks/useUsers";
 import { useGetGroups } from "@/api/hooks/useGroups";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
@@ -58,6 +59,7 @@ const UserManagement: React.FC = () => {
   const deleteUserMutation = useDeleteUser();
   const disableUserMutation = useDisableUser();
   const enableUserMutation = useEnableUser();
+  const resetPasswordMutation = useResetPassword();
 
   React.useEffect(() => {
     if (editingUser && users) {
@@ -174,6 +176,21 @@ const UserManagement: React.FC = () => {
     );
   };
 
+  const handleResetPassword = async (username: string) => {
+    await handleMutation(
+      {
+        mutation: resetPasswordMutation,
+        actionMessages: {
+          loading: t("users.apiMessages.resettingPassword.loading"),
+          success: t("users.apiMessages.resettingPassword.success"),
+          successMessage: t("users.apiMessages.resettingPassword.successMessage"),
+          error: t("users.apiMessages.resettingPassword.error"),
+        },
+      },
+      username
+    );
+  };
+
   return (
     <Box
       sx={{
@@ -247,6 +264,7 @@ const UserManagement: React.FC = () => {
           onEditUser={editUserPermission.allowed ? handleEditUser : undefined}
           onDeleteUser={deleteUserPermission.allowed ? handleDeleteUser : undefined}
           onToggleUserStatus={disableUserPermission.allowed ? handleToggleUserStatus : undefined}
+          onResetPassword={editUserPermission.allowed ? handleResetPassword : undefined}
           activeFilters={activeFilters}
           activeSorting={activeSorting}
           handleMutation={handleMutation}

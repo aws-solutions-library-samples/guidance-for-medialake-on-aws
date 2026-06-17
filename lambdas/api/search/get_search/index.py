@@ -1,6 +1,8 @@
 import concurrent.futures
 import json
+import math
 import os
+import re
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -44,14 +46,61 @@ THUMBNAIL_INDEX = int(os.getenv("THUMBNAIL_INDEX", "2"))
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 500
 
+# Required source fields returned for every search hit
+REQUIRED_SOURCE_FIELDS: List[str] = [
+    "InventoryID",
+    "DigitalSourceAsset.Type",
+    "DigitalSourceAsset.MainRepresentation.Format",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
+    "DigitalSourceAsset.CreateDate",
+    "DerivedRepresentations.Purpose",
+    "DerivedRepresentations.StorageInfo.PrimaryLocation",
+    "Metadata.Consolidated.type",
+]
+
+# Maximum number of dynamic facet fields from metadata config
+MAX_FACET_FIELDS = 25
+
 # Storage identifier field configuration
 STORAGE_IDENTIFIER_FIELD = (
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket"
 )
 
+# Keys already captured by AssetSearchResult — used to merge extra _source fields
+_KNOWN_SOURCE_KEYS = frozenset(
+    {
+        "InventoryID",
+        "DigitalSourceAsset",
+        "DerivedRepresentations",
+        "FileHash",
+        "Metadata",
+    }
+)
+
 # Initialize AWS clients and utilities
 logger = Logger()
 metrics = Metrics()
+
+# Global DynamoDB resource — reused across all functions in this module
+_dynamodb_resource = boto3.resource("dynamodb")
+
+# Module-level singleton for EmbeddingStoreFactory (avoids per-call DynamoDB lookups)
+_embedding_store_factory = None
+
+
+def _get_embedding_store_factory():
+    """Get or create the singleton EmbeddingStoreFactory instance."""
+    global _embedding_store_factory
+    if _embedding_store_factory is None:
+        from embedding_store_factory import EmbeddingStoreFactory
+
+        _embedding_store_factory = EmbeddingStoreFactory(logger, metrics)
+    return _embedding_store_factory
+
 
 # Initialize unified search orchestrator
 unified_search_orchestrator = None
@@ -98,7 +147,7 @@ class BaseModelWithConfig(BaseModel):
 class SearchParams(BaseModelWithConfig):
     """Pydantic model for search parameters"""
 
-    q: str = Field(..., min_length=1)
+    q: str = Field(default="", min_length=0)
     page: conint(gt=0) = Field(default=1)  # type: ignore
     pageSize: conint(gt=0, le=MAX_PAGE_SIZE) = Field(default=DEFAULT_PAGE_SIZE)  # type: ignore
     min_score: float = Field(default=0.01)
@@ -126,6 +175,27 @@ class SearchParams(BaseModelWithConfig):
 
     # Semantic search modality (Marengo 3.0): comma-separated visual,audio,transcript
     searchModality: Optional[str] = Field(default="visual")
+
+    @field_validator("filters", mode="before")
+    @classmethod
+    def parse_filters(cls, v: Any) -> Optional[List[Dict]]:
+        """Parse filters from JSON string if needed"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                logger.warning(f"filters JSON parsed to non-list type: {type(parsed)}")
+                return []
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse filters JSON string: {v}")
+                return []
+        logger.warning(f"Unexpected filters type: {type(v)}")
+        return []
 
     @model_validator(mode="before")
     @classmethod
@@ -241,9 +311,8 @@ class SearchMetadata(BaseModelWithConfig):
     totalResults: int
     page: int
     pageSize: int
-    searchTerm: str
     facets: Optional[Dict[str, Any]] = None
-    suggestions: Optional[Dict[str, Any]] = None
+    facetsInfo: Optional[Dict[str, Any]] = None
 
 
 class SearchResponse(BaseModelWithConfig):
@@ -259,16 +328,22 @@ _opensearch_client = None
 
 
 def get_opensearch_client() -> OpenSearch:
-    """Create and return a cached OpenSearch client with optimized settings."""
+    """Create and return a cached OpenSearch client with optimized settings.
+
+    Uses refreshable credentials so that long-lived Lambda containers never
+    sign requests with expired IAM tokens.
+    """
     global _opensearch_client
 
     if _opensearch_client is None:
+        from refreshable_auth import get_refreshable_credentials
+
         host = os.environ["OPENSEARCH_ENDPOINT"].replace("https://", "")
         region = os.environ["AWS_REGION"]
         service_scope = os.environ["SCOPE"]
 
         auth = RequestsAWSV4SignerAuth(
-            boto3.Session().get_credentials(), region, service_scope
+            get_refreshable_credentials(), region, service_scope
         )
 
         _opensearch_client = OpenSearch(
@@ -287,75 +362,101 @@ def get_opensearch_client() -> OpenSearch:
     return _opensearch_client
 
 
-def verify_opensearch_field_exists(
-    client: OpenSearch, index_name: str, field_path: str
-) -> bool:
-    """
-    Verify that a field exists in the OpenSearch index mapping.
+# Cache for metadata fields config with version-based invalidation.
+# Instead of a blind TTL, we do a lightweight DynamoDB read of just the
+# `updatedAt` timestamp on each request.  If it matches the cached version
+# we skip the full fetch.  This guarantees immediate consistency when
+# someone saves new field config via the settings API, while still
+# avoiding the cost of fetching the full fields array on every search.
+_metadata_fields_cache: Optional[List[Dict]] = None
+_metadata_fields_cache_version: Optional[str] = None  # updatedAt value
 
-    This function checks if a specific field path exists in the OpenSearch index
-    mapping structure. It's used to validate that expected fields are present
-    before constructing queries that depend on them.
 
-    Args:
-        client: OpenSearch client instance
-        index_name: Name of the OpenSearch index to check
-        field_path: Dot-notation field path to verify (e.g., "DigitalSourceAsset.Type")
-
-    Returns:
-        True if the field exists in the mapping, False otherwise
-
-    Note:
-        This function logs a warning if the field doesn't exist but doesn't raise
-        an exception, allowing queries to continue with potentially degraded results.
-    """
+def _get_metadata_fields_version() -> Optional[str]:
+    """Lightweight DynamoDB read that returns only the updatedAt timestamp."""
     try:
-        # Get the index mapping
-        mapping_response = client.indices.get_mapping(index=index_name)
-
-        # Navigate through the mapping structure
-        # The response structure is: {index_name: {"mappings": {"properties": {...}}}}
-        if index_name not in mapping_response:
-            logger.warning(f"Index {index_name} not found in mapping response")
-            return False
-
-        mappings = mapping_response[index_name].get("mappings", {})
-        properties = mappings.get("properties", {})
-
-        # Split the field path and navigate through nested properties
-        field_parts = field_path.split(".")
-        current_level = properties
-
-        for part in field_parts:
-            if part not in current_level:
-                logger.warning(
-                    f"Field path component '{part}' not found in mapping. "
-                    f"Full path: {field_path}"
-                )
-                return False
-
-            # Move to the next level
-            field_info = current_level[part]
-            if "properties" in field_info:
-                current_level = field_info["properties"]
-            elif part == field_parts[-1]:
-                # We've reached the final field
-                return True
-            else:
-                # Field exists but has no nested properties when we expect more
-                logger.warning(
-                    f"Field '{part}' exists but has no nested properties. "
-                    f"Cannot continue to verify full path: {field_path}"
-                )
-                return False
-
-        return True
-
-    except Exception as e:
-        logger.warning(
-            f"Could not verify field {field_path} in index {index_name}: {str(e)}"
+        table = _dynamodb_resource.Table(os.environ["SYSTEM_SETTINGS_TABLE_NAME"])
+        resp = table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "METADATA_FIELDS"},
+            ProjectionExpression="updatedAt",
+            ConsistentRead=True,
         )
-        return False
+        item = resp.get("Item")
+        return item.get("updatedAt") if item else None
+    except Exception:
+        logger.warning("Failed to check metadata fields version")
+        return None
+
+
+def fetch_metadata_fields_config() -> Optional[List[Dict]]:
+    """Fetch metadata fields configuration from DynamoDB.
+
+    Uses a version-stamp check so the cache is invalidated immediately
+    when someone updates the config via the settings API, while still
+    avoiding a full DynamoDB read on every search request when nothing
+    has changed.
+    """
+    global _metadata_fields_cache, _metadata_fields_cache_version
+
+    current_version = _get_metadata_fields_version()
+
+    # Cache hit — version hasn't changed
+    if (
+        _metadata_fields_cache is not None
+        and current_version is not None
+        and current_version == _metadata_fields_cache_version
+    ):
+        return _metadata_fields_cache
+
+    # Cache miss or version changed — full fetch
+    try:
+        table = _dynamodb_resource.Table(os.environ["SYSTEM_SETTINGS_TABLE_NAME"])
+        resp = table.get_item(
+            Key={"PK": "SYSTEM_SETTINGS", "SK": "METADATA_FIELDS"},
+        )
+        item = resp.get("Item")
+        result = item.get("fields") if item else None
+        _metadata_fields_cache = result
+        _metadata_fields_cache_version = current_version
+        return result
+    except Exception:
+        logger.exception("Failed to fetch metadata fields config from DynamoDB")
+        return None
+
+
+def build_dynamic_aggregations(
+    fields: List[Dict],
+) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    """Build dynamic aggregations from metadata fields config.
+
+    Returns (aggs_dict, facets_info_or_none).
+    """
+    filterable = sorted(
+        [f for f in fields if f.get("isFilterable")],
+        key=lambda f: f.get("name", ""),
+    )
+    total_filterable = len(filterable)
+    capped = filterable[:MAX_FACET_FIELDS]
+
+    aggs: Dict[str, Any] = {}
+    for field in capped:
+        name = field["name"]
+        ftype = field.get("type", "string")
+        if ftype == "date":
+            aggs[f"{name}__min"] = {"min": {"field": name}}
+            aggs[f"{name}__max"] = {"max": {"field": name}}
+        elif ftype == "number":
+            aggs[name] = {"stats": {"field": name}}
+        else:
+            agg_field = field.get("keywordName") or f"{name}.keyword"
+            aggs[name] = {"terms": {"field": agg_field, "size": 10}}
+
+    facets_info = (
+        {"limited": True, "total": total_filterable}
+        if total_filterable > MAX_FACET_FIELDS
+        else None
+    )
+    return aggs, facets_info
 
 
 def map_sort_field_to_opensearch_path(field_name: str) -> str:
@@ -391,8 +492,14 @@ def map_sort_field_to_opensearch_path(field_name: str) -> str:
     return field_mapping.get(field_name, field_name)
 
 
-def build_search_query(params: SearchParams) -> Dict:
-    """Build search query from search parameters"""
+def build_search_query(
+    params: SearchParams, metadata_fields_config: Optional[List[Dict]] = None
+) -> Tuple[Dict, Optional[Dict]]:
+    """Build search query from search parameters.
+
+    Returns (query_body, facets_info) where facets_info is metadata about
+    dynamic facet aggregations (never sent to OpenSearch).
+    """
     start_time = time.time()
     terms = params.q.split() if params.q else []
     logger.info(
@@ -400,10 +507,8 @@ def build_search_query(params: SearchParams) -> Dict:
     )
 
     if params.semantic:
-        # Use embedding store factory for semantic search
-        from embedding_store_factory import EmbeddingStoreFactory
-
-        factory = EmbeddingStoreFactory(logger, metrics)
+        # Use cached embedding store factory for semantic search
+        factory = _get_embedding_store_factory()
         embedding_store = factory.create_embedding_store()
 
         # Get the search result from the embedding store
@@ -418,7 +523,7 @@ def build_search_query(params: SearchParams) -> Dict:
         logger.info(
             f"[PERF] Total search query build time (semantic): {time.time() - start_time:.3f}s"
         )
-        return result
+        return result, None
 
     # ────────────────────────────────────────────────────────────────
     # Asset explorer case exact “storageIdentifier:” lookups
@@ -456,7 +561,7 @@ def build_search_query(params: SearchParams) -> Dict:
 
         logger.info(f"Storage identifier query body: {query_body}")
 
-        return query_body
+        return query_body, None
     # ─────────────────────────────────────────────────────────────────
 
     parse_start = time.time()
@@ -643,15 +748,59 @@ def build_search_query(params: SearchParams) -> Dict:
 
     # Process generic filters
     if params.filters:
+        # Group term filters by field so multiple values become a single
+        # `terms` (OR) query instead of multiple `term` (AND) filters.
+        term_values_by_field: Dict[str, list] = {}
+
+        # Build a lookup of keywordName from metadata fields config
+        keyword_name_lookup: Dict[str, str] = {}
+        if metadata_fields_config:
+            for mf in metadata_fields_config:
+                kw = mf.get("keywordName")
+                if kw:
+                    keyword_name_lookup[mf["name"]] = kw
+
         for filter_item in params.filters:
-            if filter_item.get("operator") == "term":
-                filters_to_add.append(
-                    {"term": {filter_item["field"]: filter_item["value"]}}
+            operator = filter_item.get("operator")
+            field_name = filter_item.get("field", "")
+            if operator == "term":
+                # Resolve the correct keyword field name:
+                # 1. Use keywordName from metadata config if available
+                # 2. For Metadata.* text fields, append .keyword
+                # 3. Otherwise use the field as-is (already keyword-mapped)
+                term_field = field_name
+                if field_name in keyword_name_lookup:
+                    term_field = keyword_name_lookup[field_name]
+                elif field_name.startswith("Metadata.") and not field_name.endswith(
+                    ".keyword"
+                ):
+                    term_field = f"{field_name}.keyword"
+                term_values_by_field.setdefault(term_field, []).append(
+                    filter_item["value"]
                 )
-            elif filter_item.get("operator") == "range":
-                filters_to_add.append(
-                    {"range": {filter_item["field"]: filter_item["value"]}}
-                )
+            elif operator == "match":
+                filters_to_add.append({"match": {field_name: filter_item["value"]}})
+            elif operator == "range":
+                range_params = {}
+                if filter_item.get("gte") is not None:
+                    range_params["gte"] = filter_item["gte"]
+                if filter_item.get("lte") is not None:
+                    range_params["lte"] = filter_item["lte"]
+                if range_params:
+                    filters_to_add.append({"range": {field_name: range_params}})
+                else:
+                    logger.warning(
+                        f"Range filter missing gte/lte bounds: {filter_item}"
+                    )
+            else:
+                logger.warning(f"Unknown filter operator: {operator}")
+
+        # Emit grouped term filters: single value → term, multiple → terms (OR)
+        for term_field, values in term_values_by_field.items():
+            if len(values) == 1:
+                filters_to_add.append({"term": {term_field: values[0]}})
+            else:
+                filters_to_add.append({"terms": {term_field: values}})
 
     # Add all filters at once
     query["bool"]["filter"].extend(filters_to_add)
@@ -663,12 +812,6 @@ def build_search_query(params: SearchParams) -> Dict:
         "size": params.size,
         "from": params.from_,
         "aggs": {
-            "file_types": {
-                "terms": {
-                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
-                    "size": 50,
-                }
-            },
             "asset_types": {
                 "terms": {"field": "DigitalSourceAsset.Type.keyword", "size": 20}
             },
@@ -702,22 +845,17 @@ def build_search_query(params: SearchParams) -> Dict:
             },
         },
         "_source": {
-            "includes": [
-                "InventoryID",
-                "DigitalSourceAsset.Type",
-                "DigitalSourceAsset.MainRepresentation.Format",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
-                "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.CreateDate",
-                "DigitalSourceAsset.CreateDate",
-                "DerivedRepresentations.Purpose",
-                "DerivedRepresentations.StorageInfo.PrimaryLocation",
-                "FileHash",
-                "Metadata.Consolidated.type",
-            ]
+            "includes": list(
+                set(REQUIRED_SOURCE_FIELDS) | set(params.search_fields or [])
+            )
         },
     }
+
+    # Merge dynamic aggregations from metadata fields config
+    facets_info = None
+    if metadata_fields_config is not None:
+        dynamic_aggs, facets_info = build_dynamic_aggregations(metadata_fields_config)
+        query_body["aggs"].update(dynamic_aggs)
 
     # Add sort clause if sort parameters are present
     if params.sort_by:
@@ -729,47 +867,20 @@ def build_search_query(params: SearchParams) -> Dict:
         f"[PERF] Total search query build time (regular): {time.time() - start_time:.3f}s"
     )
 
-    return query_body
+    return query_body, facets_info
 
 
 def add_common_fields(result: Dict, prefix: str = "") -> Dict:
     """Add commonly needed fields to the root level of the result object"""
-    # Access the nested structure
-    digital_source_asset = result.get(f"{prefix}DigitalSourceAsset", {})
-    main_rep = digital_source_asset.get("MainRepresentation", {})
-    storage_info = main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-    storage_info.get("ObjectKey", {})
     inventory_id = result.get("InventoryID", "")
 
     # Add ID fields
     if inventory_id:
         # Extract the UUID part from the inventory ID
         if ":" in inventory_id:
-            uuid_part = inventory_id.split(":")[-1]
-            result["id"] = uuid_part
+            result["id"] = inventory_id.split(":")[-1]
         else:
             result["id"] = inventory_id
-
-    # Add asset metadata fields
-    # result["assetType"] = digital_source_asset.get("Type", "")
-    # result["format"] = main_rep.get("Format", "")
-    # result["objectName"] = object_key.get("Name", "")
-    # result["fullPath"] = object_key.get("FullPath", "")
-    # result["bucket"] = storage_info.get("Bucket", "")
-
-    # # Handle file size - check different locations
-    # file_size = storage_info.get("FileSize", 0)
-    # if not file_size and "FileInfo" in storage_info:
-    #     file_size = storage_info.get("FileInfo", {}).get("Size", 0)
-    # result["fileSize"] = file_size
-
-    # Handle creation date - check different locations
-    # created_date = storage_info.get("CreateDate", "")
-    # if not created_date and "FileInfo" in storage_info:
-    #     created_date = storage_info.get("FileInfo", {}).get("CreateDate", "")
-    # if not created_date:
-    #     created_date = digital_source_asset.get("CreateDate", "")
-    # result["createdAt"] = created_date
 
     # Include consolidated metadata directly
     if "Metadata" in result and "Consolidated" in result.get("Metadata", {}):
@@ -786,23 +897,12 @@ def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[
     processed_hits = []
     url_requests = []
 
-    logger.info(f"[URL_DEBUG] Starting URL collection for {len(hits)} hits")
-
-    for hit_idx, hit in enumerate(hits):
+    for hit in hits:
         source = hit["_source"]
         digital_source_asset = source.get("DigitalSourceAsset", {})
         derived_representations = source.get("DerivedRepresentations", [])
 
         asset_id = digital_source_asset.get("ID", "unknown")
-        logger.info(
-            f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(hits)} - Asset ID: {asset_id}"
-        )
-        logger.info(
-            f"[URL_DEBUG] DigitalSourceAsset keys: {list(digital_source_asset.keys())}"
-        )
-        logger.info(
-            f"[URL_DEBUG] DerivedRepresentations count: {len(derived_representations)}"
-        )
 
         hit_data = {
             "hit": hit,
@@ -813,20 +913,10 @@ def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[
         }
 
         # Collect URL requests for derived representations
-        for rep_idx, representation in enumerate(derived_representations):
+        for representation in derived_representations:
             purpose = representation.get("Purpose", "unknown")
             rep_storage_info = representation.get("StorageInfo", {}).get(
                 "PrimaryLocation", {}
-            )
-
-            logger.info(
-                f"[URL_DEBUG] Processing representation {rep_idx + 1}/{len(derived_representations)} - Purpose: {purpose}"
-            )
-            logger.info(
-                f"[URL_DEBUG] StorageInfo keys: {list(rep_storage_info.keys())}"
-            )
-            logger.info(
-                f"[URL_DEBUG] StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
             )
 
             if rep_storage_info.get("StorageType") == "s3":
@@ -834,48 +924,22 @@ def collect_cloudfront_url_requests(hits: List[Dict]) -> Tuple[List[Dict], List[
                 object_key = rep_storage_info.get("ObjectKey", {})
                 key = object_key.get("FullPath", "")
 
-                logger.info(
-                    f"[URL_DEBUG] S3 representation found - Bucket: '{bucket}', Key: '{key}'"
-                )
-                logger.info(f"[URL_DEBUG] ObjectKey structure: {object_key}")
-
                 if bucket and key:
                     request_id = f"{asset_id}_{purpose}_{len(url_requests)}"
-                    url_request = {
-                        "request_id": request_id,
-                        "bucket": bucket,
-                        "key": key,
-                    }
-
-                    url_requests.append(url_request)
-                    logger.info(f"[URL_DEBUG] Added URL request: {url_request}")
+                    url_requests.append(
+                        {
+                            "request_id": request_id,
+                            "bucket": bucket,
+                            "key": key,
+                        }
+                    )
 
                     if purpose == "thumbnail":
                         hit_data["thumbnail_request_id"] = request_id
-                        logger.info(
-                            f"[URL_DEBUG] Set thumbnail_request_id: {request_id}"
-                        )
                     elif purpose == "proxy":
                         hit_data["proxy_request_id"] = request_id
-                        logger.info(f"[URL_DEBUG] Set proxy_request_id: {request_id}")
-                else:
-                    logger.warning(
-                        f"[URL_DEBUG] Missing bucket or key - Bucket: '{bucket}', Key: '{key}'"
-                    )
-            else:
-                logger.info(
-                    f"[URL_DEBUG] Non-S3 representation - StorageType: {rep_storage_info.get('StorageType', 'NOT_FOUND')}"
-                )
 
         processed_hits.append(hit_data)
-        logger.info(
-            f"[URL_DEBUG] Hit {hit_idx + 1} processed - thumbnail_id: {hit_data['thumbnail_request_id']}, proxy_id: {hit_data['proxy_request_id']}"
-        )
-
-    logger.info(
-        f"[URL_DEBUG] URL collection complete - {len(url_requests)} URL requests collected"
-    )
-    logger.info(f"[URL_DEBUG] URL requests: {url_requests}")
 
     return processed_hits, url_requests
 
@@ -886,14 +950,6 @@ def process_search_hit_with_cloudfront_urls(
     """Process a single search hit with pre-generated CloudFront URLs"""
     hit = hit_data["hit"]
     source = hit_data["source"]
-    asset_id = hit_data["asset_id"]
-
-    logger.info(
-        f"[URL_DEBUG] Processing hit with CloudFront URLs for asset: {asset_id}"
-    )
-    logger.info(
-        f"[URL_DEBUG] Available CloudFront URLs: {list(cloudfront_urls.keys())}"
-    )
 
     # Get CloudFront URLs from the batch results
     thumbnail_url = None
@@ -905,19 +961,9 @@ def process_search_hit_with_cloudfront_urls(
         thumbnail_url = (
             get_indexed_thumbnail_url(thumbnail_url) if thumbnail_url else None
         )
-        logger.info(
-            f"[URL_DEBUG] Thumbnail URL for {asset_id}: {thumbnail_url} (request_id: {hit_data['thumbnail_request_id']})"
-        )
-    else:
-        logger.info(f"[URL_DEBUG] No thumbnail request ID for {asset_id}")
 
     if hit_data["proxy_request_id"]:
         proxy_url = cloudfront_urls.get(hit_data["proxy_request_id"])
-        logger.info(
-            f"[URL_DEBUG] Proxy URL for {asset_id}: {proxy_url} (request_id: {hit_data['proxy_request_id']})"
-        )
-    else:
-        logger.info(f"[URL_DEBUG] No proxy request ID for {asset_id}")
 
     # Create base result object
     result = AssetSearchResult(
@@ -933,11 +979,14 @@ def process_search_hit_with_cloudfront_urls(
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
-    final_result = add_common_fields(result_dict)
 
-    logger.info(
-        f"[URL_DEBUG] Final processed result for {asset_id} - thumbnailUrl: {final_result.get('thumbnailUrl')}, proxyUrl: {final_result.get('proxyUrl')}"
-    )
+    # Merge any extra _source fields not captured by the AssetSearchResult model
+    # (e.g. top-level custom metadata fields like end_seconds requested via fields param)
+    for key, value in source.items():
+        if key not in _KNOWN_SOURCE_KEYS and key not in result_dict:
+            result_dict[key] = value
+
+    final_result = add_common_fields(result_dict)
 
     return final_result
 
@@ -954,8 +1003,6 @@ def get_indexed_thumbnail_url(thumbnail_url: str, index: int = THUMBNAIL_INDEX) 
     Returns:
         Modified URL with the specific thumbnail index
     """
-    import re
-
     if not thumbnail_url or ".jpg" not in thumbnail_url:
         return thumbnail_url
 
@@ -971,9 +1018,6 @@ def get_indexed_thumbnail_url(thumbnail_url: str, index: int = THUMBNAIL_INDEX) 
         # No existing index, add it (replace .jpg with .{index:07d}.jpg)
         indexed_url = thumbnail_url.replace(".jpg", f".{index:07d}.jpg")
 
-    logger.info(
-        f"Converted thumbnail URL from {thumbnail_url} to {indexed_url} (index: {index})"
-    )
     return indexed_url
 
 
@@ -982,17 +1026,6 @@ def process_search_hit(hit: Dict) -> Dict:
     source = hit["_source"]
     digital_source_asset = source.get("DigitalSourceAsset", {})
     derived_representations = source.get("DerivedRepresentations", [])
-    main_rep = digital_source_asset.get("MainRepresentation", {})
-    main_rep.get("StorageInfo", {}).get("PrimaryLocation", {})
-
-    asset_id = digital_source_asset.get("ID", "unknown")
-    inventory_id = source.get("InventoryID", "unknown")
-    logger.info(
-        f"Processing asset {asset_id} (InventoryID: {inventory_id}) with score {hit.get('_score', 0)}"
-    )
-    logger.info(
-        f"Asset has DigitalSourceAsset: {bool(digital_source_asset)}, DerivedRepresentations: {len(derived_representations)}"
-    )
 
     thumbnail_url = None
     proxy_url = None
@@ -1032,6 +1065,13 @@ def process_search_hit(hit: Dict) -> Dict:
 
     # Convert to dictionary and add common fields
     result_dict = result.model_dump(by_alias=True)
+
+    # Merge any extra _source fields not captured by the AssetSearchResult model
+    # (e.g. top-level custom metadata fields like end_seconds requested via fields param)
+    for key, value in source.items():
+        if key not in _KNOWN_SOURCE_KEYS and key not in result_dict:
+            result_dict[key] = value
+
     return add_common_fields(result_dict)
 
 
@@ -1039,10 +1079,6 @@ def process_clip(clip_hit: Dict) -> Dict:
     """Process a clip hit to preserve all clip-specific fields."""
     source = clip_hit["_source"]
     inventory_id = source.get("InventoryID", None)
-
-    logger.info(
-        f"Processing clip for asset {inventory_id} with score {clip_hit.get('_score', 0)}"
-    )
 
     # For clip documents, we only have minimal information
     # The parent asset information should be handled by the calling function
@@ -1074,7 +1110,6 @@ def process_clip(clip_hit: Dict) -> Dict:
         ]:
             result[key] = value
 
-    logger.info(f"Processed clip with fields: {list(result.keys())}")
     return result
 
 
@@ -1155,18 +1190,26 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
         orphan_ids = list(orphaned_clip_assets - parent_assets.keys())
         if orphan_ids:
-            logger.info(f"Searching for parent assets with IDs: {orphan_ids}")
-
-            # Use match_phrase for each InventoryID with should clause
-            should_clauses = []
-            for inventory_id in orphan_ids:
-                should_clauses.append({"match_phrase": {"InventoryID": inventory_id}})
+            # Use terms on .keyword for exact match, with match_phrase
+            # fallback for analyzed InventoryID fields (values contain colons)
+            id_should_clauses = [
+                {"terms": {"InventoryID.keyword": orphan_ids}},
+            ]
+            id_should_clauses.extend(
+                {"match_phrase": {"InventoryID": iid}} for iid in orphan_ids
+            )
 
             batch_query = {
                 "query": {
                     "bool": {
-                        "should": should_clauses,
-                        "minimum_should_match": 1,
+                        "must": [
+                            {
+                                "bool": {
+                                    "should": id_should_clauses,
+                                    "minimum_should_match": 1,
+                                }
+                            },
+                        ],
                         "must_not": [{"term": {"embedding_scope": "clip"}}],
                     }
                 },
@@ -1175,9 +1218,6 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
 
             try:
                 resp = client.search(body=batch_query, index=index_name)
-                logger.info(
-                    f"Batch query found {resp['hits']['total']['value']} parent assets"
-                )
                 for hit in resp["hits"]["hits"]:
                     src = hit["_source"]
                     pid = src["InventoryID"]
@@ -1189,23 +1229,15 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                         "score": highest_clip_score,
                         "hit": hit,
                     }
-                    logger.info(
-                        f"Fetched parent asset for orphaned clips: {pid} with score {highest_clip_score}"
-                    )
             except Exception as e:
-                logger.error(f"Error batch fetching parent assets: {str(e)}")
-                import traceback
-
-                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.exception(f"Error batch fetching parent assets: {str(e)}")
 
     def process_asset_with_clips(inventory_id):
         if inventory_id not in parent_assets:
-            logger.warning(f"Parent asset {inventory_id} not found in parent_assets")
             return None
 
         try:
             parent_hit = parent_assets[inventory_id]["hit"]
-            logger.info(f"Processing parent asset {inventory_id}")
             result = process_search_hit(parent_hit)
 
             if inventory_id in clips_by_asset:
@@ -1220,20 +1252,12 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
                     asset_clips, key=lambda x: x["score"], reverse=True
                 )
                 result["clips"] = [process_clip(c["hit"]) for c in sorted_clips]
-
-                logger.info(
-                    f"Processed asset {inventory_id} with {len(result['clips'])} clips, final score: {result['score']}"
-                )
             else:
                 result["clips"] = []
-                logger.info(f"No clips found for asset {inventory_id}")
 
             return result
         except Exception as e:
-            logger.error(f"Error processing parent asset {inventory_id}: {str(e)}")
-            import traceback
-
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.exception(f"Error processing parent asset {inventory_id}: {str(e)}")
             return None
 
     def process_standalone_hit(hit):
@@ -1283,17 +1307,58 @@ def process_semantic_results_parallel(hits: List[Dict]) -> List[Dict]:
     return results
 
 
+def _clean_aggregations(aggregations: Optional[Dict]) -> Optional[Dict]:
+    """Strip OpenSearch noise from aggregation results.
+
+    Removes fields the frontend never reads:
+    - doc_count_error_upper_bound / sum_other_doc_count on each agg
+    - the duplicate 'file_types' aggregation (FE uses 'file_extensions')
+    - entirely empty aggregations (all buckets have doc_count 0)
+    """
+    if not aggregations:
+        return None
+
+    cleaned: Dict[str, Any] = {}
+    for key, agg in aggregations.items():
+        # Skip the duplicate file_types agg — FE only uses file_extensions
+        if key == "file_types":
+            continue
+
+        if not isinstance(agg, dict):
+            cleaned[key] = agg
+            continue
+
+        entry: Dict[str, Any] = {}
+
+        # Copy only the fields the FE actually reads
+        if "buckets" in agg:
+            entry["buckets"] = [
+                {k: v for k, v in bucket.items() if k != "key_as_string"}
+                for bucket in agg["buckets"]
+            ]
+        # Stats aggregations (number fields)
+        for stat_key in ("min", "max", "count", "avg", "sum"):
+            if stat_key in agg:
+                entry[stat_key] = agg[stat_key]
+
+        cleaned[key] = entry
+
+    return cleaned if cleaned else None
+
+
 def create_search_metadata(
-    total_results: int, params: SearchParams, aggregations=None, suggestions=None
+    total_results: int,
+    params: SearchParams,
+    aggregations=None,
+    facets_info=None,
 ) -> SearchMetadata:
     """Create search metadata object"""
     return SearchMetadata(
         totalResults=total_results,
         page=params.page,
         pageSize=params.pageSize,
-        searchTerm=params.q,
-        facets=aggregations,
-        suggestions=suggestions,
+        facets=_clean_aggregations(aggregations),
+        facetsInfo=facets_info,
     )
 
 
@@ -1333,8 +1398,10 @@ def perform_search(params: SearchParams) -> Dict:
             }
 
     try:
+        metadata_fields_config = fetch_metadata_fields_config()
+
         query_build_start = time.time()
-        search_body = build_search_query(params)
+        search_body, facets_info = build_search_query(params, metadata_fields_config)
         logger.info(
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
@@ -1352,7 +1419,6 @@ def perform_search(params: SearchParams) -> Dict:
             hits = embedding_result.hits
             total_results = embedding_result.total_results
             aggregations = embedding_result.aggregations
-            suggestions = embedding_result.suggestions
 
             logger.info(
                 f"{store_type} returned {len(hits)} hits from {total_results} total"
@@ -1425,15 +1491,12 @@ def perform_search(params: SearchParams) -> Dict:
             hits = response.get("hits", {}).get("hits", [])
             total_results = response["hits"]["total"]["value"]
             aggregations = response.get("aggregations")
-            suggestions = response.get("suggest")
 
             logger.info(
                 f"OpenSearch returned {len(hits)} hits from {total_results} total"
             )
 
             # Validate page range
-            import math
-
             total_pages = (
                 math.ceil(total_results / params.pageSize) if total_results > 0 else 0
             )
@@ -1530,7 +1593,7 @@ def perform_search(params: SearchParams) -> Dict:
                     total_count,
                     params,
                     aggregations,
-                    suggestions,
+                    facets_info=facets_info,
                 )
 
                 logger.info(
@@ -1553,80 +1616,29 @@ def perform_search(params: SearchParams) -> Dict:
                 batch_processing_start = time.time()
 
                 # Step 1: Collect all CloudFront URL requests
-                url_collection_start = time.time()
                 processed_hits_data, url_requests = collect_cloudfront_url_requests(
                     hits
-                )
-                logger.info(
-                    f"[PERF] Semantic URL request collection took: {time.time() - url_collection_start:.3f}s"
-                )
-                logger.info(
-                    f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} semantic hits"
                 )
 
                 # Step 2: Generate all CloudFront URLs in parallel
                 if url_requests:
-                    logger.info(
-                        f"[URL_DEBUG] Proceeding with semantic batch URL generation for {len(url_requests)} requests"
-                    )
-                    batch_url_start = time.time()
                     cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
-                    logger.info(
-                        f"[PERF] Semantic batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
-                    )
-                    successful_urls = len(
-                        [url for url in cloudfront_urls.values() if url]
-                    )
-                    logger.info(
-                        f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
-                    )
-                    logger.info(
-                        f"[URL_DEBUG] Semantic CloudFront URLs result: {cloudfront_urls}"
-                    )
                 else:
-                    logger.warning(
-                        "[URL_DEBUG] No URL requests to process for semantic search - skipping URL generation"
-                    )
                     cloudfront_urls = {}
 
                 # Step 3: Process all hits with pre-generated URLs
-                results_processing_start = time.time()
                 results = []
-                logger.info(
-                    f"[URL_DEBUG] Processing {len(processed_hits_data)} semantic hits with CloudFront URLs"
-                )
 
-                for hit_idx, hit_data in enumerate(processed_hits_data):
+                for hit_data in processed_hits_data:
                     try:
-                        logger.info(
-                            f"[URL_DEBUG] Processing semantic hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
-                        )
-                        logger.info(
-                            f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
-                        )
-                        logger.info(
-                            f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
-                        )
-
                         result = process_search_hit_with_cloudfront_urls(
                             hit_data, cloudfront_urls
                         )
-
-                        # Log the final result URLs
-                        logger.info(
-                            f"[URL_DEBUG] Final semantic result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
-                        )
-
                         results.append(result)
                     except Exception as e:
-                        logger.warning(
-                            f"[URL_DEBUG] Error processing semantic hit {hit_idx + 1}: {str(e)}"
-                        )
+                        logger.warning(f"Error processing semantic hit: {str(e)}")
                         continue
 
-                logger.info(
-                    f"[PERF] Semantic results processing took: {time.time() - results_processing_start:.3f}s"
-                )
                 logger.info(
                     f"[PERF] Total semantic batch processing took: {time.time() - batch_processing_start:.3f}s"
                 )
@@ -1646,7 +1658,7 @@ def perform_search(params: SearchParams) -> Dict:
                     total_results,
                     params,
                     aggregations,
-                    suggestions,
+                    facets_info=facets_info,
                 )
 
                 return {
@@ -1662,84 +1674,36 @@ def perform_search(params: SearchParams) -> Dict:
             batch_processing_start = time.time()
 
             # Step 1: Collect all CloudFront URL requests
-            url_collection_start = time.time()
             processed_hits_data, url_requests = collect_cloudfront_url_requests(hits)
-            logger.info(
-                f"[PERF] URL request collection took: {time.time() - url_collection_start:.3f}s"
-            )
-            logger.info(
-                f"[URL_DEBUG] Collected {len(url_requests)} CloudFront URL requests for {len(processed_hits_data)} hits"
-            )
 
             # Step 2: Generate all CloudFront URLs in parallel
             if url_requests:
-                logger.info(
-                    f"[URL_DEBUG] Proceeding with batch URL generation for {len(url_requests)} requests"
-                )
-                batch_url_start = time.time()
                 cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
-                logger.info(
-                    f"[PERF] Batch CloudFront URL generation took: {time.time() - batch_url_start:.3f}s"
-                )
-                successful_urls = len([url for url in cloudfront_urls.values() if url])
-                logger.info(
-                    f"[URL_DEBUG] Generated {successful_urls} successful URLs out of {len(url_requests)} requests"
-                )
-                logger.info(f"[URL_DEBUG] CloudFront URLs result: {cloudfront_urls}")
             else:
-                logger.warning(
-                    "[URL_DEBUG] No URL requests to process - skipping URL generation"
-                )
                 cloudfront_urls = {}
 
             # Step 3: Process all hits with pre-generated URLs
-            results_processing_start = time.time()
             results = []
-            logger.info(
-                f"[URL_DEBUG] Processing {len(processed_hits_data)} hits with CloudFront URLs"
-            )
 
-            for hit_idx, hit_data in enumerate(processed_hits_data):
+            for hit_data in processed_hits_data:
                 try:
-                    logger.info(
-                        f"[URL_DEBUG] Processing hit {hit_idx + 1}/{len(processed_hits_data)} - Asset ID: {hit_data['asset_id']}"
-                    )
-                    logger.info(
-                        f"[URL_DEBUG] Thumbnail request ID: {hit_data.get('thumbnail_request_id')}"
-                    )
-                    logger.info(
-                        f"[URL_DEBUG] Proxy request ID: {hit_data.get('proxy_request_id')}"
-                    )
-
                     result = process_search_hit_with_cloudfront_urls(
                         hit_data, cloudfront_urls
                     )
-
-                    # Log the final result URLs
-                    logger.info(
-                        f"[URL_DEBUG] Final result for {hit_data['asset_id']} - thumbnailUrl: {result.get('thumbnailUrl')}, proxyUrl: {result.get('proxyUrl')}"
-                    )
-
                     results.append(result)
                 except Exception as e:
-                    logger.warning(
-                        f"[URL_DEBUG] Error processing hit {hit_idx + 1}: {str(e)}"
-                    )
+                    logger.warning(f"Error processing hit: {str(e)}")
                     continue
 
             logger.info(
-                f"[PERF] Results processing took: {time.time() - results_processing_start:.3f}s"
-            )
-            logger.info(
                 f"[PERF] Total batch processing took: {time.time() - batch_processing_start:.3f}s"
             )
-            logger.info(f"Regular search completed: {len(results)} results processed")
 
             search_metadata = create_search_metadata(
                 total_results,
                 params,
                 aggregations,
-                suggestions,
+                facets_info=facets_info,
             )
 
             return {
@@ -1750,9 +1714,6 @@ def perform_search(params: SearchParams) -> Dict:
                     "results": results,
                 },
             }
-
-        total_time = time.time() - overall_start
-        logger.info(f"[PERF] Total search operation time: {total_time:.3f}s")
 
     except (RequestError, NotFoundError) as e:
         logger.warning(f"OpenSearch error: {str(e)}")
@@ -1839,7 +1800,16 @@ def handle_search():
         logger.info("[PERF] Starting unified search handler")
 
         param_start = time.time()
-        query_params = app.current_event.get("queryStringParameters") or {}
+        query_params = dict(app.current_event.get("queryStringParameters") or {})
+
+        # API Gateway REST API only keeps the last value for repeated query params
+        # in queryStringParameters. Use multiValueQueryStringParameters to get all
+        # values for repeated params like fields=X&fields=Y.
+        multi_value_params = (
+            app.current_event.get("multiValueQueryStringParameters") or {}
+        )
+        if "fields" in multi_value_params:
+            query_params["fields"] = multi_value_params["fields"]
 
         # Ensure required parameter exists
         if "q" not in query_params:
@@ -1900,6 +1870,12 @@ def handle_provider_status():
         }
 
 
+# Connector cache for /search/connectors endpoint
+_connector_cache = None
+_connector_cache_time = 0
+_CONNECTOR_CACHE_TTL = 60  # seconds
+
+
 @app.get("/search/connectors")
 def handle_search_connectors():
     """
@@ -1910,6 +1886,8 @@ def handle_search_connectors():
     permission. Only a lightweight summary is returned (id, name, type,
     storageIdentifier, status).
     """
+    global _connector_cache, _connector_cache_time
+
     try:
         connector_table_name = os.environ.get("MEDIALAKE_CONNECTOR_TABLE")
         if not connector_table_name:
@@ -1923,14 +1901,32 @@ def handle_search_connectors():
                 "data": {"connectors": []},
             }
 
-        dynamodb_resource = boto3.resource("dynamodb")
-        table = dynamodb_resource.Table(connector_table_name)
+        # Return cached result if still fresh
+        if (
+            _connector_cache is not None
+            and (time.time() - _connector_cache_time) < _CONNECTOR_CACHE_TTL
+        ):
+            return _connector_cache
 
-        response = table.scan()
+        table = _dynamodb_resource.Table(connector_table_name)
+
+        # Only fetch the fields we actually need
+        scan_kwargs = {
+            "ProjectionExpression": "id, #n, #t, storageIdentifier, #s, objectPrefix, #r, allowUploads",
+            "ExpressionAttributeNames": {
+                "#n": "name",
+                "#t": "type",
+                "#s": "status",
+                "#r": "region",
+            },
+        }
+
+        response = table.scan(**scan_kwargs)
         items = response.get("Items", [])
 
         while "LastEvaluatedKey" in response:
-            response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+            scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+            response = table.scan(**scan_kwargs)
             items.extend(response.get("Items", []))
 
         connectors = [
@@ -1950,12 +1946,17 @@ def handle_search_connectors():
             for item in items
         ]
 
-        logger.info(f"Returned {len(connectors)} connector summaries")
-        return {
+        result = {
             "status": "200",
             "message": "ok",
             "data": {"connectors": connectors},
         }
+
+        # Cache the result
+        _connector_cache = result
+        _connector_cache_time = time.time()
+
+        return result
 
     except Exception as e:
         logger.exception(f"Error fetching connector summaries: {str(e)}")

@@ -1,5 +1,107 @@
 # Changelog
 
+## [1.14.4] - 2026-05-07
+
+### Bug Fixes
+
+- fix: Allow custom metadata to render properly when Coactive is selected as a search provider
+
+### Code Refactoring
+
+- refactor: add deployment_options in the config.json and move CliCredentialsStackSynthesizer support using "use_cli_credentials": true option under deployment_options
+- refactor: Ability to use CLI credentials with CDK for deployment
+
+## [1.14.3] - 2026-05-06
+
+### Code Refactoring
+
+- refactor: Remove connector from storing LOCK records in DynamoDB asset table
+- refactor: Migrate collections listing and search to OpenSearch with DynamoDB stream sync
+
+## [1.14.2] - 2026-05-05
+
+### Code Refactoring
+
+- refactor: Turn pruning to False for IAC bucket that holds custom nodes to prevent 50 tag limit being hit on the S3 bucket
+
+## [1.14.1] - 2026-05-04
+
+### Code Refactoring
+
+- refactor: CoActive refactor to support advanced configuration for unique search endpoint and dataset ID's
+
+## [1.14.0] - 2026-04-29
+
+### Features
+
+- feat: Add ability for nodes to be Lambda containers
+
+### Bug Fixes
+
+- fix: custom metadata filters working with state store
+
+## [1.13.1] - 2026-04-28
+
+### Bug Fixes
+
+- fix: custom metadata filters working with semantic searches
+
+## [1.13.0] - 2026-04-28
+
+### Features
+
+- feat: Ability to select custom metadata to show on search result cards as well as filter off of
+
+### Bug Fixes
+
+- fix: CORS policy added correctly to S3 buckets when upload is selected when custom domains are used
+- fix: dual pipeline triggers fix so both event trigger assemblies are built
+
+### Code Refactoring
+
+- refactor: User password reset added to user admin interface and self reset through login UI
+
+### Other Changes
+
+- ci: update to CI promo process
+
+## [1.12.1] - 2026-04-16
+
+### Chores
+
+- chore: file cleanup- chore: file cleanup
+
+## [1.12.0] - 2026-04-16
+
+### Features
+
+- feat: add new OpenSearch instances to validator
+- feat: same account deployment in the same region and other regions
+- feat: add configurable audio track selection to video proxy pipeline
+
+### Bug Fixes
+
+- fix: single node fix
+- fix: error in AssetDetailPage for videos with no audio
+
+### Code Refactoring
+
+- refactor: Increase upload to 500 assets at a time, a single asset can be up to 500 GB with multi-part upload
+- refactor: fix for the same node is used twice the pipeline would overwrite it's resources in DynamoDB, updated delete pipelines to async to avoid API Gateway time out
+- refactor: Optimize token refresh in background and long inactivity
+- refactor: removal of delete buttons/icons if user doesn't have delete permissions
+
+### Other Changes
+
+- ci: updates to gitlab ci for promotion to GitHub
+- ci: revert 1.12.0 tag
+- chore(release): v1.12.0 [skip ci]
+- ci: updates to ci promotion process
+- Revert "style: apply black formatting to lambda_middleware.py"
+- style: apply black formatting to lambda_middleware.py
+- updates to middleware
+- build: update of requests library
+
 ## [1.11.8] - 2026-04-08
 
 ### Other Changes

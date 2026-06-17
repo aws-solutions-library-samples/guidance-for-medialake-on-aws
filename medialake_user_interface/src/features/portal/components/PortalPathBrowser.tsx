@@ -113,9 +113,7 @@ const PortalPathBrowser: React.FC<Props> = ({
       fetchFolders(browsePath);
     } catch (err) {
       console.error("Failed to create folder", err);
-      setCreateError(
-        (err as Error)?.message || t("uploadPortals.pathBrowser.createFolderFailed"),
-      );
+      setCreateError((err as Error)?.message || t("uploadPortals.pathBrowser.createFolderFailed"));
     } finally {
       setIsCreating(false);
     }

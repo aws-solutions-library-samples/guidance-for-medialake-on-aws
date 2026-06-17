@@ -6,6 +6,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import LockIcon from "@mui/icons-material/Lock";
 import RestoreIcon from "@mui/icons-material/Restore";
 import { zIndexTokens } from "@/theme/tokens";
+import { useCollectionAssetPermissions } from "@/permissions";
 
 interface AssetHeaderProps {
   onDownload?: () => void;
@@ -21,6 +22,7 @@ const AssetHeader: React.FC<AssetHeaderProps> = ({
   onRestore,
 }) => {
   const { t } = useTranslation();
+  const { canAdd, addTooltip } = useCollectionAssetPermissions();
 
   return (
     <Box
@@ -42,10 +44,12 @@ const AssetHeader: React.FC<AssetHeaderProps> = ({
         </IconButton>
       </Tooltip>
 
-      <Tooltip title={t("common.actions.addToCollection")}>
-        <IconButton onClick={onAddToCollection}>
-          <HomeIcon />
-        </IconButton>
+      <Tooltip title={canAdd ? t("common.actions.addToCollection") : addTooltip}>
+        <span>
+          <IconButton onClick={onAddToCollection} disabled={!canAdd}>
+            <HomeIcon />
+          </IconButton>
+        </span>
       </Tooltip>
 
       <Tooltip title={t("common.actions.lock")}>

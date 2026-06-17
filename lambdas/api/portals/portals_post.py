@@ -19,6 +19,7 @@ from portal_utils import (
     GSI1_PK_VALUE,
     INDEX_SK,
     METADATA_SK,
+    _validate_portal_structure,
     get_dest_sk,
     get_portal_pk,
     get_slug_pk,
@@ -60,6 +61,26 @@ def register_route(app):
                 return create_error_response(
                     code="VALIDATION_ERROR",
                     message="slug must be 3-50 chars, lowercase alphanumeric and hyphens",
+                    status_code=400,
+                    request_id=request_id,
+                )
+
+            # Reject a non-object appearance before any write (Req 14.6).
+            appearance = body.get("appearance")
+            if appearance is not None and not isinstance(appearance, dict):
+                return create_error_response(
+                    code="VALIDATION_ERROR",
+                    message="appearance must be an object",
+                    status_code=400,
+                    request_id=request_id,
+                )
+
+            # Enforce structural invariants server-side before any write.
+            structure_error = _validate_portal_structure(body)
+            if structure_error:
+                return create_error_response(
+                    code="VALIDATION_ERROR",
+                    message=structure_error,
                     status_code=400,
                     request_id=request_id,
                 )
@@ -126,6 +147,8 @@ def register_route(app):
                 metadata.allowedGroups = body.get("allowedGroups")
                 metadata.ipAllowlist = body.get("ipAllowlist")
                 metadata.metadataFields = body.get("metadataFields")
+                metadata.appearance = appearance
+                metadata.pages = body.get("pages")
                 metadata.passphrase = passphrase_hash
                 metadata.tokenBypassesPassphrase = body.get(
                     "tokenBypassesPassphrase", False
@@ -155,6 +178,7 @@ def register_route(app):
                     d.allowFolderCreation = dest.get("allowFolderCreation", False)
                     d.order = dest.get("order", 0)
                     d.pathSegments = dest.get("pathSegments")
+                    d.pageNumber = dest.get("pageNumber")
                     d.save()
                     written_items.append(d)
 

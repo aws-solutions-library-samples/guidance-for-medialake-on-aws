@@ -52,6 +52,11 @@ node:
                 - ${MEDIALAKE_ASSET_TABLE}
             - effect: Allow
               actions:
+                - dynamodb:GetItem
+              resources:
+                - ${SYSTEM_SETTINGS_TABLE_ARN}
+            - effect: Allow
+              actions:
                 - secretsmanager:GetSecretValue
               resources:
                 - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:*
