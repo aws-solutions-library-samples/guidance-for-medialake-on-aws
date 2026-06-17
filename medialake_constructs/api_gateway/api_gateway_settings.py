@@ -17,11 +17,13 @@ The module handles:
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secrets_manager
 from constructs import Construct
 
@@ -40,6 +42,7 @@ class SettingsApiProps:
     system_settings_table: dynamodb.ITable
     api_keys_table: dynamodb.ITable
     cognito_user_pool: cognito.UserPool
+    portal_settings_integration_lambda: Optional[lambda_.IFunction] = None
 
 
 class SettingsApi(Construct):
@@ -235,6 +238,89 @@ class SettingsApi(Construct):
 
         # Add CORS for users
         add_cors_options_method(users_resource)
+
+        # ===================================================================
+        # /settings/portals resource and methods (optional)
+        # ===================================================================
+        if props.portal_settings_integration_lambda:
+            portal_integration = api_gateway.LambdaIntegration(
+                props.portal_settings_integration_lambda, proxy=True
+            )
+
+            portals_resource = settings_resource.add_resource("portals")
+            portal_id_resource = portals_resource.add_resource("{id}")
+            tokens_resource = portal_id_resource.add_resource("tokens")
+            token_id_resource = tokens_resource.add_resource("{tokenId}")
+            logo_resource = portal_id_resource.add_resource("logo")
+
+            for method in ["GET", "POST"]:
+                m = portals_resource.add_method(method, portal_integration)
+                cfn_method = m.node.default_child
+                cfn_method.authorization_type = "CUSTOM"
+                cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            for method in ["GET", "PUT", "DELETE"]:
+                m = portal_id_resource.add_method(method, portal_integration)
+                cfn_method = m.node.default_child
+                cfn_method.authorization_type = "CUSTOM"
+                cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            for method in ["GET", "POST"]:
+                m = tokens_resource.add_method(method, portal_integration)
+                cfn_method = m.node.default_child
+                cfn_method.authorization_type = "CUSTOM"
+                cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            m = token_id_resource.add_method("DELETE", portal_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            m = logo_resource.add_method("POST", portal_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            # /settings/portal-themes and /settings/portal-templates
+            portal_themes_resource = settings_resource.add_resource("portal-themes")
+            portal_theme_id_resource = portal_themes_resource.add_resource("{id}")
+            portal_templates_resource = settings_resource.add_resource(
+                "portal-templates"
+            )
+            portal_template_id_resource = portal_templates_resource.add_resource("{id}")
+
+            for collection_res in [
+                portal_themes_resource,
+                portal_templates_resource,
+            ]:
+                for method in ["GET", "POST"]:
+                    m = collection_res.add_method(method, portal_integration)
+                    cfn_method = m.node.default_child
+                    cfn_method.authorization_type = "CUSTOM"
+                    cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            for item_res in [
+                portal_theme_id_resource,
+                portal_template_id_resource,
+            ]:
+                for method in ["GET", "PUT", "DELETE"]:
+                    m = item_res.add_method(method, portal_integration)
+                    cfn_method = m.node.default_child
+                    cfn_method.authorization_type = "CUSTOM"
+                    cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            for res in [
+                portals_resource,
+                portal_id_resource,
+                tokens_resource,
+                token_id_resource,
+                logo_resource,
+                portal_themes_resource,
+                portal_theme_id_resource,
+                portal_templates_resource,
+                portal_template_id_resource,
+            ]:
+                add_cors_options_method(res)
 
         # Store references
         self._lambda = settings_lambda

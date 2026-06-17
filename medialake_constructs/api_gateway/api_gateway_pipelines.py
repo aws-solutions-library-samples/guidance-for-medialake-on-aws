@@ -326,6 +326,12 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "ENVIRONMENT": config.environment,
                 "SSM_PREFIX": config.ssm_prefix,
                 "RESOURCE_PREFIX": config.resource_prefix,
+                "SES_FROM_EMAIL": config.ses_from_address or "",
+                "SES_FROM_ARN": (
+                    f"arn:aws:ses:{self.region}:{self.account_id}:identity/{config.ses_from_address}"
+                    if config.ses_from_address
+                    else ""
+                ),
             },
         )
 

@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    env: {
+      VITE_WAF_CAPTCHA_API_KEY: "test-captcha-api-key",
+    },
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["node_modules", "dist", "playwright", "tests"],
     coverage: {

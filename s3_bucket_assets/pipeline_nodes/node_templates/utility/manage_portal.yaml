@@ -1,0 +1,57 @@
+spec: v1.0.0
+node:
+  id: manage_portal
+  title: Manage Portal
+  description: Create or update an upload portal and generate a shareable link
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/ManagePortalLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              resources:
+                - ${SYSTEM_SETTINGS_TABLE_ARN}
+actions:
+  generate:
+    summary: Manage portal
+    description: Create or update an upload portal and generate a shareable link
+    operationId: managePortal
+    parameters:
+      - in: body
+        name: Field Mapping
+        required: false
+        default: {}
+        schema:
+          type: object
+      - in: body
+        name: Default Portal Config
+        required: false
+        default: {}
+        schema:
+          type: object
+      - in: body
+        name: Token Expiry Days
+        required: false
+        default: 7
+        schema:
+          type: number
+      - in: body
+        name: Email Field
+        required: false
+        schema:
+          type: string
+    x-requestMapping: utility/manage_portal/generate/
+    x-responseMapping: utility/manage_portal/generate/
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [portal_link]

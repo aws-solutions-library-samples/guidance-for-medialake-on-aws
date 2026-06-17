@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import tempfile
@@ -35,6 +36,53 @@ from config import (
 logger = Logger()
 
 resource_prefix = os.environ["RESOURCE_PREFIX"]
+
+_cloudfront_domain_cache: str | None = None
+
+
+def _resolve_cloudfront_domain() -> str:
+    """Return the CloudFront domain, falling back to SSM when the env var is empty."""
+    global _cloudfront_domain_cache
+    if _cloudfront_domain_cache:
+        return _cloudfront_domain_cache
+
+    domain = os.environ.get("CLOUDFRONT_DOMAIN", "")
+    if domain:
+        _cloudfront_domain_cache = domain
+        return domain
+
+    ssm_param = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+    if not ssm_param:
+        environment = os.environ.get("ENVIRONMENT", "dev")
+        ssm_prefix = os.environ.get("SSM_PREFIX", f"/medialake/{environment}")
+        ssm_param = f"{ssm_prefix}/cloudfront-distribution-domain"
+    logger.info(
+        f"CLOUDFRONT_DOMAIN env var is empty, attempting SSM fallback: {ssm_param}"
+    )
+    try:
+        ssm = boto3.client("ssm")
+        resp = ssm.get_parameter(Name=ssm_param)
+        domain = resp["Parameter"]["Value"].strip().strip("/")
+        if domain and not domain.startswith("PENDING"):
+            _cloudfront_domain_cache = domain
+            logger.info(f"Resolved CloudFront domain from SSM: {domain}")
+            return domain
+        else:
+            logger.warning(
+                f"SSM parameter {ssm_param} exists but value is not usable: '{domain}'"
+            )
+    except Exception as e:
+        error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+        if error_code == "ParameterNotFound":
+            logger.error(
+                f"SSM parameter {ssm_param} does not exist. Ensure the MediaLakeUserInterface stack has been deployed."
+            )
+        else:
+            logger.error(
+                f"Failed to read CloudFront domain from SSM ({ssm_param}): {type(e).__name__}: {e}"
+            )
+
+    return ""
 
 
 def sanitize_function_name(pipeline_name, node_label, version):
@@ -607,6 +655,24 @@ def _determine_connection_input_type(
     return None
 
 
+def _serialize_param_value(value: object) -> str:
+    """Serialize a pipeline parameter value to a string suitable for Lambda env vars.
+
+    Ensures dict/list values produce valid JSON (double-quoted) rather than
+    Python repr syntax (single-quoted) so that downstream ``json.loads()``
+    calls in node lambdas succeed.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 def get_deployment_config(node_id: str) -> Dict[str, Any]:
     """Retrieve deployment configuration for a node from DynamoDB.
 
@@ -976,6 +1042,11 @@ def create_lambda_function(
                     "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # System settings table for provider configuration lookup
                     "SYSTEM_SETTINGS_TABLE_NAME": SYSTEM_SETTINGS_TABLE_NAME or "",
+                    # CloudFront domain for portal URL generation
+                    "CLOUDFRONT_DOMAIN": _resolve_cloudfront_domain(),
+                    # SES configuration for portal email notifications
+                    "SES_FROM_EMAIL": os.environ.get("SES_FROM_EMAIL", ""),
+                    "SES_FROM_ARN": os.environ.get("SES_FROM_ARN", ""),
                     # OpenSearch index for Marengo 3.0 asset embeddings (separate from media index)
                     "ASSET_EMBEDDINGS_INDEX": os.environ.get(
                         "ASSET_EMBEDDINGS_INDEX", "asset-embeddings"
@@ -1023,8 +1094,8 @@ def create_lambda_function(
                         env_var_name = param_key.replace(" ", "_").upper()
 
                         # Get the parameter value or default if not available
-                        if param_value:
-                            env_var_value = str(param_value)
+                        if param_value is not None:
+                            env_var_value = _serialize_param_value(param_value)
 
                             # Check if this is a multiline parameter embedded in the Lambda zip
                             if param_key in multiline_params:

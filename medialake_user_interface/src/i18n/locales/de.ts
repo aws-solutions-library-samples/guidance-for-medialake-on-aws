@@ -377,6 +377,7 @@ export default {
       usersAndGroups: "Benutzer und Gruppen",
       permissionSets: "Berechtigungen",
       permissions: "Berechtigungen",
+      uploadPortals: "Upload-Portale",
     },
   },
   profile: {
@@ -1896,6 +1897,61 @@ export default {
       title: "Dashboard löschen?",
       message:
         'Sind Sie sicher, dass Sie "{{name}}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "Upload-Portale",
+    pageDescription: "Upload-Portale für externe Mitwirkende verwalten",
+    createPortal: "Portal erstellen",
+    form: {
+      portalNamePlaceholder: "Portalname",
+      optionalDescription: "Optionale Beschreibung",
+      clickToUploadLogo: "Klicken Sie, um ein Logo hochzuladen",
+      accessMode: "Zugriffsmodus",
+      accessModes: {
+        public: "Öffentlich",
+        tokenProtected: "Token-geschützt",
+        cognitoGroups: "Authentifiziert (Cognito)",
+      },
+      passphrase: "Passphrase",
+      show: "Anzeigen",
+      hide: "Ausblenden",
+      tokenBypassesPassphrase: "Token umgeht Passphrase",
+      allowedGroups: "Zugelassene Gruppen",
+      ipAllowlist: "IP-Zulassungsliste",
+      active: "Aktiv",
+      captcha: "CAPTCHA",
+      expiryOptional: "Ablauf (optional)",
+      selectGroups: "Gruppen auswählen",
+      ipPlaceholder: "Ein CIDR-Bereich pro Zeile (z.B. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "Ziel durchsuchen",
+      folderName: "Ordnername",
+      create: "Erstellen",
+      cancel: "Abbrechen",
+      noSubfolders: "Keine Unterordner gefunden.",
+      createFolderFailed: "Ordner konnte nicht erstellt werden.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "Doppelte Dateien erkannt",
+      applyToAllConflicts: "Auf alle Konflikte anwenden",
+      skipConflictingFiles: "Konfliktdateien überspringen",
+      overwriteExistingFiles: "Vorhandene Dateien überschreiben",
+    },
+    queue: {
+      noFilesStaged: "Keine Dateien zum Hochladen bereitgestellt.",
+      clearAllConfirm:
+        "Dadurch werden alle bereitgestellten Dateien aus der Upload-Warteschlange entfernt.",
+    },
+    list: {
+      shortUrl: "Kurz-URL",
+      copyLink: "Link kopieren",
+      deletePortal: "Portal löschen",
+    },
+    tokens: {
+      copyUrl: "URL kopieren",
+      revokeToken: "Token widerrufen",
     },
   },
 };

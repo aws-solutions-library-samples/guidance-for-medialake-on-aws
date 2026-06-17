@@ -70,6 +70,18 @@ class SettingsStack(cdk.NestedStack):
                 sort_key_type=dynamodb.AttributeType.STRING,
                 stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
                 point_in_time_recovery=True,
+                global_secondary_indexes=[
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="GSI1",
+                        partition_key=dynamodb.Attribute(
+                            name="GSI1_PK", type=dynamodb.AttributeType.STRING
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="GSI1_SK", type=dynamodb.AttributeType.STRING
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    )
+                ],
             ),
         )
 

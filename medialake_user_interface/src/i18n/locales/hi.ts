@@ -373,6 +373,7 @@ export default {
       usersAndGroups: "उपयोगकर्ता और समूह",
       permissionSets: "अनुमतियाँ",
       permissions: "अनुमतियां",
+      uploadPortals: "अपलोड पोर्टल",
     },
   },
   profile: {
@@ -1870,6 +1871,60 @@ export default {
     deleteDialog: {
       title: "डैशबोर्ड हटाएं?",
       message: 'क्या आप वाकई "{{name}}" को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "अपलोड पोर्टल",
+    pageDescription: "बाहरी योगदानकर्ताओं के लिए अपलोड पोर्टल प्रबंधित करें",
+    createPortal: "पोर्टल बनाएं",
+    form: {
+      portalNamePlaceholder: "पोर्टल का नाम",
+      optionalDescription: "वैकल्पिक विवरण",
+      clickToUploadLogo: "लोगो अपलोड करने के लिए क्लिक करें",
+      accessMode: "एक्सेस मोड",
+      accessModes: {
+        public: "सार्वजनिक",
+        tokenProtected: "टोकन संरक्षित",
+        cognitoGroups: "प्रमाणित (Cognito)",
+      },
+      passphrase: "पासफ़्रेज़",
+      show: "दिखाएं",
+      hide: "छिपाएं",
+      tokenBypassesPassphrase: "टोकन पासफ़्रेज़ को बायपास करता है",
+      allowedGroups: "अनुमत समूह",
+      ipAllowlist: "IP अनुमति सूची",
+      active: "सक्रिय",
+      captcha: "CAPTCHA",
+      expiryOptional: "समाप्ति (वैकल्पिक)",
+      selectGroups: "समूह चुनें",
+      ipPlaceholder: "प्रति पंक्ति एक CIDR रेंज (उदा. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "गंतव्य ब्राउज़ करें",
+      folderName: "फ़ोल्डर का नाम",
+      create: "बनाएं",
+      cancel: "रद्द करें",
+      noSubfolders: "कोई सबफ़ोल्डर नहीं मिला।",
+      createFolderFailed: "फ़ोल्डर बनाने में विफल।",
+    },
+    conflicts: {
+      duplicateFilesDetected: "डुप्लिकेट फ़ाइलें पाई गईं",
+      applyToAllConflicts: "सभी विरोधों पर लागू करें",
+      skipConflictingFiles: "विरोधी फ़ाइलें छोड़ें",
+      overwriteExistingFiles: "मौजूदा फ़ाइलें अधिलेखित करें",
+    },
+    queue: {
+      noFilesStaged: "अपलोड के लिए कोई फ़ाइल तैयार नहीं है।",
+      clearAllConfirm: "यह अपलोड कतार से सभी तैयार फ़ाइलों को हटा देगा।",
+    },
+    list: {
+      shortUrl: "छोटा URL",
+      copyLink: "लिंक कॉपी करें",
+      deletePortal: "पोर्टल हटाएं",
+    },
+    tokens: {
+      copyUrl: "URL कॉपी करें",
+      revokeToken: "टोकन रद्द करें",
     },
   },
 };

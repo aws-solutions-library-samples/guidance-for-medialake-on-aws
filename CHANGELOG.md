@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.0] - 2026-06-17
+
+### Features
+
+- feat: Upload portals - preview(refactor and fixes are expected)
+
 ## [1.14.5] - 2026-06-15
 
 ### Bug Fixes

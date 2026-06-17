@@ -307,6 +307,30 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "publish_event"],
         )
 
+        self.generate_portal_link_lambda_deployment = LambdaDeployment(
+            self,
+            "GeneratePortalLinkLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "generate_portal_link"],
+        )
+
+        self.manage_portal_lambda_deployment = LambdaDeployment(
+            self,
+            "ManagePortalLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "manage_portal"],
+        )
+
+        self.send_portal_link_lambda_deployment = LambdaDeployment(
+            self,
+            "SendPortalLinkLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "send_portal_link"],
+        )
+
         self.pipeline_trigger_lambda_deployment = LambdaDeployment(
             self,
             "PipelineTriggerLambdaDeployment",

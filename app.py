@@ -47,6 +47,7 @@ from medialake_stacks.integrations_environment_stack import (
 )
 from medialake_stacks.nodes_stack import NodesStack, NodesStackProps
 from medialake_stacks.pipeline_stack import PipelineStack, PipelineStackProps
+from medialake_stacks.portal_api_stack import PortalApiStack, PortalApiStackProps
 
 # from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps  # Deprecated - now using CollectionTypesStack
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
@@ -326,6 +327,22 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
 
+        # Portal (public upload-portal) API — hosted in its own nested stack to
+        # stay under CloudFormation's 500-resource per-stack limit. Imports the
+        # same shared REST API and reuses the connector table from the API stack.
+        portal_api_stack = PortalApiStack(
+            self,
+            "MediaLakePortalApiStack",
+            props=PortalApiStackProps(
+                system_settings_table=settings_stack.system_settings_table_name,
+                cognito_user_pool_id=props.cognito_stack.user_pool_id,
+                connector_table=api_gateway_stack.connector_table,
+                iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
+                cloudfront_domain=props.cloudfront_domain,
+            ),
+        )
+        portal_api_stack.add_dependency(api_gateway_stack)
+
         users_groups_roles_stack = UsersGroupsStack(
             self,
             "MediaLakeUsersGroupsRolesStack",
@@ -409,10 +426,12 @@ class MediaLakeStack(cdk.Stack):
                 collections_table=collections_stack.collections_table,
                 system_settings_table=settings_stack.system_settings_table.table,
                 api_keys_table=settings_stack.api_keys_table.table,
+                portal_settings_integration_lambda=portal_api_stack.portal_management_lambda,
             ),
         )
         collection_types_stack.add_dependency(collections_stack)
         collection_types_stack.add_dependency(api_gateway_stack)
+        collection_types_stack.add_dependency(portal_api_stack)
         collection_types_stack.add_dependency(settings_stack)
 
         # Store reference to collection_types_stack

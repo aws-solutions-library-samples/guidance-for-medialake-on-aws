@@ -1,0 +1,57 @@
+spec: v1.0.0
+node:
+  id: send_portal_link
+  title: Send Portal Link
+  description: Send an upload portal link via email using SES
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/SendPortalLinkLambdaDeployment
+        runtime: python3.12
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - ses:SendEmail
+              resources:
+                - ${SES_FROM_ARN}
+actions:
+  generate:
+    summary: Send portal link
+    description: Send an upload portal link via email using SES
+    operationId: sendPortalLink
+    parameters:
+      - in: body
+        name: Recipient Email
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: Portal URL
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: Portal Name
+        required: true
+        schema:
+          type: string
+      - in: body
+        name: Dataset Name
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Expires At
+        required: false
+        schema:
+          type: string
+    x-requestMapping: utility/send_portal_link/generate/
+    x-responseMapping: utility/send_portal_link/generate/
+    connections:
+      incoming:
+        type: [portal_link, any]
+      outgoing:
+        type: [any]

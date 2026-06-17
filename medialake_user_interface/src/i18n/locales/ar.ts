@@ -368,6 +368,7 @@ export default {
       usersAndGroups: "المستخدمون والمجموعات",
       permissionSets: "الأذونات",
       permissions: "الأذونات",
+      uploadPortals: "بوابات التحميل",
     },
   },
   profile: {
@@ -1856,6 +1857,60 @@ export default {
     deleteDialog: {
       title: "حذف لوحة التحكم؟",
       message: 'هل أنت متأكد أنك تريد حذف "{{name}}"؟ لا يمكن التراجع عن هذا الإجراء.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "بوابات التحميل",
+    pageDescription: "إدارة بوابات التحميل للمساهمين الخارجيين",
+    createPortal: "إنشاء بوابة",
+    form: {
+      portalNamePlaceholder: "اسم البوابة",
+      optionalDescription: "وصف اختياري",
+      clickToUploadLogo: "انقر لتحميل الشعار",
+      accessMode: "وضع الوصول",
+      accessModes: {
+        public: "عام",
+        tokenProtected: "محمي برمز",
+        cognitoGroups: "مُصادق عليه (Cognito)",
+      },
+      passphrase: "عبارة المرور",
+      show: "إظهار",
+      hide: "إخفاء",
+      tokenBypassesPassphrase: "الرمز يتجاوز عبارة المرور",
+      allowedGroups: "المجموعات المسموح بها",
+      ipAllowlist: "قائمة عناوين IP المسموح بها",
+      active: "نشط",
+      captcha: "CAPTCHA",
+      expiryOptional: "انتهاء الصلاحية (اختياري)",
+      selectGroups: "اختر المجموعات",
+      ipPlaceholder: "نطاق CIDR واحد لكل سطر (مثال 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "تصفح الوجهة",
+      folderName: "اسم المجلد",
+      create: "إنشاء",
+      cancel: "إلغاء",
+      noSubfolders: "لم يتم العثور على مجلدات فرعية.",
+      createFolderFailed: "فشل إنشاء المجلد.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "تم اكتشاف ملفات مكررة",
+      applyToAllConflicts: "تطبيق على جميع التعارضات",
+      skipConflictingFiles: "تخطي الملفات المتعارضة",
+      overwriteExistingFiles: "الكتابة فوق الملفات الموجودة",
+    },
+    queue: {
+      noFilesStaged: "لا توجد ملفات جاهزة للتحميل.",
+      clearAllConfirm: "سيؤدي هذا إلى إزالة جميع الملفات المرحلة من قائمة التحميل.",
+    },
+    list: {
+      shortUrl: "رابط قصير",
+      copyLink: "نسخ الرابط",
+      deletePortal: "حذف البوابة",
+    },
+    tokens: {
+      copyUrl: "نسخ الرابط",
+      revokeToken: "إلغاء الرمز",
     },
   },
 };

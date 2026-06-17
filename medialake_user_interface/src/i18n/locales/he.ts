@@ -367,6 +367,7 @@ export default {
       usersAndGroups: "משתמשים וקבוצות",
       permissionSets: "הרשאות",
       permissions: "הרשאות",
+      uploadPortals: "פורטלי העלאה",
     },
   },
   profile: {
@@ -1853,6 +1854,60 @@ export default {
     deleteDialog: {
       title: "למחוק לוח בקרה?",
       message: 'האם אתה בטוח שברצונך למחוק את "{{name}}"? לא ניתן לבטל פעולה זו.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "פורטלי העלאה",
+    pageDescription: "ניהול פורטלי העלאה עבור תורמים חיצוניים",
+    createPortal: "צור פורטל",
+    form: {
+      portalNamePlaceholder: "שם הפורטל",
+      optionalDescription: "תיאור אופציונלי",
+      clickToUploadLogo: "לחץ להעלאת לוגו",
+      accessMode: "מצב גישה",
+      accessModes: {
+        public: "ציבורי",
+        tokenProtected: "מוגן בטוקן",
+        cognitoGroups: "מאומת (Cognito)",
+      },
+      passphrase: "משפט סיסמה",
+      show: "הצג",
+      hide: "הסתר",
+      tokenBypassesPassphrase: "הטוקן עוקף את משפט הסיסמה",
+      allowedGroups: "קבוצות מורשות",
+      ipAllowlist: "רשימת כתובות IP מורשות",
+      active: "פעיל",
+      captcha: "CAPTCHA",
+      expiryOptional: "תפוגה (אופציונלי)",
+      selectGroups: "בחר קבוצות",
+      ipPlaceholder: "טווח CIDR אחד לכל שורה (לדוגמה 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "עיון ביעד",
+      folderName: "שם תיקייה",
+      create: "צור",
+      cancel: "ביטול",
+      noSubfolders: "לא נמצאו תיקיות משנה.",
+      createFolderFailed: "יצירת התיקייה נכשלה.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "זוהו קבצים כפולים",
+      applyToAllConflicts: "החל על כל ההתנגשויות",
+      skipConflictingFiles: "דלג על קבצים מתנגשים",
+      overwriteExistingFiles: "החלף קבצים קיימים",
+    },
+    queue: {
+      noFilesStaged: "אין קבצים מוכנים להעלאה.",
+      clearAllConfirm: "פעולה זו תסיר את כל הקבצים המוכנים מתור ההעלאה.",
+    },
+    list: {
+      shortUrl: "כתובת URL קצרה",
+      copyLink: "העתק קישור",
+      deletePortal: "מחק פורטל",
+    },
+    tokens: {
+      copyUrl: "העתק כתובת URL",
+      revokeToken: "בטל אסימון",
     },
   },
 };

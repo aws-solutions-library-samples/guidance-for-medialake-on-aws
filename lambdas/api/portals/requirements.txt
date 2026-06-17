@@ -1,0 +1,7 @@
+# boto3/botocore: provided by the Lambda Python runtime (not bundled).
+# aws-lambda-powertools: provided by the auto-attached AWS-managed Powertools
+# layer (see medialake_constructs/shared_constructs/lambda_base.py).
+# Only deps NOT in the runtime or layer are bundled below:
+pynamodb>=6.0.0
+pydantic>=2.5.0
+bcrypt>=4.0.0

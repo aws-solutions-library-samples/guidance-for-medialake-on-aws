@@ -488,6 +488,13 @@ class ConnectorsConstruct(Construct):
             "OPENSEARCH_VPC_SUBNET_IDS": props.vpc_subnet_ids,
             "OPENSEARCH_SECURITY_GROUP_ID": props.security_group_id,
             "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
+            # Collections table — passed through to each dynamically-provisioned
+            # S3 ingest (connector) Lambda so the upload-portal collection-add
+            # automation (Layer C) can write membership rows. The name is
+            # deterministic (mirrors CollectionsStack), so referencing it here
+            # avoids a cross-stack dependency on the later-created collections
+            # stack. `post_s3` derives the ARN from this name for the IAM grant.
+            "COLLECTIONS_TABLE_NAME": f"{config.resource_prefix}_collections_{config.environment}",
             # S3 Vector Store configuration
             "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
             "VECTOR_INDEX_NAME": props.s3_vector_index_name,

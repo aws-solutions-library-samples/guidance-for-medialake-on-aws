@@ -61,6 +61,50 @@ class CloudFrontWafStack(Stack):
                         "metricName": "KnownBadInputsRuleSetMetric",
                     },
                 },
+                {
+                    "name": "PortalPublicChallengeRule",
+                    "priority": 3,
+                    "action": {"challenge": {}},
+                    "statement": {
+                        "byteMatchStatement": {
+                            "searchString": "/p/",
+                            "fieldToMatch": {"uriPath": {}},
+                            "textTransformations": [{"priority": 0, "type": "NONE"}],
+                            "positionalConstraint": "STARTS_WITH",
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "PortalPublicChallengeRuleMetric",
+                    },
+                },
+                {
+                    "name": "PortalApiRateLimitRule",
+                    "priority": 4,
+                    "action": {"block": {}},
+                    "statement": {
+                        "rateBasedStatement": {
+                            "limit": config.portal_rate_limit_per_5min or 1000,
+                            "aggregateKeyType": "IP",
+                            "scopeDownStatement": {
+                                "byteMatchStatement": {
+                                    "searchString": "/portal/",
+                                    "fieldToMatch": {"uriPath": {}},
+                                    "textTransformations": [
+                                        {"priority": 0, "type": "NONE"}
+                                    ],
+                                    "positionalConstraint": "STARTS_WITH",
+                                }
+                            },
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "PortalApiRateLimitRuleMetric",
+                    },
+                },
             ],
         )
 

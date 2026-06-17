@@ -375,6 +375,7 @@ export default {
       usersAndGroups: "Usuarios y grupos",
       permissionSets: "Permisos",
       permissions: "Permisos",
+      uploadPortals: "Portales de carga",
     },
   },
   profile: {
@@ -1886,6 +1887,60 @@ export default {
     deleteDialog: {
       title: "¿Eliminar panel?",
       message: '¿Estás seguro de que deseas eliminar "{{name}}"? Esta acción no se puede deshacer.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "Portales de carga",
+    pageDescription: "Gestionar portales de carga para colaboradores externos",
+    createPortal: "Crear portal",
+    form: {
+      portalNamePlaceholder: "Nombre del portal",
+      optionalDescription: "Descripción opcional",
+      clickToUploadLogo: "Haz clic para subir el logo",
+      accessMode: "Modo de acceso",
+      accessModes: {
+        public: "Público",
+        tokenProtected: "Protegido con token",
+        cognitoGroups: "Autenticado (Cognito)",
+      },
+      passphrase: "Frase de contraseña",
+      show: "Mostrar",
+      hide: "Ocultar",
+      tokenBypassesPassphrase: "El token omite la frase de contraseña",
+      allowedGroups: "Grupos permitidos",
+      ipAllowlist: "Lista de IP permitidas",
+      active: "Activo",
+      captcha: "CAPTCHA",
+      expiryOptional: "Caducidad (opcional)",
+      selectGroups: "Seleccionar grupos",
+      ipPlaceholder: "Un rango CIDR por línea (ej. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "Explorar destino",
+      folderName: "Nombre de carpeta",
+      create: "Crear",
+      cancel: "Cancelar",
+      noSubfolders: "No se encontraron subcarpetas.",
+      createFolderFailed: "Error al crear la carpeta.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "Archivos duplicados detectados",
+      applyToAllConflicts: "Aplicar a todos los conflictos",
+      skipConflictingFiles: "Omitir archivos en conflicto",
+      overwriteExistingFiles: "Sobrescribir archivos existentes",
+    },
+    queue: {
+      noFilesStaged: "No hay archivos preparados para cargar.",
+      clearAllConfirm: "Esto eliminará todos los archivos preparados de la cola de carga.",
+    },
+    list: {
+      shortUrl: "URL corta",
+      copyLink: "Copiar enlace",
+      deletePortal: "Eliminar portal",
+    },
+    tokens: {
+      copyUrl: "Copiar URL",
+      revokeToken: "Revocar token",
     },
   },
 };

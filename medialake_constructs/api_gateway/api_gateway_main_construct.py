@@ -151,7 +151,18 @@ class ApiGatewayConstruct(Construct):
 
         # Create the API without deploying it by default
         rest_api_props = {
-            "endpoint_types": [apigateway.EndpointType.EDGE],
+            # REGIONAL (not EDGE): this API is always fronted by the MediaLake
+            # CloudFront distribution, which references the API by its
+            # `{api-id}.execute-api.{region}.amazonaws.com` hostname. An
+            # edge-optimized API puts a second, AWS-managed CloudFront in front
+            # of that hostname, so every request makes a redundant CloudFront →
+            # CloudFront → regional hop. That double hop is the main cost of the
+            # public portal's first-request latency (the CDN→origin connection
+            # setup). REGIONAL removes the extra layer; the api id / hostname is
+            # unchanged (EndpointConfiguration is an in-place update), so the
+            # CloudFront origin and all cross-stack `ApiGatewayId` consumers keep
+            # working without modification.
+            "endpoint_types": [apigateway.EndpointType.REGIONAL],
             "cloud_watch_role": True,
             "default_cors_preflight_options": apigateway.CorsOptions(
                 allow_origins=apigateway.Cors.ALL_ORIGINS,

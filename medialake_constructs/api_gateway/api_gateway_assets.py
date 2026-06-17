@@ -33,10 +33,9 @@ from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
-from medialake_constructs.shared_constructs.lambda_layers import (
+from medialake_constructs.shared_constructs.lambda_layers import (  # ZipmergeLayer,  # Disabled: layer build bypassed (see _create_bulk_download_lambda_functions)
     CommonLibrariesLayer,
     SearchLayer,
-    ZipmergeLayer,
 )
 from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
@@ -1263,7 +1262,13 @@ class AssetsConstruct(Construct):
     def _create_bulk_download_lambda_functions(self, props: AssetsProps):
         """Create Lambda functions for bulk download processing."""
         # Create the ZipmergeLayer for fast ZIP merging
-        ZipmergeLayer(self, "ZipmergeLayer")
+        # NOTE: Disabled to bypass the Go/Docker bundling build (requires network
+        # access to the Go module proxy, which is unreachable in some environments).
+        # The zipmerge binary is not currently used at runtime — bulk download zip
+        # operations are handled in pure Python via the standard-library `zipfile`
+        # module (see lambdas/.../append_to_zip/index.py). Re-enable and wire the
+        # layer into the relevant Lambda functions if/when zipmerge is actually used.
+        # ZipmergeLayer(self, "ZipmergeLayer")
 
         # Create SQS queue for multipart upload parts
         self._multipart_upload_queue = sqs.Queue(

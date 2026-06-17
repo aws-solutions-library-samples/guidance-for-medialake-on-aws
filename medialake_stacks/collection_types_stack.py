@@ -12,11 +12,13 @@ authorization and API Gateway infrastructure.
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
@@ -37,6 +39,7 @@ class CollectionTypesStackProps:
     collections_table: dynamodb.ITable
     system_settings_table: dynamodb.ITable
     api_keys_table: dynamodb.ITable
+    portal_settings_integration_lambda: Optional[lambda_.IFunction] = None
 
 
 class CollectionTypesStack(cdk.NestedStack):
@@ -70,6 +73,7 @@ class CollectionTypesStack(cdk.NestedStack):
                 system_settings_table=props.system_settings_table,
                 api_keys_table=props.api_keys_table,
                 cognito_user_pool=props.cognito_user_pool,
+                portal_settings_integration_lambda=props.portal_settings_integration_lambda,
             ),
         )
 

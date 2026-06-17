@@ -1612,6 +1612,16 @@ def create_connector(createconnector: S3Connector) -> dict:
                 system_settings_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{system_settings_table}"
                 dynamodb_resources.append(system_settings_table_arn)
 
+            # Add collections table if configured, so the ingest Lambda can write
+            # upload-portal collection-membership rows (Layer C automation). The
+            # add is silent-fail at runtime, but without this grant every write
+            # would be denied; the env var below is what actually enables the
+            # feature for this connector.
+            collections_table_name = os.environ.get("COLLECTIONS_TABLE_NAME", "")
+            if collections_table_name:
+                collections_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{collections_table_name}"
+                dynamodb_resources.append(collections_table_arn)
+
             dynamodb_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -1851,6 +1861,21 @@ def create_connector(createconnector: S3Connector) -> dict:
                         # System settings table for external service manager
                         "SYSTEM_SETTINGS_TABLE_NAME": os.environ.get(
                             "SYSTEM_SETTINGS_TABLE_NAME", ""
+                        ),
+                        # Collections table for the upload-portal collection-add
+                        # automation (Layer C). When set, the ingest handler adds
+                        # portal uploads carrying the server-stamped
+                        # `ml-collection-ids` directive to those collections.
+                        "COLLECTIONS_TABLE_NAME": os.environ.get(
+                            "COLLECTIONS_TABLE_NAME", ""
+                        ),
+                        # Connector table for bucket→connector lookup
+                        "MEDIALAKE_CONNECTOR_TABLE_NAME": os.environ.get(
+                            "MEDIALAKE_CONNECTOR_TABLE_NAME", ""
+                        ),
+                        "CONNECTOR_STORAGE_IDENTIFIER_INDEX": "StorageIdentifierIndex",
+                        "CONNECTOR_TABLE_REGION": os.environ.get(
+                            "CONNECTOR_TABLE_REGION", os.environ.get("REGION", "")
                         ),
                         # Connector table for bucket→connector lookup
                         "MEDIALAKE_CONNECTOR_TABLE_NAME": os.environ.get(

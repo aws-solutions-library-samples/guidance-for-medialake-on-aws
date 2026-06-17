@@ -13,7 +13,7 @@ def add_cors_headers_to_response(response, allow_origins="*"):
     ] = f"'{allow_origins}'"
     response.response_parameters[
         "method.response.header.Access-Control-Allow-Headers"
-    ] = "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'"
+    ] = "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify,X-Portal-Session'"
     response.response_parameters[
         "method.response.header.Access-Control-Allow-Methods"
     ] = "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
@@ -38,7 +38,7 @@ def add_cors_options_method(resource):
                     {
                         "statusCode": "200",
                         "responseParameters": {
-                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify'",
+                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,authorization,X-Api-Key,X-Amz-Security-Token,X-Origin-Verify,X-Portal-Session'",
                             "method.response.header.Access-Control-Allow-Origin": "'*'",
                             "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'",
                         },

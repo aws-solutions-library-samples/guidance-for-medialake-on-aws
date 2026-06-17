@@ -40,6 +40,7 @@ import {
   Terrain as LogoIcon,
   Folder as FolderIcon,
   Security as SecurityIcon,
+  CloudUpload as UploadPortalIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router";
 import { useTheme as useCustomTheme } from "./hooks/useTheme";
@@ -238,6 +239,15 @@ function Sidebar() {
           disabled: !(
             safePermissionCheck("view", "integration") ||
             safePermissionCheck("view", "settings.integrations")
+          ),
+        },
+        {
+          text: t("sidebar.submenu.uploadPortals", "Upload Portals"),
+          icon: <UploadPortalIcon />,
+          path: "/settings/upload-portals",
+          disabled: !(
+            safePermissionCheck("manage", "settings") ||
+            safePermissionCheck("view", "settings.upload-portals")
           ),
         },
         {

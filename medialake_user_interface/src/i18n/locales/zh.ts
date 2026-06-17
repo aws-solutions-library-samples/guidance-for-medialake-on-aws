@@ -366,6 +366,7 @@ export default {
       usersAndGroups: "用户和组",
       permissionSets: "权限",
       permissions: "权限",
+      uploadPortals: "上传门户",
     },
   },
   profile: {
@@ -1846,6 +1847,60 @@ export default {
     deleteDialog: {
       title: "删除仪表板？",
       message: '您确定要删除"{{name}}"吗？此操作无法撤消。',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "上传门户",
+    pageDescription: "管理外部贡献者的上传门户",
+    createPortal: "创建门户",
+    form: {
+      portalNamePlaceholder: "门户名称",
+      optionalDescription: "可选描述",
+      clickToUploadLogo: "点击上传标志",
+      accessMode: "访问模式",
+      accessModes: {
+        public: "公开",
+        tokenProtected: "令牌保护",
+        cognitoGroups: "已认证 (Cognito)",
+      },
+      passphrase: "口令",
+      show: "显示",
+      hide: "隐藏",
+      tokenBypassesPassphrase: "令牌可绕过口令",
+      allowedGroups: "允许的组",
+      ipAllowlist: "IP 白名单",
+      active: "启用",
+      captcha: "验证码",
+      expiryOptional: "过期时间（可选）",
+      selectGroups: "选择组",
+      ipPlaceholder: "每行一个CIDR范围（例如 10.0.0.0/8）",
+    },
+    pathBrowser: {
+      browseDestination: "浏览目标",
+      folderName: "文件夹名称",
+      create: "创建",
+      cancel: "取消",
+      noSubfolders: "未找到子文件夹。",
+      createFolderFailed: "创建文件夹失败。",
+    },
+    conflicts: {
+      duplicateFilesDetected: "检测到重复文件",
+      applyToAllConflicts: "应用于所有冲突",
+      skipConflictingFiles: "跳过冲突文件",
+      overwriteExistingFiles: "覆盖现有文件",
+    },
+    queue: {
+      noFilesStaged: "没有待上传的文件。",
+      clearAllConfirm: "这将从上传队列中移除所有暂存的文件。",
+    },
+    list: {
+      shortUrl: "短链接",
+      copyLink: "复制链接",
+      deletePortal: "删除门户",
+    },
+    tokens: {
+      copyUrl: "复制URL",
+      revokeToken: "撤销令牌",
     },
   },
 };

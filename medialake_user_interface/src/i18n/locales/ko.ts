@@ -370,6 +370,7 @@ export default {
       usersAndGroups: "사용자 및 그룹",
       permissionSets: "권한",
       permissions: "권한",
+      uploadPortals: "업로드 포털",
     },
   },
   profile: {
@@ -1858,6 +1859,60 @@ export default {
     deleteDialog: {
       title: "대시보드를 삭제하시겠습니까?",
       message: '"{{name}}"을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "업로드 포털",
+    pageDescription: "외부 기여자를 위한 업로드 포털 관리",
+    createPortal: "포털 만들기",
+    form: {
+      portalNamePlaceholder: "포털 이름",
+      optionalDescription: "선택적 설명",
+      clickToUploadLogo: "로고를 업로드하려면 클릭하세요",
+      accessMode: "접근 모드",
+      accessModes: {
+        public: "공개",
+        tokenProtected: "토큰 보호됨",
+        cognitoGroups: "인증됨 (Cognito)",
+      },
+      passphrase: "암호 문구",
+      show: "표시",
+      hide: "숨기기",
+      tokenBypassesPassphrase: "토큰이 암호 문구를 우회함",
+      allowedGroups: "허용된 그룹",
+      ipAllowlist: "IP 허용 목록",
+      active: "활성",
+      captcha: "CAPTCHA",
+      expiryOptional: "만료 (선택 사항)",
+      selectGroups: "그룹 선택",
+      ipPlaceholder: "줄당 하나의 CIDR 범위 (예: 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "대상 찾아보기",
+      folderName: "폴더 이름",
+      create: "만들기",
+      cancel: "취소",
+      noSubfolders: "하위 폴더가 없습니다.",
+      createFolderFailed: "폴더를 만들지 못했습니다.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "중복 파일이 감지되었습니다",
+      applyToAllConflicts: "모든 충돌에 적용",
+      skipConflictingFiles: "충돌하는 파일 건너뛰기",
+      overwriteExistingFiles: "기존 파일 덮어쓰기",
+    },
+    queue: {
+      noFilesStaged: "업로드할 파일이 없습니다.",
+      clearAllConfirm: "업로드 대기열에서 모든 파일이 제거됩니다.",
+    },
+    list: {
+      shortUrl: "짧은 URL",
+      copyLink: "링크 복사",
+      deletePortal: "포털 삭제",
+    },
+    tokens: {
+      copyUrl: "URL 복사",
+      revokeToken: "토큰 취소",
     },
   },
 };

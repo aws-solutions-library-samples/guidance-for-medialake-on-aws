@@ -370,6 +370,7 @@ export default {
       usersAndGroups: "Users and Groups",
       permissionSets: "Permissions",
       permissions: "Permissions",
+      uploadPortals: "Upload Portals",
     },
   },
   profile: {
@@ -1863,6 +1864,60 @@ export default {
     deleteDialog: {
       title: "Delete Dashboard?",
       message: 'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "Upload Portals",
+    pageDescription: "Manage upload portals for external contributors",
+    createPortal: "Create Portal",
+    form: {
+      portalNamePlaceholder: "Portal name",
+      optionalDescription: "Optional description",
+      clickToUploadLogo: "Click to upload logo",
+      accessMode: "Access Mode",
+      accessModes: {
+        public: "Public",
+        tokenProtected: "Token Protected",
+        cognitoGroups: "Authenticated (Cognito)",
+      },
+      passphrase: "Passphrase",
+      show: "Show",
+      hide: "Hide",
+      tokenBypassesPassphrase: "Token bypasses passphrase",
+      allowedGroups: "Allowed Groups",
+      ipAllowlist: "IP Allowlist",
+      active: "Active",
+      captcha: "CAPTCHA",
+      expiryOptional: "Expiry (optional)",
+      selectGroups: "Select groups",
+      ipPlaceholder: "One CIDR range per line (e.g. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "Browse Destination",
+      folderName: "Folder name",
+      create: "Create",
+      cancel: "Cancel",
+      noSubfolders: "No subfolders found.",
+      createFolderFailed: "Failed to create folder.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "Duplicate files detected",
+      applyToAllConflicts: "Apply to all conflicts",
+      skipConflictingFiles: "Skip conflicting files",
+      overwriteExistingFiles: "Overwrite existing files",
+    },
+    queue: {
+      noFilesStaged: "No files staged for upload.",
+      clearAllConfirm: "This will remove all staged files from the upload queue.",
+    },
+    list: {
+      shortUrl: "Short URL",
+      copyLink: "Copy link",
+      deletePortal: "Delete Portal",
+    },
+    tokens: {
+      copyUrl: "Copy URL",
+      revokeToken: "Revoke Token",
     },
   },
 };

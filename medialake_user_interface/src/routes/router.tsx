@@ -63,6 +63,23 @@ const LazyPermissionsPage = lazyLoad(() => import("@/pages/settings/PermissionsP
 const LazyIntegrationsPage = lazyLoad(() => import("@/pages/settings/IntegrationsPage"));
 const LazyEnvironmentsPage = lazyLoad(() => import("@/pages/settings/EnvironmentsPage"));
 const LazySystemSettingsPage = lazyLoad(() => import("@/pages/settings/SystemSettingsPage"));
+const LazyUploadPortalsPage = lazyLoad(() => import("@/pages/settings/UploadPortalsPage"));
+const LazyPortalEditorPage = lazyLoad(
+  () => import("@/features/settings/upload-portals/pages/PortalEditorPage")
+);
+const LazyTemplatesListPage = lazyLoad(
+  () => import("@/features/settings/upload-portals/pages/TemplatesListPage")
+);
+const LazyTemplateEditorPage = lazyLoad(
+  () => import("@/features/settings/upload-portals/pages/TemplateEditorPage")
+);
+const LazyThemesListPage = lazyLoad(
+  () => import("@/features/settings/upload-portals/pages/ThemesListPage")
+);
+const LazyThemeEditorPage = lazyLoad(
+  () => import("@/features/settings/upload-portals/pages/ThemeEditorPage")
+);
+const LazyUploadPortalPage = lazyLoad(() => import("@/pages/UploadPortalPage"));
 
 // Heavy feature pages — pipeline editor pulls in xyflow (~150KB)
 const LazyPipelinesPage = lazyLoad(() => import("@/features/pipelines/pages/PipelinesPage"));
@@ -99,6 +116,16 @@ const CollectionGroupDetailRedirect = () => {
 };
 
 export const router = createBrowserRouter([
+  {
+    path: "/upload/:slug",
+    element: LazyUploadPortalPage,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/p/:slug",
+    element: LazyUploadPortalPage,
+    errorElement: <RouteErrorBoundary />,
+  },
   {
     path: "/sign-in",
     element: <AuthPage />,
@@ -263,6 +290,87 @@ export const router = createBrowserRouter([
           <RoutePermissionGuard
             permission={{ action: "manage", subject: "settings" }}
             element={LazyEnvironmentsPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyUploadPortalsPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/new",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyPortalEditorPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/:id/edit",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyPortalEditorPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/templates",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyTemplatesListPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/templates/new",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyTemplateEditorPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/templates/:id/edit",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyTemplateEditorPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/themes",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyThemesListPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/themes/new",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyThemeEditorPage}
+          />
+        ),
+      },
+      {
+        path: "settings/upload-portals/themes/:id/edit",
+        element: (
+          <RoutePermissionGuard
+            permission={{ action: "manage", subject: "settings" }}
+            element={LazyThemeEditorPage}
           />
         ),
       },

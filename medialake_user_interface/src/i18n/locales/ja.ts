@@ -373,6 +373,7 @@ export default {
       usersAndGroups: "ユーザーとグループ",
       permissionSets: "権限",
       permissions: "権限",
+      uploadPortals: "アップロードポータル",
     },
   },
   profile: {
@@ -1872,6 +1873,60 @@ export default {
     deleteDialog: {
       title: "ダッシュボードを削除しますか？",
       message: "「{{name}}」を削除してもよろしいですか？この操作は取り消せません。",
+    },
+  },
+  uploadPortals: {
+    pageTitle: "アップロードポータル",
+    pageDescription: "外部貢献者向けのアップロードポータルを管理",
+    createPortal: "ポータルを作成",
+    form: {
+      portalNamePlaceholder: "ポータル名",
+      optionalDescription: "任意の説明",
+      clickToUploadLogo: "クリックしてロゴをアップロード",
+      accessMode: "アクセスモード",
+      accessModes: {
+        public: "公開",
+        tokenProtected: "トークン保護",
+        cognitoGroups: "認証済み (Cognito)",
+      },
+      passphrase: "パスフレーズ",
+      show: "表示",
+      hide: "非表示",
+      tokenBypassesPassphrase: "トークンはパスフレーズをバイパスします",
+      allowedGroups: "許可されたグループ",
+      ipAllowlist: "IP 許可リスト",
+      active: "有効",
+      captcha: "CAPTCHA",
+      expiryOptional: "有効期限（任意）",
+      selectGroups: "グループを選択",
+      ipPlaceholder: "1行に1つのCIDR範囲（例：10.0.0.0/8）",
+    },
+    pathBrowser: {
+      browseDestination: "宛先を参照",
+      folderName: "フォルダ名",
+      create: "作成",
+      cancel: "キャンセル",
+      noSubfolders: "サブフォルダーが見つかりません。",
+      createFolderFailed: "フォルダーの作成に失敗しました。",
+    },
+    conflicts: {
+      duplicateFilesDetected: "重複ファイルが検出されました",
+      applyToAllConflicts: "すべての競合に適用",
+      skipConflictingFiles: "競合するファイルをスキップ",
+      overwriteExistingFiles: "既存のファイルを上書き",
+    },
+    queue: {
+      noFilesStaged: "アップロード用のファイルがありません。",
+      clearAllConfirm: "アップロードキューからすべてのファイルが削除されます。",
+    },
+    list: {
+      shortUrl: "短縮URL",
+      copyLink: "リンクをコピー",
+      deletePortal: "ポータルを削除",
+    },
+    tokens: {
+      copyUrl: "URLをコピー",
+      revokeToken: "トークンを取り消す",
     },
   },
 };

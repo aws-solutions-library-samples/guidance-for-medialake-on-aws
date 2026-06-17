@@ -375,6 +375,7 @@ export default {
       usersAndGroups: "Usuários e Grupos",
       permissionSets: "Permissões",
       permissions: "Permissões",
+      uploadPortals: "Portais de upload",
     },
   },
   profile: {
@@ -1880,6 +1881,60 @@ export default {
     deleteDialog: {
       title: "Excluir painel?",
       message: 'Tem certeza de que deseja excluir "{{name}}"? Esta ação não pode ser desfeita.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "Portais de upload",
+    pageDescription: "Gerenciar portais de upload para colaboradores externos",
+    createPortal: "Criar portal",
+    form: {
+      portalNamePlaceholder: "Nome do portal",
+      optionalDescription: "Descrição opcional",
+      clickToUploadLogo: "Clique para enviar o logo",
+      accessMode: "Modo de acesso",
+      accessModes: {
+        public: "Público",
+        tokenProtected: "Protegido por token",
+        cognitoGroups: "Autenticado (Cognito)",
+      },
+      passphrase: "Frase secreta",
+      show: "Mostrar",
+      hide: "Ocultar",
+      tokenBypassesPassphrase: "O token ignora a frase secreta",
+      allowedGroups: "Grupos permitidos",
+      ipAllowlist: "Lista de IPs permitidas",
+      active: "Ativo",
+      captcha: "CAPTCHA",
+      expiryOptional: "Expiração (opcional)",
+      selectGroups: "Selecionar grupos",
+      ipPlaceholder: "Um intervalo CIDR por linha (ex. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "Navegar destino",
+      folderName: "Nome da pasta",
+      create: "Criar",
+      cancel: "Cancelar",
+      noSubfolders: "Nenhuma subpasta encontrada.",
+      createFolderFailed: "Falha ao criar a pasta.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "Arquivos duplicados detectados",
+      applyToAllConflicts: "Aplicar a todos os conflitos",
+      skipConflictingFiles: "Ignorar arquivos em conflito",
+      overwriteExistingFiles: "Substituir arquivos existentes",
+    },
+    queue: {
+      noFilesStaged: "Nenhum arquivo preparado para upload.",
+      clearAllConfirm: "Isso removerá todos os arquivos preparados da fila de upload.",
+    },
+    list: {
+      shortUrl: "URL curta",
+      copyLink: "Copiar link",
+      deletePortal: "Excluir portal",
+    },
+    tokens: {
+      copyUrl: "Copiar URL",
+      revokeToken: "Revogar token",
     },
   },
 };

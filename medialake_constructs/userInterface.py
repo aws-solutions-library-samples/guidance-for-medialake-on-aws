@@ -169,13 +169,13 @@ class UIConstruct(Construct):
                 content_security_policy={
                     "content_security_policy": (
                         "default-src 'self'; "
-                        f"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: 'wasm-unsafe-eval' https://*.amazonaws.com https://*.amazoncognito.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
+                        f"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: 'wasm-unsafe-eval' https://*.amazonaws.com https://*.amazoncognito.com https://*.awswaf.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                         "style-src-attr 'self' 'unsafe-inline'; "
                         "img-src 'self' data: https: blob:; "
                         "font-src 'self' data: https://fonts.gstatic.com; "
                         "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
-                        f"connect-src 'self' data: blob: https://*.amazonaws.com https://*.amazoncognito.com https://*.cloudfront.net{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
+                        f"connect-src 'self' data: blob: https://*.amazonaws.com https://*.amazoncognito.com https://*.cloudfront.net https://*.awswaf.com{' http://localhost:* http://127.0.0.1:*' if config.environment == 'dev' else ''}; "
                         "frame-ancestors 'none'; "
                         "base-uri 'self'; "
                         "form-action 'self'; "
@@ -371,8 +371,10 @@ class UIConstruct(Construct):
                     "X-Api-Key",
                     "Content-Type",
                     "Idempotency-Key",
+                    "X-Portal-Session",
+                    "X-Portal-Token",
                 ],
-                access_control_allow_methods=["POST", "OPTIONS"],
+                access_control_allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
                 access_control_allow_origins=["*"],
                 origin_override=True,
             ),
@@ -388,6 +390,22 @@ class UIConstruct(Construct):
             cookie_behavior=cloudfront.CacheCookieBehavior.none(),
             header_behavior=cloudfront.CacheHeaderBehavior.none(),
             query_string_behavior=cloudfront.CacheQueryStringBehavior.none(),
+        )
+
+        # Custom origin request policy for portal API that includes CloudFront-Viewer-Address
+        # The managed AllViewerExceptHostHeader policy only forwards viewer headers.
+        # CloudFront-Viewer-Address is injected by CloudFront and must be explicitly included.
+        # In the Python CDK, passing CloudFront header names to OriginRequestHeaderBehavior.all()
+        # maps to the CloudFormation "allViewerAndWhitelistCloudFront" header behavior.
+        portal_origin_request_policy = cloudfront.OriginRequestPolicy(
+            self,
+            "PortalOriginRequestPolicy",
+            comment="Portal API: all viewer headers + CloudFront-Viewer-Address for IP allowlist",
+            header_behavior=cloudfront.OriginRequestHeaderBehavior.all(
+                "CloudFront-Viewer-Address",
+            ),
+            cookie_behavior=cloudfront.OriginRequestCookieBehavior.all(),
+            query_string_behavior=cloudfront.OriginRequestQueryStringBehavior.all(),
         )
 
         # Create a custom cache policy for static assets
@@ -510,6 +528,23 @@ function handler(event) {
                 ],
             ),
             "additional_behaviors": {
+                # Public portal SPA path — WAF CAPTCHA rule targets /p/* for public portals only.
+                "/p/*": cloudfront.BehaviorOptions(
+                    origin=s3_orig,
+                    response_headers_policy=ui_response_headers_policy,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                    cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+                    cache_policy=static_assets_cache_policy,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                    compress=True,
+                    function_associations=[
+                        cloudfront.FunctionAssociation(
+                            function=spa_rewrite_function,
+                            event_type=cloudfront.FunctionEventType.VIEWER_REQUEST,
+                        ),
+                    ],
+                ),
                 "/webhooks/*": cloudfront.BehaviorOptions(
                     origin=origins.HttpOrigin(
                         f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
@@ -519,6 +554,25 @@ function handler(event) {
                     ),
                     cache_policy=webhook_cache_policy,
                     origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    response_headers_policy=webhook_response_headers_policy,
+                ),
+                # Portal API behavior:
+                # Uses a custom origin request policy that explicitly includes
+                # CloudFront-Viewer-Address (a CloudFront-injected header) alongside
+                # all portal-specific headers. The portal Lambda authorizer reads
+                # CloudFront-Viewer-Address for IP allowlist enforcement; absence
+                # of the header causes a fail-closed deny.
+                "/portal/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(
+                        f"{props.api_gateway_rest_id}.execute-api.{scope.region}.amazonaws.com",
+                        origin_path=f"/{config.api_path}",
+                        origin_ssl_protocols=[cloudfront.OriginSslPolicy.TLS_V1_2],
+                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+                    ),
+                    cache_policy=webhook_cache_policy,
+                    origin_request_policy=portal_origin_request_policy,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     response_headers_policy=webhook_response_headers_policy,

@@ -108,9 +108,10 @@ export interface ApiError {
 }
 
 export interface ApiResponse<T> {
-  status: string;
-  message: string;
+  success: boolean;
   data: T;
+  meta?: { timestamp: string; version: string; request_id: string };
+  error?: { code: string; message: string; details?: any[] };
 }
 
 export interface QueryConfig {
@@ -297,3 +298,319 @@ export interface AWSRegion {
   value: string;
   label: string;
 }
+
+// Portal Types
+import type { PortalAppearance } from "@/features/settings/upload-portals/types/appearance.types";
+
+export interface PortalMetadataField {
+  label: string;
+  type: "text" | "number" | "select" | "radiogroup" | "checkbox" | "tagbox" | "boolean";
+  required: boolean;
+  order: number;
+  options?: string[];
+  /**
+   * 1-based page this field renders on. Undefined on portals saved before
+   * multi-page support; such portals are treated as a single page.
+   */
+  pageNumber?: number;
+  /**
+   * Optional automation role. Absent (or `"none"`) = plain data field. When
+   * `"collection-picker"`, the field's value is interpreted by the BACKEND at
+   * upload time as a set of collection IDs to add the uploaded asset to
+   * (validated against {@link PortalMetadataFieldRoleConfig.allowedCollectionIds}).
+   * The form renderer never reads this — it only renders `type`.
+   *
+   * @see portal-metadata-automation-design.md (Layer A — semantic roles).
+   */
+  role?: "none" | "collection-picker";
+  /**
+   * Role-specific configuration. For `role: "collection-picker"`:
+   *   - `allowedCollections`: the admin-curated allow-list the end user may
+   *     pick from. Stored as `{ id, name }` pairs so the public renderer can
+   *     show friendly collection names as choices while the value is the id.
+   *     This is the server-validated allow-list.
+   *   - `fixedCollectionIds`: collections every upload through this portal joins
+   *     regardless of the user's choice (ids only; no display needed).
+   *   - `multiple`: when true the picker is multi-select (tagbox); otherwise a
+   *     single-select dropdown.
+   */
+  roleConfig?: {
+    allowedCollections?: { id: string; name: string }[];
+    fixedCollectionIds?: string[];
+    multiple?: boolean;
+  };
+}
+
+/**
+ * Ordered element placement on a {@link PortalPage}. Discriminated on `kind`:
+ * a `metadata-field` element references a metadata field by `fieldKey`; the
+ * other kinds map to the built-in destination selector, path questions, and
+ * uploader question types.
+ */
+export type PortalPageElement =
+  | { kind: "metadata-field"; fieldKey: string }
+  | { kind: "destination-selector" }
+  | { kind: "path-browser" }
+  | { kind: "path-builder" }
+  | { kind: "uploader" };
+
+/**
+ * A single page in a multi-page portal flow. The persisted `pages` array is
+ * the source of truth for structure; the SurveyJS schema is derived from it
+ * at render time.
+ */
+export interface PortalPage {
+  /** 1-based, contiguous. Page navigation order. */
+  pageNumber: number;
+  /** Admin-facing page title (rendered as the SurveyJS page title). */
+  title: string;
+  /** Optional rich description (sanitized HTML). */
+  descriptionHtml?: string;
+  /** Ordered element placement on this page. */
+  elements: PortalPageElement[];
+  /** Optional SurveyJS visibleIf expression for conditional page display. */
+  visibleIf?: string;
+}
+
+export interface PortalPathSegment {
+  label: string;
+  position: number;
+  regex: string;
+  segmentType?: "text" | "alphanumeric" | "numbers" | "date" | "list" | "pattern";
+  listValues?: string[];
+  patternDescription?: string;
+}
+
+export interface PortalDestination {
+  destinationId: string;
+  friendlyName: string;
+  connectorId: string;
+  rootPath: string;
+  allowBrowsing: boolean;
+  allowFolderCreation: boolean;
+  order: number;
+  pathSegments?: PortalPathSegment[];
+  pathSeparator?: string;
+  /**
+   * 1-based page whose destination-selector offers this destination.
+   * Undefined on portals saved before multi-page support.
+   */
+  pageNumber?: number;
+}
+
+/** Full portal detail — always includes destinations. */
+export interface Portal {
+  portalId: string;
+  slug: string;
+  name: string;
+  description?: string;
+  logoS3Key?: string;
+  logoUrl?: string;
+  accessMode: "public" | "token-protected" | "cognito-groups";
+  allowedGroups?: string[];
+  passphrase?: string;
+  tokenBypassesPassphrase: boolean;
+  ipAllowlist: string[];
+  structuredPathMode: boolean;
+  isActive: boolean;
+  expiresAt?: string;
+  maxFileSizeBytes?: number;
+  maxFilesPerSession?: number;
+  metadataFields: PortalMetadataField[];
+  destinations: PortalDestination[];
+  captchaEnabled: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  /**
+   * Ordered pages composing the multi-page portal flow. The source of truth
+   * for structure; the SurveyJS schema is derived from it at render time.
+   */
+  pages: PortalPage[];
+  /**
+   * Visual-editor appearance configuration. Absent on portals saved
+   * before the visual editor, in which case consumers deep-merge with
+   * `DEFAULT_PORTAL_APPEARANCE`.
+   */
+  appearance?: PortalAppearance;
+  /**
+   * Allowed file types for uploads. Empty array means "accept all".
+   * Each entry is a MIME pattern (e.g. "image/*") or extension (".pdf").
+   */
+  allowedFileTypes?: string[];
+  /**
+   * The theme this portal was created from. Informational only — there is
+   * no live link, so editing the referenced theme does NOT change this
+   * portal's appearance (appearance is snapshot/copied at create time).
+   */
+  themeId?: string;
+}
+
+/** List-item shape returned by the list endpoint — destinations may be omitted. */
+export interface PortalListItem extends Omit<Portal, "destinations"> {
+  destinations?: PortalDestination[];
+}
+
+export interface PortalToken {
+  tokenId: string;
+  associatedEmail: string;
+  isRevoked: boolean;
+  expiresAt?: string;
+  createdAt: string;
+  prePopulatedParams?: Record<string, string>;
+}
+
+export interface CreatePortalRequest {
+  name: string;
+  slug: string;
+  description?: string;
+  accessMode: Portal["accessMode"];
+  allowedGroups?: string[];
+  passphrase?: string;
+  tokenBypassesPassphrase?: boolean;
+  ipAllowlist?: string[];
+  structuredPathMode?: boolean;
+  isActive?: boolean;
+  expiresAt?: string;
+  maxFileSizeBytes?: number;
+  maxFilesPerSession?: number;
+  metadataFields?: PortalMetadataField[];
+  destinations: PortalDestination[];
+  captchaEnabled?: boolean;
+  /**
+   * Ordered pages composing the multi-page portal flow. Required on create;
+   * `UpdatePortalRequest` makes it optional (omitting leaves pages unchanged).
+   */
+  pages: PortalPage[];
+  /**
+   * Visual-editor appearance configuration. The backend persists this
+   * field unchanged alongside the rest of the portal record.
+   */
+  appearance?: PortalAppearance;
+  logoUrl?: string;
+  /**
+   * Allowed file types for uploads. Empty array means "accept all".
+   */
+  allowedFileTypes?: string[];
+}
+
+export interface UpdatePortalRequest extends Partial<CreatePortalRequest> {}
+
+export interface GenerateTokenRequest {
+  associatedEmail: string;
+  expiresAt?: string;
+  prePopulatedParams?: Record<string, string>;
+}
+
+// Backend returns flat arrays/objects in `data`, not nested under keys
+export type PortalListResponse = ApiResponse<PortalListItem[]>;
+export type PortalResponse = ApiResponse<Portal>;
+export type PortalTokenListResponse = ApiResponse<PortalToken[]>;
+export type PortalTokenResponse = ApiResponse<{
+  tokenId: string;
+  associatedEmail: string;
+  createdAt: string;
+  expiresAt: string;
+  isRevoked: boolean;
+  rawToken: string;
+  shareableUrl: string;
+}>;
+
+// Portal Themes & Templates ---------------------------------------------------
+//
+// Themes (appearance only) and Templates (full structure snapshot) are two
+// separate reusable entities. Creation from either is snapshot/copy-on-create
+// (no live inheritance): a portal's `themeId`/`templateId` references are
+// informational only. Themes are served by `/settings/portal-themes` and
+// templates by `/settings/portal-templates`.
+
+/**
+ * A reusable appearance-only theme. Mirrors the backend `PortalThemeModel`.
+ * List responses omit `appearance`; the single-get response includes it.
+ */
+export interface PortalTheme {
+  themeId: string;
+  name: string;
+  description?: string;
+  /**
+   * Appearance snapshot. Present on the single-theme get; omitted from list
+   * items (which return identity + timestamps only).
+   */
+  appearance?: PortalAppearance;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Request body for `POST /settings/portal-themes`. */
+export interface CreatePortalThemeRequest {
+  name: string;
+  description?: string;
+  appearance?: PortalAppearance;
+}
+
+/** Request body for `PUT /settings/portal-themes/{id}`. */
+export interface UpdatePortalThemeRequest extends Partial<CreatePortalThemeRequest> {}
+
+/**
+ * A reusable full-structure template. Mirrors the backend `PortalTemplateModel`
+ * snapshot — the same shapes as a portal record, minus any passphrase
+ * (templates NEVER store a passphrase). List responses return identity +
+ * `themeId` + timestamps only; the single-get response includes the full
+ * structure snapshot.
+ */
+export interface PortalTemplate {
+  templateId: string;
+  name: string;
+  description?: string;
+  /** Optional bundled theme reference (informational; copied on create). */
+  themeId?: string;
+  /** Structure snapshot — present on the single-template get. */
+  pages?: PortalPage[];
+  metadataFields?: PortalMetadataField[];
+  /** Destinations carry `connectorId` + `pageNumber` verbatim. */
+  destinations?: PortalDestination[];
+  appearance?: PortalAppearance;
+  accessMode?: Portal["accessMode"];
+  allowedGroups?: string[];
+  ipAllowlist?: string[];
+  tokenBypassesPassphrase?: boolean;
+  structuredPathMode?: boolean;
+  captchaEnabled?: boolean;
+  maxFileSizeBytes?: number;
+  maxFilesPerSession?: number;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Request body for `POST /settings/portal-templates`. A full structure
+ * snapshot of a portal config — NO passphrase (templates never carry one).
+ */
+export interface CreatePortalTemplateRequest {
+  name: string;
+  description?: string;
+  themeId?: string;
+  pages: PortalPage[];
+  metadataFields?: PortalMetadataField[];
+  destinations: PortalDestination[];
+  appearance?: PortalAppearance;
+  accessMode?: Portal["accessMode"];
+  allowedGroups?: string[];
+  ipAllowlist?: string[];
+  tokenBypassesPassphrase?: boolean;
+  structuredPathMode?: boolean;
+  captchaEnabled?: boolean;
+  maxFileSizeBytes?: number;
+  maxFilesPerSession?: number;
+}
+
+/** Request body for `PUT /settings/portal-templates/{id}`. */
+export interface UpdatePortalTemplateRequest extends Partial<CreatePortalTemplateRequest> {}
+
+// Backend returns flat arrays/objects in `data`, mirroring the portal wrappers.
+export type PortalThemeListResponse = ApiResponse<PortalTheme[]>;
+export type PortalThemeResponse = ApiResponse<PortalTheme>;
+export type PortalTemplateListResponse = ApiResponse<PortalTemplate[]>;
+export type PortalTemplateResponse = ApiResponse<PortalTemplate>;

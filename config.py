@@ -4,7 +4,7 @@ import sys
 import warnings
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from aws_cdk import aws_logs as logs
 from pydantic import (
@@ -575,6 +575,21 @@ class CDKConfig(BaseModel):
     cloudfront_custom_domain: Optional[CloudFrontCustomDomainConfig] = None
     video_download_enabled: bool = True
     external_nodes_bucket: Optional[str] = None
+    ses_from_address: Optional[str] = None
+    portal_rate_limit_per_5min: Optional[int] = 1000
+
+    @field_validator("portal_rate_limit_per_5min", mode="before")
+    @classmethod
+    def _validate_portal_rate_limit(cls, v: Any) -> int:
+        if v is None or v == "":
+            return 1000
+        v = int(v)
+        if not (100 <= v <= 2_000_000_000):
+            raise ValueError(
+                "portal_rate_limit_per_5min must be between 100 and 2,000,000,000"
+            )
+        return v
+
     use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
     deployment_options: DeploymentOptionsConfig = Field(
         default_factory=DeploymentOptionsConfig

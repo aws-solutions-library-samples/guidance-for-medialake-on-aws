@@ -376,6 +376,7 @@ export default {
       usersAndGroups: "Utilisateurs et groupes",
       permissionSets: "Permissions",
       permissions: "Permissions",
+      uploadPortals: "Portails de téléchargement",
     },
   },
   profile: {
@@ -1892,6 +1893,60 @@ export default {
     deleteDialog: {
       title: "Supprimer le tableau de bord ?",
       message: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ? Cette action est irréversible.',
+    },
+  },
+  uploadPortals: {
+    pageTitle: "Portails de téléchargement",
+    pageDescription: "Gérer les portails de téléchargement pour les contributeurs externes",
+    createPortal: "Créer un portail",
+    form: {
+      portalNamePlaceholder: "Nom du portail",
+      optionalDescription: "Description facultative",
+      clickToUploadLogo: "Cliquez pour télécharger le logo",
+      accessMode: "Mode d'accès",
+      accessModes: {
+        public: "Public",
+        tokenProtected: "Protégé par jeton",
+        cognitoGroups: "Authentifié (Cognito)",
+      },
+      passphrase: "Phrase secrète",
+      show: "Afficher",
+      hide: "Masquer",
+      tokenBypassesPassphrase: "Le jeton contourne la phrase secrète",
+      allowedGroups: "Groupes autorisés",
+      ipAllowlist: "Liste d'IP autorisées",
+      active: "Actif",
+      captcha: "CAPTCHA",
+      expiryOptional: "Expiration (facultatif)",
+      selectGroups: "Sélectionner les groupes",
+      ipPlaceholder: "Une plage CIDR par ligne (ex. 10.0.0.0/8)",
+    },
+    pathBrowser: {
+      browseDestination: "Parcourir la destination",
+      folderName: "Nom du dossier",
+      create: "Créer",
+      cancel: "Annuler",
+      noSubfolders: "Aucun sous-dossier trouvé.",
+      createFolderFailed: "Échec de la création du dossier.",
+    },
+    conflicts: {
+      duplicateFilesDetected: "Fichiers en double détectés",
+      applyToAllConflicts: "Appliquer à tous les conflits",
+      skipConflictingFiles: "Ignorer les fichiers en conflit",
+      overwriteExistingFiles: "Remplacer les fichiers existants",
+    },
+    queue: {
+      noFilesStaged: "Aucun fichier en attente de téléchargement.",
+      clearAllConfirm: "Cela supprimera tous les fichiers en attente de la file de téléchargement.",
+    },
+    list: {
+      shortUrl: "URL courte",
+      copyLink: "Copier le lien",
+      deletePortal: "Supprimer le portail",
+    },
+    tokens: {
+      copyUrl: "Copier l'URL",
+      revokeToken: "Révoquer le jeton",
     },
   },
 };

@@ -171,6 +171,25 @@ export const QUERY_KEYS = {
     collectionTypes: () => [...QUERY_KEYS.COLLECTIONS.all, "collection-types"] as const,
     users: () => [...QUERY_KEYS.COLLECTIONS.all, "users"] as const,
   },
+  PORTALS: {
+    all: ["portals"] as const,
+    lists: () => [...QUERY_KEYS.PORTALS.all, "list"] as const,
+    details: () => [...QUERY_KEYS.PORTALS.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.PORTALS.details(), id] as const,
+    tokens: (id: string) => [...QUERY_KEYS.PORTALS.detail(id), "tokens"] as const,
+  },
+  PORTAL_THEMES: {
+    all: ["portal-themes"] as const,
+    lists: () => [...QUERY_KEYS.PORTAL_THEMES.all, "list"] as const,
+    details: () => [...QUERY_KEYS.PORTAL_THEMES.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.PORTAL_THEMES.details(), id] as const,
+  },
+  PORTAL_TEMPLATES: {
+    all: ["portal-templates"] as const,
+    lists: () => [...QUERY_KEYS.PORTAL_TEMPLATES.all, "list"] as const,
+    details: () => [...QUERY_KEYS.PORTAL_TEMPLATES.all, "detail"] as const,
+    detail: (id: string) => [...QUERY_KEYS.PORTAL_TEMPLATES.details(), id] as const,
+  },
   COLLECTION_TYPES: {
     all: ["collection-types"] as const,
     lists: () => [...QUERY_KEYS.COLLECTION_TYPES.all, "list"] as const,
