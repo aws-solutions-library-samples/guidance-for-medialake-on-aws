@@ -486,36 +486,6 @@ const SystemSettingsPage: React.FC = () => {
                                 </Typography>
                               </Box>
                             </MenuItem>
-                            <MenuItem value="twelvelabs-bedrock">
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 0.5,
-                                }}
-                              >
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                  }}
-                                >
-                                  <Typography>
-                                    {SYSTEM_SETTINGS_CONFIG.PROVIDERS.TWELVE_LABS_BEDROCK.name}
-                                  </Typography>
-                                  <Chip
-                                    label={t("settings.systemSettings.search.internal", "Internal")}
-                                    size="small"
-                                    color="success"
-                                    sx={{ height: 20, fontSize: "0.7rem" }}
-                                  />
-                                </Box>
-                                <Typography variant="caption" color="text.secondary">
-                                  Supports: Image, Video, Audio • 1024D embeddings
-                                </Typography>
-                              </Box>
-                            </MenuItem>
                             <MenuItem value="twelvelabs-bedrock-3-0">
                               <Box
                                 sx={{
@@ -622,9 +592,7 @@ const SystemSettingsPage: React.FC = () => {
                                   SYSTEM_SETTINGS_CONFIG.PROVIDERS[
                                     settings.provider.type === "twelvelabs-api"
                                       ? "TWELVE_LABS_API"
-                                      : settings.provider.type === "twelvelabs-bedrock"
-                                        ? "TWELVE_LABS_BEDROCK"
-                                        : "TWELVE_LABS_BEDROCK_3_0"
+                                      : "TWELVE_LABS_BEDROCK_3_0"
                                   ]?.dimensions?.[0] || "Unknown"
                                 }D`}
                                 color="primary"
