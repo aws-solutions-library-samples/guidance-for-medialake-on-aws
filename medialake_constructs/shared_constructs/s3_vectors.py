@@ -11,7 +11,7 @@ from constructs import Construct
 @dataclass
 class S3VectorClusterProps:
     bucket_name: str
-    vector_dimension: int = 1024
+    vector_dimension: int = 512
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None

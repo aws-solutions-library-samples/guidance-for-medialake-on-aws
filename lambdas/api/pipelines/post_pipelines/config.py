@@ -22,7 +22,7 @@ MEDIACONVERT_ROLE_ARN = os.environ.get("MEDIACONVERT_ROLE_ARN")
 # S3 Vector configuration
 VECTOR_BUCKET_NAME = os.environ.get("VECTOR_BUCKET_NAME")
 INDEX_NAME = os.environ.get("INDEX_NAME", "media-vectors")
-VECTOR_DIMENSION = os.environ.get("VECTOR_DIMENSION", "1024")
+VECTOR_DIMENSION = os.environ.get("VECTOR_DIMENSION", "512")
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 resource_prefix = os.environ.get("RESOURCE_PREFIX")
