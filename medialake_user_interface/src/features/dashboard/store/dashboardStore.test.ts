@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import * as fc from "fast-check";
-import { useDashboardStore, DEFAULT_LAYOUT } from "./dashboardStore";
+import { renderHook, act } from "@testing-library/react";
+import {
+  useDashboardStore,
+  DEFAULT_LAYOUT,
+  WIDGET_DEFINITIONS,
+  useAvailableWidgets,
+} from "./dashboardStore";
 import type { CollectionsWidgetConfig, CollectionViewType, SortBy, SortOrder } from "../types";
 
 /**
@@ -334,5 +340,46 @@ describe("Property 3: Widget Configuration Independence", () => {
       ),
       { numRuns: 100 }
     );
+  });
+});
+
+describe("my-assets widget availability", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardStore.getState().resetToDefault();
+  });
+
+  it("should have my-assets in WIDGET_DEFINITIONS with correct metadata", () => {
+    const def = WIDGET_DEFINITIONS["my-assets"];
+    expect(def).toBeDefined();
+    expect(def.type).toBe("my-assets");
+    expect(def.title).toBe("My Assets");
+    expect(def.icon).toBe("person");
+    expect(def.defaultSize).toEqual({ w: 12, h: 6 });
+    expect(def.minSize).toEqual({ w: 4, h: 4 });
+    expect(def.maxSize).toEqual({ w: 12, h: 12 });
+  });
+
+  it("should include my-assets in available widgets when not in layout", () => {
+    const { result } = renderHook(() => useAvailableWidgets());
+    expect(result.current.some((d) => d.type === "my-assets")).toBe(true);
+  });
+
+  it("should exclude my-assets from available widgets when already in layout", () => {
+    const store = useDashboardStore.getState();
+    store.addWidget("my-assets");
+
+    const { result } = renderHook(() => useAvailableWidgets());
+    expect(result.current.some((d) => d.type === "my-assets")).toBe(false);
+  });
+
+  it("should create a widget instance with correct type via addWidget", () => {
+    const store = useDashboardStore.getState();
+    store.addWidget("my-assets");
+
+    const widget = useDashboardStore.getState().layout.widgets.find((w) => w.type === "my-assets");
+    expect(widget).toBeDefined();
+    expect(widget!.type).toBe("my-assets");
+    expect(widget!.id).toBeTruthy();
   });
 });

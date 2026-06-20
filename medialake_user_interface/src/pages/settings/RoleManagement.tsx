@@ -12,7 +12,7 @@ const RoleManagement: React.FC = () => {
   const { t } = useTranslation();
   const [openRoleForm, setOpenRoleForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | undefined>();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_error, setError] = useState<string | null>(null);
 
   // API Hooks

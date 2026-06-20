@@ -17,6 +17,7 @@ import {
   InputAdornment,
   IconButton,
   Button,
+  Chip,
 } from "@mui/material";
 import {
   Storage as StorageIcon,
@@ -25,12 +26,18 @@ import {
   Clear as ClearIcon,
   ChevronLeft,
   ChevronRight,
+  Person as PersonIcon,
+  CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { springEasing } from "@/constants";
 import { zIndexTokens } from "@/theme/tokens";
 import AssetExplorer from "../features/assets/AssetExplorer";
 import { useSearchConnectors } from "../api/hooks/useSearchConnectors";
+import { useMyAssetsConnector } from "../api/hooks/useMyAssetsConnector";
+import { S3UploaderModal } from "../features/upload";
+import { usePermission } from "@/permissions";
+import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 60; // Wider collapsed width to avoid overlap
@@ -39,9 +46,19 @@ const AssetsPage: React.FC = () => {
   const { t } = useTranslation();
   const theme = useTheme();
   const [selectedConnector, setSelectedConnector] = useState<string | null>(null);
+  const [selectedIsMyAssets, setSelectedIsMyAssets] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { data: connectorsResponse, isLoading } = useSearchConnectors();
+  const { connector: myAssetsConnector, isLoading: isMyAssetsLoading } = useMyAssetsConnector();
+
+  // Feature flag — gate the My Assets section (default off).
+  const myAssetsEnabled = useFeatureFlag("my-assets-enabled", false);
+
+  // Only users with upload permission see the upload entry point.
+  const { can } = usePermission();
+  const canUpload = can("upload", "asset");
 
   const connectors = connectorsResponse?.data.connectors || [];
 
@@ -156,19 +173,58 @@ const AssetsPage: React.FC = () => {
             ) : (
               // Expanded view - show full content
               <>
+                {myAssetsEnabled && (
+                  <>
+                    {/* My Assets pinned item */}
+                    <Box sx={{ p: 1 }}>
+                      <ListItemButton
+                        selected={selectedIsMyAssets}
+                        onClick={() => {
+                          setSelectedIsMyAssets(true);
+                          setSelectedConnector(null);
+                        }}
+                        sx={{
+                          borderRadius: 1,
+                          borderLeft: `3px solid ${theme.palette.primary.main}`,
+                          backgroundColor: selectedIsMyAssets
+                            ? alpha(theme.palette.primary.main, 0.08)
+                            : alpha(theme.palette.primary.main, 0.04),
+                          "&.Mui-selected": {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                            "&:hover": {
+                              backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                            },
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <PersonIcon color="primary" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={t("assetsPage.myAssets")}
+                          primaryTypographyProps={{
+                            fontWeight: selectedIsMyAssets ? 600 : 400,
+                            color: selectedIsMyAssets
+                              ? theme.palette.primary.main
+                              : theme.palette.text.primary,
+                            variant: "body2",
+                          }}
+                        />
+                        {isMyAssetsLoading ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <Chip label="Personal" size="small" color="primary" variant="outlined" />
+                        )}
+                      </ListItemButton>
+                    </Box>
+
+                    <Divider />
+                  </>
+                )}
                 <Box sx={{ p: 1.5, pb: 1 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      mb: 1,
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      {t("assetsPage.connectors")}
-                    </Typography>
-                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    Connectors
+                  </Typography>
 
                   {/* More compact search field */}
                   <TextField
@@ -228,7 +284,10 @@ const AssetsPage: React.FC = () => {
                         <ListItem key={connector.id} disablePadding>
                           <ListItemButton
                             selected={selectedConnector === connector.id}
-                            onClick={() => setSelectedConnector(connector.id)}
+                            onClick={() => {
+                              setSelectedConnector(connector.id);
+                              setSelectedIsMyAssets(false);
+                            }}
                             sx={{
                               py: 0.75, // Reduced vertical padding
                               borderRadius: 1,
@@ -323,7 +382,104 @@ const AssetsPage: React.FC = () => {
               backgroundColor: alpha(theme.palette.background.default, 0.5),
             }}
           >
-            {selectedConnector ? (
+            {selectedIsMyAssets && myAssetsEnabled ? (
+              <Paper
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                  backgroundColor: theme.palette.background.paper,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {/* Header */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 2,
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <PersonIcon color="primary" />
+                    <Typography variant="h6">{t("assetsPage.myAssets")}</Typography>
+                    <Chip label="Personal · Private" size="small" />
+                  </Box>
+                  {canUpload && (
+                    <Button
+                      variant="contained"
+                      startIcon={<CloudUploadIcon />}
+                      onClick={() => setIsUploadModalOpen(true)}
+                      disabled={!myAssetsConnector}
+                    >
+                      Upload
+                    </Button>
+                  )}
+                </Box>
+
+                {/* Asset grid — scoped to personal prefix */}
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  {myAssetsConnector ? (
+                    <AssetExplorer
+                      connectorId={myAssetsConnector.id}
+                      bucketName={myAssetsConnector.storageIdentifier}
+                      objectPrefix={myAssetsConnector.objectPrefix}
+                      emptyStateContent={
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                            p: 4,
+                          }}
+                        >
+                          <CloudUploadIcon
+                            sx={{ fontSize: 64, color: "text.secondary", opacity: 0.5, mb: 2 }}
+                          />
+                          <Typography variant="h6" color="text.secondary" gutterBottom>
+                            {t("assetsPage.myAssetsEmpty.title", "No personal assets yet")}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mb: 3, textAlign: "center", maxWidth: 400 }}
+                          >
+                            {t(
+                              "assetsPage.myAssetsEmpty.description",
+                              "Upload your first file to My Assets"
+                            )}
+                          </Typography>
+                          <Button
+                            variant="contained"
+                            startIcon={<CloudUploadIcon />}
+                            onClick={() => setIsUploadModalOpen(true)}
+                          >
+                            {t("assetsPage.myAssetsEmpty.uploadCta", "Upload to My Assets")}
+                          </Button>
+                        </Box>
+                      }
+                    />
+                  ) : isMyAssetsLoading ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100%",
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : null}
+                </Box>
+              </Paper>
+            ) : selectedConnector ? (
               <Paper
                 elevation={0}
                 sx={{
@@ -367,6 +523,16 @@ const AssetsPage: React.FC = () => {
           </Box>
         </Box>
       </PageContent>
+
+      {/* Upload modal for My Assets context */}
+      <S3UploaderModal
+        open={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        defaultConnectorId={myAssetsConnector?.id}
+        lockConnector={true}
+        title={t("assetsPage.uploadToMyAssets")}
+        defaultObjectPrefix={myAssetsConnector?.objectPrefix}
+      />
     </Box>
   );
 };

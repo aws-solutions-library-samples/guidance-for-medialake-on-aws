@@ -144,18 +144,18 @@ const PortalEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isCreateMode = !id || id === "new";
-  const duplicateId = isCreateMode ? searchParams.get("duplicate") ?? "" : "";
+  const duplicateId = isCreateMode ? (searchParams.get("duplicate") ?? "") : "";
   // Create-from-template / apply-theme seeding (task 17.3). When the create
   // route carries `?template=<id>` and/or `?theme=<id>`, we fetch the full
   // entities and seed the editor via `store.initializeFromSources` (snapshot,
   // copy-on-create — Requirements 16.5, 17.4). These are ignored outside
   // create mode.
-  const seedTemplateId = isCreateMode ? searchParams.get("template") ?? "" : "";
-  const seedThemeId = isCreateMode ? searchParams.get("theme") ?? "" : "";
+  const seedTemplateId = isCreateMode ? (searchParams.get("template") ?? "") : "";
+  const seedThemeId = isCreateMode ? (searchParams.get("theme") ?? "") : "";
 
   // Skip the request in create mode by passing an empty string (the hook is
   // gated on `enabled: !!id`).
-  const portalQuery = useGetPortal(isCreateMode ? "" : id ?? "");
+  const portalQuery = useGetPortal(isCreateMode ? "" : (id ?? ""));
   const portal = portalQuery.data?.data as Portal | undefined;
 
   // Fetch the source portal when duplicating.

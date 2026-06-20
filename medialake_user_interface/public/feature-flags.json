@@ -8,6 +8,9 @@
   "manual-pipeline-trigger-enabled": {
     "value": false
   },
+  "my-assets-enabled": {
+    "value": false
+  },
   "system-upgrades-enabled": {
     "value": false
   }

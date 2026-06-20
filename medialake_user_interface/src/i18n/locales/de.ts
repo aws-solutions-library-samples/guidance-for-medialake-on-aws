@@ -13,21 +13,31 @@ export default {
     title: "Assets",
     connectors: "Konnektoren",
     selectConnector: "Wählen Sie einen Konnektor",
+    myAssets: "Meine Assets",
+    uploadToMyAssets: "Zu Meine Assets hochladen",
+    myAssetsEmpty: {
+      title: "Noch keine Assets",
+      description:
+        "Laden Sie Ihre ersten Mediendateien hoch, um mit Ihrer persönlichen Asset-Bibliothek zu beginnen.",
+      uploadCta: "Dateien hochladen",
+    },
   },
   upload: {
     title: "Mediendateien hochladen",
     description:
-      "Wählen Sie einen S3-Connector und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
+      "Wählen Sie ein Ziel und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
     uploadDestination: "Upload-Ziel",
     browsePath: "Pfad durchsuchen",
     uploadingTo: "Hochladen nach",
     restrictedToPrefix: "eingeschränkt",
     allowedPrefixesInfo: "Sie können nur zu {{count}} erlaubten Pfad(en) hochladen",
-    connectorLabel: "S3-Connector",
-    selectConnectorPlaceholder: "Wählen Sie einen S3-Connector",
+    connectorLabel: "Upload-Ziel",
+    selectConnectorPlaceholder: "Wählen Sie ein Ziel",
     loadingConnectors: "Connectors werden geladen...",
     noConnectors:
       "Keine S3-Connectors verfügbar. Bitte konfigurieren Sie zuerst einen S3-Connector.",
+    noDestinations:
+      "Sie haben keinen Zugriff auf Upload-Ziele. Wenden Sie sich an Ihren Administrator, um Zugriff anzufordern.",
     dashboardNote:
       "Nur Dateien der Typen audio/*, video/*, image/*, HLS (application/x-mpegURL) und MPEG-DASH (application/dash+xml) sind erlaubt",
     meta: {
@@ -227,6 +237,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoriten",
+      emptyTitle: "Keine favorisierten Sammlungen",
+      emptyDescription: "Von Ihnen favorisierte Sammlungen werden hier angezeigt",
+    },
     title: "Sammlungen",
     description: "Organisieren und verwalten Sie Ihre Medien-Assets in Sammlungen",
     createCollection: "Sammlung erstellen",
@@ -926,6 +941,7 @@ export default {
     },
   },
   common: {
+    remove: "Entfernen",
     back: "Zurück",
     search: "Suchen",
     public: "Öffentlich",
@@ -1742,6 +1758,9 @@ export default {
         myCollectionsTitle: "Meine Sammlungen",
         sharedWithMeTitle: "Mit mir geteilt",
         mySharedTitle: "Meine geteilten Sammlungen",
+        favoritesTitle: "Favorisierte Sammlungen",
+        favoritesEmptyTitle: "Keine favorisierten Sammlungen",
+        favoritesEmptyDescription: "Von Ihnen favorisierte Sammlungen werden hier angezeigt",
         emptyTitle: "Keine Sammlungen gefunden",
         emptyDescription: "Erstellen Sie eine Sammlung, um zu beginnen",
         createCollection: "Sammlung erstellen",
@@ -1754,6 +1773,7 @@ export default {
           myCollections: "Meine Sammlungen",
           sharedWithMe: "Mit mir geteilt",
           myShared: "Meine geteilten Sammlungen",
+          favorites: "Favorisierte Sammlungen",
         },
         sortingTitle: "Sortierung",
         sortBy: "Sortieren nach",
@@ -1772,6 +1792,11 @@ export default {
         title: "Neueste Assets",
         emptyTitle: "Keine neuesten Assets",
         emptyDescription: "Kürzlich hochgeladene Assets werden hier angezeigt",
+      },
+      myAssets: {
+        title: "Meine Assets",
+        emptyTitle: "Noch keine persönlichen Assets",
+        emptyDescription: "Laden Sie Ihre erste Datei in Meine Assets hoch.",
       },
       collectionGroup: {
         title: "Sammlungsgruppe",
@@ -1900,6 +1925,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "Wiederverwendbare Erscheinungs-Themes, die Sie auf neue oder vorhandene Portale anwenden können.",
+      deleteTitle: "Theme löschen",
+      editorLoadError: "Theme konnte nicht geladen werden",
+    },
+    templates: {
+      listDescription:
+        "Wiederverwendbare Portalstrukturen, mit denen Sie neue Portale aus einer bewährten Konfiguration starten können.",
+      createFromTemplate: "Portal aus dieser Vorlage erstellen",
+      deleteTitle: "Vorlage löschen",
+      editorLoadError: "Vorlage konnte nicht geladen werden",
+    },
+    actions: {
+      applyTheme: "Theme anwenden",
+      applyThemeMenu: "Theme anwenden…",
+      saveAsTemplate: "Als Vorlage speichern",
+      saveAsTheme: "Als Theme speichern",
+      startFromTemplate: "Mit Vorlage beginnen",
+      startFromTemplateMenu: "Mit Vorlage beginnen…",
+    },
+    fieldTypes: {
+      radioGroup: "Optionsfeldgruppe",
+      yesNo: "Ja / Nein",
+    },
     pageTitle: "Upload-Portale",
     pageDescription: "Upload-Portale für externe Mitwirkende verwalten",
     createPortal: "Portal erstellen",

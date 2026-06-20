@@ -41,7 +41,13 @@ const PERMISSION_CATEGORIES: Record<string, { label: string; permissions: string
   },
   connectors: {
     label: "Connectors",
-    permissions: ["connectors:view", "connectors:create", "connectors:edit", "connectors:delete"],
+    permissions: [
+      "connectors:view",
+      "connectors:create",
+      "connectors:edit",
+      "connectors:delete",
+      "connectors:upload",
+    ],
   },
   pipelines: {
     label: "Pipelines",

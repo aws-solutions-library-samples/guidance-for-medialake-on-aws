@@ -30,8 +30,8 @@ import { usePortalEditorStore } from "../stores/usePortalEditorStore";
 const resolveUploaderPageNumber = (): number => {
   const pages = usePortalEditorStore.getState().portalData?.pages as PortalPage[] | undefined;
   if (Array.isArray(pages) && pages.length > 0) {
-    const hostingUploader = pages.find(
-      (page) => page.elements?.some((element) => element.kind === "uploader")
+    const hostingUploader = pages.find((page) =>
+      page.elements?.some((element) => element.kind === "uploader")
     );
     return (hostingUploader ?? pages[0]).pageNumber;
   }

@@ -2317,11 +2317,27 @@ def update_restore_status(
 
 # Process records in parallel with improved logging
 def process_records_in_parallel(
-    processor: AssetProcessor, records: List[Dict], max_workers: int = 5
+    processor: AssetProcessor, records: List[Dict], max_workers: Optional[int] = None
 ):
-    """Process records in parallel using a ThreadPoolExecutor"""
+    """Process records in parallel using a ThreadPoolExecutor.
+
+    Concurrency defaults to the ``INGEST_MAX_WORKERS`` env var (falling back to
+    5). Raising it is memory-safe: each record is processed by streaming its S3
+    object (chunked MD5 + head/metadata), never loading the whole file, so more
+    concurrent records does not risk large-file OOM on this Lambda.
+    """
+    if max_workers is None:
+        try:
+            max_workers = int(os.environ.get("INGEST_MAX_WORKERS", "5"))
+        except (TypeError, ValueError):
+            max_workers = 5
+    max_workers = max(1, max_workers)
+
     # Add logging for initial record count
-    logger.info(f"Starting parallel processing with {len(records)} records")
+    logger.info(
+        f"Starting parallel processing with {len(records)} records "
+        f"(max_workers={max_workers})"
+    )
 
     # Debug log the first record structure
     if records and len(records) > 0:

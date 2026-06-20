@@ -10,6 +10,7 @@ and associated Lambda functions for managing media connectors. It handles:
 - Lambda function configuration
 """
 
+import datetime
 from dataclasses import dataclass
 
 from aws_cdk import Stack
@@ -20,6 +21,7 @@ from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_ssm as ssm
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
@@ -81,6 +83,7 @@ class ConnectorsProps:
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
+    personal_assets_bucket_name: str | None = None  # For system connector record
 
 
 class ConnectorsConstruct(Construct):
@@ -260,6 +263,49 @@ class ConnectorsConstruct(Construct):
             string_value=self.connectors_table.table.table_name,
             description="MediaLake Connector Table Name",
         )
+
+        # --- System Connector Record in DynamoDB ---
+        # Created here (not in StorageConnectorsStack) so CloudFormation has an
+        # explicit dependency on the real connectors table object.
+        if props.personal_assets_bucket_name:
+            connector_item = {
+                "id": {"S": f"my-assets-system-{config.environment}"},
+                "type": {"S": "s3"},
+                "name": {"S": "My Assets System Connector"},
+                "status": {"S": "active"},
+                "storageIdentifier": {"S": props.personal_assets_bucket_name},
+                "objectPrefix": {"S": "personal/"},
+                "isInternal": {"BOOL": True},
+                "region": {"S": Stack.of(self).region},
+                "createdAt": {"S": datetime.datetime.utcnow().isoformat() + "Z"},
+            }
+
+            sdk_call = cr.AwsSdkCall(
+                service="DynamoDB",
+                action="putItem",
+                parameters={
+                    "TableName": self.connectors_table.table.table_name,
+                    "Item": connector_item,
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"my-assets-system-{config.environment}"
+                ),
+            )
+
+            cr.AwsCustomResource(
+                self,
+                "PersonalAssetsSystemConnector",
+                on_create=sdk_call,
+                on_update=sdk_call,
+                policy=cr.AwsCustomResourcePolicy.from_statements(
+                    [
+                        iam.PolicyStatement(
+                            actions=["dynamodb:PutItem"],
+                            resources=[self.connectors_table.table.table_arn],
+                        )
+                    ]
+                ),
+            )
 
         # Create connectors resource
         connectors_resource = props.api_resource.root.add_resource("connectors")
@@ -982,8 +1028,43 @@ class ConnectorsConstruct(Construct):
 
         apply_custom_authorization(regions_get, props.authorizer)
 
+        # --- my-assets connector endpoint ---
+        my_assets_resource = connectors_resource.add_resource("my-assets")
+
+        my_assets_get_lambda = Lambda(
+            self,
+            "ConnectorsMyAssetsGetLambda",
+            config=LambdaConfig(
+                name="connectors_my_assets_get",
+                entry="lambdas/api/connectors/my_assets/get_my_assets",
+                environment_variables={
+                    "MEDIALAKE_CONNECTOR_TABLE": self.connectors_table.table_arn,
+                    "PERSONAL_ASSETS_BUCKET_SSM_PARAM": f"/medialake/{config.environment}/personal-assets-bucket-name",
+                    "REGION": config.primary_region,
+                },
+            ),
+        )
+
+        self.connectors_table.table.grant_read_write_data(my_assets_get_lambda.function)
+
+        my_assets_get_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter/medialake/{config.environment}/personal-assets-bucket-name"
+                ],
+            )
+        )
+
+        my_assets_get = my_assets_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(my_assets_get_lambda.function),
+        )
+        apply_custom_authorization(my_assets_get, props.authorizer)
+
         # Add CORS OPTIONS methods to all resources for proper preflight handling
         # This ensures browsers can make CORS preflight requests successfully
+        add_cors_options_method(my_assets_resource)
         add_cors_options_method(connectors_resource)
         add_cors_options_method(connector_id_resource)
         add_cors_options_method(connector_s3_resource)

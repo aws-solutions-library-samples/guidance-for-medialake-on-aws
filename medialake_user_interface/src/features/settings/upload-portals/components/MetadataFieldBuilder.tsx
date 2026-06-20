@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Autocomplete,
   Box,
@@ -116,6 +117,7 @@ const SortableFieldRow: React.FC<{
   onRenameLabel,
   availableCollections = [],
 }) => {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -255,10 +257,10 @@ const SortableFieldRow: React.FC<{
             <MenuItem value="text">Text</MenuItem>
             <MenuItem value="number">Number</MenuItem>
             <MenuItem value="select">Dropdown</MenuItem>
-            <MenuItem value="radiogroup">Radio Group</MenuItem>
+            <MenuItem value="radiogroup">{t("uploadPortals.fieldTypes.radioGroup")}</MenuItem>
             <MenuItem value="checkbox">Checkboxes</MenuItem>
             <MenuItem value="tagbox">Tags</MenuItem>
-            <MenuItem value="boolean">Yes / No</MenuItem>
+            <MenuItem value="boolean">{t("uploadPortals.fieldTypes.yesNo")}</MenuItem>
           </Select>
         )}
         <FormControlLabel

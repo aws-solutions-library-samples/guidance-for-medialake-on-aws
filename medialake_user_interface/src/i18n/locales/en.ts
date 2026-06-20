@@ -13,20 +13,29 @@ export default {
     title: "Assets",
     connectors: "Connectors",
     selectConnector: "Select a connector",
+    myAssets: "My Assets",
+    uploadToMyAssets: "Upload to My Assets",
+    myAssetsEmpty: {
+      title: "No assets yet",
+      description: "Upload your first media files to get started with your personal asset library.",
+      uploadCta: "Upload Files",
+    },
   },
   upload: {
     title: "Upload Media Files",
     description:
-      "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+      "Select a destination and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
     uploadDestination: "Upload Destination",
     browsePath: "Browse Path",
     uploadingTo: "Uploading to",
     restrictedToPrefix: "restricted",
     allowedPrefixesInfo: "You can only upload to {{count}} allowed path(s)",
-    connectorLabel: "S3 Connector",
-    selectConnectorPlaceholder: "Select an S3 connector",
+    connectorLabel: "Upload Destination",
+    selectConnectorPlaceholder: "Select a destination",
     loadingConnectors: "Loading connectors...",
     noConnectors: "No S3 connectors available. Please configure an S3 connector first.",
+    noDestinations:
+      "You don't have access to any upload destinations. Contact your administrator to request access.",
     dashboardNote:
       "Only audio/*, video/*, image/*, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed",
     meta: {
@@ -351,6 +360,11 @@ export default {
     metadataFilter: {
       placeholder: "Filter by metadata",
       valuePlaceholder: "Value...",
+    },
+    favorites: {
+      sectionTitle: "Favorites",
+      emptyTitle: "No Favorite Collections",
+      emptyDescription: "Collections you favorite will appear here",
     },
   },
   sidebar: {
@@ -933,6 +947,7 @@ export default {
     chipMore: "+{{count}} more",
     edit: "Edit",
     delete: "Delete",
+    remove: "Remove",
     share: "Share",
     sharing: "Sharing...",
     viewAll: "View All",
@@ -1702,7 +1717,7 @@ export default {
         clear: "Clear custom name",
       },
       favorites: {
-        title: "Favorites",
+        title: "Favorite Assets",
         emptyTitle: "No favorites yet",
         emptyDescription: "Mark assets as favorites to see them here",
       },
@@ -1714,6 +1729,9 @@ export default {
         myCollectionsTitle: "My Collections",
         sharedWithMeTitle: "Shared With Me",
         mySharedTitle: "My Shared Collections",
+        favoritesTitle: "Favorite Collections",
+        favoritesEmptyTitle: "No Favorite Collections",
+        favoritesEmptyDescription: "Collections you favorite will appear here",
         emptyTitle: "No collections found",
         emptyDescription: "Create a collection to get started",
         createCollection: "Create Collection",
@@ -1726,6 +1744,7 @@ export default {
           myCollections: "My Collections",
           sharedWithMe: "Shared With Me",
           myShared: "My Shared Collections",
+          favorites: "Favorite Collections",
         },
         sortingTitle: "Sorting",
         sortBy: "Sort By",
@@ -1744,6 +1763,11 @@ export default {
         title: "Recent Assets",
         emptyTitle: "No recent assets",
         emptyDescription: "Recently uploaded assets will appear here",
+      },
+      myAssets: {
+        title: "My Assets",
+        emptyTitle: "No personal assets yet",
+        emptyDescription: "Upload your first file to My Assets.",
       },
       collectionGroup: {
         title: "Collection Group",
@@ -1867,6 +1891,30 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription: "Reusable appearance themes you can apply to new or existing portals.",
+      deleteTitle: "Delete theme",
+      editorLoadError: "Failed to load theme",
+    },
+    templates: {
+      listDescription:
+        "Reusable portal structures you can use to start new portals from a known-good setup.",
+      createFromTemplate: "Create portal from this template",
+      deleteTitle: "Delete template",
+      editorLoadError: "Failed to load template",
+    },
+    actions: {
+      applyTheme: "Apply theme",
+      applyThemeMenu: "Apply theme…",
+      saveAsTemplate: "Save as Template",
+      saveAsTheme: "Save as Theme",
+      startFromTemplate: "Start from template",
+      startFromTemplateMenu: "Start from template…",
+    },
+    fieldTypes: {
+      radioGroup: "Radio Group",
+      yesNo: "Yes / No",
+    },
     pageTitle: "Upload Portals",
     pageDescription: "Manage upload portals for external contributors",
     createPortal: "Create Portal",

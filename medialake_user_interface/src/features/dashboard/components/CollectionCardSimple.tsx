@@ -1,10 +1,21 @@
 import React from "react";
-import { Box, Card, CardContent, Typography, Chip, alpha, useTheme } from "@mui/material";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  IconButton,
+  alpha,
+  useTheme,
+} from "@mui/material";
 import {
   Folder as FolderIcon,
   FolderOpen as FolderOpenIcon,
   Public as PublicIcon,
   Lock as PrivateIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
   Work,
   Campaign,
   Assignment,
@@ -55,6 +66,10 @@ export interface CollectionCardSimpleProps {
   thumbnailValue?: string;
   thumbnailUrl?: string;
   onClick: () => void;
+  /** Whether the collection is currently in the user's favorites. */
+  isFavorite?: boolean;
+  /** Callback fired when the favorite toggle is activated. When undefined the toggle is not rendered. */
+  onFavoriteToggle?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
@@ -68,6 +83,8 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
   thumbnailValue,
   thumbnailUrl,
   onClick,
+  isFavorite,
+  onFavoriteToggle,
 }) => {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -142,6 +159,7 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
       <Box sx={{ p: 1, pb: 0 }}>
         <Box
           sx={{
+            position: "relative",
             height: 120,
             borderRadius: 2.5,
             overflow: "hidden",
@@ -155,6 +173,35 @@ export const CollectionCardSimple: React.FC<CollectionCardSimpleProps> = ({
           }}
         >
           {renderThumbnail()}
+
+          {onFavoriteToggle && (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavoriteToggle(e);
+              }}
+              aria-label={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+              title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+              data-testid="collection-favorite-button"
+              sx={{
+                position: "absolute",
+                top: 6,
+                left: 6,
+                color: isFavorite ? "error.main" : "primary.main",
+                bgcolor: alpha(theme.palette.background.paper, 0.85),
+                "&:hover": {
+                  bgcolor: alpha(theme.palette.background.paper, 0.95),
+                },
+              }}
+            >
+              {isFavorite ? (
+                <FavoriteIcon fontSize="small" />
+              ) : (
+                <FavoriteBorderIcon fontSize="small" />
+              )}
+            </IconButton>
+          )}
         </Box>
       </Box>
 

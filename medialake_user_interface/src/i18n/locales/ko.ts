@@ -13,20 +13,29 @@ export default {
     title: "자산",
     connectors: "커넥터",
     selectConnector: "커넥터 선택",
+    myAssets: "내 자산",
+    uploadToMyAssets: "내 자산에 업로드",
+    myAssetsEmpty: {
+      title: "아직 자산이 없습니다",
+      description: "첫 번째 미디어 파일을 업로드하여 개인 자산 라이브러리를 시작하세요.",
+      uploadCta: "파일 업로드",
+    },
   },
   upload: {
     title: "미디어 파일 업로드",
     description:
-      "S3 커넥터를 선택하고 미디어 파일을 업로드하세요. 오디오, 비디오, HLS 및 MPEG-DASH 형식만 지원됩니다.",
+      "대상을 선택하고 미디어 파일을 업로드하세요. 오디오, 비디오, HLS 및 MPEG-DASH 형식만 지원됩니다.",
     uploadDestination: "업로드 대상",
     browsePath: "경로 찾아보기",
     uploadingTo: "업로드 중",
     restrictedToPrefix: "제한됨",
     allowedPrefixesInfo: "{{count}}개의 허용된 경로에만 업로드할 수 있습니다",
-    connectorLabel: "S3 커넥터",
-    selectConnectorPlaceholder: "S3 커넥터 선택",
+    connectorLabel: "업로드 대상",
+    selectConnectorPlaceholder: "대상 선택",
     loadingConnectors: "커넥터 로딩 중...",
     noConnectors: "사용 가능한 S3 커넥터가 없습니다. 먼저 S3 커넥터를 구성하세요.",
+    noDestinations:
+      "업로드 대상에 대한 액세스 권한이 없습니다. 액세스를 요청하려면 관리자에게 문의하세요.",
     dashboardNote:
       "audio/*, video/*, image/*, HLS (application/x-mpegURL) 및 MPEG-DASH (application/dash+xml) 파일만 허용됩니다",
     meta: {
@@ -220,6 +229,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "즐겨찾기",
+      emptyTitle: "즐겨찾는 컬렉션이 없습니다",
+      emptyDescription: "즐겨찾기에 추가한 컬렉션이 여기에 표시됩니다",
+    },
     title: "컬렉션",
     description: "컬렉션에서 미디어 자산 정리 및 관리",
     createCollection: "컬렉션 생성",
@@ -911,6 +925,7 @@ export default {
     },
   },
   common: {
+    remove: "제거",
     back: "뒤로",
     search: "검색",
     public: "공개",
@@ -1709,6 +1724,9 @@ export default {
         myCollectionsTitle: "내 컬렉션",
         sharedWithMeTitle: "나에게 공유됨",
         mySharedTitle: "내가 공유한 컬렉션",
+        favoritesTitle: "즐겨찾는 컬렉션",
+        favoritesEmptyTitle: "즐겨찾는 컬렉션이 없습니다",
+        favoritesEmptyDescription: "즐겨찾기에 추가한 컬렉션이 여기에 표시됩니다",
         emptyTitle: "컬렉션을 찾을 수 없습니다",
         emptyDescription: "컬렉션을 만들어 시작하세요",
         createCollection: "컬렉션 만들기",
@@ -1721,6 +1739,7 @@ export default {
           myCollections: "내 컬렉션",
           sharedWithMe: "나에게 공유됨",
           myShared: "내가 공유한 컬렉션",
+          favorites: "즐겨찾는 컬렉션",
         },
         sortingTitle: "정렬",
         sortBy: "정렬 기준",
@@ -1739,6 +1758,11 @@ export default {
         title: "최근 자산",
         emptyTitle: "최근 자산이 없습니다",
         emptyDescription: "최근 업로드된 자산이 여기에 표시됩니다",
+      },
+      myAssets: {
+        title: "내 자산",
+        emptyTitle: "아직 개인 자산이 없습니다",
+        emptyDescription: "내 자산에 첫 번째 파일을 업로드하세요.",
       },
       collectionGroup: {
         title: "컬렉션 그룹",
@@ -1862,6 +1886,29 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription: "새 포털이나 기존 포털에 적용할 수 있는 재사용 가능한 외관 테마입니다.",
+      deleteTitle: "테마 삭제",
+      editorLoadError: "테마를 불러오지 못했습니다",
+    },
+    templates: {
+      listDescription: "검증된 설정에서 새 포털을 시작할 수 있는 재사용 가능한 포털 구조입니다.",
+      createFromTemplate: "이 템플릿으로 포털 생성",
+      deleteTitle: "템플릿 삭제",
+      editorLoadError: "템플릿을 불러오지 못했습니다",
+    },
+    actions: {
+      applyTheme: "테마 적용",
+      applyThemeMenu: "테마 적용…",
+      saveAsTemplate: "템플릿으로 저장",
+      saveAsTheme: "테마로 저장",
+      startFromTemplate: "템플릿으로 시작",
+      startFromTemplateMenu: "템플릿으로 시작…",
+    },
+    fieldTypes: {
+      radioGroup: "라디오 그룹",
+      yesNo: "예 / 아니요",
+    },
     pageTitle: "업로드 포털",
     pageDescription: "외부 기여자를 위한 업로드 포털 관리",
     createPortal: "포털 만들기",

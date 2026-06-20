@@ -53,6 +53,64 @@ PROVIDER_INDEX_MAPPING = {
 }
 
 
+PERSONAL_PREFIX = "personal/"
+
+PERSONAL_ASSETS_BUCKET = os.environ.get("PERSONAL_ASSETS_BUCKET", "")
+
+
+def _get_full_path_from_result(result: Dict[str, Any]) -> str:
+    """Extract the S3 FullPath from a search result dict."""
+    return (
+        result.get("DigitalSourceAsset", {})
+        .get("MainRepresentation", {})
+        .get("StorageInfo", {})
+        .get("PrimaryLocation", {})
+        .get("ObjectKey", {})
+        .get("FullPath", "")
+    )
+
+
+def _get_bucket_from_result(result: Dict[str, Any]) -> str:
+    """Extract the S3 Bucket from a search result dict."""
+    return (
+        result.get("DigitalSourceAsset", {})
+        .get("MainRepresentation", {})
+        .get("StorageInfo", {})
+        .get("PrimaryLocation", {})
+        .get("Bucket", "")
+    )
+
+
+def is_owned_or_nonpersonal(
+    bucket: str, full_path: str, user_sub: Optional[str]
+) -> bool:
+    """Authoritative personal-asset ownership check.
+
+    Personal "My Assets" objects live under the reserved ``personal/{sub}/``
+    key prefix. A result is visible to ``user_sub`` when it is NOT a personal
+    asset, or when it is that user's OWN personal asset.
+
+    ``Bucket`` and ``ObjectKey.FullPath`` are analyzed ``text`` fields in
+    OpenSearch and cannot be matched/prefixed server-side, so this guard is the
+    authoritative enforcement point (the search Lambda over-fetches and applies
+    it in Python).
+
+    Fail closed: if ``PERSONAL_ASSETS_BUCKET`` is not configured, or a result
+    under ``personal/`` is missing its ``Bucket`` value, we cannot positively
+    rule it out as a personal asset, so we treat it as personal and require
+    ownership rather than leaking it. Only a result whose ``Bucket`` is a known,
+    *different* bucket is exempted from the ownership check.
+    """
+    if not full_path.startswith(PERSONAL_PREFIX):
+        # Not a personal asset — always visible.
+        return True
+    if PERSONAL_ASSETS_BUCKET and bucket and bucket != PERSONAL_ASSETS_BUCKET:
+        # Lives in a known, non-personal bucket — not a My Assets object.
+        return True
+    # Personal asset (or, fail-closed, possibly one): require ownership.
+    return bool(user_sub) and full_path.startswith(f"{PERSONAL_PREFIX}{user_sub}/")
+
+
 class UnifiedSearchOrchestrator:
     """
     Main orchestrator for unified search that routes queries to appropriate providers
@@ -62,6 +120,12 @@ class UnifiedSearchOrchestrator:
     def __init__(self, logger, metrics):
         self.logger = logger
         self.metrics = metrics
+        if not PERSONAL_ASSETS_BUCKET:
+            self.logger.warning(
+                "PERSONAL_ASSETS_BUCKET is not configured; personal-asset "
+                "isolation will fail closed (objects under 'personal/' are "
+                "treated as private and hidden from non-owners)."
+            )
         self.provider_factory = SearchProviderFactory(logger, metrics)
         self._providers = {}
         self._default_provider = None
@@ -80,6 +144,34 @@ class UnifiedSearchOrchestrator:
             "twelvelabs_api", TwelveLabsAPISearchProvider
         )
         self.logger.info("Registered search provider classes")
+
+    def _apply_owner_guard_hits(
+        self, hits: List[SearchHit], user_sub: Optional[str]
+    ) -> List[SearchHit]:
+        """Filter SearchHit list to enforce personal-asset ownership."""
+        return [
+            h
+            for h in hits
+            if is_owned_or_nonpersonal(
+                _get_bucket_from_result(h.source or {}),
+                _get_full_path_from_result(h.source or {}),
+                user_sub,
+            )
+        ]
+
+    def _apply_owner_guard_dicts(
+        self, results: List[Dict[str, Any]], user_sub: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Filter plain-dict result list to enforce personal-asset ownership."""
+        return [
+            r
+            for r in results
+            if is_owned_or_nonpersonal(
+                _get_bucket_from_result(r),
+                _get_full_path_from_result(r),
+                user_sub,
+            )
+        ]
 
     def _should_reload_providers(self) -> bool:
         """Check if providers should be reloaded from configuration"""
@@ -433,12 +525,15 @@ class UnifiedSearchOrchestrator:
         )
         return default_index
 
-    def search(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
+    def search(
+        self, query_params: Dict[str, Any], user_sub: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Main search method that routes queries to appropriate providers.
 
         Args:
             query_params: HTTP query parameters
+            user_sub: Authenticated user's sub claim (for personal-asset ownership guard)
 
         Returns:
             Search response in MediaLake format
@@ -455,8 +550,15 @@ class UnifiedSearchOrchestrator:
 
             # Keyword searches go straight to OpenSearch — no provider needed
             if search_query.search_type.value == "keyword":
-                result = self._execute_opensearch_search(query_params)
+                result = self._execute_opensearch_search(query_params, user_sub)
                 self._add_presigned_urls_to_search_results(result)
+
+                # Apply owner guard to keyword search results
+                data = result.get("data", {})
+                if "results" in data:
+                    data["results"] = self._apply_owner_guard_dicts(
+                        data["results"], user_sub
+                    )
 
                 total_time = time.time() - start_time
                 self.logger.info(f"Keyword search completed in {total_time:.3f}s")
@@ -471,6 +573,11 @@ class UnifiedSearchOrchestrator:
             if provider:
                 # Execute search using selected provider
                 search_result = provider.search(search_query)
+
+                # Apply owner guard: filter out personal assets not owned by the user
+                search_result.hits = self._apply_owner_guard_hits(
+                    search_result.hits, user_sub
+                )
 
                 # Convert to MediaLake response format
                 response = self._convert_to_medialake_response(
@@ -682,7 +789,7 @@ class UnifiedSearchOrchestrator:
             )
 
     def _execute_opensearch_search(
-        self, query_params: Dict[str, Any]
+        self, query_params: Dict[str, Any], user_sub: Optional[str] = None
     ) -> Dict[str, Any]:
         """Execute search using OpenSearch-based system for keyword search"""
         self.logger.info("Executing keyword search using OpenSearch directly")
@@ -753,6 +860,8 @@ class UnifiedSearchOrchestrator:
                 search_params["filename"] = query_params["filename"]
             if "storageIdentifier" in query_params:
                 search_params["storageIdentifier"] = query_params["storageIdentifier"]
+            if "objectPrefix" in query_params:
+                search_params["objectPrefix"] = query_params["objectPrefix"]
             if "sort" in query_params:
                 search_params["sort"] = query_params["sort"]
             if "searchModality" in query_params:
@@ -762,7 +871,7 @@ class UnifiedSearchOrchestrator:
             params = SearchParams(**search_params)
 
             # Execute legacy search
-            result = perform_search(params)
+            result = perform_search(params, user_sub)
 
             self.logger.info("Legacy search completed successfully")
             return result

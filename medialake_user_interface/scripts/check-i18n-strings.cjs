@@ -674,8 +674,11 @@ class I18nChecker {
         continue;
       }
 
-      // Skip comment lines
-      if (/^\s*\/\//.test(line) || /^\s*\/\*/.test(line)) {
+      // Skip comment lines: // line comments, /* block-comment starts, and
+      // JSDoc continuation lines (` * ...`). The last case matters because
+      // markdown code spans in JSDoc (e.g. `Record<string, string>`) would
+      // otherwise be misdetected as template literals.
+      if (/^\s*\/\//.test(line) || /^\s*\/\*/.test(line) || /^\s*\*/.test(line)) {
         continue;
       }
 

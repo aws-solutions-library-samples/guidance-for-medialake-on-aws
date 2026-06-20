@@ -51,18 +51,21 @@ export interface Collection {
  * - "public": filter where isPublic === true
  * - "private": filter where isPublic === false
  * - "my-collections": filter where ownerId === currentUserId
+ * - "favorites": filter to collections whose id is in favoritedIds (empty when absent)
  * - "shared-with-me": collections explicitly shared (use dedicated endpoint, no filtering needed)
  * - "my-shared": collections owned by user that have been shared (use dedicated endpoint, no filtering needed)
  *
  * @param collections - Array of collections to filter
  * @param viewType - The view type determining which collections to display
  * @param currentUserId - The ID of the current user
+ * @param favoritedIds - Optional set of favorited collection IDs (used by the "favorites" branch)
  * @returns Filtered array of collections based on the view type
  */
 export function filterCollections(
   collections: Collection[],
   viewType: CollectionViewType,
-  currentUserId: string
+  currentUserId: string,
+  favoritedIds?: ReadonlySet<string>
 ): Collection[] {
   switch (viewType) {
     case "all":
@@ -76,6 +79,9 @@ export function filterCollections(
 
     case "my-collections":
       return collections.filter((c) => c.ownerId === currentUserId);
+
+    case "favorites":
+      return favoritedIds ? collections.filter((c) => favoritedIds.has(c.id)) : [];
 
     case "shared-with-me":
     case "my-shared":

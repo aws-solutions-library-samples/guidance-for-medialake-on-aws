@@ -70,13 +70,11 @@ Click the **"Create New Group"** or **"+"** button at the top of the page.
 A form will appear with the following fields:
 
 - **Name** (Required): Enter a descriptive name for your group
-
   - Example: "Q1 2025 Marketing Campaign"
   - Keep it concise but descriptive
   - Maximum 255 characters
 
 - **Description** (Optional): Add additional context about the group
-
   - Example: "All collections related to our Q1 marketing initiatives"
   - Maximum 1000 characters
   - Helps team members understand the group's purpose

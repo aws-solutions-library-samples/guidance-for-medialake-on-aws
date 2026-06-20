@@ -13,20 +13,30 @@ export default {
     title: "アセット",
     connectors: "コネクタ",
     selectConnector: "コネクタを選択",
+    myAssets: "マイアセット",
+    uploadToMyAssets: "マイアセットにアップロード",
+    myAssetsEmpty: {
+      title: "アセットがまだありません",
+      description:
+        "最初のメディアファイルをアップロードして、個人アセットライブラリを始めましょう。",
+      uploadCta: "ファイルをアップロード",
+    },
   },
   upload: {
     title: "メディアファイルをアップロード",
     description:
-      "S3コネクタを選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
+      "送信先を選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
     uploadDestination: "アップロード先",
     browsePath: "パスを参照",
     uploadingTo: "アップロード先",
     restrictedToPrefix: "制限付き",
     allowedPrefixesInfo: "{{count}}個の許可されたパスにのみアップロードできます",
-    connectorLabel: "S3コネクタ",
-    selectConnectorPlaceholder: "S3コネクタを選択",
+    connectorLabel: "アップロード先",
+    selectConnectorPlaceholder: "送信先を選択",
     loadingConnectors: "コネクタを読み込んでいます...",
     noConnectors: "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
+    noDestinations:
+      "アップロード先へのアクセス権がありません。アクセスをリクエストするには管理者にお問い合わせください。",
     dashboardNote:
       "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
     meta: {
@@ -223,6 +233,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "お気に入り",
+      emptyTitle: "お気に入りのコレクションはありません",
+      emptyDescription: "お気に入りに追加したコレクションがここに表示されます",
+    },
     title: "コレクション",
     description: "コレクション内でメディアアセットを整理・管理",
     createCollection: "コレクションを作成",
@@ -916,6 +931,7 @@ export default {
     },
   },
   common: {
+    remove: "削除",
     back: "戻る",
     search: "検索",
     public: "公開",
@@ -1719,6 +1735,9 @@ export default {
         myCollectionsTitle: "マイコレクション",
         sharedWithMeTitle: "共有されたもの",
         mySharedTitle: "共有したコレクション",
+        favoritesTitle: "お気に入りのコレクション",
+        favoritesEmptyTitle: "お気に入りのコレクションはありません",
+        favoritesEmptyDescription: "お気に入りに追加したコレクションがここに表示されます",
         emptyTitle: "コレクションが見つかりません",
         emptyDescription: "コレクションを作成して開始",
         createCollection: "コレクションを作成",
@@ -1731,6 +1750,7 @@ export default {
           myCollections: "マイコレクション",
           sharedWithMe: "共有されたもの",
           myShared: "共有したコレクション",
+          favorites: "お気に入りのコレクション",
         },
         sortingTitle: "並び替え",
         sortBy: "並び替え",
@@ -1749,6 +1769,11 @@ export default {
         title: "最近のアセット",
         emptyTitle: "最近のアセットはありません",
         emptyDescription: "最近アップロードされたアセットがここに表示されます",
+      },
+      myAssets: {
+        title: "マイアセット",
+        emptyTitle: "個人アセットはまだありません",
+        emptyDescription: "マイアセットに最初のファイルをアップロードしてください。",
       },
       collectionGroup: {
         title: "コレクショングループ",
@@ -1876,6 +1901,29 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription: "新規または既存のポータルに適用できる、再利用可能な外観テーマ。",
+      deleteTitle: "テーマを削除",
+      editorLoadError: "テーマの読み込みに失敗しました",
+    },
+    templates: {
+      listDescription: "実績のある構成から新しいポータルを作成できる、再利用可能なポータル構造。",
+      createFromTemplate: "このテンプレートからポータルを作成",
+      deleteTitle: "テンプレートを削除",
+      editorLoadError: "テンプレートの読み込みに失敗しました",
+    },
+    actions: {
+      applyTheme: "テーマを適用",
+      applyThemeMenu: "テーマを適用…",
+      saveAsTemplate: "テンプレートとして保存",
+      saveAsTheme: "テーマとして保存",
+      startFromTemplate: "テンプレートから開始",
+      startFromTemplateMenu: "テンプレートから開始…",
+    },
+    fieldTypes: {
+      radioGroup: "ラジオグループ",
+      yesNo: "はい / いいえ",
+    },
     pageTitle: "アップロードポータル",
     pageDescription: "外部貢献者向けのアップロードポータルを管理",
     createPortal: "ポータルを作成",

@@ -13,20 +13,30 @@ export default {
     title: "संपत्तियाँ",
     connectors: "कनेक्टर",
     selectConnector: "कनेक्टर चुनें",
+    myAssets: "मेरी संपत्तियाँ",
+    uploadToMyAssets: "मेरी संपत्तियों में अपलोड करें",
+    myAssetsEmpty: {
+      title: "अभी तक कोई संपत्ति नहीं",
+      description:
+        "अपनी व्यक्तिगत संपत्ति लाइब्रेरी शुरू करने के लिए अपनी पहली मीडिया फ़ाइलें अपलोड करें।",
+      uploadCta: "फ़ाइलें अपलोड करें",
+    },
   },
   upload: {
     title: "मीडिया फ़ाइलें अपलोड करें",
     description:
-      "एक S3 कनेक्टर चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
+      "एक गंतव्य चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
     uploadDestination: "अपलोड गंतव्य",
     browsePath: "पथ ब्राउज़ करें",
     uploadingTo: "अपलोड हो रहा है",
     restrictedToPrefix: "प्रतिबंधित",
     allowedPrefixesInfo: "आप केवल {{count}} अनुमत पथ(ों) पर अपलोड कर सकते हैं",
-    connectorLabel: "S3 कनेक्टर",
-    selectConnectorPlaceholder: "S3 कनेक्टर चुनें",
+    connectorLabel: "अपलोड गंतव्य",
+    selectConnectorPlaceholder: "गंतव्य चुनें",
     loadingConnectors: "कनेक्टर लोड हो रहे हैं...",
     noConnectors: "कोई S3 कनेक्टर उपलब्ध नहीं है। कृपया पहले एक S3 कनेक्टर कॉन्फ़िगर करें।",
+    noDestinations:
+      "आपके पास किसी भी अपलोड गंतव्य तक पहुँच नहीं है। पहुँच का अनुरोध करने के लिए अपने व्यवस्थापक से संपर्क करें।",
     dashboardNote:
       "केवल audio/*, video/*, image/*, HLS (application/x-mpegURL) और MPEG-DASH (application/dash+xml) फ़ाइलों की अनुमति है",
     meta: {
@@ -223,6 +233,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "पसंदीदा",
+      emptyTitle: "कोई पसंदीदा संग्रह नहीं",
+      emptyDescription: "आपके द्वारा पसंदीदा बनाए गए संग्रह यहाँ दिखाई देंगे",
+    },
     title: "कलेक्शन",
     description: "कलेक्शनों में मीडिया संपत्तियों को व्यवस्थित और प्रबंधित करें",
     createCollection: "कलेक्शन बनाएं",
@@ -917,6 +932,7 @@ export default {
     },
   },
   common: {
+    remove: "निकालें",
     back: "वापस",
     search: "खोजें",
     public: "सार्वजनिक",
@@ -1720,6 +1736,9 @@ export default {
         myCollectionsTitle: "मेरे संग्रह",
         sharedWithMeTitle: "मेरे साथ साझा किया गया",
         mySharedTitle: "मेरे साझा संग्रह",
+        favoritesTitle: "पसंदीदा संग्रह",
+        favoritesEmptyTitle: "कोई पसंदीदा संग्रह नहीं",
+        favoritesEmptyDescription: "आपके द्वारा पसंदीदा बनाए गए संग्रह यहाँ दिखाई देंगे",
         emptyTitle: "कोई संग्रह नहीं मिला",
         emptyDescription: "शुरू करने के लिए एक संग्रह बनाएं",
         createCollection: "संग्रह बनाएं",
@@ -1732,6 +1751,7 @@ export default {
           myCollections: "मेरे संग्रह",
           sharedWithMe: "मेरे साथ साझा किया गया",
           myShared: "मेरे साझा संग्रह",
+          favorites: "पसंदीदा संग्रह",
         },
         sortingTitle: "क्रमबद्ध करना",
         sortBy: "इसके अनुसार क्रमबद्ध करें",
@@ -1750,6 +1770,11 @@ export default {
         title: "हाल की संपत्तियां",
         emptyTitle: "कोई हाल की संपत्तियां नहीं",
         emptyDescription: "हाल ही में अपलोड की गई संपत्तियां यहां दिखाई देंगी",
+      },
+      myAssets: {
+        title: "मेरी संपत्तियां",
+        emptyTitle: "अभी तक कोई व्यक्तिगत संपत्तियां नहीं",
+        emptyDescription: "मेरी संपत्तियों में अपनी पहली फ़ाइल अपलोड करें।",
       },
       collectionGroup: {
         title: "संग्रह समूह",
@@ -1874,6 +1899,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "पुन: उपयोग करने योग्य दिखावट थीम जिन्हें आप नए या मौजूदा पोर्टल पर लागू कर सकते हैं।",
+      deleteTitle: "थीम हटाएं",
+      editorLoadError: "थीम लोड करने में विफल",
+    },
+    templates: {
+      listDescription:
+        "पुन: उपयोग करने योग्य पोर्टल संरचनाएं जिनका उपयोग आप किसी विश्वसनीय सेटअप से नए पोर्टल शुरू करने के लिए कर सकते हैं।",
+      createFromTemplate: "इस टेम्पलेट से पोर्टल बनाएं",
+      deleteTitle: "टेम्पलेट हटाएं",
+      editorLoadError: "टेम्पलेट लोड करने में विफल",
+    },
+    actions: {
+      applyTheme: "थीम लागू करें",
+      applyThemeMenu: "थीम लागू करें…",
+      saveAsTemplate: "टेम्पलेट के रूप में सहेजें",
+      saveAsTheme: "थीम के रूप में सहेजें",
+      startFromTemplate: "टेम्पलेट से शुरू करें",
+      startFromTemplateMenu: "टेम्पलेट से शुरू करें…",
+    },
+    fieldTypes: {
+      radioGroup: "रेडियो समूह",
+      yesNo: "हां / नहीं",
+    },
     pageTitle: "अपलोड पोर्टल",
     pageDescription: "बाहरी योगदानकर्ताओं के लिए अपलोड पोर्टल प्रबंधित करें",
     createPortal: "पोर्टल बनाएं",

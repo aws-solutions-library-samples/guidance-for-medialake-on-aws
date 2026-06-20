@@ -1175,7 +1175,11 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         # Search endpoints - accessible to all authenticated users
         "get /search": None,
         "get /search/fields": None,
-        "get /search/connectors": None,
+        # Connector summaries for the Assets page sidebar and upload
+        # destination picker. Gated by search:view (not connectors:view) so
+        # asset browsers can see connectors, while users without search:view
+        # get a 403 and the UI falls back to My Assets only.
+        "get /search/connectors": "search:view",
         # Settings endpoints
         "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
@@ -1328,6 +1332,52 @@ def _paths_match(path1: str, path2: str) -> bool:
             return False
 
     return True
+
+
+@tracer.capture_method
+def is_self_profile_access(
+    http_method: str,
+    resource_path: str,
+    path_parameters: Dict[str, str],
+    parsed_token: Dict[str, Any],
+) -> bool:
+    """
+    Return True when the request is an authenticated user viewing their OWN
+    profile via GET /users/{user_id}.
+
+    Every authenticated user is allowed to view their own profile regardless of
+    the ``users:view`` permission (which gates viewing OTHER users). This is
+    True only when the requested ``user_id`` matches the caller's own identity
+    (sub / cognito:username / username), so it never grants access to anyone
+    else's profile.
+
+    Args:
+        http_method: HTTP method (e.g. "get").
+        resource_path: API Gateway resource template (e.g. "/users/{user_id}").
+        path_parameters: Resolved path parameters (e.g. {"user_id": "<sub>"}).
+        parsed_token: Decoded JWT claims for the caller.
+
+    Returns:
+        True if the caller is viewing their own profile, else False.
+    """
+    if (http_method or "").lower() != "get":
+        return False
+    if (resource_path or "").rstrip("/") != "/users/{user_id}":
+        return False
+    if not isinstance(parsed_token, dict):
+        return False
+
+    requested_user_id = (path_parameters or {}).get("user_id")
+    if not requested_user_id:
+        return False
+
+    caller_identities = {
+        parsed_token.get("sub"),
+        parsed_token.get("cognito:username"),
+        parsed_token.get("username"),
+    }
+    caller_identities.discard(None)
+    return requested_user_id in caller_identities
 
 
 @tracer.capture_method
@@ -2283,6 +2333,20 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             required_permission = get_required_permission(
                 http_method, resource_path, path_parameters
             )
+
+            # Self-access exception: any authenticated user may view their OWN
+            # profile via GET /users/{user_id}, even without the users:view
+            # permission (which gates viewing OTHER users). This does not grant
+            # access to anyone else's profile.
+            if required_permission and is_self_profile_access(
+                http_method, resource_path, path_parameters, parsed_token
+            ):
+                logger.info(
+                    "Self-profile access granted for own user_id; "
+                    "bypassing users:view requirement",
+                    extra={"correlation_id": correlation_id},
+                )
+                required_permission = None
 
             # Initialize authorization variables
             is_authorized = False

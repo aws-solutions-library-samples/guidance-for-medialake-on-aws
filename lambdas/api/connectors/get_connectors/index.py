@@ -104,14 +104,25 @@ def get_connectors() -> dict:
         # Scan the table to get all connectors
         try:
             response = table.scan()
-            connectors = [format_connector(item) for item in response.get("Items", [])]
+            items = response.get("Items", [])
 
             # Handle pagination if there are more items
             while "LastEvaluatedKey" in response:
                 response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
-                connectors.extend(
-                    [format_connector(item) for item in response.get("Items", [])]
+                items.extend(response.get("Items", []))
+
+            # Filter out internal and my-assets connectors
+            items = [
+                item
+                for item in items
+                if item.get("type") != "my-assets"
+                and not (
+                    str(item.get("isInternal", "")).lower() == "true"
+                    or item.get("isInternal") is True
                 )
+            ]
+
+            connectors = [format_connector(item) for item in items]
 
             logger.info(f"Retrieved {len(connectors)} connectors successfully")
 

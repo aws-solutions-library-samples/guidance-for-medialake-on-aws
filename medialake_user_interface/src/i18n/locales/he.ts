@@ -13,20 +13,28 @@ export default {
     title: "נכסים",
     connectors: "מחברים",
     selectConnector: "בחר מחבר",
+    myAssets: "הנכסים שלי",
+    uploadToMyAssets: "העלאה לנכסים שלי",
+    myAssetsEmpty: {
+      title: "אין נכסים עדיין",
+      description: "העלה את קבצי המדיה הראשונים שלך כדי להתחיל עם ספריית הנכסים האישית שלך.",
+      uploadCta: "העלאת קבצים",
+    },
   },
   upload: {
     title: "העלאת קבצי מדיה",
     description:
-      "בחר מחבר S3 והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
+      "בחר יעד והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
     uploadDestination: "יעד ההעלאה",
     browsePath: "עיון בנתיב",
     uploadingTo: "מעלה אל",
     restrictedToPrefix: "מוגבל",
     allowedPrefixesInfo: "ניתן להעלות רק ל-{{count}} נתיב(ים) מורשה(ים)",
-    connectorLabel: "מחבר S3",
-    selectConnectorPlaceholder: "בחר מחבר S3",
+    connectorLabel: "יעד ההעלאה",
+    selectConnectorPlaceholder: "בחר יעד",
     loadingConnectors: "טוען מחברים...",
     noConnectors: "אין מחברי S3 זמינים. אנא הגדר תחילה מחבר S3.",
+    noDestinations: "אין לך גישה לאף יעד העלאה. פנה למנהל המערכת כדי לבקש גישה.",
     dashboardNote:
       "מותרים רק קבצים מסוג audio/*, video/*, image/*, HLS (application/x-mpegURL) ו-MPEG-DASH (application/dash+xml)",
     meta: {
@@ -217,6 +225,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "מועדפים",
+      emptyTitle: "אין אוספים מועדפים",
+      emptyDescription: "אוספים שתסמן כמועדפים יופיעו כאן",
+    },
     title: "אוספים",
     description: "ארגן ונהל נכסי מדיה באוספים",
     createCollection: "צור אוסף",
@@ -907,6 +920,7 @@ export default {
     },
   },
   common: {
+    remove: "הסר",
     back: "חזור",
     search: "חפש",
     public: "ציבורי",
@@ -1704,6 +1718,9 @@ export default {
         myCollectionsTitle: "האוספים שלי",
         sharedWithMeTitle: "משותף איתי",
         mySharedTitle: "האוספים המשותפים שלי",
+        favoritesTitle: "אוספים מועדפים",
+        favoritesEmptyTitle: "אין אוספים מועדפים",
+        favoritesEmptyDescription: "אוספים שתסמן כמועדפים יופיעו כאן",
         emptyTitle: "לא נמצאו אוספים",
         emptyDescription: "צור אוסף כדי להתחיל",
         createCollection: "צור אוסף",
@@ -1716,6 +1733,7 @@ export default {
           myCollections: "האוספים שלי",
           sharedWithMe: "משותף איתי",
           myShared: "האוספים המשותפים שלי",
+          favorites: "אוספים מועדפים",
         },
         sortingTitle: "מיון",
         sortBy: "מיין לפי",
@@ -1734,6 +1752,11 @@ export default {
         title: "נכסים אחרונים",
         emptyTitle: "אין נכסים אחרונים",
         emptyDescription: "נכסים שהועלו לאחרונה יופיעו כאן",
+      },
+      myAssets: {
+        title: "הנכסים שלי",
+        emptyTitle: "אין עדיין נכסים אישיים",
+        emptyDescription: "העלה את הקובץ הראשון שלך לנכסים שלי.",
       },
       collectionGroup: {
         title: "קבוצת אוספים",
@@ -1857,6 +1880,30 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription: "ערכות נושא של מראה לשימוש חוזר שניתן להחיל על פורטלים חדשים או קיימים.",
+      deleteTitle: "מחק ערכת נושא",
+      editorLoadError: "טעינת ערכת הנושא נכשלה",
+    },
+    templates: {
+      listDescription:
+        "מבני פורטל לשימוש חוזר שבהם ניתן להשתמש כדי להתחיל פורטלים חדשים מתצורה בדוקה.",
+      createFromTemplate: "צור פורטל מתבנית זו",
+      deleteTitle: "מחק תבנית",
+      editorLoadError: "טעינת התבנית נכשלה",
+    },
+    actions: {
+      applyTheme: "החל ערכת נושא",
+      applyThemeMenu: "החל ערכת נושא…",
+      saveAsTemplate: "שמור כתבנית",
+      saveAsTheme: "שמור כערכת נושא",
+      startFromTemplate: "התחל מתבנית",
+      startFromTemplateMenu: "התחל מתבנית…",
+    },
+    fieldTypes: {
+      radioGroup: "קבוצת לחצני בחירה",
+      yesNo: "כן / לא",
+    },
     pageTitle: "פורטלי העלאה",
     pageDescription: "ניהול פורטלי העלאה עבור תורמים חיצוניים",
     createPortal: "צור פורטל",

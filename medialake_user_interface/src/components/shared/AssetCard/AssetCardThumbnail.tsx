@@ -32,7 +32,7 @@ const createImageErrorHandler =
   (assetType?: string, placeholderImage?: string) =>
   (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     event.currentTarget.src =
-      assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : placeholderImage ?? PLACEHOLDER_IMAGE;
+      assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : (placeholderImage ?? PLACEHOLDER_IMAGE);
   };
 
 const AssetCardThumbnail: React.FC<AssetCardThumbnailProps> = React.memo(

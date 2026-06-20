@@ -191,6 +191,9 @@ class CollectionsApi(Construct):
                     "COLLECTIONS_INDEX_NAME": f"{config.resource_prefix}_collections_{config.environment}",
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    # User table holds per-user favorites; the collection-delete
+                    # path cleans up favorite rows referencing the deleted collection.
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
                     # Cognito user pool for /collections/users endpoint
                     # Allows sharing UI to list users without requiring users:view
                     **(
@@ -225,6 +228,28 @@ class CollectionsApi(Construct):
 
         # Grant read access to asset table (for copying asset thumbnails)
         props.asset_table.grant_read_data(collections_lambda.function)
+
+        # Allow the collection-delete path to clean up favorite rows that
+        # reference a deleted collection. Favorites live in the user table; the
+        # handler queries the sparse GSI4 (gsi4Pk=FAVCOLLECTION#<id>) and deletes
+        # the matching base rows. Granted by name/ARN to avoid a cross-stack
+        # table dependency.
+        _user_table_arn = Stack.of(self).format_arn(
+            service="dynamodb",
+            resource="table",
+            resource_name=f"{config.resource_prefix}-user-{config.environment}",
+        )
+        collections_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:Query",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:BatchWriteItem",
+                ],
+                resources=[_user_table_arn, f"{_user_table_arn}/index/GSI4"],
+            )
+        )
 
         # ------------------------------------------------------------------
         # Asset deletion cleanup consumer

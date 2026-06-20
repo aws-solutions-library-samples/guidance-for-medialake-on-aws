@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, ArrowDropDown as ArrowDropDownIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import { useListTemplates } from "@/api/hooks/useTemplates";
 import { useListThemes } from "@/api/hooks/useThemes";
@@ -53,6 +54,7 @@ export interface CreatePortalMenuProps {
 type PickerMode = "template" | "theme" | null;
 
 const CreatePortalMenu: React.FC<CreatePortalMenuProps> = ({ disabled = false, title }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [picker, setPicker] = useState<PickerMode>(null);
@@ -114,13 +116,15 @@ const CreatePortalMenu: React.FC<CreatePortalMenuProps> = ({ disabled = false, t
         >
           Blank portal
         </MenuItem>
-        <MenuItem onClick={openTemplatePicker}>Start from template…</MenuItem>
-        <MenuItem onClick={openThemePicker}>Apply theme…</MenuItem>
+        <MenuItem onClick={openTemplatePicker}>
+          {t("uploadPortals.actions.startFromTemplateMenu")}
+        </MenuItem>
+        <MenuItem onClick={openThemePicker}>{t("uploadPortals.actions.applyThemeMenu")}</MenuItem>
       </Menu>
 
       {/* Template picker */}
       <Dialog open={picker === "template"} onClose={closePicker} fullWidth maxWidth="xs">
-        <DialogTitle>Start from template</DialogTitle>
+        <DialogTitle>{t("uploadPortals.actions.startFromTemplate")}</DialogTitle>
         <DialogContent dividers>
           {templates.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
@@ -149,7 +153,7 @@ const CreatePortalMenu: React.FC<CreatePortalMenuProps> = ({ disabled = false, t
 
       {/* Theme picker */}
       <Dialog open={picker === "theme"} onClose={closePicker} fullWidth maxWidth="xs">
-        <DialogTitle>Apply theme</DialogTitle>
+        <DialogTitle>{t("uploadPortals.actions.applyTheme")}</DialogTitle>
         <DialogContent dividers>
           {themes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">

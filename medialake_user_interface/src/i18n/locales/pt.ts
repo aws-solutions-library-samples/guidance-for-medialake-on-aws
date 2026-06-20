@@ -13,20 +13,30 @@ export default {
     title: "Ativos",
     connectors: "Conectores",
     selectConnector: "Selecione um conector",
+    myAssets: "Meus ativos",
+    uploadToMyAssets: "Enviar para Meus ativos",
+    myAssetsEmpty: {
+      title: "Nenhum ativo ainda",
+      description:
+        "Envie seus primeiros arquivos de mídia para começar sua biblioteca pessoal de ativos.",
+      uploadCta: "Enviar arquivos",
+    },
   },
   upload: {
     title: "Carregar arquivos de mídia",
     description:
-      "Selecione um conector S3 e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
+      "Selecione um destino e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
     uploadDestination: "Destino do upload",
     browsePath: "Navegar caminho",
     uploadingTo: "Carregando para",
     restrictedToPrefix: "restrito",
     allowedPrefixesInfo: "Você só pode carregar para {{count}} caminho(s) permitido(s)",
-    connectorLabel: "Conector S3",
-    selectConnectorPlaceholder: "Selecione um conector S3",
+    connectorLabel: "Destino do upload",
+    selectConnectorPlaceholder: "Selecione um destino",
     loadingConnectors: "Carregando conectores...",
     noConnectors: "Nenhum conector S3 disponível. Por favor, configure um conector S3 primeiro.",
+    noDestinations:
+      "Você não tem acesso a nenhum destino de upload. Entre em contato com o administrador para solicitar acesso.",
     dashboardNote:
       "Apenas arquivos do tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) e MPEG-DASH (application/dash+xml) são permitidos",
     meta: {
@@ -225,6 +235,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoritos",
+      emptyTitle: "Nenhuma coleção favorita",
+      emptyDescription: "As coleções que você favoritar aparecerão aqui",
+    },
     title: "Coleções",
     description: "Organize e gerencie seus ativos de mídia em coleções",
     createCollection: "Criar Coleção",
@@ -924,6 +939,7 @@ export default {
     },
   },
   common: {
+    remove: "Remover",
     back: "Voltar",
     search: "Pesquisar",
     public: "Público",
@@ -1730,6 +1746,9 @@ export default {
         myCollectionsTitle: "Minhas Coleções",
         sharedWithMeTitle: "Compartilhado Comigo",
         mySharedTitle: "Minhas Coleções Compartilhadas",
+        favoritesTitle: "Coleções favoritas",
+        favoritesEmptyTitle: "Nenhuma coleção favorita",
+        favoritesEmptyDescription: "As coleções que você favoritar aparecerão aqui",
         emptyTitle: "Nenhuma coleção encontrada",
         emptyDescription: "Crie uma coleção para começar",
         createCollection: "Criar Coleção",
@@ -1742,6 +1761,7 @@ export default {
           myCollections: "Minhas Coleções",
           sharedWithMe: "Compartilhado Comigo",
           myShared: "Minhas Coleções Compartilhadas",
+          favorites: "Coleções favoritas",
         },
         sortingTitle: "Ordenação",
         sortBy: "Ordenar Por",
@@ -1760,6 +1780,11 @@ export default {
         title: "Recursos Recentes",
         emptyTitle: "Não há recursos recentes",
         emptyDescription: "Recursos carregados recentemente aparecerão aqui",
+      },
+      myAssets: {
+        title: "Meus Recursos",
+        emptyTitle: "Ainda não há recursos pessoais",
+        emptyDescription: "Carregue seu primeiro arquivo em Meus Recursos.",
       },
       collectionGroup: {
         title: "Grupo de Coleções",
@@ -1884,6 +1909,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "Temas de aparência reutilizáveis que você pode aplicar a portais novos ou existentes.",
+      deleteTitle: "Excluir tema",
+      editorLoadError: "Falha ao carregar o tema",
+    },
+    templates: {
+      listDescription:
+        "Estruturas de portal reutilizáveis que você pode usar para iniciar novos portais a partir de uma configuração confiável.",
+      createFromTemplate: "Criar portal a partir deste modelo",
+      deleteTitle: "Excluir modelo",
+      editorLoadError: "Falha ao carregar o modelo",
+    },
+    actions: {
+      applyTheme: "Aplicar tema",
+      applyThemeMenu: "Aplicar tema…",
+      saveAsTemplate: "Salvar como modelo",
+      saveAsTheme: "Salvar como tema",
+      startFromTemplate: "Começar a partir de um modelo",
+      startFromTemplateMenu: "Começar a partir de um modelo…",
+    },
+    fieldTypes: {
+      radioGroup: "Grupo de opções",
+      yesNo: "Sim / Não",
+    },
     pageTitle: "Portais de upload",
     pageDescription: "Gerenciar portais de upload para colaboradores externos",
     createPortal: "Criar portal",

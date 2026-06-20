@@ -13,20 +13,28 @@ export default {
     title: "الأصول",
     connectors: "الموصلات",
     selectConnector: "اختر موصل",
+    myAssets: "أصولي",
+    uploadToMyAssets: "رفع إلى أصولي",
+    myAssetsEmpty: {
+      title: "لا توجد أصول بعد",
+      description: "قم برفع ملفات الوسائط الأولى للبدء في مكتبة الأصول الشخصية الخاصة بك.",
+      uploadCta: "رفع الملفات",
+    },
   },
   upload: {
     title: "تحميل ملفات الوسائط",
     description:
-      "حدد موصل S3 وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو و HLS و MPEG-DASH فقط.",
+      "حدد وجهة وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو و HLS و MPEG-DASH فقط.",
     uploadDestination: "وجهة التحميل",
     browsePath: "تصفح المسار",
     uploadingTo: "التحميل إلى",
     restrictedToPrefix: "مقيد",
     allowedPrefixesInfo: "يمكنك التحميل فقط إلى {{count}} مسار(ات) مسموح بها",
-    connectorLabel: "موصل S3",
-    selectConnectorPlaceholder: "حدد موصل S3",
+    connectorLabel: "وجهة التحميل",
+    selectConnectorPlaceholder: "حدد وجهة",
     loadingConnectors: "جارٍ تحميل الموصلات...",
     noConnectors: "لا توجد موصلات S3 متاحة. يرجى تكوين موصل S3 أولاً.",
+    noDestinations: "ليس لديك حق الوصول إلى أي وجهات تحميل. تواصل مع المسؤول لطلب الوصول.",
     dashboardNote:
       "يُسمح فقط بالملفات من نوع audio/*، وvideo/*، وimage/*، وHLS (application/x-mpegURL)، وMPEG-DASH (application/dash+xml)",
     meta: {
@@ -218,6 +226,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "المفضلة",
+      emptyTitle: "لا توجد مجموعات مفضلة",
+      emptyDescription: "ستظهر المجموعات التي تضيفها إلى المفضلة هنا",
+    },
     title: "المجموعات",
     description: "تنظيم وإدارة أصول الوسائط في المجموعات",
     createCollection: "إنشاء مجموعة",
@@ -909,6 +922,7 @@ export default {
     },
   },
   common: {
+    remove: "إزالة",
     back: "رجوع",
     search: "بحث",
     public: "عام",
@@ -1708,6 +1722,9 @@ export default {
         myCollectionsTitle: "مجموعاتي",
         sharedWithMeTitle: "مشتركة معي",
         mySharedTitle: "مجموعاتي المشتركة",
+        favoritesTitle: "المجموعات المفضلة",
+        favoritesEmptyTitle: "لا توجد مجموعات مفضلة",
+        favoritesEmptyDescription: "ستظهر المجموعات التي تضيفها إلى المفضلة هنا",
         emptyTitle: "لم يتم العثور على مجموعات",
         emptyDescription: "أنشئ مجموعة للبدء",
         createCollection: "إنشاء مجموعة",
@@ -1720,6 +1737,7 @@ export default {
           myCollections: "مجموعاتي",
           sharedWithMe: "مشتركة معي",
           myShared: "مجموعاتي المشتركة",
+          favorites: "المجموعات المفضلة",
         },
         sortingTitle: "الترتيب",
         sortBy: "ترتيب حسب",
@@ -1738,6 +1756,11 @@ export default {
         title: "الأصول الحديثة",
         emptyTitle: "لا توجد أصول حديثة",
         emptyDescription: "ستظهر الأصول المرفوعة حديثاً هنا",
+      },
+      myAssets: {
+        title: "أصولي",
+        emptyTitle: "لا توجد أصول شخصية بعد",
+        emptyDescription: "قم بتحميل أول ملف إلى أصولي.",
       },
       collectionGroup: {
         title: "مجموعة المجموعات",
@@ -1860,6 +1883,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "سمات مظهر قابلة لإعادة الاستخدام يمكنك تطبيقها على البوابات الجديدة أو الحالية.",
+      deleteTitle: "حذف السمة",
+      editorLoadError: "فشل تحميل السمة",
+    },
+    templates: {
+      listDescription:
+        "هياكل بوابات قابلة لإعادة الاستخدام يمكنك استخدامها لبدء بوابات جديدة من إعداد موثوق.",
+      createFromTemplate: "إنشاء بوابة من هذا القالب",
+      deleteTitle: "حذف القالب",
+      editorLoadError: "فشل تحميل القالب",
+    },
+    actions: {
+      applyTheme: "تطبيق السمة",
+      applyThemeMenu: "تطبيق السمة…",
+      saveAsTemplate: "حفظ كقالب",
+      saveAsTheme: "حفظ كسمة",
+      startFromTemplate: "البدء من قالب",
+      startFromTemplateMenu: "البدء من قالب…",
+    },
+    fieldTypes: {
+      radioGroup: "مجموعة أزرار اختيار",
+      yesNo: "نعم / لا",
+    },
     pageTitle: "بوابات التحميل",
     pageDescription: "إدارة بوابات التحميل للمساهمين الخارجيين",
     createPortal: "إنشاء بوابة",

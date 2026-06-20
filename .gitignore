@@ -141,6 +141,10 @@ coverage/
 aws-exports.json
 config.json
 config.json.bkp
+# Environment-specific config backups/variants must never be committed
+# (they embed account IDs, emails, VPC CIDRs, etc.)
+config.json.*
+*.bak
 config-saks.json
 *.jinja2-tmp
 

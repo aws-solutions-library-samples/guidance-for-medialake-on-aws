@@ -162,7 +162,6 @@ This means if you manually correct an asset's correlation ID and it succeeds, fu
 After triggering enrichment, you can monitor progress by:
 
 1. **Checking asset status**: Query the asset's `ExternalMetadataStatus.status` field
-
    - `pending` - Enrichment in progress
    - `success` - Completed successfully
    - `failed` - Failed after retries

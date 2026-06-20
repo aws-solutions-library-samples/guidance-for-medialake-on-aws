@@ -4,3 +4,4 @@ export { FavoritesWidget } from "./FavoritesWidget";
 export { CollectionsWidget } from "./CollectionsWidget";
 export { CollectionGroupWidget } from "./CollectionGroupWidget";
 export { RecentAssetsWidget } from "./RecentAssetsWidget";
+export { MyAssetsWidget } from "./MyAssetsWidget";

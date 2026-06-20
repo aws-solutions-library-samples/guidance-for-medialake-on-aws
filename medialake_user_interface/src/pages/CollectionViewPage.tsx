@@ -38,6 +38,8 @@ import { AddToCollectionModal } from "@/components/collections/AddToCollectionMo
 import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
 import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { CollectionTreeView } from "@/components/collections/CollectionTreeView";
+import { CollectionFavoriteButton } from "@/components/collections/CollectionFavoriteButton";
+import { useCollectionFavorites } from "@/hooks/useCollectionFavorites";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
 import {
@@ -69,7 +71,9 @@ import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
-import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { getOriginalAssetId, isClipAsset, getClipDisplayName } from "@/utils/clipTransformation";
+import { resolveDotPath } from "@/utils/dotPathResolve";
+import { ChipArrayField } from "@/components/common/ChipArrayField";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import { springEasing } from "@/constants";
 
@@ -243,6 +247,10 @@ const CollectionViewPage: React.FC = () => {
     getAssetThumbnail,
     getAssetProxy,
   });
+
+  // Collection-level favorites (the heart in the page header), shared with every
+  // other collection-favorite surface via the same React Query cache.
+  const { isCollectionFavorited, handleFavoriteToggle } = useCollectionFavorites();
 
   const {
     handleDeleteClick,
@@ -578,22 +586,50 @@ const CollectionViewPage: React.FC = () => {
     });
   };
 
-  const renderCardField = useCallback((fieldId: string, asset: AssetItem) => {
-    switch (fieldId) {
-      case "name":
-        return getAssetName(asset);
-      case "type":
-        return getAssetType(asset);
-      case "size":
-        return formatFileSize(
-          asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
-        );
-      case "date":
-        return formatDate(asset.DigitalSourceAsset.CreateDate);
-      default:
-        return "";
-    }
-  }, []);
+  // Render card fields with full parity to the Search results view so the same
+  // asset shows the same fields on a collection's detail page. The card field
+  // IDs come from `useViewPreferences` (name/type/format/size/fullPath/createdAt),
+  // and the default branch resolves any custom metadata dot-path just like
+  // MasterResultsView, so collection cards aren't limited to a hard-coded subset.
+  const renderCardField = useCallback(
+    (fieldId: string, asset: AssetItem): React.ReactNode => {
+      switch (fieldId) {
+        case "name":
+          return isClipAsset(asset) ? getClipDisplayName(asset) : getAssetName(asset);
+        case "type":
+          return getAssetType(asset);
+        case "format":
+          return asset.DigitalSourceAsset.MainRepresentation.Format;
+        case "size":
+          return formatFileSize(
+            asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size
+          );
+        case "createdAt":
+        // Legacy id used by older saved preferences — keep both mapping to CreateDate.
+        // eslint-disable-next-line no-fallthrough
+        case "date":
+          return formatDate(asset.DigitalSourceAsset.CreateDate);
+        case "modifiedAt":
+          return formatDate(
+            asset.DigitalSourceAsset.ModifiedDate || asset.DigitalSourceAsset.CreateDate
+          );
+        case "fullPath":
+          return asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
+            .FullPath;
+        default: {
+          // Array-aware dot-path traversal for custom metadata fields
+          const value = resolveDotPath(asset, fieldId);
+          if (value == null) return "—";
+          if (Array.isArray(value)) {
+            if (value.length === 0) return "—";
+            return <ChipArrayField values={value.map(String)} />;
+          }
+          return String(value);
+        }
+      }
+    },
+    [getAssetName, getAssetType]
+  );
 
   // Helper to get collection type info for sub-collection cards
   const getCollectionTypeInfo = useCallback(
@@ -800,7 +836,13 @@ const CollectionViewPage: React.FC = () => {
 
               {/* Action Buttons */}
               {collection && (
-                <Box sx={{ display: "flex", gap: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  {/* Favorite toggle — available to any user who can view the
+                      collection, not gated by role. */}
+                  <CollectionFavoriteButton
+                    isFavorite={isCollectionFavorited(collection.id)}
+                    onToggle={(e) => handleFavoriteToggle(collection, e)}
+                  />
                   {(collection.userRole === "owner" || collection.userRole === "editor") && (
                     <Button
                       variant="contained"

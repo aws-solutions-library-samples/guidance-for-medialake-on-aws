@@ -61,7 +61,7 @@ const useNotificationWithFallback = () => {
   let globalNotification: any = null;
   try {
     // Dynamic import to avoid SSR/client mismatch
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     const { useNotification } = require("@/shared/context/NotificationContext");
     globalNotification = useNotification();
   } catch {}

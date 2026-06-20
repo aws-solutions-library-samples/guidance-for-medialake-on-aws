@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     PRESET_APPLY: (presetId: string) => `/dashboard/presets/${presetId}/apply`,
   },
   CONNECTORS: "/connectors",
+  MY_ASSETS_CONNECTOR: "/connectors/my-assets",
   PIPELINES: "/pipelines",
   PIPELINE_EXECUTIONS: "/pipelines/executions",
   PIPELINE_EXECUTION_RETRY: {

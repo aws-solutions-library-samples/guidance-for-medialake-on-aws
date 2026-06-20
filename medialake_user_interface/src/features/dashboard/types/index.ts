@@ -7,7 +7,8 @@ export type CollectionViewType =
   | "private"
   | "my-collections"
   | "shared-with-me"
-  | "my-shared";
+  | "my-shared"
+  | "favorites";
 
 // Sorting configuration types
 export type SortBy = "name" | "createdAt" | "updatedAt";
@@ -31,7 +32,12 @@ export interface CollectionGroupWidgetConfig extends Record<string, unknown> {
   sorting: SortConfig;
 }
 
-export type WidgetType = "favorites" | "collections" | "recent-assets" | "collection-group";
+export type WidgetType =
+  | "favorites"
+  | "collections"
+  | "recent-assets"
+  | "collection-group"
+  | "my-assets";
 
 export interface WidgetDefinition {
   type: WidgetType;

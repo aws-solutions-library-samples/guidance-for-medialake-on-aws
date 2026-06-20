@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import { useCreateTemplate, useGetTemplate, useUpdateTemplate } from "@/api/hooks/useTemplates";
 import type { PortalTemplate } from "@/api/types/api.types";
@@ -51,11 +52,12 @@ import PortalEditorPreview from "../components/editor/PortalEditorPreview";
  *   - /settings/upload-portals/templates/:id/edit   → edit
  */
 const TemplateEditorPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isCreateMode = !id || id === "new";
 
-  const templateQuery = useGetTemplate(isCreateMode ? "" : id ?? "");
+  const templateQuery = useGetTemplate(isCreateMode ? "" : (id ?? ""));
   const template = templateQuery.data?.data as PortalTemplate | undefined;
 
   const initialize = usePortalEditorStore((s) => s.initialize);
@@ -169,7 +171,7 @@ const TemplateEditorPage: React.FC = () => {
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", p: 4 }}
         >
           <Stack spacing={2} alignItems="center">
-            <Typography variant="h6">Failed to load template</Typography>
+            <Typography variant="h6">{t("uploadPortals.templates.editorLoadError")}</Typography>
             <Button variant="outlined" onClick={handleBack}>
               Back to templates
             </Button>

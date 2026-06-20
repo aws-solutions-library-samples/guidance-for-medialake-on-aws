@@ -75,8 +75,8 @@ function findUserPoolId(): string {
 
   // 3. Fallback: search by name
   const output = awsCli("cognito-idp list-user-pools --max-results 50");
-  const pool = JSON.parse(output).UserPools?.find(
-    (p: any) => p.Name?.toLowerCase().includes("medialake")
+  const pool = JSON.parse(output).UserPools?.find((p: any) =>
+    p.Name?.toLowerCase().includes("medialake")
   );
   if (!pool) throw new Error("No MediaLake user pool found");
   console.log(`[RoleAuth] Using user pool from name search: ${pool.Id}`);

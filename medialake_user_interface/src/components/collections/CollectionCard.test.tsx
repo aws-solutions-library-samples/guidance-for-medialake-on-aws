@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import type { Collection } from "../../api/hooks/useCollections";
 import {
@@ -10,9 +10,12 @@ import {
 } from "../../hooks/useCollectionViewPreferences";
 
 // i18n: pass through fallback strings so assertions don't rely on a real bundle.
+// Return the inline fallback when provided, otherwise the key itself — so labels
+// sourced from i18n keys without an inline default (e.g. the favorite toggle's
+// `favorites.*` aria-labels) are still assertable.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
+    t: (key: string, fallback?: string) => fallback ?? key,
   }),
 }));
 
@@ -310,5 +313,64 @@ describe("CollectionCard — preset coverage", () => {
       expect(screen.getAllByText("Test Collection").length).toBeGreaterThan(0);
       unmount();
     }
+  });
+});
+
+describe("CollectionCard — favorite toggle", () => {
+  it("does not render the toggle when onFavoriteToggle is not provided", () => {
+    render(<CollectionCard collection={makeCollection()} onClick={vi.fn()} />);
+    expect(screen.queryByTestId("collection-favorite-button")).not.toBeInTheDocument();
+  });
+
+  it("renders the toggle when onFavoriteToggle is provided", () => {
+    render(
+      <CollectionCard collection={makeCollection()} onClick={vi.fn()} onFavoriteToggle={vi.fn()} />
+    );
+    expect(screen.getByTestId("collection-favorite-button")).toBeInTheDocument();
+  });
+
+  it("shows the filled icon and remove-from-favorites label when favorited", () => {
+    render(
+      <CollectionCard
+        collection={makeCollection()}
+        onClick={vi.fn()}
+        isFavorite
+        onFavoriteToggle={vi.fn()}
+      />
+    );
+    const button = screen.getByTestId("collection-favorite-button");
+    expect(button).toHaveAttribute("aria-label", "favorites.removeFavorite");
+    expect(screen.getByTestId("FavoriteIcon")).toBeInTheDocument();
+    expect(screen.queryByTestId("FavoriteBorderIcon")).not.toBeInTheDocument();
+  });
+
+  it("shows the outline icon and add-to-favorites label when not favorited", () => {
+    render(
+      <CollectionCard
+        collection={makeCollection()}
+        onClick={vi.fn()}
+        isFavorite={false}
+        onFavoriteToggle={vi.fn()}
+      />
+    );
+    const button = screen.getByTestId("collection-favorite-button");
+    expect(button).toHaveAttribute("aria-label", "favorites.addFavorite");
+    expect(screen.getByTestId("FavoriteBorderIcon")).toBeInTheDocument();
+    expect(screen.queryByTestId("FavoriteIcon")).not.toBeInTheDocument();
+  });
+
+  it("invokes onFavoriteToggle and does NOT trigger card navigation (click isolation)", () => {
+    const onClick = vi.fn();
+    const onFavoriteToggle = vi.fn();
+    render(
+      <CollectionCard
+        collection={makeCollection()}
+        onClick={onClick}
+        onFavoriteToggle={onFavoriteToggle}
+      />
+    );
+    fireEvent.click(screen.getByTestId("collection-favorite-button"));
+    expect(onFavoriteToggle).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
   });
 });

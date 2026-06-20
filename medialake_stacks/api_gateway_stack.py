@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import Duration, Fn
@@ -75,6 +76,7 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
     # user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
+    personal_assets_bucket: Optional[s3.IBucket] = None
 
 
 class ApiGatewayStack(cdk.NestedStack):
@@ -237,6 +239,11 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                personal_assets_bucket_name=(
+                    props.personal_assets_bucket.bucket_name
+                    if props.personal_assets_bucket
+                    else None
+                ),
             ),
         )
 
@@ -258,6 +265,11 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table=props.system_settings_table,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 connector_table=self._connectors_api_gateway.connector_table,
+                personal_assets_bucket_name=(
+                    props.personal_assets_bucket.bucket_name
+                    if props.personal_assets_bucket
+                    else None
+                ),
             ),
         )
 
@@ -279,6 +291,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket.bucket,
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 video_download_enabled=config.video_download_enabled,
+                personal_assets_bucket=props.personal_assets_bucket,
                 asset_events_bus=props.application_service_events_internal_event_bus,
             ),
         )

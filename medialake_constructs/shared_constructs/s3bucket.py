@@ -11,6 +11,7 @@ from constructs import Construct
 class S3BucketProps:
     access_logs: bool = False
     destroy_on_delete: bool = True
+    versioned: bool = True
     bucket_name: Optional[str] = None
     access_logs_bucket: Optional[s3.Bucket] = None
     cors: Optional[List[s3.CorsRule]] = None
@@ -57,7 +58,7 @@ class S3Bucket(Construct):
             "encryption": s3.BucketEncryption.KMS,
             "encryption_key": self.kms_key,
             "block_public_access": s3.BlockPublicAccess.BLOCK_ALL,
-            "versioned": True,
+            "versioned": props.versioned,
             "enforce_ssl": True,
             "removal_policy": (
                 RemovalPolicy.DESTROY

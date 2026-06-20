@@ -17,6 +17,8 @@ import { useDashboardActions, useDashboardStore } from "../../store/dashboardSto
 import type { BaseWidgetProps, CollectionsWidgetConfig } from "../../types";
 import { filterCollections, sortCollections } from "../../utils/collectionFilters";
 import type { Collection } from "../../utils/collectionFilters";
+import { buildFavoritesCollectionList } from "../../utils/buildFavoritesCollectionList";
+import { useCollectionFavorites } from "@/hooks/useCollectionFavorites";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { jwtDecode } from "jwt-decode";
 import { WidgetConfigPanel } from "./WidgetConfigPanel";
@@ -154,6 +156,9 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
 
   const { data: collectionTypesResponse, isLoading: isLoadingTypes } = useGetCollectionTypes();
 
+  // Shared collection-favorites state — single source of truth across surfaces.
+  const { favorites, isCollectionFavorited, handleFavoriteToggle } = useCollectionFavorites();
+
   // Select the appropriate data based on viewType
   const rawCollections = useMemo(() => {
     if (viewType === "shared-with-me") {
@@ -182,13 +187,40 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
 
   // Apply filtering and sorting
   const processedCollections = useMemo(() => {
-    if (!rawCollections || !currentUserId) {
+    if (!currentUserId) {
+      return [];
+    }
+    // Favorites view: union all loaded datasets, join with the favorited-id set,
+    // then append a metadata fallback card for favorited ids absent from the pool
+    // (e.g. favorited shared collections not in the current page).
+    if (viewType === "favorites") {
+      return buildFavoritesCollectionList(
+        [
+          (standardCollectionsResponse?.data as Collection[]) ?? [],
+          (sharedWithMeResponse?.data as Collection[]) ?? [],
+          (sharedByMeResponse?.data as Collection[]) ?? [],
+        ],
+        favorites ?? [],
+        currentUserId,
+        config.sorting
+      );
+    }
+    if (!rawCollections) {
       return [];
     }
     const filtered = filterCollections(rawCollections, viewType, currentUserId);
     const sorted = sortCollections(filtered, config.sorting);
     return sorted;
-  }, [rawCollections, viewType, currentUserId, config.sorting]);
+  }, [
+    rawCollections,
+    viewType,
+    currentUserId,
+    config.sorting,
+    favorites,
+    standardCollectionsResponse,
+    sharedWithMeResponse,
+    sharedByMeResponse,
+  ]);
 
   const collectionTypes = collectionTypesResponse?.data || [];
 
@@ -257,25 +289,48 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
         return t("dashboard.widgets.collections.sharedWithMeTitle", "Shared With Me");
       case "my-shared":
         return t("dashboard.widgets.collections.mySharedTitle", "My Shared Collections");
+      case "favorites":
+        return t("dashboard.widgets.collections.favoritesTitle", "Favorite Collections");
       default:
         return t("dashboard.widgets.collections.title", "Collections");
     }
   }, [viewType, customName, t]);
 
+  const isFavoritesView = viewType === "favorites";
+
+  // Favorites view gets its own empty-state copy and no "create" action — the
+  // user can't create their way into a favorite.
+  const emptyState = (
+    <EmptyState
+      icon={<CollectionIcon sx={{ fontSize: 48 }} />}
+      title={
+        isFavoritesView
+          ? t("dashboard.widgets.collections.favoritesEmptyTitle", "No Favorite Collections")
+          : t("dashboard.widgets.collections.emptyTitle", "No collections found")
+      }
+      description={
+        isFavoritesView
+          ? t(
+              "dashboard.widgets.collections.favoritesEmptyDescription",
+              "Collections you favorite will appear here"
+            )
+          : t(
+              "dashboard.widgets.collections.emptyDescription",
+              "Create a collection to get started"
+            )
+      }
+      actionLabel={
+        isFavoritesView
+          ? undefined
+          : t("dashboard.widgets.collections.createCollection", "Create Collection")
+      }
+      onAction={isFavoritesView ? undefined : handleCreateCollection}
+    />
+  );
+
   const renderContent = () => {
     if (!processedCollections || processedCollections.length === 0) {
-      return (
-        <EmptyState
-          icon={<CollectionIcon sx={{ fontSize: 48 }} />}
-          title={t("dashboard.widgets.collections.emptyTitle", "No collections found")}
-          description={t(
-            "dashboard.widgets.collections.emptyDescription",
-            "Create a collection to get started"
-          )}
-          actionLabel={t("dashboard.widgets.collections.createCollection", "Create Collection")}
-          onAction={handleCreateCollection}
-        />
-      );
+      return emptyState;
     }
 
     return (
@@ -285,18 +340,7 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
         cardWidth={CARD_WIDTH}
         cardHeight={CARD_HEIGHT}
         getItemKey={(collection: CollectionItem) => collection.id}
-        emptyState={
-          <EmptyState
-            icon={<CollectionIcon sx={{ fontSize: 48 }} />}
-            title={t("dashboard.widgets.collections.emptyTitle", "No collections found")}
-            description={t(
-              "dashboard.widgets.collections.emptyDescription",
-              "Create a collection to get started"
-            )}
-            actionLabel={t("dashboard.widgets.collections.createCollection", "Create Collection")}
-            onAction={handleCreateCollection}
-          />
-        }
+        emptyState={emptyState}
         renderCard={(collection: CollectionItem) => {
           const typeInfo = getCollectionTypeInfo(collection.collectionTypeId);
           return (
@@ -311,6 +355,8 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
               thumbnailValue={collection.thumbnailValue}
               thumbnailUrl={collection.thumbnailUrl}
               onClick={() => handleCollectionClick(collection.id)}
+              isFavorite={isCollectionFavorited(collection.id)}
+              onFavoriteToggle={(e) => handleFavoriteToggle(collection, e)}
             />
           );
         }}
