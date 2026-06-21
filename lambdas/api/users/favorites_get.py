@@ -18,18 +18,27 @@ def _get_user_favorites(
         formatted_user_id = f"USER#{user_id}"
         table = dynamodb.Table(table_name)
 
+        # Read favorites directly from the base table with a strongly consistent
+        # read. The base table is keyed (userId, itemKey="FAV#{type}#{ts}"), so a
+        # sort-key prefix returns the same per-type set that GSI1 (gsi1Sk=
+        # "ITEM_TYPE#{type}#{ts}") would — but a GSI is eventually consistent and
+        # cannot use ConsistentRead, so a fetch right after an add/remove could
+        # return stale state until the index caught up. Querying the base table
+        # avoids that index-propagation lag. (favorites_post still writes gsi1Sk,
+        # so this is backwards compatible and the data model is unchanged.)
         if item_type:
             query_params = {
-                "IndexName": "GSI1",
-                "KeyConditionExpression": "userId = :userId AND begins_with(gsi1Sk, :prefix)",
+                "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
+                "ConsistentRead": True,
                 "ExpressionAttributeValues": {
                     ":userId": formatted_user_id,
-                    ":prefix": f"ITEM_TYPE#{item_type}#",
+                    ":prefix": f"FAV#{item_type}#",
                 },
             }
         else:
             query_params = {
                 "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
+                "ConsistentRead": True,
                 "ExpressionAttributeValues": {
                     ":userId": formatted_user_id,
                     ":prefix": "FAV#",

@@ -46,6 +46,7 @@ class SearchProps:
     system_settings_table: str
     s3_vector_bucket_name: str
     connector_table: Optional[dynamodb.TableV2] = None
+    personal_assets_bucket_name: Optional[str] = None
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
 
@@ -105,6 +106,13 @@ class SearchConstruct(Construct):
                             "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
                         }
                         if props.connector_table
+                        else {}
+                    ),
+                    **(
+                        {
+                            "PERSONAL_ASSETS_BUCKET": props.personal_assets_bucket_name,
+                        }
+                        if props.personal_assets_bucket_name
                         else {}
                     ),
                 },

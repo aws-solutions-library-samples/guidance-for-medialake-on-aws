@@ -1,5 +1,5 @@
 /* PipelineToolbar.tsx */
-/* eslint-disable @typescript-eslint/no-shadow */
+
 import React, { useRef, ChangeEvent, useState } from "react";
 import {
   Stack,
@@ -885,7 +885,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
   };
 
   // Helper function to get tooltip message for disabled export (currently unused but kept for future use)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _getExportTooltipMessage = (): string => {
     if (!pipelineName || !pipelineName.trim()) {
       return t("integrations.editor.pipelineNameRequired");
@@ -1080,7 +1080,7 @@ const PipelineToolbar: React.FC<PipelineToolbarProps> = (props) => {
             );
           }
           // Drop positionAbsolute
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { positionAbsolute, ...keep } = n;
           return keep;
         }),

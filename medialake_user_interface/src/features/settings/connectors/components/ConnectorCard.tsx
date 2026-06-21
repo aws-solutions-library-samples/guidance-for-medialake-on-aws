@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
+  Edit as EditIcon,
   CloudUpload as CloudUploadIcon,
   AccessTime as AccessTimeIcon,
   Sync as SyncIcon,
@@ -35,7 +36,7 @@ const AWS_BRAND_ORANGE = "#FF9900";
 
 interface ConnectorCardProps {
   connector: ConnectorResponse;
-  onEdit: (connector: ConnectorResponse) => void;
+  onEdit?: (connector: ConnectorResponse) => void;
   onDelete: (id: string) => Promise<void>;
   onToggleStatus?: (id: string, enabled: boolean) => Promise<void>;
   onSync?: (id: string) => Promise<void>;
@@ -45,7 +46,7 @@ interface ConnectorCardProps {
 
 const ConnectorCard: React.FC<ConnectorCardProps> = ({
   connector,
-  onEdit: _onEdit,
+  onEdit,
   onDelete,
   onSync,
   showSeconds: initialShowSeconds = false,
@@ -312,6 +313,25 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
                       },
                     }}
                   />
+                </IconButton>
+              </Tooltip>
+            )}
+            {onEdit && (
+              <Tooltip title={t("common.actions.edit", "Edit")}>
+                <IconButton
+                  onClick={() => onEdit(connector)}
+                  size="small"
+                  data-testid={`connector-edit-button-${connector.id}`}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    width: 40,
+                    height: 40,
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                    },
+                  }}
+                >
+                  <EditIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}

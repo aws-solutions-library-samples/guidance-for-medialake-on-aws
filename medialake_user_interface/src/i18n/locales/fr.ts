@@ -13,20 +13,30 @@ export default {
     title: "Actifs",
     connectors: "Connecteurs",
     selectConnector: "Sélectionnez un connecteur",
+    myAssets: "Mes actifs",
+    uploadToMyAssets: "Téléverser vers Mes actifs",
+    myAssetsEmpty: {
+      title: "Aucun actif pour le moment",
+      description:
+        "Téléversez vos premiers fichiers multimédias pour commencer votre bibliothèque personnelle.",
+      uploadCta: "Téléverser des fichiers",
+    },
   },
   upload: {
     title: "Télécharger des fichiers multimédias",
     description:
-      "Sélectionnez un connecteur S3 et téléchargez vos fichiers multimédias. Seuls les formats audio, vidéo, HLS et MPEG-DASH sont pris en charge.",
+      "Sélectionnez une destination et téléchargez vos fichiers multimédias. Seuls les formats audio, vidéo, HLS et MPEG-DASH sont pris en charge.",
     uploadDestination: "Destination du téléchargement",
     browsePath: "Parcourir le chemin",
     uploadingTo: "Téléchargement vers",
     restrictedToPrefix: "restreint",
     allowedPrefixesInfo: "Vous ne pouvez télécharger que vers {{count}} chemin(s) autorisé(s)",
-    connectorLabel: "Connecteur S3",
-    selectConnectorPlaceholder: "Sélectionnez un connecteur S3",
+    connectorLabel: "Destination du téléchargement",
+    selectConnectorPlaceholder: "Sélectionnez une destination",
     loadingConnectors: "Chargement des connecteurs...",
     noConnectors: "Aucun connecteur S3 disponible. Veuillez d'abord configurer un connecteur S3.",
+    noDestinations:
+      "Vous n'avez accès à aucune destination de téléchargement. Contactez votre administrateur pour demander l'accès.",
     dashboardNote:
       "Seuls les fichiers de type audio/*, video/*, image/*, HLS (application/x-mpegURL) et MPEG-DASH (application/dash+xml) sont autorisés",
     meta: {
@@ -44,6 +54,7 @@ export default {
       "Vous ne pouvez parcourir et télécharger que vers les dossiers dans le chemin sélectionné.",
     currentPath: "Chemin actuel",
     confirm: "Utiliser ce chemin",
+    refresh: "Actualiser",
     validation: {
       invalidPath: "Le chemin sélectionné est en dehors des préfixes autorisés.",
       noPathSelected: "Veuillez naviguer vers un dossier avant de confirmer.",
@@ -117,6 +128,40 @@ export default {
         "Le nom du compartiment doit être globalement unique et suivre les règles de nommage S3.",
       addPrefix: "Ajouter un préfixe",
       allowUploads: "Autoriser les téléchargements",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     status: {
       active: "Actif",
@@ -226,6 +271,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoris",
+      emptyTitle: "Aucune collection favorite",
+      emptyDescription: "Les collections que vous ajoutez aux favoris apparaîtront ici",
+    },
     title: "Collections",
     description: "Organisez et gérez vos actifs multimédias dans des collections",
     createCollection: "Créer une collection",
@@ -881,6 +931,7 @@ export default {
     },
   },
   common: {
+    remove: "Retirer",
     back: "Retour",
     search: "Rechercher",
     public: "Public",
@@ -1739,6 +1790,9 @@ export default {
         myCollectionsTitle: "Mes Collections",
         sharedWithMeTitle: "Partagé avec Moi",
         mySharedTitle: "Mes Collections Partagées",
+        favoritesTitle: "Collections favorites",
+        favoritesEmptyTitle: "Aucune collection favorite",
+        favoritesEmptyDescription: "Les collections que vous ajoutez aux favoris apparaîtront ici",
         emptyTitle: "Aucune collection trouvée",
         emptyDescription: "Créez une collection pour commencer",
         createCollection: "Créer une Collection",
@@ -1751,6 +1805,7 @@ export default {
           myCollections: "Mes Collections",
           sharedWithMe: "Partagé avec Moi",
           myShared: "Mes Collections Partagées",
+          favorites: "Collections favorites",
         },
         sortingTitle: "Tri",
         sortBy: "Trier Par",
@@ -1769,6 +1824,11 @@ export default {
         title: "Ressources Récentes",
         emptyTitle: "Pas de ressources récentes",
         emptyDescription: "Les ressources récemment téléchargées apparaîtront ici",
+      },
+      myAssets: {
+        title: "Mes Ressources",
+        emptyTitle: "Pas encore de ressources personnelles",
+        emptyDescription: "Téléchargez votre premier fichier dans Mes Ressources.",
       },
       collectionGroup: {
         title: "Groupe de Collections",
@@ -1947,6 +2007,48 @@ export default {
     tokens: {
       copyUrl: "Copier l'URL",
       revokeToken: "Révoquer le jeton",
+    },
+    themeTemplateActions: {
+      saveAs: "Enregistrer sous…",
+      saveAsTemplate: "Enregistrer comme modèle",
+      saveAsTheme: "Enregistrer comme thème",
+      applyTheme: "Appliquer le thème",
+    },
+    themes: {
+      pageDescription:
+        "Thèmes d'apparence réutilisables que vous pouvez appliquer à des portails nouveaux ou existants",
+      deleteTheme: "Supprimer le thème",
+      failedToLoad: "Échec du chargement du thème",
+    },
+    templates: {
+      pageDescription:
+        "Structures de portail réutilisables pour créer rapidement de nouveaux portails",
+      createFromTemplate: "Créer un portail à partir de ce modèle",
+      deleteTemplate: "Supprimer le modèle",
+      failedToLoad: "Échec du chargement du modèle",
+    },
+    createMenu: {
+      startFromTemplate: "Démarrer à partir d'un modèle…",
+      applyTheme: "Appliquer un thème…",
+      startFromTemplateTitle: "Démarrer à partir d'un modèle",
+      applyThemeTitle: "Appliquer un thème",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Facultatif. Utilisé pour acheminer les événements de fin de lot de téléchargement vers un pipeline spécifique pour l'enrichissement automatique.",
+    },
+    actions: {
+      applyTheme: "Appliquer le thème",
+      applyThemeMenu: "Appliquer le thème…",
+      saveAsTemplate: "Enregistrer comme modèle",
+      saveAsTheme: "Enregistrer comme thème",
+      startFromTemplate: "Commencer à partir d'un modèle",
+      startFromTemplateMenu: "Commencer à partir d'un modèle…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Groupe de boutons radio",
+      yesNo: "Oui / Non",
     },
   },
 };

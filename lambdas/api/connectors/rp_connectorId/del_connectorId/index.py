@@ -61,8 +61,9 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
 
         # Best-effort cleanup — each step is wrapped individually
 
-        # Delete EventBridge Pipe if it exists
-        if pipe_arn and integration_method == "eventbridge":
+        # Delete EventBridge Pipe if it exists (regardless of recorded
+        # integration method — clean it up whenever a pipe ARN is present).
+        if pipe_arn:
             pipe_name = pipe_arn.split(":")[-1].split("/")[-1]
             try:
                 pipe_info = pipes_client.describe_pipe(Name=pipe_name)
@@ -120,7 +121,7 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                     )
 
         # Delete Pipe IAM role
-        if pipe_role_arn and integration_method == "eventbridge":
+        if pipe_role_arn:
             pipe_role_name = pipe_role_arn.split("/")[-1]
             try:
                 attached_policies = iam.list_attached_role_policies(
@@ -144,11 +145,24 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
 
         # Delete Lambda
         if lambda_arn:
+            function_name = lambda_arn.split(":")[-1]
             try:
-                lambda_client.delete_function(FunctionName=lambda_arn.split(":")[-1])
+                lambda_client.delete_function(FunctionName=function_name)
                 logger.info(f"Deleted Lambda function: {lambda_arn}")
             except ClientError as e:
                 logger.warning(f"Error deleting Lambda: {str(e)}")
+
+            # Delete the Lambda's CloudWatch log group — AWS does NOT remove it
+            # when the function is deleted, so it would otherwise be orphaned.
+            logs_client = boto3.client("logs", region_name=region)
+            try:
+                logs_client.delete_log_group(
+                    logGroupName=f"/aws/lambda/{function_name}"
+                )
+                logger.info(f"Deleted log group for function: {function_name}")
+            except ClientError as e:
+                if e.response["Error"]["Code"] != "ResourceNotFoundException":
+                    logger.warning(f"Error deleting log group: {str(e)}")
 
         # Delete main IAM role
         if iam_role_arn:

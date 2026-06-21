@@ -113,8 +113,8 @@ function findUserPoolId(): string {
     const userPools = JSON.parse(userPoolsOutput);
 
     // Look for a user pool with 'medialake' in the name
-    const mediaLakePool = userPools.UserPools?.find(
-      (pool: any) => pool.Name?.toLowerCase().includes("medialake")
+    const mediaLakePool = userPools.UserPools?.find((pool: any) =>
+      pool.Name?.toLowerCase().includes("medialake")
     );
 
     if (!mediaLakePool) {

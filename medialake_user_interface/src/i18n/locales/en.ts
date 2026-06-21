@@ -13,20 +13,29 @@ export default {
     title: "Assets",
     connectors: "Connectors",
     selectConnector: "Select a connector",
+    myAssets: "My Assets",
+    uploadToMyAssets: "Upload to My Assets",
+    myAssetsEmpty: {
+      title: "No assets yet",
+      description: "Upload your first media files to get started with your personal asset library.",
+      uploadCta: "Upload Files",
+    },
   },
   upload: {
     title: "Upload Media Files",
     description:
-      "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+      "Select a destination and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
     uploadDestination: "Upload Destination",
     browsePath: "Browse Path",
     uploadingTo: "Uploading to",
     restrictedToPrefix: "restricted",
     allowedPrefixesInfo: "You can only upload to {{count}} allowed path(s)",
-    connectorLabel: "S3 Connector",
-    selectConnectorPlaceholder: "Select an S3 connector",
+    connectorLabel: "Upload Destination",
+    selectConnectorPlaceholder: "Select a destination",
     loadingConnectors: "Loading connectors...",
     noConnectors: "No S3 connectors available. Please configure an S3 connector first.",
+    noDestinations:
+      "You don't have access to any upload destinations. Contact your administrator to request access.",
     dashboardNote:
       "Only audio/*, video/*, image/*, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed",
     meta: {
@@ -42,6 +51,7 @@ export default {
     prefixHelper: "You can only browse and upload to folders within the selected path.",
     currentPath: "Current Path",
     confirm: "Use This Path",
+    refresh: "Refresh",
     validation: {
       invalidPath: "The selected path is outside the allowed prefixes.",
       noPathSelected: "Please navigate to a folder before confirming.",
@@ -113,6 +123,40 @@ export default {
       objectPrefixNumbered: "Object Prefix {{number}}",
       bucketNameHelper: "Bucket name must be globally unique, follow S3 naming rules.",
       addPrefix: "Add Prefix",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     status: {
       active: "Active",
@@ -351,6 +395,11 @@ export default {
     metadataFilter: {
       placeholder: "Filter by metadata",
       valuePlaceholder: "Value...",
+    },
+    favorites: {
+      sectionTitle: "Favorites",
+      emptyTitle: "No Favorite Collections",
+      emptyDescription: "Collections you favorite will appear here",
     },
   },
   sidebar: {
@@ -870,6 +919,7 @@ export default {
   },
   common: {
     back: "Back",
+    remove: "Remove",
     search: "Search",
     public: "Public",
     private: "Private",
@@ -1702,7 +1752,7 @@ export default {
         clear: "Clear custom name",
       },
       favorites: {
-        title: "Favorites",
+        title: "Favorite Assets",
         emptyTitle: "No favorites yet",
         emptyDescription: "Mark assets as favorites to see them here",
       },
@@ -1714,6 +1764,9 @@ export default {
         myCollectionsTitle: "My Collections",
         sharedWithMeTitle: "Shared With Me",
         mySharedTitle: "My Shared Collections",
+        favoritesTitle: "Favorite Collections",
+        favoritesEmptyTitle: "No Favorite Collections",
+        favoritesEmptyDescription: "Collections you favorite will appear here",
         emptyTitle: "No collections found",
         emptyDescription: "Create a collection to get started",
         createCollection: "Create Collection",
@@ -1726,6 +1779,7 @@ export default {
           myCollections: "My Collections",
           sharedWithMe: "Shared With Me",
           myShared: "My Shared Collections",
+          favorites: "Favorite Collections",
         },
         sortingTitle: "Sorting",
         sortBy: "Sort By",
@@ -1744,6 +1798,11 @@ export default {
         title: "Recent Assets",
         emptyTitle: "No recent assets",
         emptyDescription: "Recently uploaded assets will appear here",
+      },
+      myAssets: {
+        title: "My Assets",
+        emptyTitle: "No personal assets yet",
+        emptyDescription: "Upload your first file to My Assets.",
       },
       collectionGroup: {
         title: "Collection Group",
@@ -1918,6 +1977,45 @@ export default {
     tokens: {
       copyUrl: "Copy URL",
       revokeToken: "Revoke Token",
+    },
+    themeTemplateActions: {
+      saveAs: "Save as…",
+      saveAsTemplate: "Save as Template",
+      saveAsTheme: "Save as Theme",
+      applyTheme: "Apply theme",
+    },
+    themes: {
+      pageDescription: "Reusable appearance themes you can apply to new or existing portals",
+      deleteTheme: "Delete theme",
+      failedToLoad: "Failed to load theme",
+    },
+    templates: {
+      pageDescription: "Reusable portal structures you can use to start new portals quickly",
+      createFromTemplate: "Create portal from this template",
+      deleteTemplate: "Delete template",
+      failedToLoad: "Failed to load template",
+    },
+    createMenu: {
+      startFromTemplate: "Start from template…",
+      applyTheme: "Apply theme…",
+      startFromTemplateTitle: "Start from template",
+      applyThemeTitle: "Apply theme",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Optional. Used to route upload-batch completion events to a specific pipeline for auto-enrichment.",
+    },
+    actions: {
+      applyTheme: "Apply theme",
+      applyThemeMenu: "Apply theme…",
+      saveAsTemplate: "Save as Template",
+      saveAsTheme: "Save as Theme",
+      startFromTemplate: "Start from template",
+      startFromTemplateMenu: "Start from template…",
+    },
+    fieldTypes: {
+      radioGroup: "Radio Group",
+      yesNo: "Yes / No",
     },
   },
 };

@@ -2,7 +2,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -381,6 +381,137 @@ def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[st
         raise APIError(f"Error creating multipart upload: {str(e)}", 500)
 
 
+def get_user_sub_from_event(event: Dict) -> Optional[str]:
+    """Extract user sub from API Gateway authorizer context.
+
+    Checks ``requestContext.authorizer.sub`` first (custom authorizer),
+    then falls back to ``requestContext.authorizer.claims.sub`` (Cognito).
+
+    Returns:
+        The user's Cognito ``sub`` claim, or ``None`` if it cannot be
+        determined.  The caller decides how to handle the missing value.
+    """
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return None
+        sub = authorizer.get("sub")
+        if sub:
+            return sub
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            try:
+                claims = json.loads(claims)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        if isinstance(claims, dict):
+            return claims.get("sub")
+    except Exception:
+        pass
+    return None
+
+
+def get_caller_permissions(event: Dict) -> List[str]:
+    """Extract the caller's flat permission list from the authorizer context.
+
+    The custom authorizer passes the decoded token — including the
+    ``custom:permissions`` JSON-string claim — as
+    ``requestContext.authorizer.claims``.
+
+    Returns an empty list if permissions cannot be determined.
+    """
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return []
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            claims = json.loads(claims)
+        if not isinstance(claims, dict):
+            return []
+        perms = claims.get("custom:permissions", "[]")
+        if isinstance(perms, str):
+            perms = json.loads(perms)
+        return perms if isinstance(perms, list) else []
+    except Exception:
+        logger.warning("Could not parse caller permissions from authorizer context")
+        return []
+
+
+def caller_can_upload_to_connectors(event: Dict) -> bool:
+    """Whether the caller may upload into shared (non-personal) connectors.
+
+    Requires the ``connectors:upload`` permission (the ``settings.`` prefixed
+    variant is also accepted for backward compatibility). This is independent
+    of personal "My Assets" uploads, which only require ``assets:upload``.
+    """
+    perms = get_caller_permissions(event)
+    return "connectors:upload" in perms or "settings.connectors:upload" in perms
+
+
+def validate_personal_path(event: Dict, resolved_key: str) -> str:
+    """Validate that the resolved S3 key belongs to the authenticated user.
+
+    For my-assets connectors, ensures the upload targets only the
+    authenticated user's personal folder.
+
+    Args:
+        event: The API Gateway event (for extracting user_sub).
+        resolved_key: The fully constructed S3 object key.
+
+    Returns:
+        The user_sub if validation passes.
+
+    Raises:
+        APIError(401): If user_sub cannot be extracted.
+        APIError(403): If the key doesn't start with ``personal/{user_sub}/``.
+    """
+    user_sub = get_user_sub_from_event(event)
+    if user_sub is None:
+        raise APIError("Unauthorized: unable to identify user", 401)
+
+    expected_prefix = f"personal/{user_sub}/"
+    if not resolved_key.startswith(expected_prefix):
+        logger.warning(
+            f"Personal path enforcement rejected - resolved_key: {resolved_key}, "
+            f"expected_prefix: {expected_prefix}"
+        )
+        metrics.add_metric(
+            name="PersonalPathEnforcementRejection", value=1, unit="Count"
+        )
+        raise APIError(
+            "Access denied: upload path is outside your personal folder",
+            403,
+        )
+
+    return user_sub
+
+
+def _is_personal_target(connector: Dict[str, Any]) -> bool:
+    """Whether an upload to ``connector`` must be confined to the caller's own
+    personal ("My Assets") folder.
+
+    True for the per-user my-assets connector AND for any connector that targets
+    the personal-assets bucket or the reserved ``personal/`` key prefix (e.g. the
+    internal ``my-assets-system`` connector). Enforcing personal-path ownership
+    regardless of the connector's declared ``type`` prevents a caller with
+    ``connectors:upload`` from using a personal-bucket connector to write into
+    another user's folder.
+    """
+    if connector.get("type") == "my-assets":
+        return True
+
+    object_prefix = (connector.get("objectPrefix") or "").lstrip("/")
+    if object_prefix == "personal" or object_prefix.startswith("personal/"):
+        return True
+
+    personal_bucket = os.environ.get("PERSONAL_ASSETS_BUCKET", "").strip()
+    if personal_bucket and connector.get("storageIdentifier") == personal_bucket:
+        return True
+
+    return False
+
+
 @metrics.log_metrics(capture_cold_start_metric=True)
 @tracer.capture_lambda_handler
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
@@ -486,8 +617,39 @@ def lambda_handler(
             # No prefix restrictions
             key = f"{safe_path}/{request.filename}" if safe_path else request.filename
 
-        # Normalize the key to prevent any issues
-        key = str(Path(key))
+        # Normalize the key to prevent any issues.
+        # Use os.path.normpath to resolve ".." and "." components, which
+        # pathlib.Path does NOT do for relative paths.  This is critical
+        # for the personal-path enforcement below: without normpath, a
+        # crafted path like "personal/user-A/../user-B/file" would pass
+        # the startswith check but resolve to another user's folder on S3.
+        key = os.path.normpath(str(Path(key)))
+
+        # Enforce personal-path ownership for any connector that targets the
+        # personal-assets bucket / reserved `personal/` prefix — the per-user
+        # my-assets connector AND the internal my-assets-system connector. This
+        # stops a caller with connectors:upload from using a personal-bucket
+        # connector to write into another user's folder.
+        if _is_personal_target(connector):
+            validate_personal_path(event, key)
+        else:
+            # Uploading into a shared (non-personal) connector requires the
+            # connectors:upload permission in addition to assets:upload.
+            # Personal "My Assets" uploads above are exempt.
+            if not caller_can_upload_to_connectors(event):
+                logger.warning(
+                    "Upload to shared connector denied: caller lacks "
+                    "connectors:upload",
+                    extra={"connector_id": request.connector_id},
+                )
+                metrics.add_metric(
+                    name="ConnectorUploadPermissionDenied", value=1, unit="Count"
+                )
+                raise APIError(
+                    "Access denied: you do not have permission to upload to "
+                    "this connector.",
+                    403,
+                )
 
         # Handle multipart upload if file is larger than 100MB
         if is_multipart_upload_required(request.file_size):

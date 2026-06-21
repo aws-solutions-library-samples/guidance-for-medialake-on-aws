@@ -55,8 +55,8 @@ function ensureTestUserIsSuperAdmin(): void {
         `aws cognito-idp list-user-pools --max-results 50 --profile ${profile} --region ${region}`,
         { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
       );
-      const pool = JSON.parse(poolsJson).UserPools?.find(
-        (p: any) => p.Name?.toLowerCase().includes("medialake")
+      const pool = JSON.parse(poolsJson).UserPools?.find((p: any) =>
+        p.Name?.toLowerCase().includes("medialake")
       );
       if (!pool) return;
       poolId = pool.Id;

@@ -274,6 +274,102 @@ describe("usePortalEditorStore", () => {
 });
 
 /**
+ * Field Configuration ↔ Pages synchronization (addMetadataField /
+ * removeMetadataField).
+ *
+ * These actions keep `portalData.metadataFields` and the page `elements` in
+ * lockstep so a field added/removed in the Field Configuration section also
+ * appears/disappears in the Pages tab and on the public renderer.
+ */
+describe("usePortalEditorStore — field/page sync", () => {
+  beforeEach(() => {
+    usePortalEditorStore.getState().reset();
+    usePortalEditorStore.getState().initialize();
+  });
+
+  const slug = (label: string): string =>
+    label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  it("addMetadataField creates a field AND places its element on the uploader page", () => {
+    usePortalEditorStore.getState().addMetadataField();
+
+    const portal = usePortalEditorStore.getState().portalData as PortalEditorPortalData;
+    const fields = portal.metadataFields as Array<{ label: string; type: string }>;
+    expect(fields).toHaveLength(1);
+    expect(fields[0].type).toBe("text");
+    expect(fields[0].label.length).toBeGreaterThan(0);
+
+    // The default uploader page (page 1) now hosts a metadata-field element
+    // referencing the new field by its slug.
+    const pages = portal.pages as Array<{
+      pageNumber: number;
+      elements: Array<{ kind: string; fieldKey?: string }>;
+    }>;
+    const uploaderPage = pages.find((p) => p.elements.some((el) => el.kind === "uploader"))!;
+    const fieldElement = uploaderPage.elements.find((el) => el.kind === "metadata-field");
+    expect(fieldElement?.fieldKey).toBe(slug(fields[0].label));
+    expect(usePortalEditorStore.getState().isDirty).toBe(true);
+  });
+
+  it("addMetadataField synthesizes unique keys so repeated adds do not collide", () => {
+    usePortalEditorStore.getState().addMetadataField();
+    usePortalEditorStore.getState().addMetadataField();
+
+    const portal = usePortalEditorStore.getState().portalData as PortalEditorPortalData;
+    const fields = portal.metadataFields as Array<{ label: string }>;
+    const keys = fields.map((f) => slug(f.label));
+    expect(new Set(keys).size).toBe(2);
+
+    const pages = portal.pages as Array<{
+      elements: Array<{ kind: string; fieldKey?: string }>;
+    }>;
+    const fieldElements = pages.flatMap((p) =>
+      p.elements.filter((el) => el.kind === "metadata-field")
+    );
+    expect(fieldElements).toHaveLength(2);
+  });
+
+  it("removeMetadataField deletes the field AND strips its page element (no orphan)", () => {
+    usePortalEditorStore.getState().addMetadataField();
+    const created = (usePortalEditorStore.getState().portalData as PortalEditorPortalData)
+      .metadataFields as Array<{ label: string }>;
+    const key = slug(created[0].label);
+
+    usePortalEditorStore.getState().removeMetadataField(key);
+
+    const portal = usePortalEditorStore.getState().portalData as PortalEditorPortalData;
+    expect(portal.metadataFields).toHaveLength(0);
+    const pages = portal.pages as Array<{
+      elements: Array<{ kind: string; fieldKey?: string }>;
+    }>;
+    const orphanElements = pages.flatMap((p) =>
+      p.elements.filter((el) => el.kind === "metadata-field")
+    );
+    expect(orphanElements).toHaveLength(0);
+  });
+
+  it("a field added via Field Configuration then deleted leaves no orphaned page element", () => {
+    usePortalEditorStore.getState().addMetadataField();
+    const created = (usePortalEditorStore.getState().portalData as PortalEditorPortalData)
+      .metadataFields as Array<{ label: string }>;
+    usePortalEditorStore.getState().removeMetadataField(slug(created[0].label));
+
+    // Run validation and assert the "pages" bucket records no error: the
+    // previous bug left a metadata-field element referencing a missing field
+    // key, which validate() flags under "pages". Other buckets (name/slug/
+    // destinations) may still error for an otherwise-empty draft — those are
+    // unrelated to the orphan-on-delete fix under test.
+    usePortalEditorStore.getState().validate();
+    const pageErrors = usePortalEditorStore.getState().validationErrors.pages ?? [];
+    expect(pageErrors).toHaveLength(0);
+  });
+});
+
+/**
  * Persistence behavior (tasks 5.16 & 5.17).
  *
  * Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8

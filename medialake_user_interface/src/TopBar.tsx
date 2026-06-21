@@ -28,6 +28,8 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "./hooks/useTheme";
 import { useDirection } from "./contexts/DirectionContext";
 import { S3UploaderModal } from "./features/upload";
+import { useMyAssetsConnector } from "./api/hooks/useMyAssetsConnector";
+import { usePermission } from "./permissions";
 import { useFeatureFlag } from "./contexts/FeatureFlagsContext";
 import FilterModal from "./components/search/FilterModal";
 import {
@@ -80,6 +82,13 @@ function TopBar() {
   // Check semantic search configuration status
   const { isSemanticSearchEnabled, isConfigured, providerData } = useSemanticSearchStatus();
   const isMarengo30 = providerData?.data?.searchProvider?.type === "twelvelabs-bedrock-3-0";
+
+  // Fetch My Assets connector for upload pre-selection
+  const { connector: myAssetsConnector } = useMyAssetsConnector();
+
+  // Only users with upload permission see the upload entry point.
+  const { can } = usePermission();
+  const canUpload = can("upload", "asset");
 
   // Keep a ref to the latest filters so the debounced callback always reads
   // the current value instead of a stale closure capture.
@@ -739,22 +748,24 @@ function TopBar() {
           mr: 2,
         }}
       >
-        {/* Upload Button */}
-        <IconButton
-          size="small"
-          onClick={handleOpenUploadModal}
-          sx={{
-            color: muiTheme.palette.text.secondary,
-            backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.1 : 0.04),
-            borderRadius: "8px",
-            padding: "8px",
-            "&:hover": {
-              backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.2 : 0.08),
-            },
-          }}
-        >
-          <CloudUploadIcon />
-        </IconButton>
+        {/* Upload Button — only for users who can upload */}
+        {canUpload && (
+          <IconButton
+            size="small"
+            onClick={handleOpenUploadModal}
+            sx={{
+              color: muiTheme.palette.text.secondary,
+              backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.1 : 0.04),
+              borderRadius: "8px",
+              padding: "8px",
+              "&:hover": {
+                backgroundColor: alpha(muiTheme.palette.action.active, isDark ? 0.2 : 0.08),
+              },
+            }}
+          >
+            <CloudUploadIcon />
+          </IconButton>
+        )}
 
         {/* Notification Center */}
         <NotificationCenter />
@@ -795,8 +806,10 @@ function TopBar() {
         title={t("upload.title", "Upload Media Files")}
         description={t(
           "upload.description",
-          "Select an S3 connector and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported."
+          "Select a destination and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported."
         )}
+        defaultConnectorId={myAssetsConnector?.id}
+        defaultObjectPrefix={myAssetsConnector?.objectPrefix}
       />
 
       {/* Filter Modal */}

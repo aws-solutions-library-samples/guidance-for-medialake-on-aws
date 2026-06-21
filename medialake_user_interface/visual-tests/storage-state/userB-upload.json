@@ -1,0 +1,50 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "https://d1tve21z3gagji.cloudfront.net",
+      "localStorage": [
+        {
+          "name": "i18nextLng",
+          "value": "en-US"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.749834d8-9011-701a-a260-953998683b4b.accessToken",
+          "value": "eyJraWQiOiIrXC8zXC9CdnFxZ0MxampLTEx3OENVbGZvWXowUDhUcVkycUc4QjlwamR0OUE9IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiI3NDk4MzRkOC05MDExLTcwMWEtYTI2MC05NTM5OTg2ODNiNGIiLCJjb2duaXRvOmdyb3VwcyI6WyJlZGl0b3JzIl0sImlzcyI6Imh0dHBzOlwvXC9jb2duaXRvLWlkcC51cy1lYXN0LTEuYW1hem9uYXdzLmNvbVwvdXMtZWFzdC0xXzc1Y1pxeEtwTCIsImNsaWVudF9pZCI6IjFzNHJjcnZycmtoamI5cnZtZ2Y3MWZ1ZDZwIiwib3JpZ2luX2p0aSI6IjUyYTI4MTM0LWE5YmYtNGNjMy05ZjlkLTAzZTgxMjY3M2Q3OSIsImV2ZW50X2lkIjoiZWI0MTA4ZjUtMjc3Mi00YjBiLWFhNGQtN2I0ZDU2NWRmOTZlIiwidG9rZW5fdXNlIjoiYWNjZXNzIiwic2NvcGUiOiJhd3MuY29nbml0by5zaWduaW4udXNlci5hZG1pbiIsImF1dGhfdGltZSI6MTc3NTUzMjU0NiwiZXhwIjoxNzc1NTM2MTQ2LCJjdXN0b206cGVybWlzc2lvbnMiOiJbXCJjb2xsZWN0aW9uczplZGl0XCIsIFwibm9kZXM6dmlld1wiLCBcImFzc2V0czpkZWxldGVcIiwgXCJhc3NldHM6ZWRpdFwiLCBcInBpcGVsaW5lc0V4ZWN1dGlvbnM6Y2FuY2VsXCIsIFwicGlwZWxpbmVzOnZpZXdcIiwgXCJwaXBlbGluZXNFeGVjdXRpb25zOnZpZXdcIiwgXCJzeXN0ZW06dmlld1wiLCBcInBpcGVsaW5lczpkZWxldGVcIiwgXCJjb2xsZWN0aW9uczp2aWV3XCIsIFwic3RvcmFnZTp2aWV3XCIsIFwicmVnaW9uczp2aWV3XCIsIFwicGlwZWxpbmVzOmNyZWF0ZVwiLCBcInBpcGVsaW5lczplZGl0XCIsIFwiY29sbGVjdGlvbi10eXBlczp2aWV3XCIsIFwiYXNzZXRzOnZpZXdcIiwgXCJhc3NldHM6ZG93bmxvYWRcIiwgXCJjb2xsZWN0aW9uczpjcmVhdGVcIiwgXCJjb25uZWN0b3JzOnZpZXdcIiwgXCJhc3NldHM6dXBsb2FkXCIsIFwidXNlcnM6dmlld1wiLCBcInNlYXJjaDp2aWV3XCIsIFwicGlwZWxpbmVzRXhlY3V0aW9uczpyZXRyeVwiLCBcImNvbGxlY3Rpb25zOmRlbGV0ZVwiXSIsImlhdCI6MTc3NTUzMjU0NiwianRpIjoiZDgwZGMyN2YtN2MxZS00Njk2LThjNGEtMTJjMjhiZDEzZjNmIiwidXNlcm5hbWUiOiI3NDk4MzRkOC05MDExLTcwMWEtYTI2MC05NTM5OTg2ODNiNGIifQ.K5-iOSVpPBoU50PwMoo91S9TXoKset1X-5nyCFqEHQkxp1tTdcqUd3ED2_WWSA6i3sDiUs7lEvV5Gww7RMwwmpHm62TJ4FQc1gF9YHyXIvfB-6u1d0JfSXjMuwxnxHWZU5rl7b4dyj6-Iurv2Z21BotbUACrRP7qyDTh8reA3I9vpFTNpS3WvdxPrXUr_yG1tAqGgFnqNy0FCB100gOKbNn3OezRc7Q9Nk5YQGsxUaLNgk0LYZiS08K7oDKcw5L96w6idkpOqVRpnsxaK5jBAb9nllrYV6sNN9k_yuCCL0qqrkfHc3kPRyFV1Jv6BH7Vzes8wc0rTJTY9htlXyqXjA"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.749834d8-9011-701a-a260-953998683b4b.clockDrift",
+          "value": "-349"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.749834d8-9011-701a-a260-953998683b4b.signInDetails",
+          "value": "{\"loginId\":\"visual-test-userB@example.com\",\"authFlowType\":\"USER_SRP_AUTH\"}"
+        },
+        {
+          "name": "medialake-auth-token",
+          "value": "eyJraWQiOiJmNmdwajkxVWZkMzV6b0VGS1M1cjJ1TGoxdDNpS1I0U1p1WTltTmx3bWVVPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI3NDk4MzRkOC05MDExLTcwMWEtYTI2MC05NTM5OTg2ODNiNGIiLCJjb2duaXRvOmdyb3VwcyI6WyJlZGl0b3JzIl0sImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb21cL3VzLWVhc3QtMV83NWNacXhLcEwiLCJjb2duaXRvOnVzZXJuYW1lIjoiNzQ5ODM0ZDgtOTAxMS03MDFhLWEyNjAtOTUzOTk4NjgzYjRiIiwib3JpZ2luX2p0aSI6IjUyYTI4MTM0LWE5YmYtNGNjMy05ZjlkLTAzZTgxMjY3M2Q3OSIsImF1ZCI6IjFzNHJjcnZycmtoamI5cnZtZ2Y3MWZ1ZDZwIiwiZXZlbnRfaWQiOiJlYjQxMDhmNS0yNzcyLTRiMGItYWE0ZC03YjRkNTY1ZGY5NmUiLCJ0b2tlbl91c2UiOiJpZCIsImF1dGhfdGltZSI6MTc3NTUzMjU0NiwiZXhwIjoxNzc1NTM2MTQ2LCJjdXN0b206cGVybWlzc2lvbnMiOiJbXCJjb2xsZWN0aW9uczplZGl0XCIsIFwibm9kZXM6dmlld1wiLCBcImFzc2V0czpkZWxldGVcIiwgXCJhc3NldHM6ZWRpdFwiLCBcInBpcGVsaW5lc0V4ZWN1dGlvbnM6Y2FuY2VsXCIsIFwicGlwZWxpbmVzOnZpZXdcIiwgXCJwaXBlbGluZXNFeGVjdXRpb25zOnZpZXdcIiwgXCJzeXN0ZW06dmlld1wiLCBcInBpcGVsaW5lczpkZWxldGVcIiwgXCJjb2xsZWN0aW9uczp2aWV3XCIsIFwic3RvcmFnZTp2aWV3XCIsIFwicmVnaW9uczp2aWV3XCIsIFwicGlwZWxpbmVzOmNyZWF0ZVwiLCBcInBpcGVsaW5lczplZGl0XCIsIFwiY29sbGVjdGlvbi10eXBlczp2aWV3XCIsIFwiYXNzZXRzOnZpZXdcIiwgXCJhc3NldHM6ZG93bmxvYWRcIiwgXCJjb2xsZWN0aW9uczpjcmVhdGVcIiwgXCJjb25uZWN0b3JzOnZpZXdcIiwgXCJhc3NldHM6dXBsb2FkXCIsIFwidXNlcnM6dmlld1wiLCBcInNlYXJjaDp2aWV3XCIsIFwicGlwZWxpbmVzRXhlY3V0aW9uczpyZXRyeVwiLCBcImNvbGxlY3Rpb25zOmRlbGV0ZVwiXSIsImlhdCI6MTc3NTUzMjU0NiwianRpIjoiZTk3YmQ0ODEtMzU2Ny00MDM1LWEzOWMtMDA2NTIzZDMwNGJkIiwiZW1haWwiOiJ2aXN1YWwtdGVzdC11c2VyQkBleGFtcGxlLmNvbSJ9.p4ae7nDMrpq4kNLN2g_yD7tahIm6LCLCm6y-xw3hk4DJvKRQmh7TEP0SRkzHaFBXti68bZKIA1Do7QooMeXXWM60reuAHDEgBrSjEfds3GIRAOmeg5ucChY-8rokyvS5LmxC208YykPdIP4KPoGcyRlJg-4PWyjS0JUbMrzAVcL0Xu4sN6kpAClUWpUqFH1kgF397YklbJYywgH4Uo2f2tj6RxIjmUxurEWZA5uXIP98EoKDAS2z-LnRnJ4sep6TVoob9io7SEFsRNvkDLqT7_4N5Bz_IR3vcaR4zMZPoKXVEhTSat6Kw46vgNsmbBuUPv49m9PkkqC2mmgWC0PL_A"
+        },
+        {
+          "name": "medialake-aws-config",
+          "value": "{\"region\":\"us-east-1\",\"Auth\":{\"identity_providers\":[{\"identity_provider_method\":\"cognito\",\"identity_provider_name\":null,\"identity_provider_metadata_url\":null}],\"Cognito\":{\"userPoolClientId\":\"1s4rcrvrrkhjb9rvmgf71fud6p\",\"userPoolId\":\"us-east-1_75cZqxKpL\",\"identityPoolId\":\"us-east-1:812a5904-3af4-4079-9ebd-c6f42a518b4f\",\"domain\":\"medialake-dev-c8cc1e343c4cd2ba.auth.us-east-1.amazoncognito.com\",\"loginWith\":{\"username\":true,\"email\":true,\"oauth\":{\"domain\":\"medialake-dev-c8cc1e343c4cd2ba.auth.us-east-1.amazoncognito.com\",\"scopes\":[\"email\",\"openid\",\"profile\"],\"responseType\":\"code\",\"redirectSignIn\":\"https://d1tve21z3gagji.cloudfront.net/\",\"redirectSignOut\":\"https://d1tve21z3gagji.cloudfront.net/sign-in\"}}}},\"API\":{\"REST\":{\"RestApi\":{\"endpoint\":\"https://d1tve21z3gagji.cloudfront.net/v1\"}}}}"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.749834d8-9011-701a-a260-953998683b4b.refreshToken",
+          "value": "eyJjdHkiOiJKV1QiLCJlbmMiOiJBMjU2R0NNIiwiYWxnIjoiUlNBLU9BRVAifQ.jMjaXbof-MJI0XBI2Mjo_qbzsnxoAOxj2dopDWsiSGZRbQFJVZACl7rtLTjQAdcWvxrxHGlI7nRfIV38xzFOA9psdliiPUo7StTVvbbAwaEi5ncopsqqGmaPj4qIjJ5Wv-UpHhzEcNVnp8YnbOJPEnnUiyOVbrZO4LZFyaTg9LIfyI6F98Ken0IKPDmH1Iu-LBJsNTCqb9XrvPmv6Y2Nu3WAS_ba9zHlJqN1pwrqIEp5LjjkVqK_UqLJtJfH7PJ2ZkoR80TMhai-_QY4l2j_82315HGLvngracOc2hODJDx1hXCYbHuYmTyqlutd3GyhALeNypXTSbn8JV9HDiRcEA.rgnjh8le1diWvq77.jgFurh5OJOKbPCOn_nYvYhTZIxYB93zAqKXQ76U-8jW4A2ARYojsJcPmVoJqvfmKe8umFNRQp5zmUGedsBlvOIExB9CRIoyI7wpL9XHYLquPQIwGo36kQ8rboSXlztZ8XFxf1Hlbtz4gP28KpiIYou1AWt8O6bBRMv2mohDDt7AmNz8RwA4Kr5-o6pjy5hF_ffhVoFWjbSCiWsYmJvoeF143jjTE9_ACMY_yY2gHz0Vrmbsw0q8ghIvXEog-aLrLH4i7s3u_AWa0bxH3tpUZsa3fmPg4H8dl3lN5BWyPIDjp7X7MVVL1WsinafTJ93Sl_cVnnp17hDfanJIgYkg0PaqbA3RtwnGPa2mYMN0NygGS7M8du8TPmsR3CT2wLrPP7eLAqSsKFD9wCirMfZ7JkqNFCkRgGqf_-JJzasp7UHF59wYWEwuWz4NLbg90AKrNoQQzHu3N66AvNeXA6sb8Apl_FWPcJc4Gaz85ohGnsCHZuY_RjPI4umAk5EnX0NpCrVlQ3T1VEG8yNqPjibd2GbFAxd7MnV4CJSnlSyd6BE0GH3CMZwux0AB2wxkPSqa6-mFwG1YUf1BYoufCCIJF9NABLeqXuFo7TRc6pPBBBeYl68Wr1HXIseClxDzEAW61_IgBLGkROoPi5L8cacljNZ1Dc0FUcZHPw-UFKeMHrfp04NIvRlQTGukEsemyhM_JoWYxdtRtJyK8EUiDEu1fI47BKDQf4bUfFYLHeU1CXLbY_S-KNBPLh18sz-8zeAsuqNjr4ZvIzgV48vI0s6HHteYnssIKL9DWFxlHhUP_HWhTVeJx7r3H4JN83uG8M9wvZUFenoKAmnRzKt0je313G__l7DFq50Qjdpk87Cr0MJnNUDe-syTDwfPslcfVGiCXgS-GWazn-ReN3LlILJZhAG1DGCKH3GaND-j3HLYlmHbeNDdaHk6OodDACjlwF2VXeO4AoG1BMDcKQLEPnPbLcwvmWKYbAe3BP0miEL_pMERDLwP-iotHugAaRRGBDHUQXYctbA4pL2zbzrAWIJLnpiYwLdfHPeDLILUqZ9gCmfLGUHZE2T-zdzVW9smKCa5Rjndwdre3g0pSHMANwApGoZvWcXNVZl6xp7IR2LWHCiMY2nSSOMUY3KGOGSxItIEHUzClbHbMdnDjmIzN1HADnW7ehBmh4RXI8bzAtyLxaFVFu2F5AQe2wwIi7QvfIwFlxdzUtnPlw_ru5T4f4_UKzsbC03g1M1U2tJsCOd56PHl1IdYMpM7Ixw_xFgrBLLe4cc-abRq9rk5nzCya6d9FlhW_h7kOT7Jpff-OudGbx04E0m4NauYKMmZvCw.06yr6cTe9rZuVT2zw_ylfA"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.LastAuthUser",
+          "value": "749834d8-9011-701a-a260-953998683b4b"
+        },
+        {
+          "name": "medialake_notifications",
+          "value": "[]"
+        },
+        {
+          "name": "CognitoIdentityServiceProvider.1s4rcrvrrkhjb9rvmgf71fud6p.749834d8-9011-701a-a260-953998683b4b.idToken",
+          "value": "eyJraWQiOiJmNmdwajkxVWZkMzV6b0VGS1M1cjJ1TGoxdDNpS1I0U1p1WTltTmx3bWVVPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI3NDk4MzRkOC05MDExLTcwMWEtYTI2MC05NTM5OTg2ODNiNGIiLCJjb2duaXRvOmdyb3VwcyI6WyJlZGl0b3JzIl0sImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb21cL3VzLWVhc3QtMV83NWNacXhLcEwiLCJjb2duaXRvOnVzZXJuYW1lIjoiNzQ5ODM0ZDgtOTAxMS03MDFhLWEyNjAtOTUzOTk4NjgzYjRiIiwib3JpZ2luX2p0aSI6IjUyYTI4MTM0LWE5YmYtNGNjMy05ZjlkLTAzZTgxMjY3M2Q3OSIsImF1ZCI6IjFzNHJjcnZycmtoamI5cnZtZ2Y3MWZ1ZDZwIiwiZXZlbnRfaWQiOiJlYjQxMDhmNS0yNzcyLTRiMGItYWE0ZC03YjRkNTY1ZGY5NmUiLCJ0b2tlbl91c2UiOiJpZCIsImF1dGhfdGltZSI6MTc3NTUzMjU0NiwiZXhwIjoxNzc1NTM2MTQ2LCJjdXN0b206cGVybWlzc2lvbnMiOiJbXCJjb2xsZWN0aW9uczplZGl0XCIsIFwibm9kZXM6dmlld1wiLCBcImFzc2V0czpkZWxldGVcIiwgXCJhc3NldHM6ZWRpdFwiLCBcInBpcGVsaW5lc0V4ZWN1dGlvbnM6Y2FuY2VsXCIsIFwicGlwZWxpbmVzOnZpZXdcIiwgXCJwaXBlbGluZXNFeGVjdXRpb25zOnZpZXdcIiwgXCJzeXN0ZW06dmlld1wiLCBcInBpcGVsaW5lczpkZWxldGVcIiwgXCJjb2xsZWN0aW9uczp2aWV3XCIsIFwic3RvcmFnZTp2aWV3XCIsIFwicmVnaW9uczp2aWV3XCIsIFwicGlwZWxpbmVzOmNyZWF0ZVwiLCBcInBpcGVsaW5lczplZGl0XCIsIFwiY29sbGVjdGlvbi10eXBlczp2aWV3XCIsIFwiYXNzZXRzOnZpZXdcIiwgXCJhc3NldHM6ZG93bmxvYWRcIiwgXCJjb2xsZWN0aW9uczpjcmVhdGVcIiwgXCJjb25uZWN0b3JzOnZpZXdcIiwgXCJhc3NldHM6dXBsb2FkXCIsIFwidXNlcnM6dmlld1wiLCBcInNlYXJjaDp2aWV3XCIsIFwicGlwZWxpbmVzRXhlY3V0aW9uczpyZXRyeVwiLCBcImNvbGxlY3Rpb25zOmRlbGV0ZVwiXSIsImlhdCI6MTc3NTUzMjU0NiwianRpIjoiZTk3YmQ0ODEtMzU2Ny00MDM1LWEzOWMtMDA2NTIzZDMwNGJkIiwiZW1haWwiOiJ2aXN1YWwtdGVzdC11c2VyQkBleGFtcGxlLmNvbSJ9.p4ae7nDMrpq4kNLN2g_yD7tahIm6LCLCm6y-xw3hk4DJvKRQmh7TEP0SRkzHaFBXti68bZKIA1Do7QooMeXXWM60reuAHDEgBrSjEfds3GIRAOmeg5ucChY-8rokyvS5LmxC208YykPdIP4KPoGcyRlJg-4PWyjS0JUbMrzAVcL0Xu4sN6kpAClUWpUqFH1kgF397YklbJYywgH4Uo2f2tj6RxIjmUxurEWZA5uXIP98EoKDAS2z-LnRnJ4sep6TVoob9io7SEFsRNvkDLqT7_4N5Bz_IR3vcaR4zMZPoKXVEhTSat6Kw46vgNsmbBuUPv49m9PkkqC2mmgWC0PL_A"
+        }
+      ]
+    }
+  ]
+}

@@ -321,6 +321,72 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
     return result
 
 
+def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
+    """
+    Build the concrete EventBridge event pattern for the upload_batch_completed trigger node.
+
+    Always includes:
+      - source: ["medialake.pipeline"]
+      - detail-type: ["Upload Batch Completed"]
+      - detail.automationTag: [configured automation_tag]
+
+    Conditionally includes:
+      - detail.portalId: [portal_id] only when portal_id is configured (non-empty)
+
+    Maps outcome_filter to detail.outcome:
+      - "COMPLETE" → ["COMPLETE"]
+      - "COMPLETE_WITH_ERRORS" → ["COMPLETE_WITH_ERRORS"]
+      - "BOTH" → ["COMPLETE", "COMPLETE_WITH_ERRORS"]
+      - unset/None/empty → ["COMPLETE"] (default)
+
+    Args:
+        node: Node object containing configuration with parameters
+              (automation_tag, portal_id, outcome_filter)
+
+    Returns:
+        EventBridge-compatible event pattern dictionary
+    """
+    # Retrieve parameters from both the parameters dict and top-level configuration
+    parameters = node.data.configuration.get("parameters", {})
+    for key, value in node.data.configuration.items():
+        if key != "parameters" and isinstance(value, (str, int, float, bool)):
+            if key not in parameters:
+                parameters[key] = value
+
+    automation_tag = parameters.get("automation_tag", "")
+    portal_id = parameters.get("portal_id", "")
+    outcome_filter = parameters.get("outcome_filter", "")
+
+    # Build the base pattern — source, detail-type, and automationTag are always present
+    pattern: Dict[str, Any] = {
+        "source": ["medialake.pipeline"],
+        "detail-type": ["Upload Batch Completed"],
+        "detail": {
+            "automationTag": [automation_tag],
+        },
+    }
+
+    # Include detail.portalId only when portal_id is configured (non-empty)
+    if portal_id and str(portal_id).strip():
+        pattern["detail"]["portalId"] = [str(portal_id).strip()]
+
+    # Map outcome_filter to detail.outcome
+    outcome_map = {
+        "COMPLETE": ["COMPLETE"],
+        "COMPLETE_WITH_ERRORS": ["COMPLETE_WITH_ERRORS"],
+        "BOTH": ["COMPLETE", "COMPLETE_WITH_ERRORS"],
+    }
+    # Default to ["COMPLETE"] when outcome_filter is unset, empty, or not recognized
+    outcome = (
+        outcome_map.get(outcome_filter, ["COMPLETE"])
+        if outcome_filter
+        else ["COMPLETE"]
+    )
+    pattern["detail"]["outcome"] = outcome
+
+    return pattern
+
+
 def get_event_pattern_for_rule(
     rule_name: str, node: Any, pipeline_name: str, yaml_data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
@@ -461,6 +527,14 @@ def get_event_pattern_for_rule(
             logger.info(
                 f"Created flattened pattern for pipeline_execution_completed: {json.dumps(pattern)}"
             )
+            return pattern
+        elif rule_name == "upload_batch_completed_trigger":
+            # Build event pattern for the Upload Batch Completed trigger node.
+            # Always include source, detail-type, and detail.automationTag.
+            # Include detail.portalId only when portal_id is configured.
+            # Map outcome_filter to detail.outcome with a default of ["COMPLETE"].
+            pattern = build_upload_batch_completed_pattern(node)
+            logger.info(f"Built upload_batch_completed pattern: {json.dumps(pattern)}")
             return pattern
         else:
             # For other rules, use the pattern from YAML

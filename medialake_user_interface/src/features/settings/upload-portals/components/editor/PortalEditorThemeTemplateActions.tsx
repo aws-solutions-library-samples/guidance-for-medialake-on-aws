@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Dialog,
@@ -52,6 +53,7 @@ type SaveMode = "theme" | "template" | null;
 const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateActionsProps> = ({
   onNotify,
 }) => {
+  const { t } = useTranslation();
   const applyTheme = usePortalEditorStore((s) => s.applyTheme);
   const buildThemePayload = usePortalEditorStore((s) => s.buildThemePayload);
   const buildTemplatePayload = usePortalEditorStore((s) => s.buildTemplatePayload);
@@ -138,17 +140,21 @@ const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateAction
         onClick={(e) => setMenuAnchor(e.currentTarget)}
         aria-haspopup="menu"
       >
-        Save as…
+        {t("uploadPortals.themeTemplateActions.saveAs")}
       </Button>
 
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
-        <MenuItem onClick={() => openSaveDialog("template")}>Save as Template</MenuItem>
-        <MenuItem onClick={() => openSaveDialog("theme")}>Save as Theme</MenuItem>
+        <MenuItem onClick={() => openSaveDialog("template")}>
+          {t("uploadPortals.themeTemplateActions.saveAsTemplate")}
+        </MenuItem>
+        <MenuItem onClick={() => openSaveDialog("theme")}>
+          {t("uploadPortals.themeTemplateActions.saveAsTheme")}
+        </MenuItem>
       </Menu>
 
       {/* Apply theme picker */}
       <Dialog open={applyOpen} onClose={() => setApplyOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Apply theme</DialogTitle>
+        <DialogTitle>{t("uploadPortals.themeTemplateActions.applyTheme")}</DialogTitle>
         <DialogContent dividers>
           {themes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">

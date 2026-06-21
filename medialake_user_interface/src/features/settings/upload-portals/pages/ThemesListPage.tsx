@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -36,6 +37,7 @@ import UploadPortalsSubNav from "../components/UploadPortalsSubNav";
  * `/settings/upload-portals/themes`.
  */
 const ThemesListPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const createPermission = useActionPermission("manage", "settings");
   const { data: response, isLoading } = useListThemes();
@@ -65,7 +67,7 @@ const ThemesListPage: React.FC = () => {
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Themes"
-        description="Reusable appearance themes you can apply to new or existing portals."
+        description={t("uploadPortals.themes.pageDescription")}
         action={
           <Button
             variant="contained"
@@ -131,7 +133,7 @@ const ThemesListPage: React.FC = () => {
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete theme</DialogTitle>
+        <DialogTitle>{t("uploadPortals.themes.deleteTheme")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Portals and templates

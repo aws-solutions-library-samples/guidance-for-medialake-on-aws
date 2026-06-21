@@ -339,6 +339,8 @@ class MediaLakeStack(cdk.Stack):
                 connector_table=api_gateway_stack.connector_table,
                 iac_assets_bucket=props.base_infrastructure.iac_assets_bucket,
                 cloudfront_domain=props.cloudfront_domain,
+                pipelines_event_bus_name=props.base_infrastructure.pipelines_event_bus.event_bus_name,
+                pipelines_event_bus_arn=props.base_infrastructure.pipelines_event_bus.event_bus_arn,
             ),
         )
         portal_api_stack.add_dependency(api_gateway_stack)

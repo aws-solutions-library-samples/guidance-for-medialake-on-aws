@@ -490,6 +490,37 @@ def is_relevant_event(
     return any(event_name.startswith(prefix) for prefix in allowed_prefixes)
 
 
+def _parse_string_list(attr: dict | None) -> tuple:
+    """Parse a DynamoDB list-of-strings attribute into a normalized tuple."""
+    if not attr:
+        return ()
+    values = attr.get("L", [])
+    return tuple(
+        v.get("S", "").strip().lower()
+        for v in values
+        if isinstance(v, dict) and v.get("S", "").strip()
+    )
+
+
+def _parse_file_filter(attr: dict | None) -> dict | None:
+    """Parse the DynamoDB ``fileFilter`` map into a normalized dict.
+
+    Returns ``None`` when no usable filter is present (missing, NULL, or empty),
+    which downstream means "allow all".
+    """
+    if not attr or "M" not in attr:
+        return None
+    m = attr["M"]
+    mode = m.get("mode", {}).get("S", "allow").strip().lower()
+    if mode not in ("allow", "deny"):
+        mode = "allow"
+    extensions = tuple(e.lstrip(".") for e in _parse_string_list(m.get("extensions")))
+    mime_types = _parse_string_list(m.get("mimeTypes"))
+    if not extensions and not mime_types:
+        return None
+    return {"mode": mode, "extensions": extensions, "mimeTypes": mime_types}
+
+
 @functools.lru_cache(maxsize=50)
 def lookup_connector_by_bucket(bucket_name: str) -> dict | None:
     """Cached lookup of connector record by bucket name using GSI query."""
@@ -501,20 +532,224 @@ def lookup_connector_by_bucket(bucket_name: str) -> dict | None:
             IndexName=CONNECTOR_STORAGE_IDENTIFIER_INDEX,
             KeyConditionExpression="storageIdentifier = :b",
             ExpressionAttributeValues={":b": {"S": bucket_name}},
-            ProjectionExpression="id, integrationMethod",
+            ProjectionExpression=(
+                "id, integrationMethod, allowedFileExtensions, fileFilter"
+            ),
             Limit=1,
         )
         items = resp.get("Items", [])
         if not items:
             return None
         item = items[0]
+        # Parse both the structured `fileFilter` (canonical) and the legacy
+        # `allowedFileExtensions` allow-list. Missing/empty on both means
+        # "allow all" — what every connector created before filtering looks
+        # like, so existing connectors keep ingesting everything unchanged.
+        allowed_raw = item.get("allowedFileExtensions", {}).get("L", [])
+        allowed_exts = tuple(
+            ext.get("S", "").strip().lower().lstrip(".")
+            for ext in allowed_raw
+            if ext.get("S", "").strip()
+        )
         return {
             "id": item["id"]["S"],
             "integrationMethod": item.get("integrationMethod", {}).get("S", ""),
+            "allowedFileExtensions": allowed_exts,
+            "fileFilter": _parse_file_filter(item.get("fileFilter")),
         }
     except Exception as e:
         logger.warning(f"Connector lookup failed for bucket {bucket_name}: {e}")
         return None
+
+
+def _mime_type_matches(content_type: str, patterns: tuple) -> bool:
+    """Return True if ``content_type`` matches any MIME pattern.
+
+    Supports exact matches ("video/mp4"), subtype wildcards ("image/*"), and
+    the universal wildcards ("*" / "*/*").
+    """
+    if not content_type or not patterns:
+        return False
+    ct = content_type.lower().split(";")[0].strip()
+    main_type = ct.split("/")[0] if "/" in ct else ct
+    for pattern in patterns:
+        if pattern in ("*", "*/*"):
+            return True
+        if pattern == ct:
+            return True
+        if pattern.endswith("/*") and pattern[:-2] == main_type:
+            return True
+    return False
+
+
+@functools.lru_cache(maxsize=1)
+def _env_file_filter() -> dict | None:
+    """Parse the connector's file filter from its own environment variable.
+
+    The ``CONNECTOR_FILE_FILTER`` env var is set on each per-connector Lambda at
+    creation time from the connector configuration, so the connector is driven
+    entirely by its own configuration without a DynamoDB read on the hot path.
+
+    Returns the normalized filter dict, or ``None`` when the env var is absent
+    or empty (meaning "allow all" / fall back to the connector record).
+    """
+    raw = os.environ.get("CONNECTOR_FILE_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        logger.warning("Invalid CONNECTOR_FILE_FILTER env var; ignoring it")
+        return None
+    if not isinstance(data, dict):
+        return None
+    mode = str(data.get("mode", "allow")).strip().lower()
+    if mode not in ("allow", "deny"):
+        mode = "allow"
+    extensions = tuple(
+        str(e).strip().lower().lstrip(".")
+        for e in (data.get("extensions") or [])
+        if str(e).strip()
+    )
+    mime_types = tuple(
+        str(m).strip().lower() for m in (data.get("mimeTypes") or []) if str(m).strip()
+    )
+    if not extensions and not mime_types:
+        return None
+    return {"mode": mode, "extensions": extensions, "mimeTypes": mime_types}
+
+
+_CONTENT_CATEGORY_BY_EXT = {
+    # documents
+    "pdf": "document",
+    "doc": "document",
+    "docx": "document",
+    "txt": "document",
+    "rtf": "document",
+    "odt": "document",
+    "md": "document",
+    "ppt": "document",
+    "pptx": "document",
+    "xls": "document",
+    "xlsx": "document",
+    "pages": "document",
+    # structured data
+    "csv": "data",
+    "json": "data",
+    "xml": "data",
+    "yaml": "data",
+    "yml": "data",
+    "tsv": "data",
+    "parquet": "data",
+    # archives
+    "zip": "archive",
+    "tar": "archive",
+    "gz": "archive",
+    "tgz": "archive",
+    "rar": "archive",
+    "7z": "archive",
+    "bz2": "archive",
+    # code / text
+    "py": "code",
+    "js": "code",
+    "ts": "code",
+    "tsx": "code",
+    "jsx": "code",
+    "java": "code",
+    "c": "code",
+    "cpp": "code",
+    "h": "code",
+    "hpp": "code",
+    "go": "code",
+    "rs": "code",
+    "rb": "code",
+    "sh": "code",
+    "html": "code",
+    "css": "code",
+    "sql": "code",
+}
+
+
+def get_content_category(asset_type: str, file_ext: str) -> str:
+    """Coarse content category for non-media badges and search facets.
+
+    Supported media maps to its kind (image/video/audio); everything else maps
+    to a lightweight category derived from the extension
+    (document/data/archive/code/other).
+    """
+    if asset_type in ("Image", "Video", "Audio"):
+        return asset_type.lower()
+    return _CONTENT_CATEGORY_BY_EXT.get(
+        (file_ext or "").strip().lower().lstrip("."), "other"
+    )
+
+
+def _resolve_file_filter(bucket_name: str) -> dict | None:
+    """Resolve the active file filter for a bucket's connector.
+
+    Prefers the Lambda's own ``CONNECTOR_FILE_FILTER`` env var, then the
+    connector record's structured ``fileFilter``, then the legacy
+    ``allowedFileExtensions`` allow-list. Returns ``None`` when no filter is
+    configured (meaning "allow all" for supported media).
+    """
+    file_filter = _env_file_filter()
+    if file_filter is not None:
+        return file_filter
+    info = lookup_connector_by_bucket(bucket_name)
+    if info is None:
+        return None
+    file_filter = info.get("fileFilter")
+    if file_filter:
+        return file_filter
+    allowed = info.get("allowedFileExtensions", ())
+    if allowed:
+        return {"mode": "allow", "extensions": tuple(allowed), "mimeTypes": ()}
+    return None
+
+
+def _filter_matches(file_filter: dict, file_ext: str, content_type: str) -> bool:
+    """True if the object matches the filter's extensions or MIME patterns."""
+    extensions = file_filter.get("extensions", ())
+    mime_types = file_filter.get("mimeTypes", ())
+    return bool(
+        (file_ext and file_ext in extensions)
+        or _mime_type_matches(content_type, mime_types)
+    )
+
+
+def should_ingest_file(bucket_name: str, file_ext: str, content_type: str) -> bool:
+    """Decide whether a SUPPORTED-MEDIA object should be ingested per the filter.
+
+    No filter / empty filter -> ingest (allow all). Allow mode -> ingest only
+    matches; deny mode -> ingest everything except matches.
+    """
+    file_ext = (file_ext or "").strip().lower().lstrip(".")
+    file_filter = _resolve_file_filter(bucket_name)
+    if file_filter is None:
+        return True
+    extensions = file_filter.get("extensions", ())
+    mime_types = file_filter.get("mimeTypes", ())
+    if not extensions and not mime_types:
+        return True
+    matched = _filter_matches(file_filter, file_ext, content_type)
+    if file_filter.get("mode") == "deny":
+        return not matched
+    return matched
+
+
+def is_explicitly_allowed(bucket_name: str, file_ext: str, content_type: str) -> bool:
+    """True only when an allow-mode filter explicitly lists this file.
+
+    Drives whether a NON-MEDIA ("Other") object is ingested: only when the
+    connector opted in by allow-listing its extension or MIME type. Deny mode
+    and an absent filter never opt non-media in (so behavior is unchanged for
+    connectors that don't configure an allow-list).
+    """
+    file_ext = (file_ext or "").strip().lower().lstrip(".")
+    file_filter = _resolve_file_filter(bucket_name)
+    if not file_filter or file_filter.get("mode") != "allow":
+        return False
+    return _filter_matches(file_filter, file_ext, content_type)
 
 
 class FileHash(TypedDict):
@@ -1073,17 +1308,45 @@ class AssetProcessor:
                 f"Asset type determination for {key}: content_type={content_type}, file_ext={file_ext}, determined_type={asset_type}"
             )
 
-            # Stop processing if asset type is not one of: "Image", "Video", "Audio"
-            if asset_type not in ["Image", "Video", "Audio"]:
+            # Gate the object: supported media goes through the connector's
+            # file filter; non-media ("Other") is ingested ONLY when the
+            # connector explicitly allow-lists it (preview-only, no pipeline).
+            is_supported_media = asset_type in ["Image", "Video", "Audio"]
+
+            if is_supported_media:
+                if not should_ingest_file(bucket, file_ext, content_type):
+                    logger.info(
+                        f"Skipping {bucket}/{key}: file extension '{file_ext}' / "
+                        f"content type '{content_type}' excluded by the connector's "
+                        f"file filter"
+                    )
+                    metrics.add_metric(
+                        name="ConnectorFileTypeFiltered",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                    release_processing_lock(bucket, key, version_id)
+                    return None
+            else:
+                if not is_explicitly_allowed(bucket, file_ext, content_type):
+                    logger.info(
+                        f"Skipping processing for unsupported asset type: "
+                        f"{asset_type} for {bucket}/{key}"
+                    )
+                    metrics.add_metric(
+                        name="UnsupportedAssetTypeSkipped",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                    release_processing_lock(bucket, key, version_id)
+                    return None
                 logger.info(
-                    f"Skipping processing for unsupported asset type: {asset_type} for {bucket}/{key}"
+                    f"Ingesting non-media asset (preview-only, no pipeline): "
+                    f"{bucket}/{key} type={asset_type} ext={file_ext}"
                 )
                 metrics.add_metric(
-                    name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1
+                    name="NonMediaAssetIngested", unit=MetricUnit.Count, value=1
                 )
-                # Release lock before returning
-                release_processing_lock(bucket, key, version_id)
-                return None
 
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
@@ -1607,11 +1870,20 @@ class AssetProcessor:
                 },
             )
 
-            self.publish_event(
-                dynamo_entry["InventoryID"],
-                dynamo_entry["DigitalSourceAsset"]["ID"],
-                metadata,
-            )
+            # Supported media triggers the default pipelines via EventBridge.
+            # Non-media is searchable (DynamoDB stream -> OpenSearch) but gets no
+            # pipeline processing, so we skip the AssetCreated event for it.
+            if is_supported_media:
+                self.publish_event(
+                    dynamo_entry["InventoryID"],
+                    dynamo_entry["DigitalSourceAsset"]["ID"],
+                    metadata,
+                )
+            else:
+                logger.info(
+                    f"Skipping pipeline event for non-media asset "
+                    f"{dynamo_entry['InventoryID']} (preview-only)"
+                )
 
             # Release lock after successful processing
             release_processing_lock(bucket, key, version_id)
@@ -1748,6 +2020,7 @@ class AssetProcessor:
                 "DigitalSourceAsset": {
                     "ID": f"asset:{type_abbrev}:{asset_id}",
                     "Type": asset_type,
+                    "contentCategory": get_content_category(asset_type, file_ext),
                     "CreateDate": timestamp,
                     "IngestedAt": timestamp,
                     "originalIngestDate": timestamp,  # Set original ingest date to current time for new assets
@@ -2317,11 +2590,27 @@ def update_restore_status(
 
 # Process records in parallel with improved logging
 def process_records_in_parallel(
-    processor: AssetProcessor, records: List[Dict], max_workers: int = 5
+    processor: AssetProcessor, records: List[Dict], max_workers: Optional[int] = None
 ):
-    """Process records in parallel using a ThreadPoolExecutor"""
+    """Process records in parallel using a ThreadPoolExecutor.
+
+    Concurrency defaults to the ``INGEST_MAX_WORKERS`` env var (falling back to
+    5). Raising it is memory-safe: each record is processed by streaming its S3
+    object (chunked MD5 + head/metadata), never loading the whole file, so more
+    concurrent records does not risk large-file OOM on this Lambda.
+    """
+    if max_workers is None:
+        try:
+            max_workers = int(os.environ.get("INGEST_MAX_WORKERS", "5"))
+        except (TypeError, ValueError):
+            max_workers = 5
+    max_workers = max(1, max_workers)
+
     # Add logging for initial record count
-    logger.info(f"Starting parallel processing with {len(records)} records")
+    logger.info(
+        f"Starting parallel processing with {len(records)} records "
+        f"(max_workers={max_workers})"
+    )
 
     # Debug log the first record structure
     if records and len(records) > 0:

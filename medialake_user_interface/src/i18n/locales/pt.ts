@@ -13,20 +13,30 @@ export default {
     title: "Ativos",
     connectors: "Conectores",
     selectConnector: "Selecione um conector",
+    myAssets: "Meus ativos",
+    uploadToMyAssets: "Enviar para Meus ativos",
+    myAssetsEmpty: {
+      title: "Nenhum ativo ainda",
+      description:
+        "Envie seus primeiros arquivos de mídia para começar sua biblioteca pessoal de ativos.",
+      uploadCta: "Enviar arquivos",
+    },
   },
   upload: {
     title: "Carregar arquivos de mídia",
     description:
-      "Selecione um conector S3 e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
+      "Selecione um destino e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
     uploadDestination: "Destino do upload",
     browsePath: "Navegar caminho",
     uploadingTo: "Carregando para",
     restrictedToPrefix: "restrito",
     allowedPrefixesInfo: "Você só pode carregar para {{count}} caminho(s) permitido(s)",
-    connectorLabel: "Conector S3",
-    selectConnectorPlaceholder: "Selecione um conector S3",
+    connectorLabel: "Destino do upload",
+    selectConnectorPlaceholder: "Selecione um destino",
     loadingConnectors: "Carregando conectores...",
     noConnectors: "Nenhum conector S3 disponível. Por favor, configure um conector S3 primeiro.",
+    noDestinations:
+      "Você não tem acesso a nenhum destino de upload. Entre em contato com o administrador para solicitar acesso.",
     dashboardNote:
       "Apenas arquivos do tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) e MPEG-DASH (application/dash+xml) são permitidos",
     meta: {
@@ -43,6 +53,7 @@ export default {
     prefixHelper: "Você só pode navegar e carregar para pastas dentro do caminho selecionado.",
     currentPath: "Caminho Atual",
     confirm: "Usar Este Caminho",
+    refresh: "Atualizar",
     validation: {
       invalidPath: "O caminho selecionado está fora dos prefixos permitidos.",
       noPathSelected: "Por favor, navegue até uma pasta antes de confirmar.",
@@ -116,6 +127,40 @@ export default {
         "O nome do bucket deve ser globalmente único e seguir as regras de nomenclatura do S3.",
       addPrefix: "Adicionar Prefixo",
       allowUploads: "Permitir uploads",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     status: {
       active: "Ativo",
@@ -225,6 +270,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoritos",
+      emptyTitle: "Nenhuma coleção favorita",
+      emptyDescription: "As coleções que você favoritar aparecerão aqui",
+    },
     title: "Coleções",
     description: "Organize e gerencie seus ativos de mídia em coleções",
     createCollection: "Criar Coleção",
@@ -924,6 +974,7 @@ export default {
     },
   },
   common: {
+    remove: "Remover",
     back: "Voltar",
     search: "Pesquisar",
     public: "Público",
@@ -1730,6 +1781,9 @@ export default {
         myCollectionsTitle: "Minhas Coleções",
         sharedWithMeTitle: "Compartilhado Comigo",
         mySharedTitle: "Minhas Coleções Compartilhadas",
+        favoritesTitle: "Coleções favoritas",
+        favoritesEmptyTitle: "Nenhuma coleção favorita",
+        favoritesEmptyDescription: "As coleções que você favoritar aparecerão aqui",
         emptyTitle: "Nenhuma coleção encontrada",
         emptyDescription: "Crie uma coleção para começar",
         createCollection: "Criar Coleção",
@@ -1742,6 +1796,7 @@ export default {
           myCollections: "Minhas Coleções",
           sharedWithMe: "Compartilhado Comigo",
           myShared: "Minhas Coleções Compartilhadas",
+          favorites: "Coleções favoritas",
         },
         sortingTitle: "Ordenação",
         sortBy: "Ordenar Por",
@@ -1760,6 +1815,11 @@ export default {
         title: "Recursos Recentes",
         emptyTitle: "Não há recursos recentes",
         emptyDescription: "Recursos carregados recentemente aparecerão aqui",
+      },
+      myAssets: {
+        title: "Meus Recursos",
+        emptyTitle: "Ainda não há recursos pessoais",
+        emptyDescription: "Carregue seu primeiro arquivo em Meus Recursos.",
       },
       collectionGroup: {
         title: "Grupo de Coleções",
@@ -1935,6 +1995,47 @@ export default {
     tokens: {
       copyUrl: "Copiar URL",
       revokeToken: "Revogar token",
+    },
+    themeTemplateActions: {
+      saveAs: "Salvar como…",
+      saveAsTemplate: "Salvar como modelo",
+      saveAsTheme: "Salvar como tema",
+      applyTheme: "Aplicar tema",
+    },
+    themes: {
+      pageDescription:
+        "Temas de aparência reutilizáveis que você pode aplicar a portais novos ou existentes",
+      deleteTheme: "Excluir tema",
+      failedToLoad: "Falha ao carregar o tema",
+    },
+    templates: {
+      pageDescription: "Estruturas de portal reutilizáveis para iniciar novos portais rapidamente",
+      createFromTemplate: "Criar portal a partir deste modelo",
+      deleteTemplate: "Excluir modelo",
+      failedToLoad: "Falha ao carregar o modelo",
+    },
+    createMenu: {
+      startFromTemplate: "Iniciar a partir de modelo…",
+      applyTheme: "Aplicar tema…",
+      startFromTemplateTitle: "Iniciar a partir de modelo",
+      applyThemeTitle: "Aplicar tema",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Opcional. Usado para encaminhar eventos de conclusão de lote de upload para um pipeline específico para enriquecimento automático.",
+    },
+    actions: {
+      applyTheme: "Aplicar tema",
+      applyThemeMenu: "Aplicar tema…",
+      saveAsTemplate: "Salvar como modelo",
+      saveAsTheme: "Salvar como tema",
+      startFromTemplate: "Começar a partir de um modelo",
+      startFromTemplateMenu: "Começar a partir de um modelo…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Grupo de opções",
+      yesNo: "Sim / Não",
     },
   },
 };

@@ -21,7 +21,7 @@ import { registerUppyUploaderRenderer } from "./UppyUploaderQuestion";
  * {@link ReactQuestionFactory}.
  *
  * `ReactQuestionFactory` invokes the registered creator with the props object
- * `{ question, isDisplayMode, creator }` (see
+ * `{ question, isDisplayMode, creator }` (see // i18n-ignore
  * `ReactQuestionFactory.createQuestionElement`), so each creator forwards those
  * props straight into the renderer component.
  *

@@ -81,7 +81,10 @@ export const PERMISSION_APPLICABILITY: Record<PermissionType, AreaId[] | "all"> 
     "settings",
     "integrations",
   ],
-  upload: ["assets"],
+  // "assets" => personal My Assets uploads (assets:upload).
+  // "connectors" => uploading into shared connectors (connectors:upload),
+  // which is enforced separately by the backend.
+  upload: ["assets", "connectors"],
   download: ["assets"],
   publish: ["assets"],
   // Collection-specific granular actions for adding/removing assets to/from

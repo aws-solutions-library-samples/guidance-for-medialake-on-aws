@@ -98,6 +98,23 @@ class UsersGroupsStack(cdk.NestedStack):
                     ),
                     projection_type=dynamodb.ProjectionType.ALL,
                 ),
+                # GSI4 (FavoritesByCollection) - reverse lookup of COLLECTION
+                # favorites by collection id, so the collection-delete path can
+                # find and remove favorite rows across all users. Sparse: only
+                # COLLECTION favorites write gsi4Pk/gsi4Sk, so asset/pipeline
+                # favorites are not indexed here and are unaffected. KEYS_ONLY is
+                # enough — GSI results always include the base keys (userId,
+                # itemKey) needed to delete the rows.
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI4",
+                    partition_key=dynamodb.Attribute(
+                        name="gsi4Pk", type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="gsi4Sk", type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.KEYS_ONLY,
+                ),
             ],
         )
         self._user_table = DynamoDB(self, "UserTable", user_table_props)

@@ -14,6 +14,7 @@ import type {
 import UploadQueueTable from "./UploadQueueTable";
 import ConflictResolutionDialog from "./ConflictResolutionDialog";
 import type { UppyFile, Meta, Body } from "@uppy/core";
+import { StorageHelper } from "@/common/helpers/storage-helper";
 
 interface Props {
   portalSlug: string;
@@ -74,6 +75,13 @@ const PortalUploader: React.FC<Props> = ({
   const multipartDataRef = useRef<Map<string, PortalMultipartMetadata>>(new Map());
   const portalApi = usePortalApi(portalSlug, sessionJwt, useCaptchaIntegration);
 
+  // --- Upload session state ---
+  const sessionIdRef = useRef<string | null>(null);
+  const fileCountRef = useRef<number>(0);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const sessionStorageKey = `upload-session:${portalSlug}:${destination.destinationId}`;
+
   const catchSessionExpired = useCallback(
     (err: unknown) => {
       if (err instanceof PortalSessionExpiredError) {
@@ -83,6 +91,34 @@ const PortalUploader: React.FC<Props> = ({
     },
     [onSessionExpired]
   );
+
+  // --- Session resume on mount ---
+  useEffect(() => {
+    const storedId = sessionStorage.getItem(sessionStorageKey);
+    if (!storedId) return;
+
+    let cancelled = false;
+    portalApi
+      .getSession(storedId)
+      .then((session) => {
+        if (cancelled) return;
+        if (session.status === "OPEN") {
+          sessionIdRef.current = storedId;
+        } else {
+          sessionStorage.removeItem(sessionStorageKey);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          sessionStorage.removeItem(sessionStorageKey);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize Uppy
   useEffect(() => {
@@ -176,8 +212,15 @@ const PortalUploader: React.FC<Props> = ({
             path: relativePath,
             destinationId: destination.destinationId,
             metadata: metadataFields,
+            sessionId: sessionIdRef.current || undefined,
           });
           if (!result.presignedPost) throw new Error("Missing presigned post data");
+          // Lazily capture sessionId from the response
+          if (result.sessionId && !sessionIdRef.current) {
+            sessionIdRef.current = result.sessionId;
+            sessionStorage.setItem(sessionStorageKey, result.sessionId);
+          }
+          fileCountRef.current += 1;
           return {
             method: "POST" as const,
             url: result.presignedPost.url,
@@ -203,10 +246,17 @@ const PortalUploader: React.FC<Props> = ({
             path: relativePath,
             destinationId: destination.destinationId,
             metadata: metadataFields,
+            sessionId: sessionIdRef.current || undefined,
           });
           if (!result.uploadId || !result.key || !result.bucket) {
             throw new Error("Missing multipart data");
           }
+          // Lazily capture sessionId from the response
+          if (result.sessionId && !sessionIdRef.current) {
+            sessionIdRef.current = result.sessionId;
+            sessionStorage.setItem(sessionStorageKey, result.sessionId);
+          }
+          fileCountRef.current += 1;
           multipartDataRef.current.set(file.id, {
             uploadId: result.uploadId,
             key: result.key,
@@ -276,7 +326,93 @@ const PortalUploader: React.FC<Props> = ({
     destination.rootPath,
     metadataFields,
     catchSessionExpired,
+    sessionStorageKey,
   ]);
+
+  // --- Heartbeat: post every ~30s while uploading and a sessionId exists ---
+  useEffect(() => {
+    if (!isUploading || !sessionIdRef.current) {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      return;
+    }
+
+    heartbeatIntervalRef.current = setInterval(() => {
+      const sid = sessionIdRef.current;
+      if (sid) {
+        portalApi.heartbeat(sid).catch(() => {
+          // best-effort; a failed heartbeat should not crash the uploader
+        });
+      }
+    }, 30_000);
+
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, [isUploading, portalApi]);
+
+  // --- Finalize on Uppy `complete` event ---
+  useEffect(() => {
+    if (!uppy) return;
+
+    const onUploadComplete = () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      portalApi.finalize(sid, fileCountRef.current).catch(() => {
+        // best-effort; finalize is idempotent and the sweep is the safety net
+      });
+    };
+
+    uppy.on("complete", onUploadComplete);
+    return () => {
+      uppy.off("complete", onUploadComplete);
+    };
+  }, [uppy, portalApi]);
+
+  // --- Finalize on beforeunload via fetch keepalive ---
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+
+      const baseURL = StorageHelper.getAwsConfig()?.API?.REST?.RestApi?.endpoint || "";
+      const url = `${baseURL}/portal/${portalSlug}/upload-session/${sid}/finalize`;
+
+      try {
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Portal-Session": sessionJwt,
+          },
+          body: JSON.stringify({ fileCount: fileCountRef.current }),
+          keepalive: true,
+        });
+      } catch {
+        // best-effort; cannot handle errors during unload
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [portalSlug, sessionJwt]);
+
+  // --- Cleanup heartbeat on unmount ---
+  useEffect(() => {
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleUpload = async () => {
     if (!uppy || files.length === 0) return;
@@ -351,12 +487,12 @@ const PortalUploader: React.FC<Props> = ({
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       {uppy && (
         <Dashboard
           uppy={uppy}
           width="100%"
-          height={300}
+          height={200}
           hideUploadButton
           proudlyDisplayPoweredByUppy={false}
           note={dropZoneText || undefined}

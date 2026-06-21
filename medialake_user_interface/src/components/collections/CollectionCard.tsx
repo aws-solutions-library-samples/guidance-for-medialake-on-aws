@@ -26,6 +26,8 @@ import {
   Delete as DeleteIcon,
   MoreHoriz as MoreHorizIcon,
   ChevronRight as ChevronRightIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { ALL_ICONS } from "./ThumbnailSelector";
@@ -79,6 +81,10 @@ export interface CollectionCardProps {
    * that haven't been wired up to the preferences hook yet.
    */
   display?: CollectionCardDisplayPrefs;
+  /** Whether the collection is currently in the user's favorites. */
+  isFavorite?: boolean;
+  /** Callback fired when the favorite toggle is activated. When undefined the toggle is not rendered. */
+  onFavoriteToggle?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 // Tag cap derived from card size — keeps card heights visually stable.
@@ -134,6 +140,8 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
   sortedMetadataKey,
   parentName,
   display = DEFAULT_PREFS,
+  isFavorite,
+  onFavoriteToggle,
 }) => {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -262,7 +270,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
       }
     }
     const PlaceholderIcon = placeholderIconName
-      ? ALL_ICONS[placeholderIconName] ?? FolderIcon
+      ? (ALL_ICONS[placeholderIconName] ?? FolderIcon)
       : FolderIcon;
     return (
       <PlaceholderIcon
@@ -376,6 +384,35 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
               }}
             />
           </Tooltip>
+        )}
+
+        {onFavoriteToggle && (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFavoriteToggle(e);
+            }}
+            aria-label={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+            title={isFavorite ? t("favorites.removeFavorite") : t("favorites.addFavorite")}
+            data-testid="collection-favorite-button"
+            sx={{
+              position: "absolute",
+              top: 6,
+              left: 6,
+              color: isFavorite ? "error.main" : "primary.main",
+              bgcolor: alpha(theme.palette.background.paper, 0.85),
+              "&:hover": {
+                bgcolor: alpha(theme.palette.background.paper, 0.95),
+              },
+            }}
+          >
+            {isFavorite ? (
+              <FavoriteIcon fontSize="small" />
+            ) : (
+              <FavoriteBorderIcon fontSize="small" />
+            )}
+          </IconButton>
         )}
       </Box>
 

@@ -13,20 +13,30 @@ export default {
     title: "アセット",
     connectors: "コネクタ",
     selectConnector: "コネクタを選択",
+    myAssets: "マイアセット",
+    uploadToMyAssets: "マイアセットにアップロード",
+    myAssetsEmpty: {
+      title: "アセットがまだありません",
+      description:
+        "最初のメディアファイルをアップロードして、個人アセットライブラリを始めましょう。",
+      uploadCta: "ファイルをアップロード",
+    },
   },
   upload: {
     title: "メディアファイルをアップロード",
     description:
-      "S3コネクタを選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
+      "送信先を選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
     uploadDestination: "アップロード先",
     browsePath: "パスを参照",
     uploadingTo: "アップロード先",
     restrictedToPrefix: "制限付き",
     allowedPrefixesInfo: "{{count}}個の許可されたパスにのみアップロードできます",
-    connectorLabel: "S3コネクタ",
-    selectConnectorPlaceholder: "S3コネクタを選択",
+    connectorLabel: "アップロード先",
+    selectConnectorPlaceholder: "送信先を選択",
     loadingConnectors: "コネクタを読み込んでいます...",
     noConnectors: "利用可能なS3コネクタがありません。まずS3コネクタを設定してください。",
+    noDestinations:
+      "アップロード先へのアクセス権がありません。アクセスをリクエストするには管理者にお問い合わせください。",
     dashboardNote:
       "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
     meta: {
@@ -43,6 +53,7 @@ export default {
     prefixHelper: "選択したパス内のフォルダのみを参照およびアップロードできます。",
     currentPath: "現在のパス",
     confirm: "このパスを使用",
+    refresh: "更新",
     validation: {
       invalidPath: "選択されたパスは許可されたプレフィックスの範囲外です。",
       noPathSelected: "確認する前にフォルダに移動してください。",
@@ -104,6 +115,40 @@ export default {
       objectPrefixNumbered: "Object プレフィックス {{number}}",
       bucketNameHelper: "バケット name must be globally unique, follow S3 naming rules.",
       addPrefix: "プレフィックスを追加",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "コネクタを削除",
@@ -223,6 +268,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "お気に入り",
+      emptyTitle: "お気に入りのコレクションはありません",
+      emptyDescription: "お気に入りに追加したコレクションがここに表示されます",
+    },
     title: "コレクション",
     description: "コレクション内でメディアアセットを整理・管理",
     createCollection: "コレクションを作成",
@@ -916,6 +966,7 @@ export default {
     },
   },
   common: {
+    remove: "削除",
     back: "戻る",
     search: "検索",
     public: "公開",
@@ -1719,6 +1770,9 @@ export default {
         myCollectionsTitle: "マイコレクション",
         sharedWithMeTitle: "共有されたもの",
         mySharedTitle: "共有したコレクション",
+        favoritesTitle: "お気に入りのコレクション",
+        favoritesEmptyTitle: "お気に入りのコレクションはありません",
+        favoritesEmptyDescription: "お気に入りに追加したコレクションがここに表示されます",
         emptyTitle: "コレクションが見つかりません",
         emptyDescription: "コレクションを作成して開始",
         createCollection: "コレクションを作成",
@@ -1731,6 +1785,7 @@ export default {
           myCollections: "マイコレクション",
           sharedWithMe: "共有されたもの",
           myShared: "共有したコレクション",
+          favorites: "お気に入りのコレクション",
         },
         sortingTitle: "並び替え",
         sortBy: "並び替え",
@@ -1749,6 +1804,11 @@ export default {
         title: "最近のアセット",
         emptyTitle: "最近のアセットはありません",
         emptyDescription: "最近アップロードされたアセットがここに表示されます",
+      },
+      myAssets: {
+        title: "マイアセット",
+        emptyTitle: "個人アセットはまだありません",
+        emptyDescription: "マイアセットに最初のファイルをアップロードしてください。",
       },
       collectionGroup: {
         title: "コレクショングループ",
@@ -1927,6 +1987,46 @@ export default {
     tokens: {
       copyUrl: "URLをコピー",
       revokeToken: "トークンを取り消す",
+    },
+    themeTemplateActions: {
+      saveAs: "名前を付けて保存…",
+      saveAsTemplate: "テンプレートとして保存",
+      saveAsTheme: "テーマとして保存",
+      applyTheme: "テーマを適用",
+    },
+    themes: {
+      pageDescription: "新しいポータルまたは既存のポータルに適用できる再利用可能な外観テーマ",
+      deleteTheme: "テーマを削除",
+      failedToLoad: "テーマの読み込みに失敗しました",
+    },
+    templates: {
+      pageDescription: "新しいポータルをすばやく開始するために使用できる再利用可能なポータル構造",
+      createFromTemplate: "このテンプレートからポータルを作成",
+      deleteTemplate: "テンプレートを削除",
+      failedToLoad: "テンプレートの読み込みに失敗しました",
+    },
+    createMenu: {
+      startFromTemplate: "テンプレートから開始…",
+      applyTheme: "テーマを適用…",
+      startFromTemplateTitle: "テンプレートから開始",
+      applyThemeTitle: "テーマを適用",
+    },
+    metadata: {
+      completionEventHelperText:
+        "オプション。アップロードバッチ完了イベントを自動エンリッチメント用の特定のパイプラインにルーティングするために使用されます。",
+    },
+    actions: {
+      applyTheme: "テーマを適用",
+      applyThemeMenu: "テーマを適用…",
+      saveAsTemplate: "テンプレートとして保存",
+      saveAsTheme: "テーマとして保存",
+      startFromTemplate: "テンプレートから開始",
+      startFromTemplateMenu: "テンプレートから開始…",
+    },
+
+    fieldTypes: {
+      radioGroup: "ラジオグループ",
+      yesNo: "はい / いいえ",
     },
   },
 };

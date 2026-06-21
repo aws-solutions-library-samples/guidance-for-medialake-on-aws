@@ -56,5 +56,14 @@
             }
         ]
     },
-    "external_nodes_bucket": ""
+    "external_nodes_bucket": "",
+    "upload_portals": {
+        "session_retention_days": 7,
+        "idle_finalize_minutes": 30,
+        "sweep_interval_minutes": 5,
+        "completion_grace_minutes": 60,
+        "max_session_age_hours": 24,
+        "heartbeat_interval_seconds": 30,
+        "heartbeat_min_interval_seconds": 10
+    }
 }

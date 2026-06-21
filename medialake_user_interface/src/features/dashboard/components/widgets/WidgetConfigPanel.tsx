@@ -201,6 +201,9 @@ export const WidgetConfigPanel: React.FC<WidgetConfigPanelProps> = ({
           <MenuItem value="my-shared">
             {t("dashboard.widgets.collections.viewTypes.myShared", "My Shared Collections")}
           </MenuItem>
+          <MenuItem value="favorites">
+            {t("dashboard.widgets.collections.viewTypes.favorites", "Favorite Collections")}
+          </MenuItem>
         </Select>
       </FormControl>
 

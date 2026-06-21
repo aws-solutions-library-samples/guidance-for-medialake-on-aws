@@ -7,6 +7,10 @@ Handles all public-facing portal routes:
   POST /<slug>/upload/multipart/sign    – sign a multipart part
   POST /<slug>/upload/multipart/complete – complete multipart upload
   POST /<slug>/upload/multipart/abort   – abort multipart upload
+  POST /<slug>/upload-session           – create/resume upload session
+  GET  /<slug>/upload-session/<id>      – get session status
+  POST /<slug>/upload-session/<id>/heartbeat – session heartbeat
+  POST /<slug>/upload-session/<id>/finalize  – finalize session
   GET  /<slug>/browse                   – browse destination files
   POST /<slug>/folder                   – create folder
 """
@@ -14,6 +18,7 @@ Handles all public-facing portal routes:
 import json
 import os
 import re
+import sys
 from decimal import Decimal
 from typing import Any, Dict, List
 
@@ -30,6 +35,24 @@ from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
+# Upload session store — vendored into the Lambda package at deploy time.
+# The shared module lives at lambdas/shared/upload_session/session_store.py;
+# in the Lambda runtime it's available on sys.path directly.
+try:
+    from upload_session.session_store import SessionStore
+except ImportError:
+    # Fallback for local development / testing: add the shared dir to path.
+    _SHARED_DIR = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "shared")
+    )
+    if _SHARED_DIR not in sys.path:
+        sys.path.insert(0, _SHARED_DIR)
+    # Clear any stale partial import (e.g., a test directory shadowing the real module)
+    for _k in list(sys.modules.keys()):
+        if _k.startswith("upload_session"):
+            del sys.modules[_k]
+    from upload_session.session_store import SessionStore
+
 logger = Logger(service="portal-public-api", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="portal-public-api")
 metrics = Metrics(namespace="medialake", service="portal-public-api")
@@ -38,8 +61,36 @@ SYSTEM_SETTINGS_TABLE_NAME = os.environ.get("SYSTEM_SETTINGS_TABLE_NAME", "")
 MEDIALAKE_CONNECTOR_TABLE = os.environ.get("MEDIALAKE_CONNECTOR_TABLE", "")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "")
 RESOURCE_PREFIX = os.environ.get("RESOURCE_PREFIX", "")
+UPLOAD_SESSIONS_TABLE_NAME = os.environ.get("UPLOAD_SESSIONS_TABLE_NAME", "")
+SESSION_RETENTION_DAYS = int(os.environ.get("SESSION_RETENTION_DAYS", "7"))
+HEARTBEAT_MIN_INTERVAL_SECONDS = int(
+    os.environ.get("HEARTBEAT_MIN_INTERVAL_SECONDS", "30")
+)
+
+# Portal images (logo/banner/favicon) live in the private, KMS-encrypted IAC
+# assets bucket — which is NOT a CloudFront origin — so they are served to the
+# browser via presigned S3 GET URLs resolved at read time. Lifetime is moderate
+# (and further capped by the Lambda role credentials); the public page
+# re-resolves the URL on every load.
+IAC_ASSETS_BUCKET_NAME = os.environ.get("IAC_ASSETS_BUCKET_NAME", "")
+PORTAL_ASSET_URL_EXPIRATION = 6 * 60 * 60  # 6 hours
 
 dynamodb = boto3.resource("dynamodb")
+
+# Upload session store (lazy init — only created if table name is configured)
+_session_store: SessionStore | None = None
+
+
+def _get_session_store() -> SessionStore:
+    """Get or create the singleton SessionStore instance."""
+    global _session_store
+    if _session_store is None:
+        _session_store = SessionStore(
+            table_name=UPLOAD_SESSIONS_TABLE_NAME,
+            dynamodb_resource=dynamodb,
+        )
+    return _session_store
+
 
 # --- S3 client cache (from post_upload/index.py) ---
 _SIGV4_CFG = Config(
@@ -266,6 +317,7 @@ ML_USER_PREFIX = "ml-usr-"
 COLLECTION_IDS_DIRECTIVE = "ml-collection-ids"
 SOURCE_DIRECTIVE = "ml-source"
 PORTAL_ID_DIRECTIVE = "ml-portal-id"
+ML_BATCH_ID_DIRECTIVE = "ml-batch-id"
 PORTAL_SOURCE_VALUE = "upload-portal"
 
 
@@ -277,12 +329,19 @@ def _slug(label: Any) -> str:
 
 
 def _resolve_portal_metadata(
-    portal: Dict[str, Any], portal_id: str, submitted: Dict[str, Any] | None
+    portal: Dict[str, Any],
+    portal_id: str,
+    submitted: Dict[str, Any] | None,
+    session_id: str | None = None,
 ) -> Dict[str, str]:
     """Translate client-submitted form metadata into the server-trusted S3
     user-metadata namespace.
 
     Returns the dict of metadata keys/values to attach as `x-amz-meta-*`.
+
+    When *session_id* is provided, stamps ``ml-batch-id`` alongside the
+    existing provenance directives (``ml-source``, ``ml-portal-id``).
+    Client-supplied ``ml-batch-id`` is already dropped by the ``ml-*`` guard.
     """
     submitted = submitted or {}
     fields = portal.get("metadataFields") or []
@@ -336,6 +395,12 @@ def _resolve_portal_metadata(
     # Provenance directives (always present for portal uploads).
     result[SOURCE_DIRECTIVE] = PORTAL_SOURCE_VALUE
     result[PORTAL_ID_DIRECTIVE] = str(portal_id)
+
+    # Batch-id directive: server-authoritative session tag (R4.1/4.2/4.4).
+    # Client-supplied ml-batch-id is already dropped by the ml-* guard above (R4.3).
+    if session_id:
+        result[ML_BATCH_ID_DIRECTIVE] = session_id
+
     return result
 
 
@@ -449,6 +514,17 @@ def _error(status_code, message):
     )
 
 
+def _get_authorizer_portal_id() -> str | None:
+    """Extract the portalId from the Portal_Authorizer context.
+
+    The Portal_Authorizer sets `context: {"portalId": ...}` in the Allow policy.
+    API Gateway makes this available at requestContext.authorizer.portalId.
+    """
+    request_context = app.current_event.raw_event.get("requestContext", {})
+    authorizer = request_context.get("authorizer", {})
+    return authorizer.get("portalId")
+
+
 def _calculate_part_size(file_size):
     """Calculate optimal part size and total parts for multipart upload."""
     GB = 1024 * 1024 * 1024
@@ -475,13 +551,51 @@ def _calculate_part_size(file_size):
     return part_size, total_parts
 
 
-def _validate_content_type(content_type):
-    """Return True if content_type matches any allowed pattern."""
-    for allowed in ALLOWED_CONTENT_TYPES:
-        if allowed.endswith("*"):
-            if content_type.startswith(allowed[:-1]):
+def _resolve_allowed_types(portal):
+    """Resolve a portal's effective allowed upload types (tri-state).
+
+    - ``allowedFileTypes`` absent (None) → the default media allow-list
+      (``ALLOWED_CONTENT_TYPES``), preserving behavior for portals created
+      before the field existed;
+    - ``allowedFileTypes == []`` (empty) → returned as ``[]``, which
+      :func:`_is_file_allowed` treats as "allow any file type";
+    - non-empty list → that list verbatim.
+    """
+    val = portal.get("allowedFileTypes")
+    if val is None:
+        return list(ALLOWED_CONTENT_TYPES)
+    return list(val)
+
+
+def _is_file_allowed(content_type, filename, allowed_types):
+    """Return True if a file is permitted by ``allowed_types``.
+
+    An empty ``allowed_types`` means "allow any file". Otherwise the file passes
+    if it matches ANY entry, where an entry may be:
+      - a wildcard MIME pattern (``image/*``) → content-type prefix match,
+      - an exact MIME type (``application/pdf``) → content-type equality, or
+      - a file extension (``.pdf`` / ``pdf``) → filename suffix match.
+    This mirrors Uppy's client-side ``allowedFileTypes`` matching so the client
+    and server agree on what is accepted.
+    """
+    if not allowed_types:
+        return True
+    ct = (content_type or "").lower()
+    fn = (filename or "").lower()
+    for entry in allowed_types:
+        e = str(entry).strip().lower()
+        if not e:
+            continue
+        if e.endswith("/*"):
+            if ct.startswith(e[:-1]):
                 return True
-        elif content_type == allowed:
+        elif "/" in e:
+            if ct == e:
+                return True
+        elif e.startswith("."):
+            if fn.endswith(e):
+                return True
+        elif fn.endswith("." + e):
             return True
     return False
 
@@ -491,6 +605,27 @@ def _validate_content_type(content_type):
 # ---------------------------------------------------------------------------
 
 
+def _resolve_asset_url(s3_key):
+    """Resolve a portal image S3 key to a presigned S3 GET URL for the browser.
+
+    Portal images are stored privately in the IAC assets bucket (SSE-KMS) and
+    are not served through CloudFront, so they are exposed via short-lived
+    presigned GET URLs resolved on each read. Returns ``None`` when the key is
+    falsy or the URL cannot be generated.
+    """
+    if not s3_key:
+        return None
+    try:
+        from url_utils import generate_presigned_url
+
+        return generate_presigned_url(
+            IAC_ASSETS_BUCKET_NAME, s3_key, expiration=PORTAL_ASSET_URL_EXPIRATION
+        )
+    except Exception:
+        logger.warning("Could not resolve portal asset URL", extra={"key": s3_key})
+        return None
+
+
 def _resolve_appearance_asset_urls(appearance):
     """Resolve the read-time-only `bannerUrl`/`faviconUrl` from their stored S3
     keys so the public portal page can render the admin-configured banner and
@@ -498,29 +633,33 @@ def _resolve_appearance_asset_urls(appearance):
 
     The visual editor persists `bannerS3Key` and `faviconS3Key` inside
     `appearance.branding`; the resolved URLs are intentionally NOT stored (they
-    are derived from the CloudFront domain at read time, exactly like the
-    portal `logoUrl`). Without this resolution the public renderer never
-    receives a `bannerUrl`/`faviconUrl` and silently drops the banner/favicon
-    even though the admin configured them.
+    are derived at read time as presigned S3 GET URLs, exactly like the portal
+    `logoUrl`). Without this resolution the public renderer never receives a
+    `bannerUrl`/`faviconUrl` and silently drops the banner/favicon even though
+    the admin configured them.
 
     Returns a shallow copy of `appearance` with the URLs populated; passes the
-    value through unchanged when there is no appearance, no branding map, or no
-    CloudFront domain configured.
+    value through unchanged when there is no appearance or no branding map.
     """
     if not isinstance(appearance, dict):
         return appearance
 
     branding = appearance.get("branding")
-    if not isinstance(branding, dict) or not CLOUDFRONT_DOMAIN:
+    if not isinstance(branding, dict):
         return appearance
 
     resolved_branding = dict(branding)
-    banner_key = branding.get("bannerS3Key")
-    if banner_key:
-        resolved_branding["bannerUrl"] = f"https://{CLOUDFRONT_DOMAIN}/{banner_key}"
-    favicon_key = branding.get("faviconS3Key")
-    if favicon_key:
-        resolved_branding["faviconUrl"] = f"https://{CLOUDFRONT_DOMAIN}/{favicon_key}"
+    banner_url = _resolve_asset_url(branding.get("bannerS3Key"))
+    if banner_url:
+        resolved_branding["bannerUrl"] = banner_url
+    else:
+        # No key (or resolution failed) → never surface a stale URL.
+        resolved_branding.pop("bannerUrl", None)
+    favicon_url = _resolve_asset_url(branding.get("faviconS3Key"))
+    if favicon_url:
+        resolved_branding["faviconUrl"] = favicon_url
+    else:
+        resolved_branding.pop("faviconUrl", None)
 
     resolved = dict(appearance)
     resolved["branding"] = resolved_branding
@@ -560,10 +699,7 @@ def get_portal(slug: str):
             }
         )
 
-    logo_url = None
-    logo_key = portal.get("logoS3Key")
-    if logo_key and CLOUDFRONT_DOMAIN:
-        logo_url = f"https://{CLOUDFRONT_DOMAIN}/{logo_key}"
+    logo_url = _resolve_asset_url(portal.get("logoS3Key"))
 
     return {
         "portalId": portal_id,
@@ -576,15 +712,211 @@ def get_portal(slug: str):
         "maxFilesPerSession": portal.get("maxFilesPerSession"),
         "structuredPathMode": portal.get("structuredPathMode", False),
         "captchaEnabled": portal.get("captchaEnabled", False),
+        "allowedFileTypes": portal.get("allowedFileTypes"),
         "appearance": _resolve_appearance_asset_urls(portal.get("appearance")),
         "pages": portal.get("pages", []),
     }
 
 
+@app.post("/<slug>/upload-session")
+@tracer.capture_method
+def post_upload_session(slug: str):
+    """Create a new upload session or validate resume of an existing one.
+
+    Create (R1.1): creates a fresh session for the authenticated portal.
+    Resume (R2.1/2.3/2.4): validates an existing session for reuse.
+
+    Body (optional):
+        { "resumeSessionId": "..." }
+
+    Returns:
+        201: { sessionId, status, expectedCount, completedCount }
+        403: portalId mismatch (R9.4)
+        404: session not found
+        409: session not OPEN (R2.3)
+    """
+    portal_id, portal = _get_portal_by_slug(slug)
+    if not portal:
+        return _error(404, "Portal not found")
+
+    auth_portal_id = _get_authorizer_portal_id()
+
+    body = app.current_event.json_body or {}
+    resume_session_id = body.get("resumeSessionId")
+
+    store = _get_session_store()
+
+    if resume_session_id:
+        # Validate-resume path (R2.1/2.3/2.4)
+        session = store.get_session(resume_session_id)
+        if not session:
+            return _error(404, "Session not found")
+
+        # Cross-portal check (R9.3/9.4)
+        if session.get("portalId") != auth_portal_id:
+            return _error(403, "Access denied: portal mismatch")
+
+        # Non-OPEN check (R2.3)
+        if session.get("status") != "OPEN":
+            return _error(409, "Session is not OPEN and cannot be resumed")
+
+        return Response(
+            status_code=200,
+            content_type="application/json",
+            body=json.dumps(
+                {
+                    "sessionId": session["sessionId"],
+                    "status": session["status"],
+                    "expectedCount": int(session.get("expectedCount", 0)),
+                    "completedCount": int(session.get("completedCount", 0)),
+                }
+            ),
+        )
+
+    # Create path (R1.1)
+    max_files = int(portal.get("maxFilesPerSession") or 1000)
+    automation_tag = portal.get("automationTag") or ""
+    session = store.create_session(
+        portal_id=auth_portal_id or portal_id,
+        automation_tag=automation_tag,
+        max_files=max_files,
+        retention_days=SESSION_RETENTION_DAYS,
+    )
+
+    return Response(
+        status_code=201,
+        content_type="application/json",
+        body=json.dumps(
+            {
+                "sessionId": session["sessionId"],
+                "status": session["status"],
+                "expectedCount": int(session.get("expectedCount", 0)),
+                "completedCount": int(session.get("completedCount", 0)),
+            }
+        ),
+    )
+
+
+@app.get("/<slug>/upload-session/<session_id>")
+@tracer.capture_method
+def get_upload_session(slug: str, session_id: str):
+    """Retrieve upload session status for resume probe.
+
+    Returns:
+        200: { sessionId, status, expectedCount, completedCount }
+        403: portalId mismatch (R9.4)
+        404: session not found
+    """
+    auth_portal_id = _get_authorizer_portal_id()
+
+    store = _get_session_store()
+    session = store.get_session(session_id)
+    if not session:
+        return _error(404, "Session not found")
+
+    # Cross-portal check (R9.3/9.4)
+    if session.get("portalId") != auth_portal_id:
+        return _error(403, "Access denied: portal mismatch")
+
+    return {
+        "sessionId": session["sessionId"],
+        "status": session["status"],
+        "expectedCount": int(session.get("expectedCount", 0)),
+        "completedCount": int(session.get("completedCount", 0)),
+    }
+
+
+@app.post("/<slug>/upload-session/<session_id>/heartbeat")
+@tracer.capture_method
+def post_heartbeat(slug: str, session_id: str):
+    """Post a heartbeat to keep the session alive (R3.1).
+
+    Returns:
+        204: heartbeat accepted
+        429: rate-limited (R9.6)
+        403: portalId mismatch (R9.4)
+        404: session not found
+    """
+    auth_portal_id = _get_authorizer_portal_id()
+    store = _get_session_store()
+
+    session = store.get_session(session_id)
+    if not session:
+        return _error(404, "Session not found")
+
+    if session.get("portalId") != auth_portal_id:
+        return _error(403, "Access denied: portal mismatch")
+
+    accepted = store.heartbeat(session_id, HEARTBEAT_MIN_INTERVAL_SECONDS)
+    if not accepted:
+        return _error(429, "Rate limited")
+
+    return Response(status_code=204, content_type="application/json", body="")
+
+
+@app.post("/<slug>/upload-session/<session_id>/finalize")
+@tracer.capture_method
+def post_finalize(slug: str, session_id: str):
+    """Finalize the upload session (R3.2-3.6).
+
+    Body: { "fileCount": <int> }
+
+    Returns:
+        200: { status, expectedCount, completedCount, outcome? }
+        403: portalId mismatch (R9.4)
+        404: session not found
+        409: write failed (retryable, R3.6)
+    """
+    auth_portal_id = _get_authorizer_portal_id()
+    store = _get_session_store()
+
+    session = store.get_session(session_id)
+    if not session:
+        return _error(404, "Session not found")
+
+    if session.get("portalId") != auth_portal_id:
+        return _error(403, "Access denied: portal mismatch")
+
+    body = app.current_event.json_body or {}
+    file_count = body.get("fileCount")
+
+    if (
+        file_count is None
+        or not isinstance(file_count, int)
+        or isinstance(file_count, bool)
+        or file_count < 0
+    ):
+        return _error(400, "fileCount must be a non-negative integer")
+
+    result = store.finalize(session_id, declared_count=file_count)
+
+    if result.write_failed:
+        return _error(
+            409, "Finalize write failed; session is still OPEN. You may retry."
+        )
+
+    # Read back the latest state
+    updated_session = store.get_session(session_id)
+    response_body = {
+        "status": updated_session["status"],
+        "expectedCount": int(updated_session.get("expectedCount", 0)),
+        "completedCount": int(updated_session.get("completedCount", 0)),
+    }
+    if updated_session["status"] != "OPEN":
+        response_body["outcome"] = updated_session["status"]
+
+    return response_body
+
+
 @app.post("/<slug>/upload")
 @tracer.capture_method
 def post_upload(slug: str):
-    """Initiate a single-part or multipart upload."""
+    """Initiate a single-part or multipart upload.
+
+    Extended for upload sessions: when sessionId is absent, auto-creates a
+    session (R1.1/R2.2). When sessionId is present, registers the key against
+    the existing session (R1.2/R1.3/R2.1). Returns sessionId in the response.
+    """
     body = app.current_event.json_body or {}
     destination_id = body.get("destinationId")
     filename = body.get("filename")
@@ -596,6 +928,7 @@ def post_upload(slug: str):
         return _error(400, "Invalid path: traversal segments are not allowed")
     metadata = body.get("metadata") or {}
     file_count = body.get("fileCount", 1)
+    session_id = body.get("sessionId") or None
 
     if not filename:
         return _error(400, "filename is required")
@@ -630,7 +963,7 @@ def post_upload(slug: str):
     if not destination:
         return _error(400, "Destination not found")
 
-    if not _validate_content_type(content_type):
+    if not _is_file_allowed(content_type, filename, _resolve_allowed_types(portal)):
         return _error(400, f"Content type '{content_type}' is not allowed")
 
     max_size = portal.get("maxFileSizeBytes")
@@ -658,10 +991,65 @@ def post_upload(slug: str):
 
     bucket = connector["storageIdentifier"]
 
+    # --- Upload session handling (R1.1, R2.1, R2.2) ---
+    auth_portal_id = _get_authorizer_portal_id()
+    store = _get_session_store()
+    max_files_cap = int(max_files) if max_files else 1000
+
+    if session_id:
+        # Existing session: validate ownership and register the key (R2.1)
+        session = store.get_session(session_id)
+        if not session:
+            return _error(404, "Session not found")
+
+        # Cross-portal check (R9.3/9.4)
+        if session.get("portalId") != auth_portal_id:
+            return _error(403, "Access denied: portal mismatch")
+
+        # Non-OPEN check (R2.3)
+        if session.get("status") != "OPEN":
+            return _error(409, "Session is not OPEN")
+
+        # Register the key (R1.2/R1.3)
+        reg_result = store.register_key(
+            session_id, s3_key, max_files_cap, portal_id=auth_portal_id
+        )
+        if not reg_result.success:
+            if reg_result.not_open:
+                return _error(409, "Session is not OPEN")
+            if reg_result.cap_exceeded:
+                return _error(
+                    400,
+                    f"Registration would exceed maximum {max_files_cap} files per session",
+                )
+            return _error(400, reg_result.error or "Registration failed")
+    else:
+        # No session: auto-create one (R1.1, R2.2)
+        automation_tag = portal.get("automationTag") or ""
+        session = store.create_session(
+            portal_id=auth_portal_id or portal_id,
+            automation_tag=automation_tag,
+            max_files=max_files_cap,
+            retention_days=SESSION_RETENTION_DAYS,
+        )
+        session_id = session["sessionId"]
+
+        # Register the first key against the new session
+        reg_result = store.register_key(
+            session_id, s3_key, max_files_cap, portal_id=auth_portal_id or portal_id
+        )
+        if not reg_result.success and not reg_result.already_counted:
+            logger.error(
+                "Failed to register key on newly created session",
+                extra={"session_id": session_id, "error": reg_result.error},
+            )
+
     # Resolve the client-submitted form metadata into the server-trusted
     # namespace (ml-usr-* user fields, ml-collection-ids directive validated
     # against the saved allow-list, provenance). See _resolve_portal_metadata.
-    s3_metadata = _resolve_portal_metadata(portal, portal_id, metadata)
+    s3_metadata = _resolve_portal_metadata(
+        portal, portal_id, metadata, session_id=session_id
+    )
 
     if is_multipart_upload_required(file_size):
         upload_id = create_multipart_upload(
@@ -670,6 +1058,7 @@ def post_upload(slug: str):
         part_size, total_parts = _calculate_part_size(file_size)
         return {
             "multipart": True,
+            "sessionId": session_id,
             "bucket": bucket,
             "key": s3_key,
             "uploadId": upload_id,
@@ -686,6 +1075,7 @@ def post_upload(slug: str):
     )
     return {
         "multipart": False,
+        "sessionId": session_id,
         "presignedPost": {
             "url": presigned_post["url"],
             "fields": presigned_post["fields"],

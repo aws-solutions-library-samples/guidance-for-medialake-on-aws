@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -29,11 +30,11 @@ import PortalEditorPreview from "../components/editor/PortalEditorPreview";
  *
  * Edit flow (Requirement 17.9 — load → modify → save back):
  *   - `useGetTemplate(id)` fetches the full snapshot.
- *   - `store.initializeFromSources({ template })` seeds the editor structure
+ *   - `store.initializeFromSources({ template })` seeds the editor structure // i18n-ignore
  *     (`pages`, `metadataFields`, `destinations` incl. `connectorId` +
  *     `pageNumber`, access settings, limits) and appearance by deep-cloned
  *     snapshot (Property 11 — no live link to the source template object).
- *   - On save, `store.buildTemplatePayload(name, description, themeId)`
+ *   - On save, `store.buildTemplatePayload(name, description, themeId)` // i18n-ignore
  *     serializes the FULL structure (NO passphrase — Requirement 17.7) and
  *     PUTs via `useUpdateTemplate`. The backend re-runs
  *     `_validate_portal_structure` and rejects an invalid template with 400.
@@ -51,11 +52,12 @@ import PortalEditorPreview from "../components/editor/PortalEditorPreview";
  *   - /settings/upload-portals/templates/:id/edit   → edit
  */
 const TemplateEditorPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isCreateMode = !id || id === "new";
 
-  const templateQuery = useGetTemplate(isCreateMode ? "" : id ?? "");
+  const templateQuery = useGetTemplate(isCreateMode ? "" : (id ?? ""));
   const template = templateQuery.data?.data as PortalTemplate | undefined;
 
   const initialize = usePortalEditorStore((s) => s.initialize);
@@ -169,7 +171,7 @@ const TemplateEditorPage: React.FC = () => {
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", p: 4 }}
         >
           <Stack spacing={2} alignItems="center">
-            <Typography variant="h6">Failed to load template</Typography>
+            <Typography variant="h6">{t("uploadPortals.templates.failedToLoad")}</Typography>
             <Button variant="outlined" onClick={handleBack}>
               Back to templates
             </Button>

@@ -465,7 +465,7 @@ export async function uploadFilesViaModal(
 
     // Find the combobox (the actual dropdown element)
     const connectorCombobox = page.getByRole("combobox", {
-      name: "S3 Connector",
+      name: "Upload Destination",
     });
     await connectorCombobox.waitFor({ state: "visible", timeout: 5000 });
     await connectorCombobox.click();

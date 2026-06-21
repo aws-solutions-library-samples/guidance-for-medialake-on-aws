@@ -13,19 +13,27 @@ export default {
     title: "资产",
     connectors: "连接器",
     selectConnector: "选择连接器",
+    myAssets: "我的资产",
+    uploadToMyAssets: "上传到我的资产",
+    myAssetsEmpty: {
+      title: "暂无资产",
+      description: "上传您的第一批媒体文件，开始使用您的个人资产库。",
+      uploadCta: "上传文件",
+    },
   },
   upload: {
     title: "上传媒体文件",
-    description: "选择S3连接器并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
+    description: "选择目标并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
     uploadDestination: "上传目标",
     browsePath: "浏览路径",
     uploadingTo: "正在上传到",
     restrictedToPrefix: "受限",
     allowedPrefixesInfo: "您只能上传到{{count}}个允许的路径",
-    connectorLabel: "S3连接器",
-    selectConnectorPlaceholder: "选择S3连接器",
+    connectorLabel: "上传目标",
+    selectConnectorPlaceholder: "选择目标",
     loadingConnectors: "正在加载连接器...",
     noConnectors: "没有可用的S3连接器。请先配置S3连接器。",
+    noDestinations: "您无权访问任何上传目标。请联系管理员申请访问权限。",
     dashboardNote:
       "仅允许音频/*、视频/*、图像/*、HLS (application/x-mpegURL) 和 MPEG-DASH (application/dash+xml) 文件",
     meta: {
@@ -40,6 +48,7 @@ export default {
     prefixHelper: "您只能浏览并上传到所选路径内的文件夹。",
     currentPath: "当前路径",
     confirm: "使用此路径",
+    refresh: "刷新",
     validation: {
       invalidPath: "所选路径超出允许的前缀。",
       noPathSelected: "请在确认前导航到文件夹。",
@@ -101,6 +110,40 @@ export default {
       objectPrefixNumbered: "Object 前缀 {{number}}",
       bucketNameHelper: "存储桶 name must be globally unique, follow S3 naming rules.",
       addPrefix: "添加前缀",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "删除连接器",
@@ -216,6 +259,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "收藏",
+      emptyTitle: "没有收藏的收藏集",
+      emptyDescription: "您收藏的收藏集将显示在此处",
+    },
     title: "收藏集",
     description: "在收藏集中组织和管理您的媒体资产",
     createCollection: "创建收藏集",
@@ -904,6 +952,7 @@ export default {
     },
   },
   common: {
+    remove: "移除",
     back: "返回",
     search: "搜索",
     public: "公开",
@@ -1700,6 +1749,9 @@ export default {
         myCollectionsTitle: "我的收藏集",
         sharedWithMeTitle: "与我共享",
         mySharedTitle: "我共享的收藏集",
+        favoritesTitle: "收藏的收藏集",
+        favoritesEmptyTitle: "没有收藏的收藏集",
+        favoritesEmptyDescription: "您收藏的收藏集将显示在此处",
         emptyTitle: "未找到收藏集",
         emptyDescription: "创建收藏集以开始",
         createCollection: "创建收藏集",
@@ -1712,6 +1764,7 @@ export default {
           myCollections: "我的收藏集",
           sharedWithMe: "与我共享",
           myShared: "我共享的收藏集",
+          favorites: "收藏的收藏集",
         },
         sortingTitle: "排序",
         sortBy: "排序方式",
@@ -1730,6 +1783,11 @@ export default {
         title: "最近资源",
         emptyTitle: "暂无最近资源",
         emptyDescription: "最近上传的资源将显示在此处",
+      },
+      myAssets: {
+        title: "我的资源",
+        emptyTitle: "暂无个人资源",
+        emptyDescription: "将您的第一个文件上传到我的资源。",
       },
       collectionGroup: {
         title: "收藏组",
@@ -1901,6 +1959,45 @@ export default {
     tokens: {
       copyUrl: "复制URL",
       revokeToken: "撤销令牌",
+    },
+    themeTemplateActions: {
+      saveAs: "另存为…",
+      saveAsTemplate: "另存为模板",
+      saveAsTheme: "另存为主题",
+      applyTheme: "应用主题",
+    },
+    themes: {
+      pageDescription: "可重复使用的外观主题，可应用于新的或现有的门户",
+      deleteTheme: "删除主题",
+      failedToLoad: "加载主题失败",
+    },
+    templates: {
+      pageDescription: "可重复使用的门户结构，可用于快速启动新门户",
+      createFromTemplate: "从此模板创建门户",
+      deleteTemplate: "删除模板",
+      failedToLoad: "加载模板失败",
+    },
+    createMenu: {
+      startFromTemplate: "从模板开始…",
+      applyTheme: "应用主题…",
+      startFromTemplateTitle: "从模板开始",
+      applyThemeTitle: "应用主题",
+    },
+    metadata: {
+      completionEventHelperText: "可选。用于将上传批次完成事件路由到特定管道以进行自动丰富。",
+    },
+    actions: {
+      applyTheme: "应用主题",
+      applyThemeMenu: "应用主题…",
+      saveAsTemplate: "另存为模板",
+      saveAsTheme: "另存为主题",
+      startFromTemplate: "从模板开始",
+      startFromTemplateMenu: "从模板开始…",
+    },
+
+    fieldTypes: {
+      radioGroup: "单选按钮组",
+      yesNo: "是 / 否",
     },
   },
 };

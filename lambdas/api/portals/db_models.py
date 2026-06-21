@@ -73,7 +73,17 @@ class PortalMetadataModel(Model):
     isActive = BooleanAttribute(default=True)
     maxFileSizeBytes = NumberAttribute(null=True)
     maxFilesPerSession = NumberAttribute(null=True)
+    automationTag = UnicodeAttribute(null=True)
     accessVersion = NumberAttribute(null=True)
+
+    # Allowed upload file types (MIME patterns like "image/*" or extensions like
+    # ".pdf"). Semantics are tri-state and intentional:
+    #   - attribute ABSENT (None) → fall back to the default media allow-list
+    #     (audio/video/image/...), preserving behavior for portals created
+    #     before this field existed;
+    #   - attribute == [] (empty)  → allow ANY file type (admin cleared it);
+    #   - non-empty list           → restrict to exactly those types.
+    allowedFileTypes = ListAttribute(null=True)
 
     # Appearance pass-through. MapAttribute with no inner schema so the entire
     # visual-editor appearance object round-trips verbatim (fixes the silent-drop

@@ -47,10 +47,9 @@ export interface AssetEditingState {
 }
 
 // ─── Combined type for backward compatibility ───
+// i18n-ignore: the generic type list (A<T>, B<T>) is misread as JSX text by the i18n checker
 export interface AssetItemActions<T = any>
-  extends AssetAccessors<T>,
-    AssetActions<T>,
-    AssetEditingState {}
+  extends AssetAccessors<T>, AssetActions<T>, AssetEditingState {}
 
 // ─── Contexts ───
 const AccessorsContext = createContext<AssetAccessors | null>(null);

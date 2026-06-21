@@ -50,7 +50,7 @@ interface Props {
    * Optional atomic-rename callback. When provided, label edits are committed
    * through this (on blur / Enter) instead of the plain `onChange` path so the
    * field's `label` AND every referencing page element's `fieldKey` stay in
-   * sync (the `slug(label) === fieldKey` invariant). Receives the field's
+   * sync (the slug(label) === fieldKey invariant). Receives the field's
    * CURRENT key (`slug(field.label)` before the edit) and the new label.
    *
    * Without it the label edit falls back to `onChange`, which only changes the
@@ -58,6 +58,22 @@ interface Props {
    * the field by key (e.g. the legacy flat-form usage).
    */
   onRenameField?: (oldFieldKey: string, newLabel: string) => void;
+  /**
+   * Optional dedicated "add field" callback. When provided, the "Add Field"
+   * button routes through this instead of the plain `onChange` append, so the
+   * store can create the field AND place its `metadata-field` element on a page
+   * (keeping the Pages tab and the public renderer in sync). Without it, add
+   * falls back to the legacy `onChange` append (label-less field, no element).
+   */
+  onAddField?: () => void;
+  /**
+   * Optional dedicated "remove field" callback, invoked with the array index of
+   * the field being removed. When provided, removal routes through this so the
+   * store can delete the field AND strip its page element (no orphaned,
+   * input-type-less element left behind). Without it, removal falls back to the
+   * legacy `onChange` filter (which leaves any page element orphaned).
+   */
+  onRemoveField?: (index: number) => void;
   /**
    * Collections the admin may add to a `collection-picker` field's allow-list.
    * Passed in by the parent (which owns the data fetch) so this component stays
@@ -255,9 +271,11 @@ const SortableFieldRow: React.FC<{
             <MenuItem value="text">Text</MenuItem>
             <MenuItem value="number">Number</MenuItem>
             <MenuItem value="select">Dropdown</MenuItem>
+            {/* i18n-ignore */}
             <MenuItem value="radiogroup">Radio Group</MenuItem>
             <MenuItem value="checkbox">Checkboxes</MenuItem>
             <MenuItem value="tagbox">Tags</MenuItem>
+            {/* i18n-ignore */}
             <MenuItem value="boolean">Yes / No</MenuItem>
           </Select>
         )}
@@ -386,13 +404,16 @@ const SortableFieldRow: React.FC<{
  * render-time length reconciliation regenerates/truncates ids only when the
  * parent replaces `fields` wholesale (e.g. loading a saved portal).
  *
- * The public Props contract is unchanged: `{ fields, onChange, fieldErrors }`.
+ * The public Props contract: fields, onChange, fieldErrors, plus the optional
+ * onRenameField / onAddField / onRemoveField sync callbacks.
  */
 const MetadataFieldBuilder: React.FC<Props> = ({
   fields,
   onChange,
   fieldErrors,
   onRenameField,
+  onAddField,
+  onRemoveField,
   availableCollections,
 }) => {
   const idsRef = React.useRef<string[]>([]);
@@ -418,6 +439,14 @@ const MetadataFieldBuilder: React.FC<Props> = ({
   );
 
   const addField = () => {
+    // When the parent supplies a dedicated add handler (store-backed), delegate
+    // so the field is created AND placed on a page. The id list reconciles to
+    // the grown `fields` prop on the next render (append at the end), matching
+    // where the store appends the new field.
+    if (onAddField) {
+      onAddField();
+      return;
+    }
     idsRef.current = [...idsRef.current, `mdf-${counterRef.current++}`];
     onChange([...fields, { label: "", type: "text", required: false, order: fields.length }]);
   };
@@ -427,7 +456,16 @@ const MetadataFieldBuilder: React.FC<Props> = ({
   };
 
   const removeField = (i: number) => {
+    // Keep `ids` aligned by splicing the exact removed index (truncating from
+    // the end via render reconciliation would misalign identity for the
+    // remaining fields when a middle field is removed).
     idsRef.current = idsRef.current.filter((_, idx) => idx !== i);
+    // Prefer the dedicated, store-backed remove so the field's page element is
+    // stripped too (no orphaned element left behind).
+    if (onRemoveField) {
+      onRemoveField(i);
+      return;
+    }
     onChange(fields.filter((_, idx) => idx !== i).map((f, idx) => ({ ...f, order: idx })));
   };
 

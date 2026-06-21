@@ -235,8 +235,8 @@ export class CognitoServiceAdapter implements ServiceAdapter {
       });
 
       const userPools = JSON.parse(result);
-      const mediaLakePool = userPools.UserPools?.find(
-        (pool: any) => pool.Name?.toLowerCase().includes(searchPattern.toLowerCase())
+      const mediaLakePool = userPools.UserPools?.find((pool: any) =>
+        pool.Name?.toLowerCase().includes(searchPattern.toLowerCase())
       );
 
       if (!mediaLakePool) {

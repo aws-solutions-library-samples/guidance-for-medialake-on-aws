@@ -13,20 +13,28 @@ export default {
     title: "נכסים",
     connectors: "מחברים",
     selectConnector: "בחר מחבר",
+    myAssets: "הנכסים שלי",
+    uploadToMyAssets: "העלאה לנכסים שלי",
+    myAssetsEmpty: {
+      title: "אין נכסים עדיין",
+      description: "העלה את קבצי המדיה הראשונים שלך כדי להתחיל עם ספריית הנכסים האישית שלך.",
+      uploadCta: "העלאת קבצים",
+    },
   },
   upload: {
     title: "העלאת קבצי מדיה",
     description:
-      "בחר מחבר S3 והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
+      "בחר יעד והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
     uploadDestination: "יעד ההעלאה",
     browsePath: "עיון בנתיב",
     uploadingTo: "מעלה אל",
     restrictedToPrefix: "מוגבל",
     allowedPrefixesInfo: "ניתן להעלות רק ל-{{count}} נתיב(ים) מורשה(ים)",
-    connectorLabel: "מחבר S3",
-    selectConnectorPlaceholder: "בחר מחבר S3",
+    connectorLabel: "יעד ההעלאה",
+    selectConnectorPlaceholder: "בחר יעד",
     loadingConnectors: "טוען מחברים...",
     noConnectors: "אין מחברי S3 זמינים. אנא הגדר תחילה מחבר S3.",
+    noDestinations: "אין לך גישה לאף יעד העלאה. פנה למנהל המערכת כדי לבקש גישה.",
     dashboardNote:
       "מותרים רק קבצים מסוג audio/*, video/*, image/*, HLS (application/x-mpegURL) ו-MPEG-DASH (application/dash+xml)",
     meta: {
@@ -41,6 +49,7 @@ export default {
     prefixHelper: "אתה יכול רק לעיין ולהעלות לתיקיות בתוך הנתיב שנבחר.",
     currentPath: "נתיב נוכחי",
     confirm: "השתמש בנתיב זה",
+    refresh: "רענן",
     validation: {
       invalidPath: "הנתיב שנבחר נמצא מחוץ לקידומות המותרות.",
       noPathSelected: "אנא נווט לתיקייה לפני אישור.",
@@ -102,6 +111,40 @@ export default {
       objectPrefixNumbered: "Object קידומת {{number}}",
       bucketNameHelper: "דלי name must be globally unique, follow S3 naming rules.",
       addPrefix: "הוסף קידומת",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "מחק מחבר",
@@ -217,6 +260,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "מועדפים",
+      emptyTitle: "אין אוספים מועדפים",
+      emptyDescription: "אוספים שתסמן כמועדפים יופיעו כאן",
+    },
     title: "אוספים",
     description: "ארגן ונהל נכסי מדיה באוספים",
     createCollection: "צור אוסף",
@@ -907,6 +955,7 @@ export default {
     },
   },
   common: {
+    remove: "הסר",
     back: "חזור",
     search: "חפש",
     public: "ציבורי",
@@ -1704,6 +1753,9 @@ export default {
         myCollectionsTitle: "האוספים שלי",
         sharedWithMeTitle: "משותף איתי",
         mySharedTitle: "האוספים המשותפים שלי",
+        favoritesTitle: "אוספים מועדפים",
+        favoritesEmptyTitle: "אין אוספים מועדפים",
+        favoritesEmptyDescription: "אוספים שתסמן כמועדפים יופיעו כאן",
         emptyTitle: "לא נמצאו אוספים",
         emptyDescription: "צור אוסף כדי להתחיל",
         createCollection: "צור אוסף",
@@ -1716,6 +1768,7 @@ export default {
           myCollections: "האוספים שלי",
           sharedWithMe: "משותף איתי",
           myShared: "האוספים המשותפים שלי",
+          favorites: "אוספים מועדפים",
         },
         sortingTitle: "מיון",
         sortBy: "מיין לפי",
@@ -1734,6 +1787,11 @@ export default {
         title: "נכסים אחרונים",
         emptyTitle: "אין נכסים אחרונים",
         emptyDescription: "נכסים שהועלו לאחרונה יופיעו כאן",
+      },
+      myAssets: {
+        title: "הנכסים שלי",
+        emptyTitle: "אין עדיין נכסים אישיים",
+        emptyDescription: "העלה את הקובץ הראשון שלך לנכסים שלי.",
       },
       collectionGroup: {
         title: "קבוצת אוספים",
@@ -1908,6 +1966,46 @@ export default {
     tokens: {
       copyUrl: "העתק כתובת URL",
       revokeToken: "בטל אסימון",
+    },
+    themeTemplateActions: {
+      saveAs: "שמור כ…",
+      saveAsTemplate: "שמור כתבנית",
+      saveAsTheme: "שמור כערכת נושא",
+      applyTheme: "החל ערכת נושא",
+    },
+    themes: {
+      pageDescription: "ערכות נושא חוזרות שניתן להחיל על פורטלים חדשים או קיימים",
+      deleteTheme: "מחק ערכת נושא",
+      failedToLoad: "טעינת ערכת הנושא נכשלה",
+    },
+    templates: {
+      pageDescription: "מבנים חוזרים של פורטלים להתחלה מהירה של פורטלים חדשים",
+      createFromTemplate: "צור פורטל מתבנית זו",
+      deleteTemplate: "מחק תבנית",
+      failedToLoad: "טעינת התבנית נכשלה",
+    },
+    createMenu: {
+      startFromTemplate: "התחל מתבנית…",
+      applyTheme: "החל ערכת נושא…",
+      startFromTemplateTitle: "התחל מתבנית",
+      applyThemeTitle: "החל ערכת נושא",
+    },
+    metadata: {
+      completionEventHelperText:
+        "אופציונלי. משמש לניתוב אירועי השלמת מנות העלאה לצינור ספציפי להעשרה אוטומטית.",
+    },
+    actions: {
+      applyTheme: "החל ערכת נושא",
+      applyThemeMenu: "החל ערכת נושא…",
+      saveAsTemplate: "שמור כתבנית",
+      saveAsTheme: "שמור כערכת נושא",
+      startFromTemplate: "התחל מתבנית",
+      startFromTemplateMenu: "התחל מתבנית…",
+    },
+
+    fieldTypes: {
+      radioGroup: "קבוצת לחצני בחירה",
+      yesNo: "כן / לא",
     },
   },
 };

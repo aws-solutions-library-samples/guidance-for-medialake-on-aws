@@ -1,5 +1,5 @@
 import React from "react";
-import { Tabs, Tab } from "@mui/material";
+import { Box, Divider, Tab, Tabs, Typography } from "@mui/material";
 import { useNavigate } from "react-router";
 
 /**
@@ -12,11 +12,12 @@ import { useNavigate } from "react-router";
  *   - Templates  → /settings/upload-portals/templates
  *   - Themes     → /settings/upload-portals/themes
  *
- * Templates and Themes were added in task 17.3 as sibling routes (rather
- * than nested tabs inside a single page) so each list keeps its own URL,
- * back-button behavior, and deep-linkable editor routes. This component is
- * the lightweight tab strip that ties the three sibling pages together so
- * an admin can move between them without going back to a parent.
+ * "Portals" is the primary destination — the live, end-user-facing artifacts.
+ * "Templates" and "Themes" are the reusable building blocks a portal is
+ * assembled from (a Template carries structure + appearance; a Theme carries
+ * appearance only), so they are grouped behind a quiet "Building blocks" label
+ * rather than sitting as equal siblings to Portals. The routing contract
+ * (`active` → route) is unchanged; this is a visual reframing only.
  */
 export type UploadPortalsTab = "portals" | "templates" | "themes";
 
@@ -40,17 +41,38 @@ const UploadPortalsSubNav: React.FC<UploadPortalsSubNavProps> = ({ active }) => 
     }
   };
 
+  // Two tab strips share one handler. Each strip shows a selection indicator
+  // only when its own tab is active; the other falls back to `false` so MUI
+  // renders no indicator and emits no "value not found" warning.
+  const portalsValue: UploadPortalsTab | false = active === "portals" ? "portals" : false;
+  const blocksValue: UploadPortalsTab | false = active === "portals" ? false : active;
+
   return (
-    <Tabs
-      value={active}
-      onChange={handleChange}
-      aria-label="Upload portals sections"
-      sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        mb: 2,
+        borderBottom: 1,
+        borderColor: "divider",
+      }}
     >
-      <Tab label="Portals" value="portals" />
-      <Tab label="Templates" value="templates" />
-      <Tab label="Themes" value="themes" />
-    </Tabs>
+      <Tabs value={portalsValue} onChange={handleChange} aria-label="Upload portals">
+        <Tab label="Portals" value="portals" />
+      </Tabs>
+
+      <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
+
+      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+        Building blocks
+      </Typography>
+
+      <Tabs value={blocksValue} onChange={handleChange} aria-label="Reusable building blocks">
+        <Tab label="Templates" value="templates" />
+        <Tab label="Themes" value="themes" />
+      </Tabs>
+    </Box>
   );
 };
 

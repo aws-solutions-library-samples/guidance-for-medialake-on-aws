@@ -11,6 +11,10 @@ describe("API_ENDPOINTS", () => {
       expect(API_ENDPOINTS.CONNECTORS).toBe("/connectors");
     });
 
+    it("has correct my-assets connector endpoint", () => {
+      expect(API_ENDPOINTS.MY_ASSETS_CONNECTOR).toBe("/connectors/my-assets");
+    });
+
     it("has correct pipelines endpoint", () => {
       expect(API_ENDPOINTS.PIPELINES).toBe("/pipelines");
     });

@@ -15,6 +15,39 @@ logger = Logger(service="portals-image-upload")
 IAC_ASSETS_BUCKET_NAME = os.environ.get("IAC_ASSETS_BUCKET_NAME", "")
 s3_client = boto3.client("s3")
 
+# Presigned-URL lifetime for portal images (logo/banner/favicon). The portal
+# assets live in the private, KMS-encrypted IAC assets bucket, which is NOT a
+# CloudFront origin, so they are served to the browser via presigned S3 GET
+# URLs. The frontend re-resolves these URLs on every portal read (editor load
+# and public page load), so a moderate lifetime is sufficient — and in practice
+# the URL is further capped by the Lambda execution role's credential lifetime.
+PORTAL_ASSET_URL_EXPIRATION = 6 * 60 * 60  # 6 hours
+
+
+def resolve_portal_asset_url(
+    s3_key: Optional[str],
+    expiration: int = PORTAL_ASSET_URL_EXPIRATION,
+) -> Optional[str]:
+    """Resolve a portal image S3 key to a presigned GET URL for browser display.
+
+    Portal images are stored privately in the IAC assets bucket (SSE-KMS) and
+    are therefore served via presigned S3 GET URLs rather than a CloudFront
+    path. Returns ``None`` when ``s3_key`` is falsy or the URL cannot be
+    generated, so callers can safely fall back to "no image".
+    """
+    if not s3_key:
+        return None
+    try:
+        from url_utils import generate_presigned_url
+
+        return generate_presigned_url(
+            IAC_ASSETS_BUCKET_NAME, s3_key, expiration=expiration
+        )
+    except Exception:
+        logger.warning("Could not resolve portal asset URL", extra={"key": s3_key})
+        return None
+
+
 ALLOWED_CONTENT_TYPES = {
     "image/png": "png",
     "image/jpeg": "jpg",

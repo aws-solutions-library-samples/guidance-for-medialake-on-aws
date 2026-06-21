@@ -7,6 +7,7 @@ import {
   FolderOpen as CollectionIcon,
   Schedule as RecentIcon,
   FolderSpecial as FolderSpecialIcon,
+  Person as PersonIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import { FavoritesWidget } from "./widgets/FavoritesWidget";
 import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
 import { CollectionGroupWidget } from "./widgets/CollectionGroupWidget";
+import { MyAssetsWidget } from "./widgets/MyAssetsWidget";
 import type { WidgetType, CollectionsWidgetConfig, CollectionGroupWidgetConfig } from "../types";
 
 // Widget component map
@@ -30,6 +32,7 @@ const WIDGET_COMPONENTS: Record<
   collections: CollectionsWidget,
   "recent-assets": RecentAssetsWidget,
   "collection-group": CollectionGroupWidget,
+  "my-assets": MyAssetsWidget,
 };
 
 // Widget icon map
@@ -38,6 +41,7 @@ const WIDGET_ICONS: Record<WidgetType, React.ReactNode> = {
   collections: <CollectionIcon />,
   "recent-assets": <RecentIcon />,
   "collection-group": <FolderSpecialIcon />,
+  "my-assets": <PersonIcon />,
 };
 
 export const ExpandedWidgetModal: React.FC = () => {
@@ -61,6 +65,8 @@ export const ExpandedWidgetModal: React.FC = () => {
       } else if (widget.type === "collections") {
         queryClient.invalidateQueries({ queryKey: ["collections"] });
       } else if (widget.type === "recent-assets") {
+        queryClient.invalidateQueries({ queryKey: ["search"] });
+      } else if (widget.type === "my-assets") {
         queryClient.invalidateQueries({ queryKey: ["search"] });
       }
     }

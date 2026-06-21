@@ -439,6 +439,11 @@ export interface Portal {
    */
   allowedFileTypes?: string[];
   /**
+   * Optional automation tag used to route upload-batch completion events
+   * to a trigger pipeline node. Set by the administrator in the portal editor.
+   */
+  automationTag?: string;
+  /**
    * The theme this portal was created from. Informational only — there is
    * no live link, so editing the referenced theme does NOT change this
    * portal's appearance (appearance is snapshot/copied at create time).
@@ -492,6 +497,10 @@ export interface CreatePortalRequest {
    * Allowed file types for uploads. Empty array means "accept all".
    */
   allowedFileTypes?: string[];
+  /**
+   * Optional automation tag for routing upload-batch completion events.
+   */
+  automationTag?: string;
 }
 
 export interface UpdatePortalRequest extends Partial<CreatePortalRequest> {}

@@ -85,6 +85,26 @@ const CARD_SHADOW_ELEVATION: Record<PortalAppearance["layout"]["cardShadow"], nu
 const EMPTY_PAGES: PortalPage[] = [];
 
 /**
+ * Determine whether a sanitized HTML string carries meaningful content.
+ *
+ * Mirrors the helper in {@link PortalHeader} so the admin preview and the
+ * public page agree on when a cleared rich-text field (Tiptap emits
+ * `<p></p>` / `<p><br></p>` / whitespace-only markup) should fall back to the
+ * plain-text `name`. Strips tags and collapses entities/whitespace, while
+ * still treating embedded media as content.
+ */
+const htmlHasContent = (html: string | undefined | null): boolean => {
+  if (!html) return false;
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, "")
+    .trim();
+  if (text.length > 0) return true;
+  return /<(img|video|iframe|svg|audio)\b/i.test(html);
+};
+
+/**
  * PortalPreviewRenderer
  *
  * Renders the live preview of the public upload-portal page. It builds the
@@ -132,21 +152,30 @@ const PortalPreviewRendererComponent: React.FC<PortalPreviewRendererProps> = ({
   // Sanitize the chrome HTML once per change. DOMPurify is synchronous and
   // fast, but memoizing keeps the render cheap when only a color changes.
   const sanitizedTitle = useMemo(
-    () => DOMPurify.sanitize(appearance.content.titleHtml ?? ""),
+    () =>
+      htmlHasContent(appearance.content.titleHtml)
+        ? DOMPurify.sanitize(appearance.content.titleHtml ?? "")
+        : "",
     [appearance.content.titleHtml]
   );
   const sanitizedDescription = useMemo(
-    () => DOMPurify.sanitize(appearance.content.descriptionHtml ?? ""),
+    () =>
+      htmlHasContent(appearance.content.descriptionHtml)
+        ? DOMPurify.sanitize(appearance.content.descriptionHtml ?? "")
+        : "",
     [appearance.content.descriptionHtml]
   );
   const sanitizedFooter = useMemo(
-    () => DOMPurify.sanitize(appearance.content.footerHtml ?? ""),
+    () =>
+      htmlHasContent(appearance.content.footerHtml)
+        ? DOMPurify.sanitize(appearance.content.footerHtml ?? "")
+        : "",
     [appearance.content.footerHtml]
   );
 
-  const hasTitleHtml = sanitizedTitle.trim().length > 0;
-  const hasDescriptionHtml = sanitizedDescription.trim().length > 0;
-  const hasFooterHtml = sanitizedFooter.trim().length > 0;
+  const hasTitleHtml = sanitizedTitle.length > 0;
+  const hasDescriptionHtml = sanitizedDescription.length > 0;
+  const hasFooterHtml = sanitizedFooter.length > 0;
 
   const shouldRenderBanner =
     appearance.branding.bannerHeight > 0 && !!appearance.branding.bannerUrl;

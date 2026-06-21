@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Box,
@@ -8,9 +8,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Typography,
 } from "@mui/material";
-import FolderIcon from "@mui/icons-material/Folder";
 import { useTranslation } from "react-i18next";
 import FileUploader from "./FileUploader";
 
@@ -26,6 +24,9 @@ interface S3UploaderModalProps {
   path?: string;
   onUploadComplete?: (files: any[]) => void;
   onUploadError?: (error: Error, file: any) => void;
+  defaultConnectorId?: string;
+  lockConnector?: boolean;
+  defaultObjectPrefix?: string;
 }
 
 const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
@@ -36,16 +37,13 @@ const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
   path = "",
   onUploadComplete,
   onUploadError,
+  defaultConnectorId,
+  lockConnector,
+  defaultObjectPrefix,
 }) => {
   const { t } = useTranslation();
   const [, setUploadedFiles] = useState<any[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>(path || "");
-
-  // Sync currentPath with path prop
-  useEffect(() => {
-    setCurrentPath(path || "");
-  }, [path]);
 
   const handleUploadComplete = (files: any[]) => {
     setUploadedFiles(files);
@@ -75,13 +73,6 @@ const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
       <DialogTitle>{title || t("upload.title")}</DialogTitle>
       <DialogContent>
         <DialogContentText>{description}</DialogContentText>
-        {currentPath && (
-          <Alert severity="info" sx={{ mt: 2, mb: 2 }} icon={<FolderIcon />}>
-            <Typography variant="body2">
-              <strong>{t("upload.uploadingTo")}:</strong> {currentPath || "/"}
-            </Typography>
-          </Alert>
-        )}
         {uploadError && (
           <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
             {uploadError}
@@ -92,7 +83,9 @@ const S3UploaderModal: React.FC<S3UploaderModalProps> = ({
             onUploadComplete={handleUploadComplete}
             onUploadError={handleUploadError}
             path={path}
-            onPathChange={(p) => setCurrentPath(p)}
+            defaultConnectorId={defaultConnectorId}
+            lockConnector={lockConnector}
+            defaultObjectPrefix={defaultObjectPrefix}
           />
         </Box>
       </DialogContent>

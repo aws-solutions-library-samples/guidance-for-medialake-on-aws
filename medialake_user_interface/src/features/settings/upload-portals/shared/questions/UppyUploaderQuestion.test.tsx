@@ -230,6 +230,20 @@ describe("UppyUploaderRenderer — single upload trigger (Req 7.7 / Property 10)
     const props = recordedProps.current as Record<string, unknown>;
     expect(props.allowedFileTypes).toEqual(["image/png", "image/jpeg"]);
   });
+
+  it("passes an empty allowedFileTypes through (cleared = allow any file type)", () => {
+    // An explicit empty array is the "allow all" state and must NOT fall back
+    // to the media default — it flows to PortalUploader, which then applies no
+    // Uppy restriction.
+    const config = buildConfig({ allowedFileTypes: [] });
+    const { survey, uploader } = buildSurveyAndUploader(config);
+    survey.setValue(SELECTED_DESTINATION_KEY, "dest-1");
+
+    renderRenderer(uploader, publicRuntime(config));
+
+    const props = recordedProps.current as Record<string, unknown>;
+    expect(props.allowedFileTypes).toEqual([]);
+  });
 });
 
 describe("UppyUploaderRenderer — empty destination blocks completion (Req 15.1)", () => {

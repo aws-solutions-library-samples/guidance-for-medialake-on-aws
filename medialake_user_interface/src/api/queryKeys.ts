@@ -8,6 +8,7 @@ export const QUERY_KEYS = {
   },
   CONNECTORS: {
     all: ["connectors"] as const,
+    myAssets: () => [...QUERY_KEYS.CONNECTORS.all, "my-assets"] as const,
     lists: () => [...QUERY_KEYS.CONNECTORS.all, "list"] as const,
     list: (filters: string) => [...QUERY_KEYS.CONNECTORS.lists(), { filters }] as const,
     details: () => [...QUERY_KEYS.CONNECTORS.all, "detail"] as const,

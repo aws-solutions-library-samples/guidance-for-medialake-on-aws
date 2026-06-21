@@ -1,0 +1,56 @@
+spec: v1.0.0
+node:
+  id: upload_batch_completed
+  title: Upload Batch Completed
+  description: Trigger a workflow when a portal upload batch completes
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: upload_batch_completed_trigger
+        event_pattern:
+          source: ["medialake.pipeline"]
+          detail-type: ["Upload Batch Completed"]
+          detail:
+            automationTag: ["${automation_tag}"]
+            outcome: ["${outcome_filter}"]
+actions:
+  trigger:
+    summary: Trigger when an upload batch completes
+    description: This step will trigger when a portal upload batch completes
+    operationId: triggerUploadBatchCompleted
+    parameters:
+      - in: body
+        name: automation_tag
+        label: Automation Tag
+        description: Match upload batches whose portal carries this automation tag.
+        required: true
+        schema:
+          type: select
+      - in: body
+        name: portal_id
+        label: Portal (optional)
+        description: Restrict to a single portal.
+        required: false
+        schema:
+          type: select
+      - in: body
+        name: outcome_filter
+        label: Completion Outcome
+        required: false
+        schema:
+          type: select
+          options:
+            - label: "Completed only"
+              value: "COMPLETE"
+            - label: "Completed with errors only"
+              value: "COMPLETE_WITH_ERRORS"
+            - label: "Both"
+              value: "BOTH"
+          default: "COMPLETE"
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

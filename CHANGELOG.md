@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.15.0] - 2026-06-17
+
+### Features
+
+- feat: Upload portals - preview(refactor and fixes are expected)
+
+## [1.14.5] - 2026-06-15
+
+### Bug Fixes
+
+- fix: prevent orphaned collections/shares on user, asset & group deletion
+- fix: video pipeline nodes becomes too large for Lambda deployment
+
+### Code Refactoring
+
+- refactor: Add collection action permissions(add asset to collection and remove asset from collection) at a global RBAC level
+
 ## [1.14.4] - 2026-05-07
 
 ### Bug Fixes

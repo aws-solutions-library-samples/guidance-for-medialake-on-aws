@@ -90,6 +90,8 @@ class AssetsProps:
         True  # Feature flag for video/clip download functionality
     )
 
+    personal_assets_bucket: Optional[s3.IBucket] = None
+
     # Bulk download parameters
     small_file_threshold_mb: int = 512  # Max size for a file to be considered "small"
     chunk_size_mb: int = 100  # Size of each chunk for large file processing
@@ -562,6 +564,13 @@ class AssetsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
+                    **(
+                        {
+                            "PERSONAL_ASSETS_BUCKET": props.personal_assets_bucket.bucket_name
+                        }
+                        if props.personal_assets_bucket
+                        else {}
+                    ),
                 },
             ),
         )
@@ -812,6 +821,30 @@ class AssetsConstruct(Construct):
                 resources=["arn:aws:s3:::*"],
             )
         )
+
+        # Grant upload Lambdas explicit permissions on the personal assets bucket
+        if props.personal_assets_bucket:
+            for fn in [
+                upload_lambda.function,
+                multipart_complete_lambda.function,
+                multipart_sign_lambda.function,
+                multipart_abort_lambda.function,
+            ]:
+                props.personal_assets_bucket.grant_put(fn)
+                fn.add_to_role_policy(
+                    iam.PolicyStatement(
+                        actions=[
+                            "s3:CreateMultipartUpload",
+                            "s3:UploadPart",
+                            "s3:CompleteMultipartUpload",
+                            "s3:AbortMultipartUpload",
+                            "s3:GetObject",
+                        ],
+                        resources=[
+                            props.personal_assets_bucket.bucket_arn + "/*",
+                        ],
+                    )
+                )
 
         # Create API Gateway resources for multipart endpoints
         multipart_resource = upload_resource.add_resource("multipart")

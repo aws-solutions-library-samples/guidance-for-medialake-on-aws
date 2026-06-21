@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -49,11 +50,12 @@ import {
  * truth the appearance sections read/write.
  */
 const ThemeEditorPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isCreateMode = !id || id === "new";
 
-  const themeQuery = useGetTheme(isCreateMode ? "" : id ?? "");
+  const themeQuery = useGetTheme(isCreateMode ? "" : (id ?? ""));
   const theme = themeQuery.data?.data as PortalTheme | undefined;
 
   const initialize = usePortalEditorStore((s) => s.initialize);
@@ -157,7 +159,7 @@ const ThemeEditorPage: React.FC = () => {
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", p: 4 }}
         >
           <Stack spacing={2} alignItems="center">
-            <Typography variant="h6">Failed to load theme</Typography>
+            <Typography variant="h6">{t("uploadPortals.themes.failedToLoad")}</Typography>
             <Button variant="outlined" onClick={handleBack}>
               Back to themes
             </Button>

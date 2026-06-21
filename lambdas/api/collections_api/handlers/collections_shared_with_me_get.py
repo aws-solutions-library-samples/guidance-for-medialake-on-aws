@@ -13,6 +13,7 @@ from collections_utils import (
     create_error_response,
     create_success_response,
     format_collection_item,
+    get_collection_item_count,
 )
 from db_models import CollectionModel
 from user_auth import extract_user_context
@@ -92,6 +93,15 @@ def register_route(app):
                         METADATA_SK,
                     )
 
+                    # Compute live item count (deprecated stored itemCount drifts);
+                    # fall back to the stored value if the count query errors (-1).
+                    dynamic_count = get_collection_item_count(
+                        collections_table, collection.PK
+                    )
+                    item_count = (
+                        dynamic_count if dynamic_count >= 0 else collection.itemCount
+                    )
+
                     # Format collection
                     collection_dict = {
                         "PK": collection.PK,
@@ -101,7 +111,7 @@ def register_route(app):
                         "ownerId": collection.ownerId,
                         "status": collection.status,
                         "isPublic": collection.isPublic,
-                        "itemCount": collection.itemCount,
+                        "itemCount": item_count,
                         "childCollectionCount": collection.childCollectionCount,
                         "collectionTypeId": collection.collectionTypeId,
                         "parentId": collection.parentId,

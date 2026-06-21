@@ -2,16 +2,20 @@
 
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError
 from collections_utils import (
+    COLLECTION_PK_PREFIX,
     apply_field_selection,
     create_error_response,
     create_success_response,
     format_collection_item,
+    get_collection_item_count,
 )
 from models import ListCollectionsQueryParams
 from user_auth import extract_user_context
@@ -21,6 +25,52 @@ from utils.metadata_filter_parser import parse_metadata_filter_params
 logger = Logger(service="collections-get", level=os.environ.get("LOG_LEVEL", "INFO"))
 tracer = Tracer(service="collections-get")
 metrics = Metrics(namespace="medialake", service="collections")
+
+# DynamoDB table for dynamic item-count queries. itemCount stored on the
+# METADATA row (and mirrored into OpenSearch) is deprecated and drifts, so the
+# list endpoint recomputes counts the same way the detail endpoint does.
+_dynamodb = boto3.resource("dynamodb")
+_collections_table = _dynamodb.Table(
+    os.environ.get("COLLECTIONS_TABLE_NAME", "collections_table_dev")
+)
+
+# Upper bound on how many collections we'll recompute counts for in a single
+# request. Realistic UI page sizes are <= 100; this guards against pathological
+# large pages (pageSize can be up to 5000) causing a flood of COUNT queries.
+_MAX_DYNAMIC_COUNT_ITEMS = int(os.environ.get("MAX_DYNAMIC_COUNT_ITEMS", "200"))
+
+
+@tracer.capture_method
+def _apply_dynamic_item_counts(formatted_items: list) -> None:
+    """Override each item's stale stored itemCount with a live DynamoDB count.
+
+    Counts are computed in parallel (bounded) for the page of results. On a
+    per-item error (count returns -1) the existing stored value is kept so the
+    listing never surfaces -1 on a card. Mutates ``formatted_items`` in place.
+    """
+    if not formatted_items:
+        return
+
+    if len(formatted_items) > _MAX_DYNAMIC_COUNT_ITEMS:
+        logger.info(
+            "Skipping dynamic item-count recompute for large page",
+            extra={
+                "item_count": len(formatted_items),
+                "max": _MAX_DYNAMIC_COUNT_ITEMS,
+            },
+        )
+        return
+
+    def _count_for(item: dict) -> tuple[dict, int]:
+        pk = f"{COLLECTION_PK_PREFIX}{item.get('id', '')}"
+        return item, get_collection_item_count(_collections_table, pk)
+
+    max_workers = min(16, len(formatted_items))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for item, count in executor.map(_count_for, formatted_items):
+            # -1 signals a query error — keep the stored value as a fallback.
+            if count >= 0:
+                item["itemCount"] = count
 
 
 def register_route(app):
@@ -223,6 +273,10 @@ def register_route(app):
             formatted_items = [
                 format_collection_item(item, user_context) for item in results
             ]
+
+            # Replace stale stored itemCount (from OpenSearch) with live DynamoDB
+            # counts so the list matches the detail view when items are added/removed.
+            _apply_dynamic_item_counts(formatted_items)
 
             # Apply field selection
             if query_params.fields:

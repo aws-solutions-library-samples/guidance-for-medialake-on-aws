@@ -11,6 +11,7 @@ import {
   useDeleteConnector,
   useToggleConnector,
   useCreateS3Connector,
+  useUpdateConnector,
   useSyncConnector,
 } from "@/api/hooks/useConnectors";
 import { ConnectorResponse, CreateConnectorRequest } from "@/api/types/api.types";
@@ -37,6 +38,7 @@ const ConnectorsPage: React.FC = () => {
   const { mutateAsync: toggleConnector } = useToggleConnector();
   const { mutateAsync: syncConnector } = useSyncConnector();
   const { mutateAsync: createS3Connector, isPending: isCreatingConnector } = useCreateS3Connector();
+  const { mutateAsync: updateConnector } = useUpdateConnector();
 
   // Safely pull out the connectors array
   const rawConnectors = connectorsResponse?.data?.connectors;
@@ -106,6 +108,26 @@ const ConnectorsPage: React.FC = () => {
 
   const handleSave = async (connectorData: CreateConnectorRequest): Promise<void> => {
     try {
+      // Edit mode: only name/description are updatable in place.
+      if (editingConnector?.id) {
+        await updateConnector({
+          id: editingConnector.id,
+          data: {
+            name: connectorData.name,
+            description: connectorData.description,
+          },
+        });
+
+        handleModalClose();
+        setAlert({
+          message: t("connectors.apiMessages.updating.success"),
+          severity: "success",
+        });
+
+        await queryClient.invalidateQueries({ queryKey: ["connectors"] });
+        return;
+      }
+
       if (connectorData.type === "s3") {
         const response = await createS3Connector(connectorData);
 
@@ -123,9 +145,9 @@ const ConnectorsPage: React.FC = () => {
         await queryClient.invalidateQueries({ queryKey: ["connectors"] });
       }
     } catch (error: any) {
-      // console.error('Error creating connector:', error);
-
-      let errorMessage = "Failed to create connector";
+      let errorMessage = editingConnector
+        ? "Failed to update connector"
+        : "Failed to create connector";
 
       if (error.message) {
         errorMessage = error.message;

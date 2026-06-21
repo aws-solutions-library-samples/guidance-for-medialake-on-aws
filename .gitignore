@@ -141,6 +141,10 @@ coverage/
 aws-exports.json
 config.json
 config.json.bkp
+# Environment-specific config backups/variants must never be committed
+# (they embed account IDs, emails, VPC CIDRs, etc.)
+config.json.*
+*.bak
 config-saks.json
 *.jinja2-tmp
 
@@ -173,3 +177,13 @@ aiPrompt.json
 
 
 *.lp5
+
+# Visual-testing scratch artifacts (Playwright harness output, provisioning
+# scripts, screenshots, traces). Not part of the product; may contain
+# credentials/tokens — must never be committed.
+.vistest/
+medialake_user_interface/.vistest/
+medialake_user_interface/vistest-report/
+medialake_user_interface/vistest-results/
+medialake_user_interface/tests/vistest/
+medialake_user_interface/playwright.vistest.config.ts

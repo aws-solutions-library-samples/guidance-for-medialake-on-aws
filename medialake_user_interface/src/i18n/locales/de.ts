@@ -13,21 +13,31 @@ export default {
     title: "Assets",
     connectors: "Konnektoren",
     selectConnector: "Wählen Sie einen Konnektor",
+    myAssets: "Meine Assets",
+    uploadToMyAssets: "Zu Meine Assets hochladen",
+    myAssetsEmpty: {
+      title: "Noch keine Assets",
+      description:
+        "Laden Sie Ihre ersten Mediendateien hoch, um mit Ihrer persönlichen Asset-Bibliothek zu beginnen.",
+      uploadCta: "Dateien hochladen",
+    },
   },
   upload: {
     title: "Mediendateien hochladen",
     description:
-      "Wählen Sie einen S3-Connector und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
+      "Wählen Sie ein Ziel und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
     uploadDestination: "Upload-Ziel",
     browsePath: "Pfad durchsuchen",
     uploadingTo: "Hochladen nach",
     restrictedToPrefix: "eingeschränkt",
     allowedPrefixesInfo: "Sie können nur zu {{count}} erlaubten Pfad(en) hochladen",
-    connectorLabel: "S3-Connector",
-    selectConnectorPlaceholder: "Wählen Sie einen S3-Connector",
+    connectorLabel: "Upload-Ziel",
+    selectConnectorPlaceholder: "Wählen Sie ein Ziel",
     loadingConnectors: "Connectors werden geladen...",
     noConnectors:
       "Keine S3-Connectors verfügbar. Bitte konfigurieren Sie zuerst einen S3-Connector.",
+    noDestinations:
+      "Sie haben keinen Zugriff auf Upload-Ziele. Wenden Sie sich an Ihren Administrator, um Zugriff anzufordern.",
     dashboardNote:
       "Nur Dateien der Typen audio/*, video/*, image/*, HLS (application/x-mpegURL) und MPEG-DASH (application/dash+xml) sind erlaubt",
     meta: {
@@ -45,6 +55,7 @@ export default {
       "Sie können nur Ordner innerhalb des ausgewählten Pfades durchsuchen und hochladen.",
     currentPath: "Aktueller Pfad",
     confirm: "Diesen Pfad verwenden",
+    refresh: "Aktualisieren",
     validation: {
       invalidPath: "Der ausgewählte Pfad liegt außerhalb der erlaubten Präfixe.",
       noPathSelected: "Bitte navigieren Sie zu einem Ordner, bevor Sie bestätigen.",
@@ -107,6 +118,40 @@ export default {
       objectPrefixNumbered: "Object Präfix {{number}}",
       bucketNameHelper: "Bucket name must be globally unique, follow S3 naming rules.",
       addPrefix: "Präfix hinzufügen",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "Konnektor löschen",
@@ -227,6 +272,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoriten",
+      emptyTitle: "Keine favorisierten Sammlungen",
+      emptyDescription: "Von Ihnen favorisierte Sammlungen werden hier angezeigt",
+    },
     title: "Sammlungen",
     description: "Organisieren und verwalten Sie Ihre Medien-Assets in Sammlungen",
     createCollection: "Sammlung erstellen",
@@ -926,6 +976,7 @@ export default {
     },
   },
   common: {
+    remove: "Entfernen",
     back: "Zurück",
     search: "Suchen",
     public: "Öffentlich",
@@ -1742,6 +1793,9 @@ export default {
         myCollectionsTitle: "Meine Sammlungen",
         sharedWithMeTitle: "Mit mir geteilt",
         mySharedTitle: "Meine geteilten Sammlungen",
+        favoritesTitle: "Favorisierte Sammlungen",
+        favoritesEmptyTitle: "Keine favorisierten Sammlungen",
+        favoritesEmptyDescription: "Von Ihnen favorisierte Sammlungen werden hier angezeigt",
         emptyTitle: "Keine Sammlungen gefunden",
         emptyDescription: "Erstellen Sie eine Sammlung, um zu beginnen",
         createCollection: "Sammlung erstellen",
@@ -1754,6 +1808,7 @@ export default {
           myCollections: "Meine Sammlungen",
           sharedWithMe: "Mit mir geteilt",
           myShared: "Meine geteilten Sammlungen",
+          favorites: "Favorisierte Sammlungen",
         },
         sortingTitle: "Sortierung",
         sortBy: "Sortieren nach",
@@ -1772,6 +1827,11 @@ export default {
         title: "Neueste Assets",
         emptyTitle: "Keine neuesten Assets",
         emptyDescription: "Kürzlich hochgeladene Assets werden hier angezeigt",
+      },
+      myAssets: {
+        title: "Meine Assets",
+        emptyTitle: "Noch keine persönlichen Assets",
+        emptyDescription: "Laden Sie Ihre erste Datei in Meine Assets hoch.",
       },
       collectionGroup: {
         title: "Sammlungsgruppe",
@@ -1952,6 +2012,48 @@ export default {
     tokens: {
       copyUrl: "URL kopieren",
       revokeToken: "Token widerrufen",
+    },
+    themeTemplateActions: {
+      saveAs: "Speichern als…",
+      saveAsTemplate: "Als Vorlage speichern",
+      saveAsTheme: "Als Theme speichern",
+      applyTheme: "Theme anwenden",
+    },
+    themes: {
+      pageDescription:
+        "Wiederverwendbare Erscheinungsthemen, die Sie auf neue oder bestehende Portale anwenden können",
+      deleteTheme: "Theme löschen",
+      failedToLoad: "Theme konnte nicht geladen werden",
+    },
+    templates: {
+      pageDescription:
+        "Wiederverwendbare Portalstrukturen, mit denen Sie schnell neue Portale erstellen können",
+      createFromTemplate: "Portal aus dieser Vorlage erstellen",
+      deleteTemplate: "Vorlage löschen",
+      failedToLoad: "Vorlage konnte nicht geladen werden",
+    },
+    createMenu: {
+      startFromTemplate: "Von Vorlage starten…",
+      applyTheme: "Theme anwenden…",
+      startFromTemplateTitle: "Von Vorlage starten",
+      applyThemeTitle: "Theme anwenden",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Optional. Wird verwendet, um Upload-Batch-Abschlussereignisse an eine bestimmte Pipeline zur automatischen Anreicherung weiterzuleiten.",
+    },
+    actions: {
+      applyTheme: "Theme anwenden",
+      applyThemeMenu: "Theme anwenden…",
+      saveAsTemplate: "Als Vorlage speichern",
+      saveAsTheme: "Als Theme speichern",
+      startFromTemplate: "Mit Vorlage beginnen",
+      startFromTemplateMenu: "Mit Vorlage beginnen…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Optionsfeldgruppe",
+      yesNo: "Ja / Nein",
     },
   },
 };

@@ -34,27 +34,18 @@ import PortalEditorToolbar from "../components/editor/PortalEditorToolbar";
 import PortalEditorThemeTemplateActions from "../components/editor/PortalEditorThemeTemplateActions";
 import PortalEditorSidebar from "../components/editor/PortalEditorSidebar";
 import PortalEditorPreview from "../components/editor/PortalEditorPreview";
+import { ALL_GROUPED_SECTIONS } from "../components/editor/sectionGroups";
 import { readFileAsBase64 } from "../utils/readFileAsBase64";
 import type { EditorSection, PreviewMode } from "../stores/usePortalEditorStore";
 
 /**
- * Sidebar section order used by the first-error-focus routine. Matches
- * {@link PortalEditorSidebar}'s rendering order (Requirement 9.5). We pick
- * the first section in this list that has one or more errors, open its
- * accordion, and move keyboard focus to its header button.
+ * Sidebar section order used by the first-error-focus routine. Derived from
+ * {@link ALL_GROUPED_SECTIONS} so it always matches {@link PortalEditorSidebar}'s
+ * grouped rendering order (Requirement 9.5): we pick the first section in this
+ * order that has one or more errors, open its accordion, and move keyboard
+ * focus to its header button.
  */
-const SECTION_ORDER: EditorSection[] = [
-  "branding",
-  "content",
-  "pages",
-  "fields",
-  "appearance",
-  "typography",
-  "layout",
-  "access",
-  "destinations",
-  "metadata",
-];
+const SECTION_ORDER: readonly EditorSection[] = ALL_GROUPED_SECTIONS;
 
 /** Cycle order for the Cmd/Ctrl+Shift+P preview-mode shortcut. */
 const PREVIEW_MODE_CYCLE: PreviewMode[] = ["desktop", "tablet", "mobile"];
@@ -144,18 +135,18 @@ const PortalEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isCreateMode = !id || id === "new";
-  const duplicateId = isCreateMode ? searchParams.get("duplicate") ?? "" : "";
+  const duplicateId = isCreateMode ? (searchParams.get("duplicate") ?? "") : "";
   // Create-from-template / apply-theme seeding (task 17.3). When the create
   // route carries `?template=<id>` and/or `?theme=<id>`, we fetch the full
   // entities and seed the editor via `store.initializeFromSources` (snapshot,
   // copy-on-create — Requirements 16.5, 17.4). These are ignored outside
   // create mode.
-  const seedTemplateId = isCreateMode ? searchParams.get("template") ?? "" : "";
-  const seedThemeId = isCreateMode ? searchParams.get("theme") ?? "" : "";
+  const seedTemplateId = isCreateMode ? (searchParams.get("template") ?? "") : "";
+  const seedThemeId = isCreateMode ? (searchParams.get("theme") ?? "") : "";
 
   // Skip the request in create mode by passing an empty string (the hook is
   // gated on `enabled: !!id`).
-  const portalQuery = useGetPortal(isCreateMode ? "" : id ?? "");
+  const portalQuery = useGetPortal(isCreateMode ? "" : (id ?? ""));
   const portal = portalQuery.data?.data as Portal | undefined;
 
   // Fetch the source portal when duplicating.
