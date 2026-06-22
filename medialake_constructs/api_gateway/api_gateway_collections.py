@@ -231,7 +231,9 @@ class CollectionsApi(Construct):
 
         # User table access for the collections Lambda:
         # 1. Collection-delete path cleans up favorite rows (GSI4 query + delete)
-        # 2. Recent endpoint queries GSI5 for per-user recent collections (read)
+        # 2. Recent endpoint queries GSI4 for per-user recent collections (read).
+        #    GSI4 is overloaded: FAVCOLLECTION# rows back favorite cleanup and
+        #    USER# rows back the recent-collections list on the same index.
         # 3. Add/remove item handlers write activity records via
         #    record_collection_activity (UpdateItem/PutItem)
         # Granted by name/ARN to avoid a cross-stack table dependency.
@@ -254,7 +256,6 @@ class CollectionsApi(Construct):
                 resources=[
                     _user_table_arn,
                     f"{_user_table_arn}/index/GSI4",
-                    f"{_user_table_arn}/index/GSI5",
                 ],
             )
         )

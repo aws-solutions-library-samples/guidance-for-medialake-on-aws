@@ -32,17 +32,19 @@ _collections_table = _dynamodb.Table(
 
 
 def _cursor_to_start_key(parsed):
-    """Rebuild the GSI5 ExclusiveStartKey from a parsed cursor.
+    """Rebuild the GSI4 ExclusiveStartKey from a parsed cursor.
 
-    A GSI5 query's start key needs the base-table keys (userId, itemKey) AND the GSI
-    sort key (gsi5Sk). GSI5 projects ALL, so every returned row carries all three.
+    A GSI4 query's start key needs the base-table keys (userId, itemKey) AND the
+    index keys (gsi4Pk, gsi4Sk). GSI4 projects ALL, so every returned row carries
+    all four.
     """
     if not parsed:
         return None
     return {
         "userId": parsed["pk"],
         "itemKey": parsed["sk"],
-        "gsi5Sk": parsed["gsi_sk"],
+        "gsi4Pk": parsed["gsi_pk"],
+        "gsi4Sk": parsed["gsi_sk"],
     }
 
 
@@ -88,11 +90,12 @@ def register_route(app):
         results = []
         last_row = None  # last row APPENDED to results (cursor anchor)
 
-        # Over-fetch from GSI5 (ordered by recency) and filter until the page is full.
+        # Over-fetch from GSI4 (per-user partition, ordered by recency) and
+        # filter until the page is full.
         while len(results) < page_size:
             query_kwargs = dict(
-                IndexName="GSI5",
-                KeyConditionExpression=Key("userId").eq(f"USER#{user_id}"),
+                IndexName="GSI4",
+                KeyConditionExpression=Key("gsi4Pk").eq(f"USER#{user_id}"),
                 ScanIndexForward=True,  # reverse-ts asc == most-recent first
                 Limit=page_size * 3,  # headroom for filtering
             )
@@ -118,14 +121,15 @@ def register_route(app):
             if len(results) == page_size or not start_key:
                 break
 
-        # Cursor is derived from the GSI5 key of the LAST ROW APPENDED to results
-        # (userId + itemKey + gsi5Sk), never from the over-fetch batch LastEvaluatedKey.
+        # Cursor is derived from the GSI4 key of the LAST ROW APPENDED to results
+        # (userId + itemKey + gsi4Pk + gsi4Sk), never from the over-fetch batch
+        # LastEvaluatedKey.
         next_cursor = (
             create_cursor(
                 pk=last_row["userId"],
                 sk=last_row["itemKey"],
-                gsi_pk=last_row["userId"],
-                gsi_sk=last_row["gsi5Sk"],
+                gsi_pk=last_row["gsi4Pk"],
+                gsi_sk=last_row["gsi4Sk"],
             )
             if len(results) == page_size and last_row is not None
             else None

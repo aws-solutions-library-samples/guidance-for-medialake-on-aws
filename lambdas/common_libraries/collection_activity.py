@@ -7,8 +7,9 @@ recency record on the user table with a conditional keep-max upsert that
 guarantees the stored timestamp is the maximum seen for the pair, even
 under out-of-order events.
 
-The record populates GSI5 (RecentCollectionsByUser) via a reverse-timestamp
-sort key so the most recently modified collections appear first.
+The record populates the overloaded GSI4 index (gsi4Pk = USER#{user_id},
+gsi4Sk = reverse-timestamp) so the most recently modified collections appear
+first when the user partition is queried.
 """
 
 import os
@@ -77,7 +78,8 @@ def record_collection_activity(user_id: str, collection_id: str, table=None) -> 
             },
             UpdateExpression=(
                 "SET collectionId = :cid, itemType = :t, "
-                "lastActivityAt = :iso, lastActivityMs = :ms, gsi5Sk = :rts"
+                "lastActivityAt = :iso, lastActivityMs = :ms, "
+                "gsi4Pk = :upk, gsi4Sk = :rts"
             ),
             ConditionExpression=(
                 "attribute_not_exists(lastActivityMs) OR lastActivityMs < :ms"
@@ -87,6 +89,7 @@ def record_collection_activity(user_id: str, collection_id: str, table=None) -> 
                 ":t": "RECENT_COLLECTION",
                 ":iso": iso,
                 ":ms": now_ms,
+                ":upk": f"USER#{user_id}",
                 ":rts": reverse_ts,
             },
         )
