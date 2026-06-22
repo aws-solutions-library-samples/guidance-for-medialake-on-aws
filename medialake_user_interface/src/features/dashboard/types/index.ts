@@ -152,4 +152,12 @@ export interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /**
+   * When true, the action button is still rendered but disabled (e.g. the
+   * current user lacks permission to perform it). Mirrors the disable-with-tooltip
+   * pattern used on the full Collections page.
+   */
+  actionDisabled?: boolean;
+  /** Tooltip shown on the action button — typically the permission explanation. */
+  actionTooltip?: string;
 }

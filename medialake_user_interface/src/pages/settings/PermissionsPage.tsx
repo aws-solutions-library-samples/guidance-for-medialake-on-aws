@@ -49,6 +49,7 @@ import {
   isPermissionApplicable,
 } from "@/features/settings/permissions/types/permissions.types";
 import { useCreateGroup, useDeleteGroup } from "@/api/hooks/useGroups";
+import { blurActiveElement } from "@/utils/a11y";
 
 // Types for change history
 interface PermissionChange {
@@ -661,7 +662,10 @@ const PermissionsPage: React.FC = () => {
               groups={groups}
               selectedGroupId={selectedGroupId}
               onGroupChange={handleGroupChange}
-              onCreateGroupClick={() => setCreateDialogOpen(true)}
+              onCreateGroupClick={() => {
+                blurActiveElement();
+                setCreateDialogOpen(true);
+              }}
               onDeleteGroupClick={handleDeleteGroup}
             />
           </Box>

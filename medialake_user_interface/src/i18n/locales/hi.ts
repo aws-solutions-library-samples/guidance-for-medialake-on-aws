@@ -25,7 +25,7 @@ export default {
   upload: {
     title: "मीडिया फ़ाइलें अपलोड करें",
     description:
-      "एक गंतव्य चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
+      "एक गंतव्य चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, इमेज, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
     uploadDestination: "अपलोड गंतव्य",
     browsePath: "पथ ब्राउज़ करें",
     uploadingTo: "अपलोड हो रहा है",
@@ -41,6 +41,24 @@ export default {
       "केवल audio/*, video/*, image/*, HLS (application/x-mpegURL) और MPEG-DASH (application/dash+xml) फ़ाइलों की अनुमति है",
     meta: {
       name: "नाम",
+    },
+    collectionSelector: {
+      trigger: "संग्रहों में जोड़ें",
+      selectedCount: "{{count}} चयनित",
+      searchPlaceholder: "संग्रह खोजें\u2026",
+      searchSection: "खोज",
+      noSearchResults: "कोई मिलान संग्रह नहीं",
+      createAction: '"{{name}}" बनाएं',
+      emptyState: "कोई संग्रह उपलब्ध नहीं। खोज का उपयोग करके एक बनाएं।",
+      recentSection: "हाल के",
+      favoritesSection: "पसंदीदा",
+      emptyRecent: "कोई हाल के संग्रह नहीं",
+      emptyFavorites: "कोई पसंदीदा संग्रह नहीं",
+      searchError: "संग्रह खोजने में विफल",
+      createFailed: "संग्रह बनाने में विफल",
+      emptySection: "कोई संग्रह नहीं",
+      loading: "लोड हो रहा है\u2026",
+      more: "और",
     },
   },
   pathBrowser: {

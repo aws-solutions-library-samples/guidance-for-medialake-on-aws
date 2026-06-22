@@ -76,6 +76,8 @@ class ApiGatewayStackProps:
     waf_acl_arn: str
     # user_table: dynamodb.TableV2
     s3_vector_bucket_name: str
+    # Upload directives table for collection-metadata overflow (§6.5)
+    upload_directives_table: dynamodb.ITable = None
     personal_assets_bucket: Optional[s3.IBucket] = None
 
 
@@ -239,6 +241,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 system_settings_table_name=props.system_settings_table,
                 system_settings_table_arn=f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.system_settings_table}",
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
+                upload_directives_table=props.upload_directives_table,
                 personal_assets_bucket_name=(
                     props.personal_assets_bucket.bucket_name
                     if props.personal_assets_bucket
@@ -293,6 +296,7 @@ class ApiGatewayStack(cdk.NestedStack):
                 video_download_enabled=config.video_download_enabled,
                 personal_assets_bucket=props.personal_assets_bucket,
                 asset_events_bus=props.application_service_events_internal_event_bus,
+                upload_directives_table=props.upload_directives_table,
             ),
         )
 

@@ -24,7 +24,7 @@ export default {
   upload: {
     title: "Upload Media Files",
     description:
-      "Select a destination and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported.",
+      "Select a destination and upload your media files. Only audio, video, image, HLS, and MPEG-DASH formats are supported.",
     uploadDestination: "Upload Destination",
     browsePath: "Browse Path",
     uploadingTo: "Uploading to",
@@ -40,6 +40,24 @@ export default {
       "Only audio/*, video/*, image/*, HLS (application/x-mpegURL), and MPEG-DASH (application/dash+xml) files are allowed",
     meta: {
       name: "Name",
+    },
+    collectionSelector: {
+      trigger: "Add to collections",
+      selectedCount: "{{count}} selected",
+      searchPlaceholder: "Search collections\u2026",
+      searchSection: "Search",
+      noSearchResults: "No matching collections",
+      createAction: 'Create "{{name}}"',
+      emptyState: "No collections available. Create one using search.",
+      recentSection: "Recent",
+      favoritesSection: "Favorites",
+      emptyRecent: "No recent collections",
+      emptyFavorites: "No favorite collections",
+      searchError: "Failed to search collections",
+      createFailed: "Failed to create collection",
+      emptySection: "No collections",
+      loading: "Loading\u2026",
+      more: "More",
     },
   },
   pathBrowser: {

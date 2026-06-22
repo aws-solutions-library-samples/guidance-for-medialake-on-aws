@@ -24,6 +24,11 @@ Parameters:
     Type: String
     Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
 
+  GitBranch:
+    Description: Git branch to clone from the repository
+    Type: String
+    Default: main
+
   S3PresignedURL:
     Description: Presigned URL for downloading the CDK code ZIP (if S3PresignedURL source type is selected)
     Type: String
@@ -70,6 +75,14 @@ Parameters:
     Type: String
     Default: ''
     MaxLength: 63
+
+  UseCliCredentials:
+    Description: Use CDK CliCredentialsStackSynthesizer instead of default bootstrap role synthesizer.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
 
   ExistingVPCId:
     Description: ID of the existing VPC (e.g., vpc-0123456789abcdef0)
@@ -123,10 +136,16 @@ Metadata:
           - ExistingPrivateSubnetIds
       -
         Label:
+          default: Deployment Options
+        Parameters:
+          - UseCliCredentials
+      -
+        Label:
           default: Media Lake Deployment Configuration
         Parameters:
           - SourceType
           - GitRepositoryUrl
+          - GitBranch
           - S3PresignedURL
     ParameterLabels:
       DeploymentName:
@@ -151,10 +170,14 @@ Metadata:
         default: Public Subnet IDs (comma-separated)
       ExistingPrivateSubnetIds:
         default: Private Subnet IDs (comma-separated)
+      UseCliCredentials:
+        default: Use CLI Credentials Synthesizer
       SourceType:
         default: Source Type
       GitRepositoryUrl:
         default: Git Repository URL
+      GitBranch:
+        default: Git Branch
       S3PresignedURL:
         default: S3 Presigned URL
 
@@ -523,7 +546,7 @@ Resources:
           - Name: GIT_REPOSITORY_URL
             Value: !Ref GitRepositoryUrl
           - Name: GIT_BRANCH
-            Value: main
+            Value: !Ref GitBranch
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -593,6 +616,8 @@ Resources:
             Value: !Ref DeploymentName
           - Name: IS_DEFAULT_DEPLOYMENT
             Value: !If [IsDefaultDeployment, 'true', 'false']
+          - Name: USE_CLI_CREDENTIALS
+            Value: !Ref UseCliCredentials
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -677,6 +702,14 @@ Resources:
                   else
                     echo "Additional deployment '$DEPLOYMENT_NAME' - using prefixed naming"
                     echo "$( jq '.use_prefixed_names = true' config.json )" > config.json
+                  fi
+                - |
+                  if [ "$USE_CLI_CREDENTIALS" = "true" ]; then
+                    echo "Using CLI credentials synthesizer"
+                    echo "$( jq '.deployment_options.use_cli_credentials = true' config.json )" > config.json
+                  else
+                    echo "Using default bootstrap role synthesizer"
+                    echo "$( jq '.deployment_options.use_cli_credentials = false' config.json )" > config.json
                   fi
                 - echo "Final config.json:"
                 - cat config.json

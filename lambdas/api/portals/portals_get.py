@@ -36,6 +36,7 @@ def register_route(app):
                         "logoS3Key": getattr(item, "logoS3Key", None),
                         "accessMode": getattr(item, "accessMode", None),
                         "isActive": item.isActive,
+                        "automationTag": getattr(item, "automationTag", None),
                         "createdAt": getattr(item, "createdAt", None),
                         "updatedAt": getattr(item, "updatedAt", None),
                     }

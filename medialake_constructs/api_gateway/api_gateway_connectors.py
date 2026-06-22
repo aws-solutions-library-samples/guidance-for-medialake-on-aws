@@ -83,6 +83,8 @@ class ConnectorsProps:
     x_origin_verify_secret: secretsmanager.Secret | None = None
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None
+    # Upload directives table for collection-metadata overflow (§6.5)
+    upload_directives_table: dynamodb.ITable | None = None
     personal_assets_bucket_name: str | None = None  # For system connector record
 
 
@@ -608,6 +610,19 @@ class ConnectorsConstruct(Construct):
             # Environment flag for development-specific behavior
             "ENVIRONMENT": config.environment,
         }
+
+        # Add Upload directives table name for ingest lambda READ access (§6.5, §9.3)
+        if props.upload_directives_table:
+            env_vars["UPLOAD_DIRECTIVES_TABLE_NAME"] = (
+                props.upload_directives_table.table_name
+            )
+
+        # Add User table name for ingest lambda WRITE access (§9.3, Req 11.3).
+        # The ingest lambda calls record_collection_activity after association,
+        # which needs the user table name to upsert recency rows.
+        env_vars["USER_TABLE_NAME"] = (
+            f"{config.resource_prefix}-user-{config.environment}"
+        )
 
         connector_s3_post_lambda = Lambda(
             self,

@@ -86,7 +86,12 @@ def _extract_event_detail(new_image: dict) -> dict:
     """Extract the UploadBatchCompleted event detail from the NewImage.
 
     Carries sessionId, portalId, automationTag, expectedCount, completedCount,
-    failedCount, completedAt, and outcome (= terminal status) as required by R6.5.
+    failedCount, completedAt, outcome (= terminal status) as required by R6.5,
+    and userMetadata — the batch's user-entered portal form fields.
+
+    Downstream trigger-workflow nodes read `detail.userMetadata.<slug>` to branch
+    on portal form fields. Values are strings (a boolean is the string "true" or
+    "false"); the map is empty when the session carried no user metadata.
     """
 
     def _get_s(key: str) -> str:
@@ -95,6 +100,15 @@ def _extract_event_detail(new_image: dict) -> dict:
     def _get_n(key: str) -> int:
         val = new_image.get(key, {}).get("N", "0")
         return int(val)
+
+    def _get_string_map(key: str) -> dict:
+        """Deserialize a DynamoDB Map of string-valued entries to a flat dict.
+
+        The stream Map shape is {"M": {slug: {"S": value}}}; defaults to {} when
+        the attribute is absent. Non-string entries are coerced to "".
+        """
+        raw_map = new_image.get(key, {}).get("M", {})
+        return {slug: entry.get("S", "") for slug, entry in raw_map.items()}
 
     return {
         "sessionId": _get_s("sessionId"),
@@ -105,6 +119,7 @@ def _extract_event_detail(new_image: dict) -> dict:
         "failedCount": _get_n("failedCount"),
         "completedAt": _get_s("completedAt"),
         "outcome": _get_s("status"),
+        "userMetadata": _get_string_map("userMetadata"),
     }
 
 

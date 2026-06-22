@@ -21,6 +21,10 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
+from collection_activity import record_collection_activity
+
+# Import shared helpers from common_libraries layer for collection association
+from collections_utils import get_user_collection_role
 
 # Import centralized file extension constants from common_libraries layer
 from file_extensions import SUPPORTED_EXTENSIONS
@@ -70,24 +74,32 @@ collections_table = None
 
 
 # ---------------------------------------------------------------------------
-# Upload-portal collection-add automation (Layer C)
+# Upload collection association (generalized Layer C)
 #
-# When an object uploaded through an upload portal carries the server-stamped
-# `ml-source: upload-portal` + `ml-collection-ids` user-metadata directives,
-# add the freshly-created asset to those collections. This runs AFTER the asset
-# id exists (the directive only rides on the S3 object; the asset record is
-# minted here in ingest). It is idempotent and SILENT-FAIL: any error is logged
-# and ingest continues unaffected.
+# When an object uploaded through an upload portal OR the standard upload page
+# carries server-stamped `ml-source` + `ml-collection-ids` (or an overflow
+# reference) user-metadata directives, add the freshly-created asset to those
+# collections. This runs AFTER the asset id exists. For the `upload` source,
+# per-uploader permission and per-collection existence checks are enforced;
+# for the legacy `upload-portal` source, associations remain pre-authorized.
+# It is idempotent and SILENT-FAIL: any error is logged and ingest continues.
 # ---------------------------------------------------------------------------
 
 PORTAL_SOURCE_VALUE = "upload-portal"
+UPLOAD_SOURCE_VALUE = "upload"
 ML_SOURCE_KEY = "ml-source"
 ML_COLLECTION_IDS_KEY = "ml-collection-ids"
+ML_USER_ID_KEY = "ml-user-id"
+ML_OVERFLOW_KEY = "ml-collection-overflow"
 COLLECTION_PK_PREFIX = "COLL#"
 ASSET_SK_PREFIX = "ASSET#"
 # Full-file membership SK suffix used by the collections API (clip-less item):
 # `ASSET#{inventoryId}#FULL`. Mirrors `generate_asset_sk` in collections_api.
 ASSET_SK_FULL_SUFFIX = "#FULL"
+
+# Upload directives table — used to resolve overflow side-records when the
+# inline collection-ids metadata exceeds the S3 user-metadata budget (§6.5).
+UPLOAD_DIRECTIVES_TABLE_NAME = os.environ.get("UPLOAD_DIRECTIVES_TABLE_NAME", "")
 
 
 def _find_portal_user_metadata(obj) -> Dict[str, str]:
@@ -116,64 +128,193 @@ def _find_portal_user_metadata(obj) -> Dict[str, str]:
     return {}
 
 
-def _add_asset_to_portal_collections(inventory_id: str, asset_metadata) -> None:
-    """Add the asset (identified by its ``inventory_id``) to the collections named
-    by the portal ``ml-collection-ids`` directive, if present.
+def _collections_table():
+    """Return the lazily-initialized DynamoDB Table resource for the collections table."""
+    global collections_table
+    if collections_table is None:
+        collections_table = boto3.resource("dynamodb").Table(COLLECTIONS_TABLE_NAME)
+    return collections_table
 
-    The membership row is written in the exact shape the collections API uses
-    (PK=``COLL#{id}``, SK=``ASSET#{inventoryId}#FULL``, GSI2 reverse lookup),
-    so it is consistent with API-created memberships and the collections
-    DynamoDB→OpenSearch stream picks it up automatically. The collections API
-    keys assets by their InventoryID (it treats the stored ``assetId`` as the
-    InventoryID), so we use ``inventory_id`` here — NOT the DigitalSourceAsset
-    ID. Idempotent (PutItem) and silent-fail (logs and returns).
+
+def _resolve_collection_ids(user_md, asset_metadata) -> list:
+    """Resolve collection ids from inline metadata or overflow side-record.
+
+    Tries the inline ``ml-collection-ids`` first (comma-separated). Falls back
+    to reading the overflow directive table when ``ml-collection-overflow=1``.
+    Returns an empty list when neither is present (Req 9.3).
+    """
+    raw = user_md.get(ML_COLLECTION_IDS_KEY, "")
+    if raw:
+        return [c.strip() for c in str(raw).split(",") if c.strip()]
+    if user_md.get(ML_OVERFLOW_KEY) == "1":
+        bucket, key = _object_location(asset_metadata)
+        if bucket and key:
+            return _read_overflow_directive(bucket, key)
+    return []
+
+
+def _object_location(asset_metadata) -> tuple:
+    """Extract (bucket, key) from asset metadata StorageInfo.PrimaryLocation."""
+    try:
+        primary = asset_metadata.get("StorageInfo", {}).get("PrimaryLocation", {})
+        bucket = primary.get("Bucket", "")
+        key = primary.get("ObjectKey", {}).get("FullPath", "")
+        return bucket, key
+    except Exception:
+        return "", ""
+
+
+def _read_overflow_directive(bucket: str, key: str) -> list:
+    """Resolve an overflow directive from the dedicated Upload directives table.
+
+    Read-only access — the upload API (§6.5) writes these side-records.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        logger.warning(
+            "UPLOAD_DIRECTIVES_TABLE_NAME not configured; cannot resolve overflow directive"
+        )
+        return []
+    try:
+        resp = (
+            boto3.resource("dynamodb")
+            .Table(UPLOAD_DIRECTIVES_TABLE_NAME)
+            .get_item(Key={"PK": f"UPLOADDIR#{bucket}#{key}"})
+        )
+        item = resp.get("Item") or {}
+        return [c for c in item.get("collectionIds", []) if c]
+    except Exception as e:
+        logger.warning(f"Failed to read overflow directive for {bucket}/{key}: {e}")
+        return []
+
+
+def _collection_exists(collection_id: str) -> bool:
+    """Check if a collection exists and is not deleted (Req 10.3)."""
+    try:
+        resp = _collections_table().get_item(
+            Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": "METADATA"}
+        )
+        item = resp.get("Item")
+        return bool(item) and item.get("status", "ACTIVE") != "DELETED"
+    except Exception as e:
+        logger.warning(f"Failed to check collection existence {collection_id}: {e}")
+        return False
+
+
+def _is_addable(collection_id: str, user_id: str) -> bool:
+    """Check if user has Addable rights on a collection (Req 10.4).
+
+    Addable = role in {OWNER, EDITOR, ADMIN}.
+    """
+    try:
+        resp = _collections_table().get_item(
+            Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": "METADATA"}
+        )
+        collection = resp.get("Item")
+        if not collection:
+            return False
+        role = get_user_collection_role(collection, user_id)
+        return role in ("OWNER", "EDITOR", "ADMIN")
+    except Exception as e:
+        logger.warning(
+            f"Failed to check addable status for {user_id} on {collection_id}: {e}"
+        )
+        return False
+
+
+def _put_membership(collection_id: str, inventory_id: str, added_by: str) -> None:
+    """Write an idempotent membership row in the collections-API shape (Req 9.5).
+
+    PutItem on a deterministic PK/SK overwrites rather than duplicates, so
+    adding an asset already in the collection leaves membership unchanged.
+    """
+    asset_sk = f"{ASSET_SK_PREFIX}{inventory_id}{ASSET_SK_FULL_SUFFIX}"
+    _collections_table().put_item(
+        Item={
+            "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+            "SK": asset_sk,
+            "itemType": "asset",
+            "assetId": inventory_id,
+            "clipBoundary": {},
+            "sortOrder": 0,
+            "metadata": {},
+            "addedAt": utc_now_z(),
+            "addedBy": added_by,
+            "GSI2_PK": asset_sk,
+            "GSI2_SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+        }
+    )
+
+
+def associate_upload_collections(inventory_id: str, asset_metadata) -> None:
+    """Add the freshly-created asset to each directive collection.
+
+    Serves both the ``upload-portal`` source (unchanged, pre-authorized) and the
+    new ``upload`` source (with per-uploader permission checks). Silent-fail and
+    isolated: never raises into ingest (Req 10.1).
+
+    Gate on ``ml-source``; for the ``upload`` source, read uploader id from
+    ``ml-user-id`` and enforce permission checks. When an ``upload``-source
+    object has no ``ml-user-id``, log a warning and continue fail-closed — every
+    permission check denies, so all associations are skipped.
+
+    Each collection is wrapped in its own try/except for failure isolation
+    (Req 10.2) inside an outer try/except so ingestion always completes (Req 10.1).
     """
     if not COLLECTIONS_TABLE_NAME:
         # Automation not configured for this deployment — no-op.
         return
     try:
         user_md = _find_portal_user_metadata(asset_metadata)
-        if user_md.get(ML_SOURCE_KEY) != PORTAL_SOURCE_VALUE:
+        source = user_md.get(ML_SOURCE_KEY)
+        if source not in (PORTAL_SOURCE_VALUE, UPLOAD_SOURCE_VALUE):
             return
-        raw_ids = user_md.get(ML_COLLECTION_IDS_KEY, "")
-        collection_ids = [c.strip() for c in str(raw_ids).split(",") if c.strip()]
+
+        collection_ids = _resolve_collection_ids(user_md, asset_metadata)
         if not collection_ids:
+            # No collection ids present — nothing to associate (Req 9.3).
             return
 
-        global collections_table
-        if collections_table is None:
-            collections_table = boto3.resource("dynamodb").Table(COLLECTIONS_TABLE_NAME)
+        uploader_id = user_md.get(ML_USER_ID_KEY, "")
+        enforce_permissions = source == UPLOAD_SOURCE_VALUE
 
-        asset_sk = f"{ASSET_SK_PREFIX}{inventory_id}{ASSET_SK_FULL_SUFFIX}"
-        added_at = utc_now_z()
+        if enforce_permissions and not uploader_id:
+            # Fail-closed: without an uploader identity, permission checks
+            # will deny every association. Log once and let the loop proceed —
+            # _is_addable("", ...) returns False for all collections.
+            logger.warning(
+                f"'{UPLOAD_SOURCE_VALUE}'-source object for asset {inventory_id} has no "
+                f"{ML_USER_ID_KEY}; permission checks will deny every association (fail-closed)"
+            )
+
+        added_by = uploader_id if uploader_id else source
+
         for collection_id in collection_ids:
             try:
-                collections_table.put_item(
-                    Item={
-                        "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                        "SK": asset_sk,
-                        "itemType": "asset",
-                        "assetId": inventory_id,
-                        "clipBoundary": {},
-                        "sortOrder": 0,
-                        "metadata": {},
-                        "addedAt": added_at,
-                        "addedBy": PORTAL_SOURCE_VALUE,
-                        # GSI2 reverse lookup (asset → collections); matches the
-                        # collections API: GSI2_PK = SK, GSI2_SK = COLL#{id}.
-                        "GSI2_PK": asset_sk,
-                        "GSI2_SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    }
-                )
+                if not _collection_exists(collection_id):
+                    logger.info(
+                        f"Skip association: collection {collection_id} does not exist or is deleted"
+                    )
+                    continue
+                if enforce_permissions and not _is_addable(collection_id, uploader_id):
+                    logger.info(
+                        f"Skip association: user {uploader_id} not addable on collection {collection_id}"
+                    )
+                    continue
+                _put_membership(collection_id, inventory_id, added_by)
                 logger.info(
-                    f"Added asset {inventory_id} to collection {collection_id} (upload-portal)"
+                    f"Added asset {inventory_id} to collection {collection_id} (source={source})"
                 )
-            except Exception as item_error:  # noqa: BLE001 — silent-fail per item
+                # Record activity for the upload source when uploader is known (Req 11.3)
+                if source == UPLOAD_SOURCE_VALUE and uploader_id:
+                    record_collection_activity(uploader_id, collection_id)
+            except (
+                Exception
+            ) as item_err:  # noqa: BLE001 — failure isolation per item (Req 10.2, 10.5)
                 logger.warning(
-                    f"Failed to add asset {inventory_id} to collection {collection_id}: {item_error}"
+                    f"Association failed asset={inventory_id} collection={collection_id}: {item_err}"
                 )
-    except Exception as e:  # noqa: BLE001 — never break ingest
-        logger.warning(f"Portal collection-add skipped for asset {inventory_id}: {e}")
+    except Exception as e:  # noqa: BLE001 — never break ingest (Req 10.1)
+        logger.warning(f"Upload collection-add skipped for asset {inventory_id}: {e}")
 
 
 # Environment configuration
@@ -2120,11 +2261,12 @@ class AssetProcessor:
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
         """Publish event to EventBridge with optimized serialization"""
         with self.asset_context(asset_id=asset_id, inventory_id=inventory_id):
-            # Upload-portal automation (Layer C): if this asset arrived through
-            # an upload portal with a server-stamped `ml-collection-ids`
-            # directive, add it to those collections now that the asset exists.
+            # Upload collection association (generalized Layer C): if this asset
+            # arrived through an upload portal or the standard upload page with
+            # server-stamped `ml-collection-ids` / overflow directives, add it
+            # to those collections now that the asset's inventory_id exists.
             # Silent-fail — never blocks event publication or ingest.
-            _add_asset_to_portal_collections(inventory_id, metadata)
+            associate_upload_collections(inventory_id, metadata)
             try:
                 # Extract content type information
                 content_type = (

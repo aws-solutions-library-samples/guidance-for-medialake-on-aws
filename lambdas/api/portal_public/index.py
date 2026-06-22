@@ -1051,6 +1051,25 @@ def post_upload(slug: str):
         portal, portal_id, metadata, session_id=session_id
     )
 
+    # Capture the batch's user-entered metadata onto the session (once) so the
+    # UploadBatchCompleted event can carry it for downstream trigger-workflow
+    # branching (e.g. a boolean field). Portal forms are batch-uniform, so the
+    # ml-usr-* subset is identical for every file in the session. Best-effort:
+    # this must never break the upload if it fails.
+    user_md = {
+        k[len(ML_USER_PREFIX) :]: v
+        for k, v in s3_metadata.items()
+        if k.startswith(ML_USER_PREFIX)
+    }
+    if user_md:
+        try:
+            store.set_batch_metadata(session_id, user_md)
+        except Exception:
+            logger.warning(
+                "Failed to capture batch metadata onto session",
+                extra={"session_id": session_id},
+            )
+
     if is_multipart_upload_required(file_size):
         upload_id = create_multipart_upload(
             bucket, s3_key, content_type, metadata=s3_metadata or None

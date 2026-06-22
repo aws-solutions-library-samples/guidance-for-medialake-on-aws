@@ -24,7 +24,7 @@ export default {
   upload: {
     title: "تحميل ملفات الوسائط",
     description:
-      "حدد وجهة وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو و HLS و MPEG-DASH فقط.",
+      "حدد وجهة وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو والصورة و HLS و MPEG-DASH فقط.",
     uploadDestination: "وجهة التحميل",
     browsePath: "تصفح المسار",
     uploadingTo: "التحميل إلى",
@@ -39,6 +39,24 @@ export default {
       "يُسمح فقط بالملفات من نوع audio/*، وvideo/*، وimage/*، وHLS (application/x-mpegURL)، وMPEG-DASH (application/dash+xml)",
     meta: {
       name: "الاسم",
+    },
+    collectionSelector: {
+      trigger: "إضافة إلى المجموعات",
+      selectedCount: "{{count}} محدد",
+      searchPlaceholder: "البحث في المجموعات\u2026",
+      searchSection: "البحث",
+      noSearchResults: "لا توجد مجموعات مطابقة",
+      createAction: 'إنشاء "{{name}}"',
+      emptyState: "لا توجد مجموعات متاحة. أنشئ واحدة باستخدام البحث.",
+      recentSection: "الأخيرة",
+      favoritesSection: "المفضلة",
+      emptyRecent: "لا توجد مجموعات حديثة",
+      emptyFavorites: "لا توجد مجموعات مفضلة",
+      searchError: "فشل البحث في المجموعات",
+      createFailed: "فشل إنشاء المجموعة",
+      emptySection: "لا توجد مجموعات",
+      loading: "جارٍ التحميل\u2026",
+      more: "المزيد",
     },
   },
   pathBrowser: {

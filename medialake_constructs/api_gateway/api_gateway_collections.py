@@ -229,11 +229,12 @@ class CollectionsApi(Construct):
         # Grant read access to asset table (for copying asset thumbnails)
         props.asset_table.grant_read_data(collections_lambda.function)
 
-        # Allow the collection-delete path to clean up favorite rows that
-        # reference a deleted collection. Favorites live in the user table; the
-        # handler queries the sparse GSI4 (gsi4Pk=FAVCOLLECTION#<id>) and deletes
-        # the matching base rows. Granted by name/ARN to avoid a cross-stack
-        # table dependency.
+        # User table access for the collections Lambda:
+        # 1. Collection-delete path cleans up favorite rows (GSI4 query + delete)
+        # 2. Recent endpoint queries GSI5 for per-user recent collections (read)
+        # 3. Add/remove item handlers write activity records via
+        #    record_collection_activity (UpdateItem/PutItem)
+        # Granted by name/ARN to avoid a cross-stack table dependency.
         _user_table_arn = Stack.of(self).format_arn(
             service="dynamodb",
             resource="table",
@@ -243,11 +244,18 @@ class CollectionsApi(Construct):
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
                     "dynamodb:Query",
                     "dynamodb:DeleteItem",
                     "dynamodb:BatchWriteItem",
                 ],
-                resources=[_user_table_arn, f"{_user_table_arn}/index/GSI4"],
+                resources=[
+                    _user_table_arn,
+                    f"{_user_table_arn}/index/GSI4",
+                    f"{_user_table_arn}/index/GSI5",
+                ],
             )
         )
 

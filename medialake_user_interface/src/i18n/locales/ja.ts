@@ -25,7 +25,7 @@ export default {
   upload: {
     title: "メディアファイルをアップロード",
     description:
-      "送信先を選択してメディアファイルをアップロードします。オーディオ、ビデオ、HLS、MPEG-DASH形式のみがサポートされています。",
+      "送信先を選択してメディアファイルをアップロードします。オーディオ、ビデオ、画像、HLS、MPEG-DASH形式のみがサポートされています。",
     uploadDestination: "アップロード先",
     browsePath: "パスを参照",
     uploadingTo: "アップロード先",
@@ -41,6 +41,24 @@ export default {
       "audio/*、video/*、image/*、HLS (application/x-mpegURL)、MPEG-DASH (application/dash+xml) ファイルのみが許可されています",
     meta: {
       name: "名前",
+    },
+    collectionSelector: {
+      trigger: "コレクションに追加",
+      selectedCount: "{{count}}件選択中",
+      searchPlaceholder: "コレクションを検索\u2026",
+      searchSection: "検索",
+      noSearchResults: "一致するコレクションがありません",
+      createAction: '"{{name}}"を作成',
+      emptyState: "利用可能なコレクションがありません。検索から作成してください。",
+      recentSection: "最近",
+      favoritesSection: "お気に入り",
+      emptyRecent: "最近のコレクションはありません",
+      emptyFavorites: "お気に入りのコレクションはありません",
+      searchError: "コレクションの検索に失敗しました",
+      createFailed: "コレクションの作成に失敗しました",
+      emptySection: "コレクションなし",
+      loading: "読み込み中\u2026",
+      more: "もっと見る",
     },
   },
   pathBrowser: {

@@ -25,7 +25,7 @@ export default {
   upload: {
     title: "Carregar arquivos de mídia",
     description:
-      "Selecione um destino e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, HLS e MPEG-DASH são suportados.",
+      "Selecione um destino e carregue seus arquivos de mídia. Apenas formatos de áudio, vídeo, imagem, HLS e MPEG-DASH são suportados.",
     uploadDestination: "Destino do upload",
     browsePath: "Navegar caminho",
     uploadingTo: "Carregando para",
@@ -41,6 +41,24 @@ export default {
       "Apenas arquivos do tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) e MPEG-DASH (application/dash+xml) são permitidos",
     meta: {
       name: "Nome",
+    },
+    collectionSelector: {
+      trigger: "Adicionar a coleções",
+      selectedCount: "{{count}} selecionados",
+      searchPlaceholder: "Pesquisar coleções\u2026",
+      searchSection: "Pesquisa",
+      noSearchResults: "Nenhuma coleção correspondente",
+      createAction: 'Criar "{{name}}"',
+      emptyState: "Nenhuma coleção disponível. Crie uma usando a pesquisa.",
+      recentSection: "Recentes",
+      favoritesSection: "Favoritos",
+      emptyRecent: "Nenhuma coleção recente",
+      emptyFavorites: "Nenhuma coleção favorita",
+      searchError: "Falha ao pesquisar coleções",
+      createFailed: "Falha ao criar coleção",
+      emptySection: "Nenhuma coleção",
+      loading: "Carregando\u2026",
+      more: "Mais",
     },
   },
   pathBrowser: {

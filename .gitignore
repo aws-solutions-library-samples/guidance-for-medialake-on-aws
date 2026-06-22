@@ -128,6 +128,13 @@ coverage/
 *.tmp
 *.temp
 
+# isort / pre-commit transient artifacts.
+# These are written+renamed in-place while formatting and can be picked up
+# mid-write by CDK SOURCE asset fingerprinting (TOCTOU -> ENOENT on *.isorted).
+# NOTE: .gitignore does NOT affect CDK fingerprinting; the real fix is to not
+# run isort/pre-commit concurrently with `cdk deploy`/`cdk synth`.
+*.isorted
+
 
 # zip fikes
 *.zip

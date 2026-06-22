@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MarkerSyncCoordinator } from "./MarkerSyncCoordinator";
 import type {
   Clock,
@@ -85,6 +85,14 @@ function collectEvents(coordinator: MarkerSyncCoordinator) {
 }
 
 describe("MarkerSyncCoordinator", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("Scenario 1 — Stale ack ignored", () => {
     it("emits STALE_ACK_IGNORED when ack revision < current revision", () => {
       const { coordinator } = makeCoordinator({ ids: ["session-1", "mk-1", "op-1", "op-2"] });
@@ -111,8 +119,10 @@ describe("MarkerSyncCoordinator", () => {
       coordinator.add({ timeObservation: { start: 0, end: 5 } }, "track");
       coordinator.update("mk-1", { label: "a" }, "track"); // op-1, rev=2
 
+      vi.advanceTimersByTime(200);
       const saveCountBeforeAck = storage.save.mock.calls.length;
       coordinator.acknowledgeCommit("op-1");
+      vi.advanceTimersByTime(200);
 
       expect(storage.save).toHaveBeenCalledTimes(saveCountBeforeAck + 1);
       const lastSaveCall = storage.save.mock.calls[storage.save.mock.calls.length - 1];
@@ -134,6 +144,7 @@ describe("MarkerSyncCoordinator", () => {
       coordinatorA.setReady(true);
       coordinatorA.add({ timeObservation: { start: 0, end: 5 } }, "track");
       coordinatorA.update("mk-1", { label: "x" }, "track");
+      vi.advanceTimersByTime(200); // flush coordinatorA persist
 
       const coordinatorB = new MarkerSyncCoordinator({
         clock: makeClock(),
@@ -178,8 +189,10 @@ describe("MarkerSyncCoordinator", () => {
       coordinator.add({ timeObservation: { start: 0, end: 5 } }, "track"); // rev=1
       coordinator.update("mk-1", { label: "changed" }, "track"); // op-1, rev=2
 
+      vi.advanceTimersByTime(200);
       const saveCountBeforeFail = storage.save.mock.calls.length;
       coordinator.failCommit("op-1"); // op revision=2 === current=2 → rollback
+      vi.advanceTimersByTime(200);
 
       expect(events).toContain("MARKER_COMMIT_FAILED_ROLLBACK_APPLIED");
       expect(storage.save).toHaveBeenCalledTimes(saveCountBeforeFail + 1);
@@ -199,11 +212,13 @@ describe("MarkerSyncCoordinator", () => {
       const { events } = collectEvents(coordinator);
 
       coordinator.add({ timeObservation: { start: 0, end: 5 } }, "track");
+      vi.advanceTimersByTime(200); // flush add persist
 
       for (let i = 0; i < 10; i++) {
         coordinator.preview("mk-1", { timeObservation: { start: i, end: i + 5 } }, "track");
       }
       coordinator.commit("mk-1", "track");
+      vi.advanceTimersByTime(200); // flush commit persist
 
       expect(events.filter((e) => e === "MARKER_PREVIEW_UPDATED")).toHaveLength(10);
       expect(events.filter((e) => e === "MARKER_COMMIT_REQUESTED")).toHaveLength(1);
@@ -337,6 +352,7 @@ describe("MarkerSyncCoordinator", () => {
       coordinator.update("mk-1", { label: "changed" }, "track"); // op-1, rev=2
 
       coordinator.rollback("op-1");
+      vi.advanceTimersByTime(200);
 
       const lastSaveCall = storage.save.mock.calls[storage.save.mock.calls.length - 1];
       const persistedEnvelopes: MarkerSyncEnvelope[] = lastSaveCall[1];
@@ -346,6 +362,7 @@ describe("MarkerSyncCoordinator", () => {
       // Second rollback is a no-op (op already deleted)
       const saveCountAfterRollback = storage.save.mock.calls.length;
       coordinator.rollback("op-1");
+      vi.advanceTimersByTime(200);
       expect(storage.save).toHaveBeenCalledTimes(saveCountAfterRollback);
     });
 

@@ -806,7 +806,7 @@ function TopBar() {
         title={t("upload.title", "Upload Media Files")}
         description={t(
           "upload.description",
-          "Select a destination and upload your media files. Only audio, video, HLS, and MPEG-DASH formats are supported."
+          "Select a destination and upload your media files. Only audio, video, image, HLS, and MPEG-DASH formats are supported."
         )}
         defaultConnectorId={myAssetsConnector?.id}
         defaultObjectPrefix={myAssetsConnector?.objectPrefix}

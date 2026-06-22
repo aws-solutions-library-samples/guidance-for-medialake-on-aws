@@ -1042,6 +1042,10 @@ def create_lambda_function(
                     "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # System settings table for provider configuration lookup
                     "SYSTEM_SETTINGS_TABLE_NAME": SYSTEM_SETTINGS_TABLE_NAME or "",
+                    # Upload-sessions table for the upload-portal barrier node
+                    "UPLOAD_SESSIONS_TABLE_NAME": os.environ.get(
+                        "UPLOAD_SESSIONS_TABLE_NAME", ""
+                    ),
                     # CloudFront domain for portal URL generation
                     "CLOUDFRONT_DOMAIN": _resolve_cloudfront_domain(),
                     # SES configuration for portal email notifications

@@ -81,6 +81,9 @@ class AssetsProps:
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
 
+    # Upload directives table for collection-metadata overflow (§6.5)
+    upload_directives_table: Optional[dynamodb.ITable] = None
+
     # Optional fields (must come after required fields)
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
@@ -566,6 +569,13 @@ class AssetsConstruct(Construct):
                     "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
                     **(
                         {
+                            "UPLOAD_DIRECTIVES_TABLE_NAME": props.upload_directives_table.table_name
+                        }
+                        if props.upload_directives_table
+                        else {}
+                    ),
+                    **(
+                        {
                             "PERSONAL_ASSETS_BUCKET": props.personal_assets_bucket.bucket_name
                         }
                         if props.personal_assets_bucket
@@ -574,6 +584,10 @@ class AssetsConstruct(Construct):
                 },
             ),
         )
+
+        # Grant WRITE access to the Upload directives table (overflow side-records)
+        if props.upload_directives_table:
+            props.upload_directives_table.grant_write_data(upload_lambda.function)
 
         # Add DynamoDB and S3 permissions for presigned URL Lambda
         upload_lambda.function.add_to_role_policy(

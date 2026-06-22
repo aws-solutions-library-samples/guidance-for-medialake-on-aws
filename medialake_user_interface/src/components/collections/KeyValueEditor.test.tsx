@@ -37,10 +37,13 @@ describe("KeyValueEditor", () => {
     render(<KeyValueEditor rows={rows} onChange={onChange} />);
     await user.click(screen.getByText("Add Row"));
 
-    expect(onChange).toHaveBeenCalledWith([
-      { key: "a", value: "b" },
-      { key: "", value: "" },
-    ]);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const newRows = onChange.mock.calls[0][0];
+    expect(newRows).toHaveLength(2);
+    expect(newRows[0]).toEqual({ key: "a", value: "b" });
+    expect(newRows[1].key).toBe("");
+    expect(newRows[1].value).toBe("");
+    expect(newRows[1].id).toEqual(expect.any(String));
   });
 
   it("calls onChange without the removed row when remove is clicked", async () => {

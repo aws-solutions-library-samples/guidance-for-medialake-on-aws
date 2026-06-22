@@ -171,6 +171,7 @@ export const QUERY_KEYS = {
     metadataKeys: () => ["collections", "metadata-keys"] as const,
     collectionTypes: () => [...QUERY_KEYS.COLLECTIONS.all, "collection-types"] as const,
     users: () => [...QUERY_KEYS.COLLECTIONS.all, "users"] as const,
+    recent: (pageSize: number) => [...QUERY_KEYS.COLLECTIONS.all, "recent", { pageSize }] as const,
   },
   PORTALS: {
     all: ["portals"] as const,

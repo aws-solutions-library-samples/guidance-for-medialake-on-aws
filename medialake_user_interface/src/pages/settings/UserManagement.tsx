@@ -25,6 +25,7 @@ import { useGetGroups } from "@/api/hooks/useGroups";
 import { useApiMutationHandler } from "@/shared/hooks/useApiMutationHandler";
 import { User, CreateUserRequest, UpdateUserRequest } from "@/api/types/api.types";
 import { useAuth } from "@/common/hooks/auth-context";
+import { blurActiveElement } from "@/utils/a11y";
 
 const UserManagement: React.FC = () => {
   const { t } = useTranslation();
@@ -83,11 +84,15 @@ const UserManagement: React.FC = () => {
   }, [users]);
 
   const handleAddUser = () => {
+    // Release focus from the trigger so it isn't left focused inside the
+    // aria-hidden app root once the dialog opens (a11y warning fix).
+    blurActiveElement();
     setEditingUser(undefined);
     setOpenUserForm(true);
   };
 
   const handleEditUser = (user: User) => {
+    blurActiveElement();
     setEditingUser(user);
     setOpenUserForm(true);
   };
@@ -227,7 +232,10 @@ const UserManagement: React.FC = () => {
                 <Button
                   variant="outlined"
                   startIcon={<GroupIcon />}
-                  onClick={() => setOpenCreateGroupModal(true)}
+                  onClick={() => {
+                    blurActiveElement();
+                    setOpenCreateGroupModal(true);
+                  }}
                   sx={{
                     borderRadius: "8px",
                     textTransform: "none",

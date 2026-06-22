@@ -76,6 +76,7 @@ export const API_ENDPOINTS = {
     BASE: "/collections",
     COLLECTION_TYPES: "/collections/collection-types",
     USERS: "/collections/users",
+    RECENT: "/collections/recent",
     GET: (id: string) => `/collections/${id}`,
     UPDATE: (id: string) => `/collections/${id}`,
     DELETE: (id: string) => `/collections/${id}`,

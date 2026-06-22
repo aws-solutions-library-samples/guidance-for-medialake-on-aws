@@ -23,7 +23,7 @@ export default {
   },
   upload: {
     title: "上传媒体文件",
-    description: "选择目标并上传您的媒体文件。仅支持音频、视频、HLS和MPEG-DASH格式。",
+    description: "选择目标并上传您的媒体文件。仅支持音频、视频、图像、HLS和MPEG-DASH格式。",
     uploadDestination: "上传目标",
     browsePath: "浏览路径",
     uploadingTo: "正在上传到",
@@ -38,6 +38,24 @@ export default {
       "仅允许音频/*、视频/*、图像/*、HLS (application/x-mpegURL) 和 MPEG-DASH (application/dash+xml) 文件",
     meta: {
       name: "名称",
+    },
+    collectionSelector: {
+      trigger: "添加到集合",
+      selectedCount: "已选择 {{count}} 个",
+      searchPlaceholder: "搜索集合\u2026",
+      searchSection: "搜索",
+      noSearchResults: "没有匹配的集合",
+      createAction: '创建"{{name}}"',
+      emptyState: "没有可用的集合。通过搜索创建一个。",
+      recentSection: "最近",
+      favoritesSection: "收藏夹",
+      emptyRecent: "没有最近的集合",
+      emptyFavorites: "没有收藏的集合",
+      searchError: "搜索集合失败",
+      createFailed: "创建集合失败",
+      emptySection: "没有集合",
+      loading: "加载中\u2026",
+      more: "更多",
     },
   },
   pathBrowser: {

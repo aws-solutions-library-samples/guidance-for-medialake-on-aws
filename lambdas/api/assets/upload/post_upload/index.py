@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -36,6 +37,22 @@ _S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
 # Define constants
 # 6 hours — large files (500GB) with many parts need longer-lived URLs
 DEFAULT_EXPIRATION = 21600
+MAX_COLLECTIONS_PER_UPLOAD = int(os.getenv("MAX_COLLECTIONS_PER_UPLOAD", "50"))
+
+# Collection directive constants (§6.3, §10.2)
+ML_SOURCE_KEY = "ml-source"
+ML_COLLECTION_IDS_KEY = "ml-collection-ids"
+ML_USER_ID_KEY = "ml-user-id"
+ML_OVERFLOW_KEY = "ml-collection-overflow"
+UPLOAD_SOURCE_VALUE = "upload"
+
+# S3 user-metadata budget (§6.5)
+SAFE_INLINE_BUDGET = 1536  # leave headroom for key names within S3's 2 KB limit
+
+# Upload directives table (overflow side-records, §6.5, §10.5)
+UPLOAD_DIRECTIVES_TABLE_NAME = os.getenv("UPLOAD_DIRECTIVES_TABLE_NAME", "")
+DIRECTIVE_TTL_SECONDS = 24 * 60 * 60  # ~24h
+
 ALLOWED_CONTENT_TYPES = [
     "audio/*",
     "video/*",
@@ -85,6 +102,7 @@ request_schema = {
         "content_type": {"type": "string"},
         "file_size": {"type": "integer", "minimum": 1},
         "path": {"type": "string", "default": ""},
+        "collection_ids": {"type": "array", "items": {"type": "string"}, "default": []},
     },
     "required": ["connector_id", "filename", "content_type", "file_size"],
 }
@@ -96,6 +114,7 @@ class RequestBody(BaseModel):
     content_type: str
     file_size: int = Field(gt=0)
     path: str = ""
+    collection_ids: List[str] = Field(default_factory=list)
 
     @validator("filename")
     @classmethod
@@ -131,12 +150,119 @@ class RequestBody(BaseModel):
         normalized_path = normalized_path.lstrip("/")
         return normalized_path
 
+    @validator("collection_ids")
+    @classmethod
+    def validate_collection_ids(cls, v):
+        # De-duplicate while preserving order; drop blanks.
+        seen, cleaned = set(), []
+        for cid in v:
+            cid = (cid or "").strip()
+            if cid and cid not in seen:
+                seen.add(cid)
+                cleaned.append(cid)
+        if len(cleaned) > MAX_COLLECTIONS_PER_UPLOAD:
+            raise ValueError(
+                f"At most {MAX_COLLECTIONS_PER_UPLOAD} collections may be selected per upload"
+            )
+        return cleaned
+
 
 class APIError(Exception):
     def __init__(self, message: str, status_code: int):
         self.message = message
         self.status_code = status_code
         super().__init__(self.message)
+
+
+def _authenticated_user_id(event) -> str:
+    """Read the uploader id from API Gateway authorizer claims.
+
+    Never derived from the request body — ensures association attribution
+    cannot be spoofed.
+
+    Handles both dict and JSON-string formats for claims, as API Gateway
+    may serialize authorizer claims differently depending on configuration.
+    """
+    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
+    claims = authorizer.get("claims", {}) or {}
+
+    # Handle case where claims is a JSON-encoded string
+    if isinstance(claims, str):
+        try:
+            claims = json.loads(claims)
+        except (json.JSONDecodeError, TypeError):
+            claims = {}
+
+    # Also check direct authorizer fields (custom authorizer format)
+    if not isinstance(claims, dict):
+        claims = {}
+
+    return (
+        claims.get("sub")
+        or claims.get("cognito:username")
+        or authorizer.get("sub")
+        or authorizer.get("principalId")
+        or ""
+    )
+
+
+def _within_metadata_budget(inline_ids: str, user_id: str) -> bool:
+    """Check whether the collection directive fits within S3's 2 KB user-metadata budget.
+
+    Computes the total byte cost of all metadata key-value pairs that would be stamped
+    inline, and returns True only if it stays within SAFE_INLINE_BUDGET (§6.5).
+    """
+    used = (
+        len(ML_COLLECTION_IDS_KEY)
+        + len(inline_ids.encode("utf-8"))
+        + len(ML_SOURCE_KEY)
+        + len(UPLOAD_SOURCE_VALUE)
+        + len(ML_USER_ID_KEY)
+        + len(user_id.encode("utf-8"))
+    )
+    return used <= SAFE_INLINE_BUDGET
+
+
+def _write_overflow_directive(
+    bucket: str, key: str, collection_ids: List[str], user_id: str
+) -> None:
+    """Write the full collection id list to the Upload directives table (§6.5, §10.5).
+
+    Called when the inline encoding would exceed SAFE_INLINE_BUDGET. The side-record
+    is keyed by PK=UPLOADDIR#<bucket>#<key> and carries an expiresAt TTL (~24h) so
+    DynamoDB auto-expires it.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        raise RuntimeError("UPLOAD_DIRECTIVES_TABLE_NAME is not configured")
+    boto3.resource("dynamodb").Table(UPLOAD_DIRECTIVES_TABLE_NAME).put_item(
+        Item={
+            "PK": f"UPLOADDIR#{bucket}#{key}",
+            "collectionIds": collection_ids,
+            "userId": user_id,
+            "expiresAt": int(time.time()) + DIRECTIVE_TTL_SECONDS,
+        }
+    )
+
+
+def _build_collection_metadata(
+    collection_ids: List[str], user_id: str, bucket: str, key: str
+) -> Dict[str, str]:
+    """Build the x-amz-meta-* user-metadata dict for the collection directive (§6.3).
+
+    Returns an empty dict when no collections are selected. When the inline encoding
+    would exceed the S3 budget, writes an overflow side-record and returns only the
+    overflow marker plus source/user-id.
+    """
+    if not collection_ids:
+        return {}
+    meta: Dict[str, str] = {ML_SOURCE_KEY: UPLOAD_SOURCE_VALUE, ML_USER_ID_KEY: user_id}
+    inline = ",".join(collection_ids)
+    if _within_metadata_budget(inline, user_id):
+        meta[ML_COLLECTION_IDS_KEY] = inline
+    else:
+        _write_overflow_directive(bucket, key, collection_ids, user_id)
+        meta[ML_OVERFLOW_KEY] = "1"
+    return meta
 
 
 @tracer.capture_method
@@ -309,13 +435,22 @@ def is_multipart_upload_required(file_size: int) -> bool:
 
 @tracer.capture_method
 def generate_presigned_post_url(
-    bucket: str, key: str, content_type: str, expiration: int = DEFAULT_EXPIRATION
+    bucket: str,
+    key: str,
+    content_type: str,
+    collection_meta: Dict[str, str] = None,
+    expiration: int = DEFAULT_EXPIRATION,
 ) -> Dict[str, Any]:
-    """Generate a presigned POST URL for the S3 object using region-aware S3 client."""
+    """Generate a presigned POST URL for the S3 object using region-aware S3 client.
+
+    collection_meta keys are stamped as x-amz-meta-* in both Fields and Conditions
+    so S3 persists them as object user-metadata (§6.3, Req 8.1).
+    """
     try:
         # Get region-specific S3 client
         s3_client = _get_s3_client_for_bucket(bucket)
 
+        fields = {"Content-Type": content_type}
         conditions = [
             {"bucket": bucket},
             {"key": key},
@@ -327,12 +462,16 @@ def generate_presigned_post_url(
             {"Content-Type": content_type},
         ]
 
+        # Stamp collection directive metadata into Fields and Conditions (§6.3)
+        if collection_meta:
+            for k, v in collection_meta.items():
+                fields[f"x-amz-meta-{k}"] = v
+                conditions.append({f"x-amz-meta-{k}": v})
+
         presigned_post = s3_client.generate_presigned_post(
             Bucket=bucket,
             Key=key,
-            Fields={
-                "Content-Type": content_type,
-            },
+            Fields=fields,
             Conditions=conditions,
             ExpiresIn=expiration,
         )
@@ -348,8 +487,14 @@ def generate_presigned_post_url(
 
 
 @tracer.capture_method
-def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[str, Any]:
-    """Initiate a multipart upload and return the upload ID using region-aware S3 client."""
+def create_multipart_upload(
+    bucket: str, key: str, content_type: str, collection_meta: Dict[str, str] = None
+) -> Dict[str, Any]:
+    """Initiate a multipart upload and return the upload ID using region-aware S3 client.
+
+    collection_meta is passed as Metadata to create_multipart_upload so S3 carries it
+    onto the completed object (§6.4, Req 8.2).
+    """
     try:
         # Get region-specific S3 client
         s3_client = _get_s3_client_for_bucket(bucket)
@@ -359,11 +504,16 @@ def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[st
             f"content_type: {content_type}, region: {s3_client.meta.region_name}"
         )
 
-        response = s3_client.create_multipart_upload(
-            Bucket=bucket,
-            Key=key,
-            ContentType=content_type,
-        )
+        kwargs = {
+            "Bucket": bucket,
+            "Key": key,
+            "ContentType": content_type,
+        }
+        # Stamp collection directive metadata (§6.4)
+        if collection_meta:
+            kwargs["Metadata"] = collection_meta
+
+        response = s3_client.create_multipart_upload(**kwargs)
 
         upload_id = response["UploadId"]
         logger.info(
@@ -651,6 +801,13 @@ def lambda_handler(
                     403,
                 )
 
+        # Compute the collection directive once and apply it to whichever upload
+        # path is taken (§6.3, §6.4 — single-part and multipart share the same metadata)
+        user_id = _authenticated_user_id(event)
+        collection_meta = _build_collection_metadata(
+            request.collection_ids, user_id, bucket, key
+        )
+
         # Handle multipart upload if file is larger than 100MB
         if is_multipart_upload_required(request.file_size):
             logger.info(
@@ -663,7 +820,7 @@ def lambda_handler(
             # 1. Create a multipart upload
             # 2. Generate presigned URLs for each part
             multipart_upload_info = create_multipart_upload(
-                bucket, key, request.content_type
+                bucket, key, request.content_type, collection_meta
             )
             upload_id = multipart_upload_info["upload_id"]
 
@@ -740,7 +897,7 @@ def lambda_handler(
 
             # For single-part uploads, generate a presigned POST URL
             presigned_post = generate_presigned_post_url(
-                bucket, key, request.content_type
+                bucket, key, request.content_type, collection_meta
             )
 
             logger.info(

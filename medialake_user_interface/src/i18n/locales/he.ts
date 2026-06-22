@@ -24,7 +24,7 @@ export default {
   upload: {
     title: "העלאת קבצי מדיה",
     description:
-      "בחר יעד והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, HLS ו-MPEG-DASH.",
+      "בחר יעד והעלה את קבצי המדיה שלך. נתמכים רק פורמטים של אודיו, וידאו, תמונה, HLS ו-MPEG-DASH.",
     uploadDestination: "יעד ההעלאה",
     browsePath: "עיון בנתיב",
     uploadingTo: "מעלה אל",
@@ -39,6 +39,24 @@ export default {
       "מותרים רק קבצים מסוג audio/*, video/*, image/*, HLS (application/x-mpegURL) ו-MPEG-DASH (application/dash+xml)",
     meta: {
       name: "שם",
+    },
+    collectionSelector: {
+      trigger: "הוספה לאוספים",
+      selectedCount: "{{count}} נבחרו",
+      searchPlaceholder: "חיפוש אוספים\u2026",
+      searchSection: "חיפוש",
+      noSearchResults: "לא נמצאו אוספים תואמים",
+      createAction: 'יצירת "{{name}}"',
+      emptyState: "אין אוספים זמינים. צור אחד באמצעות חיפוש.",
+      recentSection: "אחרונים",
+      favoritesSection: "מועדפים",
+      emptyRecent: "אין אוספים אחרונים",
+      emptyFavorites: "אין אוספים מועדפים",
+      searchError: "חיפוש האוספים נכשל",
+      createFailed: "יצירת האוסף נכשלה",
+      emptySection: "אין אוספים",
+      loading: "טוען\u2026",
+      more: "עוד",
     },
   },
   pathBrowser: {

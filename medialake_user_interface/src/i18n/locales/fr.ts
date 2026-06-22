@@ -25,7 +25,7 @@ export default {
   upload: {
     title: "Télécharger des fichiers multimédias",
     description:
-      "Sélectionnez une destination et téléchargez vos fichiers multimédias. Seuls les formats audio, vidéo, HLS et MPEG-DASH sont pris en charge.",
+      "Sélectionnez une destination et téléchargez vos fichiers multimédias. Seuls les formats audio, vidéo, image, HLS et MPEG-DASH sont pris en charge.",
     uploadDestination: "Destination du téléchargement",
     browsePath: "Parcourir le chemin",
     uploadingTo: "Téléchargement vers",
@@ -41,6 +41,24 @@ export default {
       "Seuls les fichiers de type audio/*, video/*, image/*, HLS (application/x-mpegURL) et MPEG-DASH (application/dash+xml) sont autorisés",
     meta: {
       name: "Nom",
+    },
+    collectionSelector: {
+      trigger: "Ajouter aux collections",
+      selectedCount: "{{count}} sélectionnés",
+      searchPlaceholder: "Rechercher des collections\u2026",
+      searchSection: "Recherche",
+      noSearchResults: "Aucune collection correspondante",
+      createAction: 'Créer "{{name}}"',
+      emptyState: "Aucune collection disponible. Créez-en une via la recherche.",
+      recentSection: "Récentes",
+      favoritesSection: "Favoris",
+      emptyRecent: "Aucune collection récente",
+      emptyFavorites: "Aucune collection favorite",
+      searchError: "Échec de la recherche de collections",
+      createFailed: "Échec de la création de la collection",
+      emptySection: "Aucune collection",
+      loading: "Chargement\u2026",
+      more: "Plus",
     },
   },
   pathBrowser: {

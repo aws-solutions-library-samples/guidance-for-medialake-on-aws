@@ -65,5 +65,8 @@
         "max_session_age_hours": 24,
         "heartbeat_interval_seconds": 30,
         "heartbeat_min_interval_seconds": 10
+    },
+    "deployment_options": {
+        "use_cli_credentials": false
     }
 }

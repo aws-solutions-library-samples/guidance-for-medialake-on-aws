@@ -56,6 +56,10 @@ vi.mock("@uppy/react/dashboard", () => ({
 
 vi.mock("@uppy/aws-s3", () => ({ default: vi.fn() }));
 vi.mock("./PathBrowser", () => ({ default: () => null }));
+// CollectionSelector is exercised by its own tests; stub it here so this
+// suite stays focused on connector/destination selection and doesn't require
+// a QueryClientProvider for the collection data hooks it uses internally.
+vi.mock("./CollectionSelector", () => ({ default: () => null }));
 
 import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
 

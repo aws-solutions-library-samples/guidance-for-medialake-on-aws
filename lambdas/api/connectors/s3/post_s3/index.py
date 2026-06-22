@@ -1087,7 +1087,12 @@ def manage_bucket_cors(
                 "Content-MD5",
                 "x-amz-*",
             ],
-            "ExposeHeaders": ["ETag", "x-amz-request-id"],
+            "ExposeHeaders": [
+                "ETag",
+                "Location",
+                "x-amz-request-id",
+                "x-amz-version-id",
+            ],
             "MaxAgeSeconds": 3600,
         }
 
@@ -1735,6 +1740,22 @@ def create_connector(createconnector: S3Connector) -> dict:
                 collections_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{collections_table_name}"
                 dynamodb_resources.append(collections_table_arn)
 
+            # Add upload directives table for READ access (overflow resolution, §9.3).
+            upload_directives_table_name = os.environ.get(
+                "UPLOAD_DIRECTIVES_TABLE_NAME", ""
+            )
+            if upload_directives_table_name:
+                upload_directives_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{upload_directives_table_name}"
+                dynamodb_resources.append(upload_directives_table_arn)
+
+            # Add user table for WRITE access (activity tracking, §9.3, Req 11.3).
+            # The ingest lambda calls record_collection_activity to upsert
+            # recency rows after upload-source association.
+            user_table_name = os.environ.get("USER_TABLE_NAME", "")
+            if user_table_name:
+                user_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{user_table_name}"
+                dynamodb_resources.append(user_table_arn)
+
             dynamodb_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -1982,6 +2003,16 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "COLLECTIONS_TABLE_NAME": os.environ.get(
                             "COLLECTIONS_TABLE_NAME", ""
                         ),
+                        # Upload directives table for collection-metadata overflow
+                        # resolution (§6.5, §9.3). The ingest handler reads
+                        # overflow side-records when ml-collection-overflow=1.
+                        "UPLOAD_DIRECTIVES_TABLE_NAME": os.environ.get(
+                            "UPLOAD_DIRECTIVES_TABLE_NAME", ""
+                        ),
+                        # User table for activity tracking (§9.3, Req 11.3).
+                        # The ingest handler calls record_collection_activity
+                        # after association to upsert recency rows.
+                        "USER_TABLE_NAME": os.environ.get("USER_TABLE_NAME", ""),
                         # Connector table for bucket→connector lookup
                         "MEDIALAKE_CONNECTOR_TABLE_NAME": os.environ.get(
                             "MEDIALAKE_CONNECTOR_TABLE_NAME", ""

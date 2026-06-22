@@ -26,6 +26,7 @@ import { usePermission } from "@/permissions";
 import useS3Upload from "../hooks/useS3Upload";
 import { MultipartUploadMetadata } from "../types/upload.types";
 import PathBrowser from "./PathBrowser";
+import CollectionSelector, { CollectionRef } from "./CollectionSelector";
 import { typography } from "@/theme/tokens";
 
 // Define meta type to make typings clearer
@@ -92,6 +93,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadPath, setUploadPath] = useState<string>(path || "");
   const [isPathBrowserOpen, setIsPathBrowserOpen] = useState<boolean>(false);
+  const [selectedCollections, setSelectedCollections] = useState<CollectionRef[]>([]);
   const { data: connectorsResponse, isLoading: isLoadingConnectors } = useSearchConnectors();
   const {
     getPresignedUrl,
@@ -103,11 +105,17 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   // Store multipart upload metadata keyed by file ID
   const multipartDataRef = useRef<Map<string, MultipartUploadMetadata>>(new Map());
 
-  // Filter only S3 connectors that are active
+  // Filter only S3 connectors that are active and have uploads enabled
   const connectors =
     connectorsResponse?.data?.connectors.filter(
-      (connector) => connector.type === "s3" && connector.status === "active"
+      (connector) =>
+        connector.type === "s3" &&
+        connector.status === "active" &&
+        connector.configuration?.allowUploads !== false
     ) || [];
+
+  // Memoize collection ids for the upload request body and Uppy meta
+  const collectionIds = useMemo(() => selectedCollections.map((c) => c.id), [selectedCollections]);
 
   // Connectors the user can pick from, excluding the My Assets virtual connector.
   // When the connector is locked (e.g. "Upload to My Assets"), or the user
@@ -293,6 +301,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
     const handleComplete = (result: { successful: any[] }) => {
       setIsUploading(false);
+      if (selectedCollections.length > 0 && result.successful?.length > 0) {
+        uppy.info(
+          "Files will be added to the selected collections after processing completes.",
+          "info",
+          5000
+        );
+      }
       if (onUploadComplete) {
         onUploadComplete(result.successful);
       }
@@ -316,7 +331,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       uppy.off("complete", handleComplete);
       uppy.off("cancel-all", handleCancelAll);
     };
-  }, [uppy, onUploadComplete, onUploadError]);
+  }, [uppy, onUploadComplete, onUploadError, selectedCollections]);
 
   // Configure S3 upload when connector is selected
   useEffect(() => {
@@ -329,6 +344,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         ...existingMeta,
         connector_id: selectedConnector,
         path: uploadPath,
+        collection_ids: collectionIds,
       },
     });
 
@@ -350,6 +366,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 content_type: file.type,
                 file_size: file.size,
                 path: uploadPath,
+                collection_ids: collectionIds,
               });
 
               // Single-part upload
@@ -377,6 +394,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 content_type: file.type,
                 file_size: file.size,
                 path: uploadPath,
+                collection_ids: collectionIds,
               });
 
               if (!result.multipart) {
@@ -497,6 +515,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     completeMultipartUpload,
     abortMultipartUpload,
     uploadPath,
+    collectionIds,
   ]);
 
   const handleConnectorChange = (event: SelectChangeEvent<string>) => {
@@ -589,6 +608,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             ))}
           </Select>
         </FormControl>
+      )}
+
+      {selectedConnector && (
+        <CollectionSelector
+          value={selectedCollections}
+          onChange={setSelectedCollections}
+          disabled={isUploading}
+        />
       )}
 
       {selectedConnector && !isMyAssetsSelected && (

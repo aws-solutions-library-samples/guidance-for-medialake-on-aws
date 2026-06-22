@@ -300,6 +300,8 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "MEDIALAKE_ASSET_TABLE": props.asset_table.table_arn,
                 "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name,
                 "SYSTEM_SETTINGS_TABLE_ARN": props.system_settings_table_arn,
+                "UPLOAD_SESSIONS_TABLE_NAME": f"{config.resource_prefix}-upload-sessions-{config.environment}",
+                "UPLOAD_SESSIONS_TABLE_ARN": f"arn:aws:dynamodb:{self.region}:{self.account_id}:table/{config.resource_prefix}-upload-sessions-{config.environment}",
                 "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,

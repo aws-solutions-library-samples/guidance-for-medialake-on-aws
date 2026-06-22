@@ -115,6 +115,21 @@ class UsersGroupsStack(cdk.NestedStack):
                     ),
                     projection_type=dynamodb.ProjectionType.KEYS_ONLY,
                 ),
+                # GSI5 (RecentCollectionsByUser) - per-user recent collection
+                # activity ordered by descending timestamp. Sparse: only
+                # RECENTCOLL# items populate gsi5Sk, so favorites and other user
+                # items are not indexed. Used by the Recent_Collections_Service
+                # to return collections the user recently modified.
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI5",
+                    partition_key=dynamodb.Attribute(
+                        name="userId", type=dynamodb.AttributeType.STRING
+                    ),
+                    sort_key=dynamodb.Attribute(
+                        name="gsi5Sk", type=dynamodb.AttributeType.STRING
+                    ),
+                    projection_type=dynamodb.ProjectionType.ALL,
+                ),
             ],
         )
         self._user_table = DynamoDB(self, "UserTable", user_table_props)

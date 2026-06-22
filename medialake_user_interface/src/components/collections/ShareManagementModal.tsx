@@ -26,6 +26,7 @@ import {
   Divider,
   alpha,
   useTheme,
+  createFilterOptions,
 } from "@mui/material";
 import {
   Share as ShareIcon,
@@ -45,6 +46,17 @@ import {
   type ShareCollectionRequest,
 } from "@/api/hooks/useCollections";
 import type { User } from "@/api/types/api.types";
+
+// Match the search term against every identifying field (name, given/family
+// name, email, and username) instead of MUI's default label-only filter, so
+// typing an email local-part like "kiro-editor" finds the user even though the
+// option label shows their display name.
+const userFilterOptions = createFilterOptions<User>({
+  stringify: (user) =>
+    [user.name, user.given_name, user.family_name, user.email, user.username]
+      .filter(Boolean)
+      .join(" "),
+});
 
 interface ShareManagementModalProps {
   open: boolean;
@@ -85,6 +97,26 @@ export const ShareManagementModal: React.FC<ShareManagementModalProps> = ({
       (user) => !sharedUserIds.has(user.username) && user.username !== collection?.ownerId
     );
   }, [users, existingShares, collection?.ownerId]);
+
+  // Index users by their Cognito username (== sub) so we can resolve the raw
+  // userId/targetId on each share into a human-readable name/email.
+  const usersById = useMemo(() => {
+    const map = new Map<string, User>();
+    (users || []).forEach((user) => map.set(user.username, user));
+    return map;
+  }, [users]);
+
+  const getShareDisplayName = (userId?: string): string => {
+    if (!userId) return "";
+    const user = usersById.get(userId);
+    if (!user) return userId;
+    return (
+      user.name ||
+      `${user.given_name || ""} ${user.family_name || ""}`.trim() ||
+      user.email ||
+      userId
+    );
+  };
 
   const handleShare = async () => {
     if (!selectedUser || !collection?.id) return;
@@ -196,6 +228,7 @@ export const ShareManagementModal: React.FC<ShareManagementModalProps> = ({
             <Autocomplete
               sx={{ flex: 2 }}
               options={availableUsers}
+              filterOptions={userFilterOptions}
               getOptionLabel={(user) =>
                 user.name ||
                 `${user.given_name || ""} ${user.family_name || ""}`.trim() ||
@@ -326,66 +359,70 @@ export const ShareManagementModal: React.FC<ShareManagementModalProps> = ({
             </Box>
           ) : (
             <List dense sx={{ bgcolor: "background.paper", borderRadius: 1 }}>
-              {existingShares.map((share, index) => (
-                <ListItem
-                  key={share.userId || share.targetId || index}
-                  sx={{
-                    borderBottom:
-                      index < existingShares.length - 1
-                        ? `1px solid ${theme.palette.divider}`
-                        : "none",
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        fontSize: "0.875rem",
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        color: "primary.main",
-                      }}
-                    >
-                      {(share.userId || share.targetId || "U")[0].toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={share.userId || share.targetId}
-                    secondary={
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-                        <Chip
-                          icon={getRoleIcon(share.role)}
-                          label={getRoleLabel(share.role)}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 22, fontSize: "0.7rem" }}
-                        />
-                        {share.sharedBy && (
-                          <Typography variant="caption" color="text.secondary">
-                            by {share.sharedBy}
-                          </Typography>
-                        )}
-                      </Box>
-                    }
-                  />
-                  <ListItemSecondaryAction>
-                    <IconButton
-                      edge="end"
-                      size="small"
-                      onClick={() => handleUnshare(share.userId || share.targetId || "")}
-                      disabled={unshareCollectionMutation.isPending}
-                      sx={{
-                        color: "error.main",
-                        "&:hover": {
-                          backgroundColor: alpha(theme.palette.error.main, 0.1),
-                        },
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </ListItemSecondaryAction>
-                </ListItem>
-              ))}
+              {existingShares.map((share, index) => {
+                const shareUserId = share.userId || share.targetId;
+                const displayName = getShareDisplayName(shareUserId) || "Unknown user";
+                return (
+                  <ListItem
+                    key={shareUserId || index}
+                    sx={{
+                      borderBottom:
+                        index < existingShares.length - 1
+                          ? `1px solid ${theme.palette.divider}`
+                          : "none",
+                    }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          fontSize: "0.875rem",
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: "primary.main",
+                        }}
+                      >
+                        {(displayName || "U")[0].toUpperCase()}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={displayName}
+                      secondary={
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                          <Chip
+                            icon={getRoleIcon(share.role)}
+                            label={getRoleLabel(share.role)}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 22, fontSize: "0.7rem" }}
+                          />
+                          {share.sharedBy && (
+                            <Typography variant="caption" color="text.secondary">
+                              by {getShareDisplayName(share.sharedBy)}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={() => handleUnshare(shareUserId || "")}
+                        disabled={unshareCollectionMutation.isPending}
+                        sx={{
+                          color: "error.main",
+                          "&:hover": {
+                            backgroundColor: alpha(theme.palette.error.main, 0.1),
+                          },
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                );
+              })}
             </List>
           )}
         </Box>

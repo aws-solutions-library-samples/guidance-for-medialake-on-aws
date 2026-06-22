@@ -904,3 +904,31 @@ class SessionStore:
             return True
         except self._table.meta.client.exceptions.ConditionalCheckFailedException:
             return False
+
+    # ------------------------------------------------------------------
+    # set_batch_metadata
+    # ------------------------------------------------------------------
+
+    def set_batch_metadata(self, session_id: str, user_metadata: dict) -> None:
+        """Capture the batch's user-entered metadata onto the session META item, once.
+
+        Portal forms are batch-uniform (filled once, applied to every file), so we
+        record the first non-empty user-metadata map and never overwrite it. Stored
+        as a `userMetadata` Map of {slug: stringValue}. No-op when user_metadata is
+        empty. Best-effort: a conditional failure (already set) is swallowed.
+        """
+        if not user_metadata:
+            return
+
+        try:
+            self._table.update_item(
+                Key={"PK": _pk(session_id), "SK": _sk_meta()},
+                UpdateExpression="SET userMetadata = if_not_exists(userMetadata, :m)",
+                ExpressionAttributeValues={":m": dict(user_metadata)},
+            )
+        except self._table.meta.client.exceptions.ConditionalCheckFailedException:
+            # First capture wins; nothing to do if userMetadata is already set.
+            pass
+        except Exception:
+            # Best-effort: never break the upload path on a metadata-capture failure.
+            pass

@@ -19,6 +19,7 @@ import { filterCollections, sortCollections } from "../../utils/collectionFilter
 import type { Collection } from "../../utils/collectionFilters";
 import { buildFavoritesCollectionList } from "../../utils/buildFavoritesCollectionList";
 import { useCollectionFavorites } from "@/hooks/useCollectionFavorites";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { jwtDecode } from "jwt-decode";
 import { WidgetConfigPanel } from "./WidgetConfigPanel";
@@ -158,6 +159,11 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
 
   // Shared collection-favorites state — single source of truth across surfaces.
   const { favorites, isCollectionFavorited, handleFavoriteToggle } = useCollectionFavorites();
+
+  // RBAC: gate the empty-state "Create Collection" action the same way the
+  // full Collections page does, so read-only users don't get an actionable
+  // create affordance from the dashboard widget.
+  const createCollectionPermission = useActionPermission("create", "collection");
 
   // Select the appropriate data based on viewType
   const rawCollections = useMemo(() => {
@@ -325,6 +331,8 @@ export const CollectionsWidget: React.FC<CollectionsWidgetProps> = ({
           : t("dashboard.widgets.collections.createCollection", "Create Collection")
       }
       onAction={isFavoritesView ? undefined : handleCreateCollection}
+      actionDisabled={!createCollectionPermission.allowed}
+      actionTooltip={createCollectionPermission.tooltip}
     />
   );
 

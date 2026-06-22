@@ -5,6 +5,7 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from collection_activity import record_collection_activity
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -13,6 +14,7 @@ from collections_utils import (
 )
 from db_models import CollectionItemModel, CollectionModel
 from pynamodb.exceptions import DeleteError, DoesNotExist, UpdateError
+from user_auth import extract_user_context
 from utils.item_utils import ASSET_SK_PREFIX, ITEM_SK_PREFIX
 
 logger = Logger(
@@ -31,6 +33,9 @@ def register_route(app):
         """Remove item from collection"""
         try:
             current_timestamp = datetime.utcnow().isoformat() + "Z"
+
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
 
             # URL decode the item_id (API Gateway doesn't auto-decode path parameters)
             decoded_item_id = unquote(item_id)
@@ -99,6 +104,10 @@ def register_route(app):
                 logger.warning(f"[DELETE] Failed to update collection timestamp: {e}")
 
             logger.info(f"[DELETE] Item removed from collection {collection_id}")
+
+            # Record activity for the recent-collections tracker (Req 11.2)
+            if user_id:
+                record_collection_activity(user_id, collection_id)
 
             return create_success_response(
                 data={"id": decoded_item_id, "removed": True},

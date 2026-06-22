@@ -51,6 +51,10 @@ from medialake_stacks.portal_api_stack import PortalApiStack, PortalApiStackProp
 
 # from medialake_stacks.settings_api_stack import SettingsApiStack, SettingsApiStackProps  # Deprecated - now using CollectionTypesStack
 from medialake_stacks.settings_stack import SettingsStack, SettingsStackProps
+from medialake_stacks.storage_connectors_stack import (
+    StorageConnectorsStack,
+    StorageConnectorsStackProps,
+)
 from medialake_stacks.updates_api_stack import UpdatesApiStack, UpdatesApiStackProps
 from medialake_stacks.user_interface_stack import (
     UserInterfaceStack,
@@ -285,6 +289,25 @@ class MediaLakeStack(cdk.Stack):
         settings_stack.add_dependency(nodes_stack)
         settings_stack.add_dependency(asset_sync_stack)
 
+        # Create StorageConnectorsStack (personal assets bucket + ingest wiring)
+        storage_connectors_stack = StorageConnectorsStack(
+            self,
+            "MediaLakeStorageConnectors",
+            props=StorageConnectorsStackProps(
+                cloudfront_domain_ssm_param=f"/medialake/{config.environment}/cloudfront-distribution-domain",
+                asset_table_arn=props.base_infrastructure.asset_table.table_arn,
+                pipelines_event_bus_name=props.base_infrastructure.pipelines_event_bus.event_bus_name,
+                opensearch_endpoint=props.base_infrastructure.collection_endpoint,
+                opensearch_index="media",
+                vpc=props.base_infrastructure.vpc,
+                security_group=props.base_infrastructure.security_group,
+                s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
+                s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,
+                system_settings_table_name=settings_stack.system_settings_table_name,
+            ),
+        )
+        storage_connectors_stack.add_dependency(settings_stack)
+
         api_gateway_stack = ApiGatewayStack(
             self,
             "MediaLakeApiGatewayStack",
@@ -324,6 +347,8 @@ class MediaLakeStack(cdk.Stack):
                 waf_acl_arn=ResourceImporter.get_waf_acl_arn(),  # Use importer instead of direct access
                 # user_table=users_groups_roles_stack.user_table,
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
+                upload_directives_table=props.base_infrastructure.upload_directives_table,
+                personal_assets_bucket=storage_connectors_stack.personal_assets_bucket,
             ),
         )
 

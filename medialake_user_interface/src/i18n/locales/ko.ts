@@ -24,7 +24,7 @@ export default {
   upload: {
     title: "미디어 파일 업로드",
     description:
-      "대상을 선택하고 미디어 파일을 업로드하세요. 오디오, 비디오, HLS 및 MPEG-DASH 형식만 지원됩니다.",
+      "대상을 선택하고 미디어 파일을 업로드하세요. 오디오, 비디오, 이미지, HLS 및 MPEG-DASH 형식만 지원됩니다.",
     uploadDestination: "업로드 대상",
     browsePath: "경로 찾아보기",
     uploadingTo: "업로드 중",
@@ -40,6 +40,24 @@ export default {
       "audio/*, video/*, image/*, HLS (application/x-mpegURL) 및 MPEG-DASH (application/dash+xml) 파일만 허용됩니다",
     meta: {
       name: "이름",
+    },
+    collectionSelector: {
+      trigger: "컬렉션에 추가",
+      selectedCount: "{{count}}개 선택됨",
+      searchPlaceholder: "컬렉션 검색\u2026",
+      searchSection: "검색",
+      noSearchResults: "일치하는 컬렉션이 없습니다",
+      createAction: '"{{name}}" 만들기',
+      emptyState: "사용 가능한 컬렉션이 없습니다. 검색을 통해 만드세요.",
+      recentSection: "최근",
+      favoritesSection: "즐겨찾기",
+      emptyRecent: "최근 컬렉션 없음",
+      emptyFavorites: "즐겨찾기 컬렉션 없음",
+      searchError: "컬렉션 검색 실패",
+      createFailed: "컬렉션 생성 실패",
+      emptySection: "컬렉션 없음",
+      loading: "로딩 중\u2026",
+      more: "더 보기",
     },
   },
   pathBrowser: {

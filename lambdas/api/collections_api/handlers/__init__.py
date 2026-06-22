@@ -27,6 +27,7 @@ from . import (
     collections_ID_thumbnail_post,
     collections_metadata_keys_get,
     collections_post,
+    collections_recent_get,
     collections_shared_by_me_get,
     collections_shared_with_me_get,
     collections_users_get,
@@ -44,6 +45,7 @@ __all__ = [
     "collections_get",
     "collections_metadata_keys_get",
     "collections_post",
+    "collections_recent_get",
     "collections_shared_by_me_get",
     "collections_shared_with_me_get",
     "collections_users_get",
@@ -84,6 +86,7 @@ def register_all_routes(app):
     # Collections endpoints
     collections_get.register_route(app)
     collections_post.register_route(app)
+    collections_recent_get.register_route(app)
     collections_collection_types_get.register_route(app)
     collections_metadata_keys_get.register_route(app)
     collections_users_get.register_route(app)

@@ -25,7 +25,7 @@ export default {
   upload: {
     title: "Mediendateien hochladen",
     description:
-      "Wählen Sie ein Ziel und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, HLS- und MPEG-DASH-Formate werden unterstützt.",
+      "Wählen Sie ein Ziel und laden Sie Ihre Mediendateien hoch. Nur Audio-, Video-, Bild-, HLS- und MPEG-DASH-Formate werden unterstützt.",
     uploadDestination: "Upload-Ziel",
     browsePath: "Pfad durchsuchen",
     uploadingTo: "Hochladen nach",
@@ -42,6 +42,24 @@ export default {
       "Nur Dateien der Typen audio/*, video/*, image/*, HLS (application/x-mpegURL) und MPEG-DASH (application/dash+xml) sind erlaubt",
     meta: {
       name: "Name",
+    },
+    collectionSelector: {
+      trigger: "Zu Sammlungen hinzufügen",
+      selectedCount: "{{count}} ausgewählt",
+      searchPlaceholder: "Sammlungen durchsuchen\u2026",
+      searchSection: "Suche",
+      noSearchResults: "Keine passenden Sammlungen",
+      createAction: '"{{name}}" erstellen',
+      emptyState: "Keine Sammlungen verfügbar. Erstellen Sie eine über die Suche.",
+      recentSection: "Zuletzt verwendet",
+      favoritesSection: "Favoriten",
+      emptyRecent: "Keine kürzlich verwendeten Sammlungen",
+      emptyFavorites: "Keine Favoriten-Sammlungen",
+      searchError: "Sammlungssuche fehlgeschlagen",
+      createFailed: "Sammlung konnte nicht erstellt werden",
+      emptySection: "Keine Sammlungen",
+      loading: "Wird geladen\u2026",
+      more: "Mehr",
     },
   },
   pathBrowser: {
