@@ -178,6 +178,16 @@ class StorageConnectorsStack(cdk.NestedStack):
                     "VECTOR_BUCKET_NAME": props.s3_vector_bucket_name,
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
                     "SYSTEM_SETTINGS_TABLE": props.system_settings_table_name,
+                    # Upload-to-collection association (Layer C): enables adding
+                    # freshly-ingested personal-bucket assets to the collections
+                    # selected during upload. Without these the association logic
+                    # in lambdas/ingest/s3 silently no-ops, so My Assets uploads
+                    # are never added to the collection. Names are deterministic
+                    # (mirror their owning stacks) to avoid cross-stack deps,
+                    # matching the regular per-connector ingest lambda wiring.
+                    "COLLECTIONS_TABLE_NAME": f"{config.resource_prefix}_collections_{config.environment}",
+                    "UPLOAD_DIRECTIVES_TABLE_NAME": f"{config.resource_prefix}-upload-directives-{config.environment}",
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
                 },
             ),
         )
@@ -193,6 +203,55 @@ class StorageConnectorsStack(cdk.NestedStack):
                     "dynamodb:BatchWriteItem",
                 ],
                 resources=[props.asset_table_arn, f"{props.asset_table_arn}/index/*"],
+            )
+        )
+
+        # Upload-to-collection association (Layer C) for the My Assets ingest
+        # path — mirrors the per-connector ingest grants in
+        # lambdas/api/connectors/s3/post_s3 so personal-bucket uploads are added
+        # to the collections selected during upload. ARNs are derived from the
+        # deterministic table names (same names set in the env vars above) to
+        # avoid a cross-stack dependency on the collections/user/upload stacks.
+        _region = Stack.of(self).region
+        _account = Stack.of(self).account
+        _collections_table_arn = (
+            f"arn:aws:dynamodb:{_region}:{_account}:table/"
+            f"{config.resource_prefix}_collections_{config.environment}"
+        )
+        _upload_directives_table_arn = (
+            f"arn:aws:dynamodb:{_region}:{_account}:table/"
+            f"{config.resource_prefix}-upload-directives-{config.environment}"
+        )
+        _user_table_arn = (
+            f"arn:aws:dynamodb:{_region}:{_account}:table/"
+            f"{config.resource_prefix}-user-{config.environment}"
+        )
+        # Collections table: read for existence/permission checks, write
+        # idempotent membership rows.
+        self._ingest_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Query",
+                    "dynamodb:BatchWriteItem",
+                ],
+                resources=[_collections_table_arn],
+            )
+        )
+        # Upload directives table: READ only (overflow side-record resolution).
+        self._ingest_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:GetItem"],
+                resources=[_upload_directives_table_arn],
+            )
+        )
+        # User table: WRITE recency rows via record_collection_activity.
+        self._ingest_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:UpdateItem", "dynamodb:PutItem"],
+                resources=[_user_table_arn],
             )
         )
         self._ingest_lambda.function.add_to_role_policy(

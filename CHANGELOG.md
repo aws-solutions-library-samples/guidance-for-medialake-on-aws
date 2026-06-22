@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.16.1] - 2026-06-22
+
+### Code Refactoring
+
+- refactor: Migrate two new GSI's GSI4 (FavoritesByCollection) and GSI5 (RecentCollectionsByUser to a single overloaded GSI and fix to my assets system connector IAM
+
 ## [1.16.0] - 2026-06-22
 
 ### Features
