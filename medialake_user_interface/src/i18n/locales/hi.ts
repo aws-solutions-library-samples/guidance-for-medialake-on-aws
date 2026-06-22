@@ -13,24 +13,52 @@ export default {
     title: "संपत्तियाँ",
     connectors: "कनेक्टर",
     selectConnector: "कनेक्टर चुनें",
+    myAssets: "मेरी संपत्तियाँ",
+    uploadToMyAssets: "मेरी संपत्तियों में अपलोड करें",
+    myAssetsEmpty: {
+      title: "अभी तक कोई संपत्ति नहीं",
+      description:
+        "अपनी व्यक्तिगत संपत्ति लाइब्रेरी शुरू करने के लिए अपनी पहली मीडिया फ़ाइलें अपलोड करें।",
+      uploadCta: "फ़ाइलें अपलोड करें",
+    },
   },
   upload: {
     title: "मीडिया फ़ाइलें अपलोड करें",
     description:
-      "एक S3 कनेक्टर चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
+      "एक गंतव्य चुनें और अपनी मीडिया फ़ाइलें अपलोड करें। केवल ऑडियो, वीडियो, इमेज, HLS और MPEG-DASH प्रारूप समर्थित हैं।",
     uploadDestination: "अपलोड गंतव्य",
     browsePath: "पथ ब्राउज़ करें",
     uploadingTo: "अपलोड हो रहा है",
     restrictedToPrefix: "प्रतिबंधित",
     allowedPrefixesInfo: "आप केवल {{count}} अनुमत पथ(ों) पर अपलोड कर सकते हैं",
-    connectorLabel: "S3 कनेक्टर",
-    selectConnectorPlaceholder: "S3 कनेक्टर चुनें",
+    connectorLabel: "अपलोड गंतव्य",
+    selectConnectorPlaceholder: "गंतव्य चुनें",
     loadingConnectors: "कनेक्टर लोड हो रहे हैं...",
     noConnectors: "कोई S3 कनेक्टर उपलब्ध नहीं है। कृपया पहले एक S3 कनेक्टर कॉन्फ़िगर करें।",
+    noDestinations:
+      "आपके पास किसी भी अपलोड गंतव्य तक पहुँच नहीं है। पहुँच का अनुरोध करने के लिए अपने व्यवस्थापक से संपर्क करें।",
     dashboardNote:
       "केवल audio/*, video/*, image/*, HLS (application/x-mpegURL) और MPEG-DASH (application/dash+xml) फ़ाइलों की अनुमति है",
     meta: {
       name: "नाम",
+    },
+    collectionSelector: {
+      trigger: "संग्रहों में जोड़ें",
+      selectedCount: "{{count}} चयनित",
+      searchPlaceholder: "संग्रह खोजें\u2026",
+      searchSection: "खोज",
+      noSearchResults: "कोई मिलान संग्रह नहीं",
+      createAction: '"{{name}}" बनाएं',
+      emptyState: "कोई संग्रह उपलब्ध नहीं। खोज का उपयोग करके एक बनाएं।",
+      recentSection: "हाल के",
+      favoritesSection: "पसंदीदा",
+      emptyRecent: "कोई हाल के संग्रह नहीं",
+      emptyFavorites: "कोई पसंदीदा संग्रह नहीं",
+      searchError: "संग्रह खोजने में विफल",
+      createFailed: "संग्रह बनाने में विफल",
+      emptySection: "कोई संग्रह नहीं",
+      loading: "लोड हो रहा है\u2026",
+      more: "और",
     },
   },
   pathBrowser: {
@@ -105,6 +133,40 @@ export default {
       objectPrefixNumbered: "Object उपसर्ग {{number}}",
       bucketNameHelper: "बकेट name must be globally unique, follow S3 naming rules.",
       addPrefix: "उपसर्ग जोड़ें",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "कनेक्टर हटाएँ",
@@ -223,6 +285,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "पसंदीदा",
+      emptyTitle: "कोई पसंदीदा संग्रह नहीं",
+      emptyDescription: "आपके द्वारा पसंदीदा बनाए गए संग्रह यहाँ दिखाई देंगे",
+    },
     title: "कलेक्शन",
     description: "कलेक्शनों में मीडिया संपत्तियों को व्यवस्थित और प्रबंधित करें",
     createCollection: "कलेक्शन बनाएं",
@@ -917,6 +984,7 @@ export default {
     },
   },
   common: {
+    remove: "निकालें",
     back: "वापस",
     search: "खोजें",
     public: "सार्वजनिक",
@@ -1720,6 +1788,9 @@ export default {
         myCollectionsTitle: "मेरे संग्रह",
         sharedWithMeTitle: "मेरे साथ साझा किया गया",
         mySharedTitle: "मेरे साझा संग्रह",
+        favoritesTitle: "पसंदीदा संग्रह",
+        favoritesEmptyTitle: "कोई पसंदीदा संग्रह नहीं",
+        favoritesEmptyDescription: "आपके द्वारा पसंदीदा बनाए गए संग्रह यहाँ दिखाई देंगे",
         emptyTitle: "कोई संग्रह नहीं मिला",
         emptyDescription: "शुरू करने के लिए एक संग्रह बनाएं",
         createCollection: "संग्रह बनाएं",
@@ -1732,6 +1803,7 @@ export default {
           myCollections: "मेरे संग्रह",
           sharedWithMe: "मेरे साथ साझा किया गया",
           myShared: "मेरे साझा संग्रह",
+          favorites: "पसंदीदा संग्रह",
         },
         sortingTitle: "क्रमबद्ध करना",
         sortBy: "इसके अनुसार क्रमबद्ध करें",
@@ -1750,6 +1822,11 @@ export default {
         title: "हाल की संपत्तियां",
         emptyTitle: "कोई हाल की संपत्तियां नहीं",
         emptyDescription: "हाल ही में अपलोड की गई संपत्तियां यहां दिखाई देंगी",
+      },
+      myAssets: {
+        title: "मेरी संपत्तियां",
+        emptyTitle: "अभी तक कोई व्यक्तिगत संपत्तियां नहीं",
+        emptyDescription: "मेरी संपत्तियों में अपनी पहली फ़ाइल अपलोड करें।",
       },
       collectionGroup: {
         title: "संग्रह समूह",
@@ -1874,6 +1951,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "पुन: उपयोग करने योग्य दिखावट थीम जिन्हें आप नए या मौजूदा पोर्टल पर लागू कर सकते हैं।",
+      deleteTitle: "थीम हटाएं",
+      editorLoadError: "थीम लोड करने में विफल",
+    },
+    templates: {
+      listDescription:
+        "पुन: उपयोग करने योग्य पोर्टल संरचनाएं जिनका उपयोग आप किसी विश्वसनीय सेटअप से नए पोर्टल शुरू करने के लिए कर सकते हैं।",
+      createFromTemplate: "इस टेम्पलेट से पोर्टल बनाएं",
+      deleteTitle: "टेम्पलेट हटाएं",
+      editorLoadError: "टेम्पलेट लोड करने में विफल",
+    },
+    actions: {
+      applyTheme: "थीम लागू करें",
+      applyThemeMenu: "थीम लागू करें…",
+      saveAsTemplate: "टेम्पलेट के रूप में सहेजें",
+      saveAsTheme: "थीम के रूप में सहेजें",
+      startFromTemplate: "टेम्पलेट से शुरू करें",
+      startFromTemplateMenu: "टेम्पलेट से शुरू करें…",
+    },
+    fieldTypes: {
+      radioGroup: "रेडियो समूह",
+      yesNo: "हां / नहीं",
+    },
     pageTitle: "अपलोड पोर्टल",
     pageDescription: "बाहरी योगदानकर्ताओं के लिए अपलोड पोर्टल प्रबंधित करें",
     createPortal: "पोर्टल बनाएं",

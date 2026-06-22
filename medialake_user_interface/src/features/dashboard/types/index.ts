@@ -7,7 +7,8 @@ export type CollectionViewType =
   | "private"
   | "my-collections"
   | "shared-with-me"
-  | "my-shared";
+  | "my-shared"
+  | "favorites";
 
 // Sorting configuration types
 export type SortBy = "name" | "createdAt" | "updatedAt";
@@ -31,7 +32,12 @@ export interface CollectionGroupWidgetConfig extends Record<string, unknown> {
   sorting: SortConfig;
 }
 
-export type WidgetType = "favorites" | "collections" | "recent-assets" | "collection-group";
+export type WidgetType =
+  | "favorites"
+  | "collections"
+  | "recent-assets"
+  | "collection-group"
+  | "my-assets";
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -146,4 +152,12 @@ export interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /**
+   * When true, the action button is still rendered but disabled (e.g. the
+   * current user lacks permission to perform it). Mirrors the disable-with-tooltip
+   * pattern used on the full Collections page.
+   */
+  actionDisabled?: boolean;
+  /** Tooltip shown on the action button — typically the permission explanation. */
+  actionTooltip?: string;
 }

@@ -494,9 +494,13 @@ const SearchPage: React.FC = () => {
   const filteredResults = useMemo(
     () =>
       searchResults?.filter((item) => {
-        const isImage = item.DigitalSourceAsset.Type === "Image" && filters.mediaTypes.images;
-        const isVideo = item.DigitalSourceAsset.Type === "Video" && filters.mediaTypes.videos;
-        const isAudio = item.DigitalSourceAsset.Type === "Audio" && filters.mediaTypes.audio;
+        const type = item.DigitalSourceAsset.Type;
+        const isImage = type === "Image" && filters.mediaTypes.images;
+        const isVideo = type === "Video" && filters.mediaTypes.videos;
+        const isAudio = type === "Audio" && filters.mediaTypes.audio;
+        // Non-media assets (e.g. documents, Type "Other") aren't covered by the
+        // media-type toggles, so always let them pass the type filter.
+        const isNonMedia = !["Image", "Video", "Audio"].includes(type);
 
         // Time-based filtering
         const createdAt = new Date(item.DigitalSourceAsset.CreateDate);
@@ -517,7 +521,7 @@ const SearchPage: React.FC = () => {
           isLastMonth ||
           isLastYear;
 
-        return (isImage || isVideo || isAudio) && passesTimeFilter;
+        return (isImage || isVideo || isAudio || isNonMedia) && passesTimeFilter;
       }) ?? [],
     [searchResults, filters]
   );

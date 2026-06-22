@@ -9,6 +9,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   actionLabel,
   onAction,
+  actionDisabled = false,
+  actionTooltip,
 }) => {
   return (
     <Box
@@ -48,7 +50,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       )}
 
       {actionLabel && onAction && (
-        <Button variant="outlined" size="small" onClick={onAction} sx={{ mt: 1 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onAction}
+          disabled={actionDisabled}
+          title={actionTooltip}
+          sx={{ mt: 1 }}
+        >
           {actionLabel}
         </Button>
       )}

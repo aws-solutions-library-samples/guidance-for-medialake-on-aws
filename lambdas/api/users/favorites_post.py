@@ -50,6 +50,13 @@ def _add_favorite(
         if metadata:
             item["metadata"] = metadata
 
+        # Reverse-lookup keys for COLLECTION favorites only (sparse GSI4), so the
+        # collection-delete path can find and remove these rows across all users.
+        # Asset/pipeline favorites omit these and are not indexed in GSI4.
+        if item_type == "COLLECTION":
+            item["gsi4Pk"] = f"FAVCOLLECTION#{item_id}"
+            item["gsi4Sk"] = item_key
+
         table.put_item(Item=item)
 
         result = {

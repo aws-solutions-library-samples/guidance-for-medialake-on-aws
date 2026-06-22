@@ -1,8 +1,9 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -36,6 +37,22 @@ _S3_CLIENT_CACHE: Dict[str, boto3.client] = {}  # {region → client}
 # Define constants
 # 6 hours — large files (500GB) with many parts need longer-lived URLs
 DEFAULT_EXPIRATION = 21600
+MAX_COLLECTIONS_PER_UPLOAD = int(os.getenv("MAX_COLLECTIONS_PER_UPLOAD", "50"))
+
+# Collection directive constants (§6.3, §10.2)
+ML_SOURCE_KEY = "ml-source"
+ML_COLLECTION_IDS_KEY = "ml-collection-ids"
+ML_USER_ID_KEY = "ml-user-id"
+ML_OVERFLOW_KEY = "ml-collection-overflow"
+UPLOAD_SOURCE_VALUE = "upload"
+
+# S3 user-metadata budget (§6.5)
+SAFE_INLINE_BUDGET = 1536  # leave headroom for key names within S3's 2 KB limit
+
+# Upload directives table (overflow side-records, §6.5, §10.5)
+UPLOAD_DIRECTIVES_TABLE_NAME = os.getenv("UPLOAD_DIRECTIVES_TABLE_NAME", "")
+DIRECTIVE_TTL_SECONDS = 24 * 60 * 60  # ~24h
+
 ALLOWED_CONTENT_TYPES = [
     "audio/*",
     "video/*",
@@ -85,6 +102,7 @@ request_schema = {
         "content_type": {"type": "string"},
         "file_size": {"type": "integer", "minimum": 1},
         "path": {"type": "string", "default": ""},
+        "collection_ids": {"type": "array", "items": {"type": "string"}, "default": []},
     },
     "required": ["connector_id", "filename", "content_type", "file_size"],
 }
@@ -96,6 +114,7 @@ class RequestBody(BaseModel):
     content_type: str
     file_size: int = Field(gt=0)
     path: str = ""
+    collection_ids: List[str] = Field(default_factory=list)
 
     @validator("filename")
     @classmethod
@@ -131,12 +150,119 @@ class RequestBody(BaseModel):
         normalized_path = normalized_path.lstrip("/")
         return normalized_path
 
+    @validator("collection_ids")
+    @classmethod
+    def validate_collection_ids(cls, v):
+        # De-duplicate while preserving order; drop blanks.
+        seen, cleaned = set(), []
+        for cid in v:
+            cid = (cid or "").strip()
+            if cid and cid not in seen:
+                seen.add(cid)
+                cleaned.append(cid)
+        if len(cleaned) > MAX_COLLECTIONS_PER_UPLOAD:
+            raise ValueError(
+                f"At most {MAX_COLLECTIONS_PER_UPLOAD} collections may be selected per upload"
+            )
+        return cleaned
+
 
 class APIError(Exception):
     def __init__(self, message: str, status_code: int):
         self.message = message
         self.status_code = status_code
         super().__init__(self.message)
+
+
+def _authenticated_user_id(event) -> str:
+    """Read the uploader id from API Gateway authorizer claims.
+
+    Never derived from the request body — ensures association attribution
+    cannot be spoofed.
+
+    Handles both dict and JSON-string formats for claims, as API Gateway
+    may serialize authorizer claims differently depending on configuration.
+    """
+    authorizer = event.get("requestContext", {}).get("authorizer", {}) or {}
+    claims = authorizer.get("claims", {}) or {}
+
+    # Handle case where claims is a JSON-encoded string
+    if isinstance(claims, str):
+        try:
+            claims = json.loads(claims)
+        except (json.JSONDecodeError, TypeError):
+            claims = {}
+
+    # Also check direct authorizer fields (custom authorizer format)
+    if not isinstance(claims, dict):
+        claims = {}
+
+    return (
+        claims.get("sub")
+        or claims.get("cognito:username")
+        or authorizer.get("sub")
+        or authorizer.get("principalId")
+        or ""
+    )
+
+
+def _within_metadata_budget(inline_ids: str, user_id: str) -> bool:
+    """Check whether the collection directive fits within S3's 2 KB user-metadata budget.
+
+    Computes the total byte cost of all metadata key-value pairs that would be stamped
+    inline, and returns True only if it stays within SAFE_INLINE_BUDGET (§6.5).
+    """
+    used = (
+        len(ML_COLLECTION_IDS_KEY)
+        + len(inline_ids.encode("utf-8"))
+        + len(ML_SOURCE_KEY)
+        + len(UPLOAD_SOURCE_VALUE)
+        + len(ML_USER_ID_KEY)
+        + len(user_id.encode("utf-8"))
+    )
+    return used <= SAFE_INLINE_BUDGET
+
+
+def _write_overflow_directive(
+    bucket: str, key: str, collection_ids: List[str], user_id: str
+) -> None:
+    """Write the full collection id list to the Upload directives table (§6.5, §10.5).
+
+    Called when the inline encoding would exceed SAFE_INLINE_BUDGET. The side-record
+    is keyed by PK=UPLOADDIR#<bucket>#<key> and carries an expiresAt TTL (~24h) so
+    DynamoDB auto-expires it.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        raise RuntimeError("UPLOAD_DIRECTIVES_TABLE_NAME is not configured")
+    boto3.resource("dynamodb").Table(UPLOAD_DIRECTIVES_TABLE_NAME).put_item(
+        Item={
+            "PK": f"UPLOADDIR#{bucket}#{key}",
+            "collectionIds": collection_ids,
+            "userId": user_id,
+            "expiresAt": int(time.time()) + DIRECTIVE_TTL_SECONDS,
+        }
+    )
+
+
+def _build_collection_metadata(
+    collection_ids: List[str], user_id: str, bucket: str, key: str
+) -> Dict[str, str]:
+    """Build the x-amz-meta-* user-metadata dict for the collection directive (§6.3).
+
+    Returns an empty dict when no collections are selected. When the inline encoding
+    would exceed the S3 budget, writes an overflow side-record and returns only the
+    overflow marker plus source/user-id.
+    """
+    if not collection_ids:
+        return {}
+    meta: Dict[str, str] = {ML_SOURCE_KEY: UPLOAD_SOURCE_VALUE, ML_USER_ID_KEY: user_id}
+    inline = ",".join(collection_ids)
+    if _within_metadata_budget(inline, user_id):
+        meta[ML_COLLECTION_IDS_KEY] = inline
+    else:
+        _write_overflow_directive(bucket, key, collection_ids, user_id)
+        meta[ML_OVERFLOW_KEY] = "1"
+    return meta
 
 
 @tracer.capture_method
@@ -309,13 +435,22 @@ def is_multipart_upload_required(file_size: int) -> bool:
 
 @tracer.capture_method
 def generate_presigned_post_url(
-    bucket: str, key: str, content_type: str, expiration: int = DEFAULT_EXPIRATION
+    bucket: str,
+    key: str,
+    content_type: str,
+    collection_meta: Dict[str, str] = None,
+    expiration: int = DEFAULT_EXPIRATION,
 ) -> Dict[str, Any]:
-    """Generate a presigned POST URL for the S3 object using region-aware S3 client."""
+    """Generate a presigned POST URL for the S3 object using region-aware S3 client.
+
+    collection_meta keys are stamped as x-amz-meta-* in both Fields and Conditions
+    so S3 persists them as object user-metadata (§6.3, Req 8.1).
+    """
     try:
         # Get region-specific S3 client
         s3_client = _get_s3_client_for_bucket(bucket)
 
+        fields = {"Content-Type": content_type}
         conditions = [
             {"bucket": bucket},
             {"key": key},
@@ -327,12 +462,16 @@ def generate_presigned_post_url(
             {"Content-Type": content_type},
         ]
 
+        # Stamp collection directive metadata into Fields and Conditions (§6.3)
+        if collection_meta:
+            for k, v in collection_meta.items():
+                fields[f"x-amz-meta-{k}"] = v
+                conditions.append({f"x-amz-meta-{k}": v})
+
         presigned_post = s3_client.generate_presigned_post(
             Bucket=bucket,
             Key=key,
-            Fields={
-                "Content-Type": content_type,
-            },
+            Fields=fields,
             Conditions=conditions,
             ExpiresIn=expiration,
         )
@@ -348,8 +487,14 @@ def generate_presigned_post_url(
 
 
 @tracer.capture_method
-def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[str, Any]:
-    """Initiate a multipart upload and return the upload ID using region-aware S3 client."""
+def create_multipart_upload(
+    bucket: str, key: str, content_type: str, collection_meta: Dict[str, str] = None
+) -> Dict[str, Any]:
+    """Initiate a multipart upload and return the upload ID using region-aware S3 client.
+
+    collection_meta is passed as Metadata to create_multipart_upload so S3 carries it
+    onto the completed object (§6.4, Req 8.2).
+    """
     try:
         # Get region-specific S3 client
         s3_client = _get_s3_client_for_bucket(bucket)
@@ -359,11 +504,16 @@ def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[st
             f"content_type: {content_type}, region: {s3_client.meta.region_name}"
         )
 
-        response = s3_client.create_multipart_upload(
-            Bucket=bucket,
-            Key=key,
-            ContentType=content_type,
-        )
+        kwargs = {
+            "Bucket": bucket,
+            "Key": key,
+            "ContentType": content_type,
+        }
+        # Stamp collection directive metadata (§6.4)
+        if collection_meta:
+            kwargs["Metadata"] = collection_meta
+
+        response = s3_client.create_multipart_upload(**kwargs)
 
         upload_id = response["UploadId"]
         logger.info(
@@ -379,6 +529,137 @@ def create_multipart_upload(bucket: str, key: str, content_type: str) -> Dict[st
             exc_info=True,
         )
         raise APIError(f"Error creating multipart upload: {str(e)}", 500)
+
+
+def get_user_sub_from_event(event: Dict) -> Optional[str]:
+    """Extract user sub from API Gateway authorizer context.
+
+    Checks ``requestContext.authorizer.sub`` first (custom authorizer),
+    then falls back to ``requestContext.authorizer.claims.sub`` (Cognito).
+
+    Returns:
+        The user's Cognito ``sub`` claim, or ``None`` if it cannot be
+        determined.  The caller decides how to handle the missing value.
+    """
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return None
+        sub = authorizer.get("sub")
+        if sub:
+            return sub
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            try:
+                claims = json.loads(claims)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        if isinstance(claims, dict):
+            return claims.get("sub")
+    except Exception:
+        pass
+    return None
+
+
+def get_caller_permissions(event: Dict) -> List[str]:
+    """Extract the caller's flat permission list from the authorizer context.
+
+    The custom authorizer passes the decoded token — including the
+    ``custom:permissions`` JSON-string claim — as
+    ``requestContext.authorizer.claims``.
+
+    Returns an empty list if permissions cannot be determined.
+    """
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return []
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            claims = json.loads(claims)
+        if not isinstance(claims, dict):
+            return []
+        perms = claims.get("custom:permissions", "[]")
+        if isinstance(perms, str):
+            perms = json.loads(perms)
+        return perms if isinstance(perms, list) else []
+    except Exception:
+        logger.warning("Could not parse caller permissions from authorizer context")
+        return []
+
+
+def caller_can_upload_to_connectors(event: Dict) -> bool:
+    """Whether the caller may upload into shared (non-personal) connectors.
+
+    Requires the ``connectors:upload`` permission (the ``settings.`` prefixed
+    variant is also accepted for backward compatibility). This is independent
+    of personal "My Assets" uploads, which only require ``assets:upload``.
+    """
+    perms = get_caller_permissions(event)
+    return "connectors:upload" in perms or "settings.connectors:upload" in perms
+
+
+def validate_personal_path(event: Dict, resolved_key: str) -> str:
+    """Validate that the resolved S3 key belongs to the authenticated user.
+
+    For my-assets connectors, ensures the upload targets only the
+    authenticated user's personal folder.
+
+    Args:
+        event: The API Gateway event (for extracting user_sub).
+        resolved_key: The fully constructed S3 object key.
+
+    Returns:
+        The user_sub if validation passes.
+
+    Raises:
+        APIError(401): If user_sub cannot be extracted.
+        APIError(403): If the key doesn't start with ``personal/{user_sub}/``.
+    """
+    user_sub = get_user_sub_from_event(event)
+    if user_sub is None:
+        raise APIError("Unauthorized: unable to identify user", 401)
+
+    expected_prefix = f"personal/{user_sub}/"
+    if not resolved_key.startswith(expected_prefix):
+        logger.warning(
+            f"Personal path enforcement rejected - resolved_key: {resolved_key}, "
+            f"expected_prefix: {expected_prefix}"
+        )
+        metrics.add_metric(
+            name="PersonalPathEnforcementRejection", value=1, unit="Count"
+        )
+        raise APIError(
+            "Access denied: upload path is outside your personal folder",
+            403,
+        )
+
+    return user_sub
+
+
+def _is_personal_target(connector: Dict[str, Any]) -> bool:
+    """Whether an upload to ``connector`` must be confined to the caller's own
+    personal ("My Assets") folder.
+
+    True for the per-user my-assets connector AND for any connector that targets
+    the personal-assets bucket or the reserved ``personal/`` key prefix (e.g. the
+    internal ``my-assets-system`` connector). Enforcing personal-path ownership
+    regardless of the connector's declared ``type`` prevents a caller with
+    ``connectors:upload`` from using a personal-bucket connector to write into
+    another user's folder.
+    """
+    if connector.get("type") == "my-assets":
+        return True
+
+    object_prefix = (connector.get("objectPrefix") or "").lstrip("/")
+    if object_prefix == "personal" or object_prefix.startswith("personal/"):
+        return True
+
+    personal_bucket = os.environ.get("PERSONAL_ASSETS_BUCKET", "").strip()
+    if personal_bucket and connector.get("storageIdentifier") == personal_bucket:
+        return True
+
+    return False
 
 
 @metrics.log_metrics(capture_cold_start_metric=True)
@@ -486,8 +767,46 @@ def lambda_handler(
             # No prefix restrictions
             key = f"{safe_path}/{request.filename}" if safe_path else request.filename
 
-        # Normalize the key to prevent any issues
-        key = str(Path(key))
+        # Normalize the key to prevent any issues.
+        # Use os.path.normpath to resolve ".." and "." components, which
+        # pathlib.Path does NOT do for relative paths.  This is critical
+        # for the personal-path enforcement below: without normpath, a
+        # crafted path like "personal/user-A/../user-B/file" would pass
+        # the startswith check but resolve to another user's folder on S3.
+        key = os.path.normpath(str(Path(key)))
+
+        # Enforce personal-path ownership for any connector that targets the
+        # personal-assets bucket / reserved `personal/` prefix — the per-user
+        # my-assets connector AND the internal my-assets-system connector. This
+        # stops a caller with connectors:upload from using a personal-bucket
+        # connector to write into another user's folder.
+        if _is_personal_target(connector):
+            validate_personal_path(event, key)
+        else:
+            # Uploading into a shared (non-personal) connector requires the
+            # connectors:upload permission in addition to assets:upload.
+            # Personal "My Assets" uploads above are exempt.
+            if not caller_can_upload_to_connectors(event):
+                logger.warning(
+                    "Upload to shared connector denied: caller lacks "
+                    "connectors:upload",
+                    extra={"connector_id": request.connector_id},
+                )
+                metrics.add_metric(
+                    name="ConnectorUploadPermissionDenied", value=1, unit="Count"
+                )
+                raise APIError(
+                    "Access denied: you do not have permission to upload to "
+                    "this connector.",
+                    403,
+                )
+
+        # Compute the collection directive once and apply it to whichever upload
+        # path is taken (§6.3, §6.4 — single-part and multipart share the same metadata)
+        user_id = _authenticated_user_id(event)
+        collection_meta = _build_collection_metadata(
+            request.collection_ids, user_id, bucket, key
+        )
 
         # Handle multipart upload if file is larger than 100MB
         if is_multipart_upload_required(request.file_size):
@@ -501,7 +820,7 @@ def lambda_handler(
             # 1. Create a multipart upload
             # 2. Generate presigned URLs for each part
             multipart_upload_info = create_multipart_upload(
-                bucket, key, request.content_type
+                bucket, key, request.content_type, collection_meta
             )
             upload_id = multipart_upload_info["upload_id"]
 
@@ -578,7 +897,7 @@ def lambda_handler(
 
             # For single-part uploads, generate a presigned POST URL
             presigned_post = generate_presigned_post_url(
-                bucket, key, request.content_type
+                bucket, key, request.content_type, collection_meta
             )
 
             logger.info(

@@ -1644,7 +1644,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
 };
 
 // Collaboration content component (unused but kept for future use)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _AssetCollaboration: React.FC<AssetCollaborationProps> = ({
   comments = [],
   onAddComment,
@@ -1773,7 +1773,7 @@ const _AssetCollaboration: React.FC<AssetCollaborationProps> = ({
 };
 
 // Pipelines content component (unused but kept for future use)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -1848,7 +1848,7 @@ const _AssetPipelines: React.FC<AssetPipelinesProps> = () => {
 };
 
 // Activity content component (unused but kept for future use)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _AssetActivity: React.FC<AssetActivityProps> = () => {
   const { t } = useTranslation();
   const theme = useTheme();

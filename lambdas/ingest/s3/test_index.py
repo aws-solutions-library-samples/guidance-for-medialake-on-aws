@@ -11,6 +11,8 @@ _file_ext_mod.SUPPORTED_EXTENSIONS = {
 }
 sys.modules.setdefault("file_extensions", _file_ext_mod)
 sys.modules.setdefault("asset_deletion_service", MagicMock())
+sys.modules.setdefault("collections_utils", MagicMock())
+sys.modules.setdefault("collection_activity", MagicMock())
 
 with patch.dict(
     "os.environ",

@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.16.0] - 2026-06-22
+
+### Features
+
+- feat(deployment): add UseCliCredentials and GitBranch CFN parameters (PR#28)
+- feat(connectors): Add per-connector file-type filtering supporting extensions and MIME types in allow or deny mode. File types that the Default Pipelines will show as a asset card with the type of file they are but no preview or viewing of the asset.
+- feat: Add ability for users to upload to My Assets, a Media Lake managed personal assets S3 bucket
+- feat(collections): per-user collection favorites
+
+### Bug Fixes
+
+- fix: Minor UI fixes for CollectionsWidget and PipelineBuilder
+- fix: collections item counts not rendering and asset cards in collections not showing full metadata
+
+### Code Refactoring
+
+- refactor: Ability to add assets to collections during upload from UI
+
 ## [1.15.0] - 2026-06-17
 
 ### Features

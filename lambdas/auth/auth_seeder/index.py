@@ -113,6 +113,8 @@ DEFAULT_PERMISSION_SETS = [
                 "view": True,
                 "edit": True,
                 "delete": True,
+                # Upload assets into shared (non-personal) connectors.
+                "upload": True,
             },
             "users": {
                 "create": True,
@@ -256,9 +258,11 @@ DEFAULT_PERMISSION_SETS = [
                 "edit": False,
             },
             # Top-level resource permissions (required by custom authorizer)
-            # Connectors (view only - needed to browse assets on the assets page)
+            # Connectors: view to browse the Assets page; upload to send assets
+            # into shared (non-personal) connectors.
             "connectors": {
                 "view": True,
+                "upload": True,
             },
             "nodes": {
                 "view": True,

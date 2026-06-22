@@ -7,6 +7,7 @@ import "@uppy/dashboard/css/style.min.css";
 import {
   Box,
   Button,
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -14,13 +15,18 @@ import {
   Select,
   SelectChangeEvent,
   Typography,
+  Alert,
 } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
+import PersonIcon from "@mui/icons-material/Person";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useTranslation } from "react-i18next";
 import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
+import { usePermission } from "@/permissions";
 import useS3Upload from "../hooks/useS3Upload";
 import { MultipartUploadMetadata } from "../types/upload.types";
 import PathBrowser from "./PathBrowser";
+import CollectionSelector, { CollectionRef } from "./CollectionSelector";
 import { typography } from "@/theme/tokens";
 
 // Define meta type to make typings clearer
@@ -63,6 +69,9 @@ interface FileUploaderProps {
   onUploadError?: (error: Error, file: any) => void;
   path?: string;
   onPathChange?: (path: string) => void;
+  defaultConnectorId?: string;
+  lockConnector?: boolean;
+  defaultObjectPrefix?: string;
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({
@@ -70,13 +79,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   onUploadError,
   path = "",
   onPathChange,
+  defaultConnectorId,
+  lockConnector,
+  defaultObjectPrefix,
 }) => {
   const { t } = useTranslation();
+  const { can } = usePermission();
+  // Shared (non-My-Assets) connectors are only offered as upload destinations
+  // to users who can upload into connectors. My Assets is always exempt.
+  const canUploadToConnectors = can("upload", "connector");
   const [uppy, setUppy] = useState<Uppy<Meta> | null>(null);
   const [selectedConnector, setSelectedConnector] = useState<string>("");
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadPath, setUploadPath] = useState<string>(path || "");
   const [isPathBrowserOpen, setIsPathBrowserOpen] = useState<boolean>(false);
+  const [selectedCollections, setSelectedCollections] = useState<CollectionRef[]>([]);
   const { data: connectorsResponse, isLoading: isLoadingConnectors } = useSearchConnectors();
   const {
     getPresignedUrl,
@@ -88,16 +105,58 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   // Store multipart upload metadata keyed by file ID
   const multipartDataRef = useRef<Map<string, MultipartUploadMetadata>>(new Map());
 
-  // Filter only S3 connectors that are active
+  // Filter only S3 connectors that are active and have uploads enabled
   const connectors =
     connectorsResponse?.data?.connectors.filter(
-      (connector) => connector.type === "s3" && connector.status === "active"
+      (connector) =>
+        connector.type === "s3" &&
+        connector.status === "active" &&
+        connector.configuration?.allowUploads !== false
     ) || [];
+
+  // Memoize collection ids for the upload request body and Uppy meta
+  const collectionIds = useMemo(() => selectedCollections.map((c) => c.id), [selectedCollections]);
+
+  // Connectors the user can pick from, excluding the My Assets virtual connector.
+  // When the connector is locked (e.g. "Upload to My Assets"), or the user
+  // lacks the connectors:upload permission, no other connectors are selectable
+  // — only My Assets remains available.
+  const otherConnectors = connectors.filter((c) => c.id !== defaultConnectorId);
+  const selectableConnectors = lockConnector || !canUploadToConnectors ? [] : otherConnectors;
+
+  // My Assets is a valid destination only when a defaultConnectorId is provided.
+  const hasMyAssets = !!defaultConnectorId;
+
+  // Total destinations available to the user. If the user can't read any
+  // connectors (e.g. no permission) and has no personal My Assets space,
+  // this is 0 and uploads are blocked.
+  const destinationCount = (hasMyAssets ? 1 : 0) + selectableConnectors.length;
+  const hasNoDestinations = destinationCount === 0;
+  const hasSingleDestination = destinationCount === 1;
+
+  // The single connector destination (when My Assets is not present).
+  const singleConnector = !hasMyAssets ? selectableConnectors[0] : undefined;
+
+  // When there is exactly one selectable connector and no My Assets, that
+  // connector is auto-selected (no dropdown is shown).
+  const autoSelectConnectorId =
+    !hasMyAssets && selectableConnectors.length === 1 ? selectableConnectors[0].id : undefined;
 
   // Sync uploadPath with path prop
   useEffect(() => {
     setUploadPath(path || "");
   }, [path]);
+
+  // Pre-select the destination automatically:
+  // - My Assets when a defaultConnectorId is provided
+  // - the only connector when it is the single available destination
+  useEffect(() => {
+    if (defaultConnectorId) {
+      setSelectedConnector(defaultConnectorId);
+    } else if (autoSelectConnectorId) {
+      setSelectedConnector(autoSelectConnectorId);
+    }
+  }, [defaultConnectorId, autoSelectConnectorId]);
 
   // Helper function to parse objectPrefix into array
   const parseObjectPrefix = (objectPrefix: string | string[] | undefined): string[] => {
@@ -115,6 +174,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     [connectors, selectedConnector]
   );
 
+  // Determine if My Assets is currently selected
+  const isMyAssetsSelected = !!defaultConnectorId && selectedConnector === defaultConnectorId;
+
   // Extract and parse allowedPrefixes from selected connector
   // Fallback to configuration.objectPrefix if top-level objectPrefix is undefined
   const allowedPrefixes = useMemo(() => {
@@ -125,25 +187,34 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   }, [selectedConnectorObj]);
 
   // Automatically default to first allowed prefix when connector has restrictions
-  // This prevents users from seeing "/" as the destination when they can't upload there
+  // For My Assets, use the fixed defaultObjectPrefix
   useEffect(() => {
-    // Only auto-set path if:
-    // 1. A connector is selected
-    // 2. The connector has prefix restrictions (allowedPrefixes.length > 0)
-    // 3. The current uploadPath is empty or root ("/")
+    if (isMyAssetsSelected && defaultObjectPrefix) {
+      const normalizedPrefix = defaultObjectPrefix.endsWith("/")
+        ? defaultObjectPrefix
+        : `${defaultObjectPrefix}/`;
+      setUploadPath(normalizedPrefix);
+      if (onPathChange) {
+        onPathChange(normalizedPrefix);
+      }
+      return;
+    }
     if (selectedConnector && allowedPrefixes.length > 0 && (!uploadPath || uploadPath === "/")) {
       const firstPrefix = allowedPrefixes[0];
-      // Ensure the prefix has proper formatting (trailing slash)
       const normalizedPrefix = firstPrefix.endsWith("/") ? firstPrefix : `${firstPrefix}/`;
-
       setUploadPath(normalizedPrefix);
-
-      // Notify parent component if callback provided
       if (onPathChange) {
         onPathChange(normalizedPrefix);
       }
     }
-  }, [selectedConnector, allowedPrefixes, uploadPath, onPathChange]);
+  }, [
+    selectedConnector,
+    allowedPrefixes,
+    uploadPath,
+    onPathChange,
+    isMyAssetsSelected,
+    defaultObjectPrefix,
+  ]);
 
   // Initialize Uppy when the component mounts
   useEffect(() => {
@@ -230,6 +301,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
     const handleComplete = (result: { successful: any[] }) => {
       setIsUploading(false);
+      if (selectedCollections.length > 0 && result.successful?.length > 0) {
+        uppy.info(
+          "Files will be added to the selected collections after processing completes.",
+          "info",
+          5000
+        );
+      }
       if (onUploadComplete) {
         onUploadComplete(result.successful);
       }
@@ -253,7 +331,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       uppy.off("complete", handleComplete);
       uppy.off("cancel-all", handleCancelAll);
     };
-  }, [uppy, onUploadComplete, onUploadError]);
+  }, [uppy, onUploadComplete, onUploadError, selectedCollections]);
 
   // Configure S3 upload when connector is selected
   useEffect(() => {
@@ -266,14 +344,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         ...existingMeta,
         connector_id: selectedConnector,
         path: uploadPath,
+        collection_ids: collectionIds,
       },
     });
 
-    // Find the selected connector
-    const connector = connectors.find((c) => c.id === selectedConnector);
-    if (!connector) return;
-
     // Configure S3 upload parameters with multipart support
+    // Works for both regular S3 connectors and My Assets virtual connectors
     const awsS3 = uppy.getPlugin("S3Uploader") as typeof AwsS3.prototype;
     if (awsS3) {
       try {
@@ -290,6 +366,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 content_type: file.type,
                 file_size: file.size,
                 path: uploadPath,
+                collection_ids: collectionIds,
               });
 
               // Single-part upload
@@ -317,6 +394,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 content_type: file.type,
                 file_size: file.size,
                 path: uploadPath,
+                collection_ids: collectionIds,
               });
 
               if (!result.multipart) {
@@ -433,11 +511,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   }, [
     uppy,
     selectedConnector,
-    connectors,
     getPresignedUrl,
     completeMultipartUpload,
     abortMultipartUpload,
     uploadPath,
+    collectionIds,
   ]);
 
   const handleConnectorChange = (event: SelectChangeEvent<string>) => {
@@ -451,38 +529,96 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     setUploadPath("");
   };
 
-  if (isLoadingConnectors) {
+  // My Assets is always available independently of the connectors query, so
+  // only block on the connectors load when there is no My Assets destination.
+  if (isLoadingConnectors && !hasMyAssets) {
     return <Typography>{t("upload.loadingConnectors")}</Typography>;
   }
 
-  if (connectors.length === 0) {
-    return <Typography color="error">{t("upload.noConnectors")}</Typography>;
+  // No destination the user can upload to (e.g. no permission to read
+  // connectors and no personal My Assets space) — block uploads entirely.
+  if (hasNoDestinations) {
+    return (
+      <Alert severity="info" icon={<InfoOutlinedIcon />}>
+        {t("upload.noDestinations")}
+      </Alert>
+    );
   }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <FormControl fullWidth>
-        <InputLabel id="connector-select-label">{t("upload.connectorLabel")}</InputLabel>
-        <Select
-          labelId="connector-select-label"
-          id="connector-select"
-          value={selectedConnector}
-          label={t("upload.connectorLabel")}
-          onChange={handleConnectorChange}
-          disabled={!connectors.length || isUploading}
+      {hasSingleDestination ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            borderRadius: "8px",
+            border: "1px solid",
+            borderColor: "divider",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+          }}
         >
-          <MenuItem value="" disabled>
-            <em>{t("upload.selectConnectorPlaceholder")}</em>
-          </MenuItem>
-          {connectors.map((connector) => (
-            <MenuItem key={connector.id} value={connector.id}>
-              {connector.name} ({connector.storageIdentifier})
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+          {hasMyAssets ? (
+            <>
+              <PersonIcon color="primary" />
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                My Assets
+              </Typography>
+              <Chip label="Personal · Private" size="small" color="primary" variant="outlined" />
+            </>
+          ) : (
+            <>
+              <FolderIcon color="primary" />
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                  {t("upload.connectorLabel")}
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {singleConnector?.name} ({singleConnector?.storageIdentifier})
+                </Typography>
+              </Box>
+            </>
+          )}
+        </Paper>
+      ) : (
+        <FormControl fullWidth>
+          <InputLabel id="connector-select-label">{t("upload.connectorLabel")}</InputLabel>
+          <Select
+            labelId="connector-select-label"
+            id="connector-select"
+            value={selectedConnector}
+            label={t("upload.connectorLabel")}
+            onChange={handleConnectorChange}
+            disabled={isUploading}
+          >
+            {hasMyAssets && (
+              <MenuItem value={defaultConnectorId}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <PersonIcon fontSize="small" color="primary" />
+                  My Assets
+                </Box>
+              </MenuItem>
+            )}
+            {selectableConnectors.map((connector) => (
+              <MenuItem key={connector.id} value={connector.id}>
+                {connector.name} ({connector.storageIdentifier})
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
 
       {selectedConnector && (
+        <CollectionSelector
+          value={selectedCollections}
+          onChange={setSelectedCollections}
+          disabled={isUploading}
+        />
+      )}
+
+      {selectedConnector && !isMyAssetsSelected && (
         <Paper
           elevation={0}
           sx={{
@@ -572,7 +708,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         )}
       </Box>
 
-      {selectedConnector && (
+      {selectedConnector && !isMyAssetsSelected && (
         <PathBrowser
           open={isPathBrowserOpen}
           onClose={() => setIsPathBrowserOpen(false)}

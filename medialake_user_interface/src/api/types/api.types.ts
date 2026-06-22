@@ -128,8 +128,19 @@ export interface CreateConnectorRequest {
     s3IntegrationMethod?: "s3Notifications" | "eventbridge";
     region?: string;
     objectPrefix?: string | string[];
+    allowedFileExtensions?: string[];
+    fileFilter?: {
+      mode?: "allow" | "deny";
+      extensions?: string[];
+      mimeTypes?: string[];
+    };
     allowUploads?: boolean;
-    [key: string]: string | string[] | boolean | undefined;
+    [key: string]:
+      | string
+      | string[]
+      | boolean
+      | { mode?: "allow" | "deny"; extensions?: string[]; mimeTypes?: string[] }
+      | undefined;
   };
 }
 

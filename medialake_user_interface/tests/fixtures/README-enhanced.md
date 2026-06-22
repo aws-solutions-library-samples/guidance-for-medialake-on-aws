@@ -11,13 +11,11 @@ The enhanced fixture system extends the original MediaLake Playwright fixtures w
 ### Core Components
 
 1. **AWS Resource Discovery Engine** ([`aws-resource-finder.ts`](../utils/aws-resource-finder.ts))
-
    - Unified resource discovery with caching and fallback mechanisms
    - Support for multiple AWS services (Cognito, CloudFront, S3, etc.)
    - Worker-isolated caching for parallel test execution
 
 2. **Service Adapters**
-
    - [`cognito-service-adapter.ts`](../utils/cognito-service-adapter.ts): Cognito user pool discovery and management
    - [`cloudfront-service-adapter.ts`](../utils/cloudfront-service-adapter.ts): CloudFront distribution discovery and testing
    - [`tag-matcher.ts`](../utils/tag-matcher.ts): Standardized tag filtering and matching
@@ -154,20 +152,17 @@ Comprehensive integration tests that validate the complete workflow from tag-bas
 #### Test Coverage
 
 1. **Complete Workflow Validation**
-
    - Tag-based resource discovery
    - User creation with permanent passwords
    - CloudFront navigation and login automation
    - End-to-end authentication flow
 
 2. **Performance and Caching**
-
    - Discovery performance benchmarks
    - Cache behavior validation
    - Concurrent execution testing
 
 3. **Backward Compatibility**
-
    - Compatibility with existing [`auth.fixtures.ts`](auth.fixtures.ts)
    - S3 bucket naming pattern compatibility
    - Worker isolation validation
@@ -479,13 +474,11 @@ PWDEBUG=1 npx playwright test tests/integration/aws-tag-discovery-e2e.spec.ts
 ### Resource Management
 
 1. **Tag Resources Consistently**
-
    - Use standardized tag patterns
    - Include environment and application tags
    - Add testing-specific tags for test resources
 
 2. **Optimize Discovery Performance**
-
    - Use appropriate cache TTL for your environment
    - Prefetch common resources in setup
    - Monitor discovery performance metrics
@@ -498,7 +491,6 @@ PWDEBUG=1 npx playwright test tests/integration/aws-tag-discovery-e2e.spec.ts
 ### Parallel Execution
 
 1. **Ensure Worker Isolation**
-
    - Each worker gets unique test users
    - Cache instances are worker-isolated
    - Resource cleanup is worker-specific

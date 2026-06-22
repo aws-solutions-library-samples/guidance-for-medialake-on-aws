@@ -8,6 +8,7 @@ export const QUERY_KEYS = {
   },
   CONNECTORS: {
     all: ["connectors"] as const,
+    myAssets: () => [...QUERY_KEYS.CONNECTORS.all, "my-assets"] as const,
     lists: () => [...QUERY_KEYS.CONNECTORS.all, "list"] as const,
     list: (filters: string) => [...QUERY_KEYS.CONNECTORS.lists(), { filters }] as const,
     details: () => [...QUERY_KEYS.CONNECTORS.all, "detail"] as const,
@@ -170,6 +171,7 @@ export const QUERY_KEYS = {
     metadataKeys: () => ["collections", "metadata-keys"] as const,
     collectionTypes: () => [...QUERY_KEYS.COLLECTIONS.all, "collection-types"] as const,
     users: () => [...QUERY_KEYS.COLLECTIONS.all, "users"] as const,
+    recent: (pageSize: number) => [...QUERY_KEYS.COLLECTIONS.all, "recent", { pageSize }] as const,
   },
   PORTALS: {
     all: ["portals"] as const,

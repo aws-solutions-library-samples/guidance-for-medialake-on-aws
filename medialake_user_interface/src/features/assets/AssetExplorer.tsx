@@ -50,9 +50,16 @@ import FacetFilterPanel, { type Facet, type SelectedFacets } from "./FacetFilter
 interface AssetExplorerProps {
   connectorId: string;
   bucketName?: string;
+  objectPrefix?: string;
+  emptyStateContent?: React.ReactNode;
 }
 
-const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }) => {
+const AssetExplorer: React.FC<AssetExplorerProps> = ({
+  connectorId,
+  bucketName,
+  objectPrefix,
+  emptyStateContent,
+}) => {
   const { t } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
@@ -121,6 +128,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
     error,
   } = useConnectorAssets({
     bucketName: bucketName || "",
+    objectPrefix,
     page,
     pageSize,
     sortBy,
@@ -527,6 +535,11 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({ connectorId, bucketName }
   const errorGuidance = errorData?.guidance;
 
   if (hasNoAssets) {
+    // Use custom empty state if provided
+    if (emptyStateContent) {
+      return <>{emptyStateContent}</>;
+    }
+
     // Distinguish between different empty states
     let title = t("assetExplorer.noAssetsFound");
     let message = t("assetExplorer.noIndexedAssets", { bucketName });

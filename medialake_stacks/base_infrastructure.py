@@ -321,7 +321,12 @@ class BaseInfrastructureStack(Stack):
                         ],
                         allowed_origins=media_assets_cors_origins,
                         allowed_headers=["*"],
-                        exposed_headers=["ETag"],
+                        exposed_headers=[
+                            "ETag",
+                            "Location",
+                            "x-amz-request-id",
+                            "x-amz-version-id",
+                        ],
                         max_age=3000,
                     )
                 ],
@@ -470,6 +475,21 @@ class BaseInfrastructureStack(Stack):
                 name="StoragePath", type=dynamodb.AttributeType.STRING
             ),
             projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        # Upload directives table — backs the overflow path for collection metadata
+        # that exceeds the S3 user-metadata budget (§6.5). Keyed by
+        # UPLOADDIR#<bucket>#<key>, auto-expired via DynamoDB TTL on `expiresAt`.
+        self._upload_directives_table = dynamodb.Table(
+            self,
+            "UploadDirectivesTable",
+            table_name=f"{config.resource_prefix}-upload-directives-{config.environment}",
+            partition_key=dynamodb.Attribute(
+                name="PK", type=dynamodb.AttributeType.STRING
+            ),
+            time_to_live_attribute="expiresAt",
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create asset table stream construct
@@ -952,6 +972,39 @@ class BaseInfrastructureStack(Stack):
         """
         indexes = self._s3_vector_cluster.indexes
         return indexes[0] if indexes else "media-vectors"
+
+    @property
+    def upload_directives_table(self) -> dynamodb.Table:
+        """
+        Returns the Upload directives DynamoDB table.
+
+        This table backs the overflow path for collection metadata that exceeds
+        the S3 user-metadata budget. Items are auto-expired via TTL.
+
+        Returns:
+            dynamodb.Table: The Upload directives table
+        """
+        return self._upload_directives_table
+
+    @property
+    def upload_directives_table_name(self) -> str:
+        """
+        Returns the name of the Upload directives table.
+
+        Returns:
+            str: Name of the Upload directives DynamoDB table
+        """
+        return self._upload_directives_table.table_name
+
+    @property
+    def upload_directives_table_arn(self) -> str:
+        """
+        Returns the ARN of the Upload directives table.
+
+        Returns:
+            str: ARN of the Upload directives DynamoDB table
+        """
+        return self._upload_directives_table.table_arn
 
     @property
     def asset_embeddings_index_name(self) -> str:

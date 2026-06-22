@@ -9,6 +9,7 @@ import React, { useCallback, useMemo } from "react";
 import { Box } from "@mui/material";
 import { Theme } from "@mui/material/styles";
 import { PLACEHOLDER_IMAGE, VIDEO_PLACEHOLDER_IMAGE } from "@/utils/placeholderSvg";
+import { getExtensionBadge } from "@/utils/extensionBadge";
 
 interface AssetCardThumbnailProps {
   id: string;
@@ -29,10 +30,11 @@ interface AssetCardThumbnailProps {
 }
 
 const createImageErrorHandler =
-  (assetType?: string, placeholderImage?: string) =>
+  (assetType?: string, placeholderImage?: string, fallbackBadge?: string) =>
   (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     event.currentTarget.src =
-      assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : placeholderImage ?? PLACEHOLDER_IMAGE;
+      fallbackBadge ??
+      (assetType === "Video" ? VIDEO_PLACEHOLDER_IMAGE : (placeholderImage ?? PLACEHOLDER_IMAGE));
   };
 
 const AssetCardThumbnail: React.FC<AssetCardThumbnailProps> = React.memo(
@@ -53,9 +55,14 @@ const AssetCardThumbnail: React.FC<AssetCardThumbnailProps> = React.memo(
     onAssetClick,
     onImageError,
   }) => {
+    const nonMediaBadge = useMemo(
+      () => (!isMediaAsset ? getExtensionBadge(name) : undefined),
+      [isMediaAsset, name]
+    );
+
     const defaultImageErrorHandler = useCallback(
-      createImageErrorHandler(assetType, placeholderImage),
-      [assetType, placeholderImage]
+      createImageErrorHandler(assetType, placeholderImage, nonMediaBadge),
+      [assetType, placeholderImage, nonMediaBadge]
     );
 
     const imgSx = useMemo(
@@ -113,7 +120,7 @@ const AssetCardThumbnail: React.FC<AssetCardThumbnailProps> = React.memo(
               src={
                 isMediaAsset
                   ? thumbnailUrl || VIDEO_PLACEHOLDER_IMAGE
-                  : thumbnailUrl || placeholderImage
+                  : thumbnailUrl || nonMediaBadge || placeholderImage
               }
               alt={name}
               onError={onImageError || defaultImageErrorHandler}

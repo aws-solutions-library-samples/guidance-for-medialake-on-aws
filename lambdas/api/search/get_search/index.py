@@ -33,7 +33,10 @@ from pydantic import (
 from search_utils import parse_search_query
 
 # Import unified search components
-from unified_search_orchestrator import UnifiedSearchOrchestrator
+from unified_search_orchestrator import (
+    UnifiedSearchOrchestrator,
+    is_owned_or_nonpersonal,
+)
 from url_utils import generate_cloudfront_url, generate_cloudfront_urls_batch
 
 # Global flag to enable/disable clip logic
@@ -52,6 +55,7 @@ REQUIRED_SOURCE_FIELDS: List[str] = [
     "DigitalSourceAsset.Type",
     "DigitalSourceAsset.MainRepresentation.Format",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey",
+    "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.Bucket",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.CreateDate",
     "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileSize",
@@ -172,6 +176,7 @@ class SearchParams(BaseModelWithConfig):
 
     # For asset explorer
     storageIdentifier: Optional[str] = None
+    objectPrefix: Optional[str] = None
 
     # Semantic search modality (Marengo 3.0): comma-separated visual,audio,transcript
     searchModality: Optional[str] = Field(default="visual")
@@ -492,8 +497,87 @@ def map_sort_field_to_opensearch_path(field_name: str) -> str:
     return field_mapping.get(field_name, field_name)
 
 
+def _hit_bucket(hit: Dict) -> str:
+    """Extract the S3 Bucket from a raw OpenSearch hit's _source."""
+    return (
+        hit.get("_source", {})
+        .get("DigitalSourceAsset", {})
+        .get("MainRepresentation", {})
+        .get("StorageInfo", {})
+        .get("PrimaryLocation", {})
+        .get("Bucket", "")
+    )
+
+
+def _hit_full_path(hit: Dict) -> str:
+    """Extract the S3 ObjectKey FullPath from a raw OpenSearch hit's _source."""
+    return (
+        hit.get("_source", {})
+        .get("DigitalSourceAsset", {})
+        .get("MainRepresentation", {})
+        .get("StorageInfo", {})
+        .get("PrimaryLocation", {})
+        .get("ObjectKey", {})
+        .get("FullPath", "")
+    )
+
+
+def build_personal_assets_filter(user_sub: Optional[str]) -> List[Dict]:
+    """Server-side ``bool.must_not`` clauses that exclude personal-bucket objects
+    not owned by ``user_sub``.
+
+    ``Bucket`` and ``ObjectKey.FullPath`` are analyzed ``text`` fields, so exact
+    ``term``/``prefix`` queries don't match them — but ``match_phrase`` does (it
+    matches the analyzer's consecutive token sequence). The personal bucket name
+    and the ``personal/{sub}/`` prefix tokenize to stable sequences, so
+    match_phrase reliably identifies personal-bucket docs and the owner's own
+    objects. That lets OpenSearch exclude other users' personal assets
+    server-side and paginate natively (no over-fetch), and keeps facet counts
+    correct (aggregations run over the filtered set).
+
+    The exact Python owner guard (``is_owned_or_nonpersonal``) remains the
+    authority and backstops the only imperfect case: a key crafted to embed
+    another user's ``personal/{sub}/`` segment mid-path could slip past
+    match_phrase, and the guard removes it from the page. match_phrase
+    false-negatives (hiding the owner's own asset) are not a concern: the prefix
+    is the fixed ``personal/<uuid>/`` shape and the same analyzer is used at
+    index and query time.
+
+    Returns clauses to extend ``query["bool"]["must_not"]``, or ``[]`` when
+    ``PERSONAL_ASSETS_BUCKET`` is not configured.
+    """
+    personal_bucket = os.environ.get("PERSONAL_ASSETS_BUCKET", "").strip()
+    if not personal_bucket:
+        return []
+
+    fullpath_field = (
+        "DigitalSourceAsset.MainRepresentation.StorageInfo."
+        "PrimaryLocation.ObjectKey.FullPath"
+    )
+    in_personal_bucket = {"match_phrase": {STORAGE_IDENTIFIER_FIELD: personal_bucket}}
+
+    if user_sub:
+        owned = {"match_phrase": {fullpath_field: f"personal/{user_sub}/"}}
+        # Exclude docs that are in the personal bucket AND not owned by the user.
+        return [
+            {
+                "bool": {
+                    "must": [
+                        in_personal_bucket,
+                        {"bool": {"must_not": [owned]}},
+                    ]
+                }
+            }
+        ]
+
+    # Unauthenticated: exclude every personal-bucket object.
+    return [in_personal_bucket]
+
+
 def build_search_query(
-    params: SearchParams, metadata_fields_config: Optional[List[Dict]] = None
+    params: SearchParams,
+    user_sub: Optional[str] = None,
+    metadata_fields_config: Optional[List[Dict]] = None,
 ) -> Tuple[Dict, Optional[Dict]]:
     """Build search query from search parameters.
 
@@ -538,20 +622,50 @@ def build_search_query(
         # This field is used to filter assets by their S3 bucket location
 
         # Try both the exact field and .keyword variant for better compatibility
-        query_body = {
-            "query": {
-                "bool": {
-                    "should": [
-                        {"term": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
-                        {"term": {f"{STORAGE_IDENTIFIER_FIELD}.keyword": bucket_name}},
-                        {"match_phrase": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
-                    ],
-                    "minimum_should_match": 1,
-                }
-            },
-            "from": (params.page - 1) * params.pageSize,
-            "size": params.pageSize,
+        bucket_clause = {
+            "bool": {
+                "should": [
+                    {"term": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
+                    {"term": {f"{STORAGE_IDENTIFIER_FIELD}.keyword": bucket_name}},
+                    {"match_phrase": {STORAGE_IDENTIFIER_FIELD: bucket_name}},
+                ],
+                "minimum_should_match": 1,
+            }
         }
+
+        # FullPath / Bucket are analyzed `text`, so exact prefix/term matching
+        # isn't possible — but match_phrase matches the analyzer's token
+        # sequence. When objectPrefix is set (the My Assets explorer, and folder
+        # browsing) we narrow server-side with a match_phrase on FullPath so
+        # OpenSearch returns (approximately) only objects under that prefix and
+        # paginates them natively. The shared personal bucket is therefore scoped
+        # per-user server-side rather than scanned globally. Exactness is still
+        # enforced by the deterministic startswith filter + personal-asset owner
+        # guard (perform_search / orchestrator), so an imprecise analyzer match
+        # cannot widen visibility — it only bounds the candidate set.
+        if params.objectPrefix:
+            fullpath_field = (
+                "DigitalSourceAsset.MainRepresentation.StorageInfo."
+                "PrimaryLocation.ObjectKey.FullPath"
+            )
+            query_body = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            bucket_clause,
+                            {"match_phrase": {fullpath_field: params.objectPrefix}},
+                        ]
+                    }
+                },
+                "from": (params.page - 1) * params.pageSize,
+                "size": params.pageSize,
+            }
+        else:
+            query_body = {
+                "query": bucket_clause,
+                "from": (params.page - 1) * params.pageSize,
+                "size": params.pageSize,
+            }
 
         # Add sort clause if sort parameters are present
         if params.sort_by:
@@ -805,7 +919,15 @@ def build_search_query(
     # Add all filters at once
     query["bool"]["filter"].extend(filters_to_add)
 
-    # Build the complete OpenSearch query with aggregations for facets
+    # Personal-asset isolation (server-side): exclude other users' personal-bucket
+    # objects via match_phrase clauses (see build_personal_assets_filter). This
+    # lets OpenSearch paginate natively (no over-fetch) and keeps the facet
+    # aggregations below accurate, because they now run over the filtered set. The
+    # exact Python owner guard (is_owned_or_nonpersonal) remains the authority and
+    # backstops the rare adversarial case.
+    query["bool"]["must_not"].extend(build_personal_assets_filter(user_sub))
+
+    # Build the complete OpenSearch query with aggregations for facets.
     query_body = {
         "query": query,
         "min_score": params.min_score,
@@ -1362,7 +1484,7 @@ def create_search_metadata(
     )
 
 
-def perform_search(params: SearchParams) -> Dict:
+def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict:
     """Perform search operation in OpenSearch with proper error handling."""
     overall_start = time.time()
     logger.info(f"[PERF] Starting search operation for query: {params.q}")
@@ -1401,7 +1523,9 @@ def perform_search(params: SearchParams) -> Dict:
         metadata_fields_config = fetch_metadata_fields_config()
 
         query_build_start = time.time()
-        search_body, facets_info = build_search_query(params, metadata_fields_config)
+        search_body, facets_info = build_search_query(
+            params, user_sub, metadata_fields_config
+        )
         logger.info(
             f"[PERF] Search query building took: {time.time() - query_build_start:.3f}s"
         )
@@ -1476,6 +1600,13 @@ def perform_search(params: SearchParams) -> Dict:
                         "size": params.size,
                         "from": params.from_,
                     }
+                    # Apply the same server-side personal-asset isolation so the
+                    # fallback paginates natively and stays consistent with the
+                    # primary query. Extend (don't replace) to preserve the
+                    # clip-scope exclusion initialized above.
+                    fallback_query["query"]["bool"]["must_not"].extend(
+                        build_personal_assets_filter(user_sub)
+                    )
 
                     logger.info("Executing simplified fallback query")
                     response = client.search(body=fallback_query, index=index_name)
@@ -1495,6 +1626,33 @@ def perform_search(params: SearchParams) -> Dict:
             logger.info(
                 f"OpenSearch returned {len(hits)} hits from {total_results} total"
             )
+
+            # Same-page backstops only — native OpenSearch pagination is
+            # authoritative. The query already isolates personal assets
+            # (build_personal_assets_filter match_phrase clauses) and scopes the
+            # explorer prefix server-side, so these exact filters are no-ops for
+            # normal data; they only drop a rare adversarial false-positive (e.g.
+            # a key crafted to embed another user's personal/{sub}/ segment
+            # mid-path) from the current page, without re-paginating.
+            if not params.semantic:
+                if params.q.startswith("storageIdentifier:") and params.objectPrefix:
+                    object_prefix = params.objectPrefix
+                    hits = [
+                        h for h in hits if _hit_full_path(h).startswith(object_prefix)
+                    ]
+
+                hits = [
+                    h
+                    for h in hits
+                    if is_owned_or_nonpersonal(
+                        _hit_bucket(h), _hit_full_path(h), user_sub
+                    )
+                ]
+
+                logger.info(
+                    f"Post-query backstop: {len(hits)} result(s) on page "
+                    f"{params.page} (total {total_results})"
+                )
 
             # Validate page range
             total_pages = (
@@ -1792,6 +1950,28 @@ def perform_search(params: SearchParams) -> Dict:
         raise SearchException("An unexpected error occurred")
 
 
+def _get_user_sub_from_event(event: Dict) -> Optional[str]:
+    """Extract user sub from API Gateway authorizer context."""
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return None
+        sub = authorizer.get("sub")
+        if sub:
+            return sub
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            try:
+                claims = json.loads(claims)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        if isinstance(claims, dict):
+            return claims.get("sub")
+    except Exception:
+        pass
+    return None
+
+
 @app.get("/search")
 def handle_search():
     """Handle search requests with unified search orchestrator."""
@@ -1819,6 +1999,9 @@ def handle_search():
                 "data": None,
             }
 
+        # Extract user sub for personal-asset ownership guard
+        user_sub = _get_user_sub_from_event(app.current_event.raw_event)
+
         logger.info(
             f"[PERF] Parameter extraction took: {time.time() - param_start:.3f}s"
         )
@@ -1826,7 +2009,7 @@ def handle_search():
         # Use unified search orchestrator
         search_start = time.time()
         orchestrator = get_unified_search_orchestrator()
-        result = orchestrator.search(query_params)
+        result = orchestrator.search(query_params, user_sub=user_sub)
         logger.info(
             f"[PERF] Unified search execution took: {time.time() - search_start:.3f}s"
         )
@@ -1910,9 +2093,12 @@ def handle_search_connectors():
 
         table = _dynamodb_resource.Table(connector_table_name)
 
-        # Only fetch the fields we actually need
+        # Only fetch the fields we actually need.
+        # NOTE: isInternal MUST be projected — it is used below to filter out
+        # internal connectors (e.g. the My Assets system connector, whose type
+        # is "s3"). Omitting it silently disables that filter.
         scan_kwargs = {
-            "ProjectionExpression": "id, #n, #t, storageIdentifier, #s, objectPrefix, #r, allowUploads",
+            "ProjectionExpression": "id, #n, #t, storageIdentifier, #s, objectPrefix, #r, allowUploads, isInternal",
             "ExpressionAttributeNames": {
                 "#n": "name",
                 "#t": "type",
@@ -1928,6 +2114,17 @@ def handle_search_connectors():
             scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
             response = table.scan(**scan_kwargs)
             items.extend(response.get("Items", []))
+
+        # Filter out internal and my-assets connectors
+        items = [
+            item
+            for item in items
+            if item.get("type") != "my-assets"
+            and not (
+                str(item.get("isInternal", "")).lower() == "true"
+                or item.get("isInternal") is True
+            )
+        ]
 
         connectors = [
             {

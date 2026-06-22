@@ -165,10 +165,30 @@ def create_resource_name_with_suffix(
     return final_name
 
 
+class FileFilterConfig(BaseModel):
+    # "allow" => ingest ONLY objects that match; "deny" => ingest everything
+    # EXCEPT objects that match. Defaults to "allow".
+    mode: str | None = "allow"
+    # Match by file extension (without dots, e.g. ["mp4", "jpg"]).
+    extensions: list[str] | None = None
+    # Match by MIME/content type. Supports exact ("video/mp4") and wildcard
+    # ("image/*", "*/*") patterns.
+    mimeTypes: list[str] | None = None
+
+
 class S3ConnectorConfig(BaseModel):
     bucket: str
     s3IntegrationMethod: str
     objectPrefix: list[str] | None = None
+    # Legacy allow-list of file extensions (without dots, e.g. ["mp4", "jpg"]).
+    # Kept for backwards compatibility; when `fileFilter` is provided it takes
+    # precedence. When both are omitted/empty, every supported media type is
+    # ingested — identical to connectors created before filtering existed.
+    allowedFileExtensions: list[str] | None = None
+    # Structured filter supporting extensions AND MIME types, in allow or deny
+    # mode. This is the canonical, more expressive replacement for
+    # `allowedFileExtensions`.
+    fileFilter: FileFilterConfig | None = None
     bucketType: str  # Required: "new" or "existing"
     region: str | None = None  # region for new buckets
     allowUploads: bool | None = False
@@ -179,6 +199,90 @@ class S3Connector(BaseModel):
     name: str
     type: str
     description: str | None = None
+
+
+def normalize_file_extensions(extensions: list[str] | None) -> list[str]:
+    """Normalize a list of file extensions for storage.
+
+    Lowercases each value, strips surrounding whitespace and any leading dot,
+    drops blanks, and de-duplicates while preserving the original order.
+
+    Returns an empty list when nothing usable is provided.
+    """
+    if not extensions:
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for ext in extensions:
+        if not isinstance(ext, str):
+            continue
+        cleaned = ext.strip().lower().lstrip(".")
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            normalized.append(cleaned)
+    return normalized
+
+
+def normalize_mime_types(mime_types: list[str] | None) -> list[str]:
+    """Normalize a list of MIME/content-type patterns for storage.
+
+    Lowercases each value, strips whitespace and any parameters (e.g.
+    "; charset=utf-8"), drops blanks, and de-duplicates while preserving order.
+    Wildcard patterns such as "image/*" and "*/*" are preserved as-is.
+    """
+    if not mime_types:
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for mime in mime_types:
+        if not isinstance(mime, str):
+            continue
+        cleaned = mime.strip().lower().split(";")[0].strip()
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            normalized.append(cleaned)
+    return normalized
+
+
+def build_file_filter(config: "S3ConnectorConfig") -> dict | None:
+    """Build the canonical, normalized file filter to persist.
+
+    Merges the legacy `allowedFileExtensions` field into the structured
+    `fileFilter` (the explicit `fileFilter` wins for any overlapping setting).
+
+    Returns ``None`` when nothing meaningful is configured, which downstream is
+    treated as "allow all" — preserving behavior for connectors that never set
+    a filter. The returned dict has the shape::
+
+        {"mode": "allow"|"deny", "extensions": [...], "mimeTypes": [...]}
+    """
+    file_filter = config.fileFilter
+
+    mode = "allow"
+    extensions: list[str] = []
+    mime_types: list[str] = []
+
+    if file_filter is not None:
+        mode = (file_filter.mode or "allow").strip().lower()
+        if mode not in ("allow", "deny"):
+            mode = "allow"
+        extensions = normalize_file_extensions(file_filter.extensions)
+        mime_types = normalize_mime_types(file_filter.mimeTypes)
+
+    # Fold in the legacy allow-list only when the structured filter did not
+    # already provide extensions (the structured field is authoritative).
+    if not extensions and config.allowedFileExtensions:
+        legacy = normalize_file_extensions(config.allowedFileExtensions)
+        if legacy:
+            extensions = legacy
+            # A bare legacy list has always meant "allow only these".
+            if file_filter is None:
+                mode = "allow"
+
+    if not extensions and not mime_types:
+        return None
+
+    return {"mode": mode, "extensions": extensions, "mimeTypes": mime_types}
 
 
 def wait_for_iam_role_propagation(iam_client, role_name, max_retries=2, base_delay=1):
@@ -983,7 +1087,12 @@ def manage_bucket_cors(
                 "Content-MD5",
                 "x-amz-*",
             ],
-            "ExposeHeaders": ["ETag", "x-amz-request-id"],
+            "ExposeHeaders": [
+                "ETag",
+                "Location",
+                "x-amz-request-id",
+                "x-amz-version-id",
+            ],
             "MaxAgeSeconds": 3600,
         }
 
@@ -1294,6 +1403,15 @@ def create_connector(createconnector: S3Connector) -> dict:
         connector_description = createconnector.description
         integration_method = createconnector.configuration.s3IntegrationMethod
         object_prefix = createconnector.configuration.objectPrefix
+        file_filter = build_file_filter(createconnector.configuration)
+        # Derive the legacy allow-list from the canonical filter so that any
+        # ingest Lambda still running the earlier (extensions-only) code keeps
+        # working for allow-mode connectors. Empty for deny-mode / no filter.
+        allowed_file_extensions = (
+            file_filter["extensions"]
+            if file_filter and file_filter["mode"] == "allow"
+            else []
+        )
 
         suffix = generate_suffix()
 
@@ -1622,6 +1740,22 @@ def create_connector(createconnector: S3Connector) -> dict:
                 collections_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{collections_table_name}"
                 dynamodb_resources.append(collections_table_arn)
 
+            # Add upload directives table for READ access (overflow resolution, §9.3).
+            upload_directives_table_name = os.environ.get(
+                "UPLOAD_DIRECTIVES_TABLE_NAME", ""
+            )
+            if upload_directives_table_name:
+                upload_directives_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{upload_directives_table_name}"
+                dynamodb_resources.append(upload_directives_table_arn)
+
+            # Add user table for WRITE access (activity tracking, §9.3, Req 11.3).
+            # The ingest lambda calls record_collection_activity to upsert
+            # recency rows after upload-source association.
+            user_table_name = os.environ.get("USER_TABLE_NAME", "")
+            if user_table_name:
+                user_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{user_table_name}"
+                dynamodb_resources.append(user_table_arn)
+
             dynamodb_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
@@ -1869,6 +2003,16 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "COLLECTIONS_TABLE_NAME": os.environ.get(
                             "COLLECTIONS_TABLE_NAME", ""
                         ),
+                        # Upload directives table for collection-metadata overflow
+                        # resolution (§6.5, §9.3). The ingest handler reads
+                        # overflow side-records when ml-collection-overflow=1.
+                        "UPLOAD_DIRECTIVES_TABLE_NAME": os.environ.get(
+                            "UPLOAD_DIRECTIVES_TABLE_NAME", ""
+                        ),
+                        # User table for activity tracking (§9.3, Req 11.3).
+                        # The ingest handler calls record_collection_activity
+                        # after association to upsert recency rows.
+                        "USER_TABLE_NAME": os.environ.get("USER_TABLE_NAME", ""),
                         # Connector table for bucket→connector lookup
                         "MEDIALAKE_CONNECTOR_TABLE_NAME": os.environ.get(
                             "MEDIALAKE_CONNECTOR_TABLE_NAME", ""
@@ -1884,6 +2028,13 @@ def create_connector(createconnector: S3Connector) -> dict:
                         "CONNECTOR_STORAGE_IDENTIFIER_INDEX": "StorageIdentifierIndex",
                         "CONNECTOR_TABLE_REGION": os.environ.get(
                             "CONNECTOR_TABLE_REGION", os.environ.get("REGION", "")
+                        ),
+                        # Connector file-type filter, baked in from the
+                        # connector configuration so the ingest Lambda is driven
+                        # by its own config (no DynamoDB read on the hot path).
+                        # Empty string = no filter (ingest all supported media).
+                        "CONNECTOR_FILE_FILTER": (
+                            json.dumps(file_filter) if file_filter else ""
                         ),
                     }
                 },
@@ -2002,6 +2153,8 @@ def create_connector(createconnector: S3Connector) -> dict:
             "lambdaArn": lambda_arn,
             "iamRoleArn": lambda_role_arn,
             "objectPrefix": object_prefix,
+            "allowedFileExtensions": allowed_file_extensions,
+            "fileFilter": file_filter,
             "pipeArn": pipe_arn,
             "pipeRoleArn": pipe_role_arn,
             "allowUploads": allow_uploads,

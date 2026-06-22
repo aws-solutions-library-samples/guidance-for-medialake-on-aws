@@ -36,6 +36,48 @@ metrics = Metrics(namespace="medialake", service="collection-detail")
 MAX_DELETE_DEPTH = 20
 
 
+def _cleanup_collection_favorites(collection_id):
+    """Remove favorite rows that reference this collection, across all users.
+
+    COLLECTION favorites are written with gsi4Pk=FAVCOLLECTION#{id} (sparse GSI4
+    on the user table), so they can be found by collection id and deleted by
+    their base keys (userId, itemKey). Best-effort: never blocks the delete.
+    """
+    import boto3
+    from boto3.dynamodb.conditions import Key
+
+    user_table_name = os.environ.get("USER_TABLE_NAME")
+    if not user_table_name:
+        logger.warning("[CASCADE] USER_TABLE_NAME not set; skipping favorites cleanup")
+        return 0
+
+    table = boto3.resource("dynamodb").Table(user_table_name)
+    deleted = 0
+    query_kwargs = {
+        "IndexName": "GSI4",
+        "KeyConditionExpression": Key("gsi4Pk").eq(f"FAVCOLLECTION#{collection_id}"),
+    }
+    while True:
+        response = table.query(**query_kwargs)
+        items = response.get("Items", [])
+        with table.batch_writer() as batch:
+            for item in items:
+                batch.delete_item(
+                    Key={"userId": item["userId"], "itemKey": item["itemKey"]}
+                )
+                deleted += 1
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        query_kwargs["ExclusiveStartKey"] = last_key
+
+    if deleted:
+        logger.info(
+            f"[CASCADE] Removed {deleted} favorite(s) referencing {collection_id}"
+        )
+    return deleted
+
+
 def _delete_collection_recursive(collection_id, user_id, depth=0):
     """Recursively delete a collection and all its children using PynamoDB"""
     if depth > MAX_DELETE_DEPTH:
@@ -136,6 +178,15 @@ def _delete_collection_recursive(collection_id, user_id, depth=0):
     # Write-through: remove from OpenSearch immediately so the collection
     # disappears from list/search results without waiting for stream sync.
     delete_collection_document(collection_id)
+
+    # Remove any per-user favorites pointing at this collection (best-effort).
+    # Runs per recursed collection, so child collections are covered too.
+    try:
+        _cleanup_collection_favorites(collection_id)
+    except Exception as e:
+        logger.warning(
+            f"[CASCADE] Failed to clean up favorites for {collection_id}: {e}"
+        )
 
     return deleted_count
 

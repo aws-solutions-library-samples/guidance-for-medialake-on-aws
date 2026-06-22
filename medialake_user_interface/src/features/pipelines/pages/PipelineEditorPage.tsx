@@ -32,6 +32,7 @@ import {
   Backdrop,
 } from "@mui/material";
 import ApiStatusModal from "@/components/ApiStatusModal";
+import { useSnackbar } from "notistack";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import BoltIcon from "@mui/icons-material/Bolt";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
@@ -520,6 +521,7 @@ const PipelineEditorContent = () => {
   const { screenToFlowPosition } = useReactFlow();
   const reactFlowInstance = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
+  const { enqueueSnackbar } = useSnackbar();
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorType, setErrorType] = useState<"trigger" | "compatibility">("compatibility");
   const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
@@ -841,6 +843,57 @@ const PipelineEditorContent = () => {
   }, [formData, originalPipelineData, pipelineId]);
 
   const handleSave = async () => {
+    // Validate the pipeline graph before attempting to save/deploy so we don't
+    // hand CloudFormation an incomplete workflow that deploys and then fails
+    // (e.g. a trigger-only graph with no processing steps).
+    const graphNodes = formData.configuration?.nodes ?? [];
+    const graphEdges = formData.configuration?.edges ?? [];
+    const isTrigger = (node: any) =>
+      typeof node?.data?.type === "string" && node.data.type.includes("TRIGGER");
+    const hasTrigger = graphNodes.some(isTrigger);
+    const hasActionNode = graphNodes.some((node: any) => !isTrigger(node));
+
+    if (graphNodes.length === 0) {
+      enqueueSnackbar(
+        t(
+          "pipelines.validation.emptyPipeline",
+          "Add a trigger and at least one processing step before saving."
+        ),
+        { variant: "warning" }
+      );
+      return;
+    }
+    if (!hasTrigger) {
+      enqueueSnackbar(
+        t(
+          "pipelines.validation.missingTrigger",
+          "Add a trigger node to start the pipeline before saving."
+        ),
+        { variant: "warning" }
+      );
+      return;
+    }
+    if (!hasActionNode) {
+      enqueueSnackbar(
+        t(
+          "pipelines.validation.missingAction",
+          "Add at least one processing step after the trigger before saving."
+        ),
+        { variant: "warning" }
+      );
+      return;
+    }
+    if (graphEdges.length === 0) {
+      enqueueSnackbar(
+        t(
+          "pipelines.validation.disconnected",
+          "Connect the trigger to your processing steps before saving."
+        ),
+        { variant: "warning" }
+      );
+      return;
+    }
+
     // If we're updating an existing pipeline, show confirmation dialog
     if (pipelineId && pipelineId !== "new") {
       setUpdateConfirmationOpen(true);

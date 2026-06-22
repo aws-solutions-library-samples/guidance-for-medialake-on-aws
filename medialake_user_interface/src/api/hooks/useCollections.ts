@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
 import axios from "axios";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
@@ -144,6 +150,17 @@ export interface Collection {
   // collections redesign so cards, detail pages, and filters can use it.
   tags?: string[];
 }
+
+/**
+ * Predicate that determines whether a collection is Addable — i.e. the current user
+ * may add assets to it. A collection is Addable when it is ACTIVE and the user's role
+ * is owner, admin, or editor.
+ *
+ * Reqs 4.1, 4.2, 4.3, 4.4
+ */
+export const isAddable = (c: Collection): boolean =>
+  c.status === "ACTIVE" &&
+  (c.userRole === "owner" || c.userRole === "admin" || c.userRole === "editor");
 
 export interface CollectionType {
   id: string;
@@ -1436,5 +1453,52 @@ export const useSetCollectionIcon = () => {
         queryKey: QUERY_KEYS.COLLECTIONS.detail(collectionId),
       });
     },
+  });
+};
+
+// =============================================================================
+// Recent Collections Hook
+// =============================================================================
+
+/** Default page size for the recent collections query (matches Section_Item_Limit). */
+const DEFAULT_RECENT_PAGE_SIZE = 5;
+
+export interface RecentCollectionsResponse {
+  success: boolean;
+  data: Collection[];
+  pagination: {
+    pageSize: number;
+    nextCursor: string | null;
+    hasNextPage: boolean;
+  };
+  meta: {
+    timestamp: string;
+    version: string;
+    request_id: string;
+  };
+}
+
+/**
+ * Infinite-query hook for the recent-collections endpoint.
+ * Pages are cursor-based (nextCursor from the response).
+ *
+ * Reqs 12.1, 12.4
+ */
+export const useRecentCollections = (pageSize: number = DEFAULT_RECENT_PAGE_SIZE) => {
+  return useInfiniteQuery<RecentCollectionsResponse>({
+    queryKey: QUERY_KEYS.COLLECTIONS.recent(pageSize),
+    queryFn: async ({ pageParam }) => {
+      const params: Record<string, string | number> = { pageSize };
+      if (pageParam) {
+        params.cursor = pageParam as string;
+      }
+      const response = await apiClient.get<RecentCollectionsResponse>(
+        API_ENDPOINTS.COLLECTIONS.RECENT,
+        { params }
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
   });
 };

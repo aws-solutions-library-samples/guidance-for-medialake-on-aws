@@ -11,6 +11,7 @@ type AssetItem = ImageItem | VideoItem | AudioItem;
 
 interface ConnectorAssetsParams {
   bucketName: string;
+  objectPrefix?: string;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -45,6 +46,7 @@ export interface ConnectorAssetsError extends Error {
 
 export const useConnectorAssets = ({
   bucketName,
+  objectPrefix,
   page = 1,
   pageSize = DEFAULT_PAGE_SIZE,
   sortBy = "createdAt",
@@ -53,21 +55,9 @@ export const useConnectorAssets = ({
   filters = {},
 }: ConnectorAssetsParams) => {
   // Construct the query string for bucket search
-  let query = bucketName ? `storageIdentifier:${bucketName}` : "";
-
-  // Add asset type filter if specified
-  if (assetType) {
-    query += ` type:${assetType}`;
-  }
-
-  // Add facet filters (AND logic for multiple facets)
-  Object.entries(filters).forEach(([field, values]) => {
-    if (values.length > 0) {
-      // For multiple values in the same field, use OR logic
-      const filterQuery = values.map((value) => `${field}:${value}`).join(" OR ");
-      query += ` (${filterQuery})`;
-    }
-  });
+  // Only use storageIdentifier — the backend parses q.startsWith("storageIdentifier:")
+  // and does not support objectPrefix or other tokens appended to this query format.
+  const query = bucketName ? `storageIdentifier:${bucketName}` : "";
 
   // Construct the sort parameter
   const sort = sortBy ? `${sortDirection === "desc" ? "-" : ""}${sortBy}` : undefined;
@@ -76,7 +66,7 @@ export const useConnectorAssets = ({
 
   return useQuery<ConnectorAssetsResponse, ConnectorAssetsError>({
     // Use the existing search list query key with our bucket filter
-    queryKey: QUERY_KEYS.SEARCH.list(query, page, pageSize, false),
+    queryKey: [...QUERY_KEYS.SEARCH.list(query, page, pageSize, false), objectPrefix],
     queryFn: async ({ signal }) => {
       try {
         // Build the query parameters
@@ -89,6 +79,10 @@ export const useConnectorAssets = ({
 
         if (sort) {
           params.sort = sort;
+        }
+
+        if (objectPrefix) {
+          params.objectPrefix = objectPrefix;
         }
 
         const response = await apiClient.get<ConnectorAssetsResponse>(API_ENDPOINTS.SEARCH, {

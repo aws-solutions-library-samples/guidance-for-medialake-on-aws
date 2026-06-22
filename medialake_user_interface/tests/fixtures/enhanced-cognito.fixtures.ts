@@ -403,8 +403,8 @@ function findUserPoolIdLegacy(): string {
     const userPoolsOutput = executeAwsCommand("cognito-idp list-user-pools --max-results 50");
     const userPools = JSON.parse(userPoolsOutput);
 
-    const mediaLakePool = userPools.UserPools?.find(
-      (pool: any) => pool.Name?.toLowerCase().includes("medialake")
+    const mediaLakePool = userPools.UserPools?.find((pool: any) =>
+      pool.Name?.toLowerCase().includes("medialake")
     );
 
     if (!mediaLakePool) {

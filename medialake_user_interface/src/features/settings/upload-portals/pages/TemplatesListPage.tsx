@@ -25,6 +25,7 @@ import {
   AddCircleOutline as UsePortalIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
@@ -45,6 +46,7 @@ import UploadPortalsSubNav from "../components/UploadPortalsSubNav";
  * `CreatePortalMenu`).
  */
 const TemplatesListPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const createPermission = useActionPermission("manage", "settings");
   const { data: response, isLoading } = useListTemplates();
@@ -76,7 +78,7 @@ const TemplatesListPage: React.FC = () => {
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Templates"
-        description="Reusable portal structures you can use to start new portals from a known-good setup."
+        description={t("uploadPortals.templates.listDescription")}
         action={
           <Button
             variant="contained"
@@ -122,7 +124,7 @@ const TemplatesListPage: React.FC = () => {
                       {template.createdAt ? new Date(template.createdAt).toLocaleDateString() : "—"}
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Create portal from this template">
+                      <Tooltip title={t("uploadPortals.templates.createFromTemplate")}>
                         <IconButton size="small" onClick={() => handleCreatePortalFrom(template)}>
                           <UsePortalIcon fontSize="small" />
                         </IconButton>
@@ -147,7 +149,7 @@ const TemplatesListPage: React.FC = () => {
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete template</DialogTitle>
+        <DialogTitle>{t("uploadPortals.templates.deleteTitle")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Portals already

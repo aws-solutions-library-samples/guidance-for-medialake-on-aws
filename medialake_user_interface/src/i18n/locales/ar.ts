@@ -13,24 +13,50 @@ export default {
     title: "الأصول",
     connectors: "الموصلات",
     selectConnector: "اختر موصل",
+    myAssets: "أصولي",
+    uploadToMyAssets: "رفع إلى أصولي",
+    myAssetsEmpty: {
+      title: "لا توجد أصول بعد",
+      description: "قم برفع ملفات الوسائط الأولى للبدء في مكتبة الأصول الشخصية الخاصة بك.",
+      uploadCta: "رفع الملفات",
+    },
   },
   upload: {
     title: "تحميل ملفات الوسائط",
     description:
-      "حدد موصل S3 وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو و HLS و MPEG-DASH فقط.",
+      "حدد وجهة وقم بتحميل ملفات الوسائط الخاصة بك. يتم دعم تنسيقات الصوت والفيديو والصورة و HLS و MPEG-DASH فقط.",
     uploadDestination: "وجهة التحميل",
     browsePath: "تصفح المسار",
     uploadingTo: "التحميل إلى",
     restrictedToPrefix: "مقيد",
     allowedPrefixesInfo: "يمكنك التحميل فقط إلى {{count}} مسار(ات) مسموح بها",
-    connectorLabel: "موصل S3",
-    selectConnectorPlaceholder: "حدد موصل S3",
+    connectorLabel: "وجهة التحميل",
+    selectConnectorPlaceholder: "حدد وجهة",
     loadingConnectors: "جارٍ تحميل الموصلات...",
     noConnectors: "لا توجد موصلات S3 متاحة. يرجى تكوين موصل S3 أولاً.",
+    noDestinations: "ليس لديك حق الوصول إلى أي وجهات تحميل. تواصل مع المسؤول لطلب الوصول.",
     dashboardNote:
       "يُسمح فقط بالملفات من نوع audio/*، وvideo/*، وimage/*، وHLS (application/x-mpegURL)، وMPEG-DASH (application/dash+xml)",
     meta: {
       name: "الاسم",
+    },
+    collectionSelector: {
+      trigger: "إضافة إلى المجموعات",
+      selectedCount: "{{count}} محدد",
+      searchPlaceholder: "البحث في المجموعات\u2026",
+      searchSection: "البحث",
+      noSearchResults: "لا توجد مجموعات مطابقة",
+      createAction: 'إنشاء "{{name}}"',
+      emptyState: "لا توجد مجموعات متاحة. أنشئ واحدة باستخدام البحث.",
+      recentSection: "الأخيرة",
+      favoritesSection: "المفضلة",
+      emptyRecent: "لا توجد مجموعات حديثة",
+      emptyFavorites: "لا توجد مجموعات مفضلة",
+      searchError: "فشل البحث في المجموعات",
+      createFailed: "فشل إنشاء المجموعة",
+      emptySection: "لا توجد مجموعات",
+      loading: "جارٍ التحميل\u2026",
+      more: "المزيد",
     },
   },
   pathBrowser: {
@@ -102,6 +128,40 @@ export default {
       objectPrefixNumbered: "Object البادئة {{number}}",
       bucketNameHelper: "الحاوية name must be globally unique, follow S3 naming rules.",
       addPrefix: "إضافة بادئة",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     dialogs: {
       deleteTitle: "حذف الموصل",
@@ -218,6 +278,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "المفضلة",
+      emptyTitle: "لا توجد مجموعات مفضلة",
+      emptyDescription: "ستظهر المجموعات التي تضيفها إلى المفضلة هنا",
+    },
     title: "المجموعات",
     description: "تنظيم وإدارة أصول الوسائط في المجموعات",
     createCollection: "إنشاء مجموعة",
@@ -909,6 +974,7 @@ export default {
     },
   },
   common: {
+    remove: "إزالة",
     back: "رجوع",
     search: "بحث",
     public: "عام",
@@ -1708,6 +1774,9 @@ export default {
         myCollectionsTitle: "مجموعاتي",
         sharedWithMeTitle: "مشتركة معي",
         mySharedTitle: "مجموعاتي المشتركة",
+        favoritesTitle: "المجموعات المفضلة",
+        favoritesEmptyTitle: "لا توجد مجموعات مفضلة",
+        favoritesEmptyDescription: "ستظهر المجموعات التي تضيفها إلى المفضلة هنا",
         emptyTitle: "لم يتم العثور على مجموعات",
         emptyDescription: "أنشئ مجموعة للبدء",
         createCollection: "إنشاء مجموعة",
@@ -1720,6 +1789,7 @@ export default {
           myCollections: "مجموعاتي",
           sharedWithMe: "مشتركة معي",
           myShared: "مجموعاتي المشتركة",
+          favorites: "المجموعات المفضلة",
         },
         sortingTitle: "الترتيب",
         sortBy: "ترتيب حسب",
@@ -1738,6 +1808,11 @@ export default {
         title: "الأصول الحديثة",
         emptyTitle: "لا توجد أصول حديثة",
         emptyDescription: "ستظهر الأصول المرفوعة حديثاً هنا",
+      },
+      myAssets: {
+        title: "أصولي",
+        emptyTitle: "لا توجد أصول شخصية بعد",
+        emptyDescription: "قم بتحميل أول ملف إلى أصولي.",
       },
       collectionGroup: {
         title: "مجموعة المجموعات",
@@ -1860,6 +1935,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "سمات مظهر قابلة لإعادة الاستخدام يمكنك تطبيقها على البوابات الجديدة أو الحالية.",
+      deleteTitle: "حذف السمة",
+      editorLoadError: "فشل تحميل السمة",
+    },
+    templates: {
+      listDescription:
+        "هياكل بوابات قابلة لإعادة الاستخدام يمكنك استخدامها لبدء بوابات جديدة من إعداد موثوق.",
+      createFromTemplate: "إنشاء بوابة من هذا القالب",
+      deleteTitle: "حذف القالب",
+      editorLoadError: "فشل تحميل القالب",
+    },
+    actions: {
+      applyTheme: "تطبيق السمة",
+      applyThemeMenu: "تطبيق السمة…",
+      saveAsTemplate: "حفظ كقالب",
+      saveAsTheme: "حفظ كسمة",
+      startFromTemplate: "البدء من قالب",
+      startFromTemplateMenu: "البدء من قالب…",
+    },
+    fieldTypes: {
+      radioGroup: "مجموعة أزرار اختيار",
+      yesNo: "نعم / لا",
+    },
     pageTitle: "بوابات التحميل",
     pageDescription: "إدارة بوابات التحميل للمساهمين الخارجيين",
     createPortal: "إنشاء بوابة",

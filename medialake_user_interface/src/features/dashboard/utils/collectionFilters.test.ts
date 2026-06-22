@@ -529,3 +529,385 @@ describe("sortCollections", () => {
     });
   });
 });
+
+/**
+ * Property-Based Tests for Collection Favorites Filtering
+ *
+ * Feature: collection-favorites
+ * Property 1: Favorites view returns exactly the favorited collections
+ *
+ * **Validates: Requirements 3.2, 4.2**
+ */
+
+describe("Property 1: Favorites view returns exactly the favorited collections", () => {
+  // Helper to generate valid ISO date strings
+  const isoDateArbitrary = fc
+    .integer({ min: 1577836800000, max: 1767225600000 })
+    .map((timestamp) => new Date(timestamp).toISOString());
+
+  // Generate an array of collections with guaranteed unique ids
+  const uniqueCollectionsArbitrary = fc
+    .uniqueArray(fc.uuid(), { minLength: 0, maxLength: 30 })
+    .chain((ids: string[]) =>
+      ids.length === 0
+        ? fc.constant([] as Collection[])
+        : (fc.tuple(
+            ...ids.map((id) =>
+              fc.record({
+                id: fc.constant(id),
+                name: fc.string({ minLength: 1, maxLength: 50 }),
+                type: fc.constantFrom("public" as const, "private" as const, "shared" as const),
+                ownerId: fc.uuid(),
+                itemCount: fc.nat({ max: 10000 }),
+                childCount: fc.nat({ max: 100 }),
+                childCollectionCount: fc.nat({ max: 100 }),
+                isPublic: fc.boolean(),
+                status: fc.constantFrom("active", "archived", "deleted"),
+                createdAt: isoDateArbitrary,
+                updatedAt: isoDateArbitrary,
+              })
+            )
+          ) as fc.Arbitrary<Collection[]>)
+    );
+
+  // Arbitrary for a user id
+  const userIdArbitrary = fc.uuid();
+
+  // Arbitrary for a set of favorited ids (may include ids not in any dataset)
+  const favoritedIdsArbitrary = fc.uniqueArray(fc.uuid(), { minLength: 0, maxLength: 20 });
+
+  it("should return exactly those collections whose id is in the favoritedIds set", () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIdArray) => {
+          const favoritedIds = new Set(favoritedIdArray);
+          const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+          // Property: every returned collection's id must be in the favoritedIds set
+          for (const c of result) {
+            expect(favoritedIds.has(c.id)).toBe(true);
+          }
+
+          // Property: every collection in the dataset whose id is in favoritedIds must appear in the result
+          const expectedIds = new Set(
+            collections.filter((c) => favoritedIds.has(c.id)).map((c) => c.id)
+          );
+          const resultIds = new Set(result.map((c) => c.id));
+          expect(resultIds).toEqual(expectedIds);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should return an empty array when favoritedIds is empty", () => {
+    fc.assert(
+      fc.property(uniqueCollectionsArbitrary, userIdArbitrary, (collections, userId) => {
+        const favoritedIds = new Set<string>();
+        const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+        expect(result).toEqual([]);
+        expect(result.length).toBe(0);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should return an empty array when the dataset is empty", () => {
+    fc.assert(
+      fc.property(userIdArbitrary, favoritedIdsArbitrary, (userId, favoritedIdArray) => {
+        const favoritedIds = new Set(favoritedIdArray);
+        const result = filterCollections([], "favorites", userId, favoritedIds);
+
+        expect(result).toEqual([]);
+        expect(result.length).toBe(0);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should return all collections when favoritedIds fully covers the dataset", () => {
+    fc.assert(
+      fc.property(uniqueCollectionsArbitrary, userIdArbitrary, (collections, userId) => {
+        // Full overlap: all collection ids are in favoritedIds
+        const favoritedIds = new Set(collections.map((c) => c.id));
+        const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+        expect(result.length).toBe(collections.length);
+        expect(new Set(result.map((c) => c.id))).toEqual(favoritedIds);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should ignore favoritedIds not present in the dataset (ids absent from dataset)", () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, extraIds) => {
+          // Combine actual collection ids with extra ids not in the dataset
+          const datasetIds = new Set(collections.map((c) => c.id));
+          const favoritedIds = new Set([
+            ...collections.map((c) => c.id),
+            ...extraIds.filter((id) => !datasetIds.has(id)),
+          ]);
+
+          const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+          // All collections should be returned (full overlap with dataset ids)
+          // Extra ids that aren't in the dataset don't produce extra results
+          expect(result.length).toBe(collections.length);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should handle duplicate ids in the favoritedIds set gracefully", () => {
+    fc.assert(
+      fc.property(uniqueCollectionsArbitrary, userIdArbitrary, (collections, userId) => {
+        if (collections.length === 0) return;
+
+        // Build favoritedIds with duplicates (Set deduplicates, so simulating via array→Set)
+        const idsWithDuplicates = [
+          ...collections.map((c) => c.id),
+          ...collections.map((c) => c.id), // duplicated
+        ];
+        const favoritedIds = new Set(idsWithDuplicates);
+
+        const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+        // Each collection should appear exactly once in the result (no duplicates)
+        expect(result.length).toBe(collections.length);
+        const resultIds = result.map((c) => c.id);
+        expect(new Set(resultIds).size).toBe(resultIds.length);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should return an empty array when favoritedIds parameter is undefined", () => {
+    fc.assert(
+      fc.property(uniqueCollectionsArbitrary, userIdArbitrary, (collections, userId) => {
+        const result = filterCollections(collections, "favorites", userId);
+
+        // When favoritedIds is not provided, favorites view returns empty
+        expect(result).toEqual([]);
+        expect(result.length).toBe(0);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  it("should preserve collection object integrity (returned objects are references from input)", () => {
+    fc.assert(
+      fc.property(uniqueCollectionsArbitrary, userIdArbitrary, (collections, userId) => {
+        if (collections.length === 0) return;
+
+        // Partial overlap: pick roughly half
+        const halfIds = collections.filter((_, i) => i % 2 === 0).map((c) => c.id);
+        const favoritedIds = new Set(halfIds);
+
+        const result = filterCollections(collections, "favorites", userId, favoritedIds);
+
+        // Each returned object should be the exact same reference from the input array
+        for (const c of result) {
+          const original = collections.find((o) => o.id === c.id);
+          expect(original).toBeDefined();
+          expect(c).toEqual(original);
+        }
+      }),
+      { numRuns: 100 }
+    );
+  });
+});
+
+/**
+ * Property-Based Tests for Non-Interference of Favorites Parameter
+ *
+ * Feature: collection-favorites
+ * Property 2: Existing view types are unchanged by the favorites addition
+ *
+ * **Validates: Requirements 3.4**
+ *
+ * For each existing viewType ("all", "public", "private", "my-collections",
+ * "shared-with-me", "my-shared"), passing a random favoritedIds parameter
+ * must produce the exact same output as omitting it entirely.
+ */
+
+describe("Property 2: Existing view types are unchanged by the favorites addition", () => {
+  // Helper to generate valid ISO date strings
+  const isoDateArbitrary = fc
+    .integer({ min: 1577836800000, max: 1767225600000 })
+    .map((timestamp) => new Date(timestamp).toISOString());
+
+  // Generate an array of collections with guaranteed unique ids
+  const uniqueCollectionsArbitrary = fc
+    .uniqueArray(fc.uuid(), { minLength: 0, maxLength: 30 })
+    .chain((ids: string[]) =>
+      ids.length === 0
+        ? fc.constant([] as Collection[])
+        : (fc.tuple(
+            ...ids.map((id) =>
+              fc.record({
+                id: fc.constant(id),
+                name: fc.string({ minLength: 1, maxLength: 50 }),
+                type: fc.constantFrom("public" as const, "private" as const, "shared" as const),
+                ownerId: fc.uuid(),
+                itemCount: fc.nat({ max: 10000 }),
+                childCount: fc.nat({ max: 100 }),
+                childCollectionCount: fc.nat({ max: 100 }),
+                isPublic: fc.boolean(),
+                status: fc.constantFrom("active", "archived", "deleted"),
+                createdAt: isoDateArbitrary,
+                updatedAt: isoDateArbitrary,
+              })
+            )
+          ) as fc.Arbitrary<Collection[]>)
+    );
+
+  // Arbitrary for a user id
+  const userIdArbitrary = fc.uuid();
+
+  // Arbitrary for a random set of favoritedIds
+  const favoritedIdsArbitrary = fc
+    .uniqueArray(fc.uuid(), { minLength: 0, maxLength: 20 })
+    .map((ids) => new Set(ids));
+
+  // The existing viewTypes that must not be affected by the favoritedIds parameter
+  const existingViewTypes: Array<Exclude<CollectionViewType, "favorites">> = [
+    "all",
+    "public",
+    "private",
+    "my-collections",
+    "shared-with-me",
+    "my-shared",
+  ];
+
+  it("should produce identical results with and without favoritedIds for all existing viewTypes", () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        fc.constantFrom(...existingViewTypes),
+        (collections, userId, favoritedIds, viewType) => {
+          const resultWithout = filterCollections(collections, viewType, userId);
+          const resultWith = filterCollections(collections, viewType, userId, favoritedIds);
+
+          // The new optional parameter must not alter existing branch outputs
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "all" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "all", userId);
+          const resultWith = filterCollections(collections, "all", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+          expect(resultWith.length).toBe(collections.length);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "public" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "public", userId);
+          const resultWith = filterCollections(collections, "public", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "private" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "private", userId);
+          const resultWith = filterCollections(collections, "private", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "my-collections" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "my-collections", userId);
+          const resultWith = filterCollections(collections, "my-collections", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "shared-with-me" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "shared-with-me", userId);
+          const resultWith = filterCollections(collections, "shared-with-me", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  it('should return identical results for "my-shared" viewType regardless of favoritedIds', () => {
+    fc.assert(
+      fc.property(
+        uniqueCollectionsArbitrary,
+        userIdArbitrary,
+        favoritedIdsArbitrary,
+        (collections, userId, favoritedIds) => {
+          const resultWithout = filterCollections(collections, "my-shared", userId);
+          const resultWith = filterCollections(collections, "my-shared", userId, favoritedIds);
+
+          expect(resultWith).toEqual(resultWithout);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});

@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
@@ -36,6 +37,7 @@ import UploadPortalsSubNav from "../components/UploadPortalsSubNav";
  * `/settings/upload-portals/themes`.
  */
 const ThemesListPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const createPermission = useActionPermission("manage", "settings");
   const { data: response, isLoading } = useListThemes();
@@ -65,7 +67,7 @@ const ThemesListPage: React.FC = () => {
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Themes"
-        description="Reusable appearance themes you can apply to new or existing portals."
+        description={t("uploadPortals.themes.listDescription")}
         action={
           <Button
             variant="contained"
@@ -131,7 +133,7 @@ const ThemesListPage: React.FC = () => {
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete theme</DialogTitle>
+        <DialogTitle>{t("uploadPortals.themes.deleteTitle")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Portals and templates

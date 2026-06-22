@@ -17,7 +17,7 @@ import type {
 export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
   favorites: {
     type: "favorites",
-    title: "Favorites",
+    title: "Favorite Assets",
     description: "Quick access to your favorited assets and collections",
     icon: "favorite",
     defaultSize: { w: 6, h: 6 },
@@ -58,6 +58,15 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     minSize: { w: 4, h: 4 },
     maxSize: { w: 12, h: 12 },
   },
+  "my-assets": {
+    type: "my-assets",
+    title: "My Assets",
+    description: "Your recently uploaded personal assets",
+    icon: "person",
+    defaultSize: { w: 12, h: 6 },
+    minSize: { w: 4, h: 4 },
+    maxSize: { w: 12, h: 12 },
+  },
 };
 
 // Default layout configuration
@@ -92,7 +101,7 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
 };
 
 const STORAGE_KEY = "dashboard-layout";
-const CURRENT_VERSION = 8; // Fixed sm breakpoint widget widths to match 6-column grid
+const CURRENT_VERSION = 8; // my-assets widget + fixed sm breakpoint widget widths to match 6-column grid
 
 // Helper to generate unique widget ID
 const generateWidgetId = (type: WidgetType): string => {

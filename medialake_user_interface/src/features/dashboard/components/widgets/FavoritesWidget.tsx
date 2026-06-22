@@ -272,7 +272,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
     <>
       <WidgetContainer
         widgetId={widgetId}
-        title={customName || t("dashboard.widgets.favorites.title")}
+        title={customName || t("dashboard.widgets.favorites.title", "Favorite Assets")}
         icon={<FavoriteIcon />}
         onExpand={handleExpand}
         onRefresh={handleRefresh}

@@ -21,6 +21,10 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.config import Config
+from collection_activity import record_collection_activity
+
+# Import shared helpers from common_libraries layer for collection association
+from collections_utils import get_user_collection_role
 
 # Import centralized file extension constants from common_libraries layer
 from file_extensions import SUPPORTED_EXTENSIONS
@@ -70,24 +74,32 @@ collections_table = None
 
 
 # ---------------------------------------------------------------------------
-# Upload-portal collection-add automation (Layer C)
+# Upload collection association (generalized Layer C)
 #
-# When an object uploaded through an upload portal carries the server-stamped
-# `ml-source: upload-portal` + `ml-collection-ids` user-metadata directives,
-# add the freshly-created asset to those collections. This runs AFTER the asset
-# id exists (the directive only rides on the S3 object; the asset record is
-# minted here in ingest). It is idempotent and SILENT-FAIL: any error is logged
-# and ingest continues unaffected.
+# When an object uploaded through an upload portal OR the standard upload page
+# carries server-stamped `ml-source` + `ml-collection-ids` (or an overflow
+# reference) user-metadata directives, add the freshly-created asset to those
+# collections. This runs AFTER the asset id exists. For the `upload` source,
+# per-uploader permission and per-collection existence checks are enforced;
+# for the legacy `upload-portal` source, associations remain pre-authorized.
+# It is idempotent and SILENT-FAIL: any error is logged and ingest continues.
 # ---------------------------------------------------------------------------
 
 PORTAL_SOURCE_VALUE = "upload-portal"
+UPLOAD_SOURCE_VALUE = "upload"
 ML_SOURCE_KEY = "ml-source"
 ML_COLLECTION_IDS_KEY = "ml-collection-ids"
+ML_USER_ID_KEY = "ml-user-id"
+ML_OVERFLOW_KEY = "ml-collection-overflow"
 COLLECTION_PK_PREFIX = "COLL#"
 ASSET_SK_PREFIX = "ASSET#"
 # Full-file membership SK suffix used by the collections API (clip-less item):
 # `ASSET#{inventoryId}#FULL`. Mirrors `generate_asset_sk` in collections_api.
 ASSET_SK_FULL_SUFFIX = "#FULL"
+
+# Upload directives table — used to resolve overflow side-records when the
+# inline collection-ids metadata exceeds the S3 user-metadata budget (§6.5).
+UPLOAD_DIRECTIVES_TABLE_NAME = os.environ.get("UPLOAD_DIRECTIVES_TABLE_NAME", "")
 
 
 def _find_portal_user_metadata(obj) -> Dict[str, str]:
@@ -116,64 +128,193 @@ def _find_portal_user_metadata(obj) -> Dict[str, str]:
     return {}
 
 
-def _add_asset_to_portal_collections(inventory_id: str, asset_metadata) -> None:
-    """Add the asset (identified by its ``inventory_id``) to the collections named
-    by the portal ``ml-collection-ids`` directive, if present.
+def _collections_table():
+    """Return the lazily-initialized DynamoDB Table resource for the collections table."""
+    global collections_table
+    if collections_table is None:
+        collections_table = boto3.resource("dynamodb").Table(COLLECTIONS_TABLE_NAME)
+    return collections_table
 
-    The membership row is written in the exact shape the collections API uses
-    (PK=``COLL#{id}``, SK=``ASSET#{inventoryId}#FULL``, GSI2 reverse lookup),
-    so it is consistent with API-created memberships and the collections
-    DynamoDB→OpenSearch stream picks it up automatically. The collections API
-    keys assets by their InventoryID (it treats the stored ``assetId`` as the
-    InventoryID), so we use ``inventory_id`` here — NOT the DigitalSourceAsset
-    ID. Idempotent (PutItem) and silent-fail (logs and returns).
+
+def _resolve_collection_ids(user_md, asset_metadata) -> list:
+    """Resolve collection ids from inline metadata or overflow side-record.
+
+    Tries the inline ``ml-collection-ids`` first (comma-separated). Falls back
+    to reading the overflow directive table when ``ml-collection-overflow=1``.
+    Returns an empty list when neither is present (Req 9.3).
+    """
+    raw = user_md.get(ML_COLLECTION_IDS_KEY, "")
+    if raw:
+        return [c.strip() for c in str(raw).split(",") if c.strip()]
+    if user_md.get(ML_OVERFLOW_KEY) == "1":
+        bucket, key = _object_location(asset_metadata)
+        if bucket and key:
+            return _read_overflow_directive(bucket, key)
+    return []
+
+
+def _object_location(asset_metadata) -> tuple:
+    """Extract (bucket, key) from asset metadata StorageInfo.PrimaryLocation."""
+    try:
+        primary = asset_metadata.get("StorageInfo", {}).get("PrimaryLocation", {})
+        bucket = primary.get("Bucket", "")
+        key = primary.get("ObjectKey", {}).get("FullPath", "")
+        return bucket, key
+    except Exception:
+        return "", ""
+
+
+def _read_overflow_directive(bucket: str, key: str) -> list:
+    """Resolve an overflow directive from the dedicated Upload directives table.
+
+    Read-only access — the upload API (§6.5) writes these side-records.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        logger.warning(
+            "UPLOAD_DIRECTIVES_TABLE_NAME not configured; cannot resolve overflow directive"
+        )
+        return []
+    try:
+        resp = (
+            boto3.resource("dynamodb")
+            .Table(UPLOAD_DIRECTIVES_TABLE_NAME)
+            .get_item(Key={"PK": f"UPLOADDIR#{bucket}#{key}"})
+        )
+        item = resp.get("Item") or {}
+        return [c for c in item.get("collectionIds", []) if c]
+    except Exception as e:
+        logger.warning(f"Failed to read overflow directive for {bucket}/{key}: {e}")
+        return []
+
+
+def _collection_exists(collection_id: str) -> bool:
+    """Check if a collection exists and is not deleted (Req 10.3)."""
+    try:
+        resp = _collections_table().get_item(
+            Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": "METADATA"}
+        )
+        item = resp.get("Item")
+        return bool(item) and item.get("status", "ACTIVE") != "DELETED"
+    except Exception as e:
+        logger.warning(f"Failed to check collection existence {collection_id}: {e}")
+        return False
+
+
+def _is_addable(collection_id: str, user_id: str) -> bool:
+    """Check if user has Addable rights on a collection (Req 10.4).
+
+    Addable = role in {OWNER, EDITOR, ADMIN}.
+    """
+    try:
+        resp = _collections_table().get_item(
+            Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": "METADATA"}
+        )
+        collection = resp.get("Item")
+        if not collection:
+            return False
+        role = get_user_collection_role(collection, user_id)
+        return role in ("OWNER", "EDITOR", "ADMIN")
+    except Exception as e:
+        logger.warning(
+            f"Failed to check addable status for {user_id} on {collection_id}: {e}"
+        )
+        return False
+
+
+def _put_membership(collection_id: str, inventory_id: str, added_by: str) -> None:
+    """Write an idempotent membership row in the collections-API shape (Req 9.5).
+
+    PutItem on a deterministic PK/SK overwrites rather than duplicates, so
+    adding an asset already in the collection leaves membership unchanged.
+    """
+    asset_sk = f"{ASSET_SK_PREFIX}{inventory_id}{ASSET_SK_FULL_SUFFIX}"
+    _collections_table().put_item(
+        Item={
+            "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+            "SK": asset_sk,
+            "itemType": "asset",
+            "assetId": inventory_id,
+            "clipBoundary": {},
+            "sortOrder": 0,
+            "metadata": {},
+            "addedAt": utc_now_z(),
+            "addedBy": added_by,
+            "GSI2_PK": asset_sk,
+            "GSI2_SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
+        }
+    )
+
+
+def associate_upload_collections(inventory_id: str, asset_metadata) -> None:
+    """Add the freshly-created asset to each directive collection.
+
+    Serves both the ``upload-portal`` source (unchanged, pre-authorized) and the
+    new ``upload`` source (with per-uploader permission checks). Silent-fail and
+    isolated: never raises into ingest (Req 10.1).
+
+    Gate on ``ml-source``; for the ``upload`` source, read uploader id from
+    ``ml-user-id`` and enforce permission checks. When an ``upload``-source
+    object has no ``ml-user-id``, log a warning and continue fail-closed — every
+    permission check denies, so all associations are skipped.
+
+    Each collection is wrapped in its own try/except for failure isolation
+    (Req 10.2) inside an outer try/except so ingestion always completes (Req 10.1).
     """
     if not COLLECTIONS_TABLE_NAME:
         # Automation not configured for this deployment — no-op.
         return
     try:
         user_md = _find_portal_user_metadata(asset_metadata)
-        if user_md.get(ML_SOURCE_KEY) != PORTAL_SOURCE_VALUE:
+        source = user_md.get(ML_SOURCE_KEY)
+        if source not in (PORTAL_SOURCE_VALUE, UPLOAD_SOURCE_VALUE):
             return
-        raw_ids = user_md.get(ML_COLLECTION_IDS_KEY, "")
-        collection_ids = [c.strip() for c in str(raw_ids).split(",") if c.strip()]
+
+        collection_ids = _resolve_collection_ids(user_md, asset_metadata)
         if not collection_ids:
+            # No collection ids present — nothing to associate (Req 9.3).
             return
 
-        global collections_table
-        if collections_table is None:
-            collections_table = boto3.resource("dynamodb").Table(COLLECTIONS_TABLE_NAME)
+        uploader_id = user_md.get(ML_USER_ID_KEY, "")
+        enforce_permissions = source == UPLOAD_SOURCE_VALUE
 
-        asset_sk = f"{ASSET_SK_PREFIX}{inventory_id}{ASSET_SK_FULL_SUFFIX}"
-        added_at = utc_now_z()
+        if enforce_permissions and not uploader_id:
+            # Fail-closed: without an uploader identity, permission checks
+            # will deny every association. Log once and let the loop proceed —
+            # _is_addable("", ...) returns False for all collections.
+            logger.warning(
+                f"'{UPLOAD_SOURCE_VALUE}'-source object for asset {inventory_id} has no "
+                f"{ML_USER_ID_KEY}; permission checks will deny every association (fail-closed)"
+            )
+
+        added_by = uploader_id if uploader_id else source
+
         for collection_id in collection_ids:
             try:
-                collections_table.put_item(
-                    Item={
-                        "PK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                        "SK": asset_sk,
-                        "itemType": "asset",
-                        "assetId": inventory_id,
-                        "clipBoundary": {},
-                        "sortOrder": 0,
-                        "metadata": {},
-                        "addedAt": added_at,
-                        "addedBy": PORTAL_SOURCE_VALUE,
-                        # GSI2 reverse lookup (asset → collections); matches the
-                        # collections API: GSI2_PK = SK, GSI2_SK = COLL#{id}.
-                        "GSI2_PK": asset_sk,
-                        "GSI2_SK": f"{COLLECTION_PK_PREFIX}{collection_id}",
-                    }
-                )
+                if not _collection_exists(collection_id):
+                    logger.info(
+                        f"Skip association: collection {collection_id} does not exist or is deleted"
+                    )
+                    continue
+                if enforce_permissions and not _is_addable(collection_id, uploader_id):
+                    logger.info(
+                        f"Skip association: user {uploader_id} not addable on collection {collection_id}"
+                    )
+                    continue
+                _put_membership(collection_id, inventory_id, added_by)
                 logger.info(
-                    f"Added asset {inventory_id} to collection {collection_id} (upload-portal)"
+                    f"Added asset {inventory_id} to collection {collection_id} (source={source})"
                 )
-            except Exception as item_error:  # noqa: BLE001 — silent-fail per item
+                # Record activity for the upload source when uploader is known (Req 11.3)
+                if source == UPLOAD_SOURCE_VALUE and uploader_id:
+                    record_collection_activity(uploader_id, collection_id)
+            except (
+                Exception
+            ) as item_err:  # noqa: BLE001 — failure isolation per item (Req 10.2, 10.5)
                 logger.warning(
-                    f"Failed to add asset {inventory_id} to collection {collection_id}: {item_error}"
+                    f"Association failed asset={inventory_id} collection={collection_id}: {item_err}"
                 )
-    except Exception as e:  # noqa: BLE001 — never break ingest
-        logger.warning(f"Portal collection-add skipped for asset {inventory_id}: {e}")
+    except Exception as e:  # noqa: BLE001 — never break ingest (Req 10.1)
+        logger.warning(f"Upload collection-add skipped for asset {inventory_id}: {e}")
 
 
 # Environment configuration
@@ -490,6 +631,37 @@ def is_relevant_event(
     return any(event_name.startswith(prefix) for prefix in allowed_prefixes)
 
 
+def _parse_string_list(attr: dict | None) -> tuple:
+    """Parse a DynamoDB list-of-strings attribute into a normalized tuple."""
+    if not attr:
+        return ()
+    values = attr.get("L", [])
+    return tuple(
+        v.get("S", "").strip().lower()
+        for v in values
+        if isinstance(v, dict) and v.get("S", "").strip()
+    )
+
+
+def _parse_file_filter(attr: dict | None) -> dict | None:
+    """Parse the DynamoDB ``fileFilter`` map into a normalized dict.
+
+    Returns ``None`` when no usable filter is present (missing, NULL, or empty),
+    which downstream means "allow all".
+    """
+    if not attr or "M" not in attr:
+        return None
+    m = attr["M"]
+    mode = m.get("mode", {}).get("S", "allow").strip().lower()
+    if mode not in ("allow", "deny"):
+        mode = "allow"
+    extensions = tuple(e.lstrip(".") for e in _parse_string_list(m.get("extensions")))
+    mime_types = _parse_string_list(m.get("mimeTypes"))
+    if not extensions and not mime_types:
+        return None
+    return {"mode": mode, "extensions": extensions, "mimeTypes": mime_types}
+
+
 @functools.lru_cache(maxsize=50)
 def lookup_connector_by_bucket(bucket_name: str) -> dict | None:
     """Cached lookup of connector record by bucket name using GSI query."""
@@ -501,20 +673,224 @@ def lookup_connector_by_bucket(bucket_name: str) -> dict | None:
             IndexName=CONNECTOR_STORAGE_IDENTIFIER_INDEX,
             KeyConditionExpression="storageIdentifier = :b",
             ExpressionAttributeValues={":b": {"S": bucket_name}},
-            ProjectionExpression="id, integrationMethod",
+            ProjectionExpression=(
+                "id, integrationMethod, allowedFileExtensions, fileFilter"
+            ),
             Limit=1,
         )
         items = resp.get("Items", [])
         if not items:
             return None
         item = items[0]
+        # Parse both the structured `fileFilter` (canonical) and the legacy
+        # `allowedFileExtensions` allow-list. Missing/empty on both means
+        # "allow all" — what every connector created before filtering looks
+        # like, so existing connectors keep ingesting everything unchanged.
+        allowed_raw = item.get("allowedFileExtensions", {}).get("L", [])
+        allowed_exts = tuple(
+            ext.get("S", "").strip().lower().lstrip(".")
+            for ext in allowed_raw
+            if ext.get("S", "").strip()
+        )
         return {
             "id": item["id"]["S"],
             "integrationMethod": item.get("integrationMethod", {}).get("S", ""),
+            "allowedFileExtensions": allowed_exts,
+            "fileFilter": _parse_file_filter(item.get("fileFilter")),
         }
     except Exception as e:
         logger.warning(f"Connector lookup failed for bucket {bucket_name}: {e}")
         return None
+
+
+def _mime_type_matches(content_type: str, patterns: tuple) -> bool:
+    """Return True if ``content_type`` matches any MIME pattern.
+
+    Supports exact matches ("video/mp4"), subtype wildcards ("image/*"), and
+    the universal wildcards ("*" / "*/*").
+    """
+    if not content_type or not patterns:
+        return False
+    ct = content_type.lower().split(";")[0].strip()
+    main_type = ct.split("/")[0] if "/" in ct else ct
+    for pattern in patterns:
+        if pattern in ("*", "*/*"):
+            return True
+        if pattern == ct:
+            return True
+        if pattern.endswith("/*") and pattern[:-2] == main_type:
+            return True
+    return False
+
+
+@functools.lru_cache(maxsize=1)
+def _env_file_filter() -> dict | None:
+    """Parse the connector's file filter from its own environment variable.
+
+    The ``CONNECTOR_FILE_FILTER`` env var is set on each per-connector Lambda at
+    creation time from the connector configuration, so the connector is driven
+    entirely by its own configuration without a DynamoDB read on the hot path.
+
+    Returns the normalized filter dict, or ``None`` when the env var is absent
+    or empty (meaning "allow all" / fall back to the connector record).
+    """
+    raw = os.environ.get("CONNECTOR_FILE_FILTER", "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        logger.warning("Invalid CONNECTOR_FILE_FILTER env var; ignoring it")
+        return None
+    if not isinstance(data, dict):
+        return None
+    mode = str(data.get("mode", "allow")).strip().lower()
+    if mode not in ("allow", "deny"):
+        mode = "allow"
+    extensions = tuple(
+        str(e).strip().lower().lstrip(".")
+        for e in (data.get("extensions") or [])
+        if str(e).strip()
+    )
+    mime_types = tuple(
+        str(m).strip().lower() for m in (data.get("mimeTypes") or []) if str(m).strip()
+    )
+    if not extensions and not mime_types:
+        return None
+    return {"mode": mode, "extensions": extensions, "mimeTypes": mime_types}
+
+
+_CONTENT_CATEGORY_BY_EXT = {
+    # documents
+    "pdf": "document",
+    "doc": "document",
+    "docx": "document",
+    "txt": "document",
+    "rtf": "document",
+    "odt": "document",
+    "md": "document",
+    "ppt": "document",
+    "pptx": "document",
+    "xls": "document",
+    "xlsx": "document",
+    "pages": "document",
+    # structured data
+    "csv": "data",
+    "json": "data",
+    "xml": "data",
+    "yaml": "data",
+    "yml": "data",
+    "tsv": "data",
+    "parquet": "data",
+    # archives
+    "zip": "archive",
+    "tar": "archive",
+    "gz": "archive",
+    "tgz": "archive",
+    "rar": "archive",
+    "7z": "archive",
+    "bz2": "archive",
+    # code / text
+    "py": "code",
+    "js": "code",
+    "ts": "code",
+    "tsx": "code",
+    "jsx": "code",
+    "java": "code",
+    "c": "code",
+    "cpp": "code",
+    "h": "code",
+    "hpp": "code",
+    "go": "code",
+    "rs": "code",
+    "rb": "code",
+    "sh": "code",
+    "html": "code",
+    "css": "code",
+    "sql": "code",
+}
+
+
+def get_content_category(asset_type: str, file_ext: str) -> str:
+    """Coarse content category for non-media badges and search facets.
+
+    Supported media maps to its kind (image/video/audio); everything else maps
+    to a lightweight category derived from the extension
+    (document/data/archive/code/other).
+    """
+    if asset_type in ("Image", "Video", "Audio"):
+        return asset_type.lower()
+    return _CONTENT_CATEGORY_BY_EXT.get(
+        (file_ext or "").strip().lower().lstrip("."), "other"
+    )
+
+
+def _resolve_file_filter(bucket_name: str) -> dict | None:
+    """Resolve the active file filter for a bucket's connector.
+
+    Prefers the Lambda's own ``CONNECTOR_FILE_FILTER`` env var, then the
+    connector record's structured ``fileFilter``, then the legacy
+    ``allowedFileExtensions`` allow-list. Returns ``None`` when no filter is
+    configured (meaning "allow all" for supported media).
+    """
+    file_filter = _env_file_filter()
+    if file_filter is not None:
+        return file_filter
+    info = lookup_connector_by_bucket(bucket_name)
+    if info is None:
+        return None
+    file_filter = info.get("fileFilter")
+    if file_filter:
+        return file_filter
+    allowed = info.get("allowedFileExtensions", ())
+    if allowed:
+        return {"mode": "allow", "extensions": tuple(allowed), "mimeTypes": ()}
+    return None
+
+
+def _filter_matches(file_filter: dict, file_ext: str, content_type: str) -> bool:
+    """True if the object matches the filter's extensions or MIME patterns."""
+    extensions = file_filter.get("extensions", ())
+    mime_types = file_filter.get("mimeTypes", ())
+    return bool(
+        (file_ext and file_ext in extensions)
+        or _mime_type_matches(content_type, mime_types)
+    )
+
+
+def should_ingest_file(bucket_name: str, file_ext: str, content_type: str) -> bool:
+    """Decide whether a SUPPORTED-MEDIA object should be ingested per the filter.
+
+    No filter / empty filter -> ingest (allow all). Allow mode -> ingest only
+    matches; deny mode -> ingest everything except matches.
+    """
+    file_ext = (file_ext or "").strip().lower().lstrip(".")
+    file_filter = _resolve_file_filter(bucket_name)
+    if file_filter is None:
+        return True
+    extensions = file_filter.get("extensions", ())
+    mime_types = file_filter.get("mimeTypes", ())
+    if not extensions and not mime_types:
+        return True
+    matched = _filter_matches(file_filter, file_ext, content_type)
+    if file_filter.get("mode") == "deny":
+        return not matched
+    return matched
+
+
+def is_explicitly_allowed(bucket_name: str, file_ext: str, content_type: str) -> bool:
+    """True only when an allow-mode filter explicitly lists this file.
+
+    Drives whether a NON-MEDIA ("Other") object is ingested: only when the
+    connector opted in by allow-listing its extension or MIME type. Deny mode
+    and an absent filter never opt non-media in (so behavior is unchanged for
+    connectors that don't configure an allow-list).
+    """
+    file_ext = (file_ext or "").strip().lower().lstrip(".")
+    file_filter = _resolve_file_filter(bucket_name)
+    if not file_filter or file_filter.get("mode") != "allow":
+        return False
+    return _filter_matches(file_filter, file_ext, content_type)
 
 
 class FileHash(TypedDict):
@@ -1073,17 +1449,45 @@ class AssetProcessor:
                 f"Asset type determination for {key}: content_type={content_type}, file_ext={file_ext}, determined_type={asset_type}"
             )
 
-            # Stop processing if asset type is not one of: "Image", "Video", "Audio"
-            if asset_type not in ["Image", "Video", "Audio"]:
+            # Gate the object: supported media goes through the connector's
+            # file filter; non-media ("Other") is ingested ONLY when the
+            # connector explicitly allow-lists it (preview-only, no pipeline).
+            is_supported_media = asset_type in ["Image", "Video", "Audio"]
+
+            if is_supported_media:
+                if not should_ingest_file(bucket, file_ext, content_type):
+                    logger.info(
+                        f"Skipping {bucket}/{key}: file extension '{file_ext}' / "
+                        f"content type '{content_type}' excluded by the connector's "
+                        f"file filter"
+                    )
+                    metrics.add_metric(
+                        name="ConnectorFileTypeFiltered",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                    release_processing_lock(bucket, key, version_id)
+                    return None
+            else:
+                if not is_explicitly_allowed(bucket, file_ext, content_type):
+                    logger.info(
+                        f"Skipping processing for unsupported asset type: "
+                        f"{asset_type} for {bucket}/{key}"
+                    )
+                    metrics.add_metric(
+                        name="UnsupportedAssetTypeSkipped",
+                        unit=MetricUnit.Count,
+                        value=1,
+                    )
+                    release_processing_lock(bucket, key, version_id)
+                    return None
                 logger.info(
-                    f"Skipping processing for unsupported asset type: {asset_type} for {bucket}/{key}"
+                    f"Ingesting non-media asset (preview-only, no pipeline): "
+                    f"{bucket}/{key} type={asset_type} ext={file_ext}"
                 )
                 metrics.add_metric(
-                    name="UnsupportedAssetTypeSkipped", unit=MetricUnit.Count, value=1
+                    name="NonMediaAssetIngested", unit=MetricUnit.Count, value=1
                 )
-                # Release lock before returning
-                release_processing_lock(bucket, key, version_id)
-                return None
 
             tags = {tag["Key"]: tag["Value"] for tag in existing_tags.get("TagSet", [])}
 
@@ -1607,11 +2011,20 @@ class AssetProcessor:
                 },
             )
 
-            self.publish_event(
-                dynamo_entry["InventoryID"],
-                dynamo_entry["DigitalSourceAsset"]["ID"],
-                metadata,
-            )
+            # Supported media triggers the default pipelines via EventBridge.
+            # Non-media is searchable (DynamoDB stream -> OpenSearch) but gets no
+            # pipeline processing, so we skip the AssetCreated event for it.
+            if is_supported_media:
+                self.publish_event(
+                    dynamo_entry["InventoryID"],
+                    dynamo_entry["DigitalSourceAsset"]["ID"],
+                    metadata,
+                )
+            else:
+                logger.info(
+                    f"Skipping pipeline event for non-media asset "
+                    f"{dynamo_entry['InventoryID']} (preview-only)"
+                )
 
             # Release lock after successful processing
             release_processing_lock(bucket, key, version_id)
@@ -1748,6 +2161,7 @@ class AssetProcessor:
                 "DigitalSourceAsset": {
                     "ID": f"asset:{type_abbrev}:{asset_id}",
                     "Type": asset_type,
+                    "contentCategory": get_content_category(asset_type, file_ext),
                     "CreateDate": timestamp,
                     "IngestedAt": timestamp,
                     "originalIngestDate": timestamp,  # Set original ingest date to current time for new assets
@@ -1847,11 +2261,12 @@ class AssetProcessor:
     def publish_event(self, inventory_id: str, asset_id: str, metadata: StorageInfo):
         """Publish event to EventBridge with optimized serialization"""
         with self.asset_context(asset_id=asset_id, inventory_id=inventory_id):
-            # Upload-portal automation (Layer C): if this asset arrived through
-            # an upload portal with a server-stamped `ml-collection-ids`
-            # directive, add it to those collections now that the asset exists.
+            # Upload collection association (generalized Layer C): if this asset
+            # arrived through an upload portal or the standard upload page with
+            # server-stamped `ml-collection-ids` / overflow directives, add it
+            # to those collections now that the asset's inventory_id exists.
             # Silent-fail — never blocks event publication or ingest.
-            _add_asset_to_portal_collections(inventory_id, metadata)
+            associate_upload_collections(inventory_id, metadata)
             try:
                 # Extract content type information
                 content_type = (
@@ -2317,11 +2732,27 @@ def update_restore_status(
 
 # Process records in parallel with improved logging
 def process_records_in_parallel(
-    processor: AssetProcessor, records: List[Dict], max_workers: int = 5
+    processor: AssetProcessor, records: List[Dict], max_workers: Optional[int] = None
 ):
-    """Process records in parallel using a ThreadPoolExecutor"""
+    """Process records in parallel using a ThreadPoolExecutor.
+
+    Concurrency defaults to the ``INGEST_MAX_WORKERS`` env var (falling back to
+    5). Raising it is memory-safe: each record is processed by streaming its S3
+    object (chunked MD5 + head/metadata), never loading the whole file, so more
+    concurrent records does not risk large-file OOM on this Lambda.
+    """
+    if max_workers is None:
+        try:
+            max_workers = int(os.environ.get("INGEST_MAX_WORKERS", "5"))
+        except (TypeError, ValueError):
+            max_workers = 5
+    max_workers = max(1, max_workers)
+
     # Add logging for initial record count
-    logger.info(f"Starting parallel processing with {len(records)} records")
+    logger.info(
+        f"Starting parallel processing with {len(records)} records "
+        f"(max_workers={max_workers})"
+    )
 
     # Debug log the first record structure
     if records and len(records) > 0:

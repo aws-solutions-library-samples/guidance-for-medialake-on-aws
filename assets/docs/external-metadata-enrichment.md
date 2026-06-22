@@ -322,7 +322,6 @@ For developers working on the feature:
 The External Metadata Enrichment feature is implemented in two phases:
 
 1. **Phase 1: Metadata Fetch** (external-metadata-enrichment spec)
-
    - Pipeline node for fetching metadata from external APIs
    - Pluggable authentication strategies (OAuth2, API Key, Basic Auth)
    - Pluggable metadata adapters (Generic REST)

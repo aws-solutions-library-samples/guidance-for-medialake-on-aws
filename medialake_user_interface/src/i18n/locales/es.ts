@@ -13,24 +13,52 @@ export default {
     title: "Activos",
     connectors: "Conectores",
     selectConnector: "Seleccionar un conector",
+    myAssets: "Mis activos",
+    uploadToMyAssets: "Subir a Mis activos",
+    myAssetsEmpty: {
+      title: "Aún no hay activos",
+      description:
+        "Sube tus primeros archivos multimedia para comenzar con tu biblioteca personal de activos.",
+      uploadCta: "Subir archivos",
+    },
   },
   upload: {
     title: "Subir archivos multimedia",
     description:
-      "Selecciona un conector S3 y sube tus archivos multimedia. Solo se admiten formatos de audio, video, HLS y MPEG-DASH.",
+      "Selecciona un destino y sube tus archivos multimedia. Solo se admiten formatos de audio, video, imagen, HLS y MPEG-DASH.",
     uploadDestination: "Destino de subida",
     browsePath: "Explorar ruta",
     uploadingTo: "Subiendo a",
     restrictedToPrefix: "restringido",
     allowedPrefixesInfo: "Solo puedes subir a {{count}} ruta(s) permitida(s)",
-    connectorLabel: "Conector S3",
-    selectConnectorPlaceholder: "Selecciona un conector S3",
+    connectorLabel: "Destino de subida",
+    selectConnectorPlaceholder: "Selecciona un destino",
     loadingConnectors: "Cargando conectores...",
     noConnectors: "No hay conectores S3 disponibles. Por favor, configure un conector S3 primero.",
+    noDestinations:
+      "No tienes acceso a ningún destino de subida. Contacta con tu administrador para solicitar acceso.",
     dashboardNote:
       "Solo se permiten archivos de tipo audio/*, video/*, image/*, HLS (application/x-mpegURL) y MPEG-DASH (application/dash+xml)",
     meta: {
       name: "Nombre",
+    },
+    collectionSelector: {
+      trigger: "Añadir a colecciones",
+      selectedCount: "{{count}} seleccionados",
+      searchPlaceholder: "Buscar colecciones\u2026",
+      searchSection: "Búsqueda",
+      noSearchResults: "No hay colecciones coincidentes",
+      createAction: 'Crear "{{name}}"',
+      emptyState: "No hay colecciones disponibles. Crea una usando la búsqueda.",
+      recentSection: "Recientes",
+      favoritesSection: "Favoritos",
+      emptyRecent: "No hay colecciones recientes",
+      emptyFavorites: "No hay colecciones favoritas",
+      searchError: "Error al buscar colecciones",
+      createFailed: "Error al crear la colección",
+      emptySection: "No hay colecciones",
+      loading: "Cargando\u2026",
+      more: "Más",
     },
   },
   pathBrowser: {
@@ -105,6 +133,40 @@ export default {
       allowUploads: "Permitir cargas",
       bucketNameHelper: "Bucket name must be globally unique, follow S3 naming rules.",
       addPrefix: "Agregar prefijo",
+      objectPrefixesTitle: "Object Prefixes",
+      objectPrefixesHelper:
+        "Restrict this connector to objects under one or more key prefixes. Leave empty to watch the whole bucket.",
+      fileFilter: "File Type Filtering",
+      fileFilterAllow: "Allow list",
+      fileFilterDeny: "Deny list",
+      fileFilterAllowHelper:
+        "Ingests only files that match the extensions or MIME types you list — this replaces the default set rather than adding to it. List a non-media type (for example, pdf) to ingest it as a preview-only item. Leave both lists empty to ingest all supported media.",
+      fileFilterDenyHelper:
+        "Ingests all supported media except files that match the extensions or MIME types you list. Non-media file types are never ingested in deny mode.",
+      fileFilterExtensions: "File Extensions",
+      fileFilterExtensionsExamples: "For example: mp4, mov, jpg",
+      fileFilterExtensionsPlaceholder: "Add an extension",
+      fileFilterMimeTypes: "MIME Types",
+      fileFilterMimeTypesExamples:
+        "For example: video/mp4 or image/* (a wildcard matches any subtype)",
+      fileFilterMimeTypesPlaceholder: "Add a MIME type",
+      supportedFormatsTitle: "Supported formats",
+      allowUploadsHelper:
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+      indexingDefaultsNote:
+        "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
+      editNote:
+        "Only the connector name and description can be changed after creation. Storage, asset filters, and advanced settings are fixed.",
+      integrationMethodNote:
+        "S3 EventBridge Notifications is the recommended integration method, providing reliable and scalable event delivery. S3 Event Notifications remains available but offers fewer delivery guarantees for high-volume buckets.",
+      recommendedSuffix: "(Recommended)",
+    },
+    steps: {
+      type: "Connector Type",
+      details: "Details",
+      storage: "Storage",
+      indexing: "Asset Filters",
+      advanced: "Advanced",
     },
     status: {
       active: "Activo",
@@ -225,6 +287,11 @@ export default {
     },
   },
   collectionsPage: {
+    favorites: {
+      sectionTitle: "Favoritos",
+      emptyTitle: "No hay colecciones favoritas",
+      emptyDescription: "Las colecciones que marques como favoritas aparecerán aquí",
+    },
     title: "Colecciones",
     description: "Organiza y gestiona tus activos multimedia en colecciones",
     createCollection: "Crear colección",
@@ -923,6 +990,7 @@ export default {
     },
   },
   common: {
+    remove: "Quitar",
     back: "Atrás",
     search: "Buscar",
     public: "Público",
@@ -1736,6 +1804,9 @@ export default {
         myCollectionsTitle: "Mis Colecciones",
         sharedWithMeTitle: "Compartido Conmigo",
         mySharedTitle: "Mis Colecciones Compartidas",
+        favoritesTitle: "Colecciones favoritas",
+        favoritesEmptyTitle: "No hay colecciones favoritas",
+        favoritesEmptyDescription: "Las colecciones que marques como favoritas aparecerán aquí",
         emptyTitle: "No se encontraron colecciones",
         emptyDescription: "Crea una colección para comenzar",
         createCollection: "Crear Colección",
@@ -1748,6 +1819,7 @@ export default {
           myCollections: "Mis Colecciones",
           sharedWithMe: "Compartido Conmigo",
           myShared: "Mis Colecciones Compartidas",
+          favorites: "Colecciones favoritas",
         },
         sortingTitle: "Ordenamiento",
         sortBy: "Ordenar Por",
@@ -1766,6 +1838,11 @@ export default {
         title: "Recursos Recientes",
         emptyTitle: "No hay recursos recientes",
         emptyDescription: "Los recursos subidos recientemente aparecerán aquí",
+      },
+      myAssets: {
+        title: "Mis Recursos",
+        emptyTitle: "Aún no hay recursos personales",
+        emptyDescription: "Sube tu primer archivo a Mis Recursos.",
       },
       collectionGroup: {
         title: "Grupo de Colecciones",
@@ -1890,6 +1967,31 @@ export default {
     },
   },
   uploadPortals: {
+    themes: {
+      listDescription:
+        "Temas de apariencia reutilizables que puedes aplicar a portales nuevos o existentes.",
+      deleteTitle: "Eliminar tema",
+      editorLoadError: "No se pudo cargar el tema",
+    },
+    templates: {
+      listDescription:
+        "Estructuras de portal reutilizables que puedes usar para iniciar nuevos portales a partir de una configuración fiable.",
+      createFromTemplate: "Crear portal a partir de esta plantilla",
+      deleteTitle: "Eliminar plantilla",
+      editorLoadError: "No se pudo cargar la plantilla",
+    },
+    actions: {
+      applyTheme: "Aplicar tema",
+      applyThemeMenu: "Aplicar tema…",
+      saveAsTemplate: "Guardar como plantilla",
+      saveAsTheme: "Guardar como tema",
+      startFromTemplate: "Empezar desde una plantilla",
+      startFromTemplateMenu: "Empezar desde una plantilla…",
+    },
+    fieldTypes: {
+      radioGroup: "Grupo de opciones",
+      yesNo: "Sí / No",
+    },
     pageTitle: "Portales de carga",
     pageDescription: "Gestionar portales de carga para colaboradores externos",
     createPortal: "Crear portal",

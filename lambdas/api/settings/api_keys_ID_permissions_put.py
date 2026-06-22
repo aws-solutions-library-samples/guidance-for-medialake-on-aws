@@ -38,6 +38,7 @@ VALID_PERMISSION_KEYS = {
     "connectors:create",
     "connectors:edit",
     "connectors:delete",
+    "connectors:upload",
     # Environments
     "environments:view",
     "environments:create",

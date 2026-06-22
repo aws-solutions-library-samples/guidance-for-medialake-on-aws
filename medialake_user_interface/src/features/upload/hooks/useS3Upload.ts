@@ -15,6 +15,7 @@ interface UploadRequest {
   content_type: string;
   file_size: number;
   path?: string;
+  collection_ids?: string[];
 }
 
 interface S3UploadResponse {

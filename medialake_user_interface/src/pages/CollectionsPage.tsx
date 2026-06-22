@@ -57,8 +57,11 @@ import { EditCollectionModal } from "../components/collections/EditCollectionMod
 import { ShareManagementModal } from "../components/collections/ShareManagementModal";
 import { ALL_ICONS } from "../components/collections/ThumbnailSelector";
 import { CollectionCard } from "../components/collections/CollectionCard";
+import { CollectionsFavoritesSection } from "../components/collections/CollectionsFavoritesSection";
 import { CollectionCardViewControls } from "../components/collections/CollectionCardViewControls";
 import { useCollectionViewPreferences } from "../hooks/useCollectionViewPreferences";
+import { useCollectionFavorites } from "@/hooks/useCollectionFavorites";
+import { buildFavoritesCollectionList } from "@/features/dashboard/utils/buildFavoritesCollectionList";
 import {
   CollectionViewControls,
   type CollectionSortOption,
@@ -307,6 +310,31 @@ const CollectionsPage: React.FC = () => {
   const sharedWithMeCollections = sharedWithMeResponse?.data || [];
   const sharedByMeCollections = sharedByMeResponse?.data || [];
   const collectionTypes = collectionTypesResponse?.data || [];
+
+  // Shared collection-favorites state — single source of truth across surfaces.
+  const { favorites, isCollectionFavorited, handleFavoriteToggle } = useCollectionFavorites();
+
+  // Favorites section (My Collections tab): join the favorited-id set against the
+  // loaded datasets (which carry `userRole` for correct action gating), then
+  // append a metadata fallback card for favorited ids not present in those
+  // datasets (e.g. favorited collections on another page or shared collections).
+  const favoritePoolIds = useMemo(
+    () =>
+      new Set(
+        [...allCollections, ...sharedWithMeCollections, ...sharedByMeCollections].map((c) => c.id)
+      ),
+    [allCollections, sharedWithMeCollections, sharedByMeCollections]
+  );
+  const favoritesList = useMemo(
+    () =>
+      buildFavoritesCollectionList(
+        [allCollections, sharedWithMeCollections, sharedByMeCollections],
+        favorites ?? [],
+        currentUserId,
+        { sortBy: "name", sortOrder: "asc" }
+      ),
+    [allCollections, sharedWithMeCollections, sharedByMeCollections, favorites, currentUserId]
+  );
 
   // Sort options for the toolbar — standard fields always visible; custom
   // metadata keys are appended by `CollectionViewControls` from the
@@ -573,6 +601,73 @@ const CollectionsPage: React.FC = () => {
 
   const isGroupsTab = activeTab === "groups";
 
+  // Shared card-grid column rule — column min-width scales with card size so
+  // S/M/L all stay uniformly packed. Used by both the My Collections favorites
+  // section and the main collections grid.
+  const cardGridSx = {
+    display: "grid",
+    gridTemplateColumns: {
+      xs: "1fr",
+      sm: `repeat(auto-fill, minmax(${
+        cardDisplayPrefs.cardSize === "small"
+          ? 220
+          : cardDisplayPrefs.cardSize === "large"
+            ? 340
+            : 280
+      }px, 1fr))`,
+      md: `repeat(auto-fill, minmax(${
+        cardDisplayPrefs.cardSize === "small"
+          ? 220
+          : cardDisplayPrefs.cardSize === "large"
+            ? 340
+            : 280
+      }px, 1fr))`,
+    },
+    gap: 2.5,
+    pt: 0.5,
+  } as const;
+
+  // Single card renderer shared by the favorites section and the main grid.
+  // `withActions` gates the owner-only mutation menu (omitted for metadata
+  // fallback cards, which carry no real `userRole`); `withSearchContext` gates
+  // the search-only parent breadcrumb and custom-metadata explainer chip.
+  const renderCollectionCard = (
+    collection: Collection,
+    opts: { withActions: boolean; withSearchContext: boolean }
+  ) => {
+    const style = getCollectionStyle(collection);
+    const sortedMetadataKey = sortField.startsWith("customMetadata.")
+      ? sortField.substring("customMetadata.".length)
+      : undefined;
+    const parentName =
+      opts.withSearchContext && collection.parentId && isSearchingOrFiltering
+        ? parentNameMap.get(collection.parentId)
+        : undefined;
+    const collectionType = collection.collectionTypeId
+      ? collectionTypes.find((ct) => ct.id === collection.collectionTypeId)
+      : undefined;
+    const placeholderIconName = collectionType?.icon;
+    return (
+      <CollectionCard
+        key={collection.id}
+        collection={collection}
+        onClick={handleViewCollection}
+        onShareClick={opts.withActions ? handleShareClick : undefined}
+        onEditClick={opts.withActions ? handleEditClick : undefined}
+        onDeleteClick={opts.withActions ? handleDeleteClick : undefined}
+        editPermission={editCollectionPermission}
+        deletePermission={deleteCollectionPermission}
+        accentColor={style.color}
+        placeholderIconName={placeholderIconName}
+        sortedMetadataKey={opts.withSearchContext ? sortedMetadataKey : undefined}
+        parentName={parentName}
+        display={cardDisplayPrefs}
+        isFavorite={isCollectionFavorited(collection.id)}
+        onFavoriteToggle={(e) => handleFavoriteToggle(collection, e)}
+      />
+    );
+  };
+
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Page header — title row with action buttons */}
@@ -815,6 +910,24 @@ const CollectionsPage: React.FC = () => {
         isLoading={isGroupsTab ? false : isLoadingCollections}
         error={isGroupsTab ? null : (error as Error)}
       >
+        {/* My Collections tab: a Favorites section stacked above the user's own
+            collections. Favorited collections absent from the loaded datasets are
+            rendered from captured metadata so they still appear here. */}
+        {activeTab === "myCollections" && (
+          <CollectionsFavoritesSection
+            favorites={favoritesList}
+            isLive={(id) => favoritePoolIds.has(id)}
+            gridSx={cardGridSx}
+            renderCard={(collection, withActions) =>
+              renderCollectionCard(collection, { withActions, withSearchContext: false })
+            }
+          />
+        )}
+        {activeTab === "myCollections" && (
+          <Typography variant="h6" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
+            {t("collectionsPage.filters.myCollections", "My Collections")}
+          </Typography>
+        )}
         {isGroupsTab ? (
           <CollectionGroupsList
             onCreateClick={handleCreateGroupClick}
@@ -917,66 +1030,11 @@ const CollectionsPage: React.FC = () => {
             )}
           </Box>
         ) : (
-          /* Card grid — column min-width scales with card size so S/M/L all stay
-             uniformly-packed without gutters blowing out on small screens. */
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: `repeat(auto-fill, minmax(${
-                  cardDisplayPrefs.cardSize === "small"
-                    ? 220
-                    : cardDisplayPrefs.cardSize === "large"
-                      ? 340
-                      : 280
-                }px, 1fr))`,
-                md: `repeat(auto-fill, minmax(${
-                  cardDisplayPrefs.cardSize === "small"
-                    ? 220
-                    : cardDisplayPrefs.cardSize === "large"
-                      ? 340
-                      : 280
-                }px, 1fr))`,
-              },
-              gap: 2.5,
-              pt: 0.5,
-            }}
-          >
-            {rootCollections.map((collection) => {
-              const style = getCollectionStyle(collection);
-              const sortedMetadataKey = sortField.startsWith("customMetadata.")
-                ? sortField.substring("customMetadata.".length)
-                : undefined;
-              const parentName =
-                collection.parentId && isSearchingOrFiltering
-                  ? parentNameMap.get(collection.parentId)
-                  : undefined;
-              // Fall back to the collection-type icon name (via the typeInfo lookup)
-              // when the collection doesn't have its own thumbnail, so the placeholder
-              // reads as the type instead of a generic folder.
-              const collectionType = collection.collectionTypeId
-                ? collectionTypes.find((ct) => ct.id === collection.collectionTypeId)
-                : undefined;
-              const placeholderIconName = collectionType?.icon;
-              return (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  onClick={handleViewCollection}
-                  onShareClick={handleShareClick}
-                  onEditClick={handleEditClick}
-                  onDeleteClick={handleDeleteClick}
-                  editPermission={editCollectionPermission}
-                  deletePermission={deleteCollectionPermission}
-                  accentColor={style.color}
-                  placeholderIconName={placeholderIconName}
-                  sortedMetadataKey={sortedMetadataKey}
-                  parentName={parentName}
-                  display={cardDisplayPrefs}
-                />
-              );
-            })}
+          /* Card grid — see `cardGridSx` for the column rule. */
+          <Box sx={cardGridSx}>
+            {rootCollections.map((collection) =>
+              renderCollectionCard(collection, { withActions: true, withSearchContext: true })
+            )}
           </Box>
         )}
         {/* Pagination — only for tabs with server-side pagination */}

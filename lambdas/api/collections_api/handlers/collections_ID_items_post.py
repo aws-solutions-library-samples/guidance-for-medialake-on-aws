@@ -8,6 +8,7 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
+from collection_activity import record_collection_activity
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -131,8 +132,10 @@ def register_route(app):
                 except PutError as e:
                     logger.error(f"[ADD_ITEM] Error adding item: {e}")
 
-            # Update collection: increment itemCount atomically and refresh timestamps
-            # Note: itemCount is maintained as a stored counter for efficient listing.
+            # Refresh the collection's updatedAt timestamp. itemCount is also
+            # incremented for backward compatibility, but it is deprecated and
+            # no longer the source of truth — both the list and detail endpoints
+            # now compute item counts dynamically from CollectionItemModel rows.
             try:
                 collection = CollectionModel.get(
                     f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
@@ -146,7 +149,10 @@ def register_route(app):
                     ]
                 )
             except Exception as e:
-                logger.warning(f"[ADD_ITEM] Failed to update collection timestamp: {e}")
+                logger.warning(
+                    f"[ADD_ITEM] Failed to update collection metadata "
+                    f"(updatedAt/itemCount) for {collection_id}: {e}"
+                )
 
             logger.info(
                 f"[ADD_ITEM] Added {len(added_items)} item(s) to collection {collection_id}"
@@ -156,6 +162,10 @@ def register_route(app):
                 unit=MetricUnit.Count,
                 value=len(added_items),
             )
+
+            # Record activity for the recent-collections tracker (Req 11.1)
+            if added_items and user_id:
+                record_collection_activity(user_id, collection_id)
 
             from aws_lambda_powertools.event_handler import Response, content_types
 

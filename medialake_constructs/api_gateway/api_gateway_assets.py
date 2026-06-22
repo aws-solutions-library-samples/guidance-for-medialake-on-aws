@@ -81,6 +81,9 @@ class AssetsProps:
     # S3 Vector Store configuration
     s3_vector_bucket_name: str
 
+    # Upload directives table for collection-metadata overflow (§6.5)
+    upload_directives_table: Optional[dynamodb.ITable] = None
+
     # Optional fields (must come after required fields)
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
@@ -89,6 +92,8 @@ class AssetsProps:
     video_download_enabled: bool = (
         True  # Feature flag for video/clip download functionality
     )
+
+    personal_assets_bucket: Optional[s3.IBucket] = None
 
     # Bulk download parameters
     small_file_threshold_mb: int = 512  # Max size for a file to be considered "small"
@@ -562,9 +567,27 @@ class AssetsConstruct(Construct):
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
                     "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
+                    **(
+                        {
+                            "UPLOAD_DIRECTIVES_TABLE_NAME": props.upload_directives_table.table_name
+                        }
+                        if props.upload_directives_table
+                        else {}
+                    ),
+                    **(
+                        {
+                            "PERSONAL_ASSETS_BUCKET": props.personal_assets_bucket.bucket_name
+                        }
+                        if props.personal_assets_bucket
+                        else {}
+                    ),
                 },
             ),
         )
+
+        # Grant WRITE access to the Upload directives table (overflow side-records)
+        if props.upload_directives_table:
+            props.upload_directives_table.grant_write_data(upload_lambda.function)
 
         # Add DynamoDB and S3 permissions for presigned URL Lambda
         upload_lambda.function.add_to_role_policy(
@@ -812,6 +835,30 @@ class AssetsConstruct(Construct):
                 resources=["arn:aws:s3:::*"],
             )
         )
+
+        # Grant upload Lambdas explicit permissions on the personal assets bucket
+        if props.personal_assets_bucket:
+            for fn in [
+                upload_lambda.function,
+                multipart_complete_lambda.function,
+                multipart_sign_lambda.function,
+                multipart_abort_lambda.function,
+            ]:
+                props.personal_assets_bucket.grant_put(fn)
+                fn.add_to_role_policy(
+                    iam.PolicyStatement(
+                        actions=[
+                            "s3:CreateMultipartUpload",
+                            "s3:UploadPart",
+                            "s3:CompleteMultipartUpload",
+                            "s3:AbortMultipartUpload",
+                            "s3:GetObject",
+                        ],
+                        resources=[
+                            props.personal_assets_bucket.bucket_arn + "/*",
+                        ],
+                    )
+                )
 
         # Create API Gateway resources for multipart endpoints
         multipart_resource = upload_resource.add_resource("multipart")
