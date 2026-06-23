@@ -59,6 +59,7 @@ ALLOWED_CONTENT_TYPES = [
     "image/*",
     "application/x-mpegURL",  # HLS
     "application/dash+xml",  # MPEG-DASH
+    "application/mxf",  # MXF
 ]
 # S3-compatible filename regex.
 # Allows: alphanumeric, S3 safe chars (!-_.*'()), and chars that require

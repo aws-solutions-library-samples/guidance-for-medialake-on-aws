@@ -110,6 +110,7 @@ ALLOWED_CONTENT_TYPES = [
     "image/*",
     "application/x-mpegURL",
     "application/dash+xml",
+    "application/mxf",
 ]
 FILENAME_REGEX = r"^[a-zA-Z0-9!\-_.*'() @\$+,;=&:]+$"
 

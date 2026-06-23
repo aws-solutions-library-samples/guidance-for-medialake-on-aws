@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.1] - 2026-06-23
+
+### Bug Fixes
+
+- fix: mxf mime type updates in uploads components and in portals as well
+
 ## [1.17.0] - 2026-06-23
 
 ### Features

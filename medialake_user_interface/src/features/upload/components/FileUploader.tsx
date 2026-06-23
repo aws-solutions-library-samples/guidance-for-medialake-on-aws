@@ -47,6 +47,7 @@ function getUppy() {
         "image/*",
         "application/x-mpegURL", // HLS
         "application/dash+xml", // MPEG-DASH
+        "application/mxf", // MXF
       ],
       maxNumberOfFiles: 500,
     },

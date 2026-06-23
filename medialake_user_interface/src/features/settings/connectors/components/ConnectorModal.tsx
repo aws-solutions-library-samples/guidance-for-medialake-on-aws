@@ -164,6 +164,7 @@ const MIME_TYPE_OPTIONS: { group: string; value: string }[] = [
   { group: "Video", value: "video/x-msvideo" },
   { group: "Video", value: "video/x-matroska" },
   { group: "Video", value: "video/webm" },
+  { group: "Video", value: "application/mxf" },
   { group: "Audio", value: "audio/wav" },
   { group: "Audio", value: "audio/mpeg" },
   { group: "Audio", value: "audio/mp4" },

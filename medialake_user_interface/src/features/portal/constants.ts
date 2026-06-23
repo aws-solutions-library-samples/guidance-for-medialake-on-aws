@@ -25,4 +25,5 @@ export const PORTAL_DEFAULT_ALLOWED_FILE_TYPES: readonly string[] = [
   "image/*",
   "application/x-mpegURL",
   "application/dash+xml",
+  "application/mxf",
 ];

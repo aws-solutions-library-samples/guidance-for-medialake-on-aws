@@ -217,6 +217,7 @@ describe("UppyUploaderRenderer — single upload trigger (Req 7.7 / Property 10)
       "image/*",
       "application/x-mpegURL",
       "application/dash+xml",
+      "application/mxf",
     ]);
   });
 
