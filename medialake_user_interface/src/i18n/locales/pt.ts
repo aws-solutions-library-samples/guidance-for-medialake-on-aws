@@ -71,6 +71,7 @@ export default {
     prefixHelper: "Você só pode navegar e carregar para pastas dentro do caminho selecionado.",
     currentPath: "Caminho Atual",
     confirm: "Usar Este Caminho",
+    refresh: "Atualizar",
     validation: {
       invalidPath: "O caminho selecionado está fora dos prefixos permitidos.",
       noPathSelected: "Por favor, navegue até uma pasta antes de confirmar.",
@@ -1961,31 +1962,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "Temas de aparência reutilizáveis que você pode aplicar a portais novos ou existentes.",
-      deleteTitle: "Excluir tema",
-      editorLoadError: "Falha ao carregar o tema",
-    },
-    templates: {
-      listDescription:
-        "Estruturas de portal reutilizáveis que você pode usar para iniciar novos portais a partir de uma configuração confiável.",
-      createFromTemplate: "Criar portal a partir deste modelo",
-      deleteTitle: "Excluir modelo",
-      editorLoadError: "Falha ao carregar o modelo",
-    },
-    actions: {
-      applyTheme: "Aplicar tema",
-      applyThemeMenu: "Aplicar tema…",
-      saveAsTemplate: "Salvar como modelo",
-      saveAsTheme: "Salvar como tema",
-      startFromTemplate: "Começar a partir de um modelo",
-      startFromTemplateMenu: "Começar a partir de um modelo…",
-    },
-    fieldTypes: {
-      radioGroup: "Grupo de opções",
-      yesNo: "Sim / Não",
-    },
     pageTitle: "Portais de upload",
     pageDescription: "Gerenciar portais de upload para colaboradores externos",
     createPortal: "Criar portal",
@@ -2037,6 +2013,47 @@ export default {
     tokens: {
       copyUrl: "Copiar URL",
       revokeToken: "Revogar token",
+    },
+    themeTemplateActions: {
+      saveAs: "Salvar como…",
+      saveAsTemplate: "Salvar como modelo",
+      saveAsTheme: "Salvar como tema",
+      applyTheme: "Aplicar tema",
+    },
+    themes: {
+      pageDescription:
+        "Temas de aparência reutilizáveis que você pode aplicar a portais novos ou existentes",
+      deleteTheme: "Excluir tema",
+      failedToLoad: "Falha ao carregar o tema",
+    },
+    templates: {
+      pageDescription: "Estruturas de portal reutilizáveis para iniciar novos portais rapidamente",
+      createFromTemplate: "Criar portal a partir deste modelo",
+      deleteTemplate: "Excluir modelo",
+      failedToLoad: "Falha ao carregar o modelo",
+    },
+    createMenu: {
+      startFromTemplate: "Iniciar a partir de modelo…",
+      applyTheme: "Aplicar tema…",
+      startFromTemplateTitle: "Iniciar a partir de modelo",
+      applyThemeTitle: "Aplicar tema",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Opcional. Usado para encaminhar eventos de conclusão de lote de upload para um pipeline específico para enriquecimento automático.",
+    },
+    actions: {
+      applyTheme: "Aplicar tema",
+      applyThemeMenu: "Aplicar tema…",
+      saveAsTemplate: "Salvar como modelo",
+      saveAsTheme: "Salvar como tema",
+      startFromTemplate: "Começar a partir de um modelo",
+      startFromTemplateMenu: "Começar a partir de um modelo…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Grupo de opções",
+      yesNo: "Sim / Não",
     },
   },
 };

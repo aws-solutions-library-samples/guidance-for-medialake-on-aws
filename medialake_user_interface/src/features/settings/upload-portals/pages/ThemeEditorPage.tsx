@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Box,
@@ -11,7 +12,6 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate, useParams } from "react-router";
-import { useTranslation } from "react-i18next";
 
 import { useCreateTheme, useGetTheme, useUpdateTheme } from "@/api/hooks/useThemes";
 import type { PortalTheme } from "@/api/types/api.types";
@@ -159,7 +159,7 @@ const ThemeEditorPage: React.FC = () => {
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", p: 4 }}
         >
           <Stack spacing={2} alignItems="center">
-            <Typography variant="h6">{t("uploadPortals.themes.editorLoadError")}</Typography>
+            <Typography variant="h6">{t("uploadPortals.themes.failedToLoad")}</Typography>
             <Button variant="outlined" onClick={handleBack}>
               Back to themes
             </Button>

@@ -14,6 +14,7 @@ import type {
 import UploadQueueTable from "./UploadQueueTable";
 import ConflictResolutionDialog from "./ConflictResolutionDialog";
 import type { UppyFile, Meta, Body } from "@uppy/core";
+import { StorageHelper } from "@/common/helpers/storage-helper";
 
 interface Props {
   portalSlug: string;
@@ -74,6 +75,24 @@ const PortalUploader: React.FC<Props> = ({
   const multipartDataRef = useRef<Map<string, PortalMultipartMetadata>>(new Map());
   const portalApi = usePortalApi(portalSlug, sessionJwt, useCaptchaIntegration);
 
+  // --- Upload session state ---
+  const sessionIdRef = useRef<string | null>(null);
+  const fileCountRef = useRef<number>(0);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Single-flight session creation. A multi-file batch fires several concurrent
+  // getUploadParameters/createMultipartUpload calls (AwsS3 `limit`). Without a
+  // shared promise, each call would read sessionIdRef.current === null before
+  // any response returns and mint its own session — fragmenting the batch.
+  // sessionPromiseRef memoizes the single in-flight create so every concurrent
+  // caller awaits the SAME session.
+  const sessionPromiseRef = useRef<Promise<string> | null>(null);
+  // Stable per-mount batch token sent on every /upload request so the server
+  // can dedupe a fragmented first wave onto one session (defense-in-depth).
+  const batchTokenRef = useRef<string>(crypto.randomUUID());
+
+  const sessionStorageKey = `upload-session:${portalSlug}:${destination.destinationId}`;
+
   const catchSessionExpired = useCallback(
     (err: unknown) => {
       if (err instanceof PortalSessionExpiredError) {
@@ -83,6 +102,55 @@ const PortalUploader: React.FC<Props> = ({
     },
     [onSessionExpired]
   );
+
+  // Resolve the upload session, creating it at most once per mount. All
+  // concurrent callers share a single in-flight startSession() promise so a
+  // multi-file batch can never fragment into multiple sessions client-side.
+  const ensureSession = useCallback(async (): Promise<string> => {
+    // Honor a session already resolved (e.g. resumed on mount).
+    if (sessionIdRef.current) return sessionIdRef.current;
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = (async () => {
+        const resp = await portalApi.startSession();
+        sessionIdRef.current = resp.sessionId;
+        sessionStorage.setItem(sessionStorageKey, resp.sessionId);
+        return resp.sessionId;
+      })();
+      // On failure, clear the memoized promise so a later upload can retry.
+      sessionPromiseRef.current.catch(() => {
+        sessionPromiseRef.current = null;
+      });
+    }
+    return sessionPromiseRef.current;
+  }, [portalApi, sessionStorageKey]);
+
+  // --- Session resume on mount ---
+  useEffect(() => {
+    const storedId = sessionStorage.getItem(sessionStorageKey);
+    if (!storedId) return;
+
+    let cancelled = false;
+    portalApi
+      .getSession(storedId)
+      .then((session) => {
+        if (cancelled) return;
+        if (session.status === "OPEN") {
+          sessionIdRef.current = storedId;
+        } else {
+          sessionStorage.removeItem(sessionStorageKey);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          sessionStorage.removeItem(sessionStorageKey);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize Uppy
   useEffect(() => {
@@ -169,6 +237,7 @@ const PortalUploader: React.FC<Props> = ({
             ? safeCurrent.slice(safeRoot.length)
             : safeCurrent;
         try {
+          const sid = await ensureSession();
           const result = await portalApi.getPresignedUrl({
             filename: file.name,
             contentType: file.type,
@@ -176,8 +245,11 @@ const PortalUploader: React.FC<Props> = ({
             path: relativePath,
             destinationId: destination.destinationId,
             metadata: metadataFields,
+            sessionId: sid,
+            batchToken: batchTokenRef.current,
           });
           if (!result.presignedPost) throw new Error("Missing presigned post data");
+          fileCountRef.current += 1;
           return {
             method: "POST" as const,
             url: result.presignedPost.url,
@@ -196,6 +268,7 @@ const PortalUploader: React.FC<Props> = ({
             ? safeCurrent.slice(safeRoot.length)
             : safeCurrent;
         try {
+          const sid = await ensureSession();
           const result = await portalApi.getPresignedUrl({
             filename: file.name,
             contentType: file.type,
@@ -203,10 +276,13 @@ const PortalUploader: React.FC<Props> = ({
             path: relativePath,
             destinationId: destination.destinationId,
             metadata: metadataFields,
+            sessionId: sid,
+            batchToken: batchTokenRef.current,
           });
           if (!result.uploadId || !result.key || !result.bucket) {
             throw new Error("Missing multipart data");
           }
+          fileCountRef.current += 1;
           multipartDataRef.current.set(file.id, {
             uploadId: result.uploadId,
             key: result.key,
@@ -276,7 +352,93 @@ const PortalUploader: React.FC<Props> = ({
     destination.rootPath,
     metadataFields,
     catchSessionExpired,
+    ensureSession,
   ]);
+
+  // --- Heartbeat: post every ~30s while uploading and a sessionId exists ---
+  useEffect(() => {
+    if (!isUploading || !sessionIdRef.current) {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      return;
+    }
+
+    heartbeatIntervalRef.current = setInterval(() => {
+      const sid = sessionIdRef.current;
+      if (sid) {
+        portalApi.heartbeat(sid).catch(() => {
+          // best-effort; a failed heartbeat should not crash the uploader
+        });
+      }
+    }, 30_000);
+
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, [isUploading, portalApi]);
+
+  // --- Finalize on Uppy `complete` event ---
+  useEffect(() => {
+    if (!uppy) return;
+
+    const onUploadComplete = () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      portalApi.finalize(sid, fileCountRef.current).catch(() => {
+        // best-effort; finalize is idempotent and the sweep is the safety net
+      });
+    };
+
+    uppy.on("complete", onUploadComplete);
+    return () => {
+      uppy.off("complete", onUploadComplete);
+    };
+  }, [uppy, portalApi]);
+
+  // --- Finalize on beforeunload via fetch keepalive ---
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+
+      const baseURL = StorageHelper.getAwsConfig()?.API?.REST?.RestApi?.endpoint || "";
+      const url = `${baseURL}/portal/${portalSlug}/upload-session/${sid}/finalize`;
+
+      try {
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Portal-Session": sessionJwt,
+          },
+          body: JSON.stringify({ fileCount: fileCountRef.current }),
+          keepalive: true,
+        });
+      } catch {
+        // best-effort; cannot handle errors during unload
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [portalSlug, sessionJwt]);
+
+  // --- Cleanup heartbeat on unmount ---
+  useEffect(() => {
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleUpload = async () => {
     if (!uppy || files.length === 0) return;
@@ -351,12 +513,12 @@ const PortalUploader: React.FC<Props> = ({
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       {uppy && (
         <Dashboard
           uppy={uppy}
           width="100%"
-          height={300}
+          height={200}
           hideUploadButton
           proudlyDisplayPoweredByUppy={false}
           note={dropZoneText || undefined}

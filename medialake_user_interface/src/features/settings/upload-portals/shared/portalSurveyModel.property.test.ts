@@ -91,9 +91,10 @@ const fieldsArb = (pageCount: number): fc.Arbitrary<PortalMetadataField[]> =>
 
 /**
  * Build a destination set with unique `destinationId`s, each referencing a real
- * page. Destinations are not consumed by {@link buildSurveyJson} (the schema
- * emits a generic `destination-selector` question), so this mainly guards that
- * extra config never leaks into / mutates the schema.
+ * page. {@link buildSurveyJson} emits a `destination-selector` question only
+ * when a page offers MORE THAN ONE destination (otherwise the sole destination
+ * is auto-resolved at runtime), so the generated count here exercises both the
+ * emitted and the omitted branch.
  */
 const destinationsArb = (pageCount: number): fc.Arbitrary<PortalDestination[]> =>
   fc

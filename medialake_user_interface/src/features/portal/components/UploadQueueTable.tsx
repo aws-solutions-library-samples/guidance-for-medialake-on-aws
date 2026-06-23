@@ -10,12 +10,8 @@ import {
   DialogTitle,
   IconButton,
   LinearProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -49,6 +45,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+/**
+ * Compact, fully-responsive upload queue.
+ *
+ * Replaces the previous fixed 6-column MUI Table (Filename/Size/Type/Status/
+ * Progress/delete) which overflowed the portal card on narrow screens and
+ * forced a horizontal page scroll. Each file is now a single flex row whose
+ * name truncates with an ellipsis (full name on hover), with the secondary
+ * metadata (size · type) on a caption line, the status chip and remove button
+ * pinned to the right, and the upload progress bar spanning the full width
+ * below the row while uploading. This layout adapts to any container width, so
+ * no column ever pushes the content off-screen.
+ */
 const UploadQueueTable: React.FC<Props> = ({ files, onRemoveFile, onClearAll }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const { t } = useTranslation();
@@ -61,68 +69,72 @@ const UploadQueueTable: React.FC<Props> = ({ files, onRemoveFile, onClearAll }) 
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
         <Typography variant="body2" color="text.secondary">
           {files.length} file{files.length !== 1 ? "s" : ""} · {formatSize(totalSize)}
         </Typography>
         <Button size="small" color="error" onClick={() => setConfirmClear(true)}>
-          Clear All
+          {/* i18n-ignore */}
+          Clear all
         </Button>
       </Box>
 
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Filename</TableCell>
-              <TableCell>Size</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Progress</TableCell>
-              <TableCell />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {files.map((file) => {
-              const status = fileStatus(file);
-              const pct =
-                file.progress?.bytesTotal && file.progress.bytesTotal > 0
-                  ? Math.round(
-                      ((file.progress.bytesUploaded || 0) / file.progress.bytesTotal) * 100
-                    )
-                  : 0;
+      <Stack
+        divider={<Box sx={{ borderBottom: "1px solid", borderColor: "divider" }} />}
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1,
+          overflow: "hidden",
+        }}
+      >
+        {files.map((file) => {
+          const status = fileStatus(file);
+          const pct =
+            file.progress?.bytesTotal && file.progress.bytesTotal > 0
+              ? Math.round(((file.progress.bytesUploaded || 0) / file.progress.bytesTotal) * 100)
+              : 0;
 
-              return (
-                <TableRow key={file.id}>
-                  <TableCell
-                    sx={{
-                      maxWidth: 200,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {file.name}
-                  </TableCell>
-                  <TableCell>{formatSize(file.size || 0)}</TableCell>
-                  <TableCell>{file.type || "—"}</TableCell>
-                  <TableCell>
-                    <Chip label={status} size="small" color={statusColor[status] || "default"} />
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 100 }}>
-                    {status === "uploading" && <LinearProgress variant="determinate" value={pct} />}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton size="small" onClick={() => onRemoveFile(file.id)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          return (
+            <Box key={file.id} sx={{ px: 1.5, py: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Tooltip title={file.name} placement="top-start">
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                      {file.name}
+                    </Typography>
+                  </Tooltip>
+                  <Typography variant="caption" color="text.secondary" noWrap component="div">
+                    {formatSize(file.size || 0)}
+                    {file.type ? ` · ${file.type}` : ""}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={status}
+                  size="small"
+                  color={statusColor[status] || "default"}
+                  sx={{ flexShrink: 0 }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => onRemoveFile(file.id)}
+                  aria-label={`Remove ${file.name}`}
+                  sx={{ flexShrink: 0 }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              {status === "uploading" && (
+                <LinearProgress
+                  variant="determinate"
+                  value={pct}
+                  sx={{ mt: 0.75, borderRadius: 1, height: 4 }}
+                />
+              )}
+            </Box>
+          );
+        })}
+      </Stack>
 
       <Dialog open={confirmClear} onClose={() => setConfirmClear(false)}>
         <DialogTitle>Clear all files?</DialogTitle>
@@ -138,7 +150,8 @@ const UploadQueueTable: React.FC<Props> = ({ files, onRemoveFile, onClearAll }) 
               onClearAll();
             }}
           >
-            Clear All
+            {/* i18n-ignore */}
+            Clear all
           </Button>
         </DialogActions>
       </Dialog>

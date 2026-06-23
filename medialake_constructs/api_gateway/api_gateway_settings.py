@@ -252,6 +252,8 @@ class SettingsApi(Construct):
             tokens_resource = portal_id_resource.add_resource("tokens")
             token_id_resource = tokens_resource.add_resource("{tokenId}")
             logo_resource = portal_id_resource.add_resource("logo")
+            banner_resource = portal_id_resource.add_resource("banner")
+            favicon_resource = portal_id_resource.add_resource("favicon")
 
             for method in ["GET", "POST"]:
                 m = portals_resource.add_method(method, portal_integration)
@@ -276,10 +278,17 @@ class SettingsApi(Construct):
             cfn_method.authorization_type = "CUSTOM"
             cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-            m = logo_resource.add_method("POST", portal_integration)
-            cfn_method = m.node.default_child
-            cfn_method.authorization_type = "CUSTOM"
-            cfn_method.authorizer_id = props.authorizer.authorizer_id
+            # Image-asset upload endpoints (logo, banner, favicon) all share the
+            # same POST-with-CUSTOM-authorizer shape.
+            for image_resource in [
+                logo_resource,
+                banner_resource,
+                favicon_resource,
+            ]:
+                m = image_resource.add_method("POST", portal_integration)
+                cfn_method = m.node.default_child
+                cfn_method.authorization_type = "CUSTOM"
+                cfn_method.authorizer_id = props.authorizer.authorizer_id
 
             # /settings/portal-themes and /settings/portal-templates
             portal_themes_resource = settings_resource.add_resource("portal-themes")
@@ -315,6 +324,8 @@ class SettingsApi(Construct):
                 tokens_resource,
                 token_id_resource,
                 logo_resource,
+                banner_resource,
+                favicon_resource,
                 portal_themes_resource,
                 portal_theme_id_resource,
                 portal_templates_resource,

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Dialog,
@@ -14,7 +15,6 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, ArrowDropDown as ArrowDropDownIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
 
 import { useListTemplates } from "@/api/hooks/useTemplates";
 import { useListThemes } from "@/api/hooks/useThemes";
@@ -30,10 +30,10 @@ import { useListThemes } from "@/api/hooks/useThemes";
  *   - "Start from template" → pick a Template, then navigate to the create
  *     route with `?template=<id>`. `PortalEditorPage` resolves the full
  *     template via `useGetTemplate` and calls
- *     `store.initializeFromSources({ template })`.
+ *     `store.initializeFromSources({ template })`. // i18n-ignore
  *   - "Apply theme" → pick a Theme, then navigate to the create route with
  *     `?theme=<id>`. `PortalEditorPage` resolves the theme via `useGetTheme`
- *     and calls `store.initializeFromSources({ theme })`.
+ *     and calls `store.initializeFromSources({ theme })`. // i18n-ignore
  *
  * Both seeds are copy-on-create (snapshot, no live link); the seeding logic
  * lives entirely in the editor store (task 17.2). This component only routes
@@ -117,14 +117,14 @@ const CreatePortalMenu: React.FC<CreatePortalMenuProps> = ({ disabled = false, t
           Blank portal
         </MenuItem>
         <MenuItem onClick={openTemplatePicker}>
-          {t("uploadPortals.actions.startFromTemplateMenu")}
+          {t("uploadPortals.createMenu.startFromTemplate")}
         </MenuItem>
-        <MenuItem onClick={openThemePicker}>{t("uploadPortals.actions.applyThemeMenu")}</MenuItem>
+        <MenuItem onClick={openThemePicker}>{t("uploadPortals.createMenu.applyTheme")}</MenuItem>
       </Menu>
 
       {/* Template picker */}
       <Dialog open={picker === "template"} onClose={closePicker} fullWidth maxWidth="xs">
-        <DialogTitle>{t("uploadPortals.actions.startFromTemplate")}</DialogTitle>
+        <DialogTitle>{t("uploadPortals.createMenu.startFromTemplateTitle")}</DialogTitle>
         <DialogContent dividers>
           {templates.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
@@ -153,7 +153,7 @@ const CreatePortalMenu: React.FC<CreatePortalMenuProps> = ({ disabled = false, t
 
       {/* Theme picker */}
       <Dialog open={picker === "theme"} onClose={closePicker} fullWidth maxWidth="xs">
-        <DialogTitle>{t("uploadPortals.actions.applyTheme")}</DialogTitle>
+        <DialogTitle>{t("uploadPortals.createMenu.applyThemeTitle")}</DialogTitle>
         <DialogContent dividers>
           {themes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">

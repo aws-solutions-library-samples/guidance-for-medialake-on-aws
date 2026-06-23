@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -25,7 +26,6 @@ import {
   AddCircleOutline as UsePortalIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
@@ -78,7 +78,7 @@ const TemplatesListPage: React.FC = () => {
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Templates"
-        description={t("uploadPortals.templates.listDescription")}
+        description={t("uploadPortals.templates.pageDescription")}
         action={
           <Button
             variant="contained"
@@ -149,7 +149,7 @@ const TemplatesListPage: React.FC = () => {
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>{t("uploadPortals.templates.deleteTitle")}</DialogTitle>
+        <DialogTitle>{t("uploadPortals.templates.deleteTemplate")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Portals already

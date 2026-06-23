@@ -72,6 +72,7 @@ export default {
       "Vous ne pouvez parcourir et télécharger que vers les dossiers dans le chemin sélectionné.",
     currentPath: "Chemin actuel",
     confirm: "Utiliser ce chemin",
+    refresh: "Actualiser",
     validation: {
       invalidPath: "Le chemin sélectionné est en dehors des préfixes autorisés.",
       noPathSelected: "Veuillez naviguer vers un dossier avant de confirmer.",
@@ -1973,31 +1974,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "Thèmes d'apparence réutilisables que vous pouvez appliquer à des portails nouveaux ou existants.",
-      deleteTitle: "Supprimer le thème",
-      editorLoadError: "Échec du chargement du thème",
-    },
-    templates: {
-      listDescription:
-        "Structures de portail réutilisables pour démarrer de nouveaux portails à partir d'une configuration éprouvée.",
-      createFromTemplate: "Créer un portail à partir de ce modèle",
-      deleteTitle: "Supprimer le modèle",
-      editorLoadError: "Échec du chargement du modèle",
-    },
-    actions: {
-      applyTheme: "Appliquer le thème",
-      applyThemeMenu: "Appliquer le thème…",
-      saveAsTemplate: "Enregistrer comme modèle",
-      saveAsTheme: "Enregistrer comme thème",
-      startFromTemplate: "Commencer à partir d'un modèle",
-      startFromTemplateMenu: "Commencer à partir d'un modèle…",
-    },
-    fieldTypes: {
-      radioGroup: "Groupe de boutons radio",
-      yesNo: "Oui / Non",
-    },
     pageTitle: "Portails de téléchargement",
     pageDescription: "Gérer les portails de téléchargement pour les contributeurs externes",
     createPortal: "Créer un portail",
@@ -2049,6 +2025,48 @@ export default {
     tokens: {
       copyUrl: "Copier l'URL",
       revokeToken: "Révoquer le jeton",
+    },
+    themeTemplateActions: {
+      saveAs: "Enregistrer sous…",
+      saveAsTemplate: "Enregistrer comme modèle",
+      saveAsTheme: "Enregistrer comme thème",
+      applyTheme: "Appliquer le thème",
+    },
+    themes: {
+      pageDescription:
+        "Thèmes d'apparence réutilisables que vous pouvez appliquer à des portails nouveaux ou existants",
+      deleteTheme: "Supprimer le thème",
+      failedToLoad: "Échec du chargement du thème",
+    },
+    templates: {
+      pageDescription:
+        "Structures de portail réutilisables pour créer rapidement de nouveaux portails",
+      createFromTemplate: "Créer un portail à partir de ce modèle",
+      deleteTemplate: "Supprimer le modèle",
+      failedToLoad: "Échec du chargement du modèle",
+    },
+    createMenu: {
+      startFromTemplate: "Démarrer à partir d'un modèle…",
+      applyTheme: "Appliquer un thème…",
+      startFromTemplateTitle: "Démarrer à partir d'un modèle",
+      applyThemeTitle: "Appliquer un thème",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Facultatif. Utilisé pour acheminer les événements de fin de lot de téléchargement vers un pipeline spécifique pour l'enrichissement automatique.",
+    },
+    actions: {
+      applyTheme: "Appliquer le thème",
+      applyThemeMenu: "Appliquer le thème…",
+      saveAsTemplate: "Enregistrer comme modèle",
+      saveAsTheme: "Enregistrer comme thème",
+      startFromTemplate: "Commencer à partir d'un modèle",
+      startFromTemplateMenu: "Commencer à partir d'un modèle…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Groupe de boutons radio",
+      yesNo: "Oui / Non",
     },
   },
 };

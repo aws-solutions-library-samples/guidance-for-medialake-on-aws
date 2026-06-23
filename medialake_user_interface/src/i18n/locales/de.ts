@@ -73,6 +73,7 @@ export default {
       "Sie können nur Ordner innerhalb des ausgewählten Pfades durchsuchen und hochladen.",
     currentPath: "Aktueller Pfad",
     confirm: "Diesen Pfad verwenden",
+    refresh: "Aktualisieren",
     validation: {
       invalidPath: "Der ausgewählte Pfad liegt außerhalb der erlaubten Präfixe.",
       noPathSelected: "Bitte navigieren Sie zu einem Ordner, bevor Sie bestätigen.",
@@ -1977,31 +1978,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "Wiederverwendbare Erscheinungs-Themes, die Sie auf neue oder vorhandene Portale anwenden können.",
-      deleteTitle: "Theme löschen",
-      editorLoadError: "Theme konnte nicht geladen werden",
-    },
-    templates: {
-      listDescription:
-        "Wiederverwendbare Portalstrukturen, mit denen Sie neue Portale aus einer bewährten Konfiguration starten können.",
-      createFromTemplate: "Portal aus dieser Vorlage erstellen",
-      deleteTitle: "Vorlage löschen",
-      editorLoadError: "Vorlage konnte nicht geladen werden",
-    },
-    actions: {
-      applyTheme: "Theme anwenden",
-      applyThemeMenu: "Theme anwenden…",
-      saveAsTemplate: "Als Vorlage speichern",
-      saveAsTheme: "Als Theme speichern",
-      startFromTemplate: "Mit Vorlage beginnen",
-      startFromTemplateMenu: "Mit Vorlage beginnen…",
-    },
-    fieldTypes: {
-      radioGroup: "Optionsfeldgruppe",
-      yesNo: "Ja / Nein",
-    },
     pageTitle: "Upload-Portale",
     pageDescription: "Upload-Portale für externe Mitwirkende verwalten",
     createPortal: "Portal erstellen",
@@ -2054,6 +2030,48 @@ export default {
     tokens: {
       copyUrl: "URL kopieren",
       revokeToken: "Token widerrufen",
+    },
+    themeTemplateActions: {
+      saveAs: "Speichern als…",
+      saveAsTemplate: "Als Vorlage speichern",
+      saveAsTheme: "Als Theme speichern",
+      applyTheme: "Theme anwenden",
+    },
+    themes: {
+      pageDescription:
+        "Wiederverwendbare Erscheinungsthemen, die Sie auf neue oder bestehende Portale anwenden können",
+      deleteTheme: "Theme löschen",
+      failedToLoad: "Theme konnte nicht geladen werden",
+    },
+    templates: {
+      pageDescription:
+        "Wiederverwendbare Portalstrukturen, mit denen Sie schnell neue Portale erstellen können",
+      createFromTemplate: "Portal aus dieser Vorlage erstellen",
+      deleteTemplate: "Vorlage löschen",
+      failedToLoad: "Vorlage konnte nicht geladen werden",
+    },
+    createMenu: {
+      startFromTemplate: "Von Vorlage starten…",
+      applyTheme: "Theme anwenden…",
+      startFromTemplateTitle: "Von Vorlage starten",
+      applyThemeTitle: "Theme anwenden",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Optional. Wird verwendet, um Upload-Batch-Abschlussereignisse an eine bestimmte Pipeline zur automatischen Anreicherung weiterzuleiten.",
+    },
+    actions: {
+      applyTheme: "Theme anwenden",
+      applyThemeMenu: "Theme anwenden…",
+      saveAsTemplate: "Als Vorlage speichern",
+      saveAsTheme: "Als Theme speichern",
+      startFromTemplate: "Mit Vorlage beginnen",
+      startFromTemplateMenu: "Mit Vorlage beginnen…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Optionsfeldgruppe",
+      yesNo: "Ja / Nein",
     },
   },
 };

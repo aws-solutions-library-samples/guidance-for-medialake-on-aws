@@ -7,8 +7,8 @@ from custom_exceptions import ForbiddenError
 from db_models import PortalMetadataModel
 from image_upload_utils import (
     ALLOWED_CONTENT_TYPES,
-    IAC_ASSETS_BUCKET_NAME,
     delete_s3_object,
+    resolve_portal_asset_url,
     upload_portal_image,
     validate_and_decode_image,
 )
@@ -91,18 +91,8 @@ def register_route(app):
             if old_s3_key and old_s3_key != result.s3_key:
                 delete_s3_object(old_s3_key)
 
-            # Resolve the S3 key to a CloudFront URL for immediate frontend use
-            favicon_url = None
-            try:
-                from url_utils import generate_cloudfront_url
-
-                favicon_url = generate_cloudfront_url(
-                    IAC_ASSETS_BUCKET_NAME, result.s3_key
-                )
-            except Exception:
-                logger.warning(
-                    "Could not resolve favicon URL", extra={"key": result.s3_key}
-                )
+            # Resolve the S3 key to a presigned GET URL for immediate frontend use
+            favicon_url = resolve_portal_asset_url(result.s3_key)
 
             return create_success_response(
                 data={"faviconS3Key": result.s3_key, "faviconUrl": favicon_url},

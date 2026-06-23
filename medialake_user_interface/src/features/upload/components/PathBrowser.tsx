@@ -20,6 +20,9 @@ import {
   alpha,
 } from "@mui/material";
 import { S3Explorer } from "../../home/S3Explorer";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/api/queryKeys";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { typography } from "@/theme/tokens";
 
 interface PathBrowserProps {
@@ -42,6 +45,7 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
   const { t } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const queryClient = useQueryClient();
 
   // State management
   const [selectedPrefix, setSelectedPrefix] = useState<string>("");
@@ -221,6 +225,16 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
     onClose();
   }, [onClose]);
 
+  // Re-fetch the connector's folder listing so paths created after the dialog
+  // was opened (e.g. a folder just added in the connector) appear. Invalidating
+  // the connector-scoped explorer query prefix marks every cached prefix stale;
+  // the active listing (current path) refetches immediately.
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: [...QUERY_KEYS.CONNECTORS.s3.all, "explorer", connectorId],
+    });
+  }, [queryClient, connectorId]);
+
   // Handle dialog close
   const handleDialogClose = useCallback(() => {
     onClose();
@@ -345,6 +359,16 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button
+          onClick={handleRefresh}
+          startIcon={<RefreshIcon />}
+          sx={{
+            textTransform: "none",
+            mr: "auto",
+          }}
+        >
+          {t("pathBrowser.refresh", "Refresh")}
+        </Button>
         <Button
           onClick={handleCancel}
           sx={{

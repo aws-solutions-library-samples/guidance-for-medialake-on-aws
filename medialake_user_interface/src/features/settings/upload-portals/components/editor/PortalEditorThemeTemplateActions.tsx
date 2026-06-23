@@ -54,7 +54,6 @@ const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateAction
   onNotify,
 }) => {
   const { t } = useTranslation();
-
   const applyTheme = usePortalEditorStore((s) => s.applyTheme);
   const buildThemePayload = usePortalEditorStore((s) => s.buildThemePayload);
   const buildTemplatePayload = usePortalEditorStore((s) => s.buildTemplatePayload);
@@ -132,7 +131,7 @@ const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateAction
         startIcon={<PaletteIcon fontSize="small" />}
         onClick={() => setApplyOpen(true)}
       >
-        {t("uploadPortals.actions.applyTheme")}
+        Apply theme
       </Button>
       <Button
         variant="text"
@@ -141,21 +140,21 @@ const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateAction
         onClick={(e) => setMenuAnchor(e.currentTarget)}
         aria-haspopup="menu"
       >
-        Save as…
+        {t("uploadPortals.themeTemplateActions.saveAs")}
       </Button>
 
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
         <MenuItem onClick={() => openSaveDialog("template")}>
-          {t("uploadPortals.actions.saveAsTemplate")}
+          {t("uploadPortals.themeTemplateActions.saveAsTemplate")}
         </MenuItem>
         <MenuItem onClick={() => openSaveDialog("theme")}>
-          {t("uploadPortals.actions.saveAsTheme")}
+          {t("uploadPortals.themeTemplateActions.saveAsTheme")}
         </MenuItem>
       </Menu>
 
       {/* Apply theme picker */}
       <Dialog open={applyOpen} onClose={() => setApplyOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>{t("uploadPortals.actions.applyTheme")}</DialogTitle>
+        <DialogTitle>{t("uploadPortals.themeTemplateActions.applyTheme")}</DialogTitle>
         <DialogContent dividers>
           {themes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
@@ -186,11 +185,7 @@ const PortalEditorThemeTemplateActions: React.FC<PortalEditorThemeTemplateAction
 
       {/* Save-as dialog */}
       <Dialog open={saveMode !== null} onClose={closeSaveDialog} fullWidth maxWidth="xs">
-        <DialogTitle>
-          {saveMode === "theme"
-            ? t("uploadPortals.actions.saveAsTheme")
-            : t("uploadPortals.actions.saveAsTemplate")}
-        </DialogTitle>
+        <DialogTitle>{saveMode === "theme" ? "Save as Theme" : "Save as Template"}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField

@@ -34,27 +34,18 @@ import PortalEditorToolbar from "../components/editor/PortalEditorToolbar";
 import PortalEditorThemeTemplateActions from "../components/editor/PortalEditorThemeTemplateActions";
 import PortalEditorSidebar from "../components/editor/PortalEditorSidebar";
 import PortalEditorPreview from "../components/editor/PortalEditorPreview";
+import { ALL_GROUPED_SECTIONS } from "../components/editor/sectionGroups";
 import { readFileAsBase64 } from "../utils/readFileAsBase64";
 import type { EditorSection, PreviewMode } from "../stores/usePortalEditorStore";
 
 /**
- * Sidebar section order used by the first-error-focus routine. Matches
- * {@link PortalEditorSidebar}'s rendering order (Requirement 9.5). We pick
- * the first section in this list that has one or more errors, open its
- * accordion, and move keyboard focus to its header button.
+ * Sidebar section order used by the first-error-focus routine. Derived from
+ * {@link ALL_GROUPED_SECTIONS} so it always matches {@link PortalEditorSidebar}'s
+ * grouped rendering order (Requirement 9.5): we pick the first section in this
+ * order that has one or more errors, open its accordion, and move keyboard
+ * focus to its header button.
  */
-const SECTION_ORDER: EditorSection[] = [
-  "branding",
-  "content",
-  "pages",
-  "fields",
-  "appearance",
-  "typography",
-  "layout",
-  "access",
-  "destinations",
-  "metadata",
-];
+const SECTION_ORDER: readonly EditorSection[] = ALL_GROUPED_SECTIONS;
 
 /** Cycle order for the Cmd/Ctrl+Shift+P preview-mode shortcut. */
 const PREVIEW_MODE_CYCLE: PreviewMode[] = ["desktop", "tablet", "mobile"];

@@ -528,6 +528,26 @@ class CloudFrontCustomDomainConfig(BaseModel):
         return self
 
 
+class UploadPortalsConfig(BaseModel):
+    """Configuration for the upload-portals session tracking feature.
+
+    Controls session lifecycle thresholds, reconciliation timing, and heartbeat
+    rate limiting for portal upload sessions.
+    """
+
+    session_retention_days: int = 7  # TTL from createdAt (Session_Retention_Period)
+    idle_finalize_minutes: int = 30  # Idle_Finalize_Threshold
+    sweep_interval_minutes: int = 5  # Reconciliation_Process cadence
+    completion_grace_minutes: int = (
+        60  # Completion_Grace_Period (from finalizeRequestedAt)
+    )
+    max_session_age_hours: int = 24  # Maximum_Session_Age (from createdAt)
+    heartbeat_interval_seconds: int = 30  # Browser heartbeat cadence
+    heartbeat_min_interval_seconds: int = (
+        10  # Heartbeat_Rate_Limit (server-enforced minimum gap)
+    )
+
+
 class DeploymentOptionsConfig(BaseModel):
     """Configuration for CDK deployment behavior.
 
@@ -595,6 +615,7 @@ class CDKConfig(BaseModel):
         default_factory=DeploymentOptionsConfig
     )
     container_nodes_enabled: bool = False  # Opt-in for container-based pipeline nodes
+    upload_portals: UploadPortalsConfig = Field(default_factory=UploadPortalsConfig)
 
     # ── Multi-deployment naming helpers ──────────────────────────────────
 

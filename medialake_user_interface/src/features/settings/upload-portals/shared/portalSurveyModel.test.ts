@@ -46,6 +46,14 @@ const buildConfig = (overrides: Partial<PortalConfig> = {}): PortalConfig => ({
       order: 0,
       pageNumber: 1,
     },
+    {
+      destinationId: "dest-2",
+      friendlyName: "Bucket B",
+      allowBrowsing: true,
+      allowFolderCreation: false,
+      order: 1,
+      pageNumber: 1,
+    },
   ],
   pages: [
     // page 2 is listed first on purpose (out of order)
@@ -258,6 +266,107 @@ describe("buildSurveyJson — built-in question titles", () => {
       expect(q.title).toBeTruthy();
       expect(q.title).not.toMatch(/^__/);
     }
+  });
+});
+
+describe("buildSurveyJson — destination-selector visibility (single vs multiple destinations)", () => {
+  const pagesWithSelector: PortalPage[] = [
+    {
+      pageNumber: 1,
+      title: "Choose",
+      elements: [{ kind: "destination-selector" }, { kind: "uploader" }],
+    },
+  ];
+
+  it("omits the destination-selector when the page offers only one destination", () => {
+    const config = buildConfig({
+      pages: pagesWithSelector,
+      destinations: [
+        {
+          destinationId: "only",
+          friendlyName: "Only Bucket",
+          allowBrowsing: false,
+          allowFolderCreation: false,
+          order: 0,
+          pageNumber: 1,
+        },
+      ],
+    });
+    const page1 = buildSurveyJson(config).pages.find((p) => p.name === "page-1");
+    const types = page1?.elements.map((q) => q.type) ?? [];
+    expect(types).not.toContain(PORTAL_QUESTION_TYPES.destinationSelector);
+    // The uploader still renders — only the useless selector is dropped.
+    expect(types).toContain(PORTAL_QUESTION_TYPES.uploader);
+  });
+
+  it("omits the destination-selector when there are no destinations", () => {
+    const config = buildConfig({ pages: pagesWithSelector, destinations: [] });
+    const page1 = buildSurveyJson(config).pages.find((p) => p.name === "page-1");
+    const types = page1?.elements.map((q) => q.type) ?? [];
+    expect(types).not.toContain(PORTAL_QUESTION_TYPES.destinationSelector);
+  });
+
+  it("emits the destination-selector when the page offers more than one destination", () => {
+    const config = buildConfig({
+      pages: pagesWithSelector,
+      destinations: [
+        {
+          destinationId: "a",
+          friendlyName: "Bucket A",
+          allowBrowsing: false,
+          allowFolderCreation: false,
+          order: 0,
+          pageNumber: 1,
+        },
+        {
+          destinationId: "b",
+          friendlyName: "Bucket B",
+          allowBrowsing: false,
+          allowFolderCreation: false,
+          order: 1,
+          pageNumber: 1,
+        },
+      ],
+    });
+    const page1 = buildSurveyJson(config).pages.find((p) => p.name === "page-1");
+    const types = page1?.elements.map((q) => q.type) ?? [];
+    expect(types).toContain(PORTAL_QUESTION_TYPES.destinationSelector);
+  });
+
+  it("counts only destinations assigned to the selector's page (multi-page)", () => {
+    // Two destinations total, but only ONE on page 1 → selector omitted on
+    // page 1 even though the portal has multiple destinations overall.
+    const config = buildConfig({
+      pages: [
+        {
+          pageNumber: 1,
+          title: "Choose",
+          elements: [{ kind: "destination-selector" }],
+        },
+        { pageNumber: 2, title: "Upload", elements: [{ kind: "uploader" }] },
+      ],
+      destinations: [
+        {
+          destinationId: "p1",
+          friendlyName: "Page 1 Bucket",
+          allowBrowsing: false,
+          allowFolderCreation: false,
+          order: 0,
+          pageNumber: 1,
+        },
+        {
+          destinationId: "p2",
+          friendlyName: "Page 2 Bucket",
+          allowBrowsing: false,
+          allowFolderCreation: false,
+          order: 1,
+          pageNumber: 2,
+        },
+      ],
+    });
+    const page1 = buildSurveyJson(config).pages.find((p) => p.name === "page-1");
+    const types = page1?.elements.map((q) => q.type) ?? [];
+    expect(types).not.toContain(PORTAL_QUESTION_TYPES.destinationSelector);
   });
 });
 

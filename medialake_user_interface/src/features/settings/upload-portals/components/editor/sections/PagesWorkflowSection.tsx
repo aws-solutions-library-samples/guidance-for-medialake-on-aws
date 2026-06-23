@@ -78,6 +78,19 @@ const SPECIAL_FIELD_TYPES: readonly {
 }[] = [{ type: "tagbox", role: "collection-picker", label: "Collection Picker" }] as const;
 
 /**
+ * Built-in (non `metadata-field`) page elements. Unlike metadata fields, these
+ * are unique per portal and carry no admin-authored config here. They are
+ * draggable from the palette onto a page and movable between pages; the store's
+ * `addElementToPage` enforces single-instance placement.
+ */
+type BuiltInKind = Exclude<PortalPageElement["kind"], "metadata-field">;
+
+const ELEMENT_PALETTE: readonly { kind: BuiltInKind; label: string }[] = [
+  { kind: "destination-selector", label: "Destination selector" },
+  { kind: "uploader", label: "Uploader" },
+] as const;
+
+/**
  * Stable empty-array defaults so the Zustand selectors return referentially
  * stable values when the slices are absent — unrelated store writes then do
  * not force a re-render of this section.
@@ -107,7 +120,9 @@ const slug = (label: string): string =>
  */
 type DragMeta =
   | { type: "palette-item"; fieldType: FieldType; role?: PortalMetadataField["role"] }
+  | { type: "palette-element"; elementKind: BuiltInKind }
   | { type: "field"; fieldKey: string; pageNumber: number; index: number }
+  | { type: "built-in"; kind: BuiltInKind; pageNumber: number }
   | { type: "page"; pageNumber: number; index: number };
 
 /**
@@ -145,6 +160,10 @@ const describeMeta = (meta: DragMeta | DropMeta | null): string => {
       return `field "${meta.fieldKey}"`;
     case "palette-item":
       return `new ${meta.fieldType} field`;
+    case "palette-element":
+      return `new ${meta.elementKind} element`;
+    case "built-in":
+      return `${meta.kind} element`;
     default:
       return "item";
   }
@@ -229,6 +248,77 @@ const PaletteItem: React.FC<{
 };
 
 /**
+ * A draggable palette swatch for a built-in element (destination selector /
+ * uploader). Dropping it on a page places that element there via
+ * `addElementToPage` (single-instance enforced in the store).
+ */
+const PaletteElementItem: React.FC<{ elementKind: BuiltInKind; label: string }> = ({
+  elementKind,
+  label,
+}) => {
+  const data: DragMeta = useMemo(() => ({ type: "palette-element", elementKind }), [elementKind]);
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `palette-element-${elementKind}`,
+    data,
+  });
+  return (
+    <Chip
+      ref={setNodeRef}
+      icon={<DragIcon />}
+      label={label}
+      variant="outlined"
+      color="secondary"
+      {...attributes}
+      {...listeners}
+      sx={{
+        cursor: "grab",
+        opacity: isDragging ? 0.4 : 1,
+        "& .MuiChip-icon": { cursor: "grab" },
+      }}
+    />
+  );
+};
+
+/**
+ * A built-in element placed on a page, rendered as a draggable + removable
+ * chip. Dragging it onto another page (or a different position) moves it
+ * (the store strips-and-reinserts, since built-ins are unique); the delete
+ * affordance removes it from the page entirely.
+ */
+const BuiltInElementChip: React.FC<{
+  kind: BuiltInKind;
+  pageNumber: number;
+  onRemove: (kind: BuiltInKind) => void;
+}> = ({ kind, pageNumber, onRemove }) => {
+  const data: DragMeta = useMemo(
+    () => ({ type: "built-in", kind, pageNumber }),
+    [kind, pageNumber]
+  );
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `builtin-${kind}-${pageNumber}`,
+    data,
+  });
+  return (
+    <Chip
+      ref={setNodeRef}
+      icon={<DragIcon />}
+      label={ELEMENT_LABELS[kind]}
+      size="small"
+      color="primary"
+      variant="outlined"
+      onDelete={() => onRemove(kind)}
+      {...attributes}
+      {...listeners}
+      sx={{
+        cursor: "grab",
+        opacity: isDragging ? 0.4 : 1,
+        "& .MuiChip-icon": { cursor: "grab" },
+      }}
+    />
+  );
+};
+
+/**
  * A single sortable `metadata-field` element within a page. The drag handle is
  * the {@link DragIcon} button so that focusing/activating it (pointer or
  * keyboard) starts the drag, while the rest of the row stays interactive.
@@ -248,7 +338,8 @@ const SortableFieldItem: React.FC<{
   label: string;
   type: FieldType | undefined;
   onRename: (fieldKey: string, newLabel: string) => boolean;
-}> = ({ fieldKey, pageNumber, index, label, type, onRename }) => {
+  onRemove: (fieldKey: string) => void;
+}> = ({ fieldKey, pageNumber, index, label, type, onRename, onRemove }) => {
   const data: DragMeta = useMemo(
     () => ({ type: "field", fieldKey, pageNumber, index }),
     [fieldKey, pageNumber, index]
@@ -285,7 +376,7 @@ const SortableFieldItem: React.FC<{
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 1,
+        gap: 0.5,
         p: 1,
         mb: 0.5,
         borderRadius: 1,
@@ -302,7 +393,7 @@ const SortableFieldItem: React.FC<{
         aria-label={`Reorder field ${label || fieldKey}`}
         {...attributes}
         {...listeners}
-        sx={{ cursor: "grab", touchAction: "none" }}
+        sx={{ cursor: "grab", touchAction: "none", flexShrink: 0 }}
       >
         <DragIcon fontSize="small" />
       </IconButton>
@@ -338,7 +429,18 @@ const SortableFieldItem: React.FC<{
           {label || fieldKey}
         </Typography>
       )}
-      {type && <Chip label={type} size="small" variant="outlined" />}
+      {type && (
+        <Chip
+          label={type}
+          size="small"
+          variant="outlined"
+          sx={{
+            flexShrink: 0,
+            maxWidth: 96,
+            "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
+          }}
+        />
+      )}
       {!isEditing && (
         <Tooltip
           // i18n-ignore
@@ -348,8 +450,24 @@ const SortableFieldItem: React.FC<{
             size="small"
             aria-label={`Rename field ${label || fieldKey}`}
             onClick={beginEdit}
+            sx={{ flexShrink: 0 }}
           >
             <EditIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {!isEditing && (
+        <Tooltip
+          // i18n-ignore
+          title="Delete field"
+        >
+          <IconButton
+            size="small"
+            aria-label={`Delete field ${label || fieldKey}`}
+            onClick={() => onRemove(fieldKey)}
+            sx={{ flexShrink: 0 }}
+          >
+            <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       )}
@@ -383,8 +501,20 @@ const SortablePage: React.FC<{
   onRemove: (pageNumber: number) => void;
   onSetUploader: (pageNumber: number) => void;
   onRenameField: (fieldKey: string, newLabel: string) => boolean;
+  onRemoveField: (fieldKey: string) => void;
   onRenamePage: (pageNumber: number, newTitle: string) => void;
-}> = ({ page, index, fields, onRemove, onSetUploader, onRenameField, onRenamePage }) => {
+  onRemoveElement: (kind: BuiltInKind) => void;
+}> = ({
+  page,
+  index,
+  fields,
+  onRemove,
+  onSetUploader,
+  onRenameField,
+  onRemoveField,
+  onRenamePage,
+  onRemoveElement,
+}) => {
   const pageData: DragMeta = useMemo(
     () => ({ type: "page", pageNumber: page.pageNumber, index }),
     [page.pageNumber, index]
@@ -589,6 +719,7 @@ const SortablePage: React.FC<{
                 label={field?.label ?? el.fieldKey}
                 type={field?.type}
                 onRename={onRenameField}
+                onRemove={onRemoveField}
               />
             );
           })}
@@ -603,7 +734,12 @@ const SortablePage: React.FC<{
         {builtInElements.length > 0 && (
           <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
             {builtInElements.map((el, i) => (
-              <Chip key={`${el.kind}-${i}`} label={ELEMENT_LABELS[el.kind]} size="small" />
+              <BuiltInElementChip
+                key={`${el.kind}-${i}`}
+                kind={el.kind}
+                pageNumber={page.pageNumber}
+                onRemove={onRemoveElement}
+              />
             ))}
           </Box>
         )}
@@ -663,6 +799,9 @@ const PagesWorkflowSection: React.FC = () => {
   const renameField = usePortalEditorStore((s) => s.renameField);
   const updatePage = usePortalEditorStore((s) => s.updatePage);
   const setUploaderPage = usePortalEditorStore((s) => s.setUploaderPage);
+  const addElementToPage = usePortalEditorStore((s) => s.addElementToPage);
+  const removeElement = usePortalEditorStore((s) => s.removeElement);
+  const removeMetadataField = usePortalEditorStore((s) => s.removeMetadataField);
 
   // Label for the floating drag overlay; null while nothing is being dragged.
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -738,6 +877,27 @@ const PagesWorkflowSection: React.FC = () => {
         return;
       }
 
+      if (a.type === "palette-element") {
+        // Palette built-in → page: place (or relocate) the unique built-in
+        // element at the resolved drop position.
+        const drop = resolveFieldDrop(o);
+        if (drop) {
+          addElementToPage(a.elementKind, drop.pageNumber, drop.index);
+        }
+        return;
+      }
+
+      if (a.type === "built-in") {
+        // Move an existing built-in element to the target page/position. The
+        // store strips-and-reinserts (built-ins are unique), so this covers
+        // both cross-page moves and same-page repositioning.
+        const drop = resolveFieldDrop(o);
+        if (drop) {
+          addElementToPage(a.kind, drop.pageNumber, drop.index);
+        }
+        return;
+      }
+
       if (a.type === "field") {
         const drop = resolveFieldDrop(o);
         if (!drop) return;
@@ -760,7 +920,7 @@ const PagesWorkflowSection: React.FC = () => {
         }
       }
     },
-    [addFieldToPage, assignFieldToPage, reorderFieldWithinPage, reorderPages]
+    [addFieldToPage, addElementToPage, assignFieldToPage, reorderFieldWithinPage, reorderPages]
   );
 
   const handleRenamePage = useCallback(
@@ -833,6 +993,9 @@ const PagesWorkflowSection: React.FC = () => {
             {SPECIAL_FIELD_TYPES.map(({ type, role, label }) => (
               <PaletteItem key={role} fieldType={type} role={role} label={label} />
             ))}
+            {ELEMENT_PALETTE.map(({ kind, label }) => (
+              <PaletteElementItem key={kind} elementKind={kind} label={label} />
+            ))}
           </Box>
         </Box>
 
@@ -862,7 +1025,9 @@ const PagesWorkflowSection: React.FC = () => {
                     onRemove={removePage}
                     onSetUploader={setUploaderPage}
                     onRenameField={renameField}
+                    onRemoveField={removeMetadataField}
                     onRenamePage={handleRenamePage}
+                    onRemoveElement={removeElement}
                   />
                 ))}
               </Stack>

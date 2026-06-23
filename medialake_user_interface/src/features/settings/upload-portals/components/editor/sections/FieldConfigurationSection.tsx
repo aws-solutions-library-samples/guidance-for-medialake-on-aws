@@ -15,6 +15,19 @@ import { usePortalEditorStore } from "../../../stores/usePortalEditorStore";
 const EMPTY_METADATA_FIELDS: readonly PortalMetadataField[] = [];
 
 /**
+ * Slugify an admin-authored field label into the stable `fieldKey` used to
+ * reference a metadata field from its page element. Mirrors the helper in
+ * `usePortalEditorStore.ts`, `MetadataFieldBuilder.tsx`, and
+ * `shared/portalSurveyModel.ts`.
+ */
+const slug = (label: string): string =>
+  label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+/**
  * FieldConfigurationSection
  *
  * Owns the metadata field builder — the surface where admins configure the
@@ -41,6 +54,8 @@ const FieldConfigurationSection: React.FC = () => {
   );
   const updatePortalData = usePortalEditorStore((s) => s.updatePortalData);
   const renameField = usePortalEditorStore((s) => s.renameField);
+  const addMetadataField = usePortalEditorStore((s) => s.addMetadataField);
+  const removeMetadataField = usePortalEditorStore((s) => s.removeMetadataField);
 
   // Collections the admin can offer in a collection-picker field's allow-list.
   // Fetched here (the section is mounted inside the app's query provider) and
@@ -65,6 +80,24 @@ const FieldConfigurationSection: React.FC = () => {
     [renameField]
   );
 
+  // Create a new field through the store so it is placed on a page (and thus
+  // appears in the Pages tab and renders on the public portal), rather than the
+  // legacy onChange append which created a label-less, unplaced field.
+  const handleAddField = useCallback(() => {
+    addMetadataField();
+  }, [addMetadataField]);
+
+  // Delete a field fully: removes it from the list AND strips its page element
+  // so no orphaned element is left behind (which previously broke save).
+  const handleRemoveField = useCallback(
+    (index: number) => {
+      const field = metadataFields[index];
+      if (!field) return;
+      removeMetadataField(slug(field.label));
+    },
+    [metadataFields, removeMetadataField]
+  );
+
   return (
     <Stack spacing={2}>
       <Box>
@@ -79,6 +112,8 @@ const FieldConfigurationSection: React.FC = () => {
           fields={metadataFields}
           onChange={handleMetadataFieldsChange}
           onRenameField={handleRenameField}
+          onAddField={handleAddField}
+          onRemoveField={handleRemoveField}
           availableCollections={availableCollections}
         />
       </Box>

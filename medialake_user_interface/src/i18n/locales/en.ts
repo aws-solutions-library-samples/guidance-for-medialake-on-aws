@@ -69,6 +69,7 @@ export default {
     prefixHelper: "You can only browse and upload to folders within the selected path.",
     currentPath: "Current Path",
     confirm: "Use This Path",
+    refresh: "Refresh",
     validation: {
       invalidPath: "The selected path is outside the allowed prefixes.",
       noPathSelected: "Please navigate to a folder before confirming.",
@@ -936,6 +937,7 @@ export default {
   },
   common: {
     back: "Back",
+    remove: "Remove",
     search: "Search",
     public: "Public",
     private: "Private",
@@ -999,7 +1001,6 @@ export default {
     chipMore: "+{{count}} more",
     edit: "Edit",
     delete: "Delete",
-    remove: "Remove",
     share: "Share",
     sharing: "Sharing...",
     viewAll: "View All",
@@ -1943,30 +1944,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription: "Reusable appearance themes you can apply to new or existing portals.",
-      deleteTitle: "Delete theme",
-      editorLoadError: "Failed to load theme",
-    },
-    templates: {
-      listDescription:
-        "Reusable portal structures you can use to start new portals from a known-good setup.",
-      createFromTemplate: "Create portal from this template",
-      deleteTitle: "Delete template",
-      editorLoadError: "Failed to load template",
-    },
-    actions: {
-      applyTheme: "Apply theme",
-      applyThemeMenu: "Apply theme…",
-      saveAsTemplate: "Save as Template",
-      saveAsTheme: "Save as Theme",
-      startFromTemplate: "Start from template",
-      startFromTemplateMenu: "Start from template…",
-    },
-    fieldTypes: {
-      radioGroup: "Radio Group",
-      yesNo: "Yes / No",
-    },
     pageTitle: "Upload Portals",
     pageDescription: "Manage upload portals for external contributors",
     createPortal: "Create Portal",
@@ -2018,6 +1995,45 @@ export default {
     tokens: {
       copyUrl: "Copy URL",
       revokeToken: "Revoke Token",
+    },
+    themeTemplateActions: {
+      saveAs: "Save as…",
+      saveAsTemplate: "Save as Template",
+      saveAsTheme: "Save as Theme",
+      applyTheme: "Apply theme",
+    },
+    themes: {
+      pageDescription: "Reusable appearance themes you can apply to new or existing portals",
+      deleteTheme: "Delete theme",
+      failedToLoad: "Failed to load theme",
+    },
+    templates: {
+      pageDescription: "Reusable portal structures you can use to start new portals quickly",
+      createFromTemplate: "Create portal from this template",
+      deleteTemplate: "Delete template",
+      failedToLoad: "Failed to load template",
+    },
+    createMenu: {
+      startFromTemplate: "Start from template…",
+      applyTheme: "Apply theme…",
+      startFromTemplateTitle: "Start from template",
+      applyThemeTitle: "Apply theme",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Optional. Used to route upload-batch completion events to a specific pipeline for auto-enrichment.",
+    },
+    actions: {
+      applyTheme: "Apply theme",
+      applyThemeMenu: "Apply theme…",
+      saveAsTemplate: "Save as Template",
+      saveAsTheme: "Save as Theme",
+      startFromTemplate: "Start from template",
+      startFromTemplateMenu: "Start from template…",
+    },
+    fieldTypes: {
+      radioGroup: "Radio Group",
+      yesNo: "Yes / No",
     },
   },
 };

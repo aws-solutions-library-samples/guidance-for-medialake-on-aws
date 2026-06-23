@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { Box, MenuItem, Select, Stack, TextField, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { MenuItem, Select, Stack, TextField } from "@mui/material";
 
 import { usePortalEditorStore } from "../../../stores/usePortalEditorStore";
 
@@ -58,6 +59,7 @@ const bytesToDisplayValue = (bytes: number | undefined, unit: SizeUnit): string 
  *   typed digits.
  */
 const MetadataSection: React.FC = () => {
+  const { t } = useTranslation();
   const maxFileSizeBytes = usePortalEditorStore(
     (s) => s.portalData?.maxFileSizeBytes as number | undefined
   );
@@ -66,6 +68,9 @@ const MetadataSection: React.FC = () => {
   );
   const allowedFileTypes = usePortalEditorStore(
     (s) => (s.portalData?.allowedFileTypes as string[] | undefined) ?? EMPTY_FILE_TYPES
+  );
+  const automationTag = usePortalEditorStore(
+    (s) => (s.portalData?.automationTag as string | undefined) ?? ""
   );
   const updatePortalData = usePortalEditorStore((s) => s.updatePortalData);
 
@@ -151,6 +156,14 @@ const MetadataSection: React.FC = () => {
     [updatePortalData]
   );
 
+  const handleAutomationTagChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      updatePortalData({ automationTag: value || undefined });
+    },
+    [updatePortalData]
+  );
+
   return (
     <Stack spacing={3}>
       <Stack direction="row" spacing={2} alignItems="flex-end">
@@ -191,6 +204,15 @@ const MetadataSection: React.FC = () => {
         multiline
         minRows={2}
         helperText="Leave empty to accept all files. Enter MIME types (image/*, video/*) or extensions (.pdf, .docx), one per line." // i18n-ignore
+      />
+
+      <TextField
+        label="Automation Tag"
+        value={automationTag}
+        onChange={handleAutomationTagChange}
+        size="small"
+        fullWidth
+        helperText={t("uploadPortals.metadata.completionEventHelperText")}
       />
     </Stack>
   );

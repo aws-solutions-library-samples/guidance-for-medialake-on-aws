@@ -5,6 +5,7 @@ import os
 from aws_lambda_powertools import Logger, Tracer
 from custom_exceptions import ForbiddenError
 from db_models import PortalDestinationModel, PortalMetadataModel
+from image_upload_utils import resolve_portal_asset_url
 from permission_utils import check_admin_permission, extract_user_context
 from portal_utils import DEST_SK_PREFIX, METADATA_SK, get_portal_pk
 from response_utils import create_error_response, create_success_response
@@ -40,6 +41,41 @@ def _attr_to_plain(value):
     return value
 
 
+def _resolve_appearance_asset_urls(appearance):
+    """Populate read-time `bannerUrl`/`faviconUrl` on `appearance.branding` from
+    their stored S3 keys so the editor preview can render them.
+
+    The visual editor persists `bannerS3Key`/`faviconS3Key` inside
+    `appearance.branding`; the displayable URLs are derived on read (presigned
+    S3 GET URLs) and never stored. Mirrors the public portal read path
+    (`portal_public`) so the admin editor and the public page resolve assets the
+    same way. Passes the value through unchanged when there is no branding map.
+    """
+    if not isinstance(appearance, dict):
+        return appearance
+
+    branding = appearance.get("branding")
+    if not isinstance(branding, dict):
+        return appearance
+
+    resolved_branding = dict(branding)
+    banner_url = resolve_portal_asset_url(branding.get("bannerS3Key"))
+    if banner_url:
+        resolved_branding["bannerUrl"] = banner_url
+    else:
+        # No key (or resolution failed) → never surface a stale URL.
+        resolved_branding.pop("bannerUrl", None)
+    favicon_url = resolve_portal_asset_url(branding.get("faviconS3Key"))
+    if favicon_url:
+        resolved_branding["faviconUrl"] = favicon_url
+    else:
+        resolved_branding.pop("faviconUrl", None)
+
+    resolved = dict(appearance)
+    resolved["branding"] = resolved_branding
+    return resolved
+
+
 def register_route(app):
     @app.get("/settings/portals/<portal_id>")
     @tracer.capture_method
@@ -68,16 +104,23 @@ def register_route(app):
                 "name": item.name,
                 "description": getattr(item, "description", None),
                 "logoS3Key": getattr(item, "logoS3Key", None),
+                "logoUrl": resolve_portal_asset_url(getattr(item, "logoS3Key", None)),
                 "accessMode": getattr(item, "accessMode", None),
                 "isActive": item.isActive,
                 "tokenBypassesPassphrase": item.tokenBypassesPassphrase,
                 "structuredPathMode": item.structuredPathMode,
                 "maxFileSizeBytes": getattr(item, "maxFileSizeBytes", None),
                 "maxFilesPerSession": getattr(item, "maxFilesPerSession", None),
+                "automationTag": getattr(item, "automationTag", None),
+                "allowedFileTypes": _attr_to_plain(
+                    getattr(item, "allowedFileTypes", None)
+                ),
                 "allowedGroups": getattr(item, "allowedGroups", None),
                 "ipAllowlist": getattr(item, "ipAllowlist", None),
                 "metadataFields": _attr_to_plain(getattr(item, "metadataFields", None)),
-                "appearance": _attr_to_plain(getattr(item, "appearance", None)),
+                "appearance": _resolve_appearance_asset_urls(
+                    _attr_to_plain(getattr(item, "appearance", None))
+                ),
                 "pages": _attr_to_plain(getattr(item, "pages", None)),
                 "createdBy": getattr(item, "createdBy", None),
                 "createdAt": getattr(item, "createdAt", None),

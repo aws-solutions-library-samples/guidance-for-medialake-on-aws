@@ -6,6 +6,20 @@ import type {
   PortalConfig,
 } from "../types/portal.types";
 
+export interface UploadSessionResponse {
+  sessionId: string;
+  status: "OPEN" | "COMPLETE" | "COMPLETE_WITH_ERRORS";
+  expectedCount: number;
+  completedCount: number;
+}
+
+export interface FinalizeResponse {
+  status: "OPEN" | "COMPLETE" | "COMPLETE_WITH_ERRORS";
+  expectedCount: number;
+  completedCount: number;
+  outcome?: "COMPLETE" | "COMPLETE_WITH_ERRORS";
+}
+
 export class PortalSessionExpiredError extends Error {
   constructor() {
     super("Portal session expired");
@@ -86,11 +100,20 @@ export function usePortalApi(
       path: string;
       destinationId: string;
       metadata?: Record<string, string>;
+      sessionId?: string;
+      batchToken?: string;
     }) => {
       if (!authClient) throw new PortalNotAuthenticatedError();
       try {
         const { data } = await authClient.post(`/portal/${slug}/upload`, fileData);
-        return data;
+        return data as {
+          sessionId?: string;
+          multipart?: boolean;
+          presignedPost?: { url: string; fields: Record<string, string> };
+          uploadId?: string;
+          key?: string;
+          bucket?: string;
+        };
       } catch (e) {
         return handleApiError(e);
       }
@@ -180,6 +203,61 @@ export function usePortalApi(
     [authClient, slug]
   );
 
+  const startSession = useCallback(
+    async (resumeSessionId?: string): Promise<UploadSessionResponse> => {
+      if (!authClient) throw new PortalNotAuthenticatedError();
+      try {
+        const body = resumeSessionId ? { resumeSessionId } : {};
+        const { data } = await authClient.post(`/portal/${slug}/upload-session`, body);
+        return data as UploadSessionResponse;
+      } catch (e) {
+        return handleApiError(e);
+      }
+    },
+    [authClient, slug]
+  );
+
+  const getSession = useCallback(
+    async (sessionId: string): Promise<UploadSessionResponse> => {
+      if (!authClient) throw new PortalNotAuthenticatedError();
+      try {
+        const { data } = await authClient.get(`/portal/${slug}/upload-session/${sessionId}`);
+        return data as UploadSessionResponse;
+      } catch (e) {
+        return handleApiError(e);
+      }
+    },
+    [authClient, slug]
+  );
+
+  const heartbeat = useCallback(
+    async (sessionId: string): Promise<void> => {
+      if (!authClient) throw new PortalNotAuthenticatedError();
+      try {
+        await authClient.post(`/portal/${slug}/upload-session/${sessionId}/heartbeat`, {});
+      } catch (e) {
+        return handleApiError(e);
+      }
+    },
+    [authClient, slug]
+  );
+
+  const finalize = useCallback(
+    async (sessionId: string, fileCount: number): Promise<FinalizeResponse> => {
+      if (!authClient) throw new PortalNotAuthenticatedError();
+      try {
+        const { data } = await authClient.post(
+          `/portal/${slug}/upload-session/${sessionId}/finalize`,
+          { fileCount }
+        );
+        return data as FinalizeResponse;
+      } catch (e) {
+        return handleApiError(e);
+      }
+    },
+    [authClient, slug]
+  );
+
   return {
     authenticate,
     getPortalConfig,
@@ -189,5 +267,9 @@ export function usePortalApi(
     abortMultipart,
     browse,
     createFolder,
+    startSession,
+    getSession,
+    heartbeat,
+    finalize,
   };
 }

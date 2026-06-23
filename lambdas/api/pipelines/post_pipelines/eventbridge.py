@@ -35,6 +35,22 @@ else:
     logger.warning("PIPELINES_TABLE environment variable not set")
 
 
+def _coerce_max_concurrency(value, default=10):
+    """Coerce a node's 'Max Concurrent Executions' to a valid int for SQS ESM ScalingConfig.
+
+    AWS requires an int in [2, 1000]; fall back to default on non-numeric input and clamp range.
+    """
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        return default
+    if ivalue < 2:
+        return default
+    if ivalue > 1000:
+        return 1000
+    return ivalue
+
+
 def resolve_pipeline_id_to_name(pipeline_id: str) -> str:
     """
     Resolve a pipeline ID (UUID) to its name by querying DynamoDB.
@@ -321,6 +337,72 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
     return result
 
 
+def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
+    """
+    Build the concrete EventBridge event pattern for the upload_batch_completed trigger node.
+
+    Always includes:
+      - source: ["medialake.pipeline"]
+      - detail-type: ["Upload Batch Completed"]
+      - detail.automationTag: [configured automation_tag]
+
+    Conditionally includes:
+      - detail.portalId: [portal_id] only when portal_id is configured (non-empty)
+
+    Maps outcome_filter to detail.outcome:
+      - "COMPLETE" → ["COMPLETE"]
+      - "COMPLETE_WITH_ERRORS" → ["COMPLETE_WITH_ERRORS"]
+      - "BOTH" → ["COMPLETE", "COMPLETE_WITH_ERRORS"]
+      - unset/None/empty → ["COMPLETE"] (default)
+
+    Args:
+        node: Node object containing configuration with parameters
+              (automation_tag, portal_id, outcome_filter)
+
+    Returns:
+        EventBridge-compatible event pattern dictionary
+    """
+    # Retrieve parameters from both the parameters dict and top-level configuration
+    parameters = node.data.configuration.get("parameters", {})
+    for key, value in node.data.configuration.items():
+        if key != "parameters" and isinstance(value, (str, int, float, bool)):
+            if key not in parameters:
+                parameters[key] = value
+
+    automation_tag = parameters.get("automation_tag", "")
+    portal_id = parameters.get("portal_id", "")
+    outcome_filter = parameters.get("outcome_filter", "")
+
+    # Build the base pattern — source, detail-type, and automationTag are always present
+    pattern: Dict[str, Any] = {
+        "source": ["medialake.pipeline"],
+        "detail-type": ["Upload Batch Completed"],
+        "detail": {
+            "automationTag": [automation_tag],
+        },
+    }
+
+    # Include detail.portalId only when portal_id is configured (non-empty)
+    if portal_id and str(portal_id).strip():
+        pattern["detail"]["portalId"] = [str(portal_id).strip()]
+
+    # Map outcome_filter to detail.outcome
+    outcome_map = {
+        "COMPLETE": ["COMPLETE"],
+        "COMPLETE_WITH_ERRORS": ["COMPLETE_WITH_ERRORS"],
+        "BOTH": ["COMPLETE", "COMPLETE_WITH_ERRORS"],
+    }
+    # Default to ["COMPLETE"] when outcome_filter is unset, empty, or not recognized
+    outcome = (
+        outcome_map.get(outcome_filter, ["COMPLETE"])
+        if outcome_filter
+        else ["COMPLETE"]
+    )
+    pattern["detail"]["outcome"] = outcome
+
+    return pattern
+
+
 def get_event_pattern_for_rule(
     rule_name: str, node: Any, pipeline_name: str, yaml_data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
@@ -461,6 +543,14 @@ def get_event_pattern_for_rule(
             logger.info(
                 f"Created flattened pattern for pipeline_execution_completed: {json.dumps(pattern)}"
             )
+            return pattern
+        elif rule_name == "upload_batch_completed_trigger":
+            # Build event pattern for the Upload Batch Completed trigger node.
+            # Always include source, detail-type, and detail.automationTag.
+            # Include detail.portalId only when portal_id is configured.
+            # Map outcome_filter to detail.outcome with a default of ["COMPLETE"].
+            pattern = build_upload_batch_completed_pattern(node)
+            logger.info(f"Built upload_batch_completed pattern: {json.dumps(pattern)}")
             return pattern
         else:
             # For other rules, use the pattern from YAML
@@ -921,6 +1011,13 @@ def create_eventbridge_rule(
     """
     logger.info(f"Creating EventBridge rule for trigger node: {node.id}")
 
+    # Track whether the EventBridge rule itself was created. If a later wiring
+    # step (queue/policy/target/event-source-mapping) fails, the orphaned rule
+    # must be cleaned up rather than left behind with no target.
+    rule_created = False
+    unique_rule_name = None
+    event_bus_name = None
+
     try:
         # Read YAML file from S3
         yaml_file_path = f"node_templates/{node.data.type.lower()}/{node.data.id}.yaml"
@@ -1014,6 +1111,10 @@ def create_eventbridge_rule(
         rule_arn = rule_response.get("RuleArn")
         logger.info(f"Created EventBridge rule with ARN: {rule_arn}")
 
+        # The rule now exists in EventBridge. If any subsequent wiring step fails,
+        # the outer handler must remove it so we never leave an orphaned rule.
+        rule_created = True
+
         # Create or get IAM role for EventBridge to invoke Lambda
         eventbridge_role_arn = get_events_role_arn(sanitized_pipeline_name)
 
@@ -1057,7 +1158,9 @@ def create_eventbridge_rule(
                 logger.info(f"Found zip file for pipeline_trigger: {zip_file_key}")
             except Exception as e:
                 logger.error(f"Failed to find zip file for pipeline_trigger: {e}")
-                return None
+                raise RuntimeError(
+                    f"Failed to find zip file for pipeline_trigger: {e}"
+                ) from e
 
             # Create a role for the trigger lambda
             iam_client = boto3.client("iam")
@@ -1090,7 +1193,9 @@ def create_eventbridge_rule(
                 logger.info(f"Role {role_name} does not exist, will create new role")
             except Exception as e:
                 logger.error(f"Error checking/deleting existing role {role_name}: {e}")
-                return None
+                raise RuntimeError(
+                    f"Error checking/deleting existing role {role_name}: {e}"
+                ) from e
 
             # Create the role
             trust_policy = {
@@ -1171,9 +1276,10 @@ def create_eventbridge_rule(
                     )
 
                 # Create the Lambda function with retry logic for role propagation issues
-                # Extract Max Concurrent Executions from node parameters for environment variable
-                max_concurrent_executions = parameters.get(
-                    "Max Concurrent Executions", 10
+                # Extract Max Concurrent Executions from node parameters for environment variable.
+                # Coerce to a valid int so the env var (and any ScalingConfig reuse) is consistent.
+                max_concurrent_executions = _coerce_max_concurrency(
+                    parameters.get("Max Concurrent Executions", 10)
                 )
 
                 create_function_params = {
@@ -1363,10 +1469,12 @@ def create_eventbridge_rule(
                     "UUID"
                 ]
 
-                # Update the mapping to add concurrency control if not present
-                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
-                max_concurrent_executions = parameters.get(
-                    "Max Concurrent Executions", 10
+                # Update the mapping to add concurrency control if not present.
+                # Extract Max Concurrent Executions from node parameters, default to 10.
+                # Coerce to a valid int — AWS rejects a string for
+                # ScalingConfig.MaximumConcurrency.
+                max_concurrent_executions = _coerce_max_concurrency(
+                    parameters.get("Max Concurrent Executions", 10)
                 )
                 logger.info(
                     f"Updating event source mapping with MaximumConcurrency={max_concurrent_executions} from node parameters"
@@ -1392,11 +1500,13 @@ def create_eventbridge_rule(
                     f"Using existing event source mapping: {event_source_mapping_uuid}"
                 )
             else:
-                # Set up Lambda trigger from SQS queue with concurrency control
-                # MaximumConcurrency limits how many Lambda instances process messages simultaneously
-                # Extract Max Concurrent Executions from node parameters, default to 10 if not specified
-                max_concurrent_executions = parameters.get(
-                    "Max Concurrent Executions", 10
+                # Set up Lambda trigger from SQS queue with concurrency control.
+                # MaximumConcurrency limits how many Lambda instances process messages.
+                # Extract Max Concurrent Executions from node parameters, default to 10.
+                # Coerce to a valid int — AWS rejects a string for
+                # ScalingConfig.MaximumConcurrency.
+                max_concurrent_executions = _coerce_max_concurrency(
+                    parameters.get("Max Concurrent Executions", 10)
                 )
                 logger.info(
                     f"Using MaximumConcurrency={max_concurrent_executions} from node parameters"
@@ -1418,7 +1528,7 @@ def create_eventbridge_rule(
                 )
         except Exception as e:
             logger.error(f"Error creating/finding SQS queue: {e}")
-            return None
+            raise RuntimeError(f"Error creating/finding SQS queue: {e}") from e
 
         # Create a policy to allow EventBridge to send messages to the SQS queue
         sqs_policy = {
@@ -1444,7 +1554,7 @@ def create_eventbridge_rule(
             )
         except Exception as e:
             logger.error(f"Error setting policy on SQS queue: {e}")
-            return None
+            raise RuntimeError(f"Error setting policy on SQS queue: {e}") from e
 
         # Set the SQS queue as the target for the EventBridge rule
         # Target ID has a 64 character limit, "-target" suffix is 7 chars
@@ -1485,7 +1595,24 @@ def create_eventbridge_rule(
 
     except Exception as e:
         logger.exception(f"Failed to create EventBridge rule for node {node.id}: {e}")
-        return None
+        # If the rule itself was already created, best-effort clean it up so a
+        # failed wiring step does not leave an orphaned rule with no target,
+        # queue policy, or event-source-mapping. Never let cleanup mask the
+        # original error.
+        if rule_created:
+            try:
+                logger.info(
+                    f"Cleaning up orphaned EventBridge rule {unique_rule_name} "
+                    "after wiring failure"
+                )
+                delete_eventbridge_rule(unique_rule_name, event_bus_name)
+            except Exception as cleanup_error:
+                logger.error(
+                    f"Failed to clean up orphaned EventBridge rule "
+                    f"{unique_rule_name}: {cleanup_error}"
+                )
+        # Re-raise so the caller learns this deploy step failed (no silent None).
+        raise
 
 
 def update_eventbridge_rule_state(

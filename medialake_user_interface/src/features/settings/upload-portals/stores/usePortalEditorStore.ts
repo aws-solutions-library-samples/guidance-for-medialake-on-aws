@@ -15,6 +15,7 @@ import type {
 } from "@/api/types/api.types";
 
 import { DEFAULT_PORTAL_APPEARANCE } from "../constants/appearanceDefaults";
+import { PORTAL_DEFAULT_ALLOWED_FILE_TYPES } from "@/features/portal/constants";
 import { portalAppearanceSchema } from "../schemas/appearance.schema";
 import { portalPagesSchemaWithFieldKeys } from "../schemas/pages.schema";
 import type {
@@ -411,6 +412,52 @@ interface PortalEditorState {
    */
   setUploaderPage: (pageNumber: number) => void;
 
+  /**
+   * Place a single built-in element (`uploader`, `destination-selector`,
+   * `path-browser`, or `path-builder`) on a page at `index`. These elements are
+   * unique per portal, so this strips any existing element of the same `kind`
+   * from every page first, then inserts one at the target position. This backs
+   * both dragging a built-in from the palette onto a page AND moving an
+   * existing built-in element across/within pages.
+   */
+  addElementToPage: (
+    kind: Exclude<PortalPageElement["kind"], "metadata-field">,
+    pageNumber: number,
+    index: number
+  ) => void;
+
+  /**
+   * Remove every built-in element of the given `kind` from all pages.
+   */
+  removeElement: (kind: Exclude<PortalPageElement["kind"], "metadata-field">) => void;
+
+  /**
+   * Create a brand-new metadata field from the Field Configuration section and
+   * place it on a page so it appears in the Pages tab AND renders on the public
+   * portal. Mirrors {@link addFieldToPage} but targets the page hosting the
+   * uploader (falling back to the first page) and appends the field's
+   * `metadata-field` element to the end of that page. A unique, non-empty
+   * default label is synthesized so the field has a valid `fieldKey`
+   * (`slug(label)`) for the element reference; the admin renames it afterward
+   * via the atomic {@link renameField} path. No-op when the portal has no
+   * pages. Marks the store dirty.
+   */
+  addMetadataField: (
+    fieldType?: PortalMetadataField["type"],
+    role?: PortalMetadataField["role"]
+  ) => void;
+
+  /**
+   * Fully delete the metadata field keyed by `fieldKey` (`slug(label)`): remove
+   * it from `metadataFields` AND strip its `metadata-field` element from every
+   * page. This keeps the field list and page elements in sync so deleting a
+   * field never leaves an orphaned, input-type-less element on a page (which
+   * previously failed save validation). Backs both the Field Configuration
+   * delete button and the per-field delete affordance in the Pages tab. Marks
+   * the store dirty.
+   */
+  removeMetadataField: (fieldKey: string) => void;
+
   // Validation actions
   clearSectionErrors: (section: EditorSection) => void;
 
@@ -539,6 +586,12 @@ const createDefaultPortalData = (): PortalEditorPortalData => ({
   ],
   metadataFields: [],
   destinations: [],
+  // Seed the default media allow-list so the editor's "Allowed file types"
+  // field shows the supported audio/video/image types out of the box. The
+  // admin can edit it, or CLEAR it entirely to allow any file type — an empty
+  // list round-trips to the backend and the uploader/validator treat it as
+  // "allow all" (see UppyUploaderQuestion + portal_public _resolve_allowed_types).
+  allowedFileTypes: [...PORTAL_DEFAULT_ALLOWED_FILE_TYPES],
 });
 
 /**
@@ -1582,6 +1635,141 @@ export const usePortalEditorStore = create<PortalEditorState>()(
             return { portalData: { ...portal, pages: nextPages }, isDirty: true };
           }),
 
+        addElementToPage: (kind, pageNumber, index) =>
+          set((state) => {
+            const portal: PortalEditorPortalData = state.portalData ?? {};
+            const pages = readPages(portal);
+            if (!pages.some((p) => p.pageNumber === pageNumber)) return {};
+
+            // Built-in elements are unique per portal: strip any existing
+            // element of this kind from every page, then insert exactly one at
+            // the target position (mirrors setUploaderPage's enforcement).
+            const newElement = { kind } as PortalPageElement;
+            const nextPages = pages.map((page) => {
+              const without = page.elements.filter((el) => el.kind !== kind);
+              if (page.pageNumber === pageNumber) {
+                const elements = [...without];
+                const clampedIndex = Math.max(0, Math.min(index, elements.length));
+                elements.splice(clampedIndex, 0, newElement);
+                return { ...page, elements };
+              }
+              if (without.length === page.elements.length) return page;
+              return { ...page, elements: without };
+            });
+
+            return { portalData: { ...portal, pages: nextPages }, isDirty: true };
+          }),
+
+        removeElement: (kind) =>
+          set((state) => {
+            const portal: PortalEditorPortalData = state.portalData ?? {};
+            const pages = readPages(portal);
+            let changed = false;
+            const nextPages = pages.map((page) => {
+              const without = page.elements.filter((el) => el.kind !== kind);
+              if (without.length === page.elements.length) return page;
+              changed = true;
+              return { ...page, elements: without };
+            });
+            if (!changed) return {};
+            return { portalData: { ...portal, pages: nextPages }, isDirty: true };
+          }),
+
+        addMetadataField: (fieldType = "text", role) =>
+          set((state) => {
+            const portal: PortalEditorPortalData = state.portalData ?? {};
+            const pages = readPages(portal);
+            if (pages.length === 0) return {};
+
+            const fields = readFields(portal);
+
+            // Target the page hosting the uploader so the new field renders
+            // alongside the upload widget; fall back to the first page.
+            const targetPage =
+              pages.find((p) => p.elements.some((el) => el.kind === "uploader")) ?? pages[0];
+
+            // Derive a unique, non-empty label so its slugified fieldKey does
+            // not collide with an existing field (the page element references
+            // the field by `slug(label)`, and an empty label has no key).
+            const usedKeys = new Set(fields.map((f) => slug(f.label)));
+            const isCollectionPicker = role === "collection-picker";
+            const baseLabel = isCollectionPicker ? "Add to collection" : "New Field";
+            let label = baseLabel;
+            let suffix = 1;
+            while (usedKeys.has(slug(label))) {
+              suffix += 1;
+              label = `${baseLabel} ${suffix}`;
+            }
+
+            const order = fields.reduce((max, f) => Math.max(max, f.order ?? 0), 0) + 1;
+            const newField: PortalMetadataField = {
+              label,
+              type: fieldType,
+              required: false,
+              order,
+              pageNumber: targetPage.pageNumber,
+              ...(isCollectionPicker
+                ? {
+                    role: "collection-picker" as const,
+                    roleConfig: {
+                      allowedCollections: [],
+                      fixedCollectionIds: [],
+                      multiple: true,
+                    },
+                  }
+                : {}),
+            };
+            const newElement: PortalPageElement = {
+              kind: "metadata-field",
+              fieldKey: slug(label),
+            };
+
+            const nextPages = pages.map((page) =>
+              page.pageNumber === targetPage.pageNumber
+                ? { ...page, elements: [...page.elements, newElement] }
+                : page
+            );
+
+            return {
+              portalData: {
+                ...portal,
+                pages: nextPages,
+                metadataFields: [...fields, newField],
+              },
+              isDirty: true,
+            };
+          }),
+
+        removeMetadataField: (fieldKey) =>
+          set((state) => {
+            const portal: PortalEditorPortalData = state.portalData ?? {};
+            const fields = readFields(portal);
+            const nextFields = fields.filter((f) => slug(f.label) !== fieldKey);
+
+            const pages = readPages(portal);
+            let pagesChanged = false;
+            const nextPages = pages.map((page) => {
+              const without = page.elements.filter(
+                (el) => !(el.kind === "metadata-field" && el.fieldKey === fieldKey)
+              );
+              if (without.length === page.elements.length) return page;
+              pagesChanged = true;
+              return { ...page, elements: without };
+            });
+
+            // No matching field and no matching element → nothing to do.
+            if (nextFields.length === fields.length && !pagesChanged) return {};
+
+            return {
+              portalData: {
+                ...portal,
+                pages: nextPages,
+                metadataFields: nextFields,
+              },
+              isDirty: true,
+            };
+          }),
+
         clearSectionErrors: (section) =>
           set((state) => {
             if (!(section in state.validationErrors)) {
@@ -1774,6 +1962,8 @@ export const usePortalEditorStore = create<PortalEditorState>()(
           const allowedFileTypes = Array.isArray(portal.allowedFileTypes)
             ? (portal.allowedFileTypes as string[])
             : undefined;
+          const automationTag =
+            typeof portal.automationTag === "string" ? portal.automationTag : undefined;
 
           const payload: CreatePortalRequest = {
             name,
@@ -1805,9 +1995,14 @@ export const usePortalEditorStore = create<PortalEditorState>()(
             payload.maxFilesPerSession = maxFilesPerSession;
           }
           if (logoUrl !== undefined) payload.logoUrl = logoUrl;
-          if (allowedFileTypes !== undefined && allowedFileTypes.length > 0) {
+          // Persist whenever the editor holds an array — INCLUDING an empty one.
+          // An empty array is the explicit "allow any file type" state and must
+          // round-trip; only a truly-absent value is omitted so the backend
+          // falls back to its default media allow-list.
+          if (allowedFileTypes !== undefined) {
             payload.allowedFileTypes = allowedFileTypes;
           }
+          if (automationTag !== undefined) payload.automationTag = automationTag;
 
           return payload;
         },

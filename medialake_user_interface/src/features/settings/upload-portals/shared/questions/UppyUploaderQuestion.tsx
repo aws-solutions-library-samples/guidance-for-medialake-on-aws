@@ -194,9 +194,14 @@ function LiveUploader({
         successMessage={content.successMessage}
         dropZoneText={content.dropZoneText}
         allowedFileTypes={
-          rt.config?.allowedFileTypes && rt.config.allowedFileTypes.length > 0
-            ? rt.config.allowedFileTypes
-            : [...PORTAL_DEFAULT_ALLOWED_FILE_TYPES]
+          // Tri-state: an UNSET (undefined) config falls back to the default
+          // media allow-list (legacy portals created before this field
+          // existed). An explicit value — including an EMPTY array — is honored
+          // verbatim; `[]` flows to PortalUploader which then applies no Uppy
+          // restriction, i.e. "allow any file type".
+          rt.config?.allowedFileTypes === undefined
+            ? [...PORTAL_DEFAULT_ALLOWED_FILE_TYPES]
+            : rt.config.allowedFileTypes
         }
         buttonStyle={content.buttonStyle}
         buttonRounding={content.buttonRounding}

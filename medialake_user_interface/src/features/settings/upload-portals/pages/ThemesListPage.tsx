@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -20,7 +21,6 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
@@ -67,7 +67,7 @@ const ThemesListPage: React.FC = () => {
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Themes"
-        description={t("uploadPortals.themes.listDescription")}
+        description={t("uploadPortals.themes.pageDescription")}
         action={
           <Button
             variant="contained"
@@ -133,7 +133,7 @@ const ThemesListPage: React.FC = () => {
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>{t("uploadPortals.themes.deleteTitle")}</DialogTitle>
+        <DialogTitle>{t("uploadPortals.themes.deleteTheme")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Portals and templates

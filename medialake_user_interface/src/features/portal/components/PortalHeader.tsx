@@ -24,6 +24,28 @@ import DOMPurify from "dompurify";
  */
 const DEFAULT_LOGO_SIZE = 48;
 
+/**
+ * Determine whether a sanitized HTML string carries meaningful content.
+ *
+ * The Tiptap rich-text editor emits non-empty-but-visually-empty markup when a
+ * field is cleared (e.g. `<p></p>`, `<p><br></p>`, or whitespace-only
+ * paragraphs). A naive `html.trim()` check treats those as content, so a
+ * cleared Title would render as a blank header instead of falling back to the
+ * plain-text `name`. This strips tags and collapses entities/whitespace to see
+ * if any real text remains, while still treating embedded media
+ * (`<img>`/`<video>`/etc.) as content.
+ */
+const htmlHasContent = (html: string | undefined | null): boolean => {
+  if (!html) return false;
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, "")
+    .trim();
+  if (text.length > 0) return true;
+  return /<(img|video|iframe|svg|audio)\b/i.test(html);
+};
+
 interface Props {
   name: string;
   description?: string;
@@ -73,13 +95,14 @@ const PortalHeader: React.FC<Props> = ({
   const isCentered = logoAlignment === "center";
 
   // Sanitize once per incoming HTML; memoized so unrelated re-renders
-  // don't re-run DOMPurify.
+  // don't re-run DOMPurify. Treat visually-empty Tiptap markup (e.g. a
+  // cleared `<p></p>`) as empty so the header falls back to `name`.
   const sanitizedTitle = useMemo(
-    () => (titleHtml && titleHtml.trim() ? DOMPurify.sanitize(titleHtml) : ""),
+    () => (htmlHasContent(titleHtml) ? DOMPurify.sanitize(titleHtml as string) : ""),
     [titleHtml]
   );
   const sanitizedDescription = useMemo(
-    () => (descriptionHtml && descriptionHtml.trim() ? DOMPurify.sanitize(descriptionHtml) : ""),
+    () => (htmlHasContent(descriptionHtml) ? DOMPurify.sanitize(descriptionHtml as string) : ""),
     [descriptionHtml]
   );
 

@@ -71,6 +71,7 @@ export default {
     prefixHelper: "आप केवल चयनित पथ के भीतर फ़ोल्डरों को ब्राउज़ और अपलोड कर सकते हैं।",
     currentPath: "वर्तमान पथ",
     confirm: "इस पथ का उपयोग करें",
+    refresh: "रिफ़्रेश करें",
     validation: {
       invalidPath: "चयनित पथ अनुमत उपसर्गों के बाहर है।",
       noPathSelected: "पुष्टि करने से पहले कृपया एक फ़ोल्डर पर नेविगेट करें।",
@@ -1951,31 +1952,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "पुन: उपयोग करने योग्य दिखावट थीम जिन्हें आप नए या मौजूदा पोर्टल पर लागू कर सकते हैं।",
-      deleteTitle: "थीम हटाएं",
-      editorLoadError: "थीम लोड करने में विफल",
-    },
-    templates: {
-      listDescription:
-        "पुन: उपयोग करने योग्य पोर्टल संरचनाएं जिनका उपयोग आप किसी विश्वसनीय सेटअप से नए पोर्टल शुरू करने के लिए कर सकते हैं।",
-      createFromTemplate: "इस टेम्पलेट से पोर्टल बनाएं",
-      deleteTitle: "टेम्पलेट हटाएं",
-      editorLoadError: "टेम्पलेट लोड करने में विफल",
-    },
-    actions: {
-      applyTheme: "थीम लागू करें",
-      applyThemeMenu: "थीम लागू करें…",
-      saveAsTemplate: "टेम्पलेट के रूप में सहेजें",
-      saveAsTheme: "थीम के रूप में सहेजें",
-      startFromTemplate: "टेम्पलेट से शुरू करें",
-      startFromTemplateMenu: "टेम्पलेट से शुरू करें…",
-    },
-    fieldTypes: {
-      radioGroup: "रेडियो समूह",
-      yesNo: "हां / नहीं",
-    },
     pageTitle: "अपलोड पोर्टल",
     pageDescription: "बाहरी योगदानकर्ताओं के लिए अपलोड पोर्टल प्रबंधित करें",
     createPortal: "पोर्टल बनाएं",
@@ -2027,6 +2003,48 @@ export default {
     tokens: {
       copyUrl: "URL कॉपी करें",
       revokeToken: "टोकन रद्द करें",
+    },
+    themeTemplateActions: {
+      saveAs: "इस रूप में सहेजें…",
+      saveAsTemplate: "टेम्पलेट के रूप में सहेजें",
+      saveAsTheme: "थीम के रूप में सहेजें",
+      applyTheme: "थीम लागू करें",
+    },
+    themes: {
+      pageDescription:
+        "पुन: प्रयोज्य उपस्थिति थीम जिन्हें आप नए या मौजूदा पोर्टलों पर लागू कर सकते हैं",
+      deleteTheme: "थीम हटाएं",
+      failedToLoad: "थीम लोड करने में विफल",
+    },
+    templates: {
+      pageDescription:
+        "पुन: प्रयोज्य पोर्टल संरचनाएं जिनका उपयोग आप नए पोर्टल तेज़ी से शुरू करने के लिए कर सकते हैं",
+      createFromTemplate: "इस टेम्पलेट से पोर्टल बनाएं",
+      deleteTemplate: "टेम्पलेट हटाएं",
+      failedToLoad: "टेम्पलेट लोड करने में विफल",
+    },
+    createMenu: {
+      startFromTemplate: "टेम्पलेट से शुरू करें…",
+      applyTheme: "थीम लागू करें…",
+      startFromTemplateTitle: "टेम्पलेट से शुरू करें",
+      applyThemeTitle: "थीम लागू करें",
+    },
+    metadata: {
+      completionEventHelperText:
+        "वैकल्पिक। अपलोड-बैच पूर्णता ईवेंट को स्वचालित संवर्धन के लिए एक विशिष्ट पाइपलाइन पर रूट करने के लिए उपयोग किया जाता है।",
+    },
+    actions: {
+      applyTheme: "थीम लागू करें",
+      applyThemeMenu: "थीम लागू करें…",
+      saveAsTemplate: "टेम्पलेट के रूप में सहेजें",
+      saveAsTheme: "थीम के रूप में सहेजें",
+      startFromTemplate: "टेम्पलेट से शुरू करें",
+      startFromTemplateMenu: "टेम्पलेट से शुरू करें…",
+    },
+
+    fieldTypes: {
+      radioGroup: "रेडियो समूह",
+      yesNo: "हां / नहीं",
     },
   },
 };

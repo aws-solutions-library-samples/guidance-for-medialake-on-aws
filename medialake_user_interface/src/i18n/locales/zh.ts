@@ -66,6 +66,7 @@ export default {
     prefixHelper: "您只能浏览并上传到所选路径内的文件夹。",
     currentPath: "当前路径",
     confirm: "使用此路径",
+    refresh: "刷新",
     validation: {
       invalidPath: "所选路径超出允许的前缀。",
       noPathSelected: "请在确认前导航到文件夹。",
@@ -1925,29 +1926,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription: "可重复使用的外观主题，可应用于新建或现有门户。",
-      deleteTitle: "删除主题",
-      editorLoadError: "无法加载主题",
-    },
-    templates: {
-      listDescription: "可重复使用的门户结构，可用于基于成熟配置创建新门户。",
-      createFromTemplate: "根据此模板创建门户",
-      deleteTitle: "删除模板",
-      editorLoadError: "无法加载模板",
-    },
-    actions: {
-      applyTheme: "应用主题",
-      applyThemeMenu: "应用主题…",
-      saveAsTemplate: "另存为模板",
-      saveAsTheme: "另存为主题",
-      startFromTemplate: "从模板开始",
-      startFromTemplateMenu: "从模板开始…",
-    },
-    fieldTypes: {
-      radioGroup: "单选按钮组",
-      yesNo: "是 / 否",
-    },
     pageTitle: "上传门户",
     pageDescription: "管理外部贡献者的上传门户",
     createPortal: "创建门户",
@@ -1999,6 +1977,45 @@ export default {
     tokens: {
       copyUrl: "复制URL",
       revokeToken: "撤销令牌",
+    },
+    themeTemplateActions: {
+      saveAs: "另存为…",
+      saveAsTemplate: "另存为模板",
+      saveAsTheme: "另存为主题",
+      applyTheme: "应用主题",
+    },
+    themes: {
+      pageDescription: "可重复使用的外观主题，可应用于新的或现有的门户",
+      deleteTheme: "删除主题",
+      failedToLoad: "加载主题失败",
+    },
+    templates: {
+      pageDescription: "可重复使用的门户结构，可用于快速启动新门户",
+      createFromTemplate: "从此模板创建门户",
+      deleteTemplate: "删除模板",
+      failedToLoad: "加载模板失败",
+    },
+    createMenu: {
+      startFromTemplate: "从模板开始…",
+      applyTheme: "应用主题…",
+      startFromTemplateTitle: "从模板开始",
+      applyThemeTitle: "应用主题",
+    },
+    metadata: {
+      completionEventHelperText: "可选。用于将上传批次完成事件路由到特定管道以进行自动丰富。",
+    },
+    actions: {
+      applyTheme: "应用主题",
+      applyThemeMenu: "应用主题…",
+      saveAsTemplate: "另存为模板",
+      saveAsTheme: "另存为主题",
+      startFromTemplate: "从模板开始",
+      startFromTemplateMenu: "从模板开始…",
+    },
+
+    fieldTypes: {
+      radioGroup: "单选按钮组",
+      yesNo: "是 / 否",
     },
   },
 };

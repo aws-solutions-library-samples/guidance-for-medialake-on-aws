@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0] - 2026-06-23
+
+### Features
+
+- feat: Update to upload portals including bug fixes, upload session handling, and pipeline nodes for upload portal session
+- feat(upload-portals): upload portals with session-completion-triggered automation
+
 ## [1.16.1] - 2026-06-22
 
 ### Code Refactoring

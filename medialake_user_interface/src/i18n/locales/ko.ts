@@ -68,6 +68,7 @@ export default {
     prefixHelper: "선택한 경로 내의 폴더만 찾아보고 업로드할 수 있습니다.",
     currentPath: "현재 경로",
     confirm: "이 경로 사용",
+    refresh: "새로고침",
     validation: {
       invalidPath: "선택한 경로가 허용된 접두사 외부에 있습니다.",
       noPathSelected: "확인하기 전에 폴더로 이동하세요.",
@@ -1938,29 +1939,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription: "새 포털이나 기존 포털에 적용할 수 있는 재사용 가능한 외관 테마입니다.",
-      deleteTitle: "테마 삭제",
-      editorLoadError: "테마를 불러오지 못했습니다",
-    },
-    templates: {
-      listDescription: "검증된 설정에서 새 포털을 시작할 수 있는 재사용 가능한 포털 구조입니다.",
-      createFromTemplate: "이 템플릿으로 포털 생성",
-      deleteTitle: "템플릿 삭제",
-      editorLoadError: "템플릿을 불러오지 못했습니다",
-    },
-    actions: {
-      applyTheme: "테마 적용",
-      applyThemeMenu: "테마 적용…",
-      saveAsTemplate: "템플릿으로 저장",
-      saveAsTheme: "테마로 저장",
-      startFromTemplate: "템플릿으로 시작",
-      startFromTemplateMenu: "템플릿으로 시작…",
-    },
-    fieldTypes: {
-      radioGroup: "라디오 그룹",
-      yesNo: "예 / 아니요",
-    },
     pageTitle: "업로드 포털",
     pageDescription: "외부 기여자를 위한 업로드 포털 관리",
     createPortal: "포털 만들기",
@@ -2012,6 +1990,46 @@ export default {
     tokens: {
       copyUrl: "URL 복사",
       revokeToken: "토큰 취소",
+    },
+    themeTemplateActions: {
+      saveAs: "다른 이름으로 저장…",
+      saveAsTemplate: "템플릿으로 저장",
+      saveAsTheme: "테마로 저장",
+      applyTheme: "테마 적용",
+    },
+    themes: {
+      pageDescription: "새 포털이나 기존 포털에 적용할 수 있는 재사용 가능한 외관 테마",
+      deleteTheme: "테마 삭제",
+      failedToLoad: "테마를 불러오지 못했습니다",
+    },
+    templates: {
+      pageDescription: "새 포털을 빠르게 시작하는 데 사용할 수 있는 재사용 가능한 포털 구조",
+      createFromTemplate: "이 템플릿에서 포털 생성",
+      deleteTemplate: "템플릿 삭제",
+      failedToLoad: "템플릿을 불러오지 못했습니다",
+    },
+    createMenu: {
+      startFromTemplate: "템플릿에서 시작…",
+      applyTheme: "테마 적용…",
+      startFromTemplateTitle: "템플릿에서 시작",
+      applyThemeTitle: "테마 적용",
+    },
+    metadata: {
+      completionEventHelperText:
+        "선택 사항. 업로드 배치 완료 이벤트를 자동 보강을 위한 특정 파이프라인으로 라우팅하는 데 사용됩니다.",
+    },
+    actions: {
+      applyTheme: "테마 적용",
+      applyThemeMenu: "테마 적용…",
+      saveAsTemplate: "템플릿으로 저장",
+      saveAsTheme: "테마로 저장",
+      startFromTemplate: "템플릿으로 시작",
+      startFromTemplateMenu: "템플릿으로 시작…",
+    },
+
+    fieldTypes: {
+      radioGroup: "라디오 그룹",
+      yesNo: "예 / 아니요",
     },
   },
 };

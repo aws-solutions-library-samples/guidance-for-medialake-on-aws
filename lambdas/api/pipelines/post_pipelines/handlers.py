@@ -735,7 +735,10 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                 f"Found {total_event_triggers} event trigger nodes and {total_manual_triggers} manual trigger nodes"
             )
 
-            # Only create EventBridge rules for event trigger nodes
+            # Only create EventBridge rules for event trigger nodes.
+            # Collect per-node failures so a broken trigger fails the whole deploy
+            # instead of being silently swallowed (which would report DEPLOYED).
+            trigger_failures = []
             for node in event_trigger_nodes:
                 processed_triggers += 1
                 update_pipeline_status(
@@ -768,6 +771,22 @@ def create_pipeline(event: Dict[str, Any]) -> Dict[str, Any]:
                     logger.error(
                         f"Failed to create EventBridge rule for event trigger node {node.data.id}: {e}"
                     )
+                    trigger_failures.append((node.data.id, str(e)))
+
+            # If any event trigger failed to wire up, fail the deploy rather than
+            # leaving the pipeline marked DEPLOYED with a non-functioning trigger.
+            # create_eventbridge_rule already cleaned up any orphaned rule it
+            # created for the failed node. Raising here is caught by the outer
+            # handler, which sets the pipeline status to FAILED and surfaces the
+            # error to the caller.
+            if trigger_failures:
+                failure_summary = "; ".join(
+                    f"{node_id}: {error}" for node_id, error in trigger_failures
+                )
+                raise RuntimeError(
+                    "Failed to create EventBridge rule(s) for event trigger "
+                    f"node(s): {failure_summary}"
+                )
 
             # Log manual trigger nodes (no EventBridge rules needed)
             for node in manual_trigger_nodes:

@@ -98,27 +98,6 @@ class UsersGroupsStack(cdk.NestedStack):
                     ),
                     projection_type=dynamodb.ProjectionType.ALL,
                 ),
-                # GSI4 (overloaded: FavoritesByCollection + RecentCollectionsByUser)
-                # One sparse, generic-key index serving two disjoint access
-                # patterns. The partition-key value spaces never overlap, so the
-                # two row types coexist safely on a single index:
-                #
-                #   * Collection-favorite cleanup (collection-delete path):
-                #       gsi4Pk = FAVCOLLECTION#{collection_id}, gsi4Sk = itemKey
-                #     Finds and removes favorite rows across all users when a
-                #     collection is deleted. Only COLLECTION favorites populate
-                #     these keys; asset/pipeline favorites are not indexed.
-                #
-                #   * Recent collections (GET /collections/recent):
-                #       gsi4Pk = USER#{user_id}, gsi4Sk = reverse-timestamp
-                #     Returns the collections a user recently modified, newest
-                #     first. Only RECENTCOLL# items populate these keys.
-                #
-                # Projection is ALL because the recent endpoint reads a non-key
-                # attribute (collectionId) straight off the index. Merging the
-                # former GSI4 + GSI5 into one index means a deployment adds only
-                # one new GSI, satisfying DynamoDB's one-new-GSI-per-UpdateTable
-                # limit without a staged deploy.
                 dynamodb.GlobalSecondaryIndexPropsV2(
                     index_name="GSI4",
                     partition_key=dynamodb.Attribute(

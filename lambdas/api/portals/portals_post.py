@@ -159,6 +159,11 @@ def register_route(app):
                 metadata.accessVersion = 1
                 metadata.maxFileSizeBytes = body.get("maxFileSizeBytes")
                 metadata.maxFilesPerSession = body.get("maxFilesPerSession")
+                metadata.automationTag = body.get("automationTag")
+                # Tri-state allowed file types (see PortalMetadataModel). Persist
+                # exactly what the client sends — including an empty list, which
+                # means "allow any file type" — so the cleared state round-trips.
+                metadata.allowedFileTypes = body.get("allowedFileTypes")
                 metadata.GSI1_PK = GSI1_PK_VALUE
                 metadata.GSI1_SK = now
                 metadata.save()

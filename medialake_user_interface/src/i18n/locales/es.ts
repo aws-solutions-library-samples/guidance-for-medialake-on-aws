@@ -71,6 +71,7 @@ export default {
     prefixHelper: "Solo puedes explorar y subir a carpetas dentro de la ruta seleccionada.",
     currentPath: "Ruta actual",
     confirm: "Usar esta ruta",
+    refresh: "Actualizar",
     validation: {
       invalidPath: "La ruta seleccionada está fuera de los prefijos permitidos.",
       noPathSelected: "Por favor, navega a una carpeta antes de confirmar.",
@@ -1967,31 +1968,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "Temas de apariencia reutilizables que puedes aplicar a portales nuevos o existentes.",
-      deleteTitle: "Eliminar tema",
-      editorLoadError: "No se pudo cargar el tema",
-    },
-    templates: {
-      listDescription:
-        "Estructuras de portal reutilizables que puedes usar para iniciar nuevos portales a partir de una configuración fiable.",
-      createFromTemplate: "Crear portal a partir de esta plantilla",
-      deleteTitle: "Eliminar plantilla",
-      editorLoadError: "No se pudo cargar la plantilla",
-    },
-    actions: {
-      applyTheme: "Aplicar tema",
-      applyThemeMenu: "Aplicar tema…",
-      saveAsTemplate: "Guardar como plantilla",
-      saveAsTheme: "Guardar como tema",
-      startFromTemplate: "Empezar desde una plantilla",
-      startFromTemplateMenu: "Empezar desde una plantilla…",
-    },
-    fieldTypes: {
-      radioGroup: "Grupo de opciones",
-      yesNo: "Sí / No",
-    },
     pageTitle: "Portales de carga",
     pageDescription: "Gestionar portales de carga para colaboradores externos",
     createPortal: "Crear portal",
@@ -2043,6 +2019,48 @@ export default {
     tokens: {
       copyUrl: "Copiar URL",
       revokeToken: "Revocar token",
+    },
+    themeTemplateActions: {
+      saveAs: "Guardar como…",
+      saveAsTemplate: "Guardar como plantilla",
+      saveAsTheme: "Guardar como tema",
+      applyTheme: "Aplicar tema",
+    },
+    themes: {
+      pageDescription:
+        "Temas de apariencia reutilizables que puedes aplicar a portales nuevos o existentes",
+      deleteTheme: "Eliminar tema",
+      failedToLoad: "Error al cargar el tema",
+    },
+    templates: {
+      pageDescription:
+        "Estructuras de portal reutilizables que puedes usar para iniciar nuevos portales rápidamente",
+      createFromTemplate: "Crear portal desde esta plantilla",
+      deleteTemplate: "Eliminar plantilla",
+      failedToLoad: "Error al cargar la plantilla",
+    },
+    createMenu: {
+      startFromTemplate: "Iniciar desde plantilla…",
+      applyTheme: "Aplicar tema…",
+      startFromTemplateTitle: "Iniciar desde plantilla",
+      applyThemeTitle: "Aplicar tema",
+    },
+    metadata: {
+      completionEventHelperText:
+        "Opcional. Se usa para enrutar eventos de finalización de lotes de carga a un pipeline específico para enriquecimiento automático.",
+    },
+    actions: {
+      applyTheme: "Aplicar tema",
+      applyThemeMenu: "Aplicar tema…",
+      saveAsTemplate: "Guardar como plantilla",
+      saveAsTheme: "Guardar como tema",
+      startFromTemplate: "Empezar desde una plantilla",
+      startFromTemplateMenu: "Empezar desde una plantilla…",
+    },
+
+    fieldTypes: {
+      radioGroup: "Grupo de opciones",
+      yesNo: "Sí / No",
     },
   },
 };

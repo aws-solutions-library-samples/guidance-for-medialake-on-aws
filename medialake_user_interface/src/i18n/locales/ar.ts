@@ -67,6 +67,7 @@ export default {
     prefixHelper: "يمكنك فقط التصفح والتحميل إلى المجلدات ضمن المسار المحدد.",
     currentPath: "المسار الحالي",
     confirm: "استخدم هذا المسار",
+    refresh: "تحديث",
     validation: {
       invalidPath: "المسار المحدد خارج البادئات المسموح بها.",
       noPathSelected: "يرجى الانتقال إلى مجلد قبل التأكيد.",
@@ -1935,31 +1936,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription:
-        "سمات مظهر قابلة لإعادة الاستخدام يمكنك تطبيقها على البوابات الجديدة أو الحالية.",
-      deleteTitle: "حذف السمة",
-      editorLoadError: "فشل تحميل السمة",
-    },
-    templates: {
-      listDescription:
-        "هياكل بوابات قابلة لإعادة الاستخدام يمكنك استخدامها لبدء بوابات جديدة من إعداد موثوق.",
-      createFromTemplate: "إنشاء بوابة من هذا القالب",
-      deleteTitle: "حذف القالب",
-      editorLoadError: "فشل تحميل القالب",
-    },
-    actions: {
-      applyTheme: "تطبيق السمة",
-      applyThemeMenu: "تطبيق السمة…",
-      saveAsTemplate: "حفظ كقالب",
-      saveAsTheme: "حفظ كسمة",
-      startFromTemplate: "البدء من قالب",
-      startFromTemplateMenu: "البدء من قالب…",
-    },
-    fieldTypes: {
-      radioGroup: "مجموعة أزرار اختيار",
-      yesNo: "نعم / لا",
-    },
     pageTitle: "بوابات التحميل",
     pageDescription: "إدارة بوابات التحميل للمساهمين الخارجيين",
     createPortal: "إنشاء بوابة",
@@ -2011,6 +1987,47 @@ export default {
     tokens: {
       copyUrl: "نسخ الرابط",
       revokeToken: "إلغاء الرمز",
+    },
+    themeTemplateActions: {
+      saveAs: "حفظ كـ…",
+      saveAsTemplate: "حفظ كقالب",
+      saveAsTheme: "حفظ كسمة",
+      applyTheme: "تطبيق السمة",
+    },
+    themes: {
+      pageDescription: "سمات مظهر قابلة لإعادة الاستخدام يمكنك تطبيقها على بوابات جديدة أو موجودة",
+      deleteTheme: "حذف السمة",
+      failedToLoad: "فشل تحميل السمة",
+    },
+    templates: {
+      pageDescription:
+        "هياكل بوابات قابلة لإعادة الاستخدام يمكنك استخدامها لبدء بوابات جديدة بسرعة",
+      createFromTemplate: "إنشاء بوابة من هذا القالب",
+      deleteTemplate: "حذف القالب",
+      failedToLoad: "فشل تحميل القالب",
+    },
+    createMenu: {
+      startFromTemplate: "البدء من قالب…",
+      applyTheme: "تطبيق سمة…",
+      startFromTemplateTitle: "البدء من قالب",
+      applyThemeTitle: "تطبيق سمة",
+    },
+    metadata: {
+      completionEventHelperText:
+        "اختياري. يُستخدم لتوجيه أحداث اكتمال دفعة التحميل إلى خط أنابيب محدد للإثراء التلقائي.",
+    },
+    actions: {
+      applyTheme: "تطبيق السمة",
+      applyThemeMenu: "تطبيق السمة…",
+      saveAsTemplate: "حفظ كقالب",
+      saveAsTheme: "حفظ كسمة",
+      startFromTemplate: "البدء من قالب",
+      startFromTemplateMenu: "البدء من قالب…",
+    },
+
+    fieldTypes: {
+      radioGroup: "مجموعة أزرار اختيار",
+      yesNo: "نعم / لا",
     },
   },
 };

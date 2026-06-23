@@ -27,8 +27,8 @@ export const RESERVED_SURVEY_KEYS = [SELECTED_DESTINATION_KEY, CURRENT_PATH_KEY]
  * SurveyJS instantiates question renderers itself, so the live API surface and
  * cross-page upload state are passed via React context rather than survey
  * props. Both render paths supply a value: the preview renderer uses
- * `mode: "preview"` (mock, non-interactive), the public renderer uses
- * `mode: "public"` (live API + Uppy).
+ * `mode: "preview"` (mock, non-interactive), the public renderer uses // i18n-ignore
+ * `mode: "public"` (live API + Uppy). // i18n-ignore
  *
  * @see design.md — "Custom SurveyJS question contracts"
  */
@@ -75,7 +75,7 @@ export function usePortalRuntime(): PortalRuntimeValue {
  * {@link collectMetadataValues}. `survey-core`'s `SurveyModel` is structurally
  * assignable to this shape (its `data` getter returns the answer object), so a
  * real survey instance can be passed directly while tests can pass a plain
- * `{ data }` object without constructing a model.
+ * `{ data }` object without constructing a model. // i18n-ignore
  */
 export interface SurveyDataLike {
   /** The SurveyJS answer object: question `name` → value. */
@@ -84,18 +84,18 @@ export interface SurveyDataLike {
 
 /**
  * Gather the metadata-field values from a survey's answer object as a
- * `Record<string, string>`, EXCLUDING the reserved keys
+ * `Record<string, string>`, EXCLUDING the reserved keys // i18n-ignore
  * (`__selectedDestinationId`, `__currentPath`).
  *
  * This is the exact shape the existing `getPresignedUrl` call expects for its
  * `metadata` parameter (S3 `x-amz-meta-*` headers are string-valued). Values
  * are serialized to strings:
  *   - arrays (multi-select `checkbox`/`tagbox`) → comma-joined string of their
- *     stringified items, e.g. `["a","b"]` → `"a, b"`; an empty array is skipped;
+ *     stringified items, e.g. `["a","b"]` → `"a, b"`; an empty array is skipped; // i18n-ignore
  *   - booleans (`boolean` toggle) → `"true"`/`"false"`;
  *   - plain objects → JSON-stringified (defensive; no current field type emits
  *     an object, but a future structured type would round-trip rather than
- *     surface `"[object Object]"`);
+ *     surface `"[object Object]"`); // i18n-ignore
  *   - everything else → `String(value)`.
  * `null`/`undefined` answers are skipped so they do not surface as the literal
  * strings `"null"`/`"undefined"`.

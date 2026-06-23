@@ -1,0 +1,45 @@
+spec: v1.0.0
+node:
+  id: mark_upload_complete
+  title: Mark Upload Processing Complete
+  description: Records each processed asset against its upload batch (ml-batch-id) and completes the batch when the last expected asset is processed.
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/MarkUploadCompleteLambdaDeployment
+        runtime: python3.12
+        timeout: 60
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:TransactWriteItems
+              resources:
+                - ${UPLOAD_SESSIONS_TABLE_ARN}
+            - effect: Allow
+              actions:
+                - cloudwatch:PutMetricData
+              resources:
+                - "*"
+actions:
+  mark:
+    summary: Mark Upload Processing Complete
+    operationId: markUploadComplete
+    parameters: []
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

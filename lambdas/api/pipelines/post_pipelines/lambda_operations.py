@@ -329,23 +329,34 @@ def add_multiline_params_to_zip(
 
 def get_zip_file_key(bucket: str, prefix: str) -> str:
     """
-    Find a zip file in an S3 bucket with the given prefix.
+    Find the most recently modified zip file in an S3 bucket with the given prefix.
+
+    BucketDeployment uses prune=False, so stale build zips accumulate under the
+    prefix over time. Selecting the lexicographically-first key (S3 list order)
+    could therefore deploy OLD node code. Instead, return the zip with the
+    newest ``LastModified`` timestamp. A paginator is used so the result is
+    correct even when more than 1000 objects share the prefix.
 
     Args:
         bucket: S3 bucket name
         prefix: Prefix to search for
 
     Returns:
-        S3 key of the first zip file found
+        S3 key of the most recently modified zip file found
     """
     s3 = boto3.client("s3")
-    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-
-    for obj in response.get("Contents", []):
-        if obj["Key"].endswith(".zip"):
-            return obj["Key"]
-
-    raise ValueError(f"No zip file found in {bucket}/{prefix}")
+    paginator = s3.get_paginator("list_objects_v2")
+    newest_key = None
+    newest_mtime = None
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            if obj["Key"].endswith(".zip"):
+                if newest_mtime is None or obj["LastModified"] > newest_mtime:
+                    newest_mtime = obj["LastModified"]
+                    newest_key = obj["Key"]
+    if newest_key is None:
+        raise ValueError(f"No zip file found in {bucket}/{prefix}")
+    return newest_key
 
 
 def wait_for_lambda_deletion(function_name: str, max_attempts: int = 40) -> None:
@@ -1042,6 +1053,10 @@ def create_lambda_function(
                     "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # System settings table for provider configuration lookup
                     "SYSTEM_SETTINGS_TABLE_NAME": SYSTEM_SETTINGS_TABLE_NAME or "",
+                    # Upload-sessions table for the upload-portal barrier node
+                    "UPLOAD_SESSIONS_TABLE_NAME": os.environ.get(
+                        "UPLOAD_SESSIONS_TABLE_NAME", ""
+                    ),
                     # CloudFront domain for portal URL generation
                     "CLOUDFRONT_DOMAIN": _resolve_cloudfront_domain(),
                     # SES configuration for portal email notifications

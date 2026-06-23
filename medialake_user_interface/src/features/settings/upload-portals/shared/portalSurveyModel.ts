@@ -210,7 +210,8 @@ function buildMetadataQuestion(field: PortalMetadataField): ISurveyJsonQuestion 
  */
 function buildQuestion(
   element: PortalPageElement,
-  metadataFields: PortalMetadataField[]
+  metadataFields: PortalMetadataField[],
+  pageDestinationCount: number
 ): ISurveyJsonQuestion | null {
   const authored = pickConditionalExpressions(element as { visibleIf?: string; enableIf?: string });
   // Allow a per-element authored title to override the built-in default
@@ -229,6 +230,13 @@ function buildQuestion(
       return { ...buildMetadataQuestion(field), ...authored };
     }
     case "destination-selector":
+      // A destination selector is only useful when the page offers MORE THAN
+      // ONE destination to choose between. With zero or one destination the
+      // uploader auto-resolves the sole/implicit destination at runtime
+      // (see UppyUploaderQuestion + DestinationSelectorRenderer's auto-select),
+      // so emitting the question here would just render an empty "Destination"
+      // card with nothing to pick. Omit it entirely in that case.
+      if (pageDestinationCount <= 1) return null;
       return {
         type: PORTAL_QUESTION_TYPES.destinationSelector,
         name: BUILTIN_QUESTION_NAMES.destinationSelector,
@@ -272,9 +280,13 @@ function buildQuestion(
 }
 
 /** Map one {@link PortalPage} to a SurveyJS page, preserving element order. */
-function buildPage(page: PortalPage, metadataFields: PortalMetadataField[]): ISurveyJsonPage {
+function buildPage(
+  page: PortalPage,
+  metadataFields: PortalMetadataField[],
+  pageDestinationCount: number
+): ISurveyJsonPage {
   const elements = (page.elements ?? [])
-    .map((element) => buildQuestion(element, metadataFields))
+    .map((element) => buildQuestion(element, metadataFields, pageDestinationCount))
     .filter((question): question is ISurveyJsonQuestion => question !== null);
 
   return {
@@ -314,10 +326,20 @@ function buildPage(page: PortalPage, metadataFields: PortalMetadataField[]): ISu
  */
 export function buildSurveyJson(config: PortalConfig): ISurveyJsonDefinition {
   const metadataFields = config.metadataFields ?? [];
+  const destinations = config.destinations ?? [];
+  // Mirror `destinationsForPage` (questionHelpers): destinations target a page
+  // via `pageNumber`, but portals saved before multi-page support declare none,
+  // in which case ALL destinations are offered on every page.
+  const anyDestinationHasPageNumber = destinations.some((d) => typeof d.pageNumber === "number");
+  const countDestinationsForPage = (pageNumber: number): number =>
+    anyDestinationHasPageNumber
+      ? destinations.filter((d) => d.pageNumber === pageNumber).length
+      : destinations.length;
+
   const pages = [...(config.pages ?? [])]
     // Sort a copy so the caller's array is never mutated. Ascending pageNumber.
     .sort((a, b) => a.pageNumber - b.pageNumber)
-    .map((page) => buildPage(page, metadataFields));
+    .map((page) => buildPage(page, metadataFields, countDestinationsForPage(page.pageNumber)));
 
   return { pages };
 }

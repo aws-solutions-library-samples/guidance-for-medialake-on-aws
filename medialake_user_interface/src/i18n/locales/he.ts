@@ -67,6 +67,7 @@ export default {
     prefixHelper: "אתה יכול רק לעיין ולהעלות לתיקיות בתוך הנתיב שנבחר.",
     currentPath: "נתיב נוכחי",
     confirm: "השתמש בנתיב זה",
+    refresh: "רענן",
     validation: {
       invalidPath: "הנתיב שנבחר נמצא מחוץ לקידומות המותרות.",
       noPathSelected: "אנא נווט לתיקייה לפני אישור.",
@@ -1932,30 +1933,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription: "ערכות נושא של מראה לשימוש חוזר שניתן להחיל על פורטלים חדשים או קיימים.",
-      deleteTitle: "מחק ערכת נושא",
-      editorLoadError: "טעינת ערכת הנושא נכשלה",
-    },
-    templates: {
-      listDescription:
-        "מבני פורטל לשימוש חוזר שבהם ניתן להשתמש כדי להתחיל פורטלים חדשים מתצורה בדוקה.",
-      createFromTemplate: "צור פורטל מתבנית זו",
-      deleteTitle: "מחק תבנית",
-      editorLoadError: "טעינת התבנית נכשלה",
-    },
-    actions: {
-      applyTheme: "החל ערכת נושא",
-      applyThemeMenu: "החל ערכת נושא…",
-      saveAsTemplate: "שמור כתבנית",
-      saveAsTheme: "שמור כערכת נושא",
-      startFromTemplate: "התחל מתבנית",
-      startFromTemplateMenu: "התחל מתבנית…",
-    },
-    fieldTypes: {
-      radioGroup: "קבוצת לחצני בחירה",
-      yesNo: "כן / לא",
-    },
     pageTitle: "פורטלי העלאה",
     pageDescription: "ניהול פורטלי העלאה עבור תורמים חיצוניים",
     createPortal: "צור פורטל",
@@ -2007,6 +1984,46 @@ export default {
     tokens: {
       copyUrl: "העתק כתובת URL",
       revokeToken: "בטל אסימון",
+    },
+    themeTemplateActions: {
+      saveAs: "שמור כ…",
+      saveAsTemplate: "שמור כתבנית",
+      saveAsTheme: "שמור כערכת נושא",
+      applyTheme: "החל ערכת נושא",
+    },
+    themes: {
+      pageDescription: "ערכות נושא חוזרות שניתן להחיל על פורטלים חדשים או קיימים",
+      deleteTheme: "מחק ערכת נושא",
+      failedToLoad: "טעינת ערכת הנושא נכשלה",
+    },
+    templates: {
+      pageDescription: "מבנים חוזרים של פורטלים להתחלה מהירה של פורטלים חדשים",
+      createFromTemplate: "צור פורטל מתבנית זו",
+      deleteTemplate: "מחק תבנית",
+      failedToLoad: "טעינת התבנית נכשלה",
+    },
+    createMenu: {
+      startFromTemplate: "התחל מתבנית…",
+      applyTheme: "החל ערכת נושא…",
+      startFromTemplateTitle: "התחל מתבנית",
+      applyThemeTitle: "החל ערכת נושא",
+    },
+    metadata: {
+      completionEventHelperText:
+        "אופציונלי. משמש לניתוב אירועי השלמת מנות העלאה לצינור ספציפי להעשרה אוטומטית.",
+    },
+    actions: {
+      applyTheme: "החל ערכת נושא",
+      applyThemeMenu: "החל ערכת נושא…",
+      saveAsTemplate: "שמור כתבנית",
+      saveAsTheme: "שמור כערכת נושא",
+      startFromTemplate: "התחל מתבנית",
+      startFromTemplateMenu: "התחל מתבנית…",
+    },
+
+    fieldTypes: {
+      radioGroup: "קבוצת לחצני בחירה",
+      yesNo: "כן / לא",
     },
   },
 };

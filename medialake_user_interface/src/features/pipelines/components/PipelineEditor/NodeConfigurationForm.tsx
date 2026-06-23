@@ -6,6 +6,7 @@ import { FormDefinition, FormFieldDefinition } from "../../../../forms/types";
 import { NodeConfiguration, Node as NodeType, NodeParameter } from "@/features/pipelines/types";
 import { useGetIntegrations } from "@/features/settings/integrations/api/integrations.controller";
 import { useGetPipelines } from "../../api/pipelinesController";
+import { useGetPortals } from "@/api/hooks/usePortals";
 
 interface NodeConfigurationFormProps {
   node: NodeType;
@@ -39,6 +40,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
     const { t } = useTranslation();
     const { data: integrationsData } = useGetIntegrations();
     const { data: pipelinesData } = useGetPipelines();
+    const { data: portalsData } = useGetPortals();
 
     // 1. Compute methodName.
     const methodName = useMemo(() => {
@@ -203,6 +205,28 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       }));
     }, [pipelinesData]);
 
+    // Automation tags sourced from upload portals. Collect each portal's
+    // explicitly-set automationTag, drop empties, and dedupe so the trigger's
+    // "Automation Tag" select offers each tag once.
+    const automationTagOptions = useMemo(() => {
+      if (!portalsData?.data) return [];
+      const tags = portalsData.data
+        .map((portal) => portal.automationTag)
+        .filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0);
+      return Array.from(new Set(tags)).map((tag) => ({
+        label: tag,
+        value: tag,
+      }));
+    }, [portalsData]);
+
+    const portalOptions = useMemo(() => {
+      if (!portalsData?.data) return [];
+      return portalsData.data.map((portal) => ({
+        label: portal.name,
+        value: portal.portalId,
+      }));
+    }, [portalsData]);
+
     // 6. Build form definition.
     const formDefinition = useMemo<FormDefinition>(() => {
       const fields: FormFieldDefinition[] = [];
@@ -356,6 +380,14 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         if (workflowField) {
           Object.assign(workflowField, { options: pipelinesOptions });
         }
+        const tagField = fields.find((field) => field.name === "parameters.automation_tag");
+        if (tagField) {
+          Object.assign(tagField, { options: automationTagOptions });
+        }
+        const portalField = fields.find((field) => field.name === "parameters.portal_id");
+        if (portalField) {
+          Object.assign(portalField, { options: portalOptions });
+        }
       }
 
       return {
@@ -373,6 +405,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       isTriggerNode,
       integrationOptions,
       pipelinesOptions,
+      automationTagOptions,
+      portalOptions,
       isFlowNode,
       methodInfo,
       node.info.nodeType,

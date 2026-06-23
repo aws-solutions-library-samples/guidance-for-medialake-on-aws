@@ -71,6 +71,7 @@ export default {
     prefixHelper: "選択したパス内のフォルダのみを参照およびアップロードできます。",
     currentPath: "現在のパス",
     confirm: "このパスを使用",
+    refresh: "更新",
     validation: {
       invalidPath: "選択されたパスは許可されたプレフィックスの範囲外です。",
       noPathSelected: "確認する前にフォルダに移動してください。",
@@ -1953,29 +1954,6 @@ export default {
     },
   },
   uploadPortals: {
-    themes: {
-      listDescription: "新規または既存のポータルに適用できる、再利用可能な外観テーマ。",
-      deleteTitle: "テーマを削除",
-      editorLoadError: "テーマの読み込みに失敗しました",
-    },
-    templates: {
-      listDescription: "実績のある構成から新しいポータルを作成できる、再利用可能なポータル構造。",
-      createFromTemplate: "このテンプレートからポータルを作成",
-      deleteTitle: "テンプレートを削除",
-      editorLoadError: "テンプレートの読み込みに失敗しました",
-    },
-    actions: {
-      applyTheme: "テーマを適用",
-      applyThemeMenu: "テーマを適用…",
-      saveAsTemplate: "テンプレートとして保存",
-      saveAsTheme: "テーマとして保存",
-      startFromTemplate: "テンプレートから開始",
-      startFromTemplateMenu: "テンプレートから開始…",
-    },
-    fieldTypes: {
-      radioGroup: "ラジオグループ",
-      yesNo: "はい / いいえ",
-    },
     pageTitle: "アップロードポータル",
     pageDescription: "外部貢献者向けのアップロードポータルを管理",
     createPortal: "ポータルを作成",
@@ -2027,6 +2005,46 @@ export default {
     tokens: {
       copyUrl: "URLをコピー",
       revokeToken: "トークンを取り消す",
+    },
+    themeTemplateActions: {
+      saveAs: "名前を付けて保存…",
+      saveAsTemplate: "テンプレートとして保存",
+      saveAsTheme: "テーマとして保存",
+      applyTheme: "テーマを適用",
+    },
+    themes: {
+      pageDescription: "新しいポータルまたは既存のポータルに適用できる再利用可能な外観テーマ",
+      deleteTheme: "テーマを削除",
+      failedToLoad: "テーマの読み込みに失敗しました",
+    },
+    templates: {
+      pageDescription: "新しいポータルをすばやく開始するために使用できる再利用可能なポータル構造",
+      createFromTemplate: "このテンプレートからポータルを作成",
+      deleteTemplate: "テンプレートを削除",
+      failedToLoad: "テンプレートの読み込みに失敗しました",
+    },
+    createMenu: {
+      startFromTemplate: "テンプレートから開始…",
+      applyTheme: "テーマを適用…",
+      startFromTemplateTitle: "テンプレートから開始",
+      applyThemeTitle: "テーマを適用",
+    },
+    metadata: {
+      completionEventHelperText:
+        "オプション。アップロードバッチ完了イベントを自動エンリッチメント用の特定のパイプラインにルーティングするために使用されます。",
+    },
+    actions: {
+      applyTheme: "テーマを適用",
+      applyThemeMenu: "テーマを適用…",
+      saveAsTemplate: "テンプレートとして保存",
+      saveAsTheme: "テーマとして保存",
+      startFromTemplate: "テンプレートから開始",
+      startFromTemplateMenu: "テンプレートから開始…",
+    },
+
+    fieldTypes: {
+      radioGroup: "ラジオグループ",
+      yesNo: "はい / いいえ",
     },
   },
 };

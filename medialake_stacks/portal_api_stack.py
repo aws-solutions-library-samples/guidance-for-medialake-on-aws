@@ -15,17 +15,22 @@ the portal routes are attached to the same physical API Gateway.
 from dataclasses import dataclass
 
 import aws_cdk as cdk
-from aws_cdk import Fn
+from aws_cdk import Duration, Fn, RemovalPolicy
 from aws_cdk import aws_apigateway as apigateway
 from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_lambda_event_sources as lambda_event_sources
 from constructs import Construct
 
 from config import config
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
+from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket
+from medialake_constructs.sqs import SQSConstruct, SQSProps
 
 
 @dataclass
@@ -37,6 +42,8 @@ class PortalApiStackProps:
     connector_table: dynamodb.TableV2
     iac_assets_bucket: S3Bucket
     cloudfront_domain: str = ""
+    pipelines_event_bus_name: str = ""
+    pipelines_event_bus_arn: str = ""
 
 
 class PortalApiStack(cdk.NestedStack):
@@ -46,6 +53,39 @@ class PortalApiStack(cdk.NestedStack):
         super().__init__(scope, id, **kwargs)
 
         self._props = props
+
+        # --- Upload Sessions DynamoDB table ---
+        upload_sessions_table_construct = DynamoDB(
+            self,
+            "UploadSessionsTable",
+            props=DynamoDBProps(
+                name=f"{config.resource_prefix}-upload-sessions-{config.environment}",
+                partition_key_name="PK",
+                partition_key_type=dynamodb.AttributeType.STRING,
+                sort_key_name="SK",
+                sort_key_type=dynamodb.AttributeType.STRING,
+                stream=dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
+                ttl_attribute="ttl",
+                billing_mode=dynamodb.Billing.on_demand(),
+                global_secondary_indexes=[
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="GSI1",
+                        partition_key=dynamodb.Attribute(
+                            name="GSI1_PK",
+                            type=dynamodb.AttributeType.STRING,
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="GSI1_SK",
+                            type=dynamodb.AttributeType.STRING,
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                ],
+            ),
+        )
+        self._upload_sessions_table = upload_sessions_table_construct.table
+        self._upload_sessions_table_name = upload_sessions_table_construct.table_name
+        self._upload_sessions_table_arn = upload_sessions_table_construct.table_arn
 
         # Import the shared REST API by ID (same pattern as ApiGatewayStack).
         api_id = Fn.import_value(
@@ -192,6 +232,11 @@ class PortalApiStack(cdk.NestedStack):
                     "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
                     "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
                     "CLOUDFRONT_DOMAIN": props.cloudfront_domain,
+                    # Portal images (logo/banner/favicon) live in the IAC assets
+                    # bucket and are served to the browser via presigned S3 GET
+                    # URLs resolved at read time.
+                    "IAC_ASSETS_BUCKET_NAME": props.iac_assets_bucket.bucket_name,
+                    "UPLOAD_SESSIONS_TABLE_NAME": self._upload_sessions_table_name,
                 },
             ),
         )
@@ -236,6 +281,45 @@ class PortalApiStack(cdk.NestedStack):
             )
         )
 
+        # Portal images live in the KMS-encrypted IAC assets bucket. Serving
+        # them via presigned S3 GET URLs requires the signing principal (this
+        # Lambda's role) to be able to decrypt with the bucket's CMK, otherwise
+        # S3 returns AccessDenied at GET time.
+        self._portal_public_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["kms:Decrypt"],
+                resources=[props.iac_assets_bucket.key_arn],
+            )
+        )
+
+        # Upload-sessions table access for the portal_public Lambda
+        self._portal_public_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:TransactWriteItems",
+                    "dynamodb:Query",
+                ],
+                resources=[
+                    self._upload_sessions_table_arn,
+                    f"{self._upload_sessions_table_arn}/index/*",
+                ],
+            )
+        )
+
+        # CloudWatch metrics for upload-session observability
+        self._portal_public_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+            )
+        )
+
         self._portal_public_lambda.function.add_permission(
             "ApiGatewayInvokePortalPublic",
             principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
@@ -265,6 +349,20 @@ class PortalApiStack(cdk.NestedStack):
         )
         portal_slug_multipart_abort_resource = (
             portal_slug_multipart_resource.add_resource("abort")
+        )
+
+        # Upload-session routes under /portal/{slug}/upload-session
+        portal_slug_upload_session_resource = portal_slug_resource.add_resource(
+            "upload-session"
+        )
+        portal_slug_upload_session_id_resource = (
+            portal_slug_upload_session_resource.add_resource("{sessionId}")
+        )
+        portal_slug_upload_session_heartbeat_resource = (
+            portal_slug_upload_session_id_resource.add_resource("heartbeat")
+        )
+        portal_slug_upload_session_finalize_resource = (
+            portal_slug_upload_session_id_resource.add_resource("finalize")
         )
 
         portal_method_config = {
@@ -299,6 +397,20 @@ class PortalApiStack(cdk.NestedStack):
             "POST", portal_public_integration, **portal_method_config
         )
 
+        # Upload-session endpoint methods
+        portal_slug_upload_session_resource.add_method(
+            "POST", portal_public_integration, **portal_method_config
+        )
+        portal_slug_upload_session_id_resource.add_method(
+            "GET", portal_public_integration, **portal_method_config
+        )
+        portal_slug_upload_session_heartbeat_resource.add_method(
+            "POST", portal_public_integration, **portal_method_config
+        )
+        portal_slug_upload_session_finalize_resource.add_method(
+            "POST", portal_public_integration, **portal_method_config
+        )
+
         for res in [
             portal_resource,
             portal_slug_resource,
@@ -310,6 +422,10 @@ class PortalApiStack(cdk.NestedStack):
             portal_slug_multipart_sign_resource,
             portal_slug_multipart_complete_resource,
             portal_slug_multipart_abort_resource,
+            portal_slug_upload_session_resource,
+            portal_slug_upload_session_id_resource,
+            portal_slug_upload_session_heartbeat_resource,
+            portal_slug_upload_session_finalize_resource,
         ]:
             add_cors_options_method(res)
 
@@ -401,6 +517,147 @@ class PortalApiStack(cdk.NestedStack):
             source_arn=wildcard_source_arn,
         )
 
+        # --- Upload Session Stream Processor Lambda ---
+        # DLQ for failed stream processing records
+        self._upload_session_stream_dlq = SQSConstruct(
+            self,
+            "UploadSessionStreamDLQ",
+            props=SQSProps(
+                queue_name="upload-session-stream-dlq",
+                visibility_timeout=Duration.minutes(2),
+                retention_period=Duration.days(14),
+                encryption=False,
+                enforce_ssl=True,
+                max_receive_count=0,
+                removal_policy=RemovalPolicy.DESTROY,
+            ),
+        )
+
+        self._upload_session_stream_lambda = Lambda(
+            self,
+            "UploadSessionStreamLambda",
+            config=LambdaConfig(
+                name="upload_session_stream",
+                entry="lambdas/back_end/upload_session_stream",
+                memory_size=256,
+                timeout_minutes=1,
+                snap_start=False,
+                environment_variables={
+                    "UPLOAD_SESSIONS_TABLE_NAME": self._upload_sessions_table_name,
+                    "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus_name,
+                },
+            ),
+        )
+
+        # DynamoDB event source on the upload-sessions table stream
+        self._upload_session_stream_lambda.function.add_event_source(
+            lambda_event_sources.DynamoEventSource(
+                self._upload_sessions_table,
+                starting_position=lambda_.StartingPosition.LATEST,
+                batch_size=10,
+                max_batching_window=Duration.seconds(5),
+                retry_attempts=3,
+                bisect_batch_on_error=True,
+                report_batch_item_failures=True,
+                on_failure=lambda_event_sources.SqsDlq(
+                    self._upload_session_stream_dlq.queue
+                ),
+            )
+        )
+
+        # Grant stream read permissions
+        self._upload_sessions_table.grant_stream_read(
+            self._upload_session_stream_lambda.function
+        )
+
+        # Grant events:PutEvents on the pipelines event bus
+        if props.pipelines_event_bus_arn:
+            self._upload_session_stream_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["events:PutEvents"],
+                    resources=[props.pipelines_event_bus_arn],
+                )
+            )
+
+        # Grant DynamoDB read + conditional emittedAt update on the upload-sessions table
+        self._upload_session_stream_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                ],
+                resources=[self._upload_sessions_table_arn],
+            )
+        )
+
+        # --- Upload Session Reconciliation Sweep Lambda ---
+        self._upload_session_sweep_lambda = Lambda(
+            self,
+            "UploadSessionSweepLambda",
+            config=LambdaConfig(
+                name="upload_session_sweep",
+                entry="lambdas/back_end/upload_session_sweep",
+                memory_size=256,
+                timeout_minutes=5,
+                snap_start=False,
+                environment_variables={
+                    "UPLOAD_SESSIONS_TABLE_NAME": self._upload_sessions_table_name,
+                    "IDLE_FINALIZE_MINUTES": str(
+                        config.upload_portals.idle_finalize_minutes
+                    ),
+                    "COMPLETION_GRACE_MINUTES": str(
+                        config.upload_portals.completion_grace_minutes
+                    ),
+                    "MAX_SESSION_AGE_HOURS": str(
+                        config.upload_portals.max_session_age_hours
+                    ),
+                },
+            ),
+        )
+
+        # Schedule the sweep on a recurring interval
+        events.Rule(
+            self,
+            "UploadSessionSweepScheduleRule",
+            schedule=events.Schedule.rate(
+                Duration.minutes(config.upload_portals.sweep_interval_minutes)
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self._upload_session_sweep_lambda.function,
+                ),
+            ],
+            description="Periodically sweeps OPEN upload sessions for idle/grace/max-age reconciliation.",
+        )
+
+        # Grant DynamoDB read/write on the upload-sessions table and GSI
+        self._upload_session_sweep_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Query",
+                ],
+                resources=[
+                    self._upload_sessions_table_arn,
+                    f"{self._upload_sessions_table_arn}/index/*",
+                ],
+            )
+        )
+
+        # Grant cloudwatch:PutMetricData for observability metrics
+        self._upload_session_sweep_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+            )
+        )
+
     @property
     def portal_authorizer_lambda(self) -> lambda_.Function:
         return self._portal_authorizer_lambda.function
@@ -412,3 +669,15 @@ class PortalApiStack(cdk.NestedStack):
     @property
     def portal_public_lambda(self) -> lambda_.Function:
         return self._portal_public_lambda.function
+
+    @property
+    def upload_sessions_table(self) -> dynamodb.ITable:
+        return self._upload_sessions_table
+
+    @property
+    def upload_sessions_table_name(self) -> str:
+        return self._upload_sessions_table_name
+
+    @property
+    def upload_sessions_table_arn(self) -> str:
+        return self._upload_sessions_table_arn
