@@ -1538,6 +1538,8 @@ def create_connector(createconnector: S3Connector) -> dict:
                             "s3:GetObject",
                             "s3:ListBucket",
                             "s3:DeleteObject",  # Added for asset deletion
+                            "s3:GetBucketVersioning",  # Required by _should_process_deletion on delete events
+                            "s3:ListObjectVersions",  # Required when versioning is enabled
                         ],
                         "Resource": [
                             f"arn:aws:s3:::{s3_bucket}",
