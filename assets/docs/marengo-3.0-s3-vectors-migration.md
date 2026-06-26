@@ -339,6 +339,77 @@ Useful options: `--media-type Video|Audio|Image`, `--prefix <key-prefix>`,
 | `cdk deploy` says index already exists | Delete not yet propagated | Wait and re-run `cdk deploy` |
 | Backfill triggers a 2.7 pipeline by mistake | Wrong state machine ARN | Confirm the ARN belongs to the imported 3.0 pipeline |
 
+### Finding the pipeline execution for an asset
+
+To confirm an embedding pipeline actually ran for a given asset, you need to
+locate its execution starting from the asset's `InventoryID`
+(`asset:uuid:<uuid>`). There are two paths, depending on whether the execution
+still lives in the projected executions table.
+
+#### Option A — Scan the pipeline executions table by asset id
+
+Executions are projected into the DynamoDB table
+`${RESOURCE_PREFIX}-pipelines-executions-${ENVIRONMENT}` (e.g.
+`medialake-pipelines-executions-dev`), defined in
+`medialake_stacks/pipelines_executions_stack.py`. Each item is keyed by
+`execution_id` (PK) + `start_time` (SK) and carries an `inventory_id` attribute
+that matches the asset's `InventoryID`. The table has **no GSI on
+`inventory_id`**, so the lookup is a `Scan` with a filter expression:
+
+```bash
+aws dynamodb scan \
+  --table-name medialake-pipelines-executions-dev \
+  --filter-expression "inventory_id = :inv" \
+  --expression-attribute-values '{":inv":{"S":"asset:uuid:<uuid>"}}'
+```
+
+> [!NOTE]
+> **90-day TTL.** Items have a `ttl` attribute and are auto-deleted ~90 days
+> after they are written, so older runs will be gone from this table. The `ttl`
+> value is a Unix epoch (seconds) — convert it (e.g. `date -r <ttl> -u`) to see
+> when the record expires.
+
+> [!WARNING]
+> **Manual API-triggered executions may not populate `inventory_id`.** The event
+> processor (`lambdas/back_end/pipelines_executions_event_processor/index.py`)
+> only reads `inventory_id` from `$.detail.InventoryID` /
+> `$.detail.detail.InventoryID` in the Step Functions input, whereas the manual
+> trigger (`lambdas/api/pipelines/trigger_pipeline/index.py`) emits it at
+> `$.item.inventory_id`. For manually triggered runs, fall back to Option B.
+
+#### Option B — Scan across Step Functions state machine executions
+
+Step Functions is the source of truth (full input/output, no dependence on the
+projected table). There is no native "query by input value", so the pattern is:
+list pipeline state machines → list executions → inspect each execution's input
+for the asset id. Pipeline state machines are named
+`${RESOURCE_PREFIX}_<sanitized-name>_pipeline` (see
+`lambdas/api/pipelines/post_pipelines/sanitizers.py`) and are **not tagged**, so
+filter on the `_pipeline` name suffix:
+
+```bash
+ASSET="asset:uuid:<uuid>"
+
+for SM in $(aws stepfunctions list-state-machines \
+    --query "stateMachines[?ends_with(name,'_pipeline')].stateMachineArn" --output text); do
+  for EX in $(aws stepfunctions list-executions --state-machine-arn "$SM" \
+      --max-results 100 --query "executions[].executionArn" --output text); do
+    if aws stepfunctions describe-execution --execution-arn "$EX" \
+        --query input --output text | grep -q "$ASSET"; then
+      echo "MATCH: $EX"
+    fi
+  done
+done
+```
+
+> [!TIP]
+> If you know which pipeline you triggered, skip the outer loop and run
+> `list-executions` against that single state machine ARN — much faster than
+> sweeping all of them. Execution names are AWS-generated UUIDs and do **not**
+> encode the asset id or a timestamp, so you must inspect each execution's
+> `input`. `describe-execution` returns the full `input`, `output`, `status`,
+> `startDate`, and `stopDate`.
+
 ## References
 
 - [AWS — TwelveLabs Marengo Embed 3.0](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-marengo-3.html)
