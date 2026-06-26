@@ -392,11 +392,14 @@ ASSET="asset:uuid:<uuid>"
 
 for SM in $(aws stepfunctions list-state-machines \
     --query "stateMachines[?ends_with(name,'_pipeline')].stateMachineArn" --output text); do
+  echo "Checking ${SM##*:}..."
+
   for EX in $(aws stepfunctions list-executions --state-machine-arn "$SM" \
       --max-results 100 --query "executions[].executionArn" --output text); do
-    if aws stepfunctions describe-execution --execution-arn "$EX" \
-        --query input --output text | grep -q "$ASSET"; then
-      echo "MATCH: $EX"
+    INPUT=$(aws stepfunctions describe-execution --execution-arn "$EX" --query input --output text)
+    if echo "$INPUT" | grep -q "$ASSET"; then
+      aws stepfunctions describe-execution --execution-arn "$EX" \
+        --query "[name, startDate, stopDate]" --output text
     fi
   done
 done
