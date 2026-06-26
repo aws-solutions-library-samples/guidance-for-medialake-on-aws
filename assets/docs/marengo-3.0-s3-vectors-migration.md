@@ -391,7 +391,7 @@ filter on the `_pipeline` name suffix:
 ASSET="asset:uuid:<uuid>"
 
 for SM in $(aws stepfunctions list-state-machines \
-    --query "stateMachines[?ends_with(name,'_pipeline')].stateMachineArn" --output text); do
+    --query "stateMachines[?starts_with(name,'medialake') && ends_with(name,'_pipeline')].stateMachineArn" --output text); do
   echo "Checking ${SM##*:}..."
 
   for EX in $(aws stepfunctions list-executions --state-machine-arn "$SM" \
