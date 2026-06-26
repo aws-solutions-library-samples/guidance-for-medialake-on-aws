@@ -275,7 +275,7 @@ class BaseInfrastructureStack(Stack):
             "MediaLakeS3Vector",
             props=S3VectorClusterProps(
                 bucket_name=f"{config.resource_prefix}-vectors-{self.account}-{region}-{config.environment}",
-                vector_dimension=1024,
+                vector_dimension=512,
                 collection_indexes=[s3_vector_index_name],
                 vpc=self._vpc.vpc,
                 security_group=self._security_group,

@@ -58,7 +58,7 @@ class PipelineStackProps:
     # S3 Vector configuration
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
-    s3_vector_dimension: int = 1024
+    s3_vector_dimension: int = 512
     # System Settings table configuration
     system_settings_table_name: str | None = None
     system_settings_table_arn: str | None = None

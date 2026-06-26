@@ -72,7 +72,7 @@ class ApiGatewayPipelinesProps:
     # S3 Vector configuration
     s3_vector_bucket_name: Optional[str] = None
     s3_vector_index_name: str = "media-vectors"
-    s3_vector_dimension: int = 1024
+    s3_vector_dimension: int = 512
     cloudfront_domain: str = ""
 
 
