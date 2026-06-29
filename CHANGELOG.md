@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.17.2] - 2026-06-29
+
+### Bug Fixes
+
+- fix: repair portal & collection nodes (deploy, validation, ownership)
+
+### Code Refactoring
+
+- refactor: CDK constructs refactored to bring down CloudFormation resources per stack
+- refactor: Use pyvips for image proxy and image thumbnail nodes
+
 ## [1.17.1] - 2026-06-23
 
 ### Bug Fixes

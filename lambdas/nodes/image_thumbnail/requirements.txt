@@ -1,1 +1,2 @@
-pillow
+aws-xray-sdk
+aws-lambda-powertools

@@ -12,6 +12,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from models import PipelineDefinition
 from pipeline_utils import determine_pipeline_type
+from portal_validation import validate_portal_config
 
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
@@ -288,6 +289,87 @@ PIPELINE_CREATION_STATE_MACHINE_ARN = os.environ.get(
 )
 
 
+def _validate_portal_nodes(request_data: Dict[str, Any]) -> list[dict]:
+    """Validate the static config of any ``manage_portal`` nodes in the pipeline.
+
+    Returns a list of ``{"node": <label>, "errors": [...]}`` for nodes whose
+    portal config is invalid (empty list = all good). Uses the same shared
+    validator as the portal API and the node's runtime check, so a bad slug /
+    appearance / page structure is rejected at deploy time with the same
+    messages — before any resources are created.
+
+    A node may legitimately receive ``name``/``slug`` from runtime field-mapping
+    rather than its static ``Default Portal Config``; in that case we validate
+    leniently (format/structure only). With no field mapping, ``name``/``slug``
+    are required because nothing else can supply them.
+    """
+    problems: list[dict] = []
+    configuration = request_data.get("configuration") or {}
+    for index, node in enumerate(configuration.get("nodes") or []):
+        data = node.get("data") or {}
+        if data.get("id") != "manage_portal":
+            continue
+        label = data.get("label") or data.get("id") or f"node[{index}]"
+        params = (data.get("configuration") or {}).get("parameters") or {}
+
+        portal_config = params.get("Default Portal Config")
+        if portal_config is None:
+            portal_config = {}
+        if not isinstance(portal_config, dict):
+            problems.append(
+                {"node": label, "errors": ["Default Portal Config must be an object"]}
+            )
+            continue
+
+        field_mapping = params.get("Field Mapping") or {}
+        partial = bool(field_mapping)
+        errors = validate_portal_config(portal_config, partial=partial)
+        if errors:
+            problems.append({"node": label, "errors": errors})
+
+    return problems
+
+
+def _validate_collection_nodes(request_data: Dict[str, Any]) -> list[dict]:
+    """Validate the static config of any ``collection_manager`` nodes.
+
+    Catches the common misconfigurations at deploy time (clear 400) instead of
+    at pipeline runtime:
+      - create without an ``Owner ID`` (collections need a real owner; we never
+        silently fall back to a hidden ``system`` owner), and
+      - update / add_assets without a ``Collection ID``.
+
+    Returns ``[{"node": <label>, "errors": [...]}]`` (empty = all good).
+    """
+    problems: list[dict] = []
+    configuration = request_data.get("configuration") or {}
+    for index, node in enumerate(configuration.get("nodes") or []):
+        data = node.get("data") or {}
+        if data.get("id") != "collection_manager":
+            continue
+        label = data.get("label") or data.get("id") or f"node[{index}]"
+        params = (data.get("configuration") or {}).get("parameters") or {}
+        operation = str(params.get("Operation") or "create").lower()
+        errors: list[str] = []
+
+        if operation == "create":
+            if not str(params.get("Owner ID") or "").strip():
+                errors.append(
+                    "Owner ID is required when the operation is 'create' "
+                    "(a collection must have a real owner to be visible/manageable)."
+                )
+        elif operation in ("update", "add_assets"):
+            if not str(params.get("Collection ID") or "").strip():
+                errors.append(
+                    f"Collection ID is required when the operation is '{operation}'."
+                )
+
+        if errors:
+            problems.append({"node": label, "errors": errors})
+
+    return problems
+
+
 @app.post("/pipelines")
 @tracer.capture_method
 def create_pipeline() -> Dict[str, Any]:
@@ -307,6 +389,28 @@ def create_pipeline() -> Dict[str, Any]:
 
         pipeline_name = pipeline.name
         logger.info(f"Processing pipeline: {pipeline_name} - {pipeline.description}")
+
+        # Validate portal-node config up front so a misconfigured manage_portal
+        # node fails the deploy with clear, field-level errors before we create
+        # any pipeline record or start the creation state machine.
+        portal_problems = _validate_portal_nodes(request_data)
+        collection_problems = _validate_collection_nodes(request_data)
+        node_problems = portal_problems + collection_problems
+        if node_problems:
+            logger.info(f"Rejecting pipeline - invalid node(s): {node_problems}")
+            return {
+                "statusCode": 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps(
+                    {
+                        "error": "Invalid node configuration",
+                        "details": node_problems,
+                    }
+                ),
+            }
 
         # Check if this is an update operation by looking for pipeline_id in the request
         pipeline_id = request_data.get("pipeline_id")

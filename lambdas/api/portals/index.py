@@ -59,9 +59,11 @@ import portals_ID_tokens_get  # noqa: E402
 import portals_ID_tokens_ID_delete  # noqa: E402
 import portals_ID_tokens_post  # noqa: E402
 import portals_post  # noqa: E402
+import portals_validate_post  # noqa: E402
 
 portals_get.register_route(app)
 portals_post.register_route(app)
+portals_validate_post.register_route(app)
 portals_ID_get.register_route(app)
 portals_ID_put.register_route(app)
 portals_ID_delete.register_route(app)

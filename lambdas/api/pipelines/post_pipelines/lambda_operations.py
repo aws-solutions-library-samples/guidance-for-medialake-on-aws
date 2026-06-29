@@ -1053,9 +1053,17 @@ def create_lambda_function(
                     "ENVIRONMENT": os.environ.get("ENVIRONMENT", "dev"),
                     # System settings table for provider configuration lookup
                     "SYSTEM_SETTINGS_TABLE_NAME": SYSTEM_SETTINGS_TABLE_NAME or "",
+                    # Resource prefix — needed by nodes that name AWS resources
+                    # (e.g. manage_portal's Secrets Manager session secret) so
+                    # the names match those produced by the rest of the app.
+                    "RESOURCE_PREFIX": resource_prefix or "",
                     # Upload-sessions table for the upload-portal barrier node
                     "UPLOAD_SESSIONS_TABLE_NAME": os.environ.get(
                         "UPLOAD_SESSIONS_TABLE_NAME", ""
+                    ),
+                    # Collections single-table for the collection_manager node
+                    "COLLECTIONS_TABLE_NAME": os.environ.get(
+                        "COLLECTIONS_TABLE_NAME", ""
                     ),
                     # CloudFront domain for portal URL generation
                     "CLOUDFRONT_DOMAIN": _resolve_cloudfront_domain(),

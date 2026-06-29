@@ -8,7 +8,6 @@ from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
 from config import config
-from medialake_constructs.api_gateway.api_gateway_users import UsersApi, UsersApiProps
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 
 
@@ -186,33 +185,11 @@ class UsersGroupsStack(cdk.NestedStack):
         )
         self._settings_table = DynamoDB(self, "SettingsTable", settings_table_props)
 
-        # Create Users API construct (unified with profile, settings, and favorites)
-        self._users_api = UsersApi(
-            self,
-            "UsersApiGateway",
-            props=UsersApiProps(
-                api_resource=props.api_resource,
-                authorizer=props.authorizer,
-                cognito_user_pool=props.cognito_user_pool,
-                x_origin_verify_secret=props.x_origin_verify_secret,
-                user_table=self._user_table.table,
-            ),
-        )
-
-    @property
-    def users_api(self):
-        """Return the users API from the construct"""
-        return self._users_api
-
-    @property
-    def roles_table(self):
-        """Return the roles table from the construct"""
-        return self._roles_api._roles_table.table
-
-    # @property
-    # def roles_metrics_table(self):
-    #     """Return the roles metrics table from the construct"""
-    #     return self._roles_api._roles_metrics_table
+        # NOTE: The Users API (/users/*) has been promoted to its own top-level
+        # stack (UsersApiStack) so its API Gateway resources land in that
+        # template instead of the MediaLakeStack parent. This stack now owns
+        # ONLY the Users/Groups/Roles data tables (created above), which stay
+        # here and are referenced by name from UsersApiStack — nothing moves.
 
     @property
     def user_table(self):

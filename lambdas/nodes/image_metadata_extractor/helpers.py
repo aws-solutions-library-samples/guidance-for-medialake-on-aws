@@ -563,11 +563,14 @@ def convert_decimals_for_json(obj: Any) -> Any:
         [1, 2.5]
     """
     if isinstance(obj, Decimal):
-        # Convert to int if it's a whole number, otherwise float
-        if obj % 1 == 0:
-            return int(obj)
-        else:
+        try:
+            # Convert to int if it's effectively a whole number
+            if obj == obj.to_integral_value():
+                return int(obj)
             return float(obj)
+        except Exception:
+            # Fallback for problematic Decimal values
+            return str(obj)
 
     if isinstance(obj, dict):
         return {key: convert_decimals_for_json(value) for key, value in obj.items()}

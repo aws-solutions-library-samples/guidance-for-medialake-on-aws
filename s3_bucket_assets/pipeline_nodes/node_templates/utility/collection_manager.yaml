@@ -51,20 +51,22 @@ actions:
               value: "create"
             - label: "Update Collection"
               value: "update"
+            - label: "Add Assets to Collection"
+              value: "add_assets"
           default: create
       - in: body
         name: Collection ID
-        label: Target Collection (for update)
-        description: Select the collection to update. Required for update operation.
+        label: Target Collection
+        description: Select the collection to update or add assets to. Required for update and add assets.
         required: false
         requiredWhen:
           field: parameters.Operation
-          value: update
+          value: [update, add_assets]
         schema:
           type: select
         showWhen:
           field: parameters.Operation
-          value: update
+          value: [update, add_assets]
       - in: body
         name: Collection Name
         label: Collection Name
@@ -104,8 +106,17 @@ actions:
       - in: body
         name: Owner ID
         label: Owner ID
-        description: User ID of the collection owner. If empty, uses 'system' as the owner.
+        description: >-
+          User ID that will own the collection. Required when creating a
+          collection — a collection must have a real owner to be visible and
+          manageable. For update/add assets this is ignored.
         required: false
+        requiredWhen:
+          field: parameters.Operation
+          value: create
+        showWhen:
+          field: parameters.Operation
+          value: create
         schema:
           type: string
       - in: body
@@ -125,6 +136,19 @@ actions:
           used for filtering and organisation, e.g. "q1, french, 2026".
         placeholder: "q1, french, 2026"
         required: false
+        schema:
+          type: string
+      - in: body
+        name: Asset IDs
+        label: Asset IDs (for add assets)
+        description: >-
+          Comma-separated asset inventory IDs to add to the collection. Leave
+          empty to add the asset(s) flowing through the pipeline automatically.
+        placeholder: "asset-123, asset-456"
+        required: false
+        showWhen:
+          field: parameters.Operation
+          value: add_assets
         schema:
           type: string
     connections:

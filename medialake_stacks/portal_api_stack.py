@@ -503,8 +503,13 @@ class PortalApiStack(cdk.NestedStack):
                 iam.PolicyStatement(
                     effect=iam.Effect.ALLOW,
                     actions=["ses:SendEmail"],
+                    # ses:SendEmail is authorized against the From identity, but
+                    # in the SES sandbox it is also checked against any recipient
+                    # that is itself a verified identity in this account. Scoping
+                    # to only the From ARN gets AccessDenied when emailing such a
+                    # recipient, so allow all identities in this account/region.
                     resources=[
-                        f"arn:aws:ses:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:identity/{config.ses_from_address}"
+                        f"arn:aws:ses:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:identity/*"
                     ],
                 )
             )
