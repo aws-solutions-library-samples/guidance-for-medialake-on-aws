@@ -24,6 +24,9 @@ with patch.dict(
 ):
     with patch("boto3.Session"), patch("boto3.client"), patch("boto3.resource"):
         from index import (
+            DELETION_TYPE_DELETE_MARKER,
+            DELETION_TYPE_PERMANENT,
+            AssetProcessor,
             normalize_event_context,
             normalize_event_contexts,
             process_records_in_parallel,
@@ -241,3 +244,206 @@ class TestUnrecognized:
 
     def test_singular_returns_none(self):
         assert normalize_event_context({"foo": "bar"}) is None
+
+
+# ---------------------------------------------------------------------------
+# 8. deletion_type normalization (EventBridge detail + raw S3 event-name)
+# ---------------------------------------------------------------------------
+
+
+class TestDeletionTypeNormalization:
+    def test_eventbridge_delete_marker(self):
+        eb = _eventbridge_event(bucket="b", key="k", detail_type="Object Deleted")
+        eb["detail"]["object"]["version-id"] = "vmarker"
+        eb["detail"]["deletion-type"] = "Delete Marker Created"
+        ctx = normalize_event_context(eb)
+        assert ctx is not None
+        assert ctx["deletion_type"] == DELETION_TYPE_DELETE_MARKER
+        assert ctx["version_id"] == "vmarker"
+
+    def test_eventbridge_permanent(self):
+        eb = _eventbridge_event(bucket="b", key="k", detail_type="Object Deleted")
+        eb["detail"]["deletion-type"] = "Permanently Deleted"
+        ctx = normalize_event_context(eb)
+        assert ctx["deletion_type"] == DELETION_TYPE_PERMANENT
+
+    def test_eventbridge_create_has_no_deletion_type(self):
+        ctx = normalize_event_context(_eventbridge_event(detail_type="Object Created"))
+        assert ctx["deletion_type"] is None
+
+    def test_raw_s3_delete_marker_created(self):
+        ctx = normalize_event_context(
+            _s3_record(event_name="ObjectRemoved:DeleteMarkerCreated")
+        )
+        assert ctx["deletion_type"] == DELETION_TYPE_DELETE_MARKER
+
+    def test_raw_s3_permanent_delete(self):
+        ctxs = normalize_event_contexts(_s3_record(event_name="ObjectRemoved:Delete"))
+        assert ctxs[0]["deletion_type"] == DELETION_TYPE_PERMANENT
+
+    def test_raw_s3_create_has_no_deletion_type(self):
+        ctx = normalize_event_context(_s3_record(event_name="ObjectCreated:Put"))
+        assert ctx["deletion_type"] is None
+
+
+# ---------------------------------------------------------------------------
+# 9. _should_process_deletion — versioned-bucket deletion semantics
+# ---------------------------------------------------------------------------
+
+
+def _make_processor():
+    """Build an AssetProcessor without __init__ (which needs live AWS clients)."""
+    proc = AssetProcessor.__new__(AssetProcessor)
+    proc.s3 = MagicMock()
+    proc.dynamodb = MagicMock()
+    return proc
+
+
+def _versions_response(versions=None, delete_markers=None):
+    return {"Versions": versions or [], "DeleteMarkers": delete_markers or []}
+
+
+class TestShouldProcessDeletion:
+    def test_delete_marker_creation_processes_without_any_s3_call(self):
+        # The regression case: a plain delete on a versioned bucket. The event
+        # is authoritative, so we process it and never touch S3.
+        proc = _make_processor()
+        result = proc._should_process_deletion(
+            "b",
+            "k",
+            version_id="vmarker",
+            deletion_type=DELETION_TYPE_DELETE_MARKER,
+        )
+        assert result is True
+        proc.s3.get_bucket_versioning.assert_not_called()
+        proc.s3.list_object_versions.assert_not_called()
+
+    def test_versioning_not_enabled_processes(self):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Suspended"}
+        assert proc._should_process_deletion("b", "k", version_id="v1") is True
+        proc.s3.list_object_versions.assert_not_called()
+
+    def test_no_version_id_processes(self):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        assert proc._should_process_deletion("b", "k", version_id=None) is True
+        proc.s3.list_object_versions.assert_not_called()
+
+    def test_permanent_delete_of_non_current_version_skips(self):
+        # A live current version still exists -> an older version was purged.
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response(
+            versions=[
+                {"Key": "k", "VersionId": "vcurrent", "IsLatest": True},
+                {"Key": "k", "VersionId": "vold", "IsLatest": False},
+            ]
+        )
+        result = proc._should_process_deletion(
+            "b", "k", version_id="vold", deletion_type=DELETION_TYPE_PERMANENT
+        )
+        assert result is False
+
+    def test_permanent_delete_when_current_is_delete_marker_processes(self):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response(
+            versions=[{"Key": "k", "VersionId": "vold", "IsLatest": False}],
+            delete_markers=[{"Key": "k", "VersionId": "vmarker", "IsLatest": True}],
+        )
+        result = proc._should_process_deletion(
+            "b", "k", version_id="vwhatever", deletion_type=DELETION_TYPE_PERMANENT
+        )
+        assert result is True
+
+    def test_delete_marker_detected_via_listing_when_type_unknown(self):
+        # deletion_type is unknown (None) but the listing shows a delete marker
+        # is the current version -> still processed.
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response(
+            delete_markers=[{"Key": "k", "VersionId": "vmarker", "IsLatest": True}]
+        )
+        assert proc._should_process_deletion("b", "k", version_id="vmarker") is True
+
+    def test_no_versions_or_markers_processes(self):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response()
+        assert proc._should_process_deletion("b", "k", version_id="v1") is True
+
+    def test_prefix_collision_only_exact_key_is_considered(self):
+        # Prefix queries can return sibling keys; they must be ignored.
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response(
+            versions=[
+                {"Key": "k-sibling", "VersionId": "vx", "IsLatest": True},
+                {"Key": "k", "VersionId": "vcurrent", "IsLatest": True},
+            ]
+        )
+        result = proc._should_process_deletion(
+            "b", "k", version_id="vold", deletion_type=DELETION_TYPE_PERMANENT
+        )
+        assert result is False
+
+    def test_islatest_fallback_uses_most_recent(self):
+        # If S3 omits IsLatest, fall back to newest LastModified. The newest
+        # entry here is a delete marker -> process.
+        from datetime import datetime, timezone
+
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.return_value = _versions_response(
+            versions=[
+                {
+                    "Key": "k",
+                    "VersionId": "vold",
+                    "LastModified": datetime(2020, 1, 1, tzinfo=timezone.utc),
+                }
+            ],
+            delete_markers=[
+                {
+                    "Key": "k",
+                    "VersionId": "vmarker",
+                    "LastModified": datetime(2021, 1, 1, tzinfo=timezone.utc),
+                }
+            ],
+        )
+        assert proc._should_process_deletion("b", "k", version_id="v1") is True
+
+    @patch("index.logger")
+    def test_versioning_read_error_fails_open_and_logs_traceback(self, mock_logger):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.side_effect = RuntimeError("boom")
+        result = proc._should_process_deletion("b", "k", version_id="v1")
+        assert result is True  # fail-open: don't drop a real delete
+        assert mock_logger.exception.called
+
+    @patch("index.logger")
+    def test_list_versions_error_fails_closed_and_logs_traceback(self, mock_logger):
+        proc = _make_processor()
+        proc.s3.get_bucket_versioning.return_value = {"Status": "Enabled"}
+        proc.s3.list_object_versions.side_effect = RuntimeError("kaboom")
+        result = proc._should_process_deletion(
+            "b", "k", version_id="v1", deletion_type=DELETION_TYPE_PERMANENT
+        )
+        assert result is False  # fail-closed: don't delete on unknown state
+        assert mock_logger.exception.called
+
+
+# ---------------------------------------------------------------------------
+# 10. delete_asset return contract (skip vs processed)
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteAssetReturn:
+    def test_skip_returns_false_without_db_lookup(self):
+        proc = _make_processor()
+        with patch.object(proc, "_should_process_deletion", return_value=False):
+            result = proc.delete_asset(
+                "b", "k", version_id="vold", deletion_type=DELETION_TYPE_PERMANENT
+            )
+        assert result is False
+        proc.dynamodb.query.assert_not_called()

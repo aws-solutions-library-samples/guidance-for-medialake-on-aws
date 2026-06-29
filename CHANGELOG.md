@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.17.4] - 2026-06-29
+
+### Bug Fixes
+
+- fix: Connector processing ObjectRemoved on S3 objects that are versioned with a delete marker
+
+### Code Refactoring
+
+- refactor: Ability to just hit enter or search button to search all assets or hit enter or search button with filters to search all assets with filters
+
 ## [1.17.3] - 2026-06-29
 
 ### Bug Fixes
