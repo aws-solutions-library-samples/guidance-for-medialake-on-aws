@@ -1,5 +1,10 @@
-boto3>=1.26.0
+# Runtime dependencies only. Keep this lean: the function + its layers
+# (OpenEXR, Numpy, Powertools, CommonLibraries) must stay under the
+# 250 MB unzipped Lambda limit.
+#
+# Intentionally NOT listed here:
+#   - boto3 / botocore : provided by the Python 3.12 Lambda runtime (~85 MB)
+#   - aws_xray_sdk      : pulled in via the Powertools layer
+#   - pytest, hypothesis: test-only deps belong in the test env, not the package
 aws-lambda-powertools>=2.0.0
 lxml>=4.9.0
-pytest>=7.0.0
-hypothesis>=6.0.0

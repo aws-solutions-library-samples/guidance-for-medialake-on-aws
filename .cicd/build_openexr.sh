@@ -104,6 +104,14 @@ docker run --rm \
     echo 'Cleanup to reduce size...'
     cd /asset-output
 
+    # Remove numpy from this layer. numpy is provided by the dedicated Numpy
+    # layer, which every node that attaches the OpenEXR layer (image_proxy,
+    # image_thumbnail, image_metadata_extractor) also attaches. Shipping numpy
+    # here as well duplicated ~50 MB across the two layers and risked a numpy
+    # version mismatch. pyvips/OpenEXR still find numpy at runtime via the
+    # Numpy layer.
+    rm -rf python/numpy python/numpy.libs python/numpy-*.dist-info || true
+
     # Remove only clearly unnecessary files from Python packages
     find python -type d -name \"__pycache__\" -exec rm -rf {} + || true
     find python -name \"*.pyc\" -delete || true

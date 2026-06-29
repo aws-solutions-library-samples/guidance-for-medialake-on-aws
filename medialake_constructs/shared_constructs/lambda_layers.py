@@ -433,7 +433,13 @@ class OpenEXRLayer(Construct):
     Includes all necessary shared libraries (libOpenEXR, libImath, etc.).
 
     **Important**: Requires NumpyLayer to be attached to the Lambda function
-    as well, as OpenEXR depends on NumPy for array operations.
+    as well, as OpenEXR depends on NumPy for array operations. numpy is
+    deliberately removed from this layer during the build (it is pulled in as
+    an OpenEXR/pyvips dependency) so that it is sourced from a single place —
+    the NumpyLayer. This avoids ~50 MB of duplication and prevents a numpy
+    version mismatch between the two layers. If you add a new Lambda that uses
+    this layer, you MUST also attach the NumpyLayer, or `import OpenEXR`/numpy
+    will fail at runtime.
 
     Security: Pins specific OpenEXR version (3.4.4) for reproducible builds.
     Compiles from source with --no-binary flag to ensure compatibility with
@@ -538,6 +544,15 @@ class OpenEXRLayer(Construct):
                           'pyvips>=3,<4'
 
                         cd /asset-output
+
+                        # Remove numpy from this layer. numpy is provided by the
+                        # dedicated Numpy layer, which every node that attaches the
+                        # OpenEXR layer (image_proxy, image_thumbnail,
+                        # image_metadata_extractor) also attaches. Shipping numpy
+                        # here as well duplicated ~50 MB across the two layers and
+                        # risked a numpy version mismatch. pyvips/OpenEXR still find
+                        # numpy at runtime via the Numpy layer.
+                        rm -rf python/numpy python/numpy.libs python/numpy-*.dist-info || true
 
                         # Remove cache files
                         find python -type d -name "__pycache__" -exec rm -rf {} + || true

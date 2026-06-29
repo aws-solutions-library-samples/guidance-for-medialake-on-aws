@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.3] - 2026-06-29
+
+### Bug Fixes
+
+- fix: Keep image node lambdas under the 250MB layer limit
+
 ## [1.17.2] - 2026-06-29
 
 ### Bug Fixes
