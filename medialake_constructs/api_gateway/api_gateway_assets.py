@@ -170,6 +170,16 @@ class AssetsConstruct(Construct):
             )
         )
 
+        # Add SSM permissions for CloudFront domain retrieval
+        get_assets_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{Stack.of(self).region}:{Stack.of(self).account}:parameter{config.ssm_param('cloudfront-distribution-domain')}"
+                ],
+            )
+        )
+
         assets_get = self._assets_resource.add_method(
             "GET",
             api_gateway.LambdaIntegration(get_assets_lambda.function),
