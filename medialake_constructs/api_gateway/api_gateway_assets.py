@@ -194,9 +194,6 @@ class AssetsConstruct(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
-                    "CLOUDFRONT_DOMAIN_SSM_PARAM": config.ssm_param(
-                        "cloudfront-distribution-domain"
-                    ),
                 },
             ),
         )
