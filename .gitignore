@@ -194,3 +194,9 @@ medialake_user_interface/vistest-report/
 medialake_user_interface/vistest-results/
 medialake_user_interface/tests/vistest/
 medialake_user_interface/playwright.vistest.config.ts
+
+# Browser-driven QA (medialake-qa skill)
+# Run outputs (reports + screenshots) and isolated browser-session dirs.
+# .qa-sessions can hold browser auth/localStorage state — must never be committed.
+qa/
+.qa-sessions/

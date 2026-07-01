@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useMemo, useCallback, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { DynamicForm } from "../../../../forms/components/DynamicForm";
@@ -7,6 +7,10 @@ import { NodeConfiguration, Node as NodeType, NodeParameter } from "@/features/p
 import { useGetIntegrations } from "@/features/settings/integrations/api/integrations.controller";
 import { useGetPipelines } from "../../api/pipelinesController";
 import { useGetPortals } from "@/api/hooks/usePortals";
+import { useGetCollections } from "@/api/hooks/useCollections";
+import { useGetUsers } from "@/api/hooks/useUsers";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { jwtDecode } from "jwt-decode";
 
 interface NodeConfigurationFormProps {
   node: NodeType;
@@ -41,6 +45,31 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
     const { data: integrationsData } = useGetIntegrations();
     const { data: pipelinesData } = useGetPipelines();
     const { data: portalsData } = useGetPortals();
+    const { data: collectionsData } = useGetCollections();
+    const { data: usersData } = useGetUsers();
+
+    // Current user's Cognito sub — used to default the Collection Manager
+    // node's "Owner ID" to the pipeline author (the collection owner must be a
+    // real user; see lambdas/nodes/collection_manager). Resolved from the JWT,
+    // mirroring the dashboard's getCurrentUserId.
+    const [currentUserSub, setCurrentUserSub] = useState("");
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const token = (await fetchAuthSession()).tokens?.idToken?.toString();
+          if (token && !cancelled) {
+            const decoded = jwtDecode<{ sub?: string }>(token);
+            setCurrentUserSub(decoded.sub || "");
+          }
+        } catch {
+          /* not authenticated / no token — leave default empty */
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
     // 1. Compute methodName.
     const methodName = useMemo(() => {
@@ -227,6 +256,27 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       }));
     }, [portalsData]);
 
+    // Collections for the Collection Manager node's "Collection ID" dropdown.
+    // Sourced from the OpenSearch-backed GET /collections list API.
+    const collectionOptions = useMemo(() => {
+      if (!collectionsData?.data) return [];
+      return collectionsData.data.map((collection) => ({
+        label: collection.name,
+        value: collection.id,
+      }));
+    }, [collectionsData]);
+
+    // Users for the Collection Manager node's "Owner ID" dropdown — so authors
+    // pick a person rather than pasting a Cognito sub. Value is the user's
+    // Cognito username (== sub in this pool), which is what ownerId compares to.
+    const userOptions = useMemo(() => {
+      if (!usersData) return [];
+      return usersData.map((user) => ({
+        label: user.name || user.email || user.username,
+        value: user.username,
+      }));
+    }, [usersData]);
+
     // 6. Build form definition.
     const formDefinition = useMemo<FormDefinition>(() => {
       const fields: FormFieldDefinition[] = [];
@@ -390,6 +440,22 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         }
       }
 
+      // Collection Manager (a UTILITY node) — populate the "Collection ID"
+      // dropdown with existing collections. Matched by field name so it works
+      // regardless of node type (the trigger-only block above does not apply).
+      const collectionField = fields.find((field) => field.name === "parameters.Collection ID");
+      if (collectionField) {
+        Object.assign(collectionField, { options: collectionOptions });
+      }
+
+      // Collection Manager "Owner ID" — render as a user picker (a collection
+      // must have a real owner). The YAML declares it as a string; flip it to a
+      // select and bind the user list.
+      const ownerField = fields.find((field) => field.name === "parameters.Owner ID");
+      if (ownerField) {
+        Object.assign(ownerField, { type: "select", options: userOptions });
+      }
+
       return {
         id: `node-config-${node.nodeId}-form`,
         name: node.info.title,
@@ -407,6 +473,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       pipelinesOptions,
       automationTagOptions,
       portalOptions,
+      collectionOptions,
+      userOptions,
       isFlowNode,
       methodInfo,
       node.info.nodeType,
@@ -628,6 +696,20 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
           }
         });
       }
+      // Default the Collection Manager "Owner ID" to the current author when it
+      // isn't already set, so pipeline-created collections get a real owner
+      // without the author pasting a sub. Editable via the user picker.
+      if (
+        currentUserSub &&
+        effectiveParameters.some((p: any) => p.name === "Owner ID") &&
+        !values.parameters["Owner ID"]
+      ) {
+        values.parameters = {
+          ...values.parameters,
+          "Owner ID": currentUserSub,
+        };
+      }
+
       return values;
     }, [
       configuration?.parameters,
@@ -639,6 +721,7 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       effectiveParameters,
       isFlowNode,
       isTriggerNode,
+      currentUserSub,
     ]);
 
     return (

@@ -1,6 +1,36 @@
-"""Shared constants and helper functions for portal handlers."""
+"""Shared constants and helper functions for portal handlers.
 
-import json
+Portal *validation* (slug/appearance/structure rules) is the single source of
+truth in the ``common_libraries`` layer module ``portal_validation`` so the
+admin API, the pipeline deployer, and the ``manage_portal`` node all agree.
+This module re-exports those symbols for backwards compatibility with the
+handlers that import them from here.
+"""
+
+import os
+import sys
+
+# Make the shared ``portal_validation`` module importable both at Lambda runtime
+# (it ships in the common_libraries layer at /opt/python, already on sys.path)
+# and when this file is loaded directly from source in unit tests. The repo's
+# layout is lambdas/api/portals/portal_utils.py → lambdas/common_libraries.
+_COMMON_LIBS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "common_libraries",
+)
+if os.path.isdir(_COMMON_LIBS_DIR) and _COMMON_LIBS_DIR not in sys.path:
+    sys.path.insert(0, _COMMON_LIBS_DIR)
+
+from portal_validation import (  # noqa: E402
+    ACCESS_CONTROL_FIELDS,
+    MAX_PORTAL_ITEM_SIZE_BYTES,
+    PORTAL_CONFIG_FIELDS,
+    SLUG_PATTERN,
+    _validate_portal_structure,
+    select_portal_config_fields,
+    validate_portal_config,
+    validate_portal_structure,
+)
 
 PORTAL_PK_PREFIX = "UPLOADPORTAL#"
 PORTAL_SLUG_PK_PREFIX = "UPLOADPORTAL_SLUG#"
@@ -13,12 +43,6 @@ INDEX_SK = "INDEX"
 GSI1_PK_VALUE = "UPLOADPORTALS"
 GSI1_PK_THEMES_VALUE = "PORTALTHEMES"
 GSI1_PK_TEMPLATES_VALUE = "PORTALTEMPLATES"
-
-# DynamoDB enforces a hard 400KB per-item limit. Because `pages` + `appearance`
-# persist inline on the single METADATA item, an over-large config would fail
-# the write at the DynamoDB layer. We reject anything above this safe budget
-# (~350KB) with a clean 400 before the write so the failure is recoverable.
-MAX_PORTAL_ITEM_SIZE_BYTES = 350 * 1024
 
 
 def get_portal_pk(portal_id: str) -> str:
@@ -43,75 +67,3 @@ def get_dest_sk(dest_id: str) -> str:
 
 def get_token_sk(token_id: str) -> str:
     return f"{TOKEN_SK_PREFIX}{token_id}"
-
-
-def _validate_portal_structure(body: dict) -> str | None:
-    """Validate multi-page structural invariants. Returns an error message
-    string on the first failure, or None when valid.
-
-    Shared by both write handlers (``portals_post.py`` and
-    ``portals_ID_put.py``) so the server-side trust boundary matches the
-    client-side Zod ``portalPagesSchema``.
-
-    Invariants:
-      1. ``pageNumber`` values form the contiguous sequence 1..N (no gaps,
-         no duplicates) where N is the page count.
-      2. every ``metadataField.pageNumber`` references a real page.
-      3. every ``destination.pageNumber`` references a real page.
-      4. exactly one page hosts an ``elements`` entry with
-         ``kind == "uploader"``.
-      5. the serialized ``pages`` + ``appearance`` payload stays under a safe
-         DynamoDB item-size budget so the METADATA write cannot fail on size.
-    """
-    pages = body.get("pages") or []
-
-    # 1. pageNumbers contiguous from 1 (no gaps, no dupes).
-    try:
-        page_numbers = sorted(p.get("pageNumber") for p in pages)
-    except TypeError:
-        return "every page must have a numeric pageNumber"
-    if any(not isinstance(n, int) or isinstance(n, bool) for n in page_numbers):
-        return "every page must have an integer pageNumber"
-    if page_numbers != list(range(1, len(pages) + 1)):
-        return f"pageNumbers must be contiguous from 1 (got {page_numbers})"
-
-    valid = set(page_numbers)
-
-    # 2. every metadataField.pageNumber references a real page.
-    for f in body.get("metadataFields") or []:
-        if f.get("pageNumber") not in valid:
-            return f"metadata field references unknown page {f.get('pageNumber')}"
-
-    # 3. every destination.pageNumber references a real page.
-    for d in body.get("destinations") or []:
-        if d.get("pageNumber") not in valid:
-            return f"destination references unknown page {d.get('pageNumber')}"
-
-    # 4. exactly one page hosts the uploader element.
-    uploader_pages = [
-        p.get("pageNumber")
-        for p in pages
-        for e in (p.get("elements") or [])
-        if isinstance(e, dict) and e.get("kind") == "uploader"
-    ]
-    if len(uploader_pages) != 1:
-        return (
-            "exactly one page must host the uploader " f"(found {len(uploader_pages)})"
-        )
-
-    # 5. serialized pages + appearance stay under the DynamoDB item-size budget.
-    try:
-        serialized = json.dumps(
-            {"pages": pages, "appearance": body.get("appearance")},
-            default=str,
-        )
-    except (TypeError, ValueError):
-        return "pages and appearance must be JSON-serializable"
-    payload_size = len(serialized.encode("utf-8"))
-    if payload_size > MAX_PORTAL_ITEM_SIZE_BYTES:
-        return (
-            "pages and appearance payload is too large "
-            f"({payload_size} bytes; limit {MAX_PORTAL_ITEM_SIZE_BYTES} bytes)"
-        )
-
-    return None

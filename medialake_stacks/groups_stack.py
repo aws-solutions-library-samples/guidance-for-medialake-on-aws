@@ -16,9 +16,6 @@ from aws_cdk import aws_iam as iam
 from constructs import Construct
 
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
-from medialake_constructs.auth.authorizer_utils import (
-    ensure_shared_authorizer_permissions,
-)
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 
 
@@ -30,12 +27,20 @@ class GroupsStackProps:
     cognito_user_pool: cognito.UserPool
     auth_table: dynamodb.TableV2
     authorizer: apigateway.IAuthorizer
-    api_resource: apigateway.RestApi
+    # The REST API is imported by ID/root so that all of this stack's API
+    # Gateway Resource/Method/Permission resources are emitted into THIS
+    # stack's template (not the parent), keeping each template well under the
+    # 500-resource CloudFormation limit.
+    rest_api_id: str
+    root_resource_id: str
 
 
-class GroupsStack(cdk.NestedStack):
+class GroupsStack(cdk.Stack):
     """
     Groups Stack for managing Groups and group members.
+
+    Top-level stack: imports the shared REST API by ID and owns its own
+    Resource/Method handles so its API surface lives in this template.
     """
 
     def __init__(
@@ -43,27 +48,17 @@ class GroupsStack(cdk.NestedStack):
     ) -> None:
         super().__init__(scope, constructor_id, **kwargs)
 
-        # Use the shared custom authorizer
-        # api_id = Fn.import_value("MediaLakeApiGatewayCore-ApiGatewayId")
-
-        # self._api_authorizer = create_shared_custom_authorizer(
-        #     self, "GroupsCustomApiAuthorizer", api_gateway_id=api_id
-        # )
-
-        # root_resource_id = Fn.import_value("MediaLakeApiGatewayCore-RootResourceId")
-
-        # api = apigateway.RestApi.from_rest_api_attributes(
-        #     self,
-        #     "GroupsImportedApi",
-        #     rest_api_id=api_id,
-        #     root_resource_id=root_resource_id,
-        # )
-
-        # Ensure the shared authorizer has permissions for this API Gateway
-        ensure_shared_authorizer_permissions(self, "Groups", props.api_resource)
+        # Import the shared REST API by ID/root so methods/resources created
+        # below are emitted into this stack's own template.
+        api = apigateway.RestApi.from_rest_api_attributes(
+            self,
+            "GroupsImportedApi",
+            rest_api_id=props.rest_api_id,
+            root_resource_id=props.root_resource_id,
+        )
 
         # Create the groups resource directly off the root
-        groups_resource = props.api_resource.root.add_resource("groups")
+        groups_resource = api.root.add_resource("groups")
 
         # Set up common environment variables for all Lambda functions
         common_env_vars = {

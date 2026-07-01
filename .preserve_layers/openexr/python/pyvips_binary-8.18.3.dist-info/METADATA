@@ -1,0 +1,49 @@
+Metadata-Version: 2.4
+Name: pyvips-binary
+Version: 8.18.3
+Summary: Binary distribution of libvips and dependencies for use with pyvips
+Author-email: Kleis Auke Wolthuizen <info@kleisauke.nl>
+License: LGPL-3.0-or-later
+Project-URL: changelog, https://github.com/kleisauke/pyvips-binary/blob/main/CHANGELOG.md
+Project-URL: funding, https://opencollective.com/libvips
+Project-URL: homepage, https://github.com/kleisauke/pyvips-binary
+Project-URL: issues, https://github.com/kleisauke/pyvips-binary/issues
+Project-URL: source, https://github.com/kleisauke/pyvips-binary
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Multimedia :: Graphics
+Classifier: Topic :: Multimedia :: Graphics :: Graphics Conversion
+Classifier: License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: cffi>=1.0.0
+Dynamic: license-file
+
+# pyvips-binary
+
+[![CI status](https://github.com/kleisauke/pyvips-binary/actions/workflows/ci.yml/badge.svg)](https://github.com/kleisauke/pyvips-binary/actions)
+[![PyPI package](https://img.shields.io/pypi/v/pyvips-binary?label=PyPI%20package)](https://pypi.org/project/pyvips-binary/)
+
+This binary package is an optional component of [pyvips](
+https://github.com/libvips/pyvips), providing pre-built binary wheels for
+running pyvips in [CFFI's API mode](
+https://cffi.readthedocs.io/en/stable/overview.html#abi-versus-api) across
+the most common platforms.
+
+This package leverages the pre-compiled libvips binaries from
+[this repository](https://github.com/kleisauke/libvips-packaging).

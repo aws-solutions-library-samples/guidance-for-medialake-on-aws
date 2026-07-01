@@ -76,8 +76,41 @@ docker run --rm \
         fi
     fi
 
+    echo 'Installing pyvips (self-contained libvips via pyvips-binary wheel)...'
+    # pyvips-binary bundles libvips and its native dependencies, so no extra
+    # system packages or manual .so copying is required.
+    #
+    # Install in two steps:
+    #   1. Binary deps (cffi, pyvips-binary) as x86_64 wheels. Two --platform tags
+    #      are required: pyvips-binary ships manylinux_2_28 wheels while cffi only
+    #      has stable manylinux2014 wheels; pip must be allowed to match both.
+    #   2. pyvips itself (pure Python) from sdist. pyvips 3.x has no wheel, so
+    #      --only-binary would silently fall back to the ancient 2.1.0 wheel whose
+    #      cdefs are incompatible with libvips 8.18 (undefined VipsCallbackFn at
+    #      import). --no-deps keeps the x86_64 cffi installed above.
+    python3.12 -m pip install \
+      --platform manylinux_2_28_x86_64 \
+      --platform manylinux2014_x86_64 \
+      --target /asset-output/python \
+      --implementation cp \
+      --python-version 3.12 \
+      --only-binary=:all: \
+      cffi pyvips-binary
+    python3.12 -m pip install \
+      --target /asset-output/python \
+      --no-deps \
+      'pyvips>=3,<4'
+
     echo 'Cleanup to reduce size...'
     cd /asset-output
+
+    # Remove numpy from this layer. numpy is provided by the dedicated Numpy
+    # layer, which every node that attaches the OpenEXR layer (image_proxy,
+    # image_thumbnail, image_metadata_extractor) also attaches. Shipping numpy
+    # here as well duplicated ~50 MB across the two layers and risked a numpy
+    # version mismatch. pyvips/OpenEXR still find numpy at runtime via the
+    # Numpy layer.
+    rm -rf python/numpy python/numpy.libs python/numpy-*.dist-info || true
 
     # Remove only clearly unnecessary files from Python packages
     find python -type d -name \"__pycache__\" -exec rm -rf {} + || true

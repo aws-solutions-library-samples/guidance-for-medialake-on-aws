@@ -2,3 +2,4 @@ boto3>=1.28.0
 aws-lambda-powertools>=2.0.0
 aws-xray-sdk
 jsonpath-ng>=1.6.0
+bcrypt>=4.0.0

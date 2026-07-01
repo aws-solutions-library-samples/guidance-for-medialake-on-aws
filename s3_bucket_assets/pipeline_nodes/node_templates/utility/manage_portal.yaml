@@ -19,6 +19,12 @@ node:
                 - dynamodb:UpdateItem
               resources:
                 - ${SYSTEM_SETTINGS_TABLE_ARN}
+            - effect: Allow
+              actions:
+                - secretsmanager:CreateSecret
+                - secretsmanager:DeleteSecret
+              resources:
+                - arn:aws:secretsmanager:${AWS_REGION}:${ACCOUNT_ID}:secret:${RESOURCE_PREFIX}/portals/*
 actions:
   generate:
     summary: Manage portal

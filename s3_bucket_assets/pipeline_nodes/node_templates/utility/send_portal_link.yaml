@@ -16,7 +16,12 @@ node:
               actions:
                 - ses:SendEmail
               resources:
-                - ${SES_FROM_ARN}
+                # All verified identities in this account/region. ses:SendEmail
+                # is authorized against the From identity, but in the SES sandbox
+                # it is also checked against any recipient that is itself a
+                # verified identity in the account — so scoping to only the From
+                # ARN gets AccessDenied when emailing such a recipient.
+                - arn:aws:ses:${AWS_REGION}:${ACCOUNT_ID}:identity/*
 actions:
   generate:
     summary: Send portal link

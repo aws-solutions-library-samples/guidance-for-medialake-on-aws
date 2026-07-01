@@ -972,6 +972,10 @@ class S3EventContext(TypedDict):
     key: str
     version_id: Optional[str]
     destination_storage_class: Optional[str]
+    # Deletion kind for ObjectRemoved events, normalized to the S3 vocabulary
+    # ("Delete Marker Created" / "Permanently Deleted"). None for non-deletion
+    # events. See DELETION_TYPE_* constants.
+    deletion_type: Optional[str]
 
 
 class AssetProcessor:
@@ -2367,20 +2371,30 @@ class AssetProcessor:
         key: str,
         is_delete_event: bool = True,
         version_id: str = None,
-    ) -> None:
+        deletion_type: str = None,
+    ) -> bool:
         """
         Delete asset record from DynamoDB based on S3 object deletion.
         Uses centralized AssetDeletionService for actual deletion.
+
+        Returns ``True`` when the deletion was processed (the version check
+        allowed it and the deletion flow ran), or ``False`` when it was
+        intentionally skipped by the version check. Raises on unexpected errors.
         """
         try:
             # Check if this deletion should be processed based on versioning
             if not self._should_process_deletion(
-                bucket, key, version_id, is_delete_event
+                bucket, key, version_id, is_delete_event, deletion_type
             ):
+                # _should_process_deletion has already logged the SPECIFIC
+                # reason (intentional skip at INFO; errors at WARNING/EXCEPTION
+                # with a full traceback). Keep this line unambiguous.
                 logger.info(
-                    f"Skipping deletion processing for {bucket}/{key} - not latest version or versioning check failed"
+                    f"Deletion not processed for {bucket}/{key} "
+                    f"(version_id={version_id}, deletion_type={deletion_type}); "
+                    f"see the preceding log line for the specific reason"
                 )
-                return
+                return False
 
             # First, try to find the asset by S3 path
             storage_path = f"{bucket}:{key}"
@@ -2485,6 +2499,10 @@ class AssetProcessor:
             else:
                 logger.warning(f"No asset found for deletion: {bucket}/{key}")
 
+            # Reached the end of the deletion flow without being skipped by the
+            # version check, so report it as processed.
+            return True
+
         except Exception as e:
             logger.exception(f"Error in delete_asset: {bucket}/{key}, error: {e}")
             metrics.add_metric(
@@ -2492,106 +2510,208 @@ class AssetProcessor:
             )
             raise
 
+    def _get_latest_version_entry(self, bucket: str, key: str) -> Optional[Dict]:
+        """Return the CURRENT (latest) version or delete marker for an exact key.
+
+        ``list_object_versions`` returns object versions and delete markers in
+        two SEPARATE arrays (``Versions`` and ``DeleteMarkers``). A normal delete
+        on a versioned bucket adds a delete marker that lives ONLY in
+        ``DeleteMarkers`` — so any logic that inspects only ``Versions`` can
+        never see that the object is now logically deleted. To know the object's
+        current state we must consider both arrays.
+
+        Returns a dict ``{"version_id", "is_delete_marker", "is_latest",
+        "last_modified"}`` for the entry S3 flags ``IsLatest`` (falling back to
+        the most recently modified entry), or ``None`` when the key has neither
+        versions nor delete markers. Raises on API error so the caller can apply
+        its own fail policy.
+        """
+        response = self.s3.list_object_versions(
+            Bucket=bucket,
+            Prefix=key,
+            # Generous page size: the exact key sorts first among prefix matches,
+            # so its current entry is always on the first page.
+            MaxKeys=100,
+        )
+
+        candidates: List[Dict] = []
+        for version in response.get("Versions", []):
+            if version.get("Key") == key:
+                candidates.append(
+                    {
+                        "version_id": version.get("VersionId"),
+                        "is_delete_marker": False,
+                        "is_latest": bool(version.get("IsLatest", False)),
+                        "last_modified": version.get("LastModified"),
+                    }
+                )
+        for marker in response.get("DeleteMarkers", []):
+            if marker.get("Key") == key:
+                candidates.append(
+                    {
+                        "version_id": marker.get("VersionId"),
+                        "is_delete_marker": True,
+                        "is_latest": bool(marker.get("IsLatest", False)),
+                        "last_modified": marker.get("LastModified"),
+                    }
+                )
+
+        if not candidates:
+            return None
+
+        # S3 flags exactly one entry (version or delete marker) as IsLatest.
+        for candidate in candidates:
+            if candidate["is_latest"]:
+                return candidate
+
+        # Fallback if IsLatest is somehow absent: newest by LastModified. Use a
+        # tz-aware floor so the sort never mixes naive/aware datetimes.
+        epoch = datetime.min.replace(tzinfo=timezone.utc)
+        candidates.sort(key=lambda c: c["last_modified"] or epoch, reverse=True)
+        return candidates[0]
+
     def _should_process_deletion(
         self,
         bucket: str,
         key: str,
         version_id: str = None,
         is_delete_event: bool = True,
+        deletion_type: str = None,
     ) -> bool:
-        """
-        Determine if a deletion should be processed based on versioning.
-        Only process deletions for the latest version if versioning is enabled.
+        """Decide whether an S3 deletion event should remove the MediaLake asset.
+
+        Goal: delete the asset when the object is no longer retrievable at its
+        key (its live version is gone), and keep it when only a non-current
+        version was permanently purged.
+
+        Decision order (each branch logs a specific, self-explanatory reason):
+          1. Delete-marker creation -> the object's current version is now a
+             delete marker, so it is logically deleted. The event is
+             authoritative, so process it WITHOUT an S3 call. This is the common
+             case for a plain delete on a versioned bucket — and exactly the case
+             the previous version-id comparison wrongly skipped.
+          2. Versioning not Enabled (or unreadable) -> a plain delete really
+             removed the object, so process it (fail-OPEN on read error).
+          3. No version id -> treat as a current-object delete -> process.
+          4. Versioned permanent delete -> inspect the key's CURRENT state via
+             list_object_versions across BOTH Versions and DeleteMarkers:
+               - delete marker on top, or nothing left -> object gone -> process
+               - a live (non-marker) version still current -> this was an
+                 older/non-current version purge -> skip
+             (fail-CLOSED on list error: don't delete an asset whose live object
+             may still exist).
+
+        Every skip and every error is logged with its reason; errors include a
+        full traceback via ``logger.exception``.
         """
         try:
-            # Check if the bucket has versioning enabled
+            # (1) Delete-marker creation is authoritative — the object is gone.
+            if deletion_type == DELETION_TYPE_DELETE_MARKER:
+                logger.info(
+                    f"Processing deletion for {bucket}/{key}: a delete marker was "
+                    f"created (deletion_type='{deletion_type}', "
+                    f"version_id={version_id}), so the object is logically deleted"
+                )
+                return True
+
+            # (2) Versioning status. Fail OPEN on read error: on a non-versioned
+            # bucket a delete genuinely removes the object, so we must not drop a
+            # real deletion just because we couldn't read the bucket config.
             try:
                 versioning_response = self.s3.get_bucket_versioning(Bucket=bucket)
                 versioning_status = versioning_response.get("Status", "Suspended")
-                logger.info(f"Bucket {bucket} versioning status: {versioning_status}")
-
-                # If versioning is not enabled or suspended, proceed with normal deletion
-                if versioning_status not in ["Enabled"]:
-                    logger.info(
-                        f"Versioning not enabled for bucket {bucket}, proceeding with deletion"
-                    )
-                    return True
-
             except Exception as e:
-                logger.warning(
-                    f"Could not check versioning status for bucket {bucket}: {str(e)}"
+                logger.exception(
+                    f"Could not read bucket versioning for {bucket} while deciding "
+                    f"deletion of {key} (version_id={version_id}, "
+                    f"deletion_type={deletion_type}): {e}. Proceeding with deletion "
+                    f"(fail-open) so a real delete is not silently dropped"
                 )
-                # If we can't check versioning, proceed with caution but allow deletion
+                metrics.add_metric(
+                    name="DeletionVersioningCheckError",
+                    unit=MetricUnit.Count,
+                    value=1,
+                )
                 return True
 
-            # If we have a version_id from the event, check if it's the latest
-            if version_id and version_id != "null":
-                try:
-                    # List object versions to get versions for this specific key
-                    versions_response = self.s3.list_object_versions(
-                        Bucket=bucket,
-                        Prefix=key,
-                        MaxKeys=10,  # Get more versions to ensure we find the exact match
-                    )
-
-                    # Filter versions to match exact key (since Prefix can return other keys)
-                    exact_versions = [
-                        v
-                        for v in versions_response.get("Versions", [])
-                        if v.get("Key") == key
-                    ]
-
-                    if exact_versions:
-                        # Sort by LastModified to get the latest version first
-                        exact_versions.sort(
-                            key=lambda x: x.get("LastModified", datetime.min),
-                            reverse=True,
-                        )
-                        latest_version = exact_versions[0]
-                        latest_version_id = latest_version.get("VersionId")
-
-                        logger.info(
-                            f"Latest version ID: {latest_version_id}, deletion version ID: {version_id}"
-                        )
-
-                        # Only process if this is the latest version
-                        if version_id == latest_version_id:
-                            logger.info(f"Deletion is for latest version, proceeding")
-                            return True
-                        else:
-                            logger.info(
-                                f"Deletion is for older version {version_id}, skipping"
-                            )
-                            metrics.add_metric(
-                                name="OlderVersionDeletionSkipped",
-                                unit=MetricUnit.Count,
-                                value=1,
-                            )
-                            return False
-                    else:
-                        logger.warning(
-                            f"No versions found for exact key {bucket}/{key}"
-                        )
-                        return True
-
-                except Exception as e:
-                    logger.warning(
-                        f"Error checking object versions for {bucket}/{key}: {str(e)}"
-                    )
-                    # If we can't check versions, be conservative and skip
-                    return False
-            else:
-                # No version ID provided, this might be a non-versioned deletion or delete marker
+            logger.info(f"Bucket {bucket} versioning status: {versioning_status}")
+            if versioning_status != "Enabled":
                 logger.info(
-                    f"No version ID provided for deletion, treating as latest version"
+                    f"Processing deletion for {bucket}/{key}: versioning is "
+                    f"'{versioning_status}' (not Enabled), so the delete removed "
+                    f"the object"
                 )
                 return True
+
+            # (3) No version id on a versioned bucket is unusual; without one we
+            # cannot reason about versions, so treat it as a current-object delete.
+            if not version_id or version_id == "null":
+                logger.info(
+                    f"Processing deletion for {bucket}/{key}: event carried no "
+                    f"version id (deletion_type={deletion_type}); treating as a "
+                    f"current-object delete"
+                )
+                return True
+
+            # (4) Versioned permanent delete: decide from the key's CURRENT state.
+            # Fail CLOSED on list error: skip rather than risk deleting an asset
+            # whose live object still exists.
+            try:
+                latest = self._get_latest_version_entry(bucket, key)
+            except Exception as e:
+                logger.exception(
+                    f"Failed to list object versions for {bucket}/{key} while "
+                    f"deciding deletion (version_id={version_id}, "
+                    f"deletion_type={deletion_type}): {e}. Skipping deletion "
+                    f"(fail-closed) to avoid removing an asset whose live object "
+                    f"may still exist"
+                )
+                metrics.add_metric(
+                    name="DeletionVersionListError", unit=MetricUnit.Count, value=1
+                )
+                return False
+
+            if latest is None:
+                logger.info(
+                    f"Processing deletion for {bucket}/{key}: no remaining "
+                    f"versions or delete markers for the key, so the object is "
+                    f"fully gone (event version_id={version_id})"
+                )
+                return True
+
+            if latest["is_delete_marker"]:
+                logger.info(
+                    f"Processing deletion for {bucket}/{key}: the current version "
+                    f"is a delete marker (id={latest['version_id']}), so the "
+                    f"object is logically deleted (event version_id={version_id})"
+                )
+                return True
+
+            # A live, non-marker version is still current -> this event was for a
+            # non-current version. Keep the asset.
+            logger.info(
+                f"Skipping deletion for {bucket}/{key}: a live current version "
+                f"still exists (current id={latest['version_id']}), so the "
+                f"deletion of version {version_id} was for a non-current version "
+                f"(deletion_type={deletion_type})"
+            )
+            metrics.add_metric(
+                name="OlderVersionDeletionSkipped", unit=MetricUnit.Count, value=1
+            )
+            return False
 
         except Exception as e:
+            # Truly unexpected (a code bug, not an AWS read failure). Log loudly
+            # with a traceback and fail CLOSED — we don't know the state, so we
+            # don't delete; the traceback makes the skip diagnosable.
             logger.exception(
-                f"Error in _should_process_deletion for {bucket}/{key}: {str(e)}"
+                f"Unexpected error in _should_process_deletion for {bucket}/{key} "
+                f"(version_id={version_id}, deletion_type={deletion_type}): {e}. "
+                f"Skipping deletion (fail-closed); investigate the traceback above"
             )
-            # If there's an error in the check, err on the side of caution and skip
+            metrics.add_metric(
+                name="DeletionDecisionUnexpectedError", unit=MetricUnit.Count, value=1
+            )
             return False
 
     @tracer.capture_method
@@ -3072,14 +3192,30 @@ def process_s3_event(
     try:
         if event_name.startswith("ObjectRemoved:"):
             # Handle deletion - only delete from DynamoDB, don't try to delete the S3 object again
+            deletion_type = ctx.get("deletion_type")
             logger.info(
-                f"Processing deletion event for {bucket}/{key}, version: {version_id}"
+                f"Processing deletion event for {bucket}/{key}, "
+                f"version: {version_id}, deletion_type: {deletion_type}"
             )
-            processor.delete_asset(
-                bucket, key, is_delete_event=True, version_id=version_id
+            processed = processor.delete_asset(
+                bucket,
+                key,
+                is_delete_event=True,
+                version_id=version_id,
+                deletion_type=deletion_type,
             )
-            metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
-            logger.info(f"Asset deletion processed: {key}")
+            if processed:
+                metrics.add_metric(name="DeletedAssets", unit=MetricUnit.Count, value=1)
+                logger.info(f"Asset deletion processed: {key}")
+            else:
+                # Intentionally skipped (e.g. non-current version delete). The
+                # specific reason was logged by _should_process_deletion.
+                metrics.add_metric(
+                    name="DeletionSkipped", unit=MetricUnit.Count, value=1
+                )
+                logger.info(
+                    f"Asset deletion skipped (reason logged above): {bucket}/{key}"
+                )
         elif event_name == "ObjectStorageClassChanged":
             update_storage_class(
                 processor.table,
@@ -3360,6 +3496,31 @@ def _decode_s3_key(raw_key: str) -> str:
     return urllib.parse.unquote(raw_key).replace("+", " ")
 
 
+# S3 deletion-type vocabulary. EventBridge "Object Deleted" events carry these
+# values verbatim in detail["deletion-type"]. For raw S3 notifications we derive
+# the same values from the event-name subtype (see _deletion_type_from_event_name)
+# so the deletion logic can stay source-agnostic.
+DELETION_TYPE_DELETE_MARKER = "Delete Marker Created"
+DELETION_TYPE_PERMANENT = "Permanently Deleted"
+
+
+def _deletion_type_from_event_name(event_name: str) -> Optional[str]:
+    """Map a raw S3 ``ObjectRemoved:*`` event name to a deletion-type value.
+
+    Raw S3 notifications encode the deletion kind in the event-name subtype,
+    whereas EventBridge puts it in ``detail["deletion-type"]``. Normalizing both
+    to the same vocabulary lets ``_should_process_deletion`` reason about
+    deletions without caring which source delivered the event. Returns ``None``
+    for non-deletion events or the generic ``ObjectRemoved:`` (EventBridge),
+    where the subtype is unknown and the deletion-type comes from the detail.
+    """
+    if event_name == "ObjectRemoved:DeleteMarkerCreated":
+        return DELETION_TYPE_DELETE_MARKER
+    if event_name == "ObjectRemoved:Delete":
+        return DELETION_TYPE_PERMANENT
+    return None
+
+
 def _extract_eventbridge_context(event_data: Dict) -> Optional[S3EventContext]:
     """Extract S3EventContext from an EventBridge-shaped payload."""
     if event_data.get("source") != "aws.s3":
@@ -3406,12 +3567,18 @@ def _extract_eventbridge_context(event_data: Dict) -> Optional[S3EventContext]:
     if detail_type == "Object Storage Class Changed":
         destination_storage_class = detail.get("destination-storage-class")
 
+    # Deletion kind: S3 EventBridge "Object Deleted" events carry the exact
+    # vocabulary ("Delete Marker Created" / "Permanently Deleted") in
+    # detail["deletion-type"]. Absent (None) for non-deletion events.
+    deletion_type = detail.get("deletion-type")
+
     return S3EventContext(
         event_type=event_type,
         bucket=bucket,
         key=key,
         version_id=version_id,
         destination_storage_class=destination_storage_class,
+        deletion_type=deletion_type,
     )
 
 
@@ -3427,6 +3594,9 @@ def normalize_event_context(event_record: Dict) -> Optional[S3EventContext]:
                 key=_decode_s3_key(s3_info["object"]["key"]),
                 version_id=s3_info["object"].get("versionId"),
                 destination_storage_class=None,
+                deletion_type=_deletion_type_from_event_name(
+                    event_record.get("eventName", "")
+                ),
             )
 
     # SQS-wrapped record
@@ -3453,6 +3623,9 @@ def normalize_event_context(event_record: Dict) -> Optional[S3EventContext]:
                         key=_decode_s3_key(record["s3"]["object"]["key"]),
                         version_id=record["s3"]["object"].get("versionId"),
                         destination_storage_class=None,
+                        deletion_type=_deletion_type_from_event_name(
+                            record.get("eventName", "")
+                        ),
                     )
 
     # EventBridge direct
@@ -3482,6 +3655,9 @@ def normalize_event_contexts(event_record: Dict) -> List[S3EventContext]:
                     key=_decode_s3_key(s3_info["object"]["key"]),
                     version_id=s3_info["object"].get("versionId"),
                     destination_storage_class=None,
+                    deletion_type=_deletion_type_from_event_name(
+                        event_record.get("eventName", "")
+                    ),
                 )
             ]
 
@@ -3541,6 +3717,9 @@ def normalize_event_contexts(event_record: Dict) -> List[S3EventContext]:
                             key=_decode_s3_key(s3_info["object"]["key"]),
                             version_id=s3_info["object"].get("versionId"),
                             destination_storage_class=None,
+                            deletion_type=_deletion_type_from_event_name(
+                                record.get("eventName", "")
+                            ),
                         )
                     )
                 except Exception as e:

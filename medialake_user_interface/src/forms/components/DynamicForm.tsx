@@ -71,7 +71,13 @@ export const DynamicForm: React.FC<DynamicFormProps> = React.memo(
             return null;
           }
         } else {
-          if (dependentValue !== field.showWhen.value) {
+          // `value` may be a single value or an array of accepted values
+          // (e.g. a field shown for several operations). Support both.
+          const expected = field.showWhen.value;
+          const matches = Array.isArray(expected)
+            ? expected.includes(dependentValue)
+            : dependentValue === expected;
+          if (!matches) {
             return null;
           }
         }

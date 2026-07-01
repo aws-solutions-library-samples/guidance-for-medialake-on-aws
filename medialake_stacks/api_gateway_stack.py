@@ -17,10 +17,6 @@ from constructs import Construct
 
 from config import config
 from constants import Lambda as LambdaConstants
-from medialake_constructs.api_gateway.api_gateway_assets import (
-    AssetsConstruct,
-    AssetsProps,
-)
 from medialake_constructs.api_gateway.api_gateway_connectors import (
     ConnectorsConstruct,
     ConnectorsProps,
@@ -276,29 +272,11 @@ class ApiGatewayStack(cdk.NestedStack):
             ),
         )
 
-        self._assets_construct = AssetsConstruct(
-            self,
-            "AssetsApiGateway",
-            props=AssetsProps(
-                asset_table=props.asset_table,
-                connector_table=self._connectors_api_gateway.connector_table,
-                api_resource=self._rest_api,
-                authorizer=self._authorizer,
-                x_origin_verify_secret=self._x_origin_verify_secret,
-                open_search_endpoint=props.collection_endpoint,
-                opensearch_index="media",
-                vpc=props.vpc,
-                security_group=props.security_group,
-                open_search_arn=props.collection_arn,
-                system_settings_table=props.system_settings_table,
-                media_assets_bucket=props.media_assets_bucket.bucket,
-                s3_vector_bucket_name=props.s3_vector_bucket_name,
-                video_download_enabled=config.video_download_enabled,
-                personal_assets_bucket=props.personal_assets_bucket,
-                asset_events_bus=props.application_service_events_internal_event_bus,
-                upload_directives_table=props.upload_directives_table,
-            ),
-        )
+        # NOTE: The Assets API surface (~29 Lambdas / ~200 resources) has been
+        # peeled out into its own top-level AssetsApiStack (see app.py) to keep
+        # this template well under the 500-resource CloudFormation limit. It
+        # imports the same shared REST API and reuses this stack's shared
+        # authorizer + the connector table, so the public API is unchanged.
 
         self._nodes_construct = ApiGatewayNodesConstruct(
             self,

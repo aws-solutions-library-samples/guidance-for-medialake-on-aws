@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.17.4] - 2026-06-29
+
+### Bug Fixes
+
+- fix: Connector processing ObjectRemoved on S3 objects that are versioned with a delete marker
+
+### Code Refactoring
+
+- refactor: Ability to just hit enter or search button to search all assets or hit enter or search button with filters to search all assets with filters
+
+## [1.17.3] - 2026-06-29
+
+### Bug Fixes
+
+- fix: Keep image node lambdas under the 250MB layer limit
+
+## [1.17.2] - 2026-06-29
+
+### Bug Fixes
+
+- fix: repair portal & collection nodes (deploy, validation, ownership)
+
+### Code Refactoring
+
+- refactor: CDK constructs refactored to bring down CloudFormation resources per stack
+- refactor: Use pyvips for image proxy and image thumbnail nodes
+
 ## [1.17.1] - 2026-06-23
 
 ### Bug Fixes

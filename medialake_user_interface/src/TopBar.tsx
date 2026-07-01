@@ -294,7 +294,11 @@ function TopBar() {
   const handleSearchSubmit = () => {
     if (searchInput.includes(":")) {
       createTagFromInput(searchInput);
-    } else if (searchInput.trim() || searchTags.length > 0) {
+    } else {
+      // An empty search box (no text, no tags) is allowed: it submits an empty
+      // query, which the backend treats as "match all" and returns every asset
+      // (any active filters are still applied). The box is cleared after
+      // navigating, so it stays blank.
       const searchQuery = getSearchQuery();
 
       // Update store state first

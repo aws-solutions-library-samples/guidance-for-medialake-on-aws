@@ -21,6 +21,7 @@ from medialake_stacks.api_gateway_deployment_stack import (
 )
 from medialake_stacks.api_gateway_stack import ApiGatewayStack, ApiGatewayStackProps
 from medialake_stacks.asset_sync_stack import AssetSyncStack, AssetSyncStackProps
+from medialake_stacks.assets_api_stack import AssetsApiStack, AssetsApiStackProps
 from medialake_stacks.authorization_stack import (
     AuthorizationStack,
     AuthorizationStackProps,
@@ -60,6 +61,7 @@ from medialake_stacks.user_interface_stack import (
     UserInterfaceStack,
     UserInterfaceStackProps,
 )
+from medialake_stacks.users_api_stack import UsersApiStack, UsersApiStackProps
 from medialake_stacks.users_groups_stack import UsersGroupsStack, UsersGroupsStackProps
 
 # from medialake_stacks.monitoring_stack import MonitoringStack - Development paused, commented out for now
@@ -307,6 +309,9 @@ class MediaLakeStack(cdk.Stack):
             ),
         )
         storage_connectors_stack.add_dependency(settings_stack)
+        # Stored so the Assets API (now a top-level stack) can reference the
+        # personal-assets bucket without the bucket leaving this stack.
+        self._storage_connectors_stack = storage_connectors_stack
 
         api_gateway_stack = ApiGatewayStack(
             self,
@@ -412,18 +417,10 @@ class MediaLakeStack(cdk.Stack):
         # Store reference to collections_stack
         self._collections_stack = collections_stack
 
-        # Allow the users Lambda to migrate collections owned by a deleted user
-        # to the deleting administrator (instead of orphaning them). The users
-        # stack is created before the collections stack, so the table reference
-        # and IAM grant are wired up here once both exist.
-        users_groups_roles_stack.users_api.users_lambda.function.add_environment(
-            "COLLECTIONS_TABLE_NAME",
-            collections_stack.collections_table.table_name,
-        )
-        collections_stack.collections_table.grant_read_write_data(
-            users_groups_roles_stack.users_api.users_lambda.function
-        )
-        users_groups_roles_stack.add_dependency(collections_stack)
+        # NOTE: The users Lambda's collection-migration wiring
+        # (COLLECTIONS_TABLE_NAME env + grant on the collections table) now lives
+        # in the top-level UsersApiStack, since the Users API was promoted out of
+        # this parent. The underlying tables are unchanged.
 
         # Create the Dashboard Stack
         dashboard_stack = DashboardStack(
@@ -441,44 +438,11 @@ class MediaLakeStack(cdk.Stack):
         # Store reference to dashboard_stack
         self._dashboard_stack = dashboard_stack
 
-        # Create the Collection Types Settings Stack
-        collection_types_stack = CollectionTypesStack(
-            self,
-            "MediaLakeCollectionTypesSettings",
-            props=CollectionTypesStackProps(
-                cognito_user_pool=props.cognito_stack.user_pool,
-                authorizer=api_gateway_stack.authorizer,
-                api_resource=self.shared_rest_api,
-                x_origin_verify_secret=self.shared_x_origin_secret,
-                collections_table=collections_stack.collections_table,
-                system_settings_table=settings_stack.system_settings_table.table,
-                api_keys_table=settings_stack.api_keys_table.table,
-                portal_settings_integration_lambda=portal_api_stack.portal_management_lambda,
-            ),
-        )
-        collection_types_stack.add_dependency(collections_stack)
-        collection_types_stack.add_dependency(api_gateway_stack)
-        collection_types_stack.add_dependency(portal_api_stack)
-        collection_types_stack.add_dependency(settings_stack)
-
-        # Store reference to collection_types_stack
-        self._collection_types_stack = collection_types_stack
-
-        groups_stack = GroupsStack(
-            self,
-            "MediaLakeGroups",
-            props=GroupsStackProps(
-                # x_origin_verify_secret=props.api_gateway_core_stack.x_origin_verify_secret,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                auth_table=props.authorization_stack.auth_table,
-                authorizer=api_gateway_stack.authorizer,
-                api_resource=self.shared_rest_api,  # Use shared object
-            ),
-        )
-        groups_stack.add_dependency(props.authorization_stack)
-
-        # Store reference to groups_stack
-        self._groups_stack = groups_stack
+        # NOTE: The Collection Types / Settings API (/settings/*) has been
+        # promoted to a top-level stack (CollectionTypesStack, instantiated at
+        # app scope) so its API Gateway resources land in that template instead
+        # of this parent. The system-settings / api-keys / collections tables
+        # stay in their owning stacks and are referenced there by name.
 
         # Add dependency to ensure authorization stack is created before API Gateway stack
         api_gateway_stack.add_dependency(props.authorization_stack)
@@ -565,23 +529,9 @@ class MediaLakeStack(cdk.Stack):
         # )
         # self._settings_api_stack = _
 
-        # Create Updates API Stack for auto-upgrade system
-        updates_api_stack = UpdatesApiStack(
-            self,
-            "MediaLakeUpdatesApi",
-            props=UpdatesApiStackProps(
-                authorizer=api_gateway_stack.authorizer,
-                api_resource=self.shared_rest_api,
-                cognito_user_pool=props.cognito_stack.user_pool,
-                cognito_app_client=props.cognito_stack.user_pool_client_id,
-                x_origin_verify_secret=self.shared_x_origin_secret,
-                system_settings_table_name=settings_stack.system_settings_table_name,
-                system_settings_table_arn=settings_stack.system_settings_table_arn,
-            ),
-        )
-
-        # Store the UpdatesApiStack reference
-        self._updates_api_stack = updates_api_stack
+        # NOTE: UpdatesApiStack is now a TOP-LEVEL stack (created in app.py) so its
+        # API Gateway resources/methods live in their own template instead of the
+        # MediaLakeStack parent. See the top-level instantiation in app.py.
 
         # # Create the Permissions Stack as a nested stack
         # _ = PermissionsStack(
@@ -623,15 +573,11 @@ class MediaLakeStack(cdk.Stack):
         #     props.resource_collector.add_resource(self._settings_api_stack)
 
         # Register the updates API stack if it has resources
-        if hasattr(self, "_updates_api_stack"):
-            props.resource_collector.add_resource(self._updates_api_stack)
+        # NOTE: UpdatesApiStack is now top-level (see app.py); nothing to register here.
 
         # Register other important stacks that might have resources
         if hasattr(self, "_users_groups_roles_stack"):
             props.resource_collector.add_resource(self._users_groups_roles_stack)
-
-        if hasattr(self, "_groups_stack"):
-            props.resource_collector.add_resource(self._groups_stack)
 
         if hasattr(self, "_integrations_stack"):
             props.resource_collector.add_resource(self._integrations_stack)
@@ -645,12 +591,27 @@ class MediaLakeStack(cdk.Stack):
         if hasattr(self, "_dashboard_stack"):
             props.resource_collector.add_resource(self._dashboard_stack)
 
-        if hasattr(self, "_collection_types_stack"):
-            props.resource_collector.add_resource(self._collection_types_stack)
-
     @property
     def connector_table(self):
         return self._api_gateway_stack.connector_table
+
+    @property
+    def shared_authorizer(self):
+        """The shared request authorizer (created in the API Gateway stack).
+
+        Exposed so API feature stacks promoted to the top level can reuse the
+        exact same authorizer instance instead of creating their own.
+        """
+        return self._api_gateway_stack.authorizer
+
+    @property
+    def personal_assets_bucket(self):
+        """Personal-assets bucket (owned by the nested StorageConnectors stack).
+
+        Exposed so the top-level Assets API stack can reference it without the
+        bucket being moved out of its owning stack.
+        """
+        return self._storage_connectors_stack.personal_assets_bucket
 
 
 medialake_stack = MediaLakeStack(
@@ -667,6 +628,149 @@ medialake_stack = MediaLakeStack(
     env=env,
 )
 # medialake_stack.add_dependency(api_gateway_core_stack)
+
+# ---------------------------------------------------------------------------
+# Top-level API feature stacks (promoted out of the MediaLakeStack umbrella).
+#
+# Each imports the shared REST API by ID so its API Gateway resources/methods
+# live in its OWN template instead of the MediaLakeStack parent (which keeps
+# every template well under the 500-resource CloudFormation limit). They reuse
+# the shared authorizer instance from the API Gateway stack.
+#
+# The explicit dependency on medialake_stack enforces single-pass ordering:
+# in one `cdk deploy`, the parent stack first sheds the old (parent-hosted)
+# methods, and only then do these stacks (re)create them — avoiding API
+# Gateway path/method collisions. The API Gateway deployment stack depends on
+# these stacks so the single stage redeploy happens last.
+# ---------------------------------------------------------------------------
+groups_stack = GroupsStack(
+    app,
+    config.stack_name("MediaLakeGroups"),
+    props=GroupsStackProps(
+        cognito_user_pool=cognito_stack.user_pool,
+        auth_table=authorization_stack.auth_table,
+        authorizer=medialake_stack.shared_authorizer,
+        rest_api_id=ResourceImporter.get_rest_api_id(),
+        root_resource_id=ResourceImporter.get_root_resource_id(),
+    ),
+    env=env,
+)
+groups_stack.add_dependency(medialake_stack)
+groups_stack.add_dependency(authorization_stack)
+
+# Updates API — same top-level promotion pattern as Groups. The system-settings
+# table name/ARN are config-derived (the table itself stays in the nested
+# SettingsStack and is not moved), so this stack needs no cross-stack object ref
+# to the data tier.
+_system_settings_table_name = (
+    f"{config.resource_prefix}-system-settings-{config.environment}"
+)
+updates_stack = UpdatesApiStack(
+    app,
+    config.stack_name("MediaLakeUpdatesApi"),
+    props=UpdatesApiStackProps(
+        cognito_user_pool=cognito_stack.user_pool,
+        authorizer=medialake_stack.shared_authorizer,
+        rest_api_id=ResourceImporter.get_rest_api_id(),
+        root_resource_id=ResourceImporter.get_root_resource_id(),
+        cognito_app_client=cognito_stack.user_pool_client_id,
+        x_origin_verify_secret_arn=ResourceImporter.get_x_origin_verify_secret_arn(),
+        system_settings_table_name=_system_settings_table_name,
+        system_settings_table_arn=(
+            f"arn:aws:dynamodb:{config.primary_region}:{config.account_id}:"
+            f"table/{_system_settings_table_name}"
+        ),
+    ),
+    env=env,
+)
+updates_stack.add_dependency(medialake_stack)
+
+# Assets API — the heaviest slice (~29 Lambdas / ~200 resources), peeled out of
+# the nested ApiGatewayStack into its own top-level stack so neither template
+# approaches the 500-resource limit. It creates NO stateful resources: every
+# table/bucket is passed by reference (asset/connector/upload-directives tables,
+# media + personal-assets buckets), so nothing is reprovisioned. It reuses the
+# shared authorizer + connector table from the API Gateway stack and imports the
+# shared REST API by ID. The dependency on medialake_stack enforces single-pass
+# ordering (ApiGatewayStack sheds the old Assets resources first).
+assets_stack = AssetsApiStack(
+    app,
+    config.stack_name("MediaLakeAssetsApi"),
+    props=AssetsApiStackProps(
+        asset_table=base_infrastructure.asset_table,
+        connector_table=medialake_stack.connector_table,
+        upload_directives_table=base_infrastructure.upload_directives_table,
+        asset_events_bus=base_infrastructure.application_service_events_internal_event_bus,
+        media_assets_bucket=base_infrastructure.media_assets_bucket,
+        authorizer=medialake_stack.shared_authorizer,
+        rest_api_id=ResourceImporter.get_rest_api_id(),
+        root_resource_id=ResourceImporter.get_root_resource_id(),
+        x_origin_verify_secret_arn=ResourceImporter.get_x_origin_verify_secret_arn(),
+        open_search_endpoint=base_infrastructure.collection_endpoint,
+        open_search_arn=base_infrastructure.collection_arn,
+        system_settings_table=_system_settings_table_name,
+        s3_vector_bucket_name=base_infrastructure.s3_vector_bucket_name,
+        vpc=base_infrastructure.vpc,
+        security_group=base_infrastructure.security_group,
+        personal_assets_bucket=medialake_stack.personal_assets_bucket,
+        video_download_enabled=config.video_download_enabled,
+    ),
+    env=env,
+)
+assets_stack.add_dependency(medialake_stack)
+
+# ---------------------------------------------------------------------------
+# Collection Types / Settings API (/settings/*) and Users API (/users/*) —
+# promoted out of the MediaLakeStack parent into their own top-level stacks so
+# their API Gateway resources land in those templates (keeping the parent well
+# under the 500-resource limit). Both own NO tables: every table stays in its
+# owning stack and is referenced BY NAME here (export-free), so nothing is
+# reprovisioned. They reuse the shared authorizer and import the shared REST API
+# by ID. The dependency on medialake_stack enforces single-pass ordering — the
+# parent first sheds the old (parent-hosted) /settings and /users methods, and
+# only then do these stacks (re)create them — avoiding API Gateway collisions.
+# ---------------------------------------------------------------------------
+_collections_table_name = f"{config.resource_prefix}_collections_{config.environment}"
+_api_keys_table_name = f"{config.resource_prefix}_api-keys_table_{config.environment}"
+_user_table_name = f"{config.resource_prefix}-user-{config.environment}"
+_portal_management_lambda_name = (
+    f"{config.resource_prefix}_portal_management_{config.environment}"
+)
+
+
+collection_types_stack = CollectionTypesStack(
+    app,
+    config.stack_name("MediaLakeCollectionTypesSettings"),
+    props=CollectionTypesStackProps(
+        cognito_user_pool=cognito_stack.user_pool,
+        authorizer=medialake_stack.shared_authorizer,
+        rest_api_id=ResourceImporter.get_rest_api_id(),
+        root_resource_id=ResourceImporter.get_root_resource_id(),
+        x_origin_verify_secret_arn=ResourceImporter.get_x_origin_verify_secret_arn(),
+        collections_table_name=_collections_table_name,
+        system_settings_table_name=_system_settings_table_name,
+        api_keys_table_name=_api_keys_table_name,
+        portal_management_lambda_name=_portal_management_lambda_name,
+    ),
+    env=env,
+)
+collection_types_stack.add_dependency(medialake_stack)
+
+users_api_stack = UsersApiStack(
+    app,
+    config.stack_name("MediaLakeUsersApi"),
+    props=UsersApiStackProps(
+        cognito_user_pool=cognito_stack.user_pool,
+        authorizer=medialake_stack.shared_authorizer,
+        rest_api_id=ResourceImporter.get_rest_api_id(),
+        root_resource_id=ResourceImporter.get_root_resource_id(),
+        x_origin_verify_secret_arn=ResourceImporter.get_x_origin_verify_secret_arn(),
+        user_table_name=_user_table_name,
+        collections_table_name=_collections_table_name,
+    ),
+    env=env,
+)
+users_api_stack.add_dependency(medialake_stack)
 
 # Use the collector instead of accessing the stack directly
 resource_count = api_resource_collector.get_resource_count()
@@ -689,6 +793,13 @@ api_gateway_deployment_stack = ApiGatewayDeploymentStack(
 )
 api_gateway_deployment_stack.add_dependency(api_gateway_core_stack)
 api_gateway_deployment_stack.add_dependency(medialake_stack)
+# The single API stage redeploy must happen after the promoted top-level API
+# stacks (re)create their methods, so the new deployment snapshot includes them.
+api_gateway_deployment_stack.add_dependency(groups_stack)
+api_gateway_deployment_stack.add_dependency(updates_stack)
+api_gateway_deployment_stack.add_dependency(assets_stack)
+api_gateway_deployment_stack.add_dependency(collection_types_stack)
+api_gateway_deployment_stack.add_dependency(users_api_stack)
 
 # NOW create User Interface Stack after deployment stack has created the SSM parameter
 # This stack reads the API Gateway stage name from SSM Parameter Store

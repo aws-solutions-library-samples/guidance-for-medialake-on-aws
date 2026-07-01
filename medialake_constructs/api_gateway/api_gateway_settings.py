@@ -249,6 +249,7 @@ class SettingsApi(Construct):
 
             portals_resource = settings_resource.add_resource("portals")
             portal_id_resource = portals_resource.add_resource("{id}")
+            validate_resource = portals_resource.add_resource("validate")
             tokens_resource = portal_id_resource.add_resource("tokens")
             token_id_resource = tokens_resource.add_resource("{tokenId}")
             logo_resource = portal_id_resource.add_resource("logo")
@@ -260,6 +261,13 @@ class SettingsApi(Construct):
                 cfn_method = m.node.default_child
                 cfn_method.authorization_type = "CUSTOM"
                 cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+            # POST /settings/portals/validate — dry-run validation, no write.
+            # Literal `validate` resolves ahead of the sibling `{id}` path var.
+            m = validate_resource.add_method("POST", portal_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
 
             for method in ["GET", "PUT", "DELETE"]:
                 m = portal_id_resource.add_method(method, portal_integration)
@@ -321,6 +329,7 @@ class SettingsApi(Construct):
             for res in [
                 portals_resource,
                 portal_id_resource,
+                validate_resource,
                 tokens_resource,
                 token_id_resource,
                 logo_resource,

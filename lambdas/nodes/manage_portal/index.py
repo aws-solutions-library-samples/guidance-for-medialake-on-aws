@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+import bcrypt
 import boto3
 import botocore.exceptions
 from aws_lambda_powertools import Logger, Tracer
@@ -15,28 +16,76 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from jsonpath_ng.ext import parse as jsonpath_parse
 from lambda_middleware import lambda_middleware
 
-ACCESS_CONTROL_FIELDS = {
-    "isActive",
-    "expiresAt",
-    "ipAllowlist",
-    "accessMode",
-    "allowedGroups",
-    "passphrase",
-    "tokenBypassesPassphrase",
-}
+# Shared portal validation / field rules (common_libraries layer) — same source
+# of truth as the admin portal API and the deploy-time pipeline check.
+from portal_validation import (
+    ACCESS_CONTROL_FIELDS,
+    select_portal_config_fields,
+    validate_portal_config,
+)
 
 logger = Logger()
 tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["SYSTEM_SETTINGS_TABLE_NAME"])
+secretsmanager = boto3.client("secretsmanager")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "")
+# Must match the prefix used by the admin portal API (portals_post.py) and the
+# portal auth endpoint (portal_auth/index.py) so the session secret name lines up.
+RESOURCE_PREFIX = os.environ.get("RESOURCE_PREFIX", "")
+
+
+def _session_secret_name(portal_id):
+    """Return the Secrets Manager name for a portal's session-signing secret."""
+    return f"{RESOURCE_PREFIX}/portals/{portal_id}/session-secret"
+
+
+def _create_session_secret(portal_id):
+    """Create the per-portal HS256 session secret.
+
+    The portal auth endpoint (``portal_auth``) signs short-lived session JWTs
+    with this secret. A portal created without it returns 500 on every
+    ``/portal/{slug}/auth`` call and is effectively inaccessible. Mirrors the
+    secret provisioning in the admin create handler (``portals_post.py``).
+    """
+    secret_name = _session_secret_name(portal_id)
+    try:
+        secretsmanager.create_secret(
+            Name=secret_name,
+            SecretString=secrets.token_urlsafe(32),
+        )
+    except secretsmanager.exceptions.ResourceExistsException:
+        # Idempotent: a secret already exists for this portal id — keep it so
+        # existing sessions stay valid.
+        logger.info(
+            "Session secret already exists, reusing it",
+            extra={"portalId": portal_id},
+        )
+    return secret_name
 
 
 def _evaluate_jsonpath(expr, data):
     """Evaluate a JSONPath expression against data, returning the first match or None."""
     matches = jsonpath_parse(expr).find(data)
     return matches[0].value if matches else None
+
+
+def _prepare_metadata_fields(merged):
+    """Allow-list a merged portal config to known fields and hash any passphrase.
+
+    Mirrors the admin create handler (``portals_post.py``): we never persist
+    arbitrary/misspelled keys, and a passphrase is stored bcrypt-hashed (a
+    plaintext passphrase would break ``portal_auth``'s ``bcrypt.checkpw``). An
+    empty passphrase is normalized to ``None`` ("no passphrase").
+    """
+    fields = select_portal_config_fields(merged)
+    if "passphrase" in fields:
+        raw = fields["passphrase"]
+        fields["passphrase"] = (
+            bcrypt.hashpw(raw.encode(), bcrypt.gensalt()).decode() if raw else None
+        )
+    return fields
 
 
 def _create_token(
@@ -132,6 +181,18 @@ def lambda_handler(event, context: LambdaContext):
     slug_resp = table.get_item(Key={"PK": f"UPLOADPORTAL_SLUG#{slug}", "SK": "INDEX"})
     slug_item = slug_resp.get("Item")
 
+    # Validate with the shared rules (same as the admin API / deploy-time check).
+    # On update, name may be unchanged/absent so validate leniently; on create
+    # require name + slug.
+    validation_errors = validate_portal_config(merged, partial=bool(slug_item))
+    if validation_errors:
+        raise ValueError(
+            "Invalid portal configuration: " + "; ".join(validation_errors)
+        )
+
+    # Allow-list known fields and bcrypt-hash any passphrase before persisting.
+    prepared = _prepare_metadata_fields(merged)
+
     def _update_existing_portal(portal_id):
         """Update metadata for an existing portal and return (portal_id, access_mode, meta_item)."""
         meta_resp = table.get_item(
@@ -144,14 +205,14 @@ def lambda_handler(event, context: LambdaContext):
         expr_names = {"#updatedAt": "updatedAt"}
         expr_values = {":updatedAt": now}
 
-        for field_key, field_val in merged.items():
+        for field_key, field_val in prepared.items():
             safe_key = field_key.replace("-", "_")
             update_expr_parts.append(f"#{safe_key} = :{safe_key}")
             expr_names[f"#{safe_key}"] = field_key
             expr_values[f":{safe_key}"] = field_val
 
         # Atomically increment accessVersion when access-control fields are mutated
-        has_access_control_change = bool(ACCESS_CONTROL_FIELDS & merged.keys())
+        has_access_control_change = bool(ACCESS_CONTROL_FIELDS & prepared.keys())
         add_expr_parts = []
         if has_access_control_change:
             add_expr_parts.append("#accessVersion :incr")
@@ -205,27 +266,33 @@ def lambda_handler(event, context: LambdaContext):
             else:
                 raise
         else:
-            # Slug claimed successfully — write metadata
+            # Slug claimed successfully — provision the session secret, then
+            # write metadata. The session secret MUST exist before the portal
+            # is usable: the portal auth endpoint signs session JWTs with it, so
+            # a portal without it fails every access with a 500.
+            secret_name = _create_session_secret(portal_id)
             metadata_item = {
                 "PK": f"UPLOADPORTAL#{portal_id}",
                 "SK": "METADATA",
                 "portalId": portal_id,
+                "slug": slug,
                 "GSI1_PK": "UPLOADPORTALS",
                 "GSI1_SK": now,
                 "isActive": True,
                 "createdAt": now,
                 "updatedAt": now,
                 "accessVersion": 1,
-                **merged,
+                **prepared,
             }
             try:
                 table.put_item(Item=metadata_item)
             except Exception as meta_exc:
-                # Best-effort cleanup: remove the slug index so it isn't orphaned.
+                # Best-effort cleanup: remove the slug index and session secret
+                # so they aren't orphaned.
                 # Guard: a concurrent request may have already fallen through the
                 # ConditionalCheckFailedException path and written metadata for
-                # this portal.  If metadata now exists, the slug index is valid
-                # and must NOT be deleted.
+                # this portal.  If metadata now exists, the slug index and secret
+                # are valid and must NOT be deleted.
                 try:
                     guard_resp = table.get_item(
                         Key={"PK": f"UPLOADPORTAL#{portal_id}", "SK": "METADATA"},
@@ -235,6 +302,19 @@ def lambda_handler(event, context: LambdaContext):
                         table.delete_item(
                             Key={"PK": f"UPLOADPORTAL_SLUG#{slug}", "SK": "INDEX"}
                         )
+                        try:
+                            secretsmanager.delete_secret(
+                                SecretId=secret_name,
+                                ForceDeleteWithoutRecovery=True,
+                            )
+                        except Exception as secret_cleanup_exc:
+                            logger.warning(
+                                "Failed to clean up session secret after metadata write failure",
+                                extra={
+                                    "portalId": portal_id,
+                                    "cleanupError": str(secret_cleanup_exc),
+                                },
+                            )
                 except Exception as cleanup_exc:
                     logger.warning(
                         "Failed to clean up slug index after metadata write failure",

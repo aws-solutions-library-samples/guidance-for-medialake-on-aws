@@ -323,6 +323,14 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "manage_portal"],
         )
 
+        self.collection_manager_lambda_deployment = LambdaDeployment(
+            self,
+            "CollectionManagerLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "collection_manager"],
+        )
+
         self.mark_upload_complete_lambda_deployment = LambdaDeployment(
             self,
             "MarkUploadCompleteLambdaDeployment",

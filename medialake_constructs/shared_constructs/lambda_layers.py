@@ -433,7 +433,13 @@ class OpenEXRLayer(Construct):
     Includes all necessary shared libraries (libOpenEXR, libImath, etc.).
 
     **Important**: Requires NumpyLayer to be attached to the Lambda function
-    as well, as OpenEXR depends on NumPy for array operations.
+    as well, as OpenEXR depends on NumPy for array operations. numpy is
+    deliberately removed from this layer during the build (it is pulled in as
+    an OpenEXR/pyvips dependency) so that it is sourced from a single place —
+    the NumpyLayer. This avoids ~50 MB of duplication and prevents a numpy
+    version mismatch between the two layers. If you add a new Lambda that uses
+    this layer, you MUST also attach the NumpyLayer, or `import OpenEXR`/numpy
+    will fail at runtime.
 
     Security: Pins specific OpenEXR version (3.4.4) for reproducible builds.
     Compiles from source with --no-binary flag to ensure compatibility with
@@ -510,7 +516,43 @@ class OpenEXRLayer(Construct):
                             fi
                         fi
 
+                        # Install pyvips (self-contained libvips via pyvips-binary
+                        # wheel). pyvips-binary bundles libvips and its native deps,
+                        # so no extra system packages or manual .so copying needed.
+                        #
+                        # Install in two steps:
+                        #   1. Binary deps (cffi, pyvips-binary) as x86_64 wheels.
+                        #      Two --platform tags are required: pyvips-binary ships
+                        #      manylinux_2_28 wheels while cffi only has stable
+                        #      manylinux2014 wheels; pip must match both.
+                        #   2. pyvips itself (pure Python) from sdist. pyvips 3.x has
+                        #      no wheel, so --only-binary would silently fall back to
+                        #      the ancient 2.1.0 wheel whose cdefs are incompatible
+                        #      with libvips 8.18 (undefined VipsCallbackFn at import).
+                        #      --no-deps keeps the x86_64 cffi installed above.
+                        python3.12 -m pip install \
+                          --platform manylinux_2_28_x86_64 \
+                          --platform manylinux2014_x86_64 \
+                          --target /asset-output/python \
+                          --implementation cp \
+                          --python-version 3.12 \
+                          --only-binary=:all: \
+                          cffi pyvips-binary
+                        python3.12 -m pip install \
+                          --target /asset-output/python \
+                          --no-deps \
+                          'pyvips>=3,<4'
+
                         cd /asset-output
+
+                        # Remove numpy from this layer. numpy is provided by the
+                        # dedicated Numpy layer, which every node that attaches the
+                        # OpenEXR layer (image_proxy, image_thumbnail,
+                        # image_metadata_extractor) also attaches. Shipping numpy
+                        # here as well duplicated ~50 MB across the two layers and
+                        # risked a numpy version mismatch. pyvips/OpenEXR still find
+                        # numpy at runtime via the Numpy layer.
+                        rm -rf python/numpy python/numpy.libs python/numpy-*.dist-info || true
 
                         # Remove cache files
                         find python -type d -name "__pycache__" -exec rm -rf {} + || true
@@ -551,7 +593,7 @@ class OpenEXRLayer(Construct):
             self,
             "OpenEXRLayer",
             layer_version_name="openexr-layer",
-            description="Lambda layer with OpenEXR 3.4.4 for HDR image processing (requires NumpyLayer)",
+            description="Lambda layer with OpenEXR 3.4.4 for HDR image processing and pyvips/libvips for image decode/resize/encode (requires NumpyLayer)",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[
                 lambda_.Architecture.X86_64,

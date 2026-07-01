@@ -25,14 +25,18 @@ class UpdatesApiStackProps:
 
     cognito_user_pool: cognito.UserPool
     authorizer: apigateway.IAuthorizer
-    api_resource: apigateway.RestApi
+    # Shared REST API imported by ID/root so this stack's API Gateway
+    # resources/methods are emitted into ITS OWN template (kept under the
+    # 500-resource CloudFormation limit) instead of the parent stack.
+    rest_api_id: str
+    root_resource_id: str
     cognito_app_client: str
-    x_origin_verify_secret: secretsmanager.Secret
+    x_origin_verify_secret_arn: str
     system_settings_table_name: str
     system_settings_table_arn: str
 
 
-class UpdatesApiStack(cdk.NestedStack):
+class UpdatesApiStack(cdk.Stack):
     """
     Stack for MediaLake Auto-Upgrade System API endpoints.
 
@@ -152,16 +156,31 @@ class UpdatesApiStack(cdk.NestedStack):
             )
         )
 
+        # Import the shared REST API by ID so the /updates resources/methods are
+        # emitted into THIS stack's template (not the parent), and build the
+        # X-Origin secret reference locally from its ARN.
+        api = apigateway.RestApi.from_rest_api_attributes(
+            self,
+            "UpdatesImportedApi",
+            rest_api_id=props.rest_api_id,
+            root_resource_id=props.root_resource_id,
+        )
+        x_origin_verify_secret = secretsmanager.Secret.from_secret_name_v2(
+            self,
+            "UpdatesXOriginSecret",
+            props.x_origin_verify_secret_arn,
+        )
+
         # Create Updates API Gateway construct
         self.updates_construct = UpdatesConstruct(
             self,
             "UpdatesApiGateway",
             props=UpdatesConstructProps(
-                api_resource=props.api_resource,
+                api_resource=api,
                 authorizer=props.authorizer,
                 cognito_user_pool=props.cognito_user_pool,
                 cognito_app_client=props.cognito_app_client,
-                x_origin_verify_secret=props.x_origin_verify_secret,
+                x_origin_verify_secret=x_origin_verify_secret,
                 updates_lambda=self.updates_lambda.function,
             ),
         )

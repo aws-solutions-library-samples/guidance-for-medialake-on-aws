@@ -302,6 +302,11 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "SYSTEM_SETTINGS_TABLE_ARN": props.system_settings_table_arn,
                 "UPLOAD_SESSIONS_TABLE_NAME": f"{config.resource_prefix}-upload-sessions-{config.environment}",
                 "UPLOAD_SESSIONS_TABLE_ARN": f"arn:aws:dynamodb:{self.region}:{self.account_id}:table/{config.resource_prefix}-upload-sessions-{config.environment}",
+                # Collections single-table — used by the collection_manager node
+                # (writes go to DynamoDB; the collections_sync stream mirrors
+                # them to OpenSearch). Underscore naming matches the API table.
+                "COLLECTIONS_TABLE_NAME": f"{config.resource_prefix}_collections_{config.environment}",
+                "COLLECTIONS_TABLE_ARN": f"arn:aws:dynamodb:{self.region}:{self.account_id}:table/{config.resource_prefix}_collections_{config.environment}",
                 "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
