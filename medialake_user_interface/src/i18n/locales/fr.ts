@@ -1743,10 +1743,13 @@ export default {
     saveError: "Erreur lors de l'enregistrement des permissions",
     groupCreated: 'Groupe "{{name}}" créé avec succès !',
     createError: "Erreur lors de la création du groupe. Veuillez réessayer.",
+    groupCreatedCopyFailed:
+      'Le groupe "{{name}}" a été créé, mais la copie des permissions a échoué. Vous pouvez les définir manuellement.',
     deleteGroup: "Supprimer le groupe",
     deleteConfirm: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ? Cette action est irréversible.',
     groupDeleted: 'Groupe "{{name}}" supprimé avec succès',
     deleteError: "Erreur lors de la suppression du groupe. Veuillez réessayer.",
+    permissionsCopied: "Permissions copiées de {{source}} vers {{target}} !",
     copyError: "Erreur lors de la copie des permissions. Veuillez réessayer.",
     copySourceNotLoaded:
       "Les permissions du groupe source ne sont pas chargées. Sélectionnez d'abord le groupe source.",

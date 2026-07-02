@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -29,10 +29,8 @@ import { useGetGroups } from "@/api/hooks/useGroups";
 import {
   useGetGroupPermissions,
   useUpdateGroupPermissions,
-  GroupPermissionsData,
+  fetchGroupPermissionsData,
 } from "@/api/hooks/useGroupPermissions";
-import { apiClient } from "@/api/apiClient";
-import { API_ENDPOINTS } from "@/api/endpoints";
 import { Group } from "@/api/types/group.types";
 import { GroupSelector } from "@/features/settings/permissions/components/GroupSelector";
 import { PermissionTable } from "@/features/settings/permissions/components/PermissionTable";
@@ -70,6 +68,19 @@ const createEmptyMatrix = (): PermissionMatrix => {
     });
   });
   return matrix;
+};
+
+/**
+ * Create a shallow-per-area copy of a permission matrix so the copy can be
+ * mutated/owned independently of the source (avoids shared object references
+ * between groups when copying permissions).
+ */
+const cloneMatrix = (source: PermissionMatrix): PermissionMatrix => {
+  const clone: PermissionMatrix = {};
+  Object.keys(source).forEach((areaId) => {
+    clone[areaId] = { ...source[areaId] };
+  });
+  return clone;
 };
 
 /**
@@ -149,6 +160,17 @@ const PermissionsPage: React.FC = () => {
     {}
   );
 
+  // Tracks whether any selected comparison group's permissions are still being
+  // fetched. While true, the comparison table is covered by a loading overlay
+  // and edits are ignored, so a late-arriving fetch cannot silently overwrite a
+  // permission the user just toggled on a not-yet-loaded group.
+  const [isLoadingComparisonPermissions, setIsLoadingComparisonPermissions] = useState(false);
+
+  // Group IDs with an in-flight comparison fetch. Used to avoid duplicate
+  // requests when the fetch effect re-runs as each request resolves, and to
+  // know when the loading flag can be cleared.
+  const inFlightComparisonFetches = useRef<Set<string>>(new Set());
+
   // Common state
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -168,6 +190,23 @@ const PermissionsPage: React.FC = () => {
   // Fetch permissions for the selected group
   const { data: groupPermissionsData, isLoading: isLoadingPermissions } =
     useGetGroupPermissions(selectedGroupId);
+
+  // Resolve a group's permission matrix, using the in-memory cache when
+  // available and otherwise fetching (and caching) it from the backend.
+  // This is essential for "copy from" flows, where the source group is often
+  // not the currently selected group and therefore has never been loaded.
+  const getGroupPermissionsMatrix = useCallback(
+    async (groupId: string): Promise<PermissionMatrix> => {
+      const cached = allGroupPermissions[groupId];
+      if (cached) return cached;
+
+      const data = await fetchGroupPermissionsData(groupId);
+      const permMatrix = permissionsArrayToMatrix(data.permissions || []);
+      setAllGroupPermissions((prev) => ({ ...prev, [groupId]: permMatrix }));
+      return permMatrix;
+    },
+    [allGroupPermissions]
+  );
 
   // Auto-select first group when groups load
   useEffect(() => {
@@ -200,39 +239,41 @@ const PermissionsPage: React.FC = () => {
     }
   }, [groupPermissionsData, selectedGroupId]);
 
-  // Fetch permissions for comparison groups that aren't loaded yet
+  // Fetch permissions for comparison groups that aren't loaded yet. The loading
+  // flag stays set until every selected group's permissions have arrived so the
+  // table overlay can block edits; otherwise a late fetch would overwrite a
+  // permission the user just toggled on a not-yet-loaded group.
   useEffect(() => {
-    if (viewMode !== "compare") return;
+    if (viewMode !== "compare") {
+      // Leaving compare mode: drop the guard so the single-group view isn't
+      // covered by a stale overlay. In-flight fetches simply resolve into the
+      // cache without re-raising the flag.
+      setIsLoadingComparisonPermissions(false);
+      return;
+    }
 
-    const fetchMissing = async () => {
-      for (const gId of comparisonGroupIds) {
-        if (allGroupPermissions[gId]) continue; // already loaded
+    const missingGroupIds = comparisonGroupIds.filter(
+      (gId) => !allGroupPermissions[gId] && !inFlightComparisonFetches.current.has(gId)
+    );
+    if (missingGroupIds.length === 0) return;
 
-        try {
-          const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUP_PERMISSIONS.GET(gId));
-          let parsed: GroupPermissionsData | null = null;
+    missingGroupIds.forEach((gId) => inFlightComparisonFetches.current.add(gId));
+    setIsLoadingComparisonPermissions(true);
 
-          if (typeof data.body === "string") {
-            const body = JSON.parse(data.body);
-            parsed = body.data || body;
-          } else if (data.body?.data) {
-            parsed = data.body.data;
-          } else if (data.data) {
-            parsed = data.data;
-          }
-
-          if (parsed) {
-            const permMatrix = permissionsArrayToMatrix(parsed.permissions || []);
-            setAllGroupPermissions((prev) => ({ ...prev, [gId]: permMatrix }));
-          }
-        } catch (err) {
-          console.error(`Failed to fetch permissions for group ${gId}:`, err);
-        }
+    Promise.all(
+      missingGroupIds.map((gId) =>
+        getGroupPermissionsMatrix(gId)
+          .catch((err) => console.error(`Failed to fetch permissions for group ${gId}:`, err))
+          .finally(() => inFlightComparisonFetches.current.delete(gId))
+      )
+    ).finally(() => {
+      // Only clear once no comparison fetch (from this or an overlapping run)
+      // is still pending, so the overlay stays up until all data has loaded.
+      if (inFlightComparisonFetches.current.size === 0) {
+        setIsLoadingComparisonPermissions(false);
       }
-    };
-
-    fetchMissing();
-  }, [viewMode, comparisonGroupIds, allGroupPermissions]);
+    });
+  }, [viewMode, comparisonGroupIds, allGroupPermissions, getGroupPermissionsMatrix]);
 
   const selectedGroup = useMemo(
     () => groups.find((g) => g.id === selectedGroupId),
@@ -307,35 +348,67 @@ const PermissionsPage: React.FC = () => {
     groupData: { name: string; id: string; description: string },
     copyFromGroupId?: string
   ) => {
+    // Step 1: create the group.
     try {
       await createGroupMutation.mutateAsync({
         name: groupData.name,
         id: groupData.id,
         description: groupData.description,
       });
-
-      // If copying from another group, save those permissions to the new group
-      if (copyFromGroupId && allGroupPermissions[copyFromGroupId]) {
-        const copiedPermissions = { ...allGroupPermissions[copyFromGroupId] };
-        const permArray = matrixToPermissionsArray(copiedPermissions);
-
-        await updatePermissionsMutation.mutateAsync({
-          groupId: groupData.id,
-          permissions: permArray,
-        });
-      }
-
-      setSelectedGroupId(groupData.id);
-      setLastSavedAt(new Date());
-      setSaveSeverity("success");
-      setSaveMessage(t("permissions.groupCreated", { name: groupData.name }));
-      setSaveSuccess(true);
     } catch (err) {
       console.error("Error creating group:", err);
       setSaveSeverity("error");
       setSaveMessage(t("permissions.createError", "Error creating group. Please try again."));
       setSaveSuccess(true);
+      return;
     }
+
+    // Step 2 (optional): copy permissions from an existing group. The group has
+    // already been created at this point, so a failure here must be reported on
+    // its own rather than as a creation error (otherwise the user is told
+    // creation failed and retries into an "id already exists" error). The source
+    // group is frequently not the one currently loaded on screen, so we can't
+    // assume it's already present in allGroupPermissions.
+    if (copyFromGroupId) {
+      try {
+        const sourceMatrix = await getGroupPermissionsMatrix(copyFromGroupId);
+        const permArray = matrixToPermissionsArray(sourceMatrix);
+
+        await updatePermissionsMutation.mutateAsync({
+          groupId: groupData.id,
+          permissions: permArray,
+        });
+
+        // Reflect the copied permissions immediately, without sharing the
+        // source group's matrix reference.
+        const newGroupMatrix = cloneMatrix(sourceMatrix);
+        setAllGroupPermissions((prev) => ({
+          ...prev,
+          [groupData.id]: newGroupMatrix,
+        }));
+        setMatrix(newGroupMatrix);
+      } catch (err) {
+        console.error("Error copying permissions to new group:", err);
+        // The group exists but is empty; select it so the user can set
+        // permissions manually, and surface a copy-specific message.
+        setSelectedGroupId(groupData.id);
+        setSaveSeverity("error");
+        setSaveMessage(
+          t("permissions.groupCreatedCopyFailed", {
+            name: groupData.name,
+            defaultValue: `Group "${groupData.name}" was created, but copying permissions failed. You can set them manually.`,
+          })
+        );
+        setSaveSuccess(true);
+        return;
+      }
+    }
+
+    setSelectedGroupId(groupData.id);
+    setLastSavedAt(new Date());
+    setSaveSeverity("success");
+    setSaveMessage(t("permissions.groupCreated", { name: groupData.name }));
+    setSaveSuccess(true);
   };
 
   const handleDeleteGroup = async () => {
@@ -378,49 +451,44 @@ const PermissionsPage: React.FC = () => {
   };
 
   const handleCopyPermissions = async (sourceGroupId: string, targetGroupId: string) => {
-    const sourcePermissions = allGroupPermissions[sourceGroupId];
-    if (sourcePermissions) {
-      const copiedPermissions: PermissionMatrix = {};
-      Object.keys(sourcePermissions).forEach((areaId) => {
-        copiedPermissions[areaId] = { ...sourcePermissions[areaId] };
-      });
+    try {
+      // Load the source group's permissions from cache or backend. The source
+      // is often not the currently selected group, so it may not be cached yet.
+      const sourcePermissions = await getGroupPermissionsMatrix(sourceGroupId);
+      const copiedPermissions = cloneMatrix(sourcePermissions);
 
       // Save to backend
       const permArray = matrixToPermissionsArray(copiedPermissions);
-      try {
-        await updatePermissionsMutation.mutateAsync({
-          groupId: targetGroupId,
-          permissions: permArray,
-        });
+      await updatePermissionsMutation.mutateAsync({
+        groupId: targetGroupId,
+        permissions: permArray,
+      });
 
-        setAllGroupPermissions((prev) => ({
-          ...prev,
-          [targetGroupId]: copiedPermissions,
-        }));
+      setAllGroupPermissions((prev) => ({
+        ...prev,
+        [targetGroupId]: copiedPermissions,
+      }));
 
-        if (viewMode === "single" && selectedGroupId === targetGroupId) {
-          setMatrix(copiedPermissions);
-        }
-
-        const sourceGroup = groups.find((g) => g.id === sourceGroupId);
-        const targetGroup = groups.find((g) => g.id === targetGroupId);
-        setLastSavedAt(new Date());
-        setSaveMessage(`Permissions copied from ${sourceGroup?.name} to ${targetGroup?.name}!`);
-        setSaveSuccess(true);
-      } catch (err) {
-        console.error("Error copying permissions:", err);
-        setSaveSeverity("error");
-        setSaveMessage(t("permissions.copyError", "Error copying permissions. Please try again."));
-        setSaveSuccess(true);
+      if (viewMode === "single" && selectedGroupId === targetGroupId) {
+        setMatrix(copiedPermissions);
       }
-    } else {
-      setSaveSeverity("error");
+
+      const sourceGroup = groups.find((g) => g.id === sourceGroupId);
+      const targetGroup = groups.find((g) => g.id === targetGroupId);
+      setLastSavedAt(new Date());
+      setSaveSeverity("success");
       setSaveMessage(
-        t(
-          "permissions.copySourceNotLoaded",
-          "Source group permissions not loaded. Select the source group first."
-        )
+        t("permissions.permissionsCopied", {
+          source: sourceGroup?.name,
+          target: targetGroup?.name,
+          defaultValue: `Permissions copied from ${sourceGroup?.name} to ${targetGroup?.name}!`,
+        })
       );
+      setSaveSuccess(true);
+    } catch (err) {
+      console.error("Error copying permissions:", err);
+      setSaveSeverity("error");
+      setSaveMessage(t("permissions.copyError", "Error copying permissions. Please try again."));
       setSaveSuccess(true);
     }
   };
@@ -520,6 +588,10 @@ const PermissionsPage: React.FC = () => {
     type: PermissionType
   ) => {
     if (!isPermissionApplicable(type, areaId as AreaId)) return;
+    // Ignore edits until all comparison permissions have loaded. The overlay
+    // blocks pointer input, but this also covers keyboard activation of the
+    // checkboxes; without it an in-flight fetch could overwrite the toggle.
+    if (isLoadingComparisonPermissions) return;
 
     setAllGroupPermissions((prev) => ({
       ...prev,
@@ -841,7 +913,9 @@ const PermissionsPage: React.FC = () => {
           )}
 
           <Box sx={{ position: "relative", minHeight: 400 }}>
-            {(loading || isPageLoading) && (
+            {(loading ||
+              isPageLoading ||
+              (viewMode === "compare" && isLoadingComparisonPermissions)) && (
               <Box
                 sx={{
                   position: "absolute",

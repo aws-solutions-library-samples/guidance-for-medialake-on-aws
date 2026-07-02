@@ -1746,11 +1746,14 @@ export default {
     saveError: "Fehler beim Speichern der Berechtigungen",
     groupCreated: 'Gruppe "{{name}}" erfolgreich erstellt!',
     createError: "Fehler beim Erstellen der Gruppe. Bitte versuchen Sie es erneut.",
+    groupCreatedCopyFailed:
+      'Gruppe "{{name}}" wurde erstellt, aber das Kopieren der Berechtigungen ist fehlgeschlagen. Sie können sie manuell festlegen.',
     deleteGroup: "Gruppe löschen",
     deleteConfirm:
       'Möchten Sie "{{name}}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
     groupDeleted: 'Gruppe "{{name}}" erfolgreich gelöscht',
     deleteError: "Fehler beim Löschen der Gruppe. Bitte versuchen Sie es erneut.",
+    permissionsCopied: "Berechtigungen von {{source}} nach {{target}} kopiert!",
     copyError: "Fehler beim Kopieren der Berechtigungen. Bitte versuchen Sie es erneut.",
     copySourceNotLoaded:
       "Quellgruppen-Berechtigungen nicht geladen. Wählen Sie zuerst die Quellgruppe aus.",

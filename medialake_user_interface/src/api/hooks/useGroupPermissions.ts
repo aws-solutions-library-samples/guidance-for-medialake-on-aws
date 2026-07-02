@@ -24,6 +24,37 @@ export interface UpdateGroupPermissionsRequest {
 }
 
 /**
+ * Fetch and normalize a single group's permissions from the backend.
+ *
+ * Handles the various response envelope shapes the API may return
+ * (stringified body, body.data, or a direct data field) and always
+ * resolves to a GroupPermissionsData object. Exported so callers can
+ * load an arbitrary group's permissions on demand (e.g. "copy from"
+ * flows) without it needing to be the currently selected group.
+ */
+export const fetchGroupPermissionsData = async (groupId: string): Promise<GroupPermissionsData> => {
+  const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUP_PERMISSIONS.GET(groupId));
+
+  // Handle string body format
+  if (typeof data.body === "string") {
+    const parsedBody = JSON.parse(data.body);
+    return parsedBody.data || parsedBody;
+  }
+
+  // Handle body.data format
+  if (data.body && data.body.data) {
+    return data.body.data;
+  }
+
+  // Handle direct response format
+  if (data.data) {
+    return data.data;
+  }
+
+  return { groupId, permissions: [] };
+};
+
+/**
  * Fetch the permissions for a specific group.
  * This calls GET /groups/{groupId}/permissions which returns the
  * permission set associated with the group.
@@ -32,27 +63,7 @@ export const useGetGroupPermissions = (groupId: string) => {
   return useQuery<GroupPermissionsData, Error>({
     queryKey: QUERY_KEYS.GROUP_PERMISSIONS.detail(groupId),
     enabled: !!groupId,
-    queryFn: async () => {
-      const { data } = await apiClient.get<any>(API_ENDPOINTS.GROUP_PERMISSIONS.GET(groupId));
-
-      // Handle string body format
-      if (typeof data.body === "string") {
-        const parsedBody = JSON.parse(data.body);
-        return parsedBody.data || parsedBody;
-      }
-
-      // Handle body.data format
-      if (data.body && data.body.data) {
-        return data.body.data;
-      }
-
-      // Handle direct response format
-      if (data.data) {
-        return data.data;
-      }
-
-      return { groupId, permissions: [] };
-    },
+    queryFn: () => fetchGroupPermissionsData(groupId),
   });
 };
 

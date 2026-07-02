@@ -73,6 +73,7 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
             <MenuItem value={100}>100</MenuItem>
             <MenuItem value={150}>150</MenuItem>
             <MenuItem value={200}>200</MenuItem>
+            <MenuItem value={250}>250</MenuItem>
           </Select>
         </FormControl>
       </Box>

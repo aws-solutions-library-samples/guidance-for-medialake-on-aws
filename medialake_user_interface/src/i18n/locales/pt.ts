@@ -1737,10 +1737,13 @@ export default {
     saveError: "Erro ao salvar as permissões",
     groupCreated: 'Grupo "{{name}}" criado com sucesso!',
     createError: "Erro ao criar o grupo. Por favor, tente novamente.",
+    groupCreatedCopyFailed:
+      'O grupo "{{name}}" foi criado, mas a cópia das permissões falhou. Você pode defini-las manualmente.',
     deleteGroup: "Excluir grupo",
     deleteConfirm: 'Tem certeza de que deseja excluir "{{name}}"? Esta ação não pode ser desfeita.',
     groupDeleted: 'Grupo "{{name}}" excluído com sucesso',
     deleteError: "Erro ao excluir o grupo. Tente novamente.",
+    permissionsCopied: "Permissões copiadas de {{source}} para {{target}}!",
     copyError: "Erro ao copiar as permissões. Por favor, tente novamente.",
     copySourceNotLoaded:
       "As permissões do grupo de origem não foram carregadas. Selecione primeiro o grupo de origem.",

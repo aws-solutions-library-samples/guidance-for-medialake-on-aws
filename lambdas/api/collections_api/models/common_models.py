@@ -136,7 +136,7 @@ class GetCollectionAssetsQueryParams(BaseModel):
 
     page: int = Field(default=1, ge=1, description="Page number")
     page_size: int = Field(
-        default=50, ge=1, le=100, description="Page size", alias="pageSize"
+        default=50, ge=1, le=5000, description="Page size (max 5000)", alias="pageSize"
     )
 
     model_config = ConfigDict(populate_by_name=True)
@@ -151,7 +151,9 @@ class ListGroupsQueryParams(BaseModel):
     """Query parameters for listing collection groups."""
 
     page: int = Field(default=1, ge=1, description="Page number (1-based)")
-    pageSize: int = Field(default=20, ge=1, le=100, description="Results per page")
+    pageSize: int = Field(
+        default=20, ge=1, le=5000, description="Results per page (max 5000)"
+    )
     sort: Optional[str] = Field(default="name", pattern="^(name|createdAt|updatedAt)$")
     sortDirection: Optional[str] = Field(default="asc", pattern="^(asc|desc)$")
     search: Optional[str] = Field(None, description="Free-text search query")

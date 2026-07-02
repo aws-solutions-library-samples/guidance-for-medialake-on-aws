@@ -1721,10 +1721,13 @@ export default {
     saveError: "Error saving permissions",
     groupCreated: 'Group "{{name}}" created successfully!',
     createError: "Error creating group. Please try again.",
+    groupCreatedCopyFailed:
+      'Group "{{name}}" was created, but copying permissions failed. You can set them manually.',
     deleteGroup: "Delete Group",
     deleteConfirm: 'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
     groupDeleted: 'Group "{{name}}" deleted successfully',
     deleteError: "Error deleting group. Please try again.",
+    permissionsCopied: "Permissions copied from {{source}} to {{target}}!",
     copyError: "Error copying permissions. Please try again.",
     copySourceNotLoaded: "Source group permissions not loaded. Select the source group first.",
     unsavedWarning: "You have unsaved changes. Are you sure you want to continue?",

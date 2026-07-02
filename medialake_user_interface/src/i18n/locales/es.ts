@@ -1741,11 +1741,14 @@ export default {
     saveError: "Error al guardar los permisos",
     groupCreated: '¡Grupo "{{name}}" creado exitosamente!',
     createError: "Error al crear el grupo. Por favor, inténtelo de nuevo.",
+    groupCreatedCopyFailed:
+      'El grupo "{{name}}" se creó, pero la copia de permisos falló. Puede configurarlos manualmente.',
     deleteGroup: "Eliminar grupo",
     deleteConfirm:
       '¿Está seguro de que desea eliminar "{{name}}"? Esta acción no se puede deshacer.',
     groupDeleted: 'Grupo "{{name}}" eliminado correctamente',
     deleteError: "Error al eliminar el grupo. Inténtelo de nuevo.",
+    permissionsCopied: "¡Permisos copiados de {{source}} a {{target}}!",
     copyError: "Error al copiar los permisos. Por favor, inténtelo de nuevo.",
     copySourceNotLoaded:
       "Los permisos del grupo de origen no están cargados. Seleccione primero el grupo de origen.",

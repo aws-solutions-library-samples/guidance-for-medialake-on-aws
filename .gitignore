@@ -200,3 +200,10 @@ medialake_user_interface/playwright.vistest.config.ts
 # .qa-sessions can hold browser auth/localStorage state — must never be committed.
 qa/
 .qa-sessions/
+
+# CI native-layer build cache (moved here by .cicd/build_lambdas.py clean step).
+# Contains vendored native libs (pyvips/libvips, OpenEXR, numpy, etc.). Must NOT
+# be tracked: formatters (isort/black) reordering vendored package imports here
+# corrupted pyvips and broke image proxy/thumbnail at runtime. Always rebuilt by
+# the .cicd/build_*.sh scripts, so it is safe to ignore.
+.preserve_layers/

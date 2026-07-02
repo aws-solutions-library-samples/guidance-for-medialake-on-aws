@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.17.5] - 2026-07-02
+
+### Bug Fixes
+
+- fix: default image pipeline node
+- fix: Copy permission group permissions when creating a new permission group
+- fix: collection pagination settings not working above 100
+
+### Other Changes
+
+- ci: pre-commit fix
+
 ## [1.17.4] - 2026-06-29
 
 ### Bug Fixes

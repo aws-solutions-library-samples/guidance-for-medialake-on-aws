@@ -1711,10 +1711,13 @@ export default {
     saveError: "שגיאה בשמירת ההרשאות",
     groupCreated: 'הקבוצה "{{name}}" נוצרה בהצלחה!',
     createError: "שגיאה ביצירת הקבוצה. אנא נסה שוב.",
+    groupCreatedCopyFailed:
+      'הקבוצה "{{name}}" נוצרה, אך העתקת ההרשאות נכשלה. ניתן להגדיר אותן ידנית.',
     deleteGroup: "מחק קבוצה",
     deleteConfirm: 'האם אתה בטוח שברצונך למחוק את "{{name}}"? לא ניתן לבטל פעולה זו.',
     groupDeleted: 'הקבוצה "{{name}}" נמחקה בהצלחה',
     deleteError: "שגיאה במחיקת הקבוצה. נסה שוב.",
+    permissionsCopied: "ההרשאות הועתקו מ-{{source}} אל {{target}}!",
     copyError: "שגיאה בהעתקת ההרשאות. אנא נסה שוב.",
     copySourceNotLoaded: "הרשאות קבוצת המקור לא נטענו. בחר תחילה את קבוצת המקור.",
     unsavedWarning: "יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך להמשיך?",

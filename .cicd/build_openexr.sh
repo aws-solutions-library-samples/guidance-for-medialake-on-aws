@@ -8,6 +8,12 @@ echo "Building OpenEXR layer..."
 echo "Working directory: $BASE_DIR"
 echo "Layer directory: $LAYER_DIR"
 
+# Start from a clean layer directory. Without this, re-running the build layers
+# a new install on top of any previous one; mixing e.g. an older pyvips with a
+# newer one leaves a corrupt package ("partially initialized module 'pyvips'
+# has no attribute 'VipsObject'" / circular import at runtime).
+rm -rf "$LAYER_DIR"
+
 # Create the directory structure
 mkdir -p $LAYER_DIR/python
 mkdir -p $LAYER_DIR/lib

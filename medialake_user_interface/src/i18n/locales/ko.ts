@@ -1717,10 +1717,13 @@ export default {
     saveError: "권한 저장 중 오류가 발생했습니다",
     groupCreated: '그룹 "{{name}}"이(가) 성공적으로 생성되었습니다!',
     createError: "그룹 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
+    groupCreatedCopyFailed:
+      '그룹 "{{name}}"이(가) 생성되었지만 권한 복사에 실패했습니다. 수동으로 설정할 수 있습니다.',
     deleteGroup: "그룹 삭제",
     deleteConfirm: '"{{name}}"을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
     groupDeleted: '그룹 "{{name}}"이(가) 성공적으로 삭제되었습니다',
     deleteError: "그룹 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.",
+    permissionsCopied: "{{source}}에서 {{target}}(으)로 권한이 복사되었습니다!",
     copyError: "권한 복사 중 오류가 발생했습니다. 다시 시도해 주세요.",
     copySourceNotLoaded: "소스 그룹 권한이 로드되지 않았습니다. 먼저 소스 그룹을 선택하세요.",
     unsavedWarning: "저장되지 않은 변경 사항이 있습니다. 계속하시겠습니까?",
