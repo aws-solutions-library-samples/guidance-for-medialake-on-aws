@@ -144,6 +144,7 @@ class AssetsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
                 },
             ),
         )
@@ -204,6 +205,7 @@ class AssetsConstruct(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
+                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
                 },
             ),
         )

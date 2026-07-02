@@ -1125,7 +1125,7 @@ def get_indexed_thumbnail_url(thumbnail_url: str, index: int = THUMBNAIL_INDEX) 
     Returns:
         Modified URL with the specific thumbnail index
     """
-    if not thumbnail_url or ".jpg" not in thumbnail_url:
+    if not thumbnail_url or not thumbnail_url.endswith(".jpg"):
         return thumbnail_url
 
     # Replace existing .0000000.jpg (or similar) with new index, or add if not present
