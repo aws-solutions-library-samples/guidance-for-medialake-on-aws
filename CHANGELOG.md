@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.6] - 2026-07-06
+
+### Bug Fixes
+
+- fix(ingest): correct S3 key decoding for keys with special characters
+- fix(nodes): correct PassRole resource pattern for transcribe node service role
+- fix(connectors): add missing S3 versioning permissions to connector role
+
 ## [1.17.5] - 2026-07-02
 
 ### Bug Fixes

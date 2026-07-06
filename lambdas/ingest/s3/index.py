@@ -1251,18 +1251,6 @@ class AssetProcessor:
         else:
             logger.info(message, **context)
 
-    def _decode_s3_event_key(self, encoded_key: str) -> str:
-        """Decode S3 event key by handling URL encoding properly"""
-        # First, decode all URL-encoded sequences (%20, %E2%80%AF, etc.)
-        decoded_key = urllib.parse.unquote(encoded_key)
-
-        # In S3 event notifications, '+' characters typically represent spaces
-        # This is different from general URL encoding where '+' in paths should be literal
-        # But S3 notifications often use '+' to represent spaces in object keys
-        decoded_key = decoded_key.replace("+", " ")
-
-        return decoded_key
-
     def _extract_file_extension(self, key: str) -> str:
         """Extract file extension from key"""
         # The key should already be URL-decoded by the time it reaches this method
@@ -1381,13 +1369,9 @@ class AssetProcessor:
         self, bucket: str, key: str, version_id: Optional[str] = None
     ) -> Optional[Dict]:
         """Process new asset from S3 with optimized performance and race condition prevention"""
-        original_key = key
-        key = self._decode_s3_event_key(key)
-
-        # Log key transformation for debugging
-        if original_key != key:
-            logger.info(f"Key decoded from '{original_key}' to '{key}'")
-
+        # NOTE: `key` is already decoded by normalize_event_context(s) and verified
+        # against S3 in process_s3_event before reaching here. Decoding it again would
+        # double-decode and corrupt keys containing a literal '+' (e.g. "video+data.mp4").
         try:
             # CRITICAL: Acquire processing lock FIRST to prevent race conditions
             # This MUST be the first operation to ensure only one Lambda processes this object
@@ -3492,8 +3476,15 @@ _EVENTBRIDGE_DETAIL_TYPE_MAP = {
 
 
 def _decode_s3_key(raw_key: str) -> str:
-    """Decode S3 key — URL-decode and replace '+' with space."""
-    return urllib.parse.unquote(raw_key).replace("+", " ")
+    """Decode an object key from a classic S3 event notification.
+
+    S3 event notifications encode object keys with application/x-www-form-urlencoded
+    rules: spaces become '+', a literal '+' becomes '%2B', and other special chars
+    are percent-encoded. ``unquote_plus`` reverses this exactly. The previous
+    ``unquote(...).replace('+', ' ')`` corrupted literal '+' characters — e.g.
+    "video+data.mp4" was decoded to "video data.mp4" and the object was not found.
+    """
+    return urllib.parse.unquote_plus(raw_key)
 
 
 # S3 deletion-type vocabulary. EventBridge "Object Deleted" events carry these
@@ -3561,7 +3552,9 @@ def _extract_eventbridge_context(event_data: Dict) -> Optional[S3EventContext]:
         )
         return None
 
-    key = _decode_s3_key(key)
+    # EventBridge S3 notifications deliver the object key un-encoded (unlike classic
+    # S3 event notifications). It must be used as-is — decoding here would corrupt
+    # keys containing '+', '%', or spaces (e.g. "test+b.png", "ARTISTS K to O.png").
 
     destination_storage_class = None
     if detail_type == "Object Storage Class Changed":

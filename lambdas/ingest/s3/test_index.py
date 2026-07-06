@@ -27,6 +27,7 @@ with patch.dict(
             DELETION_TYPE_DELETE_MARKER,
             DELETION_TYPE_PERMANENT,
             AssetProcessor,
+            _decode_s3_key,
             normalize_event_context,
             normalize_event_contexts,
             process_records_in_parallel,
@@ -447,3 +448,92 @@ class TestDeleteAssetReturn:
             )
         assert result is False
         proc.dynamodb.query.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 11. S3 object-key decoding for keys with special characters
+# ---------------------------------------------------------------------------
+
+
+class TestDecodeS3KeyHelper:
+    """`_decode_s3_key` decodes classic S3 event-notification keys.
+
+    S3 encodes object keys with application/x-www-form-urlencoded rules:
+    a space becomes '+', a literal '+' becomes '%2B', and other special
+    characters are percent-encoded. `unquote_plus` reverses this exactly.
+    """
+
+    def test_spaces_encoded_as_plus(self):
+        assert _decode_s3_key("ARTISTS+K+to+O.png") == "ARTISTS K to O.png"
+
+    def test_literal_plus_encoded_as_percent_2b(self):
+        assert _decode_s3_key("video%2Bdata.mp4") == "video+data.mp4"
+        assert _decode_s3_key("test%2Bb.png") == "test+b.png"
+
+    def test_mixed_space_and_literal_plus(self):
+        assert _decode_s3_key("my%20folder/a%2Bb.mp3") == "my folder/a+b.mp3"
+
+    def test_percent_and_special_sequences(self):
+        # A file literally named "%2B%20%%%.png" is delivered by S3 with every
+        # '%' percent-encoded as '%25'.
+        assert _decode_s3_key("%252B%2520%25%25%25.png") == "%2B%20%%%.png"
+
+    def test_plain_key_unchanged(self):
+        assert _decode_s3_key("photos/img.jpg") == "photos/img.jpg"
+
+
+class TestDirectS3RecordKeyDecoding:
+    """Direct and SQS-wrapped S3 records must be decoded via `_decode_s3_key`."""
+
+    def test_direct_record_decodes_literal_plus(self):
+        ctx = normalize_event_context(_s3_record(key="video%2Bdata.mp4"))
+        assert ctx["key"] == "video+data.mp4"
+
+    def test_direct_record_decodes_spaces(self):
+        ctxs = normalize_event_contexts(_s3_record(key="ARTISTS+K+to+O.png"))
+        assert ctxs[0]["key"] == "ARTISTS K to O.png"
+
+    def test_sqs_wrapped_record_decodes_literal_plus(self):
+        body = {"Records": [_s3_record(key="test%2Bb.png")]}
+        ctxs = normalize_event_contexts(_sqs_record(body))
+        assert ctxs[0]["key"] == "test+b.png"
+
+    def test_sqs_wrapped_record_decodes_mixed(self):
+        body = {"Records": [_s3_record(key="my%20folder/a%2Bb.mp3")]}
+        ctx = normalize_event_context(_sqs_record(body))
+        assert ctx["key"] == "my folder/a+b.mp3"
+
+
+class TestEventBridgeKeyNotDecoded:
+    """EventBridge delivers the object key un-encoded, so it is used as-is.
+
+    Decoding it would corrupt keys containing '+', '%', or spaces.
+    """
+
+    def test_direct_eventbridge_literal_plus_used_as_is(self):
+        ctx = normalize_event_context(_eventbridge_event(key="test+b.png"))
+        assert ctx["key"] == "test+b.png"
+
+    def test_direct_eventbridge_spaces_used_as_is(self):
+        ctxs = normalize_event_contexts(_eventbridge_event(key="ARTISTS K to O.png"))
+        assert ctxs[0]["key"] == "ARTISTS K to O.png"
+
+    def test_direct_eventbridge_percent_and_plus_used_as_is(self):
+        ctx = normalize_event_context(_eventbridge_event(key="%2B++ %20.mp3"))
+        assert ctx["key"] == "%2B++ %20.mp3"
+
+    def test_sqs_wrapped_eventbridge_used_as_is(self):
+        ctxs = normalize_event_contexts(
+            _sqs_record(_eventbridge_event(key="test+b.png"))
+        )
+        assert ctxs[0]["key"] == "test+b.png"
+
+
+class TestNoDoubleDecode:
+    """Regression guard: the removed second decode must not be reintroduced."""
+
+    def test_processor_has_no_legacy_decode_helper(self):
+        # `process_asset` used to call `_decode_s3_event_key`, double-decoding a
+        # key that normalize_event_context(s) had already decoded and corrupting
+        # literal '+'. That helper was removed.
+        assert not hasattr(AssetProcessor, "_decode_s3_event_key")

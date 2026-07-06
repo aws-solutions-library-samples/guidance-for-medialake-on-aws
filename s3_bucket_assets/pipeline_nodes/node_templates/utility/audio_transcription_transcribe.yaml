@@ -21,7 +21,7 @@ node:
               actions:
                 - iam:PassRole
               resources:
-                - arn:aws:iam::${AWS::AccountId}:role/*_audio_transcription_transcribe_*
+                - arn:aws:iam::${AWS::AccountId}:role/*_transcribe_service_role
 
       service_roles:
         - name: transcribe_service_role
