@@ -10,7 +10,7 @@ from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
-
+from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method
 from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
@@ -98,6 +98,7 @@ class SearchConstruct(Construct):
                     # BEDROCK_INFERENCE_PROFILE_ARN removed - Lambda auto-selects based on system settings
                     # Thumbnail index for video posters (0-4, default 2 = middle thumbnail)
                     "THUMBNAIL_INDEX": "2",
+                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
                     # Connector table for /search/connectors endpoint
                     # Allows search API to return connector summaries without
                     # requiring separate connectors:view permission
