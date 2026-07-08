@@ -2017,7 +2017,13 @@ export default {
       startFromTemplateTitle: "템플릿에서 시작",
       applyThemeTitle: "테마 적용",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "선택 사항. 업로드 배치 완료 이벤트를 자동 보강을 위한 특정 파이프라인으로 라우팅하는 데 사용됩니다.",
     },

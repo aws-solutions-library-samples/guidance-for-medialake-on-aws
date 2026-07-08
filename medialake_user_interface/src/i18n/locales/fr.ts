@@ -2054,7 +2054,13 @@ export default {
       startFromTemplateTitle: "Démarrer à partir d'un modèle",
       applyThemeTitle: "Appliquer un thème",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "Facultatif. Utilisé pour acheminer les événements de fin de lot de téléchargement vers un pipeline spécifique pour l'enrichissement automatique.",
     },

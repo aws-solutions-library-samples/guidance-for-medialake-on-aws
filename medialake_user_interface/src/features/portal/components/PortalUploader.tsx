@@ -5,6 +5,7 @@ import Dashboard from "@uppy/react/dashboard";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import { Alert, Box, Button } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { usePortalApi, PortalSessionExpiredError } from "../hooks/usePortalApi";
 import type {
   PortalDestination,
@@ -14,7 +15,6 @@ import type {
 import UploadQueueTable from "./UploadQueueTable";
 import ConflictResolutionDialog from "./ConflictResolutionDialog";
 import type { UppyFile, Meta, Body } from "@uppy/core";
-import { StorageHelper } from "@/common/helpers/storage-helper";
 
 interface Props {
   portalSlug: string;
@@ -28,7 +28,7 @@ interface Props {
   useCaptchaIntegration?: boolean;
   /**
    * Optional override for the primary upload button label. Defaults to
-   * the legacy strings ("Upload Files" / "Uploading…"). The visual
+   * the localized "Upload assets" / "Uploading…" strings. The visual
    * editor's Content section exposes `appearance.content.submitButtonText`
    * which flows through this prop at render time (Requirement 12.12).
    */
@@ -43,6 +43,12 @@ interface Props {
   buttonStyle?: "contained" | "outlined" | "text";
   /** Border-radius style of the submit button. */
   buttonRounding?: "square" | "rounded" | "pill";
+  /** Called when the upload session id is resolved (created or resumed). */
+  onSessionChange?: (sessionId: string) => void;
+  /** Called with the count of successfully uploaded files as it changes. */
+  onUploadedCountChange?: (count: number) => void;
+  /** Called when an upload starts (true) or all uploads settle (false). */
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 const GB = 1024 * 1024 * 1024;
@@ -64,6 +70,9 @@ const PortalUploader: React.FC<Props> = ({
   allowedFileTypes,
   buttonStyle,
   buttonRounding,
+  onSessionChange,
+  onUploadedCountChange,
+  onUploadingChange,
 }) => {
   const [uppy, setUppy] = useState<Uppy | null>(null);
   const [files, setFiles] = useState<UppyFile<Meta, Body>[]>([]);
@@ -73,12 +82,26 @@ const PortalUploader: React.FC<Props> = ({
   const [showConflicts, setShowConflicts] = useState(false);
 
   const multipartDataRef = useRef<Map<string, PortalMultipartMetadata>>(new Map());
+  // Per-file (filename, relative path) captured at upload-parameter time so a
+  // failed upload can be released against the session by rebuilding its key.
+  const fileLocatorRef = useRef<Map<string, { filename: string; path: string }>>(new Map());
   const portalApi = usePortalApi(portalSlug, sessionJwt, useCaptchaIntegration);
+
+  // Latest bridge callbacks held in refs so the Uppy event subscription does
+  // not need to re-bind when the parent passes new closures.
+  const onSessionChangeRef = useRef(onSessionChange);
+  const onUploadedCountChangeRef = useRef(onUploadedCountChange);
+  const onUploadingChangeRef = useRef(onUploadingChange);
+  useEffect(() => {
+    onSessionChangeRef.current = onSessionChange;
+    onUploadedCountChangeRef.current = onUploadedCountChange;
+    onUploadingChangeRef.current = onUploadingChange;
+  });
 
   // --- Upload session state ---
   const sessionIdRef = useRef<string | null>(null);
   const fileCountRef = useRef<number>(0);
-  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { t } = useTranslation();
 
   // Single-flight session creation. A multi-file batch fires several concurrent
   // getUploadParameters/createMultipartUpload calls (AwsS3 `limit`). Without a
@@ -114,6 +137,7 @@ const PortalUploader: React.FC<Props> = ({
         const resp = await portalApi.startSession();
         sessionIdRef.current = resp.sessionId;
         sessionStorage.setItem(sessionStorageKey, resp.sessionId);
+        onSessionChangeRef.current?.(resp.sessionId);
         return resp.sessionId;
       })();
       // On failure, clear the memoized promise so a later upload can retry.
@@ -136,6 +160,7 @@ const PortalUploader: React.FC<Props> = ({
         if (cancelled) return;
         if (session.status === "OPEN") {
           sessionIdRef.current = storedId;
+          onSessionChangeRef.current?.(storedId);
         } else {
           sessionStorage.removeItem(sessionStorageKey);
         }
@@ -191,22 +216,52 @@ const PortalUploader: React.FC<Props> = ({
   useEffect(() => {
     if (!uppy) return;
 
+    const reportCount = () => {
+      const count = uppy.getFiles().filter((f) => f.progress?.uploadComplete).length;
+      onUploadedCountChangeRef.current?.(count);
+    };
     const syncFiles = () => setFiles([...uppy.getFiles()]);
     const onUpload = () => {
       setIsUploading(true);
       setUploadComplete(false);
+      onUploadingChangeRef.current?.(true);
+    };
+    const onUploadSuccess = () => {
+      syncFiles();
+      reportCount();
+    };
+    const onUploadError = (file?: UppyFile<Meta, Body>) => {
+      // Release the failed key in real time so it stops inflating the
+      // session's expectedCount (the completion-join denominator). Best-effort:
+      // submit's count true-up and the server sweep are the backstops.
+      const sid = sessionIdRef.current;
+      const loc = file ? fileLocatorRef.current.get(file.id) : undefined;
+      if (sid && loc) {
+        portalApi
+          .releaseKey(sid, {
+            destinationId: destination.destinationId,
+            filename: loc.filename,
+            path: loc.path,
+          })
+          .catch(() => {
+            // best-effort; submit true-up / sweep reconcile the count
+          });
+      }
+      syncFiles();
     };
     const onComplete = () => {
       setIsUploading(false);
       setUploadComplete(true);
+      onUploadingChangeRef.current?.(false);
       syncFiles();
+      reportCount();
     };
 
     uppy.on("file-added", syncFiles);
     uppy.on("file-removed", syncFiles);
     uppy.on("upload-progress", syncFiles);
-    uppy.on("upload-success", syncFiles);
-    uppy.on("upload-error", syncFiles);
+    uppy.on("upload-success", onUploadSuccess);
+    uppy.on("upload-error", onUploadError);
     uppy.on("upload", onUpload);
     uppy.on("complete", onComplete);
 
@@ -214,12 +269,12 @@ const PortalUploader: React.FC<Props> = ({
       uppy.off("file-added", syncFiles);
       uppy.off("file-removed", syncFiles);
       uppy.off("upload-progress", syncFiles);
-      uppy.off("upload-success", syncFiles);
-      uppy.off("upload-error", syncFiles);
+      uppy.off("upload-success", onUploadSuccess);
+      uppy.off("upload-error", onUploadError);
       uppy.off("upload", onUpload);
       uppy.off("complete", onComplete);
     };
-  }, [uppy]);
+  }, [uppy, portalApi, destination.destinationId]);
 
   // Configure S3 plugin callbacks when dependencies change
   useEffect(() => {
@@ -250,6 +305,10 @@ const PortalUploader: React.FC<Props> = ({
           });
           if (!result.presignedPost) throw new Error("Missing presigned post data");
           fileCountRef.current += 1;
+          fileLocatorRef.current.set(file.id, {
+            filename: file.name,
+            path: relativePath,
+          });
           return {
             method: "POST" as const,
             url: result.presignedPost.url,
@@ -283,6 +342,10 @@ const PortalUploader: React.FC<Props> = ({
             throw new Error("Missing multipart data");
           }
           fileCountRef.current += 1;
+          fileLocatorRef.current.set(file.id, {
+            filename: file.name,
+            path: relativePath,
+          });
           multipartDataRef.current.set(file.id, {
             uploadId: result.uploadId,
             key: result.key,
@@ -355,90 +418,13 @@ const PortalUploader: React.FC<Props> = ({
     ensureSession,
   ]);
 
-  // --- Heartbeat: post every ~30s while uploading and a sessionId exists ---
-  useEffect(() => {
-    if (!isUploading || !sessionIdRef.current) {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-      return;
-    }
-
-    heartbeatIntervalRef.current = setInterval(() => {
-      const sid = sessionIdRef.current;
-      if (sid) {
-        portalApi.heartbeat(sid).catch(() => {
-          // best-effort; a failed heartbeat should not crash the uploader
-        });
-      }
-    }, 30_000);
-
-    return () => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-    };
-  }, [isUploading, portalApi]);
-
-  // --- Finalize on Uppy `complete` event ---
-  useEffect(() => {
-    if (!uppy) return;
-
-    const onUploadComplete = () => {
-      const sid = sessionIdRef.current;
-      if (!sid) return;
-      portalApi.finalize(sid, fileCountRef.current).catch(() => {
-        // best-effort; finalize is idempotent and the sweep is the safety net
-      });
-    };
-
-    uppy.on("complete", onUploadComplete);
-    return () => {
-      uppy.off("complete", onUploadComplete);
-    };
-  }, [uppy, portalApi]);
-
-  // --- Finalize on beforeunload via fetch keepalive ---
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const sid = sessionIdRef.current;
-      if (!sid) return;
-
-      const baseURL = StorageHelper.getAwsConfig()?.API?.REST?.RestApi?.endpoint || "";
-      const url = `${baseURL}/portal/${portalSlug}/upload-session/${sid}/finalize`;
-
-      try {
-        fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Portal-Session": sessionJwt,
-          },
-          body: JSON.stringify({ fileCount: fileCountRef.current }),
-          keepalive: true,
-        });
-      } catch {
-        // best-effort; cannot handle errors during unload
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [portalSlug, sessionJwt]);
-
-  // --- Cleanup heartbeat on unmount ---
-  useEffect(() => {
-    return () => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-    };
-  }, []);
+  // --- Heartbeat lives at the page level ---
+  // The session heartbeat is driven by UploadPortalPage for the entire life of
+  // the authenticated survey (any page, whether or not an upload is in flight),
+  // so server-side "idle" means the browser is actually gone rather than
+  // "uploads finished". Gating it here on `isUploading` would stop the moment
+  // uploads completed, letting the idle timeout fire while the user is still
+  // filling out the rest of the form.
 
   const handleUpload = async () => {
     if (!uppy || files.length === 0) return;
@@ -550,8 +536,8 @@ const PortalUploader: React.FC<Props> = ({
         }}
       >
         {isUploading
-          ? "Uploading…"
-          : (submitButtonText && submitButtonText.trim()) || "Upload Files"}
+          ? t("uploadPortals.public.uploading")
+          : (submitButtonText && submitButtonText.trim()) || t("uploadPortals.public.uploadAssets")}
       </Button>
 
       <ConflictResolutionDialog

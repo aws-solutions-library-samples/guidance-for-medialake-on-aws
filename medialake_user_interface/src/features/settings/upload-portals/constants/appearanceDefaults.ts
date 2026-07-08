@@ -47,7 +47,14 @@ export const DEFAULT_PORTAL_APPEARANCE: PortalAppearance = {
   content: {
     titleHtml: "",
     descriptionHtml: "",
-    submitButtonText: "Submit",
+    // Label for the uploader's OWN upload-trigger button (NOT the page-level
+    // Submit/Complete action, which is a fixed i18n string — see
+    // `UploadPortalPage.tsx`'s `model.completeText`). Defaulting this to
+    // "Upload assets" keeps the two buttons visually and semantically
+    // distinct out of the box; a value of "Submit" here would make the
+    // upload-trigger button read the same as the authoritative Submit
+    // button on any portal that collects a form submission.
+    submitButtonText: "Upload assets",
     footerHtml: "",
     successMessage: "Upload complete! Thank you.",
     dropZoneText: "Drop files here or click to browse",

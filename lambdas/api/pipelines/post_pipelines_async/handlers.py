@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler import Response, content_types
 from aws_lambda_powertools.event_handler.api_gateway import (
     APIGatewayRestResolver,
     CORSConfig,
@@ -23,6 +24,23 @@ metrics = Metrics(namespace="PostPipelineAsyncHandler")
 PIPELINES_TABLE = os.environ.get("PIPELINES_TABLE")
 if not PIPELINES_TABLE:
     logger.error("PIPELINES_TABLE environment variable is not set")
+
+
+def _api_response(status_code: int, body: Dict[str, Any]) -> Response:
+    """Build a Powertools ``Response`` with a JSON body and explicit status.
+
+    Route handlers must return a ``Response`` (not a bare API-Gateway-proxy
+    dict) so the ``APIGatewayRestResolver`` honours the intended HTTP status.
+    Returning a raw ``{"statusCode": ...}`` dict causes the resolver to treat
+    the whole dict as the response *body* and emit HTTP 200, which silently
+    hides 4xx validation errors from the client. CORS headers are added by the
+    resolver's ``CORSConfig``.
+    """
+    return Response(
+        status_code=status_code,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps(body),
+    )
 
 
 # DynamoDB operations
@@ -289,6 +307,36 @@ PIPELINE_CREATION_STATE_MACHINE_ARN = os.environ.get(
 )
 
 
+def _coerce_json_param(value: Any) -> Any:
+    """Coerce a node parameter that may arrive as a JSON string into a value.
+
+    The pipeline editor's generic node-config form serializes object-typed
+    parameters (e.g. ``Default Portal Config`` / ``Field Mapping``) as JSON
+    *strings*, whereas other callers may pass an already-parsed object. The
+    ``manage_portal`` node runtime itself ``json.loads`` these params, so the
+    deploy-time check must accept the same string form or it would reject every
+    UI-configured node with a spurious "must be an object" error.
+
+    Returns the parsed value (for a JSON string), the original value (for a
+    non-string), ``{}`` for an empty/blank string, or the sentinel
+    ``_INVALID_JSON`` when a string is present but is not valid JSON.
+    """
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return {}
+        try:
+            return json.loads(stripped)
+        except (ValueError, TypeError):
+            return _INVALID_JSON
+    return value
+
+
+# Sentinel distinguishing "a string that failed to parse as JSON" from a
+# legitimately parsed value (which could itself be falsy, e.g. {} or None).
+_INVALID_JSON = object()
+
+
 def _validate_portal_nodes(request_data: Dict[str, Any]) -> list[dict]:
     """Validate the static config of any ``manage_portal`` nodes in the pipeline.
 
@@ -302,6 +350,10 @@ def _validate_portal_nodes(request_data: Dict[str, Any]) -> list[dict]:
     rather than its static ``Default Portal Config``; in that case we validate
     leniently (format/structure only). With no field mapping, ``name``/``slug``
     are required because nothing else can supply them.
+
+    ``Default Portal Config`` and ``Field Mapping`` may arrive either as objects
+    or as JSON strings (the pipeline editor serializes object-typed params as
+    strings); both forms are accepted here, mirroring the node runtime.
     """
     problems: list[dict] = []
     configuration = request_data.get("configuration") or {}
@@ -312,17 +364,31 @@ def _validate_portal_nodes(request_data: Dict[str, Any]) -> list[dict]:
         label = data.get("label") or data.get("id") or f"node[{index}]"
         params = (data.get("configuration") or {}).get("parameters") or {}
 
-        portal_config = params.get("Default Portal Config")
-        if portal_config is None:
-            portal_config = {}
-        if not isinstance(portal_config, dict):
+        raw_portal_config = params.get("Default Portal Config")
+        if raw_portal_config is None:
+            raw_portal_config = {}
+        portal_config = _coerce_json_param(raw_portal_config)
+        if portal_config is _INVALID_JSON or not isinstance(portal_config, dict):
             problems.append(
                 {"node": label, "errors": ["Default Portal Config must be an object"]}
             )
             continue
 
-        field_mapping = params.get("Field Mapping") or {}
-        partial = bool(field_mapping)
+        # Field mapping is optional; parse it (it may be a JSON string too) so
+        # `partial` reflects whether runtime mappings actually exist. A missing,
+        # empty, or unparseable mapping is treated as "no mapping" (strict).
+        field_mapping = _coerce_json_param(params.get("Field Mapping") or {})
+        if field_mapping is _INVALID_JSON or not isinstance(field_mapping, dict):
+            field_mapping = {}
+        # A Template reference supplies the portal's structure/slug at runtime
+        # (the node fetches + expands the template), so the inline Default Portal
+        # Config may legitimately be empty. Validate leniently when a Template ID
+        # is set — any values that ARE present are still format-checked.
+        template_ref_raw = params.get("Template ID")
+        template_ref = isinstance(template_ref_raw, str) and bool(
+            template_ref_raw.strip()
+        )
+        partial = bool(field_mapping) or template_ref
         errors = validate_portal_config(portal_config, partial=partial)
         if errors:
             problems.append({"node": label, "errors": errors})
@@ -398,19 +464,13 @@ def create_pipeline() -> Dict[str, Any]:
         node_problems = portal_problems + collection_problems
         if node_problems:
             logger.info(f"Rejecting pipeline - invalid node(s): {node_problems}")
-            return {
-                "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
+            return _api_response(
+                400,
+                {
+                    "error": "Invalid node configuration",
+                    "details": node_problems,
                 },
-                "body": json.dumps(
-                    {
-                        "error": "Invalid node configuration",
-                        "details": node_problems,
-                    }
-                ),
-            }
+            )
 
         # Check if this is an update operation by looking for pipeline_id in the request
         pipeline_id = request_data.get("pipeline_id")
@@ -426,14 +486,7 @@ def create_pipeline() -> Dict[str, Any]:
                 logger.info(
                     f"Rejecting pipeline update - ID does not exist: {pipeline_id}"
                 )
-                return {
-                    "statusCode": 404,
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                    },
-                    "body": json.dumps(error_body),
-                }
+                return _api_response(404, error_body)
             logger.info(f"Updating existing pipeline with ID: {pipeline_id}")
         else:
             # This is a new pipeline creation, check if the name already exists
@@ -446,14 +499,7 @@ def create_pipeline() -> Dict[str, Any]:
                 logger.info(
                     f"Rejecting pipeline creation - name already exists: {pipeline_name}"
                 )
-                return {
-                    "statusCode": 400,
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                    },
-                    "body": json.dumps(error_body),
-                }
+                return _api_response(400, error_body)
 
             # For new pipelines, create a pipeline record with initial status
             pipeline_id = create_pipeline_record(pipeline, None, "CREATING")
@@ -489,36 +535,15 @@ def create_pipeline() -> Dict[str, Any]:
             # Handle the case when PIPELINES_TABLE is not set
             error_body = {"error": "Configuration error", "details": str(ve)}
             logger.error(f"Configuration error: {ve}")
-            return {
-                "statusCode": 500,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                },
-                "body": json.dumps(error_body),
-            }
+            return _api_response(500, error_body)
 
-        return {
-            "statusCode": 202,  # Accepted
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-            "body": json.dumps(response_body),
-        }
+        return _api_response(202, response_body)  # Accepted
 
     except Exception as e:
         logger.exception("Error starting pipeline creation")
         error_body = {"error": "Failed to start pipeline creation", "details": str(e)}
 
-        return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-            "body": json.dumps(error_body),
-        }
+        return _api_response(500, error_body)
 
 
 @app.get("/pipelines/status/{executionArn}")

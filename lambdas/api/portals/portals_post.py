@@ -155,6 +155,7 @@ def register_route(app):
                 )
                 metadata.structuredPathMode = body.get("structuredPathMode", False)
                 metadata.captchaEnabled = body.get("captchaEnabled", False)
+                metadata.formSubmissionEnabled = body.get("formSubmissionEnabled", True)
                 metadata.isActive = body.get("isActive", True)
                 metadata.accessVersion = 1
                 metadata.maxFileSizeBytes = body.get("maxFileSizeBytes")

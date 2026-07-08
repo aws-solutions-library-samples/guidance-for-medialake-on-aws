@@ -91,6 +91,7 @@ def register_route(app):
                 ),
                 "structuredPathMode": getattr(item, "structuredPathMode", None),
                 "captchaEnabled": getattr(item, "captchaEnabled", None),
+                "formSubmissionEnabled": getattr(item, "formSubmissionEnabled", None),
                 "maxFileSizeBytes": getattr(item, "maxFileSizeBytes", None),
                 "maxFilesPerSession": getattr(item, "maxFilesPerSession", None),
                 "createdBy": getattr(item, "createdBy", None),

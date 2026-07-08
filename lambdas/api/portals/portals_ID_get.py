@@ -109,6 +109,7 @@ def register_route(app):
                 "isActive": item.isActive,
                 "tokenBypassesPassphrase": item.tokenBypassesPassphrase,
                 "structuredPathMode": item.structuredPathMode,
+                "formSubmissionEnabled": getattr(item, "formSubmissionEnabled", True),
                 "maxFileSizeBytes": getattr(item, "maxFileSizeBytes", None),
                 "maxFilesPerSession": getattr(item, "maxFilesPerSession", None),
                 "automationTag": getattr(item, "automationTag", None),

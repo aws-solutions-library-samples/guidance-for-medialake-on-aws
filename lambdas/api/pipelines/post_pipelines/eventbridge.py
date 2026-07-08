@@ -339,7 +339,7 @@ def process_pattern_parameters(pattern: Dict[str, Any], node: Any) -> Dict[str, 
 
 def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
     """
-    Build the concrete EventBridge event pattern for the upload_batch_completed trigger node.
+    Build the concrete EventBridge event pattern for the Portal Upload Completed trigger node.
 
     Always includes:
       - source: ["medialake.pipeline"]
@@ -348,16 +348,18 @@ def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
 
     Conditionally includes:
       - detail.portalId: [portal_id] only when portal_id is configured (non-empty)
+      - detail.filesProcessed: ["true"|"false"] only when files_processed is set
+      - detail.formSubmissionComplete: ["true"|"false"] only when
+        form_submission_complete is set
 
-    Maps outcome_filter to detail.outcome:
-      - "COMPLETE" → ["COMPLETE"]
-      - "COMPLETE_WITH_ERRORS" → ["COMPLETE_WITH_ERRORS"]
-      - "BOTH" → ["COMPLETE", "COMPLETE_WITH_ERRORS"]
-      - unset/None/empty → ["COMPLETE"] (default)
+    The two signals ride the event as the STRINGS "true"/"false" (EventBridge
+    matches strings, not JSON booleans), so the pattern uses string values. A
+    blank/unset selection leaves that dimension UNCONSTRAINED (matches either
+    value), letting a pipeline filter on one signal, both, or neither.
 
     Args:
         node: Node object containing configuration with parameters
-              (automation_tag, portal_id, outcome_filter)
+              (automation_tag, portal_id, files_processed, form_submission_complete)
 
     Returns:
         EventBridge-compatible event pattern dictionary
@@ -371,7 +373,6 @@ def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
 
     automation_tag = parameters.get("automation_tag", "")
     portal_id = parameters.get("portal_id", "")
-    outcome_filter = parameters.get("outcome_filter", "")
 
     # Build the base pattern — source, detail-type, and automationTag are always present
     pattern: Dict[str, Any] = {
@@ -386,19 +387,16 @@ def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
     if portal_id and str(portal_id).strip():
         pattern["detail"]["portalId"] = [str(portal_id).strip()]
 
-    # Map outcome_filter to detail.outcome
-    outcome_map = {
-        "COMPLETE": ["COMPLETE"],
-        "COMPLETE_WITH_ERRORS": ["COMPLETE_WITH_ERRORS"],
-        "BOTH": ["COMPLETE", "COMPLETE_WITH_ERRORS"],
-    }
-    # Default to ["COMPLETE"] when outcome_filter is unset, empty, or not recognized
-    outcome = (
-        outcome_map.get(outcome_filter, ["COMPLETE"])
-        if outcome_filter
-        else ["COMPLETE"]
-    )
-    pattern["detail"]["outcome"] = outcome
+    # Map the two boolean selections to the string-valued event fields. Only a
+    # concrete "true"/"false" selection is applied; anything else leaves the
+    # dimension unconstrained.
+    for param_name, detail_field in (
+        ("files_processed", "filesProcessed"),
+        ("form_submission_complete", "formSubmissionComplete"),
+    ):
+        raw = str(parameters.get(param_name, "")).strip().lower()
+        if raw in ("true", "false"):
+            pattern["detail"][detail_field] = [raw]
 
     return pattern
 

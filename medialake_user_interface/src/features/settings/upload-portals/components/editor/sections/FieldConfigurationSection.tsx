@@ -105,8 +105,9 @@ const FieldConfigurationSection: React.FC = () => {
           Fields
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-          Configure the metadata fields collected on your pages. For dropdown, radio, checkbox, and
-          tag fields, add the choices respondents can pick from.
+          Configure the metadata fields collected on your pages. For dropdown, radio, and checkbox
+          fields, add the choices respondents can pick from. Tag fields are free-entry — respondents
+          type their own values instead of picking from a fixed list.
         </Typography>
         <MetadataFieldBuilder
           fields={metadataFields}

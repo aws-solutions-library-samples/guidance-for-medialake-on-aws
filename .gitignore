@@ -201,6 +201,10 @@ medialake_user_interface/playwright.vistest.config.ts
 qa/
 .qa-sessions/
 
+
+# MediaLake QA run outputs (screenshots + reports) — not source
+qa/results/
+
 # CI native-layer build cache (moved here by .cicd/build_lambdas.py clean step).
 # Contains vendored native libs (pyvips/libvips, OpenEXR, numpy, etc.). Must NOT
 # be tracked: formatters (isort/black) reordering vendored package imports here

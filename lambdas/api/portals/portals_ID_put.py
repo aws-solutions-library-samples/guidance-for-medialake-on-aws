@@ -190,6 +190,7 @@ def register_route(app):
                 "maxFilesPerSession": PortalMetadataModel.maxFilesPerSession,
                 "allowedFileTypes": PortalMetadataModel.allowedFileTypes,
                 "captchaEnabled": PortalMetadataModel.captchaEnabled,
+                "formSubmissionEnabled": PortalMetadataModel.formSubmissionEnabled,
                 "automationTag": PortalMetadataModel.automationTag,
                 "appearance": PortalMetadataModel.appearance,
                 "pages": PortalMetadataModel.pages,

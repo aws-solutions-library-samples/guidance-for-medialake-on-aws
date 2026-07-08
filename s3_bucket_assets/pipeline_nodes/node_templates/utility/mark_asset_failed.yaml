@@ -1,0 +1,46 @@
+spec: v1.0.0
+node:
+  id: mark_asset_failed
+  title: Mark Asset Failed
+  description: Records a failed asset against its upload batch (ml-batch-id) on a pipeline error/catch branch, so the batch resolves promptly as "submitted, with errors" instead of waiting out the completion grace period. Place on the catch/error branch of processing steps.
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/MarkAssetFailedLambdaDeployment
+        runtime: python3.12
+        timeout: 60
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:TransactWriteItems
+              resources:
+                - ${UPLOAD_SESSIONS_TABLE_ARN}
+            - effect: Allow
+              actions:
+                - cloudwatch:PutMetricData
+              resources:
+                - "*"
+actions:
+  mark:
+    summary: Mark Asset Failed
+    description: Record the asset as failed against its upload batch and attempt the terminal transition.
+    operationId: markAssetFailed
+    parameters: []
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

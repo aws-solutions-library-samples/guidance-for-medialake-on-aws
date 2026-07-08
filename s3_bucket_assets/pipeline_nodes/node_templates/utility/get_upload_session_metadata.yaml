@@ -1,0 +1,34 @@
+spec: v1.0.0
+node:
+  id: get_upload_session_metadata
+  title: Get Upload Session Metadata
+  description: Look up an upload session (by a sessionId or ml-batch-id found in the payload) and emit its status, counts, outcome, and user-entered batch metadata for downstream nodes. Read-only.
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/GetUploadSessionMetadataLambdaDeployment
+        runtime: python3.12
+        timeout: 60
+        iam_policy:
+          statements:
+            # Read-only access to the upload-sessions table. The ARN token is
+            # resolved at pipeline-build time from the builder environment; the
+            # default node policy already grants logs, events:PutEvents and KMS.
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+              resources:
+                - ${UPLOAD_SESSIONS_TABLE_ARN}
+actions:
+  get:
+    summary: Get Upload Session Metadata
+    description: Resolve the upload session and return its status, counts, outcome, and userMetadata for downstream nodes.
+    operationId: getUploadSessionMetadata
+    parameters: []
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

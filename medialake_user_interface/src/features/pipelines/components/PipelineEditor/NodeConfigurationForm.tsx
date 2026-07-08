@@ -7,6 +7,8 @@ import { NodeConfiguration, Node as NodeType, NodeParameter } from "@/features/p
 import { useGetIntegrations } from "@/features/settings/integrations/api/integrations.controller";
 import { useGetPipelines } from "../../api/pipelinesController";
 import { useGetPortals } from "@/api/hooks/usePortals";
+import { useListTemplates } from "@/api/hooks/useTemplates";
+import { useListThemes } from "@/api/hooks/useThemes";
 import { useGetCollections } from "@/api/hooks/useCollections";
 import { useGetUsers } from "@/api/hooks/useUsers";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -45,6 +47,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
     const { data: integrationsData } = useGetIntegrations();
     const { data: pipelinesData } = useGetPipelines();
     const { data: portalsData } = useGetPortals();
+    const { data: templatesData } = useListTemplates();
+    const { data: themesData } = useListThemes();
     const { data: collectionsData } = useGetCollections();
     const { data: usersData } = useGetUsers();
 
@@ -256,6 +260,26 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       }));
     }, [portalsData]);
 
+    // Templates + themes for the Manage Portal node's "Template" / "Theme"
+    // dropdowns, so authors pick a saved template/theme by name instead of
+    // pasting a Default Portal Config. Sourced from the same list APIs the
+    // Templates/Themes settings pages use.
+    const templateOptions = useMemo(() => {
+      if (!templatesData?.data) return [];
+      return templatesData.data.map((template) => ({
+        label: template.name,
+        value: template.templateId,
+      }));
+    }, [templatesData]);
+
+    const themeOptions = useMemo(() => {
+      if (!themesData?.data) return [];
+      return themesData.data.map((theme) => ({
+        label: theme.name,
+        value: theme.themeId,
+      }));
+    }, [themesData]);
+
     // Collections for the Collection Manager node's "Collection ID" dropdown.
     // Sourced from the OpenSearch-backed GET /collections list API.
     const collectionOptions = useMemo(() => {
@@ -347,6 +371,17 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
 
             // Determine parameter type from either schema.type or direct type
             const paramType = param.schema?.type || param.type || "string";
+
+            // Object-typed params (e.g. Field Mapping, Default Portal Config)
+            // render as a multiline JSON text area. Their value is carried as a
+            // JSON string (see formDefaultValues) so the field shows `{}` / real
+            // JSON instead of the stringified `[object Object]`, and the string
+            // passes the text-field schema on save.
+            if (paramType === "object") {
+              field.multiline = true;
+              if (field.rows === undefined) field.rows = 4;
+              if (!field.placeholder) field.placeholder = "{}";
+            }
 
             // Check for select parameters in both formats
             if (
@@ -456,6 +491,19 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         Object.assign(ownerField, { type: "select", options: userOptions });
       }
 
+      // Manage Portal (a UTILITY node) — populate the optional "Template" and
+      // "Theme" dropdowns with saved templates/themes. Matched by field name so
+      // it works regardless of node type. The YAML declares them as selects
+      // with no static options; leaving one empty means "no template/theme".
+      const templateField = fields.find((field) => field.name === "parameters.Template ID");
+      if (templateField) {
+        Object.assign(templateField, { options: templateOptions });
+      }
+      const themeField = fields.find((field) => field.name === "parameters.Theme ID");
+      if (themeField) {
+        Object.assign(themeField, { options: themeOptions });
+      }
+
       return {
         id: `node-config-${node.nodeId}-form`,
         name: node.info.title,
@@ -473,6 +521,8 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
       pipelinesOptions,
       automationTagOptions,
       portalOptions,
+      templateOptions,
+      themeOptions,
       collectionOptions,
       userOptions,
       isFlowNode,
@@ -604,6 +654,26 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
         values.integrationId = integrationOptions[0].value;
       }
 
+      // Object-typed params are carried in the form as JSON strings so the text
+      // field shows `{}` / real JSON rather than `[object Object]`, and the
+      // string passes the text-field schema on save. Normalize any object value
+      // coming from an existing node's saved configuration.
+      const objectParamNames = new Set<string>(
+        (effectiveParameters as any[])
+          .filter((p) => (p?.schema?.type || p?.type) === "object")
+          .map((p) => p.name)
+      );
+      if (objectParamNames.size > 0) {
+        const normalized: Record<string, any> = { ...values.parameters };
+        for (const pname of objectParamNames) {
+          const v = normalized[pname];
+          if (v !== null && typeof v === "object") {
+            normalized[pname] = JSON.stringify(v);
+          }
+        }
+        values.parameters = normalized;
+      }
+
       // Handle default values for UTILITY, FLOW, TRIGGER, and INTEGRATION nodes from effectiveParameters
       if (
         (node.info.nodeType === "UTILITY" || isFlowNode || isTriggerNode || isIntegrationNode) &&
@@ -636,6 +706,17 @@ export const NodeConfigurationForm: React.FC<NodeConfigurationFormProps> = React
           ) {
             const firstOption = options[0];
             defaultValue = typeof firstOption === "object" ? firstOption.value : firstOption;
+          }
+
+          // Object-typed defaults (e.g. `{}` for Field Mapping / Default Portal
+          // Config) are carried as JSON strings so the text field shows `{}`
+          // instead of `[object Object]`.
+          if (
+            defaultValue !== null &&
+            typeof defaultValue === "object" &&
+            (param.schema?.type === "object" || param.type === "object")
+          ) {
+            defaultValue = JSON.stringify(defaultValue);
           }
 
           // Only set default if it's not already set in configuration

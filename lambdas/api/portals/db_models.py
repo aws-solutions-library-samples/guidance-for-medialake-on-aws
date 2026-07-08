@@ -70,6 +70,11 @@ class PortalMetadataModel(Model):
     tokenBypassesPassphrase = BooleanAttribute(default=False)
     structuredPathMode = BooleanAttribute(default=False)
     captchaEnabled = BooleanAttribute(default=False)
+    # When True (default), the portal shows a Submit step whose click marks the
+    # session submitted (drives the formSubmissionComplete signal). When False,
+    # the portal is upload-only (no Submit button) and formSubmissionComplete is
+    # always false.
+    formSubmissionEnabled = BooleanAttribute(default=True)
     isActive = BooleanAttribute(default=True)
     maxFileSizeBytes = NumberAttribute(null=True)
     maxFilesPerSession = NumberAttribute(null=True)
@@ -234,6 +239,7 @@ class PortalTemplateModel(Model):
     tokenBypassesPassphrase = BooleanAttribute(default=False)
     structuredPathMode = BooleanAttribute(default=False)
     captchaEnabled = BooleanAttribute(default=False)
+    formSubmissionEnabled = BooleanAttribute(default=True)
     maxFileSizeBytes = NumberAttribute(null=True)
     maxFilesPerSession = NumberAttribute(null=True)
 

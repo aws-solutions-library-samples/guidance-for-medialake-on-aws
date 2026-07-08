@@ -339,6 +339,22 @@ class NodesStack(cdk.NestedStack):
             code_path=["lambdas", "nodes", "mark_upload_complete"],
         )
 
+        self.mark_asset_failed_lambda_deployment = LambdaDeployment(
+            self,
+            "MarkAssetFailedLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "mark_asset_failed"],
+        )
+
+        self.get_upload_session_metadata_lambda_deployment = LambdaDeployment(
+            self,
+            "GetUploadSessionMetadataLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "get_upload_session_metadata"],
+        )
+
         self.send_portal_link_lambda_deployment = LambdaDeployment(
             self,
             "SendPortalLinkLambdaDeployment",

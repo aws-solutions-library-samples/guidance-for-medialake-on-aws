@@ -89,6 +89,7 @@ def register_route(app):
                 "tokenBypassesPassphrase": PortalTemplateModel.tokenBypassesPassphrase,
                 "structuredPathMode": PortalTemplateModel.structuredPathMode,
                 "captchaEnabled": PortalTemplateModel.captchaEnabled,
+                "formSubmissionEnabled": PortalTemplateModel.formSubmissionEnabled,
                 "maxFileSizeBytes": PortalTemplateModel.maxFileSizeBytes,
                 "maxFilesPerSession": PortalTemplateModel.maxFilesPerSession,
             }

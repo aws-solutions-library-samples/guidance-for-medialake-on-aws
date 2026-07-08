@@ -53,7 +53,15 @@ export const createZodSchema = (fields: FormFieldDefinition[]) => {
 
     // Handle required/optional fields
     if (!field.required) {
-      fieldSchema = z.union([fieldSchema, z.undefined()]).optional();
+      // An optional select's underlying control (e.g. a MUI Select bound to
+      // a string) sits at "" — not undefined — until the user picks a value
+      // or clears it. Without allowing the empty-string literal here, the
+      // enum `refine` above rejects that natural "nothing selected" state
+      // and blocks Save on an optional field that was never touched.
+      fieldSchema =
+        field.type === "select"
+          ? z.union([fieldSchema, z.literal(""), z.undefined()]).optional()
+          : z.union([fieldSchema, z.undefined()]).optional();
     } else {
       // For required fields, make them more lenient
       // Allow empty strings for text fields but mark them as required

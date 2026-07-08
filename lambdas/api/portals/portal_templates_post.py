@@ -92,6 +92,7 @@ def register_route(app):
             )
             template.structuredPathMode = body.get("structuredPathMode", False)
             template.captchaEnabled = body.get("captchaEnabled", False)
+            template.formSubmissionEnabled = body.get("formSubmissionEnabled", True)
             template.maxFileSizeBytes = body.get("maxFileSizeBytes")
             template.maxFilesPerSession = body.get("maxFilesPerSession")
             template.createdBy = user_context.get("user_id")

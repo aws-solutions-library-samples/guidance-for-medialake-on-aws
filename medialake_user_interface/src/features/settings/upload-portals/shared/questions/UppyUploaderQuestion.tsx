@@ -17,10 +17,14 @@ import { deepMerge } from "../../utils/deepMerge";
 import {
   CURRENT_PATH_KEY,
   SELECTED_DESTINATION_KEY,
+  UPLOAD_IN_PROGRESS_KEY,
+  UPLOAD_SESSION_ID_KEY,
+  UPLOADED_FILE_COUNT_KEY,
   collectMetadataValues,
   usePortalRuntime,
 } from "../PortalRuntimeContext";
 import { PORTAL_QUESTION_TYPES, registerPortalQuestions } from "../registerPortalQuestions";
+import { useSurveyValue } from "./questionHelpers";
 
 /**
  * Marker value written into `survey.data[question.name]` once an upload has
@@ -193,6 +197,9 @@ function LiveUploader({
         submitButtonText={content.submitButtonText}
         successMessage={content.successMessage}
         dropZoneText={content.dropZoneText}
+        onSessionChange={(sessionId) => survey.setValue(UPLOAD_SESSION_ID_KEY, sessionId)}
+        onUploadedCountChange={(count) => survey.setValue(UPLOADED_FILE_COUNT_KEY, count)}
+        onUploadingChange={(uploading) => survey.setValue(UPLOAD_IN_PROGRESS_KEY, uploading)}
         allowedFileTypes={
           // Tri-state: an UNSET (undefined) config falls back to the default
           // media allow-list (legacy portals created before this field
@@ -229,12 +236,12 @@ export function UppyUploaderRenderer({ question }: { question: Question }): Reac
   const rt = usePortalRuntime();
   const survey = question.survey as SurveyModel;
 
-  if (rt.mode === "preview") {
-    return <MockUploaderDropZone content={resolveAppearanceContent(rt.config)} />;
-  }
-
-  const destinationId = survey.getValue(SELECTED_DESTINATION_KEY) as string | undefined;
-  const currentPath = (survey.getValue(CURRENT_PATH_KEY) as string | undefined) ?? "";
+  // Read the cross-page upload state REACTIVELY so the uploader re-renders when
+  // the destination/path are resolved after mount (e.g. the auto-resolve below,
+  // or a selector on an earlier page). A plain survey.getValue would not
+  // re-render on a later reserved-key write.
+  const destinationId = useSurveyValue<string>(survey, SELECTED_DESTINATION_KEY);
+  const currentPath = useSurveyValue<string>(survey, CURRENT_PATH_KEY) ?? "";
   const metadata = collectMetadataValues(survey);
 
   // Resolve the chosen destination. When the portal has exactly one
@@ -245,6 +252,28 @@ export function UppyUploaderRenderer({ question }: { question: Question }): Reac
   const effectiveDestinationId =
     destinationId ?? (allDestinations.length === 1 ? allDestinations[0].destinationId : undefined);
   const destination = allDestinations.find((d) => d.destinationId === effectiveDestinationId);
+
+  // Seed the cross-page upload state for an AUTO-RESOLVED sole destination.
+  // For a single-destination portal `buildSurveyJson` emits no
+  // destination-selector question, so nothing else writes
+  // `__selectedDestinationId` or resolves `__currentPath` from the destination
+  // rootPath. Mirror DestinationSelectorRenderer's auto-select here (once) so
+  // the path questions and the live uploader receive the resolved path. Only
+  // runs when there is no explicit selection and the path is not yet resolved.
+  const seededRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (rt.mode !== "public") return;
+    if (!effectiveDestinationId || destinationId) return;
+    if (currentPath) return;
+    if (seededRef.current === effectiveDestinationId) return;
+    seededRef.current = effectiveDestinationId;
+    survey.setValue(SELECTED_DESTINATION_KEY, effectiveDestinationId);
+    rt.onDestinationChange?.(effectiveDestinationId);
+  }, [rt, survey, effectiveDestinationId, destinationId, currentPath]);
+
+  if (rt.mode === "preview") {
+    return <MockUploaderDropZone content={resolveAppearanceContent(rt.config)} />;
+  }
 
   if (!destination || !rt.sessionJwt) {
     // No destination resolved (or no live session): do not render the live

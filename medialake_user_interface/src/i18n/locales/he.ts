@@ -2011,7 +2011,13 @@ export default {
       startFromTemplateTitle: "התחל מתבנית",
       applyThemeTitle: "החל ערכת נושא",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "אופציונלי. משמש לניתוב אירועי השלמת מנות העלאה לצינור ספציפי להעשרה אוטומטית.",
     },

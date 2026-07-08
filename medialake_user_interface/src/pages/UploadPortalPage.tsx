@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Alert, Box, Paper, Typography } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import DOMPurify from "dompurify";
@@ -37,7 +38,12 @@ import {
   PortalRuntimeContext,
   type PortalRuntimeValue,
   CURRENT_PATH_KEY,
+  UPLOAD_IN_PROGRESS_KEY,
+  UPLOAD_SESSION_ID_KEY,
+  UPLOADED_FILE_COUNT_KEY,
+  collectMetadataValues,
 } from "@/features/settings/upload-portals/shared/PortalRuntimeContext";
+import { usePortalApi } from "@/features/portal/hooks/usePortalApi";
 
 type AccessGateState = "gate" | "authenticated" | "unavailable";
 
@@ -56,6 +62,7 @@ const CARD_SHADOW_ELEVATION: Record<PortalAppearance["layout"]["cardShadow"], nu
 const UploadPortalPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
 
   const [sessionJwt, setSessionJwt] = useState<string | null>(null);
   const [portalConfig, setPortalConfig] = useState<PortalConfig | null>(null);
@@ -218,18 +225,25 @@ const UploadPortalPage: React.FC = () => {
     // Without this, SurveyJS renders its native page title in a different
     // position (Requirement: preview ↔ public parity).
     model.showPageTitles = false;
-    // The upload itself is the completion — there is no separate "submit the
-    // survey" step. Remove the Complete button and never navigate to the
-    // built-in "Thank you for completing the survey" page, so a user can keep
-    // adding more files after an upload finishes.
-    model.showCompleteButton = false;
-    model.showCompletedPage = false;
+    // Submit (the SurveyJS Complete button on the last page) is the
+    // AUTHORITATIVE pipeline trigger — it captures the final form snapshot and
+    // marks the session submitted (see post_submit). Show it only when the
+    // portal collects a form submission; an upload-only portal
+    // (formSubmissionEnabled === false) has no Submit button, so
+    // formSubmissionComplete stays false. The onComplete / onCompleting handlers
+    // are wired in a separate effect below.
+    const submissionEnabled = portalConfig.formSubmissionEnabled ?? true;
+    model.showCompleteButton = submissionEnabled;
+    model.showCompletedPage = submissionEnabled;
+    // Localized label for the authoritative Submit button (distinct from the
+    // uploader's own "Upload assets" button inside the uploader question).
+    model.completeText = t("uploadPortals.public.submit");
     if (Object.keys(prePopulatedValues).length > 0) {
       // Seed pre-populated answers without discarding any SurveyJS defaults.
       model.data = { ...model.data, ...prePopulatedValues };
     }
     return model;
-  }, [sessionJwt, portalConfig, prePopulatedValues]);
+  }, [sessionJwt, portalConfig, prePopulatedValues, t]);
 
   // Track the survey's current page so the heading we render (below) matches
   // the page actually shown — multi-page surveys display one page at a time.
@@ -241,6 +255,67 @@ const UploadPortalPage: React.FC = () => {
     survey.onCurrentPageChanged.add(handler);
     return () => survey.onCurrentPageChanged.remove(handler);
   }, [survey]);
+
+  // Portal API for the submit call fired on survey completion. Uses the live
+  // session JWT and honors the portal's CAPTCHA/WAF integration.
+  const portalApi = usePortalApi(slug ?? "", sessionJwt, portalConfig?.captchaEnabled);
+
+  // Submit (Complete) is the authoritative pipeline trigger. On completion we
+  // POST the final form snapshot + the count of successfully uploaded files to
+  // /submit (see post_submit), which marks the session submitted and lets the
+  // two-signal join fire. onCompleting blocks Submit while an upload is still
+  // in flight so the count/marker reflect a settled batch. The uploader writes
+  // the session id, uploaded count, and in-progress flag into reserved
+  // survey-data keys (see UppyUploaderQuestion / PortalRuntimeContext).
+  useEffect(() => {
+    if (!survey) return;
+
+    const onCompleting = (_sender: Model, options: { allow: boolean }) => {
+      if (survey.getValue(UPLOAD_IN_PROGRESS_KEY) === true) {
+        options.allow = false;
+      }
+    };
+
+    const onComplete = (sender: Model) => {
+      const sessionId = sender.getValue(UPLOAD_SESSION_ID_KEY) as string | undefined;
+      if (!sessionId) return;
+      const metadata = collectMetadataValues(sender);
+      const rawCount = sender.getValue(UPLOADED_FILE_COUNT_KEY);
+      const fileCount = typeof rawCount === "number" ? rawCount : undefined;
+      portalApi.submit(sessionId, { metadata, fileCount }).catch(() => {
+        // best-effort from the client; the server sweep reconciles a missed
+        // submit, and submit is idempotent on the marker.
+      });
+    };
+
+    survey.onCompleting.add(onCompleting);
+    survey.onComplete.add(onComplete);
+    return () => {
+      survey.onCompleting.remove(onCompleting);
+      survey.onComplete.remove(onComplete);
+    };
+  }, [survey, portalApi]);
+
+  // Session heartbeat — lifted from the uploader to the page so it runs for the
+  // ENTIRE life of the authenticated survey (any page, upload in flight or not).
+  // This makes the server-side "idle" timeout mean "the browser is gone" rather
+  // than "uploads finished", so a user still filling out the form after
+  // uploading is never swept. Best-effort and server-rate-limited; it reads the
+  // live session id the uploader writes into survey.data, so it starts pinging
+  // as soon as a session exists and stops when the survey unmounts.
+  useEffect(() => {
+    if (!survey) return;
+    const HEARTBEAT_INTERVAL_MS = 30_000;
+    const interval = setInterval(() => {
+      const sessionId = survey.getValue(UPLOAD_SESSION_ID_KEY) as string | undefined;
+      if (sessionId) {
+        portalApi.heartbeat(sessionId).catch(() => {
+          // best-effort; a failed heartbeat must not disrupt the flow
+        });
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [survey, portalApi]);
 
   // The current page's title, rendered as a heading above the survey body so
   // the public page mirrors the admin live preview (title under the logo).
@@ -420,16 +495,18 @@ const UploadPortalPage: React.FC = () => {
                     "& .sd-body__navigation .sv-action--hidden": {
                       display: "none",
                     },
-                    // A lone visible button (first page = Next only; last page =
-                    // Complete only) is centered.
+                    // A lone visible button (single-page portal = Submit only,
+                    // or first page = Next only) is centered.
                     "& .sd-action-bar.sd-body__navigation": {
                       justifyContent: "center",
                     },
                     // When both Previous and a forward action (Next/Complete)
-                    // are visible (middle/last pages), group them bottom-right.
+                    // are visible (multi-page middle/last pages), split them:
+                    // Previous on the bottom-left, the forward action (Next or
+                    // Submit) on the bottom-right.
                     "& .sd-action-bar.sd-body__navigation:has(#sv-nav-prev:not(.sv-action--hidden)):has(#sv-nav-next:not(.sv-action--hidden)), & .sd-action-bar.sd-body__navigation:has(#sv-nav-prev:not(.sv-action--hidden)):has(#sv-nav-complete:not(.sv-action--hidden))":
                       {
-                        justifyContent: "flex-end",
+                        justifyContent: "space-between",
                       },
                   }}
                 >

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.0] - 2026-07-08
+
+### Features
+
+- feat(portal): add portal complete and get upload metadata
+
 ## [1.17.6] - 2026-07-06
 
 ### Bug Fixes

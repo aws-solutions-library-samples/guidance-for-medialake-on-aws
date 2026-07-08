@@ -8,7 +8,8 @@ import { render, act, waitFor } from "@testing-library/react";
 
 const mockGetSession = vi.fn();
 const mockHeartbeat = vi.fn();
-const mockFinalize = vi.fn();
+const mockSubmit = vi.fn();
+const mockReleaseKey = vi.fn();
 const mockGetPresignedUrl = vi.fn();
 const mockBrowse = vi.fn();
 const mockSignPart = vi.fn();
@@ -20,7 +21,8 @@ vi.mock("../hooks/usePortalApi", () => ({
   usePortalApi: () => ({
     getSession: mockGetSession,
     heartbeat: mockHeartbeat,
-    finalize: mockFinalize,
+    submit: mockSubmit,
+    releaseKey: mockReleaseKey,
     getPresignedUrl: mockGetPresignedUrl,
     browse: mockBrowse,
     signPart: mockSignPart,
@@ -335,150 +337,104 @@ describe("PortalUploader — session integration", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Heartbeat interval scheduling and cleanup (Requirement 3.1)
+  // Heartbeat scheduling moved to the page level (UploadPortalPage) so it runs
+  // for the whole life of the authenticated survey (any page, upload in flight
+  // or not), not just during upload. The uploader no longer schedules
+  // heartbeats, so the former uploader-heartbeat tests were removed; the
+  // page-level heartbeat is covered in the UploadPortalPage tests.
   // -------------------------------------------------------------------------
-  describe("Heartbeat interval scheduling/cleanup (Requirement 3.1)", () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
 
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it("posts a heartbeat every ~30s while uploading with a sessionId", async () => {
-      // Set up a stored session that will be reused
-      sessionStorage.setItem(SESSION_STORAGE_KEY, "hb-session-id");
+  // -------------------------------------------------------------------------
+  // Submit is now an explicit survey-level action — the uploader no longer
+  // finalizes on Uppy complete or on beforeunload. It releases failed keys and
+  // reports uploading state / counts up to the survey.
+  // -------------------------------------------------------------------------
+  describe("Release on error and upload-state reporting", () => {
+    it("does NOT call submit on the Uppy complete event", async () => {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, "no-finalize-session-id");
       mockGetSession.mockResolvedValueOnce({
-        sessionId: "hb-session-id",
+        sessionId: "no-finalize-session-id",
         status: "OPEN",
-        expectedCount: 0,
-        completedCount: 0,
-      });
-      mockHeartbeat.mockResolvedValue(undefined);
-
-      const { rerender } = render(<PortalUploader {...defaultProps} />);
-
-      // Wait for the session resume to resolve
-      await act(async () => {
-        await vi.runAllTimersAsync();
-      });
-
-      // Simulate the upload starting by triggering the 'upload' event
-      act(() => {
-        emitUppyEvent("upload");
-      });
-
-      // Rerender to let state updates propagate (isUploading = true)
-      rerender(<PortalUploader {...defaultProps} />);
-
-      // Advance 30 seconds — first heartbeat
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(30_000);
-      });
-
-      expect(mockHeartbeat).toHaveBeenCalledWith("hb-session-id");
-
-      // Advance another 30 seconds — second heartbeat
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(30_000);
-      });
-
-      expect(mockHeartbeat).toHaveBeenCalledTimes(2);
-    });
-
-    it("stops heartbeat when uploading completes", async () => {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, "hb-cleanup-session-id");
-      mockGetSession.mockResolvedValueOnce({
-        sessionId: "hb-cleanup-session-id",
-        status: "OPEN",
-        expectedCount: 0,
-        completedCount: 0,
-      });
-      mockHeartbeat.mockResolvedValue(undefined);
-      mockFinalize.mockResolvedValue({
-        status: "COMPLETE",
         expectedCount: 1,
-        completedCount: 1,
-      });
-
-      const { rerender } = render(<PortalUploader {...defaultProps} />);
-
-      // Wait for session resume
-      await act(async () => {
-        await vi.runAllTimersAsync();
-      });
-
-      // Simulate upload start
-      act(() => {
-        emitUppyEvent("upload");
-      });
-      rerender(<PortalUploader {...defaultProps} />);
-
-      // First heartbeat fires
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(30_000);
-      });
-      expect(mockHeartbeat).toHaveBeenCalledTimes(1);
-
-      // Simulate upload complete — triggers isUploading = false
-      act(() => {
-        emitUppyEvent("complete", { successful: [], failed: [] });
-      });
-      rerender(<PortalUploader {...defaultProps} />);
-
-      // Clear heartbeat call count
-      mockHeartbeat.mockClear();
-
-      // Advance 30 more seconds — no heartbeat should fire
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(30_000);
-      });
-
-      expect(mockHeartbeat).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Finalize on complete and beforeunload (Requirement 3.1)
-  // -------------------------------------------------------------------------
-  describe("Finalize on complete and beforeunload", () => {
-    it("calls portalApi.finalize when Uppy emits the complete event", async () => {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, "finalize-session-id");
-      mockGetSession.mockResolvedValueOnce({
-        sessionId: "finalize-session-id",
-        status: "OPEN",
-        expectedCount: 2,
         completedCount: 0,
-      });
-      mockFinalize.mockResolvedValue({
-        status: "COMPLETE",
-        expectedCount: 2,
-        completedCount: 2,
       });
 
       render(<PortalUploader {...defaultProps} />);
-
-      // Wait for session resume to resolve so sessionIdRef is set
       await waitFor(() => {
-        expect(mockGetSession).toHaveBeenCalledWith("finalize-session-id");
+        expect(mockGetSession).toHaveBeenCalledWith("no-finalize-session-id");
       });
-      // Allow the promise chain to settle so sessionIdRef.current is assigned
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      // Simulate Uppy complete event
       act(() => {
         emitUppyEvent("complete", { successful: [], failed: [] });
       });
 
+      // The uploader must not trigger the pipeline — submit is survey-level.
+      expect(mockSubmit).not.toHaveBeenCalled();
+    });
+
+    it("reports uploading state via onUploadingChange on upload/complete", async () => {
+      const onUploadingChange = vi.fn();
+      render(<PortalUploader {...defaultProps} onUploadingChange={onUploadingChange} />);
+
+      act(() => {
+        emitUppyEvent("upload");
+      });
+      expect(onUploadingChange).toHaveBeenCalledWith(true);
+
+      act(() => {
+        emitUppyEvent("complete", { successful: [], failed: [] });
+      });
+      expect(onUploadingChange).toHaveBeenCalledWith(false);
+    });
+
+    it("releases a failed upload's key via portalApi.releaseKey", async () => {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, "release-session-id");
+      mockGetSession.mockResolvedValueOnce({
+        sessionId: "release-session-id",
+        status: "OPEN",
+        expectedCount: 0,
+        completedCount: 0,
+      });
+      mockGetPresignedUrl.mockResolvedValue({
+        sessionId: "release-session-id",
+        presignedPost: { url: "https://s3.example.com", fields: { key: "k" } },
+      });
+      mockReleaseKey.mockResolvedValue(undefined);
+
+      render(<PortalUploader {...defaultProps} />);
       await waitFor(() => {
-        expect(mockFinalize).toHaveBeenCalledWith("finalize-session-id", expect.any(Number));
+        expect(mockGetSession).toHaveBeenCalledWith("release-session-id");
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Register a file through the captured AwsS3 getUploadParameters so the
+      // per-file locator (filename, path) is recorded.
+      const file = { id: "file-1", name: "broken.mp4", type: "video/mp4", size: 100 };
+      await act(async () => {
+        await capturedS3Options.getUploadParameters(file);
+      });
+
+      // The upload then fails → the key is released against the session.
+      act(() => {
+        emitUppyEvent("upload-error", file);
+      });
+
+      await waitFor(() => {
+        expect(mockReleaseKey).toHaveBeenCalledWith("release-session-id", {
+          destinationId: "dest-1",
+          filename: "broken.mp4",
+          // currentPath "/root/subdir" with rootPath "/root" → "/subdir"
+          path: "/subdir",
+        });
       });
     });
 
-    it("fires a fetch with keepalive:true on beforeunload when a sessionId exists", async () => {
+    it("does nothing on beforeunload (no finalize beacon)", async () => {
       sessionStorage.setItem(SESSION_STORAGE_KEY, "beacon-session-id");
       mockGetSession.mockResolvedValueOnce({
         sessionId: "beacon-session-id",
@@ -490,49 +446,15 @@ describe("PortalUploader — session integration", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response());
 
       render(<PortalUploader {...defaultProps} />);
-
-      // Wait for session resume
       await waitFor(() => {
         expect(mockGetSession).toHaveBeenCalledWith("beacon-session-id");
       });
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
 
-      // Fire beforeunload event
-      act(() => {
-        window.dispatchEvent(new Event("beforeunload"));
-      });
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining("/portal/test-portal/upload-session/beacon-session-id/finalize"),
-        expect.objectContaining({
-          method: "POST",
-          keepalive: true,
-          headers: expect.objectContaining({
-            "Content-Type": "application/json",
-            "X-Portal-Session": "test-jwt",
-          }),
-          body: expect.any(String),
-        })
-      );
-
-      fetchSpy.mockRestore();
-    });
-
-    it("does not fire fetch on beforeunload when no sessionId exists", async () => {
-      // No stored session, so sessionIdRef stays null
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response());
-
-      render(<PortalUploader {...defaultProps} />);
-
-      // Fire beforeunload event
       act(() => {
         window.dispatchEvent(new Event("beforeunload"));
       });
 
       expect(fetchSpy).not.toHaveBeenCalled();
-
       fetchSpy.mockRestore();
     });
   });

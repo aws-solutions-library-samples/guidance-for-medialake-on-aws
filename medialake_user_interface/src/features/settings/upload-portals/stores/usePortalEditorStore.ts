@@ -586,6 +586,10 @@ const createDefaultPortalData = (): PortalEditorPortalData => ({
   ],
   metadataFields: [],
   destinations: [],
+  // Portals collect a form submission by default: the public flow shows a
+  // Submit step whose click marks the session submitted. The admin can turn
+  // this off to make the portal upload-only (no Submit button).
+  formSubmissionEnabled: true,
   // Seed the default media allow-list so the editor's "Allowed file types"
   // field shows the supported audio/video/image types out of the box. The
   // admin can edit it, or CLEAR it entirely to allow any file type — an empty
@@ -854,6 +858,7 @@ const TEMPLATE_SCALAR_STRUCTURE_KEYS = [
   "tokenBypassesPassphrase",
   "structuredPathMode",
   "captchaEnabled",
+  "formSubmissionEnabled",
   "maxFileSizeBytes",
   "maxFilesPerSession",
 ] as const satisfies readonly (keyof PortalTemplate)[];
@@ -1089,6 +1094,9 @@ export const usePortalEditorStore = create<PortalEditorState>()(
           }
           if (typeof portal.captchaEnabled === "boolean") {
             payload.captchaEnabled = portal.captchaEnabled;
+          }
+          if (typeof portal.formSubmissionEnabled === "boolean") {
+            payload.formSubmissionEnabled = portal.formSubmissionEnabled;
           }
           if (typeof portal.maxFileSizeBytes === "number") {
             payload.maxFileSizeBytes = portal.maxFileSizeBytes;
@@ -1951,6 +1959,10 @@ export const usePortalEditorStore = create<PortalEditorState>()(
             typeof portal.structuredPathMode === "boolean" ? portal.structuredPathMode : undefined;
           const captchaEnabled =
             typeof portal.captchaEnabled === "boolean" ? portal.captchaEnabled : undefined;
+          const formSubmissionEnabled =
+            typeof portal.formSubmissionEnabled === "boolean"
+              ? portal.formSubmissionEnabled
+              : undefined;
           const isActive = typeof portal.isActive === "boolean" ? portal.isActive : undefined;
           const expiresAt = typeof portal.expiresAt === "string" ? portal.expiresAt : undefined;
           const maxFileSizeBytes =
@@ -1986,6 +1998,9 @@ export const usePortalEditorStore = create<PortalEditorState>()(
             payload.structuredPathMode = structuredPathMode;
           }
           if (captchaEnabled !== undefined) payload.captchaEnabled = captchaEnabled;
+          if (formSubmissionEnabled !== undefined) {
+            payload.formSubmissionEnabled = formSubmissionEnabled;
+          }
           if (isActive !== undefined) payload.isActive = isActive;
           if (expiresAt !== undefined) payload.expiresAt = expiresAt;
           if (maxFileSizeBytes !== undefined) {

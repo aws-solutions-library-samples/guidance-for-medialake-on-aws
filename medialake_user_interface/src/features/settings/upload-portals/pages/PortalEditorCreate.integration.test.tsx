@@ -167,6 +167,7 @@ describe("PortalEditorPage create flow (integration)", () => {
           destinations: (sent.destinations as Portal["destinations"]) ?? [],
           pages: (sent.pages as Portal["pages"]) ?? [],
           captchaEnabled: false,
+          formSubmissionEnabled: true,
           createdBy: "test-user",
           createdAt: "2024-01-01T00:00:00Z",
           updatedAt: "2024-01-01T00:00:00Z",

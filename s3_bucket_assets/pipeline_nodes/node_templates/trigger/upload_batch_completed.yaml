@@ -1,8 +1,8 @@
 spec: v1.0.0
 node:
   id: upload_batch_completed
-  title: Upload Batch Completed
-  description: Trigger a workflow when a portal upload batch completes
+  title: Portal Upload Completed
+  description: Trigger a workflow when a portal upload session reaches a terminal state, filtered by whether the files were processed and whether the form was submitted.
   version: 1.0.0
   type: trigger
   integration:
@@ -14,20 +14,52 @@ node:
           detail-type: ["Upload Batch Completed"]
           detail:
             automationTag: ["${automation_tag}"]
-            outcome: ["${outcome_filter}"]
+            filesProcessed: ["${files_processed}"]
+            formSubmissionComplete: ["${form_submission_complete}"]
 actions:
   trigger:
-    summary: Trigger when an upload batch completes
-    description: This step will trigger when a portal upload batch completes
+    summary: Trigger when a portal upload session completes
+    description: >-
+      This step triggers when a portal upload session reaches a terminal state.
+      Select the combination to match: whether every uploaded file finished
+      processing successfully, and whether the user submitted the form. The
+      never-submitted-and-nothing-processed combination is never emitted, so a
+      "Not processed" + "Not submitted" configuration will never fire.
     operationId: triggerUploadBatchCompleted
     parameters:
       - in: body
         name: automation_tag
         label: Automation Tag
-        description: Match upload batches whose portal carries this automation tag.
+        description: Match completed uploads whose portal carries this automation tag.
         required: true
         schema:
           type: select
+      - in: body
+        name: files_processed
+        label: Files Processed
+        description: Match on whether every uploaded file finished processing successfully.
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "All files processed"
+              value: "true"
+            - label: "Some files failed"
+              value: "false"
+          default: "true"
+      - in: body
+        name: form_submission_complete
+        label: Form Submission Complete
+        description: Match on whether the user submitted the portal form.
+        required: true
+        schema:
+          type: select
+          options:
+            - label: "Form submitted"
+              value: "true"
+            - label: "Not submitted"
+              value: "false"
+          default: "true"
       - in: body
         name: portal_id
         label: Portal (optional)
@@ -35,20 +67,6 @@ actions:
         required: false
         schema:
           type: select
-      - in: body
-        name: outcome_filter
-        label: Completion Outcome
-        required: false
-        schema:
-          type: select
-          options:
-            - label: "Completed only"
-              value: "COMPLETE"
-            - label: "Completed with errors only"
-              value: "COMPLETE_WITH_ERRORS"
-            - label: "Both"
-              value: "BOTH"
-          default: "COMPLETE"
     connections:
       incoming:
         type: [any]

@@ -38,8 +38,15 @@ describe("collectMetadataValues — reserved-key contract (Req 7.6 / Property 9)
 
   it("excludes the literal reserved key names", () => {
     // Guards the contract against a future rename: the literal strings the
-    // design reserves must be the ones filtered out.
-    expect(RESERVED_SURVEY_KEYS).toEqual(["__selectedDestinationId", "__currentPath"]);
+    // design reserves must be the ones filtered out. Includes the upload
+    // hand-off keys the live uploader writes back for the survey-level submit.
+    expect(RESERVED_SURVEY_KEYS).toEqual([
+      "__selectedDestinationId",
+      "__currentPath",
+      "__uploadSessionId",
+      "__uploadedFileCount",
+      "__uploadInProgress",
+    ]);
   });
 
   it("excludes reserved keys even when they carry non-string values", () => {

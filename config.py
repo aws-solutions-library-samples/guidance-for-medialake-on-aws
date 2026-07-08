@@ -536,12 +536,12 @@ class UploadPortalsConfig(BaseModel):
     """
 
     session_retention_days: int = 7  # TTL from createdAt (Session_Retention_Period)
-    idle_finalize_minutes: int = 30  # Idle_Finalize_Threshold
-    sweep_interval_minutes: int = 5  # Reconciliation_Process cadence
-    completion_grace_minutes: int = (
-        60  # Completion_Grace_Period (from finalizeRequestedAt)
+    idle_timeout_hours: int = 4  # Idle timeout for never-submitted sessions
+    sweep_interval_minutes: int = 60  # Reconciliation_Process cadence
+    completion_grace_hours: int = (
+        8  # Completion_Grace_Period (from finalizeRequestedAt)
     )
-    max_session_age_hours: int = 24  # Maximum_Session_Age (from createdAt)
+    max_session_age_hours: int = 48  # Maximum_Session_Age (from createdAt)
     heartbeat_interval_seconds: int = 30  # Browser heartbeat cadence
     heartbeat_min_interval_seconds: int = (
         10  # Heartbeat_Rate_Limit (server-enforced minimum gap)

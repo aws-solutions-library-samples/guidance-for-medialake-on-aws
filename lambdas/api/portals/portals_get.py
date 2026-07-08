@@ -37,6 +37,7 @@ def register_route(app):
                         "accessMode": getattr(item, "accessMode", None),
                         "isActive": item.isActive,
                         "automationTag": getattr(item, "automationTag", None),
+                        "expiresAt": getattr(item, "expiresAt", None),
                         "createdAt": getattr(item, "createdAt", None),
                         "updatedAt": getattr(item, "updatedAt", None),
                     }

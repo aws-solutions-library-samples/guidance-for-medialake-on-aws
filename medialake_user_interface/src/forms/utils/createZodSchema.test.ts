@@ -84,4 +84,52 @@ describe("createZodSchema", () => {
     const result = schema.safeParse({});
     expect(result.success).toBe(true);
   });
+
+  it("allows an optional select field to be left unselected (empty string)", () => {
+    // Regression test: a not-yet-selected MUI Select bound to a string sits
+    // at "" (not undefined) until the user picks a value. An optional select
+    // must accept that natural empty state instead of enforcing its enum.
+    const fields: FormFieldDefinition[] = [
+      {
+        name: "parameters.portal_id",
+        type: "select",
+        label: "Portal (optional)",
+        required: false,
+        options: [{ value: "abc-123", label: "My Portal" }],
+      },
+    ];
+    const schema = createZodSchema(fields);
+    const result = schema.safeParse({ parameters: { portal_id: "" } });
+    expect(result.success).toBe(true);
+  });
+
+  it("still rejects an optional select field given a value outside its options", () => {
+    const fields: FormFieldDefinition[] = [
+      {
+        name: "parameters.portal_id",
+        type: "select",
+        label: "Portal (optional)",
+        required: false,
+        options: [{ value: "abc-123", label: "My Portal" }],
+      },
+    ];
+    const schema = createZodSchema(fields);
+    const result = schema.safeParse({ parameters: { portal_id: "not-a-real-id" } });
+    expect(result.success).toBe(false);
+  });
+
+  it("still accepts a valid selected value for an optional select field", () => {
+    const fields: FormFieldDefinition[] = [
+      {
+        name: "parameters.portal_id",
+        type: "select",
+        label: "Portal (optional)",
+        required: false,
+        options: [{ value: "abc-123", label: "My Portal" }],
+      },
+    ];
+    const schema = createZodSchema(fields);
+    const result = schema.safeParse({ parameters: { portal_id: "abc-123" } });
+    expect(result.success).toBe(true);
+  });
 });

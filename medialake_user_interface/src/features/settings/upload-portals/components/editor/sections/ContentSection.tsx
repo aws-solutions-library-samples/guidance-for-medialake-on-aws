@@ -65,11 +65,14 @@ const buildPortalUrl = (slug: string): string => {
  *   3. Slug `TextField` auto-slugifying on every change, with the resolved
  *      public portal URL (`<origin>/p/<slug>`) displayed underneath
  *      (Requirement 8.6).
- *   4. Submit-button `TextField` bound to
+ *   4. Upload-button `TextField` bound to
  *      `appearance.content.submitButtonText`, with a live char-count helper
  *      and a blur-time guard that reverts empty input back to the previous
  *      value so the field can never be saved as a blank string
- *      (Requirement 8.7).
+ *      (Requirement 8.7). This labels the uploader's OWN upload-trigger
+ *      button ("Upload assets" by default) — it does NOT control the
+ *      page-level Submit/Complete action, which is a fixed string so the
+ *      two buttons stay visually distinct.
  *   5. Footer {@link RichTextEditor} bound to
  *      `appearance.content.footerHtml` (Requirement 8.5).
  *
@@ -268,9 +271,10 @@ const ContentSection: React.FC = () => {
         />
       </div>
 
-      {/* Submit-button text */}
+      {/* Upload-button text — labels the uploader's own upload-trigger
+          button, distinct from the page-level Submit/Complete action. */}
       <TextField
-        label="Submit button text"
+        label="Upload button text"
         value={submitDraft}
         onChange={handleSubmitDraftChange}
         onBlur={handleSubmitBlur}

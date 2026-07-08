@@ -212,6 +212,36 @@ class AssetDeletionService:
             self.logger.error(f"DynamoDB error fetching asset: {e}")
             raise AssetDeletionError(f"Failed to fetch asset: {e}", inventory_id)
 
+    def _safe_delete_object(self, bucket: str, key: str, description: str) -> bool:
+        """Delete a single S3 object, tolerating a missing bucket/key.
+
+        ``DeleteObject`` is normally idempotent when the *key* is already
+        gone, but a *bucket* that no longer exists (e.g. its S3 connector
+        was torn down out-of-band) returns a ``NoSuchBucket`` ``ClientError``
+        instead of a quiet success. Since the desired end-state — "the
+        object is gone" — already holds in these cases, we log a warning and
+        treat it as a no-op rather than failing the entire asset deletion.
+        Any other ``ClientError`` (e.g. ``AccessDenied``) indicates a real
+        problem and is re-raised so the caller still fails loudly.
+
+        Returns:
+            True if S3 confirmed the delete, False if the bucket/key was
+            already missing (so nothing was actually deleted here).
+        """
+        try:
+            s3.delete_object(Bucket=bucket, Key=key)
+            return True
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code in ("NoSuchBucket", "NoSuchKey", "404", "NotFound"):
+                self.logger.warning(
+                    f"Skipping delete of {description} — already missing "
+                    f"(bucket/key not found): s3://{bucket}/{key} "
+                    f"(code={error_code})"
+                )
+                return False
+            raise
+
     @tracer.capture_method
     def _delete_s3_objects(self, asset: Dict[str, Any]) -> int:
         """Delete all S3 objects associated with the asset"""
@@ -225,9 +255,9 @@ class AssetDeletionService:
             bucket = main["Bucket"]
             key = main["ObjectKey"]["FullPath"]
 
-            s3.delete_object(Bucket=bucket, Key=key)
-            deleted_count += 1
-            self.logger.info(f"Deleted main representation: s3://{bucket}/{key}")
+            if self._safe_delete_object(bucket, key, "main representation"):
+                deleted_count += 1
+                self.logger.info(f"Deleted main representation: s3://{bucket}/{key}")
 
             # Log all derived representations for debugging
             derived_reps = asset.get("DerivedRepresentations", [])
@@ -255,11 +285,13 @@ class AssetDeletionService:
                         extra={"bucket": rep_bucket, "key": rep_key},
                     )
 
-                    s3.delete_object(Bucket=rep_bucket, Key=rep_key)
-                    deleted_count += 1
-                    self.logger.info(
-                        f"Deleted derived representation: s3://{rep_bucket}/{rep_key}"
-                    )
+                    if self._safe_delete_object(
+                        rep_bucket, rep_key, f"derived representation [{idx}]"
+                    ):
+                        deleted_count += 1
+                        self.logger.info(
+                            f"Deleted derived representation: s3://{rep_bucket}/{rep_key}"
+                        )
 
                     # For video thumbnails, MediaConvert generates multiple numbered files
                     # e.g., video_thumbnail.0000000.jpg, video_thumbnail.0000001.jpg, etc.
@@ -292,9 +324,11 @@ class AssetDeletionService:
             if transcript_uri := asset.get("TranscriptionS3Uri"):
                 transcript_bucket, transcript_key = self._parse_s3_uri(transcript_uri)
                 if transcript_bucket and transcript_key:
-                    s3.delete_object(Bucket=transcript_bucket, Key=transcript_key)
-                    deleted_count += 1
-                    self.logger.info(f"Deleted transcript: {transcript_uri}")
+                    if self._safe_delete_object(
+                        transcript_bucket, transcript_key, "transcript"
+                    ):
+                        deleted_count += 1
+                        self.logger.info(f"Deleted transcript: {transcript_uri}")
 
             self.metrics.add_metric("S3ObjectsDeleted", MetricUnit.Count, deleted_count)
             return deleted_count
@@ -375,11 +409,13 @@ class AssetDeletionService:
                         self.logger.info(
                             f"Deleting additional thumbnail: s3://{bucket}/{obj_key}"
                         )
-                        s3.delete_object(Bucket=bucket, Key=obj_key)
-                        deleted_count += 1
-                        self.logger.info(
-                            f"Deleted additional thumbnail: s3://{bucket}/{obj_key}"
-                        )
+                        if self._safe_delete_object(
+                            bucket, obj_key, "additional numbered thumbnail"
+                        ):
+                            deleted_count += 1
+                            self.logger.info(
+                                f"Deleted additional thumbnail: s3://{bucket}/{obj_key}"
+                            )
                     else:
                         self.logger.info(
                             f"Number part '{number_part}' doesn't match expected format (7 digits)"

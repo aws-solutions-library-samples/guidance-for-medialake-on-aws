@@ -1,20 +1,25 @@
 """Upload Session Reconciliation Sweep Lambda.
 
-Triggered on a CloudWatch Events schedule (every X minutes). Queries GSI1 to
-find all OPEN sessions (GSI1_PK="STATUS#OPEN") and evaluates each against three
-reconciliation thresholds:
+Triggered on a CloudWatch Events schedule (hourly). Queries GSI1 to find all
+OPEN sessions (GSI1_PK="STATUS#OPEN") and evaluates each against the timeout
+thresholds. The submit marker (`finalizeRequestedAt`) is set ONLY by an explicit
+user Submit — the sweep never fabricates it:
 
-1. Idle auto-finalize (R3.7): If `now - lastHeartbeatAt > IDLE_FINALIZE_MINUTES`
-   AND `finalizeRequestedAt` is NOT set, apply the finalize marker via
-   `store.reconcile_idle(session_id)`.
-2. Grace force-complete (R8.1): If `finalizeRequestedAt` IS set AND
-   `now - finalizeRequestedAt > COMPLETION_GRACE_MINUTES` AND
-   `completedCount < expectedCount`, force-complete via
-   `store.reconcile_grace(session_id)`.
-3. Max-age force-complete (R8.2): If `now - createdAt > MAX_SESSION_AGE_HOURS`,
-   force-complete via `store.reconcile_max_age(session_id)`.
-
-Requirements: 3.7, 8.1, 8.2
+1. Max-age force-resolve: If `now - createdAt > MAX_SESSION_AGE_HOURS`, call
+   `store.reconcile_max_age(session_id)`, which resolves to the matching corner
+   of the 2x2 model (submitted/not x all-succeeded/not).
+2. Grace force-complete: If the submit marker IS set AND
+   `now - finalizeRequestedAt > COMPLETION_GRACE_HOURS` AND some files never
+   reached a terminal state (`resolvedCount < expectedCount`), force-complete as
+   SUBMITTED_UNPROCESSED via `store.reconcile_grace(session_id)` (fires with the
+   with-errors signal).
+3. Idle unsubmitted-processed: If there is NO submit marker AND
+   `now - lastHeartbeatAt > IDLE_TIMEOUT_HOURS`, call
+   `store.reconcile_idle_unsubmitted(session_id)`. That transitions to
+   UNSUBMITTED_PROCESSED (fires filesProcessed=true / formSubmissionComplete=false)
+   ONLY when every uploaded file succeeded; a never-submitted session with a
+   failed or still-processing file is a no-op and stays OPEN until it either
+   succeeds or hits max age (→ silent UNSUBMITTED_UNPROCESSED).
 """
 
 import os
@@ -44,9 +49,9 @@ logger = Logger(service="upload_session_sweep")
 
 # Environment variables
 UPLOAD_SESSIONS_TABLE_NAME = os.environ.get("UPLOAD_SESSIONS_TABLE_NAME", "")
-IDLE_FINALIZE_MINUTES = int(os.environ.get("IDLE_FINALIZE_MINUTES", "60"))
-COMPLETION_GRACE_MINUTES = int(os.environ.get("COMPLETION_GRACE_MINUTES", "30"))
-MAX_SESSION_AGE_HOURS = int(os.environ.get("MAX_SESSION_AGE_HOURS", "24"))
+IDLE_TIMEOUT_HOURS = int(os.environ.get("IDLE_TIMEOUT_HOURS", "4"))
+COMPLETION_GRACE_HOURS = int(os.environ.get("COMPLETION_GRACE_HOURS", "8"))
+MAX_SESSION_AGE_HOURS = int(os.environ.get("MAX_SESSION_AGE_HOURS", "48"))
 
 # AWS resources
 dynamodb = boto3.resource("dynamodb")
@@ -92,12 +97,12 @@ def _parse_iso(value: str) -> Optional[datetime]:
 
 
 def _reconcile_session(store: SessionStore, item: dict, now: datetime) -> None:
-    """Evaluate a single OPEN session against reconciliation thresholds.
+    """Evaluate a single OPEN session against the timeout thresholds.
 
     Checks are evaluated in priority order:
-    1. Max-age force-complete (most aggressive — overrides everything)
-    2. Grace force-complete (finalized but incomplete past grace period)
-    3. Idle auto-finalize (not yet finalized and idle too long)
+    1. Max-age force-resolve (most aggressive — overrides everything)
+    2. Grace force-complete (submitted but not all files resolved past grace)
+    3. Idle unsubmitted-processed (never submitted and idle too long)
 
     Parameters
     ----------
@@ -116,14 +121,16 @@ def _reconcile_session(store: SessionStore, item: dict, now: datetime) -> None:
     last_heartbeat_at = _parse_iso(item.get("lastHeartbeatAt", ""))
     finalize_requested_at = _parse_iso(item.get("finalizeRequestedAt", ""))
     expected_count = int(item.get("expectedCount", 0))
-    completed_count = int(item.get("completedCount", 0))
+    # resolvedCount = completedCount + failedCount (files that reached a terminal
+    # pipeline state). Falls back to completedCount for robustness if the
+    # attribute is somehow absent.
+    resolved_count = int(item.get("resolvedCount", item.get("completedCount", 0)))
 
-    # Check 1: Max-age force-complete (R8.2)
-    # If now - createdAt > MAX_SESSION_AGE_HOURS, force-complete regardless of
-    # finalize state.
+    # Check 1: Max-age force-resolve.
+    # If now - createdAt > MAX_SESSION_AGE_HOURS, resolve regardless of state.
     if created_at and (now - created_at) > timedelta(hours=MAX_SESSION_AGE_HOURS):
         logger.info(
-            "Session exceeded max age, force-completing",
+            "Session exceeded max age, force-resolving",
             extra={
                 "session_id": session_id,
                 "created_at": item.get("createdAt", ""),
@@ -133,41 +140,45 @@ def _reconcile_session(store: SessionStore, item: dict, now: datetime) -> None:
         store.reconcile_max_age(session_id)
         return
 
-    # Check 2: Grace force-complete (R8.1)
-    # If finalizeRequestedAt IS set AND now - finalizeRequestedAt > COMPLETION_GRACE_MINUTES
-    # AND completedCount < expectedCount, force-complete.
+    # Check 2: Grace force-complete (submitted path).
+    # If finalizeRequestedAt IS set AND now - finalizeRequestedAt > grace AND
+    # some files never reached a terminal state, force-complete with errors.
     if finalize_requested_at is not None:
         if (now - finalize_requested_at) > timedelta(
-            minutes=COMPLETION_GRACE_MINUTES
-        ) and completed_count < expected_count:
+            hours=COMPLETION_GRACE_HOURS
+        ) and resolved_count < expected_count:
             logger.info(
-                "Finalized session exceeded grace period, force-completing",
+                "Submitted session exceeded grace period, force-completing with errors",
                 extra={
                     "session_id": session_id,
                     "finalize_requested_at": item.get("finalizeRequestedAt", ""),
-                    "grace_minutes": COMPLETION_GRACE_MINUTES,
-                    "completed_count": completed_count,
+                    "grace_hours": COMPLETION_GRACE_HOURS,
+                    "resolved_count": resolved_count,
                     "expected_count": expected_count,
                 },
             )
             store.reconcile_grace(session_id)
         return
 
-    # Check 3: Idle auto-finalize (R3.7)
-    # If now - lastHeartbeatAt > IDLE_FINALIZE_MINUTES AND finalizeRequestedAt is NOT set,
-    # apply the finalize marker.
+    # Check 3: Idle unsubmitted-processed (never-submitted path).
+    # If now - lastHeartbeatAt > IDLE_TIMEOUT_HOURS and there is NO submit marker,
+    # attempt the never-submitted-but-all-processed transition. reconcile_idle_
+    # unsubmitted is a no-op unless every uploaded file succeeded (it guards on
+    # completedCount >= expectedCount AND failedCount == 0 AND expectedCount > 0),
+    # so a session with a failed or still-processing file simply stays OPEN until
+    # it succeeds or hits max age.
     if last_heartbeat_at and (now - last_heartbeat_at) > timedelta(
-        minutes=IDLE_FINALIZE_MINUTES
+        hours=IDLE_TIMEOUT_HOURS
     ):
         logger.info(
-            "Session idle beyond threshold, auto-finalizing",
+            "Session idle beyond threshold and never submitted, attempting unsubmitted-processed",
             extra={
                 "session_id": session_id,
                 "last_heartbeat_at": item.get("lastHeartbeatAt", ""),
-                "idle_minutes": IDLE_FINALIZE_MINUTES,
+                "idle_hours": IDLE_TIMEOUT_HOURS,
             },
         )
-        store.reconcile_idle(session_id)
+        store.reconcile_idle_unsubmitted(session_id)
 
 
 # ---------------------------------------------------------------------------

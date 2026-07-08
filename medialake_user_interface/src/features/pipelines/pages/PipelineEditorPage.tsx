@@ -143,6 +143,56 @@ const updateIdCounter = (existingNodes) => {
   });
 };
 
+/**
+ * Build a human-readable message from a failed pipeline create/update request.
+ *
+ * React Query passes the raw AxiosError through, and the pipelines API returns
+ * a structured body — `{ error, details }` — where `details` is either a
+ * node-validation array (`[{ node, errors[] }]`, e.g. a bad Manage Portal
+ * config) or a plain string (name conflict / not found). We surface those
+ * field-level reasons instead of the generic "Request failed with status code
+ * 400"; falls back to the Axios message when no structured body is present.
+ */
+interface PipelineNodeValidationProblem {
+  node?: string;
+  errors?: string[];
+}
+
+const getPipelineErrorMessage = (
+  error: unknown,
+  fallback = "An error occurred while creating the pipeline."
+): string => {
+  const data = (error as { response?: { data?: unknown } })?.response?.data as
+    | { error?: string; message?: string; details?: unknown }
+    | undefined;
+
+  if (data) {
+    const { details } = data;
+
+    if (Array.isArray(details)) {
+      const formatted = (details as PipelineNodeValidationProblem[])
+        .map((d) => {
+          const errs = Array.isArray(d?.errors) ? d.errors.join(", ") : "";
+          return d?.node && errs ? `${d.node}: ${errs}` : errs || d?.node || "";
+        })
+        .filter(Boolean)
+        .join("; ");
+      if (formatted) {
+        return data.error ? `${data.error} — ${formatted}` : formatted;
+      }
+    }
+
+    if (typeof details === "string" && details.trim()) {
+      return data.error ? `${data.error}: ${details}` : details;
+    }
+    if (typeof data.error === "string" && data.error.trim()) return data.error;
+    if (typeof data.message === "string" && data.message.trim()) return data.message;
+  }
+
+  const message = (error as { message?: string })?.message;
+  return message || fallback;
+};
+
 const convertToPipelineNode = (node: AppNode): PipelineNode => ({
   id: node.id,
   type: node.type || "custom",
@@ -622,10 +672,14 @@ const PipelineEditorContent = () => {
     },
     onError: (error) => {
       console.error("[PipelineEditorPage] Pipeline creation error:", error);
-      // Show error message in ApiStatusModal
+      // Show error message in ApiStatusModal — surface the backend's
+      // field-level validation detail (e.g. an invalid Manage Portal slug)
+      // rather than the generic "Request failed with status code 400".
       setApiStatusModalState("error");
       setApiStatusModalAction("Pipeline Creation Failed");
-      setApiStatusModalMessage(error.message || "An error occurred while creating the pipeline.");
+      setApiStatusModalMessage(
+        getPipelineErrorMessage(error, "An error occurred while creating the pipeline.")
+      );
       setApiStatusModalOpen(true);
     },
   });
@@ -637,6 +691,17 @@ const PipelineEditorContent = () => {
         queryKey: ["pipelines", "list"],
       });
       navigate("/pipelines");
+    },
+    onError: (error) => {
+      console.error("[PipelineEditorPage] Pipeline update error:", error);
+      // Updates to deployed pipelines hit the same create endpoint, which now
+      // returns real 4xx errors — surface them instead of failing silently.
+      setApiStatusModalState("error");
+      setApiStatusModalAction("Pipeline Update Failed");
+      setApiStatusModalMessage(
+        getPipelineErrorMessage(error, "An error occurred while updating the pipeline.")
+      );
+      setApiStatusModalOpen(true);
     },
   });
 

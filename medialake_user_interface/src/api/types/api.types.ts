@@ -419,6 +419,12 @@ export interface Portal {
   metadataFields: PortalMetadataField[];
   destinations: PortalDestination[];
   captchaEnabled: boolean;
+  /**
+   * When true (default), the portal shows a Submit step; clicking it marks the
+   * session submitted (drives the formSubmissionComplete signal). When false,
+   * the portal is upload-only and formSubmissionComplete is always false.
+   */
+  formSubmissionEnabled: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -482,6 +488,8 @@ export interface CreatePortalRequest {
   metadataFields?: PortalMetadataField[];
   destinations: PortalDestination[];
   captchaEnabled?: boolean;
+  /** When true (default), show a Submit step; false = upload-only portal. */
+  formSubmissionEnabled?: boolean;
   /**
    * Ordered pages composing the multi-page portal flow. Required on create;
    * `UpdatePortalRequest` makes it optional (omitting leaves pages unchanged).
@@ -586,6 +594,7 @@ export interface PortalTemplate {
   tokenBypassesPassphrase?: boolean;
   structuredPathMode?: boolean;
   captchaEnabled?: boolean;
+  formSubmissionEnabled?: boolean;
   maxFileSizeBytes?: number;
   maxFilesPerSession?: number;
   createdBy?: string;
@@ -611,6 +620,7 @@ export interface CreatePortalTemplateRequest {
   tokenBypassesPassphrase?: boolean;
   structuredPathMode?: boolean;
   captchaEnabled?: boolean;
+  formSubmissionEnabled?: boolean;
   maxFileSizeBytes?: number;
   maxFilesPerSession?: number;
 }

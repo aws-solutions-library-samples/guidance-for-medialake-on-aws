@@ -2032,7 +2032,13 @@ export default {
       startFromTemplateTitle: "टेम्पलेट से शुरू करें",
       applyThemeTitle: "थीम लागू करें",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "वैकल्पिक। अपलोड-बैच पूर्णता ईवेंट को स्वचालित संवर्धन के लिए एक विशिष्ट पाइपलाइन पर रूट करने के लिए उपयोग किया जाता है।",
     },

@@ -2022,7 +2022,13 @@ export default {
       startFromTemplateTitle: "Start from template",
       applyThemeTitle: "Apply theme",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "Optional. Used to route upload-batch completion events to a specific pipeline for auto-enrichment.",
     },

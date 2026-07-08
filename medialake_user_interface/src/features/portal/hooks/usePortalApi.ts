@@ -11,14 +11,25 @@ export interface UploadSessionResponse {
   status: "OPEN" | "COMPLETE" | "COMPLETE_WITH_ERRORS";
   expectedCount: number;
   completedCount: number;
+  /**
+   * The batch's user-entered portal form fields ({ slug: value }). Empty until
+   * the user submits; populated once the session is terminal so the UI can
+   * review what was captured for a completed batch.
+   */
+  userMetadata?: Record<string, string>;
+  /** Present only once the session has reached a terminal status. */
+  outcome?: "COMPLETE" | "COMPLETE_WITH_ERRORS";
 }
 
-export interface FinalizeResponse {
+export interface SubmitResponse {
   status: "OPEN" | "COMPLETE" | "COMPLETE_WITH_ERRORS";
   expectedCount: number;
   completedCount: number;
   outcome?: "COMPLETE" | "COMPLETE_WITH_ERRORS";
 }
+
+/** Back-compat alias. */
+export type FinalizeResponse = SubmitResponse;
 
 export class PortalSessionExpiredError extends Error {
   constructor() {
@@ -242,15 +253,40 @@ export function usePortalApi(
     [authClient, slug]
   );
 
-  const finalize = useCallback(
-    async (sessionId: string, fileCount: number): Promise<FinalizeResponse> => {
+  const submit = useCallback(
+    async (
+      sessionId: string,
+      payload: {
+        metadata?: Record<string, string>;
+        uploadedKeys?: string[];
+        fileCount?: number;
+      } = {}
+    ): Promise<SubmitResponse> => {
       if (!authClient) throw new PortalNotAuthenticatedError();
       try {
         const { data } = await authClient.post(
-          `/portal/${slug}/upload-session/${sessionId}/finalize`,
-          { fileCount }
+          `/portal/${slug}/upload-session/${sessionId}/submit`,
+          payload
         );
-        return data as FinalizeResponse;
+        return data as SubmitResponse;
+      } catch (e) {
+        return handleApiError(e);
+      }
+    },
+    [authClient, slug]
+  );
+
+  const releaseKey = useCallback(
+    async (
+      sessionId: string,
+      fileLocator: { destinationId: string; filename: string; path?: string }
+    ): Promise<void> => {
+      if (!authClient) throw new PortalNotAuthenticatedError();
+      try {
+        await authClient.post(
+          `/portal/${slug}/upload-session/${sessionId}/release-key`,
+          fileLocator
+        );
       } catch (e) {
         return handleApiError(e);
       }
@@ -270,6 +306,7 @@ export function usePortalApi(
     startSession,
     getSession,
     heartbeat,
-    finalize,
+    submit,
+    releaseKey,
   };
 }

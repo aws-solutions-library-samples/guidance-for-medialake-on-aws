@@ -2041,7 +2041,13 @@ export default {
       startFromTemplateTitle: "Iniciar a partir de modelo",
       applyThemeTitle: "Aplicar tema",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "Opcional. Usado para encaminhar eventos de conclusão de lote de upload para um pipeline específico para enriquecimento automático.",
     },

@@ -2015,7 +2015,13 @@ export default {
       startFromTemplateTitle: "البدء من قالب",
       applyThemeTitle: "تطبيق سمة",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "اختياري. يُستخدم لتوجيه أحداث اكتمال دفعة التحميل إلى خط أنابيب محدد للإثراء التلقائي.",
     },

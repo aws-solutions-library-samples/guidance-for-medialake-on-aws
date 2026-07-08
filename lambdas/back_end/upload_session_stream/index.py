@@ -1,20 +1,54 @@
 """Upload Session Stream Processor Lambda.
 
-Processes DynamoDB Streams events from the upload-sessions table. Filters for
-OPEN → terminal status transitions (COMPLETE or COMPLETE_WITH_ERRORS), claims
-at-most-once emission via a conditional write, and publishes an
-UploadBatchCompleted event to the pipelines EventBridge bus.
+Processes DynamoDB Streams events from the upload-sessions table. This is the
+SINGLE emission point for the pipeline trigger: because the two-signal join in
+`try_terminal_transition` can complete from either the submit side or the
+asset-processing side (whichever arrives last), emitting off the status
+transition is the one place that observes the completed join regardless of which
+actor caused it.
 
-Requirements: 6.2, 6.4, 6.5, 6.6, 8.4
+Filters for OPEN → terminal-EMITTING status transitions (SUBMITTED_PROCESSED,
+SUBMITTED_UNPROCESSED, or UNSUBMITTED_PROCESSED), claims at-most-once emission
+via a conditional write, and publishes an UploadBatchCompleted event to the
+pipelines EventBridge bus.
+
+UNSUBMITTED_UNPROCESSED is a terminal status but is intentionally EXCLUDED here
+(it is not in EMITTING_TERMINAL_STATUSES) — a session that was never submitted
+and whose files never all succeeded is the silent false/false corner and must
+not trigger a pipeline. The event carries the two branchable signals
+(`filesProcessed`, `formSubmissionComplete`) derived from the terminal status,
+plus `userMetadata` — the authoritative form snapshot captured at submit — so
+downstream nodes can branch on the outcome and the portal form fields.
 """
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.metrics import MetricUnit
+
+# Upload session store — vendored into the Lambda package at deploy time. Import
+# the canonical emit set and the signal-derivation helper so the event schema
+# stays in lockstep with the session model (single source of truth).
+try:
+    from upload_session.session_store import (
+        EMITTING_TERMINAL_STATUSES,
+        derive_signals,
+    )
+except ImportError:
+    # Fallback for local development / testing: add the shared dir to path.
+    _SHARED_DIR = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "shared")
+    )
+    if _SHARED_DIR not in sys.path:
+        sys.path.insert(0, _SHARED_DIR)
+    from upload_session.session_store import (
+        EMITTING_TERMINAL_STATUSES,
+        derive_signals,
+    )
 
 logger = Logger(service="upload_session_stream")
 metrics = Metrics(namespace="medialake", service="upload_session_stream")
@@ -27,8 +61,10 @@ UPLOAD_SESSIONS_TABLE_NAME = os.environ.get("UPLOAD_SESSIONS_TABLE_NAME", "")
 dynamodb_client = boto3.client("dynamodb")
 events_client = boto3.client("events")
 
-# Terminal statuses that trigger emission
-TERMINAL_STATUSES = {"COMPLETE", "COMPLETE_WITH_ERRORS"}
+# Terminal statuses that trigger emission. Imported from the session store so
+# the silent corner (UNSUBMITTED_UNPROCESSED — never submitted and files never
+# all succeeded) is excluded exactly where it is defined.
+TERMINAL_STATUSES = EMITTING_TERMINAL_STATUSES
 
 
 def _is_terminal_transition(record: dict) -> bool:
@@ -86,12 +122,20 @@ def _extract_event_detail(new_image: dict) -> dict:
     """Extract the UploadBatchCompleted event detail from the NewImage.
 
     Carries sessionId, portalId, automationTag, expectedCount, completedCount,
-    failedCount, completedAt, outcome (= terminal status) as required by R6.5,
-    and userMetadata — the batch's user-entered portal form fields.
+    failedCount, completedAt, and the two branchable signals derived from the
+    terminal status:
 
-    Downstream trigger-workflow nodes read `detail.userMetadata.<slug>` to branch
-    on portal form fields. Values are strings (a boolean is the string "true" or
-    "false"); the map is empty when the session carried no user metadata.
+      * ``filesProcessed``         - "true" when every uploaded file succeeded.
+      * ``formSubmissionComplete`` - "true" when the user clicked Submit.
+
+    Both are STRINGS ("true"/"false"), not JSON booleans, so the trigger node's
+    string-interpolated EventBridge pattern (``["${files_processed}"]``) matches
+    them — the same convention the portal form fields (``userMetadata``) use.
+
+    ``userMetadata`` is the batch's user-entered portal form fields. Downstream
+    trigger-workflow nodes read ``detail.userMetadata.<slug>`` to branch on form
+    fields; values are strings and the map is empty when the session carried no
+    user metadata.
     """
 
     def _get_s(key: str) -> str:
@@ -110,6 +154,8 @@ def _extract_event_detail(new_image: dict) -> dict:
         raw_map = new_image.get(key, {}).get("M", {})
         return {slug: entry.get("S", "") for slug, entry in raw_map.items()}
 
+    files_processed, form_submission_complete = derive_signals(_get_s("status"))
+
     return {
         "sessionId": _get_s("sessionId"),
         "portalId": _get_s("portalId"),
@@ -118,7 +164,8 @@ def _extract_event_detail(new_image: dict) -> dict:
         "completedCount": _get_n("completedCount"),
         "failedCount": _get_n("failedCount"),
         "completedAt": _get_s("completedAt"),
-        "outcome": _get_s("status"),
+        "filesProcessed": files_processed,
+        "formSubmissionComplete": form_submission_complete,
         "userMetadata": _get_string_map("userMetadata"),
     }
 

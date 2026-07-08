@@ -2048,7 +2048,13 @@ export default {
       startFromTemplateTitle: "Iniciar desde plantilla",
       applyThemeTitle: "Aplicar tema",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "Opcional. Se usa para enrutar eventos de finalización de lotes de carga a un pipeline específico para enriquecimiento automático.",
     },

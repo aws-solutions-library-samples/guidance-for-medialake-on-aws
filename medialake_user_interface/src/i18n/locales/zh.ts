@@ -2003,7 +2003,13 @@ export default {
       startFromTemplateTitle: "从模板开始",
       applyThemeTitle: "应用主题",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText: "可选。用于将上传批次完成事件路由到特定管道以进行自动丰富。",
     },
     actions: {

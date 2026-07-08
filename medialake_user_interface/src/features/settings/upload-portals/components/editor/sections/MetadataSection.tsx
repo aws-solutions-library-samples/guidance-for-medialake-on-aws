@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MenuItem, Select, Stack, TextField } from "@mui/material";
+import { FormControlLabel, MenuItem, Select, Stack, Switch, TextField } from "@mui/material";
 
 import { usePortalEditorStore } from "../../../stores/usePortalEditorStore";
 
@@ -71,6 +71,11 @@ const MetadataSection: React.FC = () => {
   );
   const automationTag = usePortalEditorStore(
     (s) => (s.portalData?.automationTag as string | undefined) ?? ""
+  );
+  // Defaults to true when unset so existing portals (and new ones) collect a
+  // form submission unless the admin explicitly turns it off.
+  const formSubmissionEnabled = usePortalEditorStore(
+    (s) => (s.portalData?.formSubmissionEnabled as boolean | undefined) ?? true
   );
   const updatePortalData = usePortalEditorStore((s) => s.updatePortalData);
 
@@ -164,6 +169,13 @@ const MetadataSection: React.FC = () => {
     [updatePortalData]
   );
 
+  const handleFormSubmissionEnabledChange = useCallback(
+    (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      updatePortalData({ formSubmissionEnabled: checked });
+    },
+    [updatePortalData]
+  );
+
   return (
     <Stack spacing={3}>
       <Stack direction="row" spacing={2} alignItems="flex-end">
@@ -213,6 +225,13 @@ const MetadataSection: React.FC = () => {
         size="small"
         fullWidth
         helperText={t("uploadPortals.metadata.completionEventHelperText")}
+      />
+
+      <FormControlLabel
+        control={
+          <Switch checked={formSubmissionEnabled} onChange={handleFormSubmissionEnabledChange} />
+        }
+        label={t("uploadPortals.metadata.formSubmissionEnabled")}
       />
     </Stack>
   );

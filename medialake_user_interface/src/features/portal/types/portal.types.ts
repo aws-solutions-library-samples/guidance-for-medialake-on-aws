@@ -111,6 +111,11 @@ export interface PortalConfig {
   structuredPathMode: boolean;
   captchaEnabled: boolean;
   /**
+   * When true (default), the portal shows a Submit step whose click marks the
+   * session submitted. When false, the portal is upload-only (no Submit button).
+   */
+  formSubmissionEnabled?: boolean;
+  /**
    * Ordered pages composing the multi-page portal flow. The source of truth
    * for structure; the SurveyJS schema is derived from it at render time.
    */

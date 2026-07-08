@@ -2032,7 +2032,13 @@ export default {
       startFromTemplateTitle: "テンプレートから開始",
       applyThemeTitle: "テーマを適用",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "オプション。アップロードバッチ完了イベントを自動エンリッチメント用の特定のパイプラインにルーティングするために使用されます。",
     },

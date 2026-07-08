@@ -361,8 +361,11 @@ class PortalApiStack(cdk.NestedStack):
         portal_slug_upload_session_heartbeat_resource = (
             portal_slug_upload_session_id_resource.add_resource("heartbeat")
         )
-        portal_slug_upload_session_finalize_resource = (
-            portal_slug_upload_session_id_resource.add_resource("finalize")
+        portal_slug_upload_session_submit_resource = (
+            portal_slug_upload_session_id_resource.add_resource("submit")
+        )
+        portal_slug_upload_session_release_key_resource = (
+            portal_slug_upload_session_id_resource.add_resource("release-key")
         )
 
         portal_method_config = {
@@ -407,7 +410,10 @@ class PortalApiStack(cdk.NestedStack):
         portal_slug_upload_session_heartbeat_resource.add_method(
             "POST", portal_public_integration, **portal_method_config
         )
-        portal_slug_upload_session_finalize_resource.add_method(
+        portal_slug_upload_session_submit_resource.add_method(
+            "POST", portal_public_integration, **portal_method_config
+        )
+        portal_slug_upload_session_release_key_resource.add_method(
             "POST", portal_public_integration, **portal_method_config
         )
 
@@ -425,7 +431,8 @@ class PortalApiStack(cdk.NestedStack):
             portal_slug_upload_session_resource,
             portal_slug_upload_session_id_resource,
             portal_slug_upload_session_heartbeat_resource,
-            portal_slug_upload_session_finalize_resource,
+            portal_slug_upload_session_submit_resource,
+            portal_slug_upload_session_release_key_resource,
         ]:
             add_cors_options_method(res)
 
@@ -609,11 +616,9 @@ class PortalApiStack(cdk.NestedStack):
                 snap_start=False,
                 environment_variables={
                     "UPLOAD_SESSIONS_TABLE_NAME": self._upload_sessions_table_name,
-                    "IDLE_FINALIZE_MINUTES": str(
-                        config.upload_portals.idle_finalize_minutes
-                    ),
-                    "COMPLETION_GRACE_MINUTES": str(
-                        config.upload_portals.completion_grace_minutes
+                    "IDLE_TIMEOUT_HOURS": str(config.upload_portals.idle_timeout_hours),
+                    "COMPLETION_GRACE_HOURS": str(
+                        config.upload_portals.completion_grace_hours
                     ),
                     "MAX_SESSION_AGE_HOURS": str(
                         config.upload_portals.max_session_age_hours

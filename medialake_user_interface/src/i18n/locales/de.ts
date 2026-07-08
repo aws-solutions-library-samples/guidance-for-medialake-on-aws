@@ -2059,7 +2059,13 @@ export default {
       startFromTemplateTitle: "Von Vorlage starten",
       applyThemeTitle: "Theme anwenden",
     },
+    public: {
+      uploadAssets: "Upload assets",
+      uploading: "Uploading…",
+      submit: "Submit",
+    },
     metadata: {
+      formSubmissionEnabled: "Require form submission",
       completionEventHelperText:
         "Optional. Wird verwendet, um Upload-Batch-Abschlussereignisse an eine bestimmte Pipeline zur automatischen Anreicherung weiterzuleiten.",
     },

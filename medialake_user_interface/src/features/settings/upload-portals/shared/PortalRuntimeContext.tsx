@@ -16,10 +16,29 @@ export const SELECTED_DESTINATION_KEY = "__selectedDestinationId";
 export const CURRENT_PATH_KEY = "__currentPath";
 
 /**
+ * Reserved keys the live uploader writes back into `survey.data` so the
+ * survey-level Submit (Complete) handler can finalize the upload session:
+ *   - {@link UPLOAD_SESSION_ID_KEY}: the resolved upload sessionId.
+ *   - {@link UPLOADED_FILE_COUNT_KEY}: count of successfully uploaded files
+ *     (used to true up the session's expectedCount on submit).
+ *   - {@link UPLOAD_IN_PROGRESS_KEY}: `true` while an upload is in flight, so
+ *     onCompleting can block Submit until uploads settle.
+ */
+export const UPLOAD_SESSION_ID_KEY = "__uploadSessionId";
+export const UPLOADED_FILE_COUNT_KEY = "__uploadedFileCount";
+export const UPLOAD_IN_PROGRESS_KEY = "__uploadInProgress";
+
+/**
  * The full set of reserved keys, excluded from {@link collectMetadataValues}.
  * Declared `as const` so the values stay literal-typed for callers.
  */
-export const RESERVED_SURVEY_KEYS = [SELECTED_DESTINATION_KEY, CURRENT_PATH_KEY] as const;
+export const RESERVED_SURVEY_KEYS = [
+  SELECTED_DESTINATION_KEY,
+  CURRENT_PATH_KEY,
+  UPLOAD_SESSION_ID_KEY,
+  UPLOADED_FILE_COUNT_KEY,
+  UPLOAD_IN_PROGRESS_KEY,
+] as const;
 
 /**
  * Runtime context shared with every custom SurveyJS question.

@@ -32,6 +32,29 @@ actions:
     operationId: managePortal
     parameters:
       - in: body
+        name: Template ID
+        label: Template
+        description: >-
+          Optional. Select a saved portal Template to seed the portal's
+          structure (pages, fields, destinations), appearance and limits — so
+          you don't have to hand-write a Default Portal Config. Values in
+          Default Portal Config and runtime Field Mapping still override the
+          template. Manage templates under Settings > Upload Portals > Templates.
+        required: false
+        schema:
+          type: select
+      - in: body
+        name: Theme ID
+        label: Theme
+        description: >-
+          Optional. Select a saved appearance Theme to apply the portal's look
+          (colors, typography, layout). A Theme overrides the template's
+          appearance; Default Portal Config still wins over both. Manage themes
+          under Settings > Upload Portals > Themes.
+        required: false
+        schema:
+          type: select
+      - in: body
         name: Field Mapping
         required: false
         default: {}

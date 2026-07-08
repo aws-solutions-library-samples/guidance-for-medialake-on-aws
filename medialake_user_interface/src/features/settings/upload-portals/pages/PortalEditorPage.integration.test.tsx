@@ -104,6 +104,7 @@ const makePortalFixture = (): Portal => ({
   ],
   pages: [],
   captchaEnabled: false,
+  formSubmissionEnabled: true,
   createdBy: "test-user",
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",

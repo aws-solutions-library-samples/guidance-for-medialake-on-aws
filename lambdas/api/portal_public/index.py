@@ -10,7 +10,8 @@ Handles all public-facing portal routes:
   POST /<slug>/upload-session           – create/resume upload session
   GET  /<slug>/upload-session/<id>      – get session status
   POST /<slug>/upload-session/<id>/heartbeat – session heartbeat
-  POST /<slug>/upload-session/<id>/finalize  – finalize session
+  POST /<slug>/upload-session/<id>/submit    – submit session (fires trigger)
+  POST /<slug>/upload-session/<id>/release-key – release a failed/aborted key
   GET  /<slug>/browse                   – browse destination files
   POST /<slug>/folder                   – create folder
 """
@@ -713,6 +714,7 @@ def get_portal(slug: str):
         "maxFilesPerSession": portal.get("maxFilesPerSession"),
         "structuredPathMode": portal.get("structuredPathMode", False),
         "captchaEnabled": portal.get("captchaEnabled", False),
+        "formSubmissionEnabled": portal.get("formSubmissionEnabled", True),
         "allowedFileTypes": portal.get("allowedFileTypes"),
         "appearance": _resolve_appearance_asset_urls(portal.get("appearance")),
         "pages": portal.get("pages", []),
@@ -801,10 +803,15 @@ def post_upload_session(slug: str):
 @app.get("/<slug>/upload-session/<session_id>")
 @tracer.capture_method
 def get_upload_session(slug: str, session_id: str):
-    """Retrieve upload session status for resume probe.
+    """Retrieve upload session status and captured batch metadata.
+
+    Used both as the uploader's resume probe and to review a completed batch:
+    the response carries the batch's user-entered form fields (``userMetadata``)
+    so a client can show what was submitted once the session is terminal.
 
     Returns:
-        200: { sessionId, status, expectedCount, completedCount }
+        200: { sessionId, status, expectedCount, completedCount, failedCount,
+               userMetadata, filesProcessed, formSubmissionComplete }
         403: portalId mismatch (R9.4)
         404: session not found
     """
@@ -819,12 +826,30 @@ def get_upload_session(slug: str, session_id: str):
     if session.get("portalId") != auth_portal_id:
         return _error(403, "Access denied: portal mismatch")
 
-    return {
+    response = {
         "sessionId": session["sessionId"],
         "status": session["status"],
         "expectedCount": int(session.get("expectedCount", 0)),
         "completedCount": int(session.get("completedCount", 0)),
+        "failedCount": int(session.get("failedCount", 0)),
+        # The batch's user-entered portal form fields ({slug: value}); empty
+        # until the user submits. Returns the caller's own portal-scoped data
+        # (gated by the cross-portal check above), mirroring the metadata
+        # carried on the UploadBatchCompleted event for downstream pipelines.
+        "userMetadata": session.get("userMetadata") or {},
     }
+    # The two branchable signals, computed from the current counters/marker so
+    # they are accurate at any lifecycle point (and match the terminal event):
+    #   filesProcessed         - every uploaded file succeeded
+    #   formSubmissionComplete - the user clicked Submit
+    expected_count = int(session.get("expectedCount", 0))
+    completed_count = int(session.get("completedCount", 0))
+    failed_count = int(session.get("failedCount", 0))
+    response["filesProcessed"] = (
+        expected_count > 0 and failed_count == 0 and completed_count >= expected_count
+    )
+    response["formSubmissionComplete"] = bool(session.get("finalizeRequestedAt"))
+    return response
 
 
 @app.post("/<slug>/upload-session/<session_id>/heartbeat")
@@ -855,18 +880,30 @@ def post_heartbeat(slug: str, session_id: str):
     return Response(status_code=204, content_type="application/json", body="")
 
 
-@app.post("/<slug>/upload-session/<session_id>/finalize")
+@app.post("/<slug>/upload-session/<session_id>/submit")
 @tracer.capture_method
-def post_finalize(slug: str, session_id: str):
-    """Finalize the upload session (R3.2-3.6).
+def post_submit(slug: str, session_id: str):
+    """Record an explicit user SUBMIT — the authoritative pipeline trigger.
 
-    Body: { "fileCount": <int> }
+    Submit (not upload completion) is what fires automation. This captures the
+    final form snapshot, trues up the expected file count to what actually
+    uploaded, and applies the submit marker. The session reaches a terminal
+    EMITTING status (SUBMITTED_PROCESSED / SUBMITTED_UNPROCESSED) only once
+    processing also finishes — the two-signal join lives in the session store /
+    stream.
+
+    Body: {
+        "metadata":     { <slug>: <value>, ... }   # final form answers (optional)
+        "uploadedKeys": [ "<relativePath/filename>", ... ]  # optional true-up
+        "fileCount":    <int>                        # legacy true-up fallback
+    }
 
     Returns:
         200: { status, expectedCount, completedCount, outcome? }
+        400: invalid fileCount
         403: portalId mismatch (R9.4)
-        404: session not found
-        409: write failed (retryable, R3.6)
+        404: session/portal not found
+        409: write failed (session not OPEN; retryable, R3.6)
     """
     auth_portal_id = _get_authorizer_portal_id()
     store = _get_session_store()
@@ -879,24 +916,45 @@ def post_finalize(slug: str, session_id: str):
         return _error(403, "Access denied: portal mismatch")
 
     body = app.current_event.json_body or {}
-    file_count = body.get("fileCount")
 
-    if (
-        file_count is None
-        or not isinstance(file_count, int)
+    file_count = body.get("fileCount")
+    if file_count is not None and (
+        not isinstance(file_count, int)
         or isinstance(file_count, bool)
         or file_count < 0
     ):
         return _error(400, "fileCount must be a non-negative integer")
 
-    result = store.finalize(session_id, declared_count=file_count)
+    uploaded_keys = body.get("uploadedKeys")
+    if uploaded_keys is not None and not isinstance(uploaded_keys, list):
+        return _error(400, "uploadedKeys must be a list")
+
+    # Resolve the submitted form into the server-trusted namespace, then reduce
+    # to the ml-usr-* user fields ({slug: value}) that ride along on the event
+    # as the authoritative conditions downstream pipelines branch on.
+    portal_id, portal = _get_portal_by_slug(slug)
+    submitted_metadata = body.get("metadata") or {}
+    user_md: Dict[str, str] = {}
+    if portal:
+        s3_metadata = _resolve_portal_metadata(
+            portal, portal_id, submitted_metadata, session_id=session_id
+        )
+        user_md = {
+            k[len(ML_USER_PREFIX) :]: v
+            for k, v in s3_metadata.items()
+            if k.startswith(ML_USER_PREFIX)
+        }
+
+    result = store.submit(
+        session_id,
+        user_metadata=user_md or None,
+        uploaded_keys=uploaded_keys,
+        declared_count=file_count,
+    )
 
     if result.write_failed:
-        return _error(
-            409, "Finalize write failed; session is still OPEN. You may retry."
-        )
+        return _error(409, "Submit write failed; session is still OPEN. You may retry.")
 
-    # Read back the latest state
     updated_session = store.get_session(session_id)
     response_body = {
         "status": updated_session["status"],
@@ -907,6 +965,61 @@ def post_finalize(slug: str, session_id: str):
         response_body["outcome"] = updated_session["status"]
 
     return response_body
+
+
+@app.post("/<slug>/upload-session/<session_id>/release-key")
+@tracer.capture_method
+def post_release_key(slug: str, session_id: str):
+    """Release a key whose client-side upload failed or was aborted.
+
+    Decrements the session's expectedCount in real time so a failed upload no
+    longer inflates the completion join's denominator — independent of submit.
+    The server rebuilds the S3 key from the same (destinationId, path, filename)
+    the upload used, so the client never has to track server-built keys.
+
+    Body: { "destinationId": <str>, "filename": <str>, "path": <str?> }
+
+    Returns:
+        200: { released, alreadyReleased }
+        400: invalid input
+        403: portalId mismatch
+        404: session/portal/destination not found
+    """
+    auth_portal_id = _get_authorizer_portal_id()
+    store = _get_session_store()
+
+    session = store.get_session(session_id)
+    if not session:
+        return _error(404, "Session not found")
+    if session.get("portalId") != auth_portal_id:
+        return _error(403, "Access denied: portal mismatch")
+
+    body = app.current_event.json_body or {}
+    destination_id = body.get("destinationId")
+    filename = body.get("filename")
+    path = _sanitize_path(body.get("path", ""))
+    if path is None:
+        return _error(400, "Invalid path: traversal segments are not allowed")
+    if not destination_id:
+        return _error(400, "destinationId is required")
+    if not filename:
+        return _error(400, "filename is required")
+
+    portal_id, portal = _get_portal_by_slug(slug)
+    if not portal:
+        return _error(404, "Portal not found")
+
+    destination = _get_destination(portal_id, destination_id)
+    if not destination:
+        return _error(400, "Destination not found")
+
+    s3_key = _build_s3_key(destination["rootPath"], path, filename)
+    result = store.release_key(session_id, s3_key)
+
+    return {
+        "released": result.success,
+        "alreadyReleased": result.already_released,
+    }
 
 
 @app.post("/<slug>/upload")
@@ -1068,24 +1181,12 @@ def post_upload(slug: str):
         portal, portal_id, metadata, session_id=session_id
     )
 
-    # Capture the batch's user-entered metadata onto the session (once) so the
-    # UploadBatchCompleted event can carry it for downstream trigger-workflow
-    # branching (e.g. a boolean field). Portal forms are batch-uniform, so the
-    # ml-usr-* subset is identical for every file in the session. Best-effort:
-    # this must never break the upload if it fails.
-    user_md = {
-        k[len(ML_USER_PREFIX) :]: v
-        for k, v in s3_metadata.items()
-        if k.startswith(ML_USER_PREFIX)
-    }
-    if user_md:
-        try:
-            store.set_batch_metadata(session_id, user_md)
-        except Exception:
-            logger.warning(
-                "Failed to capture batch metadata onto session",
-                extra={"session_id": session_id},
-            )
+    # NOTE: the batch's user-entered form snapshot is captured AUTHORITATIVELY
+    # at SUBMIT (see post_submit -> store.submit), not here. Capturing at upload
+    # time would miss fields the user edits after the upload page. The S3 object
+    # still carries the provenance/identity directives (ml-source, ml-portal-id,
+    # ml-batch-id) resolved above so downstream processing can associate the
+    # asset with its batch; the form VALUES travel on the submit event.
 
     if is_multipart_upload_required(file_size):
         upload_id = create_multipart_upload(

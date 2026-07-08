@@ -62,6 +62,7 @@ PORTAL_CONFIG_FIELDS = {
     "tokenBypassesPassphrase",
     "structuredPathMode",
     "captchaEnabled",
+    "formSubmissionEnabled",
     "isActive",
     "maxFileSizeBytes",
     "maxFilesPerSession",
