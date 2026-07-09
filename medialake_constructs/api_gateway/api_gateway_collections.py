@@ -188,6 +188,12 @@ class CollectionsApi(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "SCOPE": "es",
                     "ENVIRONMENT": config.environment,
+                    # Needed by url_utils._get_cloudfront_domain() to resolve the
+                    # CloudFront domain SSM parameter (/{prefix}/{env}/cloudfront-
+                    # distribution-domain). Without this it falls back to
+                    # "/medialake/{env}", the wrong path for custom resource
+                    # prefixes, so collection thumbnail URLs come back null.
+                    "SSM_PREFIX": config.ssm_prefix,
                     "COLLECTIONS_INDEX_NAME": f"{config.resource_prefix}_collections_{config.environment}",
                     "MEDIA_ASSETS_BUCKET_NAME": props.media_assets_bucket.bucket.bucket_name,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
