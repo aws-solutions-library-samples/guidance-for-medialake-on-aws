@@ -5,13 +5,15 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from collection_activity import record_collection_activity
 from collections_utils import (
     COLLECTION_PK_PREFIX,
-    METADATA_SK,
     create_error_response,
     create_success_response,
+    require_collection_role,
 )
+from custom_exceptions import ForbiddenError
 from db_models import CollectionItemModel, CollectionModel
 from pynamodb.exceptions import DeleteError, DoesNotExist, UpdateError
 from user_auth import extract_user_context
@@ -36,6 +38,15 @@ def register_route(app):
 
             user_context = extract_user_context(app.current_event.raw_event)
             user_id = user_context.get("user_id")
+
+            # Object-level authorization: only the collection owner or an editor
+            # may remove items. The custom authorizer only enforces the coarse
+            # tenant-wide permission, so this per-collection check is required to
+            # stop any holder of collections:remove_assets/collections:edit from
+            # removing items from collections they do not own or can edit.
+            collection, _ = require_collection_role(
+                collection_id, user_id, minimum_role="EDITOR"
+            )
 
             # URL decode the item_id (API Gateway doesn't auto-decode path parameters)
             decoded_item_id = unquote(item_id)
@@ -74,9 +85,8 @@ def register_route(app):
             # Update collection: decrement itemCount atomically and refresh timestamps
             # Note: itemCount is maintained as a stored counter for efficient listing.
             try:
-                collection = CollectionModel.get(
-                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
-                )
+                # Reuse the collection loaded during the authorization check
+                # above to avoid a redundant DynamoDB read.
                 # Decrement itemCount only when it's > 0 to prevent negatives.
                 try:
                     collection.update(
@@ -114,6 +124,8 @@ def register_route(app):
                 request_id=app.current_event.request_context.request_id,
             )
 
+        except (ForbiddenError, NotFoundError):
+            raise
         except Exception as e:
             logger.exception("Error removing collection item", exc_info=e)
             return create_error_response(

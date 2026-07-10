@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1] - 2026-07-10
+
+### Bug Fixes
+
+- fix: add object-level authorization to collection api endpoints
+- fix: add SSM_PREFIX to collections API Lambda for CloudFront URL resolution
+
 ## [1.18.0] - 2026-07-08
 
 ### Features

@@ -6,12 +6,15 @@ import uuid
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.metrics import MetricUnit
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     RULE_SK_PREFIX,
     create_error_response,
+    require_collection_role,
 )
+from custom_exceptions import ForbiddenError
 from db_models import RuleModel
 from user_auth import extract_user_context
 from utils.formatting_utils import format_rule
@@ -31,7 +34,16 @@ def register_route(app):
     def collections_ID_rules_post(collection_id: str):
         """Create collection rule"""
         try:
-            extract_user_context(app.current_event.raw_event)
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
+
+            # Object-level authorization: only the collection owner or an editor
+            # may create rules. The custom authorizer only enforces the coarse
+            # tenant-wide collections:edit permission and has no per-collection
+            # awareness, so this check prevents modifying rules on a collection
+            # the caller does not own or have edit access to.
+            require_collection_role(collection_id, user_id, minimum_role="EDITOR")
+
             request_data = app.current_event.json_body
 
             current_timestamp = datetime.utcnow().isoformat() + "Z"
@@ -95,6 +107,8 @@ def register_route(app):
                 ),
             )
 
+        except (ForbiddenError, NotFoundError):
+            raise
         except Exception as e:
             logger.exception("Error creating collection rule", exc_info=e)
             return create_error_response(

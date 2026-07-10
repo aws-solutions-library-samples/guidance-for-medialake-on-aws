@@ -4,14 +4,18 @@ import os
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     RULE_SK_PREFIX,
     create_error_response,
     create_success_response,
+    require_collection_role,
 )
+from custom_exceptions import ForbiddenError
 from db_models import RuleModel
 from pynamodb.exceptions import DoesNotExist, UpdateError
+from user_auth import extract_user_context
 
 logger = Logger(
     service="collections-ID-rules-ID-put", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -28,6 +32,16 @@ def register_route(app):
     def collections_ID_rules_ID_put(collection_id: str, rule_id: str):
         """Update collection rule"""
         try:
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
+
+            # Object-level authorization: only the collection owner or an editor
+            # may update rules. The custom authorizer only enforces the coarse
+            # tenant-wide collections:edit permission with no per-collection
+            # awareness, so this check is required to prevent editing rules on a
+            # collection the caller does not own or have edit access to.
+            require_collection_role(collection_id, user_id, minimum_role="EDITOR")
+
             request_data = app.current_event.json_body
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
@@ -73,6 +87,8 @@ def register_route(app):
                 request_id=app.current_event.request_context.request_id,
             )
 
+        except (ForbiddenError, NotFoundError):
+            raise
         except UpdateError as e:
             logger.exception("Error updating rule", exc_info=e)
             return create_error_response(
