@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.2] - 2026-07-10
+
+### Bug Fixes
+
+- fix: add SSM_PREFIX environment variable to Assets and Search Lambdas
+
 ## [1.18.1] - 2026-07-10
 
 ### Bug Fixes
