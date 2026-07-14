@@ -652,9 +652,14 @@ def _is_personal_target(connector: Dict[str, Any]) -> bool:
     if connector.get("type") == "my-assets":
         return True
 
-    object_prefix = (connector.get("objectPrefix") or "").lstrip("/")
-    if object_prefix == "personal" or object_prefix.startswith("personal/"):
-        return True
+    # objectPrefix may be a string (legacy) or a list of prefixes; reuse the
+    # shared parser so both shapes are handled consistently.
+    for object_prefix in parse_object_prefixes(connector.get("objectPrefix")):
+        # parse_object_prefixes guarantees a trailing slash but not a stripped
+        # leading slash, so a bare "personal" arrives as "personal/" and
+        # "/personal" as "/personal/".
+        if object_prefix.lstrip("/").startswith("personal/"):
+            return True
 
     personal_bucket = os.environ.get("PERSONAL_ASSETS_BUCKET", "").strip()
     if personal_bucket and connector.get("storageIdentifier") == personal_bucket:

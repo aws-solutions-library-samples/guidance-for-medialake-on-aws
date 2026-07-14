@@ -894,6 +894,9 @@ class ConnectorsConstruct(Construct):
                     ),
                     "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name
                     or "",
+                    # Internal My Assets bucket — excluded from the pickable list
+                    "PERSONAL_ASSETS_BUCKET_NAME": props.personal_assets_bucket_name
+                    or "",
                 },
             ),
         )
@@ -1029,6 +1032,9 @@ class ConnectorsConstruct(Construct):
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name
+                    or "",
+                    # Internal My Assets bucket — excluded from the pickable list
+                    "PERSONAL_ASSETS_BUCKET_NAME": props.personal_assets_bucket_name
                     or "",
                 },
             ),

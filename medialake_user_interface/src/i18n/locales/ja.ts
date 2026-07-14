@@ -1515,7 +1515,7 @@ export default {
       initializing: "読み込み中...",
     },
     empty: {
-      folder: "このフォルダは空です",
+      folder: "ここには他のフォルダーはありません",
       noResults: "フィルターに一致するアイテムはありません",
     },
     keyboard: {

@@ -1517,7 +1517,7 @@ export default {
       initializing: "लोड हो रहा है...",
     },
     empty: {
-      folder: "यह फ़ोल्डर खाली है",
+      folder: "यहाँ कोई अन्य फ़ोल्डर नहीं है",
       noResults: "आपके फ़िल्टर से मेल खाने वाला कोई आइटम नहीं",
     },
     keyboard: {

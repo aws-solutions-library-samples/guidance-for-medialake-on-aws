@@ -1491,7 +1491,7 @@ export default {
       initializing: "Chargement...",
     },
     empty: {
-      folder: "Ce dossier est vide",
+      folder: "Il n'y a pas d'autres dossiers ici",
       noResults: "Aucun élément ne correspond à votre filtre",
     },
     keyboard: {

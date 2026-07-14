@@ -1519,7 +1519,7 @@ export default {
       initializing: "Loading...",
     },
     empty: {
-      folder: "This folder is empty",
+      folder: "There are no other folders in here",
       noResults: "No items match your filter",
     },
     keyboard: {

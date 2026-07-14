@@ -1503,7 +1503,7 @@ export default {
       initializing: "טוען...",
     },
     empty: {
-      folder: "תיקייה זו ריקה",
+      folder: "אין תיקיות נוספות כאן",
       noResults: "אין פריטים התואמים את הסינון שלך",
     },
     keyboard: {

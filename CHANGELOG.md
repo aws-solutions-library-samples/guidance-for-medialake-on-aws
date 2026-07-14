@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.3] - 2026-07-14
+
+### Bug Fixes
+
+- fix: handle upload destinations with connectors that have a prefix, hide personal bucket from connector S3 bucket list, set my-assets feature flag to false as default
+
 ## [1.18.2] - 2026-07-10
 
 ### Bug Fixes

@@ -1509,7 +1509,7 @@ export default {
       initializing: "로딩 중...",
     },
     empty: {
-      folder: "이 폴더는 비어 있습니다",
+      folder: "여기에 다른 폴더가 없습니다",
       noResults: "필터와 일치하는 항목이 없습니다",
     },
     keyboard: {

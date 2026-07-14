@@ -58,12 +58,22 @@ def lambda_handler(event, context):
 
         # Get MediaLake buckets from DynamoDB
         medialake_buckets = get_medialake_buckets_from_ddb()
-        print(f"MediaLake buckets to filter: {medialake_buckets}")
+
+        # The personal assets ("My Assets") bucket is internal and must never
+        # be offered as a connector target.
+        excluded_buckets = set(medialake_buckets)
+        personal_assets_bucket = os.environ.get(
+            "PERSONAL_ASSETS_BUCKET_NAME", ""
+        ).strip()
+        if personal_assets_bucket:
+            excluded_buckets.add(personal_assets_bucket)
+
+        print(f"MediaLake buckets to filter: {sorted(excluded_buckets)}")
         print(f"All S3 buckets: {all_buckets}")
 
-        # Filter out MediaLake buckets
+        # Filter out MediaLake-internal buckets
         filtered_buckets = [
-            bucket for bucket in all_buckets if bucket not in medialake_buckets
+            bucket for bucket in all_buckets if bucket not in excluded_buckets
         ]
         print(f"Filtered buckets: {filtered_buckets}")
 

@@ -30,6 +30,10 @@ vi.mock("@/permissions", () => ({
   usePermission: () => ({ can: () => true }),
 }));
 
+vi.mock("@/contexts/FeatureFlagsContext", () => ({
+  useFeatureFlag: (flag: string) => flag === "my-assets-enabled",
+}));
+
 vi.mock("@/features/upload", () => ({
   S3UploaderModal: (props: any) => (props.open ? <div data-testid="upload-modal" /> : null),
 }));
@@ -91,7 +95,7 @@ describe("AssetsPage", () => {
 
   it("renders My Assets sidebar item", () => {
     render(<AssetsPage />);
-    expect(screen.getAllByText("My Assets").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("assetsPage.myAssets").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders connector items in sidebar", () => {
@@ -147,14 +151,14 @@ describe("AssetsPage", () => {
 
     // My Assets sidebar item should still render (loading indicator in sidebar)
     // Click it to see the loading state in the main panel
-    const myAssetsItems = screen.getAllByText("My Assets");
+    const myAssetsItems = screen.getAllByText("assetsPage.myAssets");
     const sidebarButton = myAssetsItems[0].closest("[role='button']");
     if (sidebarButton) {
       await user.click(sidebarButton);
     }
 
     // CircularProgress should be rendered in the main panel
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar").length).toBeGreaterThanOrEqual(1);
   });
 
   it("opens upload modal from My Assets header", async () => {

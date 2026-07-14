@@ -1505,7 +1505,7 @@ export default {
       initializing: "جارٍ التحميل...",
     },
     empty: {
-      folder: "هذا المجلد فارغ",
+      folder: "لا توجد مجلدات أخرى هنا",
       noResults: "لا توجد عناصر تطابق التصفية الخاصة بك",
     },
     keyboard: {

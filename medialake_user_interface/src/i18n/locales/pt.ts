@@ -1534,7 +1534,7 @@ export default {
       initializing: "Carregando...",
     },
     empty: {
-      folder: "Esta pasta está vazia",
+      folder: "Não há outras pastas aqui",
       noResults: "Nenhum item corresponde ao seu filtro",
     },
     keyboard: {

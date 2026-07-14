@@ -1499,7 +1499,7 @@ export default {
       initializing: "加载中...",
     },
     empty: {
-      folder: "此文件夹为空",
+      folder: "此处没有其他文件夹",
       noResults: "没有与您的筛选条件匹配的项",
     },
     keyboard: {
