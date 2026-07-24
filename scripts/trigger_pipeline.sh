@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script: trigger_embedding_pipeline.sh
-# Description: Backfill a TwelveLabs embedding pipeline over already-ingested
-#              MediaLake assets by starting one Step Functions execution per
-#              asset (keyed by InventoryID). Event-triggered embedding pipelines
-#              have no manual "run" button, so we start their state machine
-#              directly with the input shape the lambda_middleware expects:
-#              {"item":{"inventory_id":"...","params":{}}}.
+# Script: trigger_pipeline.sh
+# Description: (Re)trigger a MediaLake pipeline over already-ingested assets by
+#              starting one Step Functions execution per asset (keyed by
+#              InventoryID). Event-triggered pipelines have no manual "run"
+#              button, so we start their state machine directly with the input
+#              the lambda_middleware expects: {"item":{"inventory_id":"...","params":{}}}.
+#
+#              Works for any pipeline's state machine — an embedding pipeline
+#              (Marengo -> S3 Vectors), the Default Video Pipeline (which then
+#              cascades to downstream pipelines), etc. Point --state-machine-arn
+#              at whichever pipeline you want to (re)run.
 #
 #              Two modes:
 #                - Discovery: scan the asset table by media type (--table).
@@ -24,17 +28,17 @@ log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR $*" >&2; }
 function usage() {
     cat <<EOF
 
-Backfill an embedding pipeline over existing MediaLake assets.
+Re-trigger a MediaLake pipeline over existing assets, keyed by InventoryID.
 
-Starts one Step Functions execution per asset, keyed by InventoryID. Either
-discover assets by scanning the asset table (--table) or target specific assets
-by ID (--inventory-ids). Defaults to a dry run that only lists matches; pass
---execute to actually start executions.
+Starts one Step Functions execution per asset. Point --state-machine-arn at any
+pipeline (embedding, Default Video, etc.). Either discover assets by scanning the
+asset table (--table) or target specific assets by ID (--inventory-ids). Defaults
+to a dry run that only lists matches; pass --execute to actually start executions.
 
 Usage: ${SCRIPT_NAME} --state-machine-arn <arn> (--table <name> | --inventory-ids <ids>) [OPTIONS]
 
 Required:
-    -s, --state-machine-arn  <arn>    State machine ARN of the embedding pipeline
+    -s, --state-machine-arn  <arn>    State machine ARN of the pipeline to run
 
     and one of:
     -t, --table              <name>   Asset DynamoDB table (discovery mode)
@@ -52,7 +56,7 @@ Dependencies: ${DEPENDENCIES[*]}
 
 Examples:
     # Test a single asset (dry run, then add --execute)
-    ${SCRIPT_NAME} -s arn:...:stateMachine:... -i asset:uuid:abc123-def456
+    ${SCRIPT_NAME} -s arn:...:stateMachine:... -i asset:uuid:abc123
 
     # Test a few specific assets
     ${SCRIPT_NAME} -s arn:...:stateMachine:... \\
