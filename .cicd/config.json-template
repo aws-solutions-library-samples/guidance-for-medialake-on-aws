@@ -50,6 +50,7 @@
         }
     },
     "authZ": {
+        "identity_providers": [
             {
                 "identity_provider_method": "cognito"
             }
