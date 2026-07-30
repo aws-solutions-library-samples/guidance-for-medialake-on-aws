@@ -10,6 +10,7 @@ from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
+
 from config import config
 from constants import Lambda as LambdaConstants
 from medialake_constructs.api_gateway.api_gateway_utils import add_cors_options_method

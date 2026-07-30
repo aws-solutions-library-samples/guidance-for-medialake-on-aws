@@ -302,6 +302,91 @@ def get_user_collection_role(collection: Any, user_id: Optional[str]) -> Optiona
     return None
 
 
+# Object-level collection roles, ordered from least to most privileged.
+# Used by require_collection_role to compare a caller's role against the
+# minimum role an operation demands.
+COLLECTION_ROLE_HIERARCHY = {"VIEWER": 1, "EDITOR": 2, "OWNER": 3}
+
+
+@tracer.capture_method
+def require_collection_role(
+    collection_id: str,
+    user_id: Optional[str],
+    minimum_role: str = "EDITOR",
+    collection: Any = None,
+):
+    """
+    Enforce object-level authorization for a collection operation.
+
+    This is the backend counterpart to the frontend CASL checks. The custom API
+    Gateway authorizer only enforces coarse, tenant-wide permissions (e.g.
+    ``collections:edit``); it has no knowledge of which collection is being
+    touched. Every mutating collection endpoint must therefore call this helper
+    so that tenant-wide RBAC is backed by per-collection ownership/share
+    enforcement. Without it, any user holding the coarse permission can mutate
+    ANY collection regardless of ownership or share (BOLA/IDOR).
+
+    Args:
+        collection_id: Collection ID without the ``COLL#`` prefix.
+        user_id: Caller's user id, as returned by ``extract_user_context``.
+        minimum_role: Minimum role the caller must hold: ``"VIEWER"``,
+            ``"EDITOR"``, or ``"OWNER"``. Defaults to ``"EDITOR"``.
+        collection: Optional pre-loaded collection model/dict. When provided the
+            collection is not re-fetched (avoids a redundant DynamoDB read for
+            handlers that have already loaded it).
+
+    Returns:
+        Tuple of ``(collection, role)`` where ``collection`` is the loaded
+        collection model/dict and ``role`` is the caller's resolved role
+        (e.g. ``"OWNER"``, ``"EDITOR"``, ``"VIEWER"``).
+
+    Raises:
+        ForbiddenError: If the caller is unauthenticated or holds a role below
+            ``minimum_role``.
+        NotFoundError: If the collection does not exist.
+    """
+    # Imported lazily so this shared library does not take a hard dependency on
+    # the collections API package or Powertools at import time.
+    from custom_exceptions import ForbiddenError
+
+    if not user_id:
+        raise ForbiddenError("Authentication required")
+
+    if collection is None:
+        from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+        from db_models import CollectionModel
+        from pynamodb.exceptions import DoesNotExist
+
+        try:
+            collection = CollectionModel.get(
+                f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+            )
+        except DoesNotExist:
+            raise NotFoundError(f"Collection '{collection_id}' not found")
+
+    role = get_user_collection_role(collection, user_id)
+
+    required_rank = COLLECTION_ROLE_HIERARCHY.get(minimum_role.upper(), 0)
+    actual_rank = COLLECTION_ROLE_HIERARCHY.get((role or "").upper(), 0)
+
+    if actual_rank < required_rank:
+        logger.warning(
+            {
+                "message": "Collection authorization denied",
+                "collection_id": collection_id,
+                "user_id": user_id,
+                "required_role": minimum_role,
+                "actual_role": role,
+                "operation": "require_collection_role",
+            }
+        )
+        raise ForbiddenError(
+            "You do not have permission to perform this action on this collection"
+        )
+
+    return collection, role
+
+
 @tracer.capture_method
 def create_cursor(
     pk: str, sk: str, gsi_pk: Optional[str] = None, gsi_sk: Optional[str] = None

@@ -32,7 +32,7 @@ vi.mock("./contexts/DirectionContext", () => ({
 }));
 
 vi.mock("./contexts/FeatureFlagsContext", () => ({
-  useFeatureFlag: () => false,
+  useFeatureFlag: (flag: string) => flag === "my-assets-enabled",
 }));
 
 vi.mock("./stores/searchStore", () => ({
@@ -41,6 +41,8 @@ vi.mock("./stores/searchStore", () => ({
   useSemanticSearch: () => false,
   useDomainActions: () => ({ setQuery: vi.fn(), setIsSemantic: vi.fn() }),
   useUIActions: () => ({ openFilterModal: vi.fn() }),
+  useActiveFilterCount: () => 0,
+  appendFiltersToUrlParams: vi.fn(),
 }));
 
 vi.mock("./components/search/FilterModal", () => ({

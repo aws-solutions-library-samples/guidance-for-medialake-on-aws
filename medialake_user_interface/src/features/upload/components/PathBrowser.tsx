@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -114,13 +114,17 @@ export const PathBrowser: React.FC<PathBrowserProps> = ({
     }
   }, [open, normalizedPrefixes, isRestrictedMode, initialPath]);
 
-  // Update current browse path when selected prefix changes
+  // Update current browse path when selected prefix changes (e.g. user picks
+  // a different prefix from the dropdown). Do NOT react to currentBrowsePath
+  // here — that would clobber sub-folder navigation within the selected prefix.
+  const prevSelectedPrefix = useRef(selectedPrefix);
   useEffect(() => {
-    if (isRestrictedMode && selectedPrefix && selectedPrefix !== currentBrowsePath) {
+    if (isRestrictedMode && selectedPrefix && selectedPrefix !== prevSelectedPrefix.current) {
       setCurrentBrowsePath(selectedPrefix);
       setValidationError("");
     }
-  }, [selectedPrefix, isRestrictedMode, currentBrowsePath]);
+    prevSelectedPrefix.current = selectedPrefix;
+  }, [selectedPrefix, isRestrictedMode]);
 
   // Validate path against allowed prefixes
   const validatePath = useCallback(

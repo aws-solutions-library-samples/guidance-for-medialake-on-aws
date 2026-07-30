@@ -5,15 +5,19 @@ import os
 from datetime import datetime
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    NotFoundError,
+)
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collection_activity import record_collection_activity
 from collections_utils import (
     COLLECTION_PK_PREFIX,
-    METADATA_SK,
     create_error_response,
+    require_collection_role,
 )
+from custom_exceptions import ForbiddenError
 from db_models import CollectionItemModel, CollectionModel
 from models import AddItemToCollectionRequest
 from pynamodb.exceptions import PutError
@@ -51,6 +55,15 @@ def register_route(app):
 
             current_timestamp = datetime.utcnow().isoformat() + "Z"
             user_id = user_context.get("user_id")
+
+            # Object-level authorization: the caller must be the collection
+            # owner or an editor. The custom authorizer only checks the coarse
+            # tenant-wide permission, so without this check any user holding
+            # collections:add_assets/collections:edit could add assets to a
+            # collection they do not own or have edit access to.
+            collection, _ = require_collection_role(
+                collection_id, user_id, minimum_role="EDITOR"
+            )
 
             asset_id = request_data.assetId
             clip_boundary = request_data.clipBoundary or {}
@@ -137,9 +150,8 @@ def register_route(app):
             # no longer the source of truth — both the list and detail endpoints
             # now compute item counts dynamically from CollectionItemModel rows.
             try:
-                collection = CollectionModel.get(
-                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
-                )
+                # Reuse the collection loaded during the authorization check
+                # above to avoid a redundant DynamoDB read.
                 collection.update(
                     actions=[
                         CollectionModel.updatedAt.set(current_timestamp),
@@ -190,7 +202,7 @@ def register_route(app):
                 ),
             )
 
-        except BadRequestError:
+        except (BadRequestError, ForbiddenError, NotFoundError):
             raise
         except Exception as e:
             logger.exception("Error adding collection item", exc_info=e)

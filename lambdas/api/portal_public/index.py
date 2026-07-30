@@ -1323,11 +1323,29 @@ def post_multipart_complete(slug: str):
 
     bucket = connector["storageIdentifier"]
     s3_client = _get_s3_client_for_bucket(bucket)
+
+    # Normalize the parts the client sent before handing them to S3. Browser
+    # multipart clients (Uppy) build each part from the CORS-exposed response
+    # headers, so a part can arrive as
+    #   {"PartNumber": 1, "etag": "...", "x-amz-request-id": "...", ...}
+    # boto3's CompleteMultipartUpload only accepts "ETag" and "PartNumber" and
+    # raises ParamValidationError on any other key, so we distill each part down
+    # to exactly those two fields (case-insensitively) and sort ascending, which
+    # S3 requires.
+    normalized_parts = []
+    for p in parts:
+        etag = p.get("ETag") or p.get("etag")
+        pn = p.get("PartNumber") if p.get("PartNumber") is not None else p.get("partNumber")
+        if not etag or pn is None:
+            return _error(400, "Each part must include an ETag and PartNumber")
+        normalized_parts.append({"ETag": etag, "PartNumber": int(pn)})
+    normalized_parts.sort(key=lambda part: part["PartNumber"])
+
     s3_client.complete_multipart_upload(
         Bucket=bucket,
         Key=key,
         UploadId=upload_id,
-        MultipartUpload={"Parts": parts},
+        MultipartUpload={"Parts": normalized_parts},
     )
 
     max_size = portal.get("maxFileSizeBytes")

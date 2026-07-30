@@ -1530,7 +1530,7 @@ export default {
       initializing: "Lädt...",
     },
     empty: {
-      folder: "Dieser Ordner ist leer",
+      folder: "Hier gibt es keine weiteren Ordner",
       noResults: "Keine Elemente entsprechen Ihrem Filter",
     },
     keyboard: {

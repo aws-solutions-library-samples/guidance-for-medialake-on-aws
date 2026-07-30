@@ -85,6 +85,7 @@ function TopBar() {
 
   // Fetch My Assets connector for upload pre-selection
   const { connector: myAssetsConnector } = useMyAssetsConnector();
+  const myAssetsEnabled = useFeatureFlag("my-assets-enabled", false);
 
   // Only users with upload permission see the upload entry point.
   const { can } = usePermission();
@@ -812,8 +813,8 @@ function TopBar() {
           "upload.description",
           "Select a destination and upload your media files. Only audio, video, image, HLS, and MPEG-DASH formats are supported."
         )}
-        defaultConnectorId={myAssetsConnector?.id}
-        defaultObjectPrefix={myAssetsConnector?.objectPrefix}
+        defaultConnectorId={myAssetsEnabled ? myAssetsConnector?.id : undefined}
+        defaultObjectPrefix={myAssetsEnabled ? myAssetsConnector?.objectPrefix : undefined}
       />
 
       {/* Filter Modal */}

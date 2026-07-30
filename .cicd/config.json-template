@@ -52,6 +52,11 @@
     "authZ": {
         "identity_providers": [
             {
+                "identity_provider_method": "saml",
+                "identity_provider_name": "BethelSSO",
+                "identity_provider_metadata_url": "https://login.microsoftonline.com/e9b2b7ba-b238-42a9-b271-2adfc82da650/federationmetadata/2007-06/federationmetadata.xml?appid=<MEDIALAKE_APP_CLIENT_ID>"
+            },
+            {
                 "identity_provider_method": "cognito"
             }
         ]

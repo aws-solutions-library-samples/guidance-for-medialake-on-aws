@@ -1527,7 +1527,7 @@ export default {
       initializing: "Cargando...",
     },
     empty: {
-      folder: "Esta carpeta está vacía",
+      folder: "No hay más carpetas aquí",
       noResults: "No hay elementos que coincidan con tu filtro",
     },
     keyboard: {
