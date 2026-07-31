@@ -10,6 +10,8 @@ interface TabbedSidebarProps {
     id: string;
     name: string;
     type: string;
+    inventoryID?: string;
+    segment?: { startTime: number; endTime: number; label?: string };
   }>;
   onBatchDelete?: () => void;
   onBatchDownload?: () => void;

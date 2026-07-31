@@ -429,16 +429,36 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
           assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
         description: "Original high resolution version",
       },
-      ...assetData.data.asset.DerivedRepresentations.map((rep) => ({
+      ...assetData.data.asset.DerivedRepresentations.map((rep: any) => ({
         id: rep.ID,
         src: rep.StorageInfo.PrimaryLocation.ObjectKey.FullPath,
         type: rep.Purpose.charAt(0).toUpperCase() + rep.Purpose.slice(1),
         format: rep.Format,
         fileSize: rep.StorageInfo.PrimaryLocation.FileInfo.Size.toString(),
         description: `${rep.Purpose} version`,
+        // Playable rendition URL (attached by the asset API for proxy and
+        // smartcrop reps) — enables the Versions tab "View" switcher.
+        url: rep.URL,
+        // Smartcrop details for the version card display.
+        aspectRatio: rep.AspectRatio,
+        resolution: rep.VideoSpec?.Resolution,
+        segment: rep.Segment,
       })),
     ];
   }, [assetData]);
+
+  // Versions-tab "View" switcher: which rendition the main player shows.
+  // null = default (proxy). Reset when navigating to a different asset.
+  const [viewedVersion, setViewedVersion] = useState<{ id: string; url: string } | null>(null);
+  useEffect(() => {
+    setViewedVersion(null);
+  }, [id]);
+  const handleViewVersion = useCallback((version: { id: string; url?: string }) => {
+    if (!version.url) return;
+    setViewedVersion((prev) =>
+      prev?.id === version.id ? null : { id: version.id, url: version.url! }
+    );
+  }, []);
 
   const transformMetadata = (metadata: any) => {
     if (!metadata) return [];
@@ -650,7 +670,7 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
           }}
         >
           <OmakaseDetailPlayer
-            src={proxyUrl}
+            src={viewedVersion?.url ?? proxyUrl}
             mediaType={mediaType}
             assetId={id || ""}
             onTimeUpdate={(time) => {
@@ -791,6 +811,8 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
         asset={asset}
         assetType={mediaType === "video" ? "Video" : "Audio"}
         searchTerm={effectiveSearchTerm}
+        onViewVersion={handleViewVersion}
+        viewedVersionId={viewedVersion?.id}
       />
     </Box>
   );

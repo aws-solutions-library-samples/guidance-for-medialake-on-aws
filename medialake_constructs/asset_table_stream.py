@@ -26,6 +26,9 @@ class AssetTableStreamProps:
     batch_size: int = 100
     max_batch_size: int = 1000
     reserved_concurrency: Optional[int] = 10
+    # Concurrent batches per stream shard (1-10). With 1, a single slow
+    # batch blocks the whole shard and the iterator ages unboundedly.
+    parallelization_factor: int = 10
 
 
 class AssetTableStream(Construct):
@@ -109,6 +112,11 @@ class AssetTableStream(Construct):
                 batch_size=props.max_batch_size,
                 max_batching_window=Duration.seconds(5),
                 retry_attempts=3,
+                # Up to 10 concurrent batches per shard (default is 1).
+                # Without this the indexer maxes out at one in-flight batch
+                # per shard and falls hours behind the stream during ingest
+                # bursts (observed 6-9.6h lag in prd on 2026-07-23).
+                parallelization_factor=props.parallelization_factor,
                 on_failure=lambda_event_sources.SqsDlq(
                     self.storage_ingest_connector_dlq.queue
                 ),

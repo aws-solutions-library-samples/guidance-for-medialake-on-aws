@@ -540,6 +540,10 @@ aws-lambda-powertools>=2.0.0
 aws-xray-sdk
 ```
 
+### Making Node Outputs Downloadable
+
+If your node produces a file, record it on the asset as a derived representation (with `StorageInfo.PrimaryLocation` giving the bucket, object key, and size) before the step returns. Doing so is what surfaces the output on the asset **and** what lets users package a batch of pipeline outputs into a single zip download from the bin. The rule is the same for every node and every purpose — a node that writes to S3 without recording a representation has nothing for packaging to collect. See [`pipeline-output-packaging.md`](assets/docs/pipeline-output-packaging.md).
+
 ### Bucket Permissions
 
 Your external S3 bucket must grant read access to the MediaLake deployment role. Add a bucket policy like:
@@ -704,6 +708,10 @@ guidance-for-medialake-on-aws/
 - Step Functions workflow orchestration
 - Customizable processing steps
 - Event-driven architecture
+- Run a manual pipeline over a selection of assets and get the outputs back as
+  a single zip download — see
+  [`pipeline-output-packaging.md`](assets/docs/pipeline-output-packaging.md),
+  which also covers what a node must record for its output to be packaged
 
 ### AWS Services Used
 

@@ -388,6 +388,79 @@ def require_collection_role(
 
 
 @tracer.capture_method
+def require_collection_view_access(
+    collection_id: str,
+    user_id: Optional[str],
+    collection: Any = None,
+):
+    """
+    Enforce object-level read authorization for a collection.
+
+    Read counterpart to ``require_collection_role``. A collection is viewable
+    when it is public, or when the caller is its owner or holds any share role
+    (VIEWER or above). This mirrors the access rule enforced by
+    ``GET /collections/{id}`` so every read endpoint that exposes collection
+    contents (items, assets, rules, ancestors) applies the same policy.
+
+    Denials are surfaced as ``NotFoundError`` (404) rather than 403 so that
+    private collection IDs cannot be probed for existence — the same behavior
+    as the collection detail endpoint.
+
+    Args:
+        collection_id: Collection ID without the ``COLL#`` prefix.
+        user_id: Caller's user id, as returned by ``extract_user_context``.
+        collection: Optional pre-loaded collection model/dict. When provided
+            the collection is not re-fetched.
+
+    Returns:
+        Tuple of ``(collection, role)``. ``role`` is the caller's resolved
+        role for private collections; for public collections the share lookup
+        is skipped and ``role`` is None.
+
+    Raises:
+        NotFoundError: If the collection does not exist, or the caller has no
+            view access to a private collection.
+    """
+    from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+
+    if collection is None:
+        from db_models import CollectionModel
+        from pynamodb.exceptions import DoesNotExist
+
+        try:
+            collection = CollectionModel.get(
+                f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
+            )
+        except DoesNotExist:
+            raise NotFoundError(f"Collection '{collection_id}' not found")
+
+    # Public collections are viewable by any authenticated caller; skip the
+    # per-user share lookup entirely.
+    if hasattr(collection, "isPublic"):
+        is_public = bool(collection.isPublic)
+    else:
+        is_public = bool(collection.get("isPublic", False))
+
+    if is_public:
+        return collection, None
+
+    role = get_user_collection_role(collection, user_id)
+    if role is None:
+        logger.warning(
+            {
+                "message": "Collection view access denied",
+                "collection_id": collection_id,
+                "user_id": user_id,
+                "operation": "require_collection_view_access",
+            }
+        )
+        # 404, not 403: do not reveal that the private collection exists.
+        raise NotFoundError(f"Collection '{collection_id}' not found")
+
+    return collection, role
+
+
+@tracer.capture_method
 def create_cursor(
     pk: str, sk: str, gsi_pk: Optional[str] = None, gsi_sk: Optional[str] = None
 ) -> str:

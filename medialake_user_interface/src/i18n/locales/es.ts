@@ -1030,6 +1030,9 @@ export default {
         pipelineNotFound: "Pipeline no encontrado",
         insufficientPermissions: "No tiene permiso para ejecutar este pipeline",
         noAssetsSelected: "No se seleccionaron activos para la ejecución del pipeline",
+        packageOutputs: "Empaquetar las salidas para descargar al finalizar",
+        packageOutputsHint:
+          "Ejecuta los activos seleccionados como un solo grupo. Cuando todas las ejecuciones terminen, los nuevos archivos de salida creados por la canalización se comprimen en un ZIP y se entregan como una notificación de descarga.",
       },
     },
     confirmBulkDelete: "Confirmar eliminación masiva",
@@ -1647,6 +1650,19 @@ export default {
     tabs: {
       markers: "Marcadores",
     },
+    cropSize: "Recorte:",
+    segmentDuration: "Duración:",
+    fullLength: "Duración completa",
+    viewing: "Viendo",
+    view: "Ver",
+  },
+  segmentWorkflows: {
+    header: "Ejecutar en el segmento",
+    runButton: "Ejecutar",
+    menuTooltip: "Ejecutar un flujo de trabajo en este segmento",
+    started: 'Se inició "{{name}}" en el segmento',
+    failed: "No se pudo iniciar el flujo de trabajo",
+    forbidden: "No tienes permiso para ejecutar este flujo de trabajo",
   },
   fileUpload: {
     errorMessages: {

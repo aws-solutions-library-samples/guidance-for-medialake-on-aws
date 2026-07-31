@@ -1010,6 +1010,9 @@ export default {
         pipelineNotFound: "خط الأنابيب غير موجود",
         insufficientPermissions: "ليس لديك إذن لتنفيذ خط الأنابيب هذا",
         noAssetsSelected: "لم يتم تحديد أصول لتنفيذ خط الأنابيب",
+        packageOutputs: "حزم المخرجات للتنزيل عند الانتهاء",
+        packageOutputsHint:
+          "يقوم بتشغيل الأصول المحددة كمجموعة واحدة. عند اكتمال جميع عمليات التنفيذ، تُضغط جميع ملفات المخرجات الجديدة التي أنشأها المسار في ملف ZIP وتُسلَّم عبر إشعار تنزيل.",
       },
     },
     confirmBulkDelete: "تأكيد الحذف الجماعي",
@@ -1532,6 +1535,19 @@ export default {
     tabs: {
       markers: "العلامات",
     },
+    cropSize: "الاقتصاص:",
+    segmentDuration: "المدة:",
+    fullLength: "المدة الكاملة",
+    viewing: "قيد العرض",
+    view: "عرض",
+  },
+  segmentWorkflows: {
+    header: "التشغيل على المقطع",
+    runButton: "تشغيل",
+    menuTooltip: "تشغيل سير عمل على هذا المقطع",
+    started: "تم بدء {{name}} على المقطع",
+    failed: "فشل بدء سير العمل",
+    forbidden: "ليس لديك إذن لتشغيل سير العمل هذا",
   },
   groups: {
     actions: {

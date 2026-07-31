@@ -18,6 +18,7 @@ from graph_utils import GraphAnalyzer
 from iam_operations import get_events_role_arn
 from lambda_operations import create_lambda_function
 from models import PipelineDefinition
+from pipeline_utils import normalize_pipeline_definition
 from s3_loader import load_pipeline_from_s3
 from step_functions_builder import build_step_function_definition, create_step_function
 
@@ -84,9 +85,9 @@ def transform_pipeline_data(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Transform pipeline data to match the expected format for PipelineDefinition.
 
-    This function:
-    1. Converts numeric width and height values to strings
-    2. Adds an 'id' field to each node's data object based on the nodeId field
+    Delegates to the shared normalizer in the common_libraries layer so this
+    handler and ``post_pipelines_async`` accept exactly the same payload shapes.
+    See ``normalize_pipeline_definition`` for the normalization rules.
 
     Args:
         pipeline_data: The pipeline data to transform
@@ -95,26 +96,7 @@ def transform_pipeline_data(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
         The transformed pipeline data
     """
     logger.info("Transforming pipeline data to match expected format")
-
-    # Make a deep copy to avoid modifying the original
-    transformed_data = json.loads(json.dumps(pipeline_data))
-
-    # Transform nodes
-    if (
-        "configuration" in transformed_data
-        and "nodes" in transformed_data["configuration"]
-    ):
-        for node in transformed_data["configuration"]["nodes"]:
-            # Convert width and height to strings
-            if "width" in node and isinstance(node["width"], int):
-                node["width"] = str(node["width"])
-            if "height" in node and isinstance(node["height"], int):
-                node["height"] = str(node["height"])
-
-            # Add id field to data object based on nodeId
-            if "data" in node and "nodeId" in node["data"] and "id" not in node["data"]:
-                node["data"]["id"] = node["data"]["nodeId"]
-
+    transformed_data = normalize_pipeline_definition(pipeline_data)
     logger.info("Pipeline data transformation complete")
     return transformed_data
 

@@ -11,7 +11,7 @@ class NodeData(BaseModel):
     type: str
     label: str
     description: str
-    icon: Dict[str, Any]
+    icon: Dict[str, Any] = Field(default_factory=dict)
     inputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     outputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     configuration: Dict[str, Any]

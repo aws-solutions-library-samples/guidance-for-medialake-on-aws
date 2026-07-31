@@ -9,6 +9,31 @@ import boto3
 # Default maximum batch size for pipeline trigger requests
 DEFAULT_MAX_BATCH_SIZE = 50
 
+# Days before pipeline-group tracking records expire (DynamoDB TTL).
+# Matches the bulk-download job retention window.
+DEFAULT_GROUP_TTL_DAYS = 7
+
+# Node template id of the Download Collector node. Its presence in a pipeline
+# definition is how a pipeline declares which of its outputs are deliverables.
+DOWNLOAD_COLLECTOR_NODE_ID = "download_collector"
+
+# How the finalizer resolves a group's artifacts.
+PACKAGING_MODE_COLLECTOR = "COLLECTOR"
+PACKAGING_MODE_AUTO_DISCOVER = "AUTO_DISCOVER"
+
+# Artifact selection is purpose-agnostic by default: an empty purposes list
+# means "every derived representation this group's executions created", so any
+# pipeline that records its outputs on the asset participates without special
+# configuration. Supplying purposes narrows the selection (e.g. ["smartcrop"]
+# to package only reframed renditions).
+DEFAULT_GROUP_PURPOSES: list[str] = []
+
+# Terminal group statuses (mirrors the upload-session terminal model)
+GROUP_STATUS_OPEN = "OPEN"
+GROUP_STATUS_COMPLETED = "COMPLETED"
+GROUP_STATUS_COMPLETED_WITH_FAILURES = "COMPLETED_WITH_FAILURES"
+GROUP_STATUS_FAILED = "FAILED"
+
 
 def _get_cors_headers() -> dict[str, str]:
     """Return standard CORS headers for API responses."""
@@ -112,6 +137,350 @@ def _validate_batch_size(assets: list[dict], max_batch_size: int) -> str | None:
     return None
 
 
+def _get_user_id(event: dict) -> str | None:
+    """Extract the caller's user id from the Cognito authorizer context."""
+    return (event.get("requestContext", {}).get("authorizer", {}) or {}).get("userId")
+
+
+def _extract_group_config(body: dict) -> tuple[dict | None, str | None]:
+    """
+    Parse and validate the optional ``group`` object from the request body.
+
+    Shape (all fields optional except presence of the object itself):
+        {"group": {"package": true, "purposes": ["smartcrop"], "name": "..."}}
+
+    When present, all executions started by this request share a group key.
+    When the group completes, the output artifacts its executions created are
+    packaged into a downloadable zip via the bulk-download workflow (unless
+    ``package`` is false).
+
+    ``purposes`` is an optional filter. Omitted (the default), every derived
+    representation the group's executions added to their assets is packaged —
+    so this works the same for reframe, proxies, transcodes, or any other
+    pipeline that records its outputs on the asset. Supplying purposes
+    restricts packaging to those representation purposes.
+
+    Returns:
+        Tuple of (normalized_group_config, error_message). Both are None when
+        the request has no group object (single/ungrouped behavior).
+    """
+    if "group" not in body:
+        return None, None
+
+    group = body.get("group")
+    if not isinstance(group, dict):
+        return None, "group must be an object"
+
+    package = group.get("package", True)
+    if not isinstance(package, bool):
+        return None, "group.package must be a boolean"
+
+    purposes = group.get("purposes", DEFAULT_GROUP_PURPOSES)
+    if not isinstance(purposes, list) or not all(
+        isinstance(p, str) and p.strip() for p in purposes
+    ):
+        return None, "group.purposes must be an array of non-empty strings"
+
+    name = group.get("name", "")
+    if not isinstance(name, str):
+        return None, "group.name must be a string"
+
+    return {"package": package, "purposes": purposes, "name": name.strip()}, None
+
+
+def _packaging_mode(pipeline: dict) -> str:
+    """
+    Decide how the group's output artifacts will be resolved.
+
+    A pipeline that contains a Download Collector node declares its own
+    deliverables: the node registers the artifacts on the branch it sits on,
+    and the finalizer packages exactly those. Pipelines without one keep the
+    legacy behavior, where outputs are inferred by diffing each asset's
+    derived representations against a submit-time baseline.
+
+    Unparseable definitions fall back to AUTO_DISCOVER so a malformed record
+    cannot block packaging outright.
+    """
+    try:
+        nodes = (
+            pipeline.get("definition", {}).get("configuration", {}).get("nodes", [])
+            or []
+        )
+        for node in nodes:
+            data = node.get("data", {}) if isinstance(node, dict) else {}
+            node_template_id = data.get("nodeId") or data.get("id")
+            if node_template_id == DOWNLOAD_COLLECTOR_NODE_ID:
+                return PACKAGING_MODE_COLLECTOR
+    except Exception as e:  # noqa: BLE001 - definition shape is user data
+        print(f"Warning: could not inspect pipeline definition for collector: {e}")
+    return PACKAGING_MODE_AUTO_DISCOVER
+
+
+def _snapshot_baseline_reps(
+    asset_table: Any, inventory_ids: list[str]
+) -> dict[str, list[str]]:
+    """
+    Snapshot the derived-representation IDs each asset already has.
+
+    The group finalizer packages only representations created AFTER the group
+    was submitted, computed as (final reps) minus (this baseline). A partial
+    or failed snapshot degrades gracefully: missing assets get an empty
+    baseline, which at worst includes pre-existing artifacts in the zip.
+    """
+    baselines: dict[str, list[str]] = {inv_id: [] for inv_id in inventory_ids}
+    unique_ids = list(dict.fromkeys(inventory_ids))
+
+    try:
+        for i in range(0, len(unique_ids), 100):
+            batch = unique_ids[i : i + 100]
+            request = {
+                asset_table.name: {
+                    "Keys": [{"InventoryID": inv_id} for inv_id in batch],
+                    "ProjectionExpression": "InventoryID, DerivedRepresentations",
+                }
+            }
+            while request:
+                response = asset_table.meta.client.batch_get_item(RequestItems=request)
+                for item in response.get("Responses", {}).get(asset_table.name, []):
+                    inv_id = item.get("InventoryID")
+                    reps = item.get("DerivedRepresentations", []) or []
+                    if inv_id:
+                        baselines[inv_id] = [
+                            rep.get("ID") for rep in reps if rep.get("ID")
+                        ]
+                unprocessed = response.get("UnprocessedKeys") or {}
+                request = unprocessed if unprocessed.get(asset_table.name) else None
+    except Exception as e:
+        print(f"Warning: baseline representation snapshot failed: {str(e)}")
+
+    return baselines
+
+
+def _create_group_record(
+    groups_table: Any,
+    group_id: str,
+    user_id: str,
+    pipeline_id: str,
+    pipeline_name: str,
+    group_config: dict,
+    expected_count: int,
+    packaging_mode: str = PACKAGING_MODE_AUTO_DISCOVER,
+) -> None:
+    """Create the group META item with counters at zero and status OPEN."""
+    now = datetime.now(timezone.utc).isoformat()
+    ttl_days = int(os.environ.get("GROUP_RECORD_TTL_DAYS", DEFAULT_GROUP_TTL_DAYS))
+    groups_table.put_item(
+        Item={
+            "PK": f"GROUP#{group_id}",
+            "SK": "META",
+            "groupId": group_id,
+            "userId": user_id,
+            "pipelineId": pipeline_id,
+            "pipelineName": pipeline_name,
+            "groupName": group_config.get("name", ""),
+            "status": GROUP_STATUS_OPEN,
+            "expectedCount": expected_count,
+            "completedCount": 0,
+            "failedCount": 0,
+            "resolvedCount": 0,
+            "package": {
+                "enabled": group_config.get("package", True),
+                "purposes": group_config.get("purposes", DEFAULT_GROUP_PURPOSES),
+                # COLLECTOR when the pipeline graph declares its deliverables
+                # with a Download Collector node; AUTO_DISCOVER otherwise.
+                "mode": packaging_mode,
+            },
+            "createdAt": now,
+            "updatedAt": now,
+            "ttl": int(datetime.now(timezone.utc).timestamp()) + ttl_days * 24 * 3600,
+        },
+        ConditionExpression="attribute_not_exists(PK)",
+    )
+
+
+def _record_group_member(
+    groups_table: Any,
+    group_id: str,
+    execution_id: str,
+    inventory_id: str,
+    params: dict,
+    baseline_rep_ids: list[str],
+) -> None:
+    """
+    Record a member execution on the group.
+
+    The executions event processor later claims this item (sets countedAt)
+    when the execution reaches a terminal state; the finalizer reads
+    baselineRepIds to compute which representations the execution created.
+    """
+    groups_table.put_item(
+        Item={
+            "PK": f"GROUP#{group_id}",
+            "SK": f"EXEC#{execution_id}",
+            "groupId": group_id,
+            "executionId": execution_id,
+            "inventoryId": inventory_id,
+            "params": {k: v for k, v in params.items() if k != "group_id"},
+            "baselineRepIds": baseline_rep_ids,
+            "status": "STARTED",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+def _group_terminal_status(completed_count: int, failed_count: int) -> str:
+    if failed_count == 0:
+        return GROUP_STATUS_COMPLETED
+    if completed_count == 0:
+        return GROUP_STATUS_FAILED
+    return GROUP_STATUS_COMPLETED_WITH_FAILURES
+
+
+def _attempt_group_terminal_transition(groups_table: Any, group_id: str) -> None:
+    """
+    Transition the group META item OPEN → terminal once every member has
+    resolved. Safe to call concurrently: the conditional update guarantees
+    exactly one writer wins, and the groups-table stream fires the finalizer
+    off that single transition.
+    """
+    try:
+        meta = groups_table.get_item(
+            Key={"PK": f"GROUP#{group_id}", "SK": "META"},
+            ConsistentRead=True,
+        ).get("Item")
+        if not meta or meta.get("status") != GROUP_STATUS_OPEN:
+            return
+        if int(meta.get("resolvedCount", 0)) < int(meta.get("expectedCount", 0)):
+            return
+
+        terminal = _group_terminal_status(
+            int(meta.get("completedCount", 0)), int(meta.get("failedCount", 0))
+        )
+        groups_table.update_item(
+            Key={"PK": f"GROUP#{group_id}", "SK": "META"},
+            UpdateExpression="SET #st = :terminal, updatedAt = :now",
+            ConditionExpression="#st = :open AND resolvedCount >= expectedCount",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={
+                ":terminal": terminal,
+                ":open": GROUP_STATUS_OPEN,
+                ":now": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except groups_table.meta.client.exceptions.ConditionalCheckFailedException:
+        pass  # another writer already transitioned the group
+    except Exception as e:
+        print(f"Warning: group terminal transition attempt failed: {str(e)}")
+
+
+def _count_failed_starts(groups_table: Any, group_id: str, failed_count: int) -> None:
+    """
+    Fold executions that never started into the group counters as failures.
+
+    They will never emit a Step Functions terminal event, so without this the
+    group could stay OPEN until the sweeper times it out.
+    """
+    if failed_count <= 0:
+        return
+    try:
+        groups_table.update_item(
+            Key={"PK": f"GROUP#{group_id}", "SK": "META"},
+            UpdateExpression=(
+                "ADD failedCount :n, resolvedCount :n SET updatedAt = :now"
+            ),
+            ConditionExpression="#st = :open",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={
+                ":n": failed_count,
+                ":open": GROUP_STATUS_OPEN,
+                ":now": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception as e:
+        print(f"Warning: failed-start count update failed: {str(e)}")
+
+
+def _setup_group(
+    event: dict,
+    dynamodb: Any,
+    assets: list[dict],
+    pipeline_id: str,
+    pipeline: dict,
+    group_config: dict,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """
+    Create the execution group and stamp its key onto every asset's params.
+
+    Returns:
+        Tuple of (group_context, error_response). ``group_context`` carries
+        ``group_id``, ``groups_table`` and the per-asset ``baselines`` when
+        setup succeeded; ``error_response`` is a ready-to-return API Gateway
+        response when it failed (and the caller must not start executions).
+    """
+    groups_table_name = os.environ.get("PIPELINE_GROUPS_TABLE_NAME")
+    if not groups_table_name:
+        return {}, _error_response(
+            400, "Grouped execution is not available in this deployment"
+        )
+
+    user_id = _get_user_id(event)
+    if not user_id:
+        return {}, _error_response(
+            401, "User identity is required for grouped execution"
+        )
+
+    groups_table = dynamodb.Table(groups_table_name)
+    group_id = str(uuid.uuid4())
+    packaging_mode = _packaging_mode(pipeline)
+
+    # Snapshot existing derived reps. In AUTO_DISCOVER mode this is what the
+    # finalizer diffs against; in COLLECTOR mode the collector node uses it as
+    # the fallback selection basis when no purposes are configured on it.
+    baselines: dict[str, list[str]] = {}
+    asset_table_name = os.environ.get("MEDIALAKE_ASSET_TABLE", "")
+    if asset_table_name:
+        baselines = _snapshot_baseline_reps(
+            dynamodb.Table(asset_table_name),
+            [a["inventory_id"] for a in assets],
+        )
+
+    try:
+        _create_group_record(
+            groups_table,
+            group_id,
+            user_id,
+            pipeline_id,
+            pipeline.get("name", pipeline_id),
+            group_config,
+            len(assets),
+            packaging_mode,
+        )
+    except Exception as e:
+        print(f"Error creating group record: {str(e)}")
+        return {}, _error_response(500, f"Failed to create execution group: {str(e)}")
+
+    # Ride the group key on each asset's params. The lambda middleware
+    # forwards params untouched and existing nodes ignore unknown keys, so
+    # this is invisible to pipeline behavior.
+    for asset in assets:
+        asset["params"]["group_id"] = group_id
+
+    print(
+        f"Created execution group {group_id} for pipeline {pipeline_id} "
+        f"({len(assets)} assets, packaging mode {packaging_mode})"
+    )
+
+    return (
+        {
+            "group_id": group_id,
+            "groups_table": groups_table,
+            "baselines": baselines,
+            "packaging_mode": packaging_mode,
+        },
+        None,
+    )
+
+
 def _build_step_function_input(
     asset: dict[str, Any],
     pipeline_id: str,
@@ -209,6 +578,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if batch_error:
             return _error_response(400, batch_error)
 
+        # Optional group config (backwards compatible: absent = ungrouped)
+        group_config, group_error = _extract_group_config(body)
+        if group_error:
+            return _error_response(400, group_error)
+
         print(f"Triggering pipeline {pipeline_id} for {len(assets)} assets")
 
         # Initialize AWS clients
@@ -246,6 +620,24 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _error_response(
                 500, f"Pipeline {pipeline_id} does not have a valid Step Function ARN"
             )
+
+        # ── Group setup (only when the request carries a group object) ──
+        group_ctx: dict[str, Any] = {}
+        if group_config is not None:
+            group_ctx, group_setup_error = _setup_group(
+                event=event,
+                dynamodb=dynamodb,
+                assets=assets,
+                pipeline_id=pipeline_id,
+                pipeline=pipeline,
+                group_config=group_config,
+            )
+            if group_setup_error:
+                return group_setup_error
+
+        group_id = group_ctx.get("group_id")
+        groups_table = group_ctx.get("groups_table")
+        baselines: dict[str, list[str]] = group_ctx.get("baselines", {})
 
         # Trigger pipeline executions for each asset
         executions = []
@@ -285,6 +677,25 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     }
                 )
                 successful_executions += 1
+
+                # Track this execution as a group member so the executions
+                # event processor can count its terminal state.
+                if group_id and groups_table is not None:
+                    try:
+                        _record_group_member(
+                            groups_table,
+                            group_id,
+                            execution_name,
+                            inventory_id,
+                            asset.get("params", {}),
+                            baselines.get(inventory_id, []),
+                        )
+                    except Exception as member_error:
+                        print(
+                            f"Warning: failed to record group member for "
+                            f"{inventory_id}: {str(member_error)}"
+                        )
+
                 print(
                     f"Successfully started Step Function execution for asset {inventory_id}: {execution_arn}"
                 )
@@ -305,6 +716,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 )
                 failed_executions += 1
 
+        # Fold never-started executions into the group as failures and close
+        # the group immediately if nothing is left to wait for.
+        if group_id and groups_table is not None:
+            _count_failed_starts(groups_table, group_id, failed_executions)
+            _attempt_group_terminal_transition(groups_table, group_id)
+
         # Prepare response
         total_assets = len(assets)
 
@@ -323,6 +740,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "executions": executions,
             "message": message,
         }
+        if group_id:
+            response_body["group_id"] = group_id
+            response_body["packaging_mode"] = group_ctx.get(
+                "packaging_mode", PACKAGING_MODE_AUTO_DISCOVER
+            )
 
         return {
             "statusCode": 200,

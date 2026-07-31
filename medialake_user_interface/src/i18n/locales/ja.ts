@@ -1019,6 +1019,9 @@ export default {
         pipelineNotFound: "パイプラインが見つかりません",
         insufficientPermissions: "このパイプラインを実行する権限がありません",
         noAssetsSelected: "パイプライン実行用のアセットが選択されていません",
+        packageOutputs: "完了時に出力をまとめてダウンロード可能にする",
+        packageOutputsHint:
+          "選択したアセットを 1 つのグループとして実行します。すべての実行が完了すると、パイプラインが作成した新しい出力ファイルが ZIP にまとめられ、ダウンロード通知として提供されます。",
       },
     },
     confirmBulkDelete: "一括削除の確認",
@@ -1635,6 +1638,19 @@ export default {
     tabs: {
       markers: "マーカー",
     },
+    cropSize: "クロップ:",
+    segmentDuration: "長さ:",
+    fullLength: "全体",
+    viewing: "表示中",
+    view: "表示",
+  },
+  segmentWorkflows: {
+    header: "セグメントで実行",
+    runButton: "実行",
+    menuTooltip: "このセグメントでワークフローを実行",
+    started: "セグメントで「{{name}}」を開始しました",
+    failed: "ワークフローの開始に失敗しました",
+    forbidden: "このワークフローを実行する権限がありません",
   },
   fileUpload: {
     errorMessages: {

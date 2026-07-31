@@ -63,10 +63,12 @@ class ApiGatewayPipelinesProps:
     authorizer: apigateway.IAuthorizer
     get_pipelines_executions_lambda: lambda_.IFunction
     post_retry_pipelines_executions_lambda: lambda_.IFunction
+    pipeline_groups_table: Optional[dynamodb.ITable] = None
     system_settings_table_name: Optional[str] = None
     system_settings_table_arn: Optional[str] = None
     mediaconvert_queue_arn: Optional[str] = None
     mediaconvert_role_arn: Optional[str] = None
+    mediaconvert_reframe_queue_arn: Optional[str] = None
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
     # S3 Vector configuration
@@ -307,6 +309,23 @@ class ApiGatewayPipelinesConstruct(Construct):
                 # them to OpenSearch). Underscore naming matches the API table.
                 "COLLECTIONS_TABLE_NAME": f"{config.resource_prefix}_collections_{config.environment}",
                 "COLLECTIONS_TABLE_ARN": f"arn:aws:dynamodb:{self.region}:{self.account_id}:table/{config.resource_prefix}_collections_{config.environment}",
+                # Pipeline execution groups table — used by the download_collector
+                # node, which registers the artifacts a run produced so the group
+                # finalizer packages exactly those. NAME reaches the node lambda
+                # as a runtime env var; ARN resolves the node YAML's
+                # ${PIPELINE_GROUPS_TABLE_ARN} IAM placeholder. Left empty when
+                # the deployment has no groups table, so saving a pipeline that
+                # uses the node fails loudly instead of silently unpermissioned.
+                "PIPELINE_GROUPS_TABLE_NAME": (
+                    props.pipeline_groups_table.table_name
+                    if props.pipeline_groups_table is not None
+                    else ""
+                ),
+                "PIPELINE_GROUPS_TABLE_ARN": (
+                    props.pipeline_groups_table.table_arn
+                    if props.pipeline_groups_table is not None
+                    else ""
+                ),
                 "INTEGRATIONS_TABLE": props.integrations_table.table_arn,
                 "IAC_ASSETS_BUCKET": props.iac_assets_bucket.bucket.bucket_name,
                 "EXTERNAL_PAYLOAD_BUCKET": props.external_payload_bucket.bucket_name,
@@ -314,6 +333,12 @@ class ApiGatewayPipelinesConstruct(Construct):
                 "PIPELINES_EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
                 "MEDIACONVERT_QUEUE_ARN": props.mediaconvert_queue_arn,
                 "MEDIACONVERT_ROLE_ARN": props.mediaconvert_role_arn,
+                # Dedicated queue for Elemental Inference smart-crop (reframe)
+                # jobs. Resolved into the video_reframe node lambda's
+                # MEDIACONVERT_QUEUE_ARN env var via its action-parameter default
+                # ${MEDIACONVERT_REFRAME_QUEUE_ARN} at pipeline-creation time.
+                "MEDIACONVERT_REFRAME_QUEUE_ARN": props.mediaconvert_reframe_queue_arn
+                or props.mediaconvert_queue_arn,
                 "NODE_TABLE": props.node_table.table_arn,
                 "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
                 "OPENSEARCH_VPC_SUBNET_IDS": ",".join(
@@ -1005,14 +1030,21 @@ class ApiGatewayPipelinesConstruct(Construct):
         apply_custom_authorization(pipeline_id_delete, props.authorizer)
 
         # POST /pipelines/{pipelineId}/trigger - Manual pipeline trigger endpoint
+        trigger_pipeline_env = {
+            "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+            "PIPELINES_TABLE": props.pipeline_table.table_name,
+            "EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
+            "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
+        }
+        if props.pipeline_groups_table is not None:
+            trigger_pipeline_env["PIPELINE_GROUPS_TABLE_NAME"] = (
+                props.pipeline_groups_table.table_name
+            )
+
         trigger_pipeline_lambda_config = LambdaConfig(
             name="pipeline_trigger_manual",
             entry="lambdas/api/pipelines/trigger_pipeline",
-            environment_variables={
-                "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                "PIPELINES_TABLE": props.pipeline_table.table_name,
-                "EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
-            },
+            environment_variables=trigger_pipeline_env,
         )
 
         self._trigger_pipeline_handler = Lambda(
@@ -1028,6 +1060,37 @@ class ApiGatewayPipelinesConstruct(Construct):
                 resources=[props.pipeline_table.table_arn],
             )
         )
+
+        # Group submissions: snapshot baseline derived reps from the asset
+        # table and create/track group records in the groups table.
+        #
+        # NOTE: both tables are owned by other stacks, so grants are written as
+        # identity-based policies on this Lambda's role rather than with
+        # table.grant_*(). For a cross-stack grantee, TableV2.grant_*() attaches
+        # a table *resource policy* naming this role's ARN, and DynamoDB
+        # rejects the table create with "Invalid principal in policy document"
+        # because the role does not exist yet when the table is created.
+        self._trigger_pipeline_handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:BatchGetItem", "dynamodb:GetItem"],
+                resources=[props.asset_table.table_arn],
+            )
+        )
+        if props.pipeline_groups_table is not None:
+            self._trigger_pipeline_handler.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem",
+                        "dynamodb:UpdateItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[
+                        props.pipeline_groups_table.table_arn,
+                        f"{props.pipeline_groups_table.table_arn}/index/*",
+                    ],
+                )
+            )
 
         # Grant permissions to send events to EventBridge
         self._trigger_pipeline_handler.function.add_to_role_policy(

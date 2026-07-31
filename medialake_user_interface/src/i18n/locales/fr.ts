@@ -985,6 +985,9 @@ export default {
         pipelineNotFound: "Pipeline introuvable",
         insufficientPermissions: "Vous n'avez pas la permission d'exécuter ce pipeline",
         noAssetsSelected: "Aucun actif sélectionné pour l'exécution du pipeline",
+        packageOutputs: "Regrouper les sorties pour le téléchargement à la fin",
+        packageOutputsHint:
+          "Exécute les ressources sélectionnées en un seul groupe. Lorsque toutes les exécutions sont terminées, tous les nouveaux fichiers de sortie créés par le pipeline sont compressés et fournis via une notification de téléchargement.",
       },
     },
     confirmBulkDelete: "Confirmer la suppression en masse",
@@ -1401,6 +1404,19 @@ export default {
     tabs: {
       markers: "Marqueurs",
     },
+    cropSize: "Recadrage :",
+    segmentDuration: "Durée :",
+    fullLength: "Durée complète",
+    viewing: "Lecture en cours",
+    view: "Afficher",
+  },
+  segmentWorkflows: {
+    header: "Exécuter sur le segment",
+    runButton: "Exécuter",
+    menuTooltip: "Exécuter un workflow sur ce segment",
+    started: "« {{name}} » lancé sur le segment",
+    failed: "Échec du démarrage du workflow",
+    forbidden: "Vous n'avez pas l'autorisation d'exécuter ce workflow",
   },
   favorites: {
     noFavorites: "Aucun actif favori pour le moment",

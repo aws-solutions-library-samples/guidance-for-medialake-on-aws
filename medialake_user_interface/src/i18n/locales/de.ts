@@ -1031,6 +1031,9 @@ export default {
         pipelineNotFound: "Pipeline nicht gefunden",
         insufficientPermissions: "Sie haben keine Berechtigung, diese Pipeline auszuführen",
         noAssetsSelected: "Keine Assets für die Pipeline-Ausführung ausgewählt",
+        packageOutputs: "Ausgaben nach Abschluss zum Download verpacken",
+        packageOutputsHint:
+          "Führt die ausgewählten Assets als eine Gruppe aus. Wenn alle Ausführungen abgeschlossen sind, werden alle neuen Ausgabedateien der Pipeline gezippt und als Download-Benachrichtigung bereitgestellt.",
       },
     },
     confirmBulkDelete: "Massenlöschung bestätigen",
@@ -1652,6 +1655,19 @@ export default {
     tabs: {
       markers: "Markierungen",
     },
+    cropSize: "Zuschnitt:",
+    segmentDuration: "Dauer:",
+    fullLength: "Gesamte Länge",
+    viewing: "Wird angezeigt",
+    view: "Ansehen",
+  },
+  segmentWorkflows: {
+    header: "Auf Segment ausführen",
+    runButton: "Ausführen",
+    menuTooltip: "Workflow für dieses Segment ausführen",
+    started: '"{{name}}" für Segment gestartet',
+    failed: "Workflow konnte nicht gestartet werden",
+    forbidden: "Sie haben keine Berechtigung, diesen Workflow auszuführen",
   },
   fileUpload: {
     errorMessages: {

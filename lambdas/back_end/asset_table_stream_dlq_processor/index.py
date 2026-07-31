@@ -1,7 +1,9 @@
+import copy
 import json
 import os
+import re
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from aws_lambda_powertools import Logger, Tracer
 from opensearchpy import OpenSearch, RequestsHttpConnection
@@ -41,6 +43,76 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, Decimal):
             return int(obj) if obj % 1 == 0 else float(obj)
         return super().default(obj)
+
+
+# A document can collide on more than one field, so healing iterates. Matches
+# the live indexer's ceiling so replay behaviour is not subtly different.
+MAX_HEAL_ROUNDS = 8
+
+# Kept in step with _CONFLICT_FIELD_PATTERNS in asset_table_stream/index.py: a
+# replay must recognise every conflict shape the live indexer can heal,
+# otherwise replaying a document is strictly worse than indexing it normally.
+_CONFLICT_FIELD_PATTERNS = (
+    # mapper_parsing_exception: failed to parse field [X] of type [long] ...
+    re.compile(r"failed to parse field \[(.+?)\] of type \["),
+    # illegal_argument_exception: mapper [X] cannot be changed from type ...
+    re.compile(r"mapper \[(.+?)\] cannot be changed from type"),
+    # object mapping conflicts: object mapping for [X] tried to parse ...
+    re.compile(r"object mapping for \[(.+?)\] tried to parse"),
+    # dynamic mapping refusals: Could not dynamically add mapping for field [X]
+    re.compile(r"Could not dynamically add mapping for field \[(.+?)\]"),
+)
+
+
+def _conflicting_field_path(reason: Any) -> Optional[str]:
+    """Pull the rejected field's dotted path out of an OpenSearch error reason."""
+    text = str(reason or "")
+    for pattern in _CONFLICT_FIELD_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _strip_conflicting_field(
+    action: Optional[Dict[str, Any]], reason: Any
+) -> Optional[Dict[str, Any]]:
+    """
+    Return a copy of a bulk action with the field OpenSearch rejected removed.
+
+    Returns None when the field cannot be located, so the caller stops trying
+    and reports the failure instead of looping. The value only disappears from
+    the search index — DynamoDB keeps the complete metadata.
+    """
+    path = _conflicting_field_path(reason)
+    if not action or not path:
+        return None
+
+    body_key = (
+        "_source" if "_source" in action else ("doc" if "doc" in action else None)
+    )
+    if body_key is None:
+        return None
+
+    healed = copy.deepcopy(action)
+    node = healed[body_key]
+    parts = path.split(".")
+
+    for part in parts[:-1]:
+        if isinstance(node, list):
+            node = node[0] if node else None
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+
+    leaf = parts[-1]
+    targets = node if isinstance(node, list) else [node]
+    removed = False
+    for target in targets:
+        if isinstance(target, dict) and leaf in target:
+            target.pop(leaf, None)
+            removed = True
+    return healed if removed else None
 
 
 def prepare_bulk_action(record: Dict[str, Any], message_type: str) -> Dict[str, Any]:
@@ -98,6 +170,8 @@ def lambda_handler(event, context):
     )
 
     bulk_actions = []
+    # doc_id -> action, so a failed item can be healed and retried
+    action_by_id: Dict[str, Dict[str, Any]] = {}
     failed_records = []
 
     for sqs_record in event.get("Records", []):
@@ -168,6 +242,8 @@ def lambda_handler(event, context):
             # Prepare bulk action
             action = prepare_bulk_action(body, message_type)
             bulk_actions.append(action)
+            if action.get("_id"):
+                action_by_id[action["_id"]] = action
 
         except Exception as e:
             logger.error(
@@ -213,30 +289,103 @@ def lambda_handler(event, context):
                     },
                 )
 
+                retry_actions = []
                 for item in failed:
                     error_info = item.get(
                         "index", item.get("update", item.get("delete", {}))
                     )
                     error_details = error_info.get("error", {})
+                    error_type = (
+                        error_details.get("type")
+                        if isinstance(error_details, dict)
+                        else "unknown"
+                    )
+                    error_reason = (
+                        error_details.get("reason")
+                        if isinstance(error_details, dict)
+                        else str(error_details)
+                    )
+                    item_id = error_info.get("_id")
+
+                    # A replay must not be less capable than the live indexer.
+                    # The stream lambda strips the field OpenSearch rejected and
+                    # retries; without the same behaviour here a document that
+                    # trips a mapping conflict is dropped on replay, which is
+                    # how assets ended up in DynamoDB but absent from search.
+                    if error_type == "mapper_parsing_exception":
+                        healed = _strip_conflicting_field(
+                            action_by_id.get(item_id), error_reason
+                        )
+                        if healed is not None:
+                            retry_actions.append(healed)
+                            logger.warning(
+                                "Mapping conflict on replay – retrying without the "
+                                "rejected field",
+                                extra={
+                                    "item_id": item_id,
+                                    "removed_field": _conflicting_field_path(
+                                        error_reason
+                                    ),
+                                    "error_reason": str(error_reason)[:300],
+                                },
+                            )
+                            continue
 
                     logger.error(
                         "Failed to reprocess item from DLQ",
                         extra={
-                            "item_id": error_info.get("_id"),
+                            "item_id": item_id,
                             "status": error_info.get("status"),
-                            "error_type": (
-                                error_details.get("type")
-                                if isinstance(error_details, dict)
-                                else "unknown"
-                            ),
-                            "error_reason": (
-                                error_details.get("reason")
-                                if isinstance(error_details, dict)
-                                else str(error_details)
-                            ),
+                            "error_type": error_type,
+                            "error_reason": error_reason,
                             "full_error": error_details,
                         },
                     )
+
+                # Bounded heal loop: a document can conflict on several fields.
+                heal_round = 0
+                while retry_actions and heal_round < MAX_HEAL_ROUNDS:
+                    heal_round += 1
+                    action_by_id.update(
+                        {a.get("_id"): a for a in retry_actions if a.get("_id")}
+                    )
+                    healed_success, healed_failed = bulk(
+                        opensearch_client,
+                        retry_actions,
+                        stats_only=False,
+                        raise_on_error=False,
+                        raise_on_exception=False,
+                    )
+                    total_success += healed_success
+                    total_failed -= healed_success
+                    next_round = []
+                    for item in healed_failed:
+                        info = item.get("index", item.get("update", {}))
+                        details = info.get("error", {})
+                        if (
+                            isinstance(details, dict)
+                            and details.get("type") == "mapper_parsing_exception"
+                        ):
+                            again = _strip_conflicting_field(
+                                action_by_id.get(info.get("_id")),
+                                details.get("reason"),
+                            )
+                            if again is not None:
+                                next_round.append(again)
+                                continue
+                        logger.error(
+                            "Replay still failing after healing",
+                            extra={
+                                "item_id": info.get("_id"),
+                                "error_type": (
+                                    details.get("type")
+                                    if isinstance(details, dict)
+                                    else "unknown"
+                                ),
+                                "heal_rounds": heal_round,
+                            },
+                        )
+                    retry_actions = next_round
 
         except Exception as e:
             logger.error(

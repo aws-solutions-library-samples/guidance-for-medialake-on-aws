@@ -5,10 +5,13 @@ from pydantic import BaseModel, Field
 
 class NodeData(BaseModel):
     id: str
+    nodeId: Optional[str] = (
+        None  # Template type identifier (e.g., "choice", "fail", "success")
+    )
     type: str
     label: str
     description: str
-    icon: Dict[str, Any]
+    icon: Dict[str, Any] = Field(default_factory=dict)
     inputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     outputTypes: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     configuration: Dict[str, Any]

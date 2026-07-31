@@ -31,6 +31,71 @@ ASSET_EMBEDDINGS_INDEX = "asset-embeddings"
 # passed via INDEX_NAMES env var. We match by checking if the name contains "_collections_".
 COLLECTIONS_INDEX_MARKER = "_collections_"
 
+# ═══════════════════════════════════════════════════════════════════════════
+# EmbeddedMetadata type safety
+# ═══════════════════════════════════════════════════════════════════════════
+# EmbeddedMetadata is a passthrough of whatever ffprobe / MediaInfo / exifr
+# emit, so the same field name can be a number in one file and a string in
+# another: video.profile is 'High' for most H.264 files but an integer when the
+# tool cannot name the profile; ID_String is '1' for one file and '1-2' for the
+# next. Because the object is dynamically mapped, the FIRST document to arrive
+# freezes each field's type. When a later document disagrees, OpenSearch
+# rejects the ENTIRE document with mapper_parsing_exception — the asset stays
+# in DynamoDB but vanishes from search, thumbnails included.
+#
+# These templates make that impossible for new fields:
+#   - numeric leaves get ignore_malformed, so a conflicting value is skipped
+#     while the rest of the document still indexes
+#   - string leaves are pinned to keyword instead of being type-guessed
+#
+# reconcile_embedded_metadata_mapping() applies the same leniency to indices
+# that were created before this existed. Both are additive and need no reindex.
+EMBEDDED_METADATA_ROOT = "Metadata.EmbeddedMetadata"
+
+NUMERIC_FIELD_TYPES = {
+    "long",
+    "integer",
+    "short",
+    "byte",
+    "double",
+    "float",
+    "half_float",
+    "scaled_float",
+    "unsigned_long",
+    "date",
+}
+
+EMBEDDED_METADATA_DYNAMIC_TEMPLATES = [
+    {
+        "embedded_metadata_lenient_integers": {
+            "path_match": f"{EMBEDDED_METADATA_ROOT}.*",
+            "match_mapping_type": "long",
+            "mapping": {"type": "long", "ignore_malformed": True},
+        }
+    },
+    {
+        "embedded_metadata_lenient_floats": {
+            "path_match": f"{EMBEDDED_METADATA_ROOT}.*",
+            "match_mapping_type": "double",
+            "mapping": {"type": "float", "ignore_malformed": True},
+        }
+    },
+    {
+        "embedded_metadata_lenient_dates": {
+            "path_match": f"{EMBEDDED_METADATA_ROOT}.*",
+            "match_mapping_type": "date",
+            "mapping": {"type": "date", "ignore_malformed": True},
+        }
+    },
+    {
+        "embedded_metadata_strings_as_keyword": {
+            "path_match": f"{EMBEDDED_METADATA_ROOT}.*",
+            "match_mapping_type": "string",
+            "mapping": {"type": "keyword", "ignore_above": 2048},
+        }
+    },
+]
+
 
 def index_exists(
     host: str, index_name: str, credentials, service: str, region: str
@@ -228,6 +293,197 @@ def create_index_with_retry(
     return False
 
 
+def _signed_request(method, url, headers, credentials, service, region, body=None):
+    """Issue a SigV4-signed request to OpenSearch and return the response."""
+    data = json.dumps(body) if body is not None else None
+    req = AWSRequest(method=method, url=url, data=data, headers=dict(headers))
+    req.headers["X-Amz-Content-SHA256"] = SigV4Auth(
+        credentials, service, region
+    ).payload(req)
+    SigV4Auth(credentials, service, region).add_auth(req)
+    prepared = req.prepare()
+    return request(
+        method=prepared.method,
+        url=prepared.url,
+        headers=prepared.headers,
+        data=prepared.body,
+    )
+
+
+def _walk_mapping_leaves(properties, prefix=""):
+    """Yield (dotted_path, leaf_mapping) for every leaf field in a mapping."""
+    for name, body in (properties or {}).items():
+        path = f"{prefix}.{name}" if prefix else name
+        if isinstance(body, dict) and "properties" in body:
+            yield from _walk_mapping_leaves(body["properties"], path)
+        elif isinstance(body, dict):
+            yield path, body
+
+
+def _nest_leaf(path, leaf):
+    """Expand 'a.b.c' + leaf into the nested properties structure OpenSearch wants."""
+    parts = path.split(".")
+    node = leaf
+    for part in reversed(parts[1:]):
+        node = {"properties": {part: node}}
+    return {parts[0]: node}
+
+
+def _deep_merge(target, addition):
+    for key, value in addition.items():
+        if isinstance(target.get(key), dict) and isinstance(value, dict):
+            _deep_merge(target[key], value)
+        else:
+            target[key] = value
+    return target
+
+
+def reconcile_embedded_metadata_mapping(
+    host, index_name, headers, credentials, service, region
+):
+    """
+    Make an EXISTING index tolerant of EmbeddedMetadata type drift.
+
+    Indices created before EMBEDDED_METADATA_DYNAMIC_TEMPLATES existed have
+    numeric EmbeddedMetadata fields with no ignore_malformed, so one string in
+    one field (video.profile = 'High') rejects the whole document and the asset
+    disappears from search. This:
+
+      1. installs the dynamic templates, so newly-seen fields are safe, and
+      2. adds ignore_malformed to every numeric EmbeddedMetadata field that is
+         already mapped.
+
+    Both are additive mapping updates — no reindex, no downtime, no data change.
+    Runs on every deployment and is idempotent, so an environment heals itself
+    on its next deploy. Failures are logged, never raised: a mapping tune-up
+    must not fail a stack deployment.
+    """
+    summary = {"index": index_name, "templates_installed": False, "fields_relaxed": 0}
+    try:
+        resp = _signed_request(
+            "GET",
+            f"{host}/{index_name}/_mapping",
+            headers,
+            credentials,
+            service,
+            region,
+        )
+        if resp.status_code == 404:
+            logger.info(
+                "Index not present – nothing to reconcile",
+                extra={"index_name": index_name},
+            )
+            return summary
+        if resp.status_code != 200:
+            logger.warning(
+                "Could not read mapping for reconciliation",
+                extra={"index_name": index_name, "status_code": resp.status_code},
+            )
+            return summary
+
+        mappings = resp.json().get(index_name, {}).get("mappings", {})
+
+        # 1. Dynamic templates for fields that do not exist yet.
+        #
+        # A dynamic_templates PUT REPLACES the index's whole template list, so
+        # merge rather than overwrite: keep any templates the index already has
+        # (an operator may have added their own) and only replace ours by name.
+        # Ours go first — order decides which template wins for a field.
+        existing_templates = mappings.get("dynamic_templates", []) or []
+        ours = {list(t.keys())[0] for t in EMBEDDED_METADATA_DYNAMIC_TEMPLATES}
+        preserved = [
+            t
+            for t in existing_templates
+            if isinstance(t, dict) and not (set(t.keys()) & ours)
+        ]
+        merged_templates = EMBEDDED_METADATA_DYNAMIC_TEMPLATES + preserved
+        if preserved:
+            logger.info(
+                "Preserving pre-existing dynamic templates during reconciliation",
+                extra={
+                    "index_name": index_name,
+                    "preserved_count": len(preserved),
+                    "preserved": [list(t.keys())[0] for t in preserved][:10],
+                },
+            )
+        put_templates = _signed_request(
+            "PUT",
+            f"{host}/{index_name}/_mapping",
+            headers,
+            credentials,
+            service,
+            region,
+            body={"dynamic_templates": merged_templates},
+        )
+        summary["templates_installed"] = put_templates.status_code == 200
+        if not summary["templates_installed"]:
+            logger.warning(
+                "Failed to install EmbeddedMetadata dynamic templates",
+                extra={
+                    "index_name": index_name,
+                    "status_code": put_templates.status_code,
+                    "response": put_templates.text[:300],
+                },
+            )
+
+        # 2. ignore_malformed for numeric fields that already exist.
+        properties = {}
+        relaxed = []
+        for path, leaf in _walk_mapping_leaves(mappings.get("properties", {})):
+            if EMBEDDED_METADATA_ROOT not in path:
+                continue
+            if leaf.get("type") not in NUMERIC_FIELD_TYPES:
+                continue
+            if leaf.get("ignore_malformed") is True:
+                continue
+            new_leaf = {"type": leaf["type"], "ignore_malformed": True}
+            if leaf["type"] == "date" and "format" in leaf:
+                new_leaf["format"] = leaf["format"]
+            _deep_merge(properties, _nest_leaf(path, new_leaf))
+            relaxed.append(path)
+
+        if relaxed:
+            put_fields = _signed_request(
+                "PUT",
+                f"{host}/{index_name}/_mapping",
+                headers,
+                credentials,
+                service,
+                region,
+                body={"properties": properties},
+            )
+            if put_fields.status_code == 200:
+                summary["fields_relaxed"] = len(relaxed)
+                logger.info(
+                    "Relaxed existing numeric EmbeddedMetadata fields",
+                    extra={
+                        "index_name": index_name,
+                        "field_count": len(relaxed),
+                        "sample_fields": relaxed[:10],
+                    },
+                )
+            else:
+                logger.warning(
+                    "Failed to relax numeric EmbeddedMetadata fields",
+                    extra={
+                        "index_name": index_name,
+                        "status_code": put_fields.status_code,
+                        "response": put_fields.text[:300],
+                    },
+                )
+        else:
+            logger.info(
+                "No numeric EmbeddedMetadata fields needed relaxing",
+                extra={"index_name": index_name},
+            )
+    except Exception as e:  # noqa: BLE001 - never fail a deploy over this
+        logger.warning(
+            f"EmbeddedMetadata mapping reconciliation skipped: {e}",
+            extra={"index_name": index_name},
+        )
+    return summary
+
+
 def create_index_if_not_exists(
     host, index_name, payload, headers, credentials, service, region, max_retries=5
 ):
@@ -382,6 +638,10 @@ def handler(event, context):
             }
         },
         "mappings": {
+            # Keep dynamically-discovered EmbeddedMetadata fields from being
+            # able to reject a whole document on a type mismatch (see
+            # EMBEDDED_METADATA_DYNAMIC_TEMPLATES).
+            "dynamic_templates": EMBEDDED_METADATA_DYNAMIC_TEMPLATES,
             "properties": {
                 # ═══════════════════════════════════════════════════════════
                 # COMMON FIELDS (used by both master and separate embedding documents)
@@ -713,7 +973,7 @@ def handler(event, context):
                 #         },
                 #     },
                 # },
-            }
+            },
         },
     }
 
@@ -930,9 +1190,16 @@ def handler(event, context):
                     logger.error(msg)
                     raise Exception(msg)
             else:
+                # The index keeps its data and mapping, but its
+                # EmbeddedMetadata leniency is reconciled on every deploy so an
+                # environment created before that existed stops rejecting
+                # documents on metadata type drift.
                 logger.info(
-                    "Skipping existing index on Update (no changes)",
+                    "Existing index retained – reconciling EmbeddedMetadata mapping",
                     extra={"index_name": index_name},
+                )
+                reconcile_embedded_metadata_mapping(
+                    host, index_name, headers, credentials, service, region
                 )
 
         logger.info("Update completed – all new indexes ensured")
@@ -984,6 +1251,17 @@ def handler(event, context):
             msg = f"Failed to create index {index_name} after multiple retries"
             logger.error(msg)
             raise Exception(msg)
+
+        # A freshly created index already carries the dynamic templates from its
+        # payload; an index left in place by create_index_if_not_exists may
+        # predate them, so reconcile either way. Idempotent.
+        if (
+            index_name != ASSET_EMBEDDINGS_INDEX
+            and COLLECTIONS_INDEX_MARKER not in index_name
+        ):
+            reconcile_embedded_metadata_mapping(
+                host, index_name, headers, credentials, service, region
+            )
 
     logger.info("Successfully created all indexes")
     return {"statusCode": 200, "body": "All indexes created successfully"}

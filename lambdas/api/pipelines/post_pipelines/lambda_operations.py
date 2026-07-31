@@ -1065,6 +1065,12 @@ def create_lambda_function(
                     "COLLECTIONS_TABLE_NAME": os.environ.get(
                         "COLLECTIONS_TABLE_NAME", ""
                     ),
+                    # Pipeline execution groups table for the download_collector
+                    # node — it registers the run's output artifacts there so
+                    # the group finalizer packages exactly those files.
+                    "PIPELINE_GROUPS_TABLE_NAME": os.environ.get(
+                        "PIPELINE_GROUPS_TABLE_NAME", ""
+                    ),
                     # CloudFront domain for portal URL generation
                     "CLOUDFRONT_DOMAIN": _resolve_cloudfront_domain(),
                     # SES configuration for portal email notifications

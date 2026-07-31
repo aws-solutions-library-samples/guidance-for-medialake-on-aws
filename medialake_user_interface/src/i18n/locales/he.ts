@@ -1008,6 +1008,9 @@ export default {
         pipelineNotFound: "הצינור לא נמצא",
         insufficientPermissions: "אין לך הרשאה להפעיל צינור זה",
         noAssetsSelected: "לא נבחרו נכסים להפעלת הצינור",
+        packageOutputs: "אריזת הפלטים להורדה בסיום",
+        packageOutputsHint:
+          "מריץ את הנכסים שנבחרו כקבוצה אחת. כאשר כל ההרצות מסתיימות, כל קובצי הפלט החדשים שהצינור יצר נארזים ל-ZIP ומסופקים כהתראת הורדה.",
       },
     },
     confirmBulkDelete: "אשר מחיקה המונית",
@@ -1530,6 +1533,19 @@ export default {
     tabs: {
       markers: "סמנים",
     },
+    cropSize: "חיתוך:",
+    segmentDuration: "משך:",
+    fullLength: "אורך מלא",
+    viewing: "בצפייה",
+    view: "צפייה",
+  },
+  segmentWorkflows: {
+    header: "הרצה על המקטע",
+    runButton: "הרצה",
+    menuTooltip: "הרצת תהליך עבודה על מקטע זה",
+    started: "{{name}} הופעל על המקטע",
+    failed: "הפעלת תהליך העבודה נכשלה",
+    forbidden: "אין לך הרשאה להריץ תהליך עבודה זה",
   },
   groups: {
     actions: {

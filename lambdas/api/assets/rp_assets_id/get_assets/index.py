@@ -397,6 +397,18 @@ def enrich_asset_data(asset: Dict[str, Any]) -> Dict[str, Any]:
                 rep["URL"] = thumbnail_url
             elif rep.get("Purpose") == "proxy" and proxy_url:
                 rep["URL"] = proxy_url
+            elif rep.get("Purpose") == "smartcrop":
+                # Smartcrop (Elemental Inference reframe) outputs live in the
+                # same media-assets bucket as proxies; attach a playable URL so
+                # the detail page can switch the player between renditions.
+                # Unlike proxy/thumbnail there may be several smartcrop reps,
+                # so the URL is generated per-rep rather than per-purpose.
+                storage = rep.get("StorageInfo", {}).get("PrimaryLocation", {})
+                if storage.get("StorageType") == "s3":
+                    rep["URL"] = generate_cloudfront_url(
+                        bucket=storage["Bucket"],
+                        key=storage["ObjectKey"]["FullPath"],
+                    )
 
         # Add computed fields
         asset["DigitalSourceAsset"]["ComputedFields"] = {

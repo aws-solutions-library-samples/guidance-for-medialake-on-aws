@@ -972,6 +972,9 @@ export default {
         pipelineNotFound: "Pipeline not found",
         insufficientPermissions: "You don't have permission to execute this pipeline",
         noAssetsSelected: "No assets selected for pipeline execution",
+        packageOutputs: "Package outputs for download when finished",
+        packageOutputsHint:
+          "Runs the selected assets as one group. When every execution finishes, any new output files the pipeline created are zipped and delivered as a download notification.",
       },
     },
     confirmBulkDelete: "Confirm Bulk Delete",
@@ -1384,6 +1387,19 @@ export default {
     tabs: {
       markers: "Markers",
     },
+    cropSize: "Crop:",
+    segmentDuration: "Duration:",
+    fullLength: "Full length",
+    viewing: "Viewing",
+    view: "View",
+  },
+  segmentWorkflows: {
+    header: "Run on segment",
+    runButton: "Run",
+    menuTooltip: "Run a workflow on this segment",
+    started: 'Started "{{name}}" on segment',
+    failed: "Failed to start workflow",
+    forbidden: "You don't have permission to run this workflow",
   },
   pipelines: {
     title: "Pipelines",

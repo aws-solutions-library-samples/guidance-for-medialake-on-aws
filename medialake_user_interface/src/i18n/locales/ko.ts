@@ -1014,6 +1014,9 @@ export default {
         pipelineNotFound: "파이프라인을 찾을 수 없습니다",
         insufficientPermissions: "이 파이프라인을 실행할 권한이 없습니다",
         noAssetsSelected: "파이프라인 실행을 위해 선택된 자산이 없습니다",
+        packageOutputs: "완료 시 출력을 압축하여 다운로드 제공",
+        packageOutputsHint:
+          "선택한 애셋을 하나의 그룹으로 실행합니다. 모든 실행이 완료되면 파이프라인이 생성한 새 출력 파일이 ZIP으로 압축되어 다운로드 알림으로 제공됩니다.",
       },
     },
     confirmBulkDelete: "일괄 삭제 확인",
@@ -1629,6 +1632,19 @@ export default {
     tabs: {
       markers: "마커",
     },
+    cropSize: "크롭:",
+    segmentDuration: "길이:",
+    fullLength: "전체 길이",
+    viewing: "보기 중",
+    view: "보기",
+  },
+  segmentWorkflows: {
+    header: "세그먼트에서 실행",
+    runButton: "실행",
+    menuTooltip: "이 세그먼트에서 워크플로 실행",
+    started: "세그먼트에서 {{name}}을(를) 시작했습니다",
+    failed: "워크플로를 시작하지 못했습니다",
+    forbidden: "이 워크플로를 실행할 권한이 없습니다",
   },
   fileUpload: {
     errorMessages: {

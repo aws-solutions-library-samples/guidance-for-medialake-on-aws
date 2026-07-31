@@ -21,22 +21,76 @@ import { PipelinesService } from "@/features/pipelines/api/pipelinesService";
  * and syncs them with the notification system.
  */
 
+interface SelectedSegment {
+  startTime: number; // seconds
+  endTime: number; // seconds
+  label?: string;
+  // Original source timecodes (HH:MM:SS:FF) when known (e.g. from clip data).
+  // Preferred over the seconds values for frame-accurate subclip downloads.
+  startTimecode?: string;
+  endTimecode?: string;
+}
+
+const TIMECODE_RE = /^\d{2}:\d{2}:\d{2}[:;]\d{2}$/;
+
+// Convert seconds to an HH:MM:SS:FF timecode with FF=00 (second-accurate).
+// Used when a segment only carries seconds (e.g. user markers).
+const secondsToTimecode = (seconds: number): string => {
+  const s = Math.max(0, Math.floor(seconds));
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}:00`;
+};
+
+// Build the bulk-download clipBoundary for a segment entry. Prefers exact
+// source timecodes; falls back to second-accurate conversion. Guarantees
+// start < end (backend rejects identical/inverted boundaries) by extending
+// sub-second segments to a 1-second window.
+const segmentToClipBoundary = (
+  segment: SelectedSegment
+): { startTime: string; endTime: string } => {
+  if (
+    segment.startTimecode &&
+    segment.endTimecode &&
+    TIMECODE_RE.test(segment.startTimecode) &&
+    TIMECODE_RE.test(segment.endTimecode)
+  ) {
+    return { startTime: segment.startTimecode, endTime: segment.endTimecode };
+  }
+  const start = secondsToTimecode(segment.startTime);
+  let end = secondsToTimecode(segment.endTime);
+  if (end === start) {
+    end = secondsToTimecode(Math.floor(segment.startTime) + 1);
+  }
+  return { startTime: start, endTime: end };
+};
+
 interface SelectedAsset {
-  id: string;
+  id: string; // unique bin-entry id (may be a synthetic clip id)
   name: string;
   type: string;
-  inventoryID: string;
+  inventoryID: string; // real asset InventoryID sent to the API
+  segment?: SelectedSegment; // present when this entry is a time-based segment
 }
 
 export function useAssetSelection<T>({
   getAssetId,
   getAssetName,
   getAssetType,
+  getInventoryId,
+  getAssetSegment,
   onDownloadSuccess,
 }: {
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
   getAssetType: (asset: T) => string;
+  // Real asset InventoryID for API calls. Defaults to getAssetId when omitted.
+  // Provide this when the entry id is synthetic (e.g. a clip/segment card).
+  getInventoryId?: (asset: T) => string;
+  // Optional segment (time range) carried by this entry, used to run pipelines
+  // against a single clip/segment rather than the whole asset.
+  getAssetSegment?: (asset: T) => SelectedSegment | undefined;
   onDownloadSuccess?: () => void; // Callback to close side panel
 }) {
   const queryClient = useQueryClient();
@@ -240,7 +294,8 @@ export function useAssetSelection<T>({
         id: assetId,
         name: getAssetName(asset),
         type: getAssetType(asset),
-        inventoryID: assetId,
+        inventoryID: getInventoryId ? getInventoryId(asset) : assetId,
+        segment: getAssetSegment ? getAssetSegment(asset) : undefined,
       };
 
       setSelectedAssets((prev) => {
@@ -263,7 +318,15 @@ export function useAssetSelection<T>({
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
+    [
+      searchParams,
+      setSearchParams,
+      getAssetId,
+      getAssetName,
+      getAssetType,
+      getInventoryId,
+      getAssetSegment,
+    ]
   );
 
   // Handle removing a single asset from selection
@@ -325,7 +388,8 @@ export function useAssetSelection<T>({
               id: getAssetId(asset),
               name: getAssetName(asset),
               type: getAssetType(asset),
-              inventoryID: getAssetId(asset),
+              inventoryID: getInventoryId ? getInventoryId(asset) : getAssetId(asset),
+              segment: getAssetSegment ? getAssetSegment(asset) : undefined,
             }));
 
           newSelectedAssets = [...prev, ...newAssets];
@@ -342,7 +406,15 @@ export function useAssetSelection<T>({
         return newSelectedAssets;
       });
     },
-    [searchParams, setSearchParams, getAssetId, getAssetName, getAssetType]
+    [
+      searchParams,
+      setSearchParams,
+      getAssetId,
+      getAssetName,
+      getAssetType,
+      getInventoryId,
+      getAssetSegment,
+    ]
   );
 
   // Get select all state for current page
@@ -481,11 +553,15 @@ export function useAssetSelection<T>({
     });
 
     try {
-      // Transform asset IDs into the required object format
-      // Empty clipBoundary {} indicates whole file download (not a subclip)
+      // Transform selection into the bulk-download request format.
+      // Whole-asset entries send an empty clipBoundary {} (whole file);
+      // segment entries send their time range so the backend cuts and zips
+      // just that subclip (multiple subclips per source are supported).
+      // Always use the real InventoryID — segment/clip entries carry a
+      // synthetic bin-entry id in `id`.
       const assetIds = selectedAssets.map((asset) => ({
-        assetId: asset.id,
-        clipBoundary: {},
+        assetId: asset.inventoryID || asset.id,
+        clipBoundary: asset.segment ? segmentToClipBoundary(asset.segment) : {},
       }));
 
       // Initiate bulk download
@@ -547,7 +623,7 @@ export function useAssetSelection<T>({
   }, [selectedAssets]);
 
   const handleBatchPipelineExecution = useCallback(
-    async (pipelineId: string) => {
+    async (pipelineId: string, options?: { packageOutputs?: boolean }) => {
       if (selectedAssets.length === 0) {
         setModalState({
           open: true,
@@ -580,10 +656,22 @@ export function useAssetSelection<T>({
       try {
         const assets = selectedAssets.map((asset) => ({
           inventory_id: asset.inventoryID,
-          params: {},
+          // Segment entries pass their time range so the pipeline (e.g. reframe)
+          // processes just that clip; whole-asset entries send no params.
+          params: asset.segment
+            ? {
+                start_time: asset.segment.startTime,
+                end_time: asset.segment.endTime,
+              }
+            : {},
         }));
 
-        const response = await PipelinesService.triggerPipeline(pipelineId, assets);
+        // When requested, submit the selection as one execution group whose
+        // output artifacts get packaged into a downloadable zip on completion
+        // (delivered via the existing download-job notifications).
+        const group = options?.packageOutputs ? { package: true, name: pipelineName } : undefined;
+
+        const response = await PipelinesService.triggerPipeline(pipelineId, assets, group);
 
         const { successful_executions, failed_executions, total_assets, message } = response;
 

@@ -289,6 +289,30 @@ const SearchPage: React.FC = () => {
     getAssetId,
     getAssetName,
     getAssetType,
+    // For clip cards the entry id is synthetic ("<id>_clip_N"); the API needs
+    // the real InventoryID. getOriginalAssetId returns the InventoryID
+    // unchanged for whole assets, so this is safe in all modes.
+    getInventoryId: (asset) => getOriginalAssetId(asset),
+    // Carry a clip's time range so batch pipeline runs (e.g. reframe) and
+    // bulk downloads process just that segment. Undefined for whole assets.
+    // Source timecodes are included when present for frame-accurate subclips.
+    getAssetSegment: (asset) => {
+      const clip = (asset as any).clipData;
+      if (
+        clip &&
+        typeof clip.start === "number" &&
+        typeof clip.end === "number" &&
+        clip.end > clip.start
+      ) {
+        return {
+          startTime: clip.start,
+          endTime: clip.end,
+          startTimecode: clip.start_timecode,
+          endTimecode: clip.end_timecode,
+        };
+      }
+      return undefined;
+    },
   });
 
   const assetFavorites = useAssetFavorites({
@@ -780,10 +804,11 @@ const SearchPage: React.FC = () => {
         <PipelineExecutionConfirmDialog
           open={assetSelection.isPipelineExecutionDialogOpen}
           onClose={assetSelection.handlePipelineExecutionDialogClose}
-          onConfirm={() =>
+          onConfirm={(options) =>
             assetSelection.selectedPipelineForExecution &&
             assetSelection.handleBatchPipelineExecution(
-              assetSelection.selectedPipelineForExecution.id
+              assetSelection.selectedPipelineForExecution.id,
+              options
             )
           }
           pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}

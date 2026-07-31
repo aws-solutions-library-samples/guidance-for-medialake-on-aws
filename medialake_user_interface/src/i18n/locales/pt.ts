@@ -1029,6 +1029,9 @@ export default {
         pipelineNotFound: "Pipeline não encontrado",
         insufficientPermissions: "Você não tem permissão para executar este pipeline",
         noAssetsSelected: "Nenhum ativo selecionado para execução do pipeline",
+        packageOutputs: "Empacotar as saídas para download ao concluir",
+        packageOutputsHint:
+          "Executa os ativos selecionados como um único grupo. Quando todas as execuções terminarem, todos os novos arquivos de saída criados pelo pipeline são compactados e entregues como uma notificação de download.",
       },
     },
     confirmBulkDelete: "Confirmar exclusão em massa",
@@ -1444,6 +1447,19 @@ export default {
     tabs: {
       markers: "Marcadores",
     },
+    cropSize: "Recorte:",
+    segmentDuration: "Duração:",
+    fullLength: "Duração total",
+    viewing: "Visualizando",
+    view: "Visualizar",
+  },
+  segmentWorkflows: {
+    header: "Executar no segmento",
+    runButton: "Executar",
+    menuTooltip: "Executar um fluxo de trabalho neste segmento",
+    started: '"{{name}}" iniciado no segmento',
+    failed: "Falha ao iniciar o fluxo de trabalho",
+    forbidden: "Você não tem permissão para executar este fluxo de trabalho",
   },
   favorites: {
     noFavorites: "Ainda não há ativos favoritos",

@@ -31,9 +31,26 @@ def register_route(app):
         """Get a specific collection group by ID"""
         try:
             user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
 
             group = get_collection_group_metadata(groups_table, groupId)
             if not group:
+                raise NotFoundError(f"Collection group {groupId} not found")
+
+            # Object-level authorization: a private group's metadata
+            # (ownerId, sharedWith, collectionIds) is only visible to its
+            # owner or users it is shared with. Denials surface as 404 so
+            # private group IDs cannot be probed for existence.
+            is_owner = user_id is not None and group.get("ownerId") == user_id
+            is_shared_with_user = user_id is not None and user_id in (
+                group.get("sharedWith") or []
+            )
+            if not group.get("isPublic", True) and not (
+                is_owner or is_shared_with_user
+            ):
+                logger.warning(
+                    f"User {user_id} denied access to private group {groupId}"
+                )
                 raise NotFoundError(f"Collection group {groupId} not found")
 
             formatted_group = format_collection_group_item(group, user_context)

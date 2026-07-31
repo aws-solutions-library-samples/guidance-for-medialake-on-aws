@@ -4,9 +4,15 @@ import os
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
-from collections_utils import COLLECTION_PK_PREFIX, METADATA_SK, create_error_response
+from collections_utils import (
+    COLLECTION_PK_PREFIX,
+    METADATA_SK,
+    create_error_response,
+    require_collection_view_access,
+)
 from db_models import CollectionModel
 from pynamodb.exceptions import DoesNotExist
+from user_auth import extract_user_context
 
 logger = Logger(
     service="collections-ID-ancestors-get", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -22,6 +28,15 @@ def register_route(app):
     def collections_ID_ancestors_get(collection_id: str):
         """Get the ancestor chain for a collection (from root to current)"""
         try:
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
+
+            # Object-level authorization: the ancestor chain is only visible
+            # when the requested collection is public, or the caller owns it
+            # or holds a share role. Denials surface as 404 (matching the
+            # collection detail endpoint) to avoid leaking existence.
+            require_collection_view_access(collection_id, user_id)
+
             ancestors = []
             current_id = collection_id
 

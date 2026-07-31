@@ -346,7 +346,7 @@
           "text": "Connected",
           "id": "dndnode_10-dndnode_13"
         },
-        "sourceHandle": "video",
+        "sourceHandle": "any",
         "targetHandle": "input-video"
       },
       {

@@ -19,14 +19,13 @@ from collections_utils import (
     ASSET_SK_PREFIX,
     COLLECTION_PK_PREFIX,
     ITEM_SK_PREFIX,
-    METADATA_SK,
     create_error_response,
     create_success_response,
+    require_collection_view_access,
 )
 
 # Import Pydantic models
 from models import GetCollectionAssetsQueryParams
-from pynamodb.exceptions import DoesNotExist
 from url_utils import generate_cloudfront_urls_batch
 from user_auth import extract_user_context
 from utils.opensearch_utils import OPENSEARCH_INDEX, get_opensearch_client
@@ -218,7 +217,7 @@ def register_route(app):
     """Register collection assets route"""
 
     # Import PynamoDB models here to avoid circular dependencies
-    from db_models import CollectionItemModel, CollectionModel
+    from db_models import CollectionItemModel
 
     @app.get("/collections/<collection_id>/assets")
     @tracer.capture_method
@@ -226,7 +225,8 @@ def register_route(app):
         """Get collection assets with OpenSearch data and CloudFront URLs"""
         try:
             # Validate user authentication
-            extract_user_context(app.current_event.raw_event)
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
 
             # Parse and validate query parameters with Pydantic
             try:
@@ -246,13 +246,11 @@ def register_route(app):
                 f"page={query_params.page}, pageSize={query_params.page_size}"
             )
 
-            # Verify collection exists
-            try:
-                CollectionModel.get(
-                    f"{COLLECTION_PK_PREFIX}{collection_id}", METADATA_SK
-                )
-            except DoesNotExist:
-                raise NotFoundError(f"Collection '{collection_id}' not found")
+            # Object-level authorization (also verifies the collection
+            # exists): asset metadata and CDN URLs are only visible when the
+            # collection is public, or the caller owns it or holds a share
+            # role. Denials surface as 404 to avoid leaking existence.
+            require_collection_view_access(collection_id, user_id)
 
             # Get all items from the collection (both old ITEM# and new ASSET# formats)
             all_items = []
