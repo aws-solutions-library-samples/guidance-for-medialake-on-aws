@@ -22,7 +22,7 @@ Parameters:
   GitRepositoryUrl:
     Description: URL of the public Git repository (e.g., https://github.com/username/repository.git)
     Type: String
-    Default: 'https://github.com/aws-solutions-library-samples/guidance-for-medialake'
+    Default: 'https://github.com/fleandro1/guidance-for-medialake-on-aws'
 
   GitBranch:
     Description: Git branch to clone from the repository
