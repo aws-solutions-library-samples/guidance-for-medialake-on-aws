@@ -8,7 +8,7 @@ import type {
   PipelineStatus,
   PipelineRun,
 } from "../types/pipelines.types";
-import type { TriggerPipelineResponse } from "@/api/types/pipeline.types";
+import type { TriggerPipelineGroup, TriggerPipelineResponse } from "@/api/types/pipeline.types";
 
 export class PipelinesService {
   static async getPipelines(): Promise<PipelinesResponse> {
@@ -137,11 +137,12 @@ export class PipelinesService {
 
   static async triggerPipeline(
     pipelineId: string,
-    assets: { inventory_id: string; params?: Record<string, any> }[]
+    assets: { inventory_id: string; params?: Record<string, any> }[],
+    group?: TriggerPipelineGroup
   ): Promise<TriggerPipelineResponse> {
     const response = await apiClient.post<TriggerPipelineResponse>(
       PIPELINES_API.endpoints.TRIGGER_PIPELINE(pipelineId),
-      { assets }
+      group ? { assets, group } : { assets }
     );
     return response.data;
   }

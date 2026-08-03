@@ -59,6 +59,19 @@ from medialake_constructs.shared_constructs.mediaconvert import (
 )
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
+# Elemental Inference smart cropping consumes one Elemental Inference "feed" per
+# running MediaConvert job. The queue's "Maximum concurrent feeds" must be > 0
+# for smart-crop jobs to run (default is 0, which queues them indefinitely).
+#
+# IMPORTANT: this must not exceed the account's "Active feeds per account"
+# Service Quota for Elemental Inference, which defaults to a small number
+# (observed: 2 in us-east-1). If the requested value exceeds the quota,
+# UpdateQueue raises ServiceQuotaExceededException and the (best-effort) custom
+# resource leaves the queue at 0 feeds. Default to 1 so the call succeeds in any
+# Elemental-Inference-enabled account; raise this (and request a quota increase
+# via Service Quotas) if you need more concurrent reframe jobs.
+REFRAME_MAX_CONCURRENT_FEEDS = 1
+
 
 def _resolve_platform(architecture: str) -> Platform:
     """Map a YAML ``architecture`` string to a CDK ``Platform``.
@@ -148,8 +161,14 @@ class NodesStack(cdk.NestedStack):
             "DeployAssets",
             sources=bucket_deployment_sources,
             destination_bucket=self._pipelines_nodes_bucket.bucket,
-            retain_on_delete=config.environment
-            == "prod",  # Retain templates in production
+            # Retain templates in production. NOTE: the environment string used
+            # in prod deployments is "prd", so match both spellings — the
+            # previous `== "prod"` comparison evaluated False in prd, which
+            # enabled the handler's old-destination purge ("aws s3 rm" on the
+            # previous bucket) during the bucket rename and failed the deploy.
+            # retain_on_delete=True skips that purge entirely (the old bucket
+            # no longer exists).
+            retain_on_delete=config.environment in ("prod", "prd"),
             prune=True,  # Remove old files not in source
         )
 
@@ -208,6 +227,14 @@ class NodesStack(cdk.NestedStack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "video_proxy_and_thumbnail"],
+        )
+
+        self.video_reframe_lambda_deployment = LambdaDeployment(
+            self,
+            "VideoReframeLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "video_reframe"],
         )
 
         self.audio_proxy_lambda_deployment = LambdaDeployment(
@@ -329,6 +356,14 @@ class NodesStack(cdk.NestedStack):
             destination_bucket=props.iac_bucket.bucket,
             parent_folder="nodes/utility",
             code_path=["lambdas", "nodes", "collection_manager"],
+        )
+
+        self.download_collector_lambda_deployment = LambdaDeployment(
+            self,
+            "DownloadCollectorLambdaDeployment",
+            destination_bucket=props.iac_bucket.bucket,
+            parent_folder="nodes/utility",
+            code_path=["lambdas", "nodes", "download_collector"],
         )
 
         self.mark_upload_complete_lambda_deployment = LambdaDeployment(
@@ -710,6 +745,82 @@ class NodesStack(cdk.NestedStack):
             ),
         )
 
+        # ========================================
+        # Reframe (Elemental Inference Smart Cropping) MediaConvert Queue
+        # ========================================
+        # Dedicated ON_DEMAND queue for Elemental Inference smart-crop (reframe)
+        # jobs so they don't compete with proxy transcodes for feed capacity.
+        # Kept fully separate from the proxy queue for backwards compatibility.
+        reframe_queue_name = (
+            f"{config.resource_prefix}-ReframeQueue-{config.environment}"
+        )
+        self.reframe_queue = MediaConvert.create_queue(
+            self,
+            "MediaLakeReframeMediaConvertQueue",
+            props=MediaConvertProps(
+                description="MediaLake queue for Elemental Inference smart-crop (reframe) jobs",
+                name=reframe_queue_name,
+                pricing_plan="ON_DEMAND",  # ON_DEMAND required (Smart Cropping is not supported on reserved queues)
+                status="ACTIVE",
+                tags=[
+                    {"Environment": config.environment},
+                    {"Application": config.resource_prefix},
+                    {"Component": "MediaConvert"},
+                    {"ManagedBy": "CDK"},
+                ],
+            ),
+        )
+
+        # "Maximum concurrent feeds" is required to be > 0 for Elemental Inference
+        # smart-crop jobs to run, but it is NOT exposed by the
+        # AWS::MediaConvert::Queue CloudFormation resource. Set it best-effort via
+        # the MediaConvert UpdateQueue API. This call is intentionally
+        # fault-tolerant (ignore_error_codes_matching=".*") so a deploy never
+        # fails in regions where Elemental Inference is unavailable or if the
+        # account quota is lower - an operator can adjust it from the console.
+        reframe_feeds_cr = cr.AwsCustomResource(
+            self,
+            "ReframeQueueMaxConcurrentFeeds",
+            on_create=cr.AwsSdkCall(
+                service="MediaConvert",
+                action="updateQueue",
+                parameters={
+                    "Name": reframe_queue_name,
+                    "MaximumConcurrentFeeds": REFRAME_MAX_CONCURRENT_FEEDS,
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{reframe_queue_name}-max-concurrent-feeds"
+                ),
+                ignore_error_codes_matching=".*",
+            ),
+            on_update=cr.AwsSdkCall(
+                service="MediaConvert",
+                action="updateQueue",
+                parameters={
+                    "Name": reframe_queue_name,
+                    "MaximumConcurrentFeeds": REFRAME_MAX_CONCURRENT_FEEDS,
+                },
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    f"{reframe_queue_name}-max-concurrent-feeds"
+                ),
+                ignore_error_codes_matching=".*",
+            ),
+            install_latest_aws_sdk=True,
+            policy=cr.AwsCustomResourcePolicy.from_statements(
+                [
+                    iam.PolicyStatement(
+                        actions=[
+                            "mediaconvert:UpdateQueue",
+                            "mediaconvert:GetQueue",
+                        ],
+                        resources=[self.reframe_queue.queue_arn],
+                    )
+                ]
+            ),
+        )
+        # The queue must exist before we can update its feed settings.
+        reframe_feeds_cr.node.add_dependency(self.reframe_queue)
+
     def _create_mediaconvert_role(self) -> iam.Role:
         """
         Create IAM role for MediaConvert service with least-privilege permissions.
@@ -761,8 +872,14 @@ class NodesStack(cdk.NestedStack):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
+                # Both the bucket ARN and the object ARN are required: GetObject
+                # and PutObject act on objects, and a bucket-only ARN
+                # ("arn:aws:s3:::*") never matches them — MediaConvert then
+                # fails every render with
+                # "Unable to write to output file ... Access Denied".
                 resources=[
-                    "arn:aws:s3:::*"
+                    "arn:aws:s3:::*",
+                    "arn:aws:s3:::*/*",
                 ],  # Allow access to any S3 bucket (user-provided buckets)
             )
         )
@@ -812,6 +929,27 @@ class NodesStack(cdk.NestedStack):
             )
         )
 
+        # Elemental Inference permissions for Smart Cropping (reframe) jobs.
+        # When a MediaConvert output uses ScalingBehavior=SMART_CROP, MediaConvert
+        # manages the Elemental Inference feed lifecycle on behalf of this role
+        # (create feed, associate, stream media, read analysis metadata, delete).
+        # These actions only support "*" as the resource. Granting them here is
+        # additive and harmless for non-reframe jobs (they are simply unused).
+        mediaconvert_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ElementalInferenceSmartCropping",
+                actions=[
+                    "elemental-inference:CreateFeed",
+                    "elemental-inference:AssociateFeed",
+                    "elemental-inference:PutMedia",
+                    "elemental-inference:GetMetadata",
+                    "elemental-inference:DeleteFeed",
+                    "elemental-inference:TagResource",
+                ],
+                resources=["*"],
+            )
+        )
+
         return mediaconvert_role
 
     # ========================================
@@ -838,3 +976,8 @@ class NodesStack(cdk.NestedStack):
     def mediaconvert_queue_arn(self) -> str:
         """ARN of the MediaConvert queue for proxy video jobs."""
         return self.proxy_queue.queue_arn
+
+    @property
+    def mediaconvert_reframe_queue_arn(self) -> str:
+        """ARN of the MediaConvert queue used for Elemental Inference smart-crop (reframe) jobs."""
+        return self.reframe_queue.queue_arn

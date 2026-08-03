@@ -33,6 +33,8 @@ interface BatchOperationsProps {
     id: string;
     name: string;
     type: string;
+    inventoryID?: string;
+    segment?: { startTime: number; endTime: number; label?: string };
   }>;
   onBatchDelete?: () => void;
   onBatchDownload?: () => void;
@@ -54,6 +56,26 @@ const getAssetTypeIcon = (type: string) => {
   if (t.includes("audio")) return <AudiotrackOutlinedIcon fontSize="small" />;
   return <InsertDriveFileOutlinedIcon fontSize="small" />;
 };
+
+// Format a number of seconds as m:ss for segment (clip) bin entries.
+const formatClock = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+// Display name for a bin entry; appends the time range for segment entries so
+// multiple segments of the same asset are distinguishable.
+const displayNameFor = (asset: {
+  name: string;
+  segment?: { startTime: number; endTime: number };
+}): string =>
+  asset.segment
+    ? `${asset.name} (${formatClock(asset.segment.startTime)}\u2013${formatClock(
+        asset.segment.endTime
+      )})`
+    : asset.name;
 
 const BatchOperations: React.FC<BatchOperationsProps> = ({
   selectedAssets,
@@ -448,8 +470,8 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                       }}
                     >
                       <Tooltip
-                        title={asset.name}
-                        disableHoverListener={asset.name.length < 50}
+                        title={displayNameFor(asset)}
+                        disableHoverListener={displayNameFor(asset).length < 50}
                         enterDelay={400}
                         arrow
                       >
@@ -466,6 +488,25 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                               wordBreak: "break-all",
+                            },
+                          }}
+                          // Segment entries get a dedicated, always-visible line
+                          // for their time range so it can't be ellipsized away
+                          // by long filenames.
+                          secondary={
+                            asset.segment
+                              ? `${formatClock(asset.segment.startTime)}\u2013${formatClock(
+                                  asset.segment.endTime
+                                )}`
+                              : undefined
+                          }
+                          secondaryTypographyProps={{
+                            variant: "caption",
+                            sx: {
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                              color: "primary.main",
+                              fontVariantNumeric: "tabular-nums",
                             },
                           }}
                         />

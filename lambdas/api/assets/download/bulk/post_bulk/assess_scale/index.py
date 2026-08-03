@@ -186,31 +186,77 @@ def get_assets_metadata(asset_ids: List[str]) -> Dict[str, Any]:
                 selected_video_fields = {}
                 selected_audio_fields = {}
 
-                video_metadata: Dict = metadata.get("video", [{}])[0]
-                audio_metadata: Dict = metadata.get("audio", [{}])[0]
+                video_streams = metadata.get("video") or [{}]
+                audio_streams = metadata.get("audio") or [{}]
+                video_metadata: Dict = video_streams[0] or {}
+                audio_metadata: Dict = audio_streams[0] or {}
+                general_metadata: Dict = metadata.get("general") or {}
 
-                try:
-                    selected_video_fields["Bitrate"] = video_metadata["BitRate"]
-                    selected_video_fields["MaxBitrate"] = video_metadata[
-                        "BitRate_Maximum"
-                    ]
-                    selected_video_fields["RateControlMode"] = video_metadata[
-                        "BitRate_Mode"
-                    ]
+                def _to_int(value: Any) -> int:
+                    """Best-effort numeric parse (handles str/Decimal/None)."""
+                    try:
+                        return int(float(value))
+                    except (TypeError, ValueError):
+                        return 0
 
-                    selected_audio_fields["Bitrate"] = audio_metadata["BitRate"]
-                    selected_audio_fields["SampleRate"] = audio_metadata["sample_rate"]
-                    selected_audio_fields["RateControlMode"] = audio_metadata[
-                        "BitRate_Mode"
+                # MediaInfo only reports fields the container actually carries;
+                # BitRate_Maximum / BitRate_Mode are frequently absent (e.g. many
+                # camera and NLE-exported MP4s). Fall back through progressively coarser
+                # sources instead of failing the whole download job, since these
+                # values only shape the subclip re-encode settings.
+                video_bitrate = (
+                    _to_int(video_metadata.get("BitRate"))
+                    or _to_int(video_metadata.get("BitRate_Nominal"))
+                    or _to_int(general_metadata.get("OverallBitRate"))
+                    or 8_000_000  # sane HD default when nothing is reported
+                )
+                video_max_bitrate = (
+                    _to_int(video_metadata.get("BitRate_Maximum")) or video_bitrate
+                )
+                video_rate_control = video_metadata.get("BitRate_Mode") or "VBR"
+
+                audio_bitrate = _to_int(audio_metadata.get("BitRate")) or 128_000
+                audio_sample_rate = (
+                    _to_int(audio_metadata.get("sample_rate"))
+                    or _to_int(audio_metadata.get("SamplingRate"))
+                    or 48_000
+                )
+                audio_rate_control = audio_metadata.get("BitRate_Mode") or "CBR"
+
+                missing = [
+                    name
+                    for name, present in [
+                        ("video.BitRate", _to_int(video_metadata.get("BitRate"))),
+                        (
+                            "video.BitRate_Maximum",
+                            _to_int(video_metadata.get("BitRate_Maximum")),
+                        ),
+                        ("video.BitRate_Mode", video_metadata.get("BitRate_Mode")),
+                        ("audio.BitRate", _to_int(audio_metadata.get("BitRate"))),
+                        (
+                            "audio.sample_rate",
+                            _to_int(audio_metadata.get("sample_rate")),
+                        ),
+                        ("audio.BitRate_Mode", audio_metadata.get("BitRate_Mode")),
                     ]
-                except KeyError as e:
-                    logger.error(
-                        "Error: Missing required asset metadata",
+                    if not present
+                ]
+                if missing:
+                    logger.warning(
+                        "Asset metadata missing optional encode fields; using fallbacks",
                         extra={
-                            "error": str(e),
+                            "assetId": asset.get("InventoryID"),
+                            "missing_fields": missing,
                         },
                     )
-                    raise  # break and exit
+
+                selected_video_fields["Bitrate"] = video_bitrate
+                selected_video_fields["MaxBitrate"] = video_max_bitrate
+                selected_video_fields["RateControlMode"] = video_rate_control
+
+                selected_audio_fields["Bitrate"] = audio_bitrate
+                selected_audio_fields["SampleRate"] = audio_sample_rate
+                selected_audio_fields["RateControlMode"] = audio_rate_control
 
                 # Create the asset metadata entry with assetId as Key
                 assets[asset["InventoryID"]] = {
@@ -295,8 +341,16 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, int
     small_files_count = 0
     large_files_count = 0
 
-    # Check if this is a full-asset single file job (no sub-clipping)
-    if SINGLE_FILE_CHECK and len(assets) == 1 and not is_sub_clip_request(assets[0]):
+    # Check if this is a full-asset single file job (no sub-clipping).
+    # Entries with an explicit s3Uri (pipeline output artifacts) are excluded:
+    # the single-file fast path resolves the asset's original file, not the
+    # referenced object, so those flow through the zip/presigned-URL paths.
+    if (
+        SINGLE_FILE_CHECK
+        and len(assets) == 1
+        and not is_sub_clip_request(assets[0])
+        and not assets[0].get("s3Uri")
+    ):
         job_type = "SINGLE_FILE"
 
         # Still calculate the size for logging purposes
@@ -517,6 +571,17 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             asset["sourceAssetMetadata"] = source_assets_metadata.get(
                 asset.get("assetId", ""), {}
             )
+            # Entries carrying an explicit S3 location (e.g. pipeline-group
+            # output artifacts) are sized by the referenced object, not by
+            # the asset's original file. Copy before overriding: multiple
+            # entries for the same asset share the metadata dict.
+            if asset.get("s3Uri"):
+                explicit_metadata = dict(asset["sourceAssetMetadata"])
+                try:
+                    explicit_metadata["size"] = int(asset.get("size", 0) or 0)
+                except (TypeError, ValueError):
+                    explicit_metadata["size"] = 0
+                asset["sourceAssetMetadata"] = explicit_metadata
 
         # Calculate job size
         total_size, sub_clips_count, small_files_count, large_files_count, job_type = (
@@ -553,8 +618,25 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 if asset_id in found_asset_ids:
                     file_size = asset.get("sourceAssetMetadata", {}).get("size", 0)
 
+                    # Explicit S3 locations (pipeline output artifacts) skip
+                    # asset-record resolution entirely: downstream handlers
+                    # already support type=S3_URI items (the same mechanism
+                    # sub-clip outputs use).
+                    if asset.get("s3Uri"):
+                        s3_uri_item = {
+                            "jobId": job_id,
+                            "userId": job.get("userId"),
+                            "assetId": asset_id,
+                            "options": job.get("options", {}),
+                            "outputLocation": asset["s3Uri"],
+                            "type": "S3_URI",
+                        }
+                        if file_size <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
+                            small_files.append(s3_uri_item)
+                        else:
+                            large_files.append(s3_uri_item)
                     # Determine if this is a sub-clip request or small or large whole-file request
-                    if is_sub_clip_request(asset):
+                    elif is_sub_clip_request(asset):
                         # Add to sub-clips for processing
                         sub_clips.append(
                             {

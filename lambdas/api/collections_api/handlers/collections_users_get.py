@@ -2,8 +2,9 @@
 
 This endpoint returns lightweight user summaries so that the ShareManagementModal
 can populate its user autocomplete without requiring the separate users:view
-permission (which is a settings-level permission). Only basic identity fields
-are returned (username, email, display name).
+permission (which is a settings-level permission). Only the minimal identity
+fields needed for the sharing UI are returned (username, email, display name) —
+account state such as enabled/status is deliberately excluded.
 """
 
 import os
@@ -11,6 +12,8 @@ import os
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
+from collections_utils import create_error_response
+from user_auth import extract_user_context
 
 logger = Logger(
     service="collections-users-get",
@@ -32,6 +35,18 @@ def register_route(app):
         request_id = app.current_event.request_context.request_id
 
         try:
+            # Defense in depth: the custom authorizer already gates this route
+            # behind collections:edit, but never dump the user directory to a
+            # request without an authenticated identity.
+            user_context = extract_user_context(app.current_event.raw_event)
+            if not user_context.get("user_id"):
+                return create_error_response(
+                    error_code="Unauthorized",
+                    error_message="Authentication required",
+                    status_code=401,
+                    request_id=request_id,
+                )
+
             user_pool_id = os.environ.get("COGNITO_USER_POOL_ID")
             if not user_pool_id:
                 logger.error("COGNITO_USER_POOL_ID not configured")
@@ -52,6 +67,9 @@ def register_route(app):
                     given_name = attrs.get("given_name")
                     family_name = attrs.get("family_name")
 
+                    # Minimal fields only: the sharing UI needs identity and
+                    # display name. Account state (enabled/status) is
+                    # admin-level information and is deliberately omitted.
                     users.append(
                         {
                             "username": user.get("Username"),
@@ -63,8 +81,6 @@ def register_route(app):
                                 if given_name and family_name
                                 else given_name or family_name or None
                             ),
-                            "enabled": user.get("Enabled", True),
-                            "status": user.get("UserStatus"),
                         }
                     )
 
@@ -88,14 +104,9 @@ def register_route(app):
 
         except Exception as e:
             logger.exception("Error fetching user summaries", exc_info=e)
-            return {
-                "statusCode": 500,
-                "body": {
-                    "success": False,
-                    "error": {
-                        "code": "INTERNAL_SERVER_ERROR",
-                        "message": "An unexpected error occurred",
-                    },
-                    "meta": {"request_id": request_id},
-                },
-            }
+            return create_error_response(
+                error_code="InternalServerError",
+                error_message="An unexpected error occurred",
+                status_code=500,
+                request_id=request_id,
+            )

@@ -1,0 +1,92 @@
+{
+  "Queue": "{{ variables.mediaconvert_queue_arn }}",
+  "UserMetadata": {{ variables.user_metadata | jsonify }},
+  "Role": "{{ variables.mediaconvert_role_arn }}",
+  "Settings": {
+    "OutputGroups": [
+      {
+        "Name": "Reframe Video",
+        "Outputs": [
+          {
+            "ContainerSettings": {
+              "Container": "MP4",
+              "Mp4Settings": {
+                "MoovPlacement": "PROGRESSIVE_DOWNLOAD"
+              }
+            },
+            "VideoDescription": {
+              "Width": {{ variables.reframe_width }},
+              "Height": {{ variables.reframe_height }},
+              "ScalingBehavior": "SMART_CROP",
+              "CodecSettings": {
+                "Codec": "H_264",
+                "H264Settings": {
+                  "MaxBitrate": {{ (variables.reframe_max_kbps | default(6000)) * 1000 }},
+                  "RateControlMode": "QVBR",
+                  "SceneChangeDetect": "TRANSITION_DETECTION",
+                  "QualityTuningLevel": "SINGLE_PASS_HQ",
+                  "CodecProfile": "MAIN",
+                  "QvbrSettings": {
+                    "QvbrQualityLevel": {{ variables.reframe_qvbr_quality | default(8) }}
+                  }
+                }
+              }
+            },
+            "AudioDescriptions": [
+              {
+                "CodecSettings": {
+                  "Codec": "AAC",
+                  "AacSettings": {
+                    "Bitrate": {{ (variables.reframe_audio_kbps | default(128)) * 1000 }},
+                    "CodingMode": "CODING_MODE_2_0",
+                    "SampleRate": 48000
+                  }
+                },
+                "AudioSourceName": "Audio Selector 1"
+              }
+            ],
+            "NameModifier": "{{ variables.reframe_name_modifier }}"
+          }
+        ],
+        "OutputGroupSettings": {
+          "Type": "FILE_GROUP_SETTINGS",
+          "FileGroupSettings": {
+            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "DestinationSettings": {
+              "S3Settings": {
+                "AccessControl": {
+                  "CannedAcl": "BUCKET_OWNER_FULL_CONTROL"
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "Inputs": [
+      {
+        "AudioSelectors": {
+          "Audio Selector 1": {
+            "DefaultSelection": "DEFAULT"
+          }
+        },
+        "VideoSelector": {},
+        "TimecodeSource": "ZEROBASED",
+        {% if variables.has_segment %}"InputClippings": [
+          {
+            "StartTimecode": "{{ variables.segment_start }}",
+            "EndTimecode": "{{ variables.segment_end }}"
+          }
+        ],
+        {% endif %}"FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}"
+      }
+    ],
+    "FollowSource": 1
+  },
+  "BillingTagsSource": "JOB",
+  "AccelerationSettings": {
+    "Mode": "DISABLED"
+  },
+  "StatusUpdateInterval": "SECONDS_60",
+  "Priority": 0
+}

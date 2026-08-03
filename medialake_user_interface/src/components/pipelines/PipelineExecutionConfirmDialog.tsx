@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -10,14 +10,25 @@ import {
   Box,
   Typography,
   Alert,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+
+export interface PipelineExecutionOptions {
+  /**
+   * Submit the selected assets as a single execution group and package the
+   * pipeline's output artifacts into a downloadable zip when every
+   * execution finishes.
+   */
+  packageOutputs: boolean;
+}
 
 interface PipelineExecutionConfirmDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (options: PipelineExecutionOptions) => void;
   pipelineName: string;
   selectedCount: number;
   isLoading: boolean;
@@ -32,6 +43,14 @@ export const PipelineExecutionConfirmDialog: React.FC<PipelineExecutionConfirmDi
   isLoading,
 }) => {
   const { t } = useTranslation();
+  const [packageOutputs, setPackageOutputs] = useState(false);
+
+  // Fresh state each time the dialog opens
+  useEffect(() => {
+    if (open) {
+      setPackageOutputs(false);
+    }
+  }, [open]);
 
   return (
     <Dialog
@@ -63,6 +82,23 @@ export const PipelineExecutionConfirmDialog: React.FC<PipelineExecutionConfirmDi
           <Typography variant="body2" color="text.secondary">
             <strong>{t("sidebar.menu.pipelines")}:</strong> {pipelineName}
           </Typography>
+
+          <Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={packageOutputs}
+                  onChange={(event) => setPackageOutputs(event.target.checked)}
+                  disabled={isLoading}
+                  data-testid="pipeline-execution-package-outputs-checkbox"
+                />
+              }
+              label={t("common.batchOperations.pipelineExecution.packageOutputs")}
+            />
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ pl: 4 }}>
+              {t("common.batchOperations.pipelineExecution.packageOutputsHint")}
+            </Typography>
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>
@@ -74,7 +110,7 @@ export const PipelineExecutionConfirmDialog: React.FC<PipelineExecutionConfirmDi
           {t("common.cancel")}
         </Button>
         <Button
-          onClick={onConfirm}
+          onClick={() => onConfirm({ packageOutputs })}
           color="primary"
           variant="contained"
           disabled={isLoading}

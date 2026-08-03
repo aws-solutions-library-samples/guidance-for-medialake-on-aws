@@ -1021,6 +1021,9 @@ export default {
         pipelineNotFound: "पाइपलाइन नहीं मिली",
         insufficientPermissions: "आपके पास इस पाइपलाइन को निष्पादित करने की अनुमति नहीं है",
         noAssetsSelected: "पाइपलाइन निष्पादन के लिए कोई एसेट चयनित नहीं",
+        packageOutputs: "पूरा होने पर आउटपुट को डाउनलोड के लिए पैकेज करें",
+        packageOutputsHint:
+          "चयनित एसेट को एक समूह के रूप में चलाता है। जब सभी निष्पादन पूरे हो जाते हैं, तो पाइपलाइन द्वारा बनाई गई सभी नई आउटपुट फ़ाइलें ज़िप कर दी जाती हैं और डाउनलोड सूचना के रूप में उपलब्ध कराई जाती हैं।",
       },
     },
     confirmBulkDelete: "बल्क डिलीट की पुष्टि करें",
@@ -1638,6 +1641,19 @@ export default {
     tabs: {
       markers: "मार्कर",
     },
+    cropSize: "क्रॉप:",
+    segmentDuration: "अवधि:",
+    fullLength: "पूरी लंबाई",
+    viewing: "देख रहे हैं",
+    view: "देखें",
+  },
+  segmentWorkflows: {
+    header: "सेगमेंट पर चलाएँ",
+    runButton: "चलाएँ",
+    menuTooltip: "इस सेगमेंट पर वर्कफ़्लो चलाएँ",
+    started: "सेगमेंट पर {{name}} शुरू किया गया",
+    failed: "वर्कफ़्लो शुरू करने में विफल",
+    forbidden: "आपको यह वर्कफ़्लो चलाने की अनुमति नहीं है",
   },
   fileUpload: {
     errorMessages: {

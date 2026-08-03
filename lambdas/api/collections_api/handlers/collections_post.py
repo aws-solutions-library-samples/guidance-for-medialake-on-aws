@@ -15,7 +15,9 @@ from collections_utils import (
     METADATA_SK,
     USER_PK_PREFIX,
     format_collection_item,
+    require_collection_role,
 )
+from custom_exceptions import ForbiddenError
 from db_models import ChildReferenceModel, CollectionModel, UserRelationshipModel
 from models import CreateCollectionRequest
 from pynamodb.connection import Connection
@@ -84,11 +86,21 @@ def register_route(app):
                 # Validate parent collection exists before proceeding
                 parent_pk = f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
                 try:
-                    CollectionModel.get(parent_pk, METADATA_SK)
+                    parent_collection = CollectionModel.get(parent_pk, METADATA_SK)
                 except DoesNotExist:
                     raise BadRequestError(
                         f"Parent collection '{request_data.parentId}' not found"
                     )
+                # Object-level authorization: creating a sub-collection
+                # mutates the parent (CHILD# reference + childCollectionCount)
+                # and attaches content to it, so the caller must own or have
+                # edit access to the parent collection.
+                require_collection_role(
+                    request_data.parentId,
+                    user_id,
+                    minimum_role="EDITOR",
+                    collection=parent_collection,
+                )
                 collection.parentId = request_data.parentId
             if request_data.metadata:
                 collection.customMetadata = request_data.metadata
@@ -231,7 +243,7 @@ def register_route(app):
                 ),
             )
 
-        except BadRequestError:
+        except (BadRequestError, ForbiddenError):
             raise
         except Exception as e:
             logger.exception("Unexpected error creating collection", exc_info=e)

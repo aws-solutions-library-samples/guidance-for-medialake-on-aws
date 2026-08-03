@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useGeneratePresignedUrl } from "../../api/hooks/usePresignedUrl";
 import { useSemanticSearchStatus } from "../../features/settings/system/hooks/useSystemSettings";
@@ -25,9 +25,14 @@ import {
   Switch,
   Paper,
   Avatar,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { RightSidebar } from "../common/RightSidebar";
+import { useGetPipelines } from "../../features/pipelines/api/pipelinesController";
+import { PipelinesService } from "../../features/pipelines/api/pipelinesService";
+import { useFeatureFlag } from "../../contexts/FeatureFlagsContext";
 
 // Icons
 import HistoryIcon from "@mui/icons-material/History";
@@ -46,6 +51,9 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import SendIcon from "@mui/icons-material/Send";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import TimelineIcon from "@mui/icons-material/Timeline";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import AspectRatioIcon from "@mui/icons-material/AspectRatio";
 import { randomHexColor, getMarkerColorByConfidence } from "../common/utils";
 import type { DetailMarkerAdapter, MarkerApi } from "../player/marker-sync/ports";
 import { getPlayerCurrentTime } from "../player/playerTimeStore";
@@ -236,11 +244,35 @@ interface AssetSidebarProps {
   asset?: any;
   assetType?: string;
   searchTerm?: string;
+  // Versions-tab "View" switcher: flips the main player between playable
+  // renditions (proxy / smartcrop). Provided by the media detail page.
+  onViewVersion?: (version: any) => void;
+  viewedVersionId?: string;
 }
 
 interface AssetVersionProps {
   versions: any[];
+  onViewVersion?: (version: any) => void;
+  viewedVersionId?: string;
 }
+
+// Parse a smartcrop Segment string ("HH:MM:SS:FF/HH:MM:SS:FF") into a compact
+// display like "0:02–0:08 · 6s". Frames are ignored (display precision only).
+const formatSegmentInfo = (segment?: string): string | null => {
+  if (!segment || typeof segment !== "string" || !segment.includes("/")) return null;
+  const toSeconds = (tc: string): number | null => {
+    const parts = tc.replace(/;/g, ":").split(":").map(Number);
+    if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  };
+  const clock = (s: number): string =>
+    `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const [startTc, endTc] = segment.split("/");
+  const start = toSeconds(startTc);
+  const end = toSeconds(endTc);
+  if (start === null || end === null || end <= start) return null;
+  return `${clock(start)}\u2013${clock(end)} \u00b7 ${end - start}s`;
+};
 
 interface AssetMarkersProps {
   onMarkerAdd?: () => void;
@@ -271,7 +303,11 @@ interface AssetActivityProps {
 }
 
 // Version content component (using existing data)
-const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
+const AssetVersions: React.FC<AssetVersionProps> = ({
+  versions = [],
+  onViewVersion,
+  viewedVersionId,
+}) => {
   const { t } = useTranslation();
   const theme = useTheme();
   const generatePresignedUrl = useGeneratePresignedUrl();
@@ -406,7 +442,56 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
                   <strong>{t("assets.fields.size")}:</strong>{" "}
                   {version.size || t("common.notAvailable")}
                 </Typography>
+                {/* Smartcrop details: target aspect ratio + output resolution */}
+                {(version.aspectRatio || version.resolution) && (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
+                    <strong>{t("assetSidebar.cropSize", "Crop:")}</strong>{" "}
+                    {[
+                      version.aspectRatio,
+                      version.resolution?.Width && version.resolution?.Height
+                        ? `${version.resolution.Width}\u00d7${version.resolution.Height}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" \u00b7 ")}
+                  </Typography>
+                )}
+                {/* Segment range + duration for segment-based smartcrops;
+                    whole-asset smartcrops are marked full length. */}
+                {version.type?.toLowerCase() === "smartcrop" && (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem" }}>
+                    <strong>{t("assetSidebar.segmentDuration", "Duration:")}</strong>{" "}
+                    {formatSegmentInfo(version.segment) ||
+                      t("assetSidebar.fullLength", "Full length")}
+                  </Typography>
+                )}
                 <Box sx={{ display: "flex", mt: 1.5 }}>
+                  {/* View: flip the main player to this rendition (proxy or
+                      smartcrop). Click again to return to the default proxy. */}
+                  {onViewVersion &&
+                    version.url &&
+                    !version.type?.toLowerCase().includes("thumb") &&
+                    version.type?.toLowerCase() !== "original" && (
+                      <Button
+                        variant={viewedVersionId === version.id ? "contained" : "outlined"}
+                        size="small"
+                        color="secondary"
+                        sx={{
+                          mr: 1,
+                          textTransform: "none",
+                          borderRadius: "8px",
+                          fontSize: "0.775rem",
+                          fontWeight: 500,
+                        }}
+                        onClick={() => onViewVersion(version)}
+                        startIcon={<PlayCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                        data-testid="view-version-button"
+                      >
+                        {viewedVersionId === version.id
+                          ? t("assetSidebar.viewing", "Viewing")
+                          : t("assetSidebar.view", "View")}
+                      </Button>
+                    )}
                   <Tooltip title={t("common.downloadVersion")}>
                     <Button
                       variant="outlined"
@@ -458,6 +543,165 @@ const AssetVersions: React.FC<AssetVersionProps> = ({ versions = [] }) => {
   );
 };
 
+/**
+ * Per-segment workflow menu shown on each marker card. Lists pipelines whose
+ * manual trigger has "Per Segment Execution" enabled and runs the selected one
+ * against this segment's time range (passed as start_time/end_time params).
+ * Renders nothing when the feature is unavailable or there are no eligible
+ * pipelines. Gated by the caller via the segment-workflows feature flag.
+ */
+const SegmentWorkflowMenu: React.FC<{
+  pipelines: any[];
+  assetId?: string;
+  startTime: number;
+  endTime: number;
+}> = ({ pipelines, assetId, startTime, endTime }) => {
+  const { t } = useTranslation();
+  const { enqueueSnackbar } = useSnackbar();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+
+  if (!assetId || pipelines.length === 0) return null;
+
+  const runPipeline = async (pipeline: any) => {
+    setRunningId(pipeline.id);
+    try {
+      const response = await PipelinesService.triggerPipeline(pipeline.id, [
+        {
+          inventory_id: assetId,
+          params: { start_time: startTime, end_time: endTime },
+        },
+      ]);
+      if ((response?.successful_executions ?? 0) > 0) {
+        enqueueSnackbar(
+          t("segmentWorkflows.started", {
+            defaultValue: 'Started "{{name}}" on segment',
+            name: pipeline.name,
+          }),
+          { variant: "success" }
+        );
+      } else {
+        enqueueSnackbar(
+          response?.message ||
+            t("segmentWorkflows.failed", { defaultValue: "Failed to start workflow" }),
+          { variant: "error" }
+        );
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      enqueueSnackbar(
+        status === 403
+          ? t("segmentWorkflows.forbidden", {
+              defaultValue: "You don't have permission to run this workflow",
+            })
+          : t("segmentWorkflows.failed", { defaultValue: "Failed to start workflow" }),
+        { variant: "error" }
+      );
+    } finally {
+      setRunningId(null);
+      setAnchorEl(null);
+    }
+  };
+
+  return (
+    <>
+      <Tooltip
+        title={t("segmentWorkflows.menuTooltip", {
+          defaultValue: "Run a workflow on this segment",
+        })}
+      >
+        <Button
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            setAnchorEl(e.currentTarget);
+          }}
+          startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+          endIcon={<ArrowDropDownIcon sx={{ fontSize: 14 }} />}
+          sx={{
+            px: 0.75,
+            py: 0,
+            height: 22,
+            minWidth: 0,
+            flexShrink: 0,
+            textTransform: "none",
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            lineHeight: 1,
+            color: "text.secondary",
+            borderRadius: "6px",
+            "& .MuiButton-startIcon": { mr: 0.25, ml: 0 },
+            "& .MuiButton-endIcon": { ml: 0, mr: -0.25 },
+            "&:hover": {
+              color: "primary.main",
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+            },
+          }}
+          aria-label={t("segmentWorkflows.menuTooltip", {
+            defaultValue: "Run a workflow on this segment",
+          })}
+          aria-haspopup="menu"
+        >
+          {t("segmentWorkflows.runButton", { defaultValue: "Run" })}
+        </Button>
+      </Tooltip>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={(e: React.SyntheticEvent) => {
+          e.stopPropagation?.();
+          setAnchorEl(null);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            elevation: 3,
+            sx: {
+              minWidth: 200,
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              "& .MuiMenuItem-root": { fontSize: "0.82rem", py: 0.75, gap: 1 },
+            },
+          },
+        }}
+      >
+        <MenuItem disabled sx={{ opacity: 1, py: 0.5 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "text.secondary",
+            }}
+          >
+            {t("segmentWorkflows.header", { defaultValue: "Run on segment" })}
+          </Typography>
+        </MenuItem>
+        {pipelines.map((pipeline) => (
+          <MenuItem
+            key={pipeline.id}
+            onClick={() => runPipeline(pipeline)}
+            disabled={runningId !== null}
+          >
+            <ListItemIcon>
+              {runningId === pipeline.id ? (
+                <CircularProgress size={16} />
+              ) : (
+                <AspectRatioIcon fontSize="small" />
+              )}
+            </ListItemIcon>
+            <ListItemText>{pipeline.name}</ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
+  );
+};
+
 // Markers content component
 const AssetMarkers: React.FC<AssetMarkersProps> = ({
   markers,
@@ -475,6 +719,27 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const { t } = useTranslation();
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
+
+  // Per-segment workflows: list manual-trigger pipelines flagged for per-segment
+  // execution so each marker card can launch one against its own time range.
+  // Gated behind a feature flag; the pipelines query is skipped when disabled.
+  const segmentWorkflowsEnabled = useFeatureFlag("segment-workflows-enabled", false);
+  const { data: segmentPipelinesData } = useGetPipelines({
+    enabled: segmentWorkflowsEnabled,
+  });
+  const perSegmentPipelines = useMemo(() => {
+    if (!segmentWorkflowsEnabled || !segmentPipelinesData?.data?.s) return [];
+    return segmentPipelinesData.data.s.filter((pipeline: any) => {
+      if (!pipeline.type?.includes("Manual Trigger")) return false;
+      // The list API returns the graph under definition.configuration.nodes;
+      // fall back to definition.nodes for any older/transformed payloads.
+      const nodes = pipeline.definition?.configuration?.nodes ?? pipeline.definition?.nodes ?? [];
+      const triggerNode = nodes.find((n: any) => n.data?.nodeId === "trigger_manual");
+      const flag = triggerNode?.data?.configuration?.parameters?.["Per Segment Execution"];
+      return flag === true || flag === "true" || flag === "Enabled";
+    });
+  }, [segmentWorkflowsEnabled, segmentPipelinesData]);
+
   // State to track editable marker names
   const [markerNames, setMarkerNamesState] = useState<Record<string, string>>({});
   const markerNamesRef = useRef<Record<string, string>>({});
@@ -1249,18 +1514,32 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       />
                     </Box>
                   </Box>
-                  <Typography
-                    variant="caption"
+                  <Box
                     sx={{
-                      color: "text.secondary",
-                      fontStyle: "italic",
-                      display: "block",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 0.5,
                       mt: 0.5,
-                      fontSize: "0.7rem",
                     }}
                   >
-                    Created by {userName}
-                  </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "text.secondary",
+                        fontStyle: "italic",
+                        fontSize: "0.7rem",
+                      }}
+                    >
+                      Created by {userName}
+                    </Typography>
+                    <SegmentWorkflowMenu
+                      pipelines={perSegmentPipelines}
+                      assetId={assetId}
+                      startTime={marker.timeObservation.start}
+                      endTime={marker.timeObservation.end}
+                    />
+                  </Box>
                   <IconButton
                     className="marker-delete"
                     size="small"
@@ -1575,33 +1854,41 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     >
                       Created by {getSearchProviderName()}
                     </Typography>
-                    {marker.score !== undefined && (
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: "6px",
-                          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
-                          border: "1px solid",
-                          borderColor: (theme) => alpha(theme.palette.primary.main, 0.15),
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      {marker.score !== undefined && (
+                        <Box
+                          component="span"
                           sx={{
-                            color: "primary.main",
-                            fontWeight: 700,
-                            fontSize: "0.625rem",
-                            fontVariantNumeric: "tabular-nums",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            px: 0.75,
+                            py: 0.25,
+                            borderRadius: "6px",
+                            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                            border: "1px solid",
+                            borderColor: (theme) => alpha(theme.palette.primary.main, 0.15),
                           }}
                         >
-                          {Number(marker.score).toFixed(3)}
-                        </Typography>
-                      </Box>
-                    )}
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "primary.main",
+                              fontWeight: 700,
+                              fontSize: "0.625rem",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {Number(marker.score).toFixed(3)}
+                          </Typography>
+                        </Box>
+                      )}
+                      <SegmentWorkflowMenu
+                        pipelines={perSegmentPipelines}
+                        assetId={assetId}
+                        startTime={marker.timeObservation.start}
+                        endTime={marker.timeObservation.end}
+                      />
+                    </Box>
                   </Box>
                   {assetId && asset?.clips && (
                     <Tooltip title={t("common.resetMarker")}>
@@ -1944,7 +2231,17 @@ const _AssetActivity: React.FC<AssetActivityProps> = () => {
 };
 export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
   const { t } = useTranslation();
-  const { markerAdapter, isMarkerReady, seek, versions = [], assetId, asset, searchTerm } = props;
+  const {
+    markerAdapter,
+    isMarkerReady,
+    seek,
+    versions = [],
+    assetId,
+    asset,
+    searchTerm,
+    onViewVersion,
+    viewedVersionId,
+  } = props;
   const [currentTab, setCurrentTab] = useState(0);
   const theme = useTheme();
   const [markers, setMarkers] = useState<MarkerInfo[]>([]);
@@ -2087,6 +2384,8 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
           >
             {currentTab === 1 && (
               <AssetVersions
+                onViewVersion={onViewVersion}
+                viewedVersionId={viewedVersionId}
                 versions={versions.map((v) => {
                   // Helper function to format file size in a friendly way
                   const formatFileSize = (bytes: number): string => {

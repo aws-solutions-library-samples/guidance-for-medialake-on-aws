@@ -5,11 +5,83 @@ This file is deployed as part of the common_libraries Lambda layer and is
 accessible to all Lambda functions.
 """
 
-from typing import Any
+import copy
+from typing import Any, Dict
 
 from aws_lambda_powertools import Logger
 
 logger = Logger()
+
+# Node icons are a presentation-only concern: the editor renders whatever React
+# element it finds here and no backend code inspects the value. Pipeline
+# definitions authored outside the editor (library templates, scripts, curl)
+# routinely omit it, so we supply this placeholder rather than rejecting an
+# otherwise valid pipeline.
+DEFAULT_NODE_ICON: Dict[str, Any] = {"props": {"size": 20}}
+
+
+def normalize_pipeline_definition(pipeline_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize a raw pipeline definition into the shape ``PipelineDefinition`` expects.
+
+    Pipeline definitions reach the API from three places that each serialize
+    slightly differently: the editor UI, the ``pipeline_library`` templates
+    (loaded from S3 at deploy time), and hand-written API calls. This function
+    reconciles those differences so any of them validate:
+
+    1. ``width``/``height`` are coerced from numbers to strings.
+    2. ``data.id`` is derived from ``data.nodeId`` when absent — both hold the
+       node *template* id (e.g. ``video_reframe``), not the instance id.
+    3. ``data.icon`` is defaulted when absent, since it is required by the model
+       but only ever used for display.
+
+    The input is not mutated.
+
+    Args:
+        pipeline_data: Raw pipeline definition dictionary
+
+    Returns:
+        A normalized copy of the pipeline definition
+    """
+    if not isinstance(pipeline_data, dict):
+        return pipeline_data
+
+    normalized = copy.deepcopy(pipeline_data)
+
+    configuration = normalized.get("configuration")
+    if not isinstance(configuration, dict):
+        return normalized
+
+    nodes = configuration.get("nodes")
+    if not isinstance(nodes, list):
+        return normalized
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+
+        # Step 1: numeric dimensions -> strings
+        for dimension in ("width", "height"):
+            value = node.get(dimension)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            node[dimension] = (
+                str(int(value)) if float(value).is_integer() else str(value)
+            )
+
+        data = node.get("data")
+        if not isinstance(data, dict):
+            continue
+
+        # Step 2: data.id <- data.nodeId
+        if not data.get("id") and data.get("nodeId"):
+            data["id"] = data["nodeId"]
+
+        # Step 3: default the display-only icon
+        if not isinstance(data.get("icon"), dict):
+            data["icon"] = copy.deepcopy(DEFAULT_NODE_ICON)
+
+    return normalized
 
 
 def determine_pipeline_type(pipeline: Any) -> str:

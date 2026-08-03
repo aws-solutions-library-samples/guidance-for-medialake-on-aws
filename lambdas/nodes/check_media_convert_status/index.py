@@ -161,6 +161,86 @@ def lambda_handler(event: Dict[str, Any], _: LambdaContext):
         out_bucket = dest.split("s3://")[1].split("/")[0]
         base_path = dest.split(f"s3://{out_bucket}/")[1].rstrip("/")
 
+        # ── Reframe (Elemental Inference smart crop) branch ──
+        # video_reframe jobs tag themselves via UserMetadata so we can save the
+        # output as a dedicated "smartcrop" derived representation. Multiple
+        # reframes (different aspect ratios / segments) coexist because each
+        # carries a distinct derived-rep ID.
+        job_user_metadata = response["Job"].get("UserMetadata", {}) or {}
+        if job_user_metadata.get("medialake_purpose") == "smartcrop":
+            reframe_group = response["Job"]["Settings"]["OutputGroups"][0]
+            reframe_output = reframe_group.get("Outputs", [{}])[0]
+            name_mod = reframe_output.get("NameModifier", "")
+            reframe_path = f"{base_path}{name_mod}.mp4"
+            video_desc = reframe_output.get("VideoDescription", {})
+            width = video_desc.get("Width")
+            height = video_desc.get("Height")
+
+            try:
+                head = s3_client.head_object(Bucket=out_bucket, Key=reframe_path)
+                reframe_size = head["ContentLength"]
+            except ClientError as e:
+                logger.error(f"Failed to get reframe file size for {reframe_path}: {e}")
+                raise
+
+            derived_id = (
+                job_user_metadata.get("medialake_derived_id") or f"{asset_id}:smartcrop"
+            )
+            reframe_rep: Dict[str, Any] = {
+                "ID": derived_id,
+                "Type": "Video",
+                "Format": "MP4",
+                "Purpose": "smartcrop",
+                "StorageInfo": {
+                    "PrimaryLocation": {
+                        "Bucket": out_bucket,
+                        "ObjectKey": {"FullPath": reframe_path},
+                        "FileInfo": {"Size": reframe_size},
+                        "Provider": "aws",
+                        "Status": "active",
+                        "StorageType": "s3",
+                    }
+                },
+            }
+            aspect_ratio = job_user_metadata.get("medialake_aspect_ratio")
+            if aspect_ratio:
+                reframe_rep["AspectRatio"] = aspect_ratio
+            if width and height:
+                reframe_rep["VideoSpec"] = {
+                    "Resolution": {"Width": width, "Height": height}
+                }
+            segment = job_user_metadata.get("medialake_segment")
+            if segment:
+                reframe_rep["Segment"] = segment
+
+            # Idempotent append: skip if a rep with this ID already exists so
+            # re-running the same reframe doesn't create duplicate entries.
+            existing_item = table.get_item(Key={"InventoryID": clean_inv_id}).get(
+                "Item", {}
+            )
+            existing_reps = existing_item.get("DerivedRepresentations", []) or []
+            if any(r.get("ID") == reframe_rep["ID"] for r in existing_reps):
+                logger.info(
+                    "Reframe derived rep %s already present, skipping DynamoDB update",
+                    reframe_rep["ID"],
+                )
+            else:
+                table.update_item(
+                    Key={"InventoryID": clean_inv_id},
+                    UpdateExpression=(
+                        "SET DerivedRepresentations = "
+                        "list_append(if_not_exists(DerivedRepresentations, :empty), :r)"
+                    ),
+                    ExpressionAttributeValues={":r": [reframe_rep], ":empty": []},
+                    ReturnValues="UPDATED_NEW",
+                )
+
+            updated_item = table.get_item(Key={"InventoryID": clean_inv_id}).get(
+                "Item", {}
+            )
+            result["updatedAsset"] = _strip_decimals(updated_item)
+            return result
+
         reps: List[Dict[str, Any]] = []
         if media_type == "Video":
             proxy_group = response["Job"]["Settings"]["OutputGroups"][0]

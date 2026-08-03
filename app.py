@@ -487,6 +487,7 @@ class MediaLakeStack(cdk.Stack):
                 collection_endpoint=props.base_infrastructure.collection_endpoint,
                 mediaconvert_queue_arn=nodes_stack.mediaconvert_queue_arn,
                 mediaconvert_role_arn=nodes_stack.mediaconvert_role_arn,
+                mediaconvert_reframe_queue_arn=nodes_stack.mediaconvert_reframe_queue_arn,
                 # S3 Vector configuration
                 s3_vector_bucket_name=props.base_infrastructure.s3_vector_bucket_name,
                 s3_vector_index_name=props.base_infrastructure.s3_vector_index_name,

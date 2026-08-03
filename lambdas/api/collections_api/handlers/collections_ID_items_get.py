@@ -3,12 +3,15 @@
 import os
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     create_error_response,
     create_success_response,
+    require_collection_view_access,
 )
 from db_models import CollectionItemModel
+from user_auth import extract_user_context
 from utils.formatting_utils import format_collection_item
 from utils.item_utils import ASSET_SK_PREFIX, ITEM_SK_PREFIX
 
@@ -27,6 +30,14 @@ def register_route(app):
     def collections_ID_items_get(collection_id: str):
         """Get collection items"""
         try:
+            user_context = extract_user_context(app.current_event.raw_event)
+            user_id = user_context.get("user_id")
+
+            # Object-level authorization: collection items are only visible
+            # when the collection is public, or the caller owns it or holds a
+            # share role. Denials surface as 404 to avoid leaking existence.
+            require_collection_view_access(collection_id, user_id)
+
             # Query for both old ITEM# and new ASSET# formats
             all_items = []
 
@@ -91,6 +102,8 @@ def register_route(app):
                 request_id=app.current_event.request_context.request_id,
             )
 
+        except NotFoundError:
+            raise
         except Exception as e:
             logger.exception("Error listing collection items", exc_info=e)
             return create_error_response(

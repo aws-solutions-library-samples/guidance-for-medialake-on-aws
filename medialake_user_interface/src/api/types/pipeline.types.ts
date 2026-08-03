@@ -187,8 +187,24 @@ export interface TriggerPipelineAsset {
   params?: Record<string, any>;
 }
 
+/**
+ * Optional execution-group settings for a trigger request. When present, all
+ * executions started by the request share a group key; when the group
+ * completes, its output artifacts are packaged into a downloadable zip
+ * (delivered through the existing bulk-download notification flow).
+ */
+export interface TriggerPipelineGroup {
+  /** Package output artifacts into a zip when the group completes. */
+  package?: boolean;
+  /** Derived-representation purposes to package (default: smartcrop). */
+  purposes?: string[];
+  /** Optional label shown in the packaged-download notification. */
+  name?: string;
+}
+
 export interface TriggerPipelineRequest {
   assets: TriggerPipelineAsset[];
+  group?: TriggerPipelineGroup;
 }
 
 export interface TriggerPipelineExecution {
@@ -207,4 +223,6 @@ export interface TriggerPipelineResponse {
   failed_executions: number;
   executions: TriggerPipelineExecution[];
   message: string;
+  /** Present when the request carried a group object. */
+  group_id?: string;
 }

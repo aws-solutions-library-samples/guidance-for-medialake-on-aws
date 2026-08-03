@@ -1,0 +1,414 @@
+{
+  "name": "Reframe with Elemental Inference",
+  "description": "Manual-trigger pipeline that reframes a video (or a selected video segment) to a vertical aspect ratio using AWS Elemental Inference smart cropping, then polls for completion. The reframed output is saved as a 'smartcrop' derived representation of the source asset. The manual trigger has 'Per Segment Execution' enabled so it can be launched on individual segments (AI or user markers) from the asset detail page, and on selected assets/segments from the bin. Choose the target aspect ratio (default 9:16) on the Video Reframe node. A Download Collector node on the success branch marks the reframed rendition as the pipeline's deliverable, so submitting a selection with 'package outputs for download' zips exactly those renditions — nothing else the asset happens to carry.",
+  "active": true,
+  "configuration": {
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 96
+        },
+        "data": {
+          "nodeId": "trigger_manual",
+          "label": "Manual Trigger (trigger)",
+          "description": "Trigger pipeline manually via API for on-demand execution",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "TRIGGER",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "trigger",
+            "parameters": {
+              "Supported Content Types": ["Video"],
+              "Per Segment Execution": true
+            },
+            "requestMapping": null,
+            "responseMapping": null
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "reframe_1",
+        "type": "custom",
+        "position": {
+          "x": 480,
+          "y": 256
+        },
+        "data": {
+          "nodeId": "video_reframe",
+          "label": "Video Reframe (reframe)",
+          "description": "Reframe a video (or a video segment) to a vertical aspect ratio using AWS Elemental Inference smart cropping.",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["video"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "reframe",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_REFRAME_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}",
+              "Aspect Ratio": "9:16"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "check_1",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "check_media_convert_status",
+          "label": "Check MediaConvert Status (extract)",
+          "description": "Checks MediaConvert Job Status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "extract",
+            "parameters": {
+              "MediaConvert Queue Arn": "${MEDIACONVERT_QUEUE_ARN}",
+              "MediaConvert Role Arn": "${MEDIACONVERT_ROLE_ARN}"
+            }
+          }
+        },
+        "width": 200,
+        "height": 100
+      },
+      {
+        "id": "choice_1",
+        "type": "custom",
+        "position": {
+          "x": 640,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "choice",
+          "label": "Choice",
+          "description": "This step will branch the workflow based on a condition",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "Completed",
+              "description": "Path taken when condition evaluates to true"
+            },
+            {
+              "name": "In Progress",
+              "description": "Path taken when condition evaluates to false"
+            },
+            {
+              "name": "Fail",
+              "description": "Path taken when condition evaluates to false"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "method": "choice",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "collect_1",
+        "type": "custom",
+        "position": {
+          "x": 896,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "download_collector",
+          "label": "Download Collector (collect)",
+          "description": "Marks the reframed rendition as a deliverable so grouped runs package it for download.",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "UTILITY",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "collect",
+            "parameters": {
+              "Purposes": "smartcrop",
+              "Require Artifacts": "false"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "success_1",
+        "type": "custom",
+        "position": {
+          "x": 1152,
+          "y": 432
+        },
+        "data": {
+          "nodeId": "success",
+          "label": "Success",
+          "description": "This step will end the execution with a success status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "success",
+            "parameters": {}
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "wait_1",
+        "type": "custom",
+        "position": {
+          "x": 368,
+          "y": 592
+        },
+        "data": {
+          "nodeId": "wait",
+          "label": "Wait (wait)",
+          "description": "This step will wait for a specific duration before moving to the next step",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [
+            {
+              "name": "any",
+              "description": "Output type: any"
+            }
+          ],
+          "type": "FLOW",
+          "configuration": {
+            "path": "",
+            "operationId": "",
+            "method": "wait",
+            "parameters": {
+              "Duration": "30"
+            }
+          }
+        },
+        "width": 200,
+        "height": 113
+      },
+      {
+        "id": "fail_1",
+        "type": "custom",
+        "position": {
+          "x": 896,
+          "y": 592
+        },
+        "data": {
+          "nodeId": "fail",
+          "label": "Fail (fail)",
+          "description": "This step will end the state machine execution with a failure status",
+          "icon": {
+            "key": null,
+            "ref": null,
+            "props": {
+              "size": 20
+            },
+            "_owner": null
+          },
+          "inputTypes": ["any"],
+          "outputTypes": [],
+          "type": "FLOW",
+          "configuration": {
+            "method": "fail",
+            "parameters": {
+              "Error": "Failed",
+              "Cause": "Reframe job failed"
+            },
+            "path": "",
+            "operationId": ""
+          }
+        },
+        "width": 200,
+        "height": 113
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-reframe_1",
+        "source": "trigger_1",
+        "target": "reframe_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-video"
+      },
+      {
+        "id": "reframe_1-check_1",
+        "source": "reframe_1",
+        "target": "check_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "check_1-choice_1",
+        "source": "check_1",
+        "target": "choice_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "choice_1-collect_1",
+        "source": "choice_1",
+        "target": "collect_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Completed",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "collect_1-success_1",
+        "source": "collect_1",
+        "target": "success_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "choice_1-wait_1",
+        "source": "choice_1",
+        "target": "wait_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "In Progress",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "choice_1-fail_1",
+        "source": "choice_1",
+        "target": "fail_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "Fail",
+        "targetHandle": "input-any"
+      },
+      {
+        "id": "wait_1-check_1",
+        "source": "wait_1",
+        "target": "check_1",
+        "type": "custom",
+        "data": {
+          "text": "Connected"
+        },
+        "sourceHandle": "any",
+        "targetHandle": "input-any"
+      }
+    ],
+    "settings": {
+      "autoStart": false,
+      "retryAttempts": 3,
+      "timeout": 3600
+    }
+  }
+}

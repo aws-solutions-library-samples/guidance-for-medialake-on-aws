@@ -2897,7 +2897,9 @@ class AssetsConstruct(Construct):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=["arn:aws:s3:::*"],
+                # Object-level ARN is required for Get/PutObject; a bucket-only
+                # ARN makes MediaConvert fail with "Access Denied" on write.
+                resources=["arn:aws:s3:::*", "arn:aws:s3:::*/*"],
             )
         )
 
@@ -2962,7 +2964,9 @@ class AssetsConstruct(Construct):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=["arn:aws:s3:::*"],
+                # Object-level ARN is required for Get/PutObject; a bucket-only
+                # ARN makes MediaConvert fail with "Access Denied" on write.
+                resources=["arn:aws:s3:::*", "arn:aws:s3:::*/*"],
             )
         )
 
@@ -3027,7 +3031,9 @@ class AssetsConstruct(Construct):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=["arn:aws:s3:::*"],
+                # Object-level ARN is required for Get/PutObject; a bucket-only
+                # ARN makes MediaConvert fail with "Access Denied" on write.
+                resources=["arn:aws:s3:::*", "arn:aws:s3:::*/*"],
             )
         )
 

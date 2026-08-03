@@ -15,6 +15,26 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["PIPELINES_EXECUTIONS_TABLE_NAME"])
 
+# Low-level client for transactions. NOTE: must be a plain client — the
+# resource's meta.client re-serializes attribute values and corrupts
+# low-level {"S": ...} parameters (same convention as upload_session's
+# session_store).
+dynamodb_client = boto3.client("dynamodb")
+
+# Pipeline execution groups table (optional — set when the group feature is
+# deployed). Executions carrying a group_id in their input are counted
+# against their group so the group finalizer can package outputs when the
+# last member finishes.
+GROUPS_TABLE_NAME = os.environ.get("PIPELINE_GROUPS_TABLE_NAME", "")
+
+# Statuses that end an execution
+TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED")
+
+GROUP_STATUS_OPEN = "OPEN"
+GROUP_STATUS_COMPLETED = "COMPLETED"
+GROUP_STATUS_COMPLETED_WITH_FAILURES = "COMPLETED_WITH_FAILURES"
+GROUP_STATUS_FAILED = "FAILED"
+
 logger = Logger(service="pipelines_executions_event_processor")
 tracer = Tracer(service="pipelines_executions_event_processor")
 metrics = Metrics(
@@ -108,6 +128,33 @@ def store_execution_details(item: Dict[str, Any]) -> None:
     table.put_item(Item=item)
 
 
+def _parse_manual_trigger_input(nested: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract fields from a manual-trigger execution input.
+
+    The manual trigger API starts executions with
+    ``{"item": {"inventory_id", "params"}, "pipeline_id", "trigger_type"}``.
+    Captures the asset id, trigger type, and — when the request was grouped —
+    the shared group key, so grouped executions can be counted against their
+    group on terminal events.
+    """
+    fields: Dict[str, Any] = {}
+
+    item = nested.get("item")
+    if isinstance(item, dict):
+        if item.get("inventory_id"):
+            fields["inventory_id"] = item["inventory_id"]
+        params = item.get("params")
+        if isinstance(params, dict) and params.get("group_id"):
+            fields["group_id"] = params["group_id"]
+
+    for key in ("pipeline_id", "trigger_type"):
+        if nested.get(key):
+            fields[key] = nested[key]
+
+    return fields
+
+
 def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
     nested_fields: Dict[str, Any] = {}
     try:
@@ -117,6 +164,8 @@ def parse_nested_metadata(detail_input_str: str) -> Dict[str, Any]:
             f"parse_nested_metadata: could not parse detail.input as JSON: {e}"
         )
         return nested_fields
+
+    nested_fields.update(_parse_manual_trigger_input(nested))
 
     detail1 = nested.get("detail", {})
 
@@ -170,6 +219,162 @@ def fetch_parent_by_trace_id(
     except Exception as e:
         logger.warning(f"fetch_parent_by_trace_id: {e}")
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline execution groups (fan-in)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _group_terminal_status(completed_count: int, failed_count: int) -> str:
+    if failed_count == 0:
+        return GROUP_STATUS_COMPLETED
+    if completed_count == 0:
+        return GROUP_STATUS_FAILED
+    return GROUP_STATUS_COMPLETED_WITH_FAILURES
+
+
+@tracer.capture_method
+def count_group_member_terminal(
+    group_id: str,
+    execution_id: str,
+    status: str,
+    inventory_id: Optional[str],
+) -> bool:
+    """
+    Count a member execution's terminal state against its group, exactly once.
+
+    A single transaction claims the member item (conditional on countedAt not
+    existing — EventBridge delivers at-least-once, so duplicate terminal
+    events must not double-count) and increments the group META counters
+    (conditional on the group still being OPEN). If either condition fails
+    the whole transaction cancels and the group state is untouched.
+
+    Returns True when the member was counted, False when skipped.
+    """
+    if not GROUPS_TABLE_NAME:
+        return False
+
+    outcome_counter = "completedCount" if status == "SUCCEEDED" else "failedCount"
+    now_iso = datetime.utcnow().isoformat()
+    client = dynamodb_client
+
+    try:
+        client.transact_write_items(
+            TransactItems=[
+                {
+                    "Update": {
+                        "TableName": GROUPS_TABLE_NAME,
+                        "Key": {
+                            "PK": {"S": f"GROUP#{group_id}"},
+                            "SK": {"S": f"EXEC#{execution_id}"},
+                        },
+                        "UpdateExpression": (
+                            "SET countedAt = :now, #st = :status, "
+                            "inventoryId = if_not_exists(inventoryId, :inv)"
+                        ),
+                        "ConditionExpression": "attribute_not_exists(countedAt)",
+                        "ExpressionAttributeNames": {"#st": "status"},
+                        "ExpressionAttributeValues": {
+                            ":now": {"S": now_iso},
+                            ":status": {"S": status},
+                            ":inv": {"S": inventory_id or "unknown"},
+                        },
+                    }
+                },
+                {
+                    "Update": {
+                        "TableName": GROUPS_TABLE_NAME,
+                        "Key": {
+                            "PK": {"S": f"GROUP#{group_id}"},
+                            "SK": {"S": "META"},
+                        },
+                        "UpdateExpression": (
+                            f"ADD resolvedCount :one, {outcome_counter} :one "
+                            "SET updatedAt = :now"
+                        ),
+                        "ConditionExpression": "attribute_exists(PK) AND #st = :open",
+                        "ExpressionAttributeNames": {"#st": "status"},
+                        "ExpressionAttributeValues": {
+                            ":one": {"N": "1"},
+                            ":open": {"S": GROUP_STATUS_OPEN},
+                            ":now": {"S": now_iso},
+                        },
+                    }
+                },
+            ]
+        )
+        metrics.add_metric(name="GroupMembersCounted", unit="Count", value=1)
+        return True
+    except client.exceptions.TransactionCanceledException as e:
+        # Expected for duplicate terminal events (member already counted) or
+        # groups already closed (sweeper timeout). Not an error.
+        logger.info(
+            "Group member count skipped",
+            extra={
+                "group_id": group_id,
+                "execution_id": execution_id,
+                "reasons": [
+                    r.get("Code") for r in e.response.get("CancellationReasons", [])
+                ],
+            },
+        )
+        return False
+    except Exception as e:
+        logger.warning(
+            f"Group member count failed: {e}",
+            extra={"group_id": group_id, "execution_id": execution_id},
+        )
+        return False
+
+
+@tracer.capture_method
+def attempt_group_terminal_transition(group_id: str) -> None:
+    """
+    Transition the group META item OPEN → terminal once every member has
+    resolved. The conditional update guarantees exactly one writer wins; the
+    groups-table stream fires the finalizer off that single transition.
+    """
+    if not GROUPS_TABLE_NAME:
+        return
+
+    groups_table = dynamodb.Table(GROUPS_TABLE_NAME)
+    try:
+        meta = groups_table.get_item(
+            Key={"PK": f"GROUP#{group_id}", "SK": "META"},
+            ConsistentRead=True,
+        ).get("Item")
+        if not meta or meta.get("status") != GROUP_STATUS_OPEN:
+            return
+        if int(meta.get("resolvedCount", 0)) < int(meta.get("expectedCount", 0)):
+            return
+
+        terminal = _group_terminal_status(
+            int(meta.get("completedCount", 0)), int(meta.get("failedCount", 0))
+        )
+        groups_table.update_item(
+            Key={"PK": f"GROUP#{group_id}", "SK": "META"},
+            UpdateExpression="SET #st = :terminal, updatedAt = :now",
+            ConditionExpression="#st = :open AND resolvedCount >= expectedCount",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={
+                ":terminal": terminal,
+                ":open": GROUP_STATUS_OPEN,
+                ":now": datetime.utcnow().isoformat(),
+            },
+        )
+        logger.info(
+            "Group transitioned to terminal status",
+            extra={"group_id": group_id, "terminal_status": terminal},
+        )
+        metrics.add_metric(name="GroupsCompleted", unit="Count", value=1)
+    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+        pass  # another writer already transitioned the group
+    except Exception as e:
+        logger.warning(
+            f"Group terminal transition attempt failed: {e}",
+            extra={"group_id": group_id},
+        )
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -298,6 +503,20 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     base_item["cause"] = detail["cause"]
 
         store_execution_details(base_item)
+
+        # ── Group fan-in ──
+        # When a grouped execution reaches a terminal state, count it against
+        # its group and close the group if it was the last member.
+        group_id = base_item.get("group_id")
+        if group_id and status in TERMINAL_STATUSES:
+            counted = count_group_member_terminal(
+                group_id=group_id,
+                execution_id=execution_id,
+                status=status,
+                inventory_id=base_item.get("inventory_id"),
+            )
+            if counted:
+                attempt_group_terminal_transition(group_id)
 
         metrics.add_metric(name="SuccessfulExecutionUpdates", unit="Count", value=1)
         if base_item.get("duration_seconds") is not None:

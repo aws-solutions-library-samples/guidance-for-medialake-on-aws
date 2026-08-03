@@ -1,0 +1,86 @@
+spec: v1.0.0
+node:
+  id: download_collector
+  title: Download Collector
+  description: >-
+    Marks the outputs of the branch it sits on as deliverables. When the
+    pipeline is launched as a download group (packaged submission from the bin),
+    every artifact this node collects is zipped and delivered to the user once
+    the last execution in the group finishes. On ungrouped runs the node does
+    nothing. Place it on the success path, after the node that creates the
+    artifact.
+  version: 1.0.0
+  type: utility
+  integration:
+    config:
+      lambda:
+        handler: utility/DownloadCollectorLambdaDeployment
+        runtime: python3.12
+        timeout: 60
+        iam_policy:
+          statements:
+            - effect: Allow
+              actions:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              resources:
+                - "*"
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              resources:
+                - ${PIPELINE_GROUPS_TABLE_ARN}
+                - ${PIPELINE_GROUPS_TABLE_ARN}/index/*
+            - effect: Allow
+              actions:
+                - dynamodb:GetItem
+              resources:
+                - ${MEDIALAKE_ASSET_TABLE}
+actions:
+  collect:
+    summary: Collect Outputs for Download
+    description: >-
+      Registers this branch's output representations against the run's download
+      group so they are packaged for download.
+    operationId: collectForDownload
+    parameters:
+      - in: body
+        name: Purposes
+        label: Representation Purposes
+        description: >-
+          Comma-separated derived-representation purposes to deliver, e.g.
+          "smartcrop" or "proxy, transcode". This is what makes the node
+          selective: only representations with these purposes are packaged, so
+          a pipeline that also writes proxies or thumbnails does not ship them.
+          Leave empty to collect whatever representations the run added to the
+          asset.
+        placeholder: "smartcrop"
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Require Artifacts
+        label: Fail If Nothing Collected
+        description: >-
+          Fail the execution when no artifact could be collected instead of
+          finishing quietly. Useful while building a pipeline — an empty
+          collection usually means the upstream node did not record its output
+          as a derived representation, or the purposes above do not match it.
+        required: false
+        schema:
+          type: select
+          options:
+            - label: "No"
+              value: "false"
+            - label: "Yes"
+              value: "true"
+          default: "false"
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]

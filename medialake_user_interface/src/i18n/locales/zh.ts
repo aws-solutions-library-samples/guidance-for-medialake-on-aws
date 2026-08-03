@@ -1004,6 +1004,9 @@ export default {
         pipelineNotFound: "未找到管道",
         insufficientPermissions: "您没有执行此管道的权限",
         noAssetsSelected: "未选择用于管道执行的资产",
+        packageOutputs: "完成后将输出打包以供下载",
+        packageOutputsHint:
+          "将所选资产作为一个组运行。当所有执行完成后，管道创建的所有新输出文件会被压缩为 ZIP，并通过下载通知提供。",
       },
     },
     confirmBulkDelete: "确认批量删除",
@@ -1619,6 +1622,19 @@ export default {
     tabs: {
       markers: "标记",
     },
+    cropSize: "裁剪：",
+    segmentDuration: "时长：",
+    fullLength: "完整时长",
+    viewing: "正在查看",
+    view: "查看",
+  },
+  segmentWorkflows: {
+    header: "在片段上运行",
+    runButton: "运行",
+    menuTooltip: "在此片段上运行工作流",
+    started: "已在片段上启动“{{name}}”",
+    failed: "启动工作流失败",
+    forbidden: "您没有运行此工作流的权限",
   },
   fileUpload: {
     errorMessages: {

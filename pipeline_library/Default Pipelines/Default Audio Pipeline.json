@@ -328,7 +328,7 @@
           "text": "to Audio Metadata",
           "id": "dndnode_0-dndnode_1"
         },
-        "sourceHandle": "audio",
+        "sourceHandle": "any",
         "targetHandle": "input-audio"
       },
       {

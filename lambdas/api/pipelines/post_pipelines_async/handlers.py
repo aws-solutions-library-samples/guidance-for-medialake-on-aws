@@ -12,8 +12,9 @@ from aws_lambda_powertools.event_handler.api_gateway import (
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from models import PipelineDefinition
-from pipeline_utils import determine_pipeline_type
+from pipeline_utils import determine_pipeline_type, normalize_pipeline_definition
 from portal_validation import validate_portal_config
+from pydantic import ValidationError
 
 # Initialize AWS Lambda Powertools utilities
 logger = Logger()
@@ -447,10 +448,28 @@ def create_pipeline() -> Dict[str, Any]:
     """
     try:
         logger.info("Received request to create/update a pipeline")
-        request_data = app.current_event.json_body
+        # Normalize before validating so definitions authored outside the editor
+        # (pipeline_library templates, scripts, curl) are accepted the same way
+        # the editor's own payloads are. The normalized copy is what we hand to
+        # the state machine, so every downstream step sees one canonical shape.
+        request_data = normalize_pipeline_definition(app.current_event.json_body)
 
         # Validate the pipeline definition
-        pipeline = PipelineDefinition(**request_data)
+        try:
+            pipeline = PipelineDefinition(**request_data)
+        except ValidationError as ve:
+            details = [
+                {
+                    "field": ".".join(str(part) for part in error["loc"]),
+                    "message": error["msg"],
+                }
+                for error in ve.errors()
+            ]
+            logger.info(f"Rejecting pipeline - invalid definition: {details}")
+            return _api_response(
+                400,
+                {"error": "Invalid pipeline definition", "details": details},
+            )
         logger.debug(f"Pipeline configuration: {pipeline}")
 
         pipeline_name = pipeline.name

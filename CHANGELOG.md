@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.19.0] - 2026-07-31
+
+### Features
+
+- feat: Elemental Inference integration for reframing and user download of produced assets in a pipeline manually executed + fix: dynamic indexing causing type issues
+
+### Bug Fixes
+
+- fix: collection API permissions
+
 ## [1.18.3] - 2026-07-14
 
 ### Bug Fixes

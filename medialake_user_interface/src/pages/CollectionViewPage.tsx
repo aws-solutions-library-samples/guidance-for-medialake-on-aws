@@ -1530,10 +1530,11 @@ const CollectionViewPage: React.FC = () => {
         <PipelineExecutionConfirmDialog
           open={assetSelection.isPipelineExecutionDialogOpen}
           onClose={assetSelection.handlePipelineExecutionDialogClose}
-          onConfirm={() =>
+          onConfirm={(options) =>
             assetSelection.selectedPipelineForExecution &&
             assetSelection.handleBatchPipelineExecution(
-              assetSelection.selectedPipelineForExecution.id
+              assetSelection.selectedPipelineForExecution.id,
+              options
             )
           }
           pipelineName={assetSelection.selectedPipelineForExecution?.name || ""}

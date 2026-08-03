@@ -37,6 +37,13 @@ actions:
               value: Audio
             - label: Image
               value: Image
+      - name: "Per Segment Execution"
+        label: "Per Segment Execution"
+        required: false
+        description: When enabled, this pipeline can be run on an individual video segment (an AI or user marker) from the asset detail page. The selected segment's time range (and, for reframe pipelines, the aspect ratio) are passed to the pipeline as per-run parameters.
+        schema:
+          type: boolean
+          default: false
 
 connections:
   incoming:

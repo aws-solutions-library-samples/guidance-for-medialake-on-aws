@@ -55,6 +55,7 @@ class PipelineStackProps:
     collection_endpoint: str
     mediaconvert_queue_arn: str
     mediaconvert_role_arn: str
+    mediaconvert_reframe_queue_arn: str
     # S3 Vector configuration
     s3_vector_bucket_name: str
     s3_vector_index_name: str = "media-vectors"
@@ -96,6 +97,8 @@ class PipelineStack(cdk.NestedStack):
             "PipelinesExecutions",
             props=PipelinesExecutionsStackProps(
                 x_origin_verify_secret=props.x_origin_verify_secret,
+                asset_table=props.asset_table,
+                pipelines_event_bus=props.pipelines_event_bus,
             ),
         )
 
@@ -113,6 +116,7 @@ class PipelineStack(cdk.NestedStack):
                 integrations_table=props.integrations_table,
                 mediaconvert_queue_arn=props.mediaconvert_queue_arn,
                 mediaconvert_role_arn=props.mediaconvert_role_arn,
+                mediaconvert_reframe_queue_arn=props.mediaconvert_reframe_queue_arn,
                 iac_assets_bucket=props.iac_assets_bucket,
                 external_payload_bucket=props.external_payload_bucket,
                 pipelines_nodes_templates_bucket=props.pipelines_nodes_templates_bucket,
@@ -123,6 +127,7 @@ class PipelineStack(cdk.NestedStack):
                 media_assets_bucket=props.media_assets_bucket,
                 get_pipelines_executions_lambda=self._pipelines_executions_stack.get_pipelines_executions_lambda,
                 post_retry_pipelines_executions_lambda=self._pipelines_executions_stack.post_retry_pipelines_executions_lambda,
+                pipeline_groups_table=self._pipelines_executions_stack.pipeline_groups_table,
                 # S3 Vector configuration
                 s3_vector_bucket_name=props.s3_vector_bucket_name,
                 s3_vector_index_name=props.s3_vector_index_name,

@@ -172,6 +172,39 @@ class BaseInfrastructureStack(Stack):
                 "MediaLakeSecurityGroup",
                 security_group_id=config.vpc.security_groups.existing_groups.media_lake_sg,
             )
+
+            # TRANSITIONAL EXPORT PIN — do not remove until no deployed stack
+            # imports it (check CloudFormation -> Exports -> Imports).
+            #
+            # Deployments that previously ran with use_existing_groups=False
+            # created this security group in-stack, and CDK auto-exported its
+            # GroupId because the MediaLakeStack nested stacks (ApiGateway,
+            # Pipeline) consume it via Fn::ImportValue. Switching to an
+            # imported SG drops that auto-export, and CloudFormation refuses
+            # to delete an export that deployed stacks still import
+            # ("Cannot delete export ... as it is in use by ...").
+            #
+            # Re-creating the export here with the SAME name and SAME value
+            # keeps CloudFormation satisfied while the consumer stacks are
+            # updated to reference the SG by literal ID. Once all consumers
+            # are redeployed, this output can be deleted in a follow-up
+            # release.
+            #
+            # NOTE: the exported value must EXACTLY match the value currently
+            # exported by the deployed stack (the GroupId of the SG that the
+            # stack used to own). CloudFormation also rejects changing an
+            # in-use export's value.
+            CfnOutput(
+                self,
+                "LegacyMediaLakeSecurityGroupIdExport",
+                value=config.vpc.security_groups.existing_groups.media_lake_sg,
+                export_name=f"{Stack.of(self).stack_name}:ExportsOutputFnGetAttMediaLakeSecurityGroup5A91D11FGroupId8FF30EA9",
+                description=(
+                    "Transitional pin of the legacy security-group GroupId "
+                    "auto-export; remove after all consumer stacks reference "
+                    "the security group by ID."
+                ),
+            )
         else:
             self._security_group = ec2.SecurityGroup(
                 self,
@@ -509,7 +542,14 @@ class BaseInfrastructureStack(Stack):
                 security_group=self._security_group,
                 batch_size=250,  # Bulk API batch size (reduced from 500)
                 max_batch_size=500,  # DynamoDB stream batch size (reduced from 1000)
-                reserved_concurrency=3,  # Limit concurrent executions (reduced from 10)
+                # 2026-07-23: raised from 3 -> 10 and added parallelization.
+                # At concurrency 3 x parallelization 1 the indexer topped out
+                # around ~50 docs/sec while prd ingests ~2.9M docs/day, so the
+                # stream iterator aged 6-9.6 hours and new assets took hours
+                # to appear in search. OpenSearch 429s are handled by the
+                # lambda's backoff + the (now faster-failing) retry decorator.
+                reserved_concurrency=10,
+                parallelization_factor=10,
             ),
         )
 
