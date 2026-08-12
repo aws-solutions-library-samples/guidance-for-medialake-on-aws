@@ -16,7 +16,17 @@ interface PipelineError {
 const PIPELINES_QUERY_KEYS = {
   all: ["pipelines"] as const,
   list: () => [...PIPELINES_QUERY_KEYS.all, "list"] as const,
+  optionalList: () => [...PIPELINES_QUERY_KEYS.all, "list", "optional"] as const,
   detail: (id: string) => [...PIPELINES_QUERY_KEYS.all, "detail", id] as const,
+};
+
+const EMPTY_PIPELINES_RESPONSE: PipelinesResponse = {
+  status: "200",
+  message: "ok",
+  data: {
+    searchMetadata: { totalResults: 0, pageSize: 0, nextToken: null },
+    s: [],
+  },
 };
 
 export const useGetPipelines = (
@@ -30,6 +40,46 @@ export const useGetPipelines = (
     gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    ...options,
+  });
+};
+
+/**
+ * List pipelines from a surface where pipelines are *optional* — i.e. the
+ * feature is a bonus on a screen that must keep working without it (the batch
+ * operations sidebar being the motivating case).
+ *
+ * Differences from `useGetPipelines`:
+ *  - Callers are expected to pass `enabled` from a permission check so no
+ *    request is made at all when the user lacks `pipelines:view`.
+ *  - A 403 resolves to an empty list instead of tripping the global
+ *    /access-denied redirect, so a stale token or a frontend/authorizer
+ *    permission mismatch can't eject the user from the page they are on.
+ *  - No background polling — these surfaces only need the list once.
+ *
+ * It deliberately uses its own query key so this tolerant behaviour never
+ * leaks into the pipelines management screens, which should surface real errors.
+ */
+export const useGetPipelinesOptional = (
+  options?: Omit<UseQueryOptions<PipelinesResponse, PipelineError>, "queryKey" | "queryFn">
+) => {
+  return useQuery({
+    queryKey: PIPELINES_QUERY_KEYS.optionalList(),
+    queryFn: async () => {
+      try {
+        return await PipelinesService.getPipelines({
+          skipAccessDeniedRedirect: true,
+        });
+      } catch (error) {
+        if ((error as { response?: { status?: number } })?.response?.status === 403) {
+          return EMPTY_PIPELINES_RESPONSE;
+        }
+        throw error;
+      }
+    },
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
     ...options,
   });
 };
