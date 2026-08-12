@@ -20,14 +20,14 @@ const PIPELINES_QUERY_KEYS = {
   detail: (id: string) => [...PIPELINES_QUERY_KEYS.all, "detail", id] as const,
 };
 
-const EMPTY_PIPELINES_RESPONSE: PipelinesResponse = {
+const emptyPipelinesResponse = (): PipelinesResponse => ({
   status: "200",
   message: "ok",
   data: {
     searchMetadata: { totalResults: 0, pageSize: 0, nextToken: null },
     s: [],
   },
-};
+});
 
 export const useGetPipelines = (
   options?: Omit<UseQueryOptions<PipelinesResponse, PipelineError>, "queryKey" | "queryFn">
@@ -72,7 +72,9 @@ export const useGetPipelinesOptional = (
         });
       } catch (error) {
         if ((error as { response?: { status?: number } })?.response?.status === 403) {
-          return EMPTY_PIPELINES_RESPONSE;
+          // Fresh object per call — a shared constant could be mutated by a
+          // consumer and would then poison every later 403.
+          return emptyPipelinesResponse();
         }
         throw error;
       }

@@ -99,9 +99,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
 
   // `canDelete` is supplied by the parent (it already derives it from
   // useActionPermission("delete", "asset")) so per-page overrides keep working.
-  const showDownloadAction = canDownload;
-  const showDeleteAction = canDelete;
-  const hasQuickActions = showDownloadAction || showDeleteAction;
+  const hasQuickActions = canDownload || canDelete;
 
   const { data: pipelinesData, isLoading: isPipelinesLoading } = useGetPipelinesOptional({
     enabled: canUsePipelines,
@@ -245,7 +243,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             empty flex child is left behind pushing the layout around. */}
         {hasQuickActions && (
           <Box sx={{ display: "flex", gap: 0.25, flexShrink: 0 }}>
-            {showDownloadAction && (
+            {canDownload && (
               <Tooltip title={t("common.actions.downloadSelected")} arrow>
                 <span>
                   <IconButton
@@ -270,7 +268,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                 </span>
               </Tooltip>
             )}
-            {showDeleteAction && (
+            {canDelete && (
               <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
                 <span>
                   <IconButton
