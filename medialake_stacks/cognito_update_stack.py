@@ -68,6 +68,8 @@ class CognitoUpdateStack(Stack):
         pre_token_env_vars = {
             **common_env_vars,
             "DEBUG_MODE": "true",
+            # Default group assigned to federated (SAML) users on first login.
+            "DEFAULT_FEDERATED_GROUP": "read-only",
         }
 
         self._pre_token_generation_lambda = Lambda(
@@ -96,6 +98,15 @@ class CognitoUpdateStack(Stack):
                     "dynamodb:Scan",
                 ],
                 resources=[auth_table_arn],
+            )
+        )
+
+        # Allow the pre-token Lambda to auto-provision federated (SAML) users
+        # into a default group on first login.
+        self._pre_token_generation_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["cognito-idp:AdminAddUserToGroup"],
+                resources=[props.cognito_user_pool_arn],
             )
         )
 
