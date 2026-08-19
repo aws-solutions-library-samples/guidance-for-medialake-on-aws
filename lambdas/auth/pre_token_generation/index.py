@@ -21,11 +21,33 @@ logger = Logger()
 
 # Initialize clients
 dynamodb = boto3.resource("dynamodb")
+cognito_idp = boto3.client("cognito-idp")
 
 # Get environment variables
 AUTH_TABLE_NAME = os.environ.get("AUTH_TABLE_NAME")
+COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID")
+# Group that federated (external IdP / SAML) users are auto-assigned on first
+# login when they belong to no group yet. Configurable via env var.
+DEFAULT_FEDERATED_GROUP = os.environ.get("DEFAULT_FEDERATED_GROUP", "read-only")
 
 auth_table = dynamodb.Table(AUTH_TABLE_NAME)
+
+
+def is_federated_user(user_attributes: Dict[str, Any]) -> bool:
+    """
+    Determine whether the user signing in came from an external identity
+    provider (e.g. SAML / BethelSSO) rather than the native Cognito directory.
+
+    Cognito sets an ``identities`` attribute on external-provider users and
+    prefixes their username with the provider name (e.g. ``BethelSSO_<id>``).
+    Either signal is sufficient; ``identities`` is the primary one.
+    """
+    if user_attributes.get("identities"):
+        return True
+
+    # Fallback: external-provider users report an EXTERNAL_PROVIDER status.
+    status = user_attributes.get("cognito:user_status", "")
+    return status.upper() == "EXTERNAL_PROVIDER"
 
 
 def get_user_groups(user_id: str, cognito_groups: List[str] = None) -> List[str]:
@@ -251,6 +273,43 @@ def handler(event, context):
         # Get all user groups (combining DynamoDB and Cognito)
         groups = get_user_groups(user_id, cognito_groups)
         logger.info(f"Combined user groups: {groups}")
+
+        # Auto-provision federated (SAML / external IdP) users on first login.
+        # These users are created in Cognito when their assertion is accepted but
+        # belong to no group, so they'd otherwise receive an empty permissions
+        # claim and be denied by the API authorizer. Assign a default group so
+        # they get baseline access and show up (with a group) in the admin UI;
+        # an admin can then promote them.
+        #
+        # Gated strictly on "federated AND no groups" so native users are never
+        # affected — native users are assigned a group at creation time.
+        if not groups and is_federated_user(user_attributes):
+            try:
+                # Use event["userName"] (the Cognito username, e.g.
+                # "BethelSSO_<id>") for the admin call; user_id (sub) is used for
+                # the DynamoDB permission lookups above.
+                cognito_idp.admin_add_user_to_group(
+                    UserPoolId=COGNITO_USER_POOL_ID,
+                    Username=event["userName"],
+                    GroupName=DEFAULT_FEDERATED_GROUP,
+                )
+                logger.info(
+                    "Auto-provisioned federated user %s into default group '%s'",
+                    event["userName"],
+                    DEFAULT_FEDERATED_GROUP,
+                )
+                # admin_add_user_to_group does not affect the groupsToOverride
+                # already computed for THIS invocation, so add the group in-memory
+                # so the current token carries it (and its permissions) too.
+                groups.append(DEFAULT_FEDERATED_GROUP)
+            except Exception as e:
+                # Never fail token generation because of provisioning; the user
+                # simply gets no permissions this round and can be assigned a
+                # group manually.
+                logger.error(
+                    f"Failed to auto-provision federated user into "
+                    f"'{DEFAULT_FEDERATED_GROUP}': {str(e)}"
+                )
 
         # Get user permissions based on groups
         try:
