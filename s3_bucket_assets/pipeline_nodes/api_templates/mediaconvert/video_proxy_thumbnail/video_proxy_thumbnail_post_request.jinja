@@ -20,6 +20,7 @@
               "CodecSettings": {
                 "Codec": "H_264",
                 "H264Settings": {
+                  "FramerateControl": "INITIALIZE_FROM_SOURCE",
                   "MaxBitrate": {{ (variables.proxy_max_kbps | default(1500)) * 1000 }},
                   "RateControlMode": "QVBR",
                   "SceneChangeDetect": "TRANSITION_DETECTION",
@@ -33,7 +34,7 @@
               },
               "VideoPreprocessors": {
                 "Deinterlacer": {
-                  "Mode": "DEINTERLACE",
+                  "Mode": "ADAPTIVE",
                   "Algorithm": "INTERPOLATE"
                 }
               }
