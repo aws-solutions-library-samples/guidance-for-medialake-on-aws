@@ -27,8 +27,15 @@ cognito_idp = boto3.client("cognito-idp")
 AUTH_TABLE_NAME = os.environ.get("AUTH_TABLE_NAME")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID")
 # Group that federated (external IdP / SAML) users are auto-assigned on first
-# login when they belong to no group yet. Configurable via env var.
+# login when they hold no app permission group yet. Configurable via env var.
 DEFAULT_FEDERATED_GROUP = os.environ.get("DEFAULT_FEDERATED_GROUP", "read-only")
+
+# Media Lake's permission-granting groups (seeded in auth_seeder). Cognito also
+# auto-adds every federated user to an IdP group named "<userPoolId>_<provider>"
+# (e.g. "us-east-1_XXXX_BethelSSO"), which grants no permissions. Auto-provision
+# must key off the presence of one of THESE groups, not "any group", otherwise
+# the ever-present IdP group suppresses provisioning.
+APP_PERMISSION_GROUPS = {"superAdministrators", "editors", "read-only"}
 
 auth_table = dynamodb.Table(AUTH_TABLE_NAME)
 
@@ -276,14 +283,18 @@ def handler(event, context):
 
         # Auto-provision federated (SAML / external IdP) users on first login.
         # These users are created in Cognito when their assertion is accepted but
-        # belong to no group, so they'd otherwise receive an empty permissions
-        # claim and be denied by the API authorizer. Assign a default group so
-        # they get baseline access and show up (with a group) in the admin UI;
-        # an admin can then promote them.
+        # hold no app permission group, so they'd otherwise receive an empty
+        # permissions claim and be denied by the API authorizer. Assign a default
+        # group so they get baseline access and show up (with a group) in the
+        # admin UI; an admin can then promote them.
         #
-        # Gated strictly on "federated AND no groups" so native users are never
-        # affected — native users are assigned a group at creation time.
-        if not groups and is_federated_user(user_attributes):
+        # Gate on the absence of an APP permission group, NOT "no groups at all":
+        # Cognito always adds federated users to an IdP group
+        # ("<userPoolId>_<provider>"), so "if not groups" never fires for them.
+        # Native users are assigned an app group at creation, so they are never
+        # affected by this branch.
+        has_app_group = any(g in APP_PERMISSION_GROUPS for g in groups)
+        if is_federated_user(user_attributes) and not has_app_group:
             try:
                 # Use event["userName"] (the Cognito username, e.g.
                 # "BethelSSO_<id>") for the admin call; user_id (sub) is used for
