@@ -953,6 +953,8 @@ function handler(event) {
                         f"https://localhost:5173",
                         f"https://localhost:5173/",
                         f"https://localhost:5173/login",
+                        # DaVinci Resolve plugin loopback redirect
+                        "http://localhost:8712/callback",
                     ],
                     "LogoutURLs": [
                         f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com",
