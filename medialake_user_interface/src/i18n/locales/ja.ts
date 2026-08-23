@@ -8,6 +8,9 @@ export default {
     hindi: "ヒンディー語",
     arabic: "アラビア語",
     hebrew: "ヘブライ語",
+    spanish: "スペイン語",
+    japanese: "日本語",
+    korean: "韓国語",
   },
   assetsPage: {
     title: "アセット",
@@ -59,6 +62,21 @@ export default {
       emptySection: "コレクションなし",
       loading: "読み込み中\u2026",
       more: "もっと見る",
+    },
+    savedLocations: {
+      sectionTitle: "保存したアップロード先",
+      allDestinations: "すべてのアップロード先",
+      save: "このアップロード先を保存",
+      remove: "この保存したアップロード先を削除",
+      atCapacity: "アップロード先は最大 {{count}} 件まで保存できます",
+      collectionsUnavailable_one:
+        "このアップロード先に保存されていたコレクションは利用できなくなったため削除されました: {{names}}",
+      collectionsUnavailable_other:
+        "このアップロード先に保存されていた {{count}} 件のコレクションは利用できなくなったため削除されました: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "選択したコレクションは利用できないため適用されません: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "選択した {{count}} 件のコレクションは利用できないため適用されません: {{names}}",
     },
   },
   pathBrowser: {
@@ -844,7 +862,6 @@ export default {
   },
   roles: {
     title: "ロール管理",
-    description: "システムロールとその権限を管理",
     actions: {
       addRole: "ロールを追加",
     },
@@ -895,6 +912,24 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "メタデータフィールド",
+        jitProvisioning: "ユーザープロビジョニング",
+      },
+      jitProvisioning: {
+        title: "ジャストインタイム ユーザープロビジョニング",
+        description:
+          "外部 ID プロバイダー経由で初めてサインインしたユーザーに割り当てるグループを選択します。グループはユーザーごとに一度だけ適用されるため、後で別のグループに移動しても、その後のサインインで元に戻ることはありません。",
+        enabledLabel: "新しいフェデレーションユーザーにデフォルトグループを割り当てる",
+        defaultGroupLabel: "デフォルトグループ",
+        defaultGroupHelp:
+          "新しいフェデレーションユーザーは、初回サインイン時にこのグループの権限を受け取ります。",
+        groupRequired:
+          "ジャストインタイム プロビジョニングを有効にする前にグループを選択してください。",
+        noGroups: "利用可能なグループがありません",
+        capabilityDisabled:
+          "この環境ではジャストインタイム プロビジョニングが有効になっていません。デプロイ設定で authZ.jit_provisioning.enabled を設定し、再デプロイするとこの設定が有効になります。",
+        lastUpdated: "最終更新",
+        loadError: "ジャストインタイム プロビジョニングの設定を読み込めませんでした。",
+        saveSuccess: "ジャストインタイム プロビジョニングの設定を保存しました。",
       },
       search: {
         title: "検索設定",
@@ -1064,6 +1099,16 @@ export default {
     error: "エラー",
     language: "言語",
     noResults: "結果が見つかりません",
+    pagination: {
+      showingRange: "{{total}} 件中 {{first}} - {{last}} 件を表示",
+      showingFiltered: "フィルター結果 {{count}} 件を表示",
+      rowsPerPage: "1ページあたりの行数",
+      goToPage: "{{page}} ページ目へ移動",
+      first: "最初のページへ移動",
+      last: "最後のページへ移動",
+      next: "次のページへ移動",
+      previous: "前のページへ移動",
+    },
     selectFilter: "フィルターを選択",
     textFilter: "テキストフィルター",
     all: "すべて",
@@ -1248,8 +1293,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "編集 type",
       deleteType: "削除 type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "権限 set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1723,6 +1766,8 @@ export default {
       errorResettingPassword:
         "パスワードのリセットに失敗しました。コードを確認して再度お試しください。",
       passwordMismatch: "パスワードが一致しません。",
+      tempPasswordResent:
+        "アカウントには保留中の一時パスワードが残っているため、新しい一時パスワードをメールで送信しました。一時パスワードでサインインすると、永続的なパスワードの設定を求められます。",
     },
   },
   permissions: {

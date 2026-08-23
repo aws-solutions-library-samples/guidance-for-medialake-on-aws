@@ -98,7 +98,7 @@ export const CollectionGroupsList: React.FC<CollectionGroupsListProps> = ({
     }
   };
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (value: number) => {
     setPage(value);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

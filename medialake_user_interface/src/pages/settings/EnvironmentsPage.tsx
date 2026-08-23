@@ -7,6 +7,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   ColumnResizeMode,
   SortingState,
   ColumnFiltersState,
@@ -16,6 +17,7 @@ import { PageHeader, PageContent } from "@/components/common/layout";
 import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
 import { BaseFilterPopover } from "@/components/common/table/BaseFilterPopover";
 import { ColumnVisibilityMenu } from "@/components/common/table/ColumnVisibilityMenu";
+import { useTablePagination } from "@/components/common/table/useTablePagination";
 import EnvironmentList from "@/features/settings/environments/components/EnvironmentList";
 import { EnvironmentForm } from "@/features/settings/environments/components/EnvironmentForm";
 import ApiStatusModal from "@/components/ApiStatusModal";
@@ -46,6 +48,9 @@ const EnvironmentsPage: React.FC = () => {
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const { pagination, setPagination, autoResetPageIndex } = useTablePagination({
+    resetOn: [globalFilter, columnFilters],
+  });
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
   const [columnVisibilityAnchor, setColumnVisibilityAnchor] = useState<null | HTMLElement>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
@@ -214,17 +219,21 @@ const EnvironmentsPage: React.FC = () => {
       columnVisibility,
       columnSizing,
       globalFilter,
+      pagination,
     },
     enableSorting: true,
     enableColumnFilters: true,
+    autoResetPageIndex,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: handleColumnVisibilityChange,
     onColumnSizingChange: setColumnSizing,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode: "onChange" as ColumnResizeMode,
     filterFns: {
       includesString: (row, columnId, filterValue) => {

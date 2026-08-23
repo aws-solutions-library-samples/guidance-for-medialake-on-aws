@@ -38,7 +38,12 @@ interface ConnectorCardProps {
   connector: ConnectorResponse;
   onEdit?: (connector: ConnectorResponse) => void;
   onDelete: (id: string) => Promise<void>;
-  onToggleStatus?: (id: string, enabled: boolean) => Promise<void>;
+  // BUG-25 — the enable/disable status toggle was declared as a prop and
+  // wired through pages/hooks (see `useToggleConnector`) but no UI control
+  // ever called it, and the backing PUT /connectors/{id}/status route does
+  // not exist on the API. Prop removed to stop misleading callers. If a
+  // real disable action is ever added, restore the prop *and* wire a real
+  // backend route at the same time.
   onSync?: (id: string) => Promise<void>;
   showSeconds?: boolean;
   allowSecondsToggle?: boolean;
@@ -338,6 +343,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
             <IconButton
               onClick={handleDeleteClick}
               size="small"
+              aria-label={t("connectors.deleteConnector", "Delete connector")}
+              title={t("connectors.deleteConnector", "Delete connector")}
               data-testid={`connector-delete-button-${connector.id}`}
               sx={{
                 backgroundColor: alpha(theme.palette.error.main, 0.1),

@@ -202,47 +202,13 @@ class GroupsStack(cdk.Stack):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
-        # Group members resource
-        group_members_resource = group_id_resource.add_resource("members")
-
-        # POST /groups/{groupId}/members - Add members to a Group
-        group_members_post_method = group_members_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(
-                groups_unified_lambda.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')" }'
-                },
-            ),
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=props.authorizer,
-        )
-        cfn_method = group_members_post_method.node.default_child
-        cfn_method.authorization_type = "CUSTOM"
-        cfn_method.authorizer_id = props.authorizer.authorizer_id
-
-        # Group member by ID resource
-        group_member_id_resource = group_members_resource.add_resource("{userId}")
-
-        # DELETE /groups/{groupId}/members/{userId} - Remove a member from a Group
-        group_member_id_delete_method = group_member_id_resource.add_method(
-            "DELETE",
-            api_gateway.LambdaIntegration(
-                groups_unified_lambda.function,
-                request_templates={
-                    "application/json": '{ "groupId": "$input.params(\'groupId\')", "userId": "$input.params(\'userId\')" }'
-                },
-            ),
-            # authorization_type=api_gateway.AuthorizationType.CUSTOM,
-            # authorizer=self._api_authorizer,
-        )
-        cfn_method = group_member_id_delete_method.node.default_child
-        cfn_method.authorization_type = "CUSTOM"
-        cfn_method.authorizer_id = props.authorizer.authorizer_id
+        # Note: there are deliberately no /groups/{groupId}/members resources.
+        # Group membership lives in Cognito groups and is managed through the
+        # users API, which is the single source of truth. The former members
+        # routes wrote DynamoDB rows that nothing read, and their authorizer
+        # entries never matched, leaving the writes ungated.
 
         # Add CORS support to all resources
         add_cors_options_method(groups_resource)
         add_cors_options_method(group_id_resource)
         add_cors_options_method(group_permissions_resource)
-        add_cors_options_method(group_members_resource)
-        add_cors_options_method(group_member_id_resource)

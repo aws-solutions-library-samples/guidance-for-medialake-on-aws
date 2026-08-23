@@ -17,7 +17,7 @@ import {
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { BulkDeleteDialog } from "@/components/assets/BulkDeleteDialog";
 import { PipelineExecutionConfirmDialog } from "@/components/pipelines/PipelineExecutionConfirmDialog";
-import { useAddItemToCollection } from "@/api/hooks/useCollections";
+import { useAddItemToCollection, type ClipBoundary } from "@/api/hooks/useCollections";
 import { RightSidebar, RightSidebarProvider } from "../components/common/RightSidebar";
 import SearchFilters from "../components/search/SearchFilters";
 import MasterResultsView from "../components/search/MasterResultsView";
@@ -381,7 +381,9 @@ const SearchPage: React.FC = () => {
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
       // Determine clip boundary based on semantic mode
-      let clipBoundary = {};
+      // Left undefined for a whole-asset add; the API rejects a partial boundary, so it is
+      // either both timecodes or nothing.
+      let clipBoundary: ClipBoundary | undefined;
       let addAllClips = false;
 
       if (currentSemantic && semanticMode === "clip") {
@@ -403,7 +405,7 @@ const SearchPage: React.FC = () => {
         collectionId,
         data: {
           assetId: assetId,
-          clipBoundary: Object.keys(clipBoundary).length > 0 ? clipBoundary : undefined,
+          clipBoundary,
           addAllClips: addAllClips,
         },
       });

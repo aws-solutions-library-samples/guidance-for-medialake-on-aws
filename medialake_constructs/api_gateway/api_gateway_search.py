@@ -99,7 +99,12 @@ class SearchConstruct(Construct):
                     # BEDROCK_INFERENCE_PROFILE_ARN removed - Lambda auto-selects based on system settings
                     # Thumbnail index for video posters (0-4, default 2 = middle thumbnail)
                     "THUMBNAIL_INDEX": "2",
-                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
+                    # Must be config.ssm_prefix, not f"/{resource_prefix}/{environment}".
+                    # ssm_prefix branches on use_prefixed_names (default False), returning
+                    # "/medialake/{env}" for legacy deployments. Hardcoding the prefixed form
+                    # overrides url_utils' correct "/medialake/{env}" fallback and breaks
+                    # CloudFront URL resolution on every non-prefixed deployment.
+                    "SSM_PREFIX": config.ssm_prefix,
                     # Connector table for /search/connectors endpoint
                     # Allows search API to return connector summaries without
                     # requiring separate connectors:view permission

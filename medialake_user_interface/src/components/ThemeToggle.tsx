@@ -81,6 +81,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
         >
           <IconButton
             onClick={() => setMode("light")}
+            aria-label={t("common.themeLight", "Light theme")}
+            aria-pressed={mode === "light"}
             sx={{
               flex: 1,
               borderRadius: 1,
@@ -94,6 +96,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
           </IconButton>
           <IconButton
             onClick={() => setMode("dark")}
+            aria-label={t("common.themeDark", "Dark theme")}
+            aria-pressed={mode === "dark"}
             sx={{
               flex: 1,
               borderRadius: 1,
@@ -106,6 +110,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ isCollapsed = false })
           </IconButton>
           <IconButton
             onClick={() => setMode("system")}
+            aria-label={t("common.themeSystem", "Use system theme")}
+            aria-pressed={mode === "system"}
             sx={{
               flex: 1,
               borderRadius: 1,

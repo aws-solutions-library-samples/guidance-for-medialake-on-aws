@@ -5,7 +5,7 @@ PUT  /groups/{groupId}/permissions - Update group permissions (auto-syncs Permis
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
@@ -34,6 +34,26 @@ VALID_RESOURCES = {
     "groups",
     "settings",
     "integrations",
+}
+
+# Companion permissions that the Permissions UI cannot express, but which
+# UI-grantable permissions depend on at request time.
+#
+# The permission matrix only covers the ten resources in VALID_RESOURCES, so a
+# group configured purely through the UI can never be granted anything outside
+# that set. `search:view` is the case that bites: it gates
+# `GET /search/connectors`, which is the only source for the File Uploader's
+# destination picker and the Assets page connector sidebar. Without it the
+# request 403s, `useSearchConnectors` swallows the error and returns an empty
+# list, and upload silently offers no destinations even though
+# `assets:upload` / `connectors:upload` were granted correctly.
+#
+# Keys and values are (resource, action) pairs. When a key is granted with
+# effect "Allow", every companion pair is force-set to "Allow".
+IMPLIED_PERMISSIONS: Dict[Tuple[str, str], Tuple[Tuple[str, str], ...]] = {
+    ("assets", "view"): (("search", "view"),),
+    ("assets", "upload"): (("search", "view"),),
+    ("connectors", "upload"): (("search", "view"),),
 }
 
 
@@ -115,6 +135,127 @@ def _get_permission_set(table, permission_set_id: str) -> Optional[Dict[str, Any
     """Get a permission set from DynamoDB by ID"""
     response = table.get_item(Key={"PK": f"PS#{permission_set_id}", "SK": "METADATA"})
     return response.get("Item")
+
+
+def _pair(permission: Dict[str, Any]) -> Tuple[str, str]:
+    """Normalised (resource, action) identity of a permission entry."""
+    return (
+        str(permission.get("resource", "")).lower(),
+        str(permission.get("action", "")).lower(),
+    )
+
+
+def _nested_permissions_to_array(
+    node: Dict[str, Any], prefix: str = ""
+) -> List[Dict[str, Any]]:
+    """Convert a nested boolean permissions dict into array form.
+
+    Mirrors the traversal in ``pre_token_generation._flatten_nested_permissions``
+    so that resource names round-trip to the exact same JWT strings. Nested
+    resources keep their dotted path (``settings.users``), and resource names are
+    deliberately NOT aliased the way ``_transform_permissions`` aliases them for
+    the frontend — persisting an aliased name would silently rename permissions
+    such as ``pipelinesExecutions:view`` and break the authorizer lookup.
+    """
+    result: List[Dict[str, Any]] = []
+
+    for key, value in node.items():
+        current_key = f"{prefix}.{key}" if prefix else key
+
+        if not isinstance(value, dict):
+            continue
+
+        # A node can mix boolean actions with nested resources
+        # (e.g. {"settings": {"view": true, "users": {...}}}), so every child
+        # is examined individually rather than classifying the whole node as
+        # either a leaf or a branch.
+        for child_key, child_value in value.items():
+            if isinstance(child_value, bool):
+                result.append(
+                    {
+                        "action": child_key,
+                        "resource": current_key,
+                        "effect": "Allow" if child_value else "Deny",
+                    }
+                )
+            elif isinstance(child_value, dict):
+                result.extend(
+                    _nested_permissions_to_array({child_key: child_value}, current_key)
+                )
+
+    return result
+
+
+def _stored_permissions_to_array(stored: Any) -> List[Dict[str, Any]]:
+    """Normalise whatever is stored on a permission set into array form.
+
+    Handles both the array format written by this handler and the nested boolean
+    format used by the seeded system permission sets. Resource names are
+    preserved verbatim.
+    """
+    if isinstance(stored, list):
+        return [
+            dict(item)
+            for item in stored
+            if isinstance(item, dict)
+            and all(k in item for k in ("action", "resource", "effect"))
+        ]
+
+    if isinstance(stored, dict):
+        return _nested_permissions_to_array(stored)
+
+    return []
+
+
+def _merge_permissions(
+    existing: List[Dict[str, Any]], incoming: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Overlay ``incoming`` onto ``existing`` instead of replacing wholesale.
+
+    The Permissions UI submits an entry for every (resource, action) cell it
+    renders — an explicit "Deny" for each unticked box — but it only renders the
+    ten resources in VALID_RESOURCES. A blanket replace therefore discarded every
+    stored permission outside that set (``search``, ``system``, ``storage``,
+    ``nodes``, ``api-keys``, ``settings-menu``, the nested ``settings.*`` block,
+    and so on), so a no-op save of the seeded Super Administrator set dropped 68
+    of its 105 permissions.
+
+    The set of pairs present in ``incoming`` defines what the UI governs, so this
+    stays correct automatically if the matrix later grows more areas.
+    """
+    governed = {_pair(p) for p in incoming}
+    merged = [p for p in existing if _pair(p) not in governed]
+    merged.extend(incoming)
+    return merged
+
+
+def _apply_implied_permissions(
+    permissions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Force-grant the companion permissions required by granted permissions.
+
+    Needed for groups with nothing to preserve — a brand-new group starts with an
+    empty permission set, so merging cannot recover ``search:view`` and the
+    upload destination picker stays empty however the matrix is filled in.
+    """
+    granted = {_pair(p) for p in permissions if p.get("effect") == "Allow"}
+
+    required: set = set()
+    for source, companions in IMPLIED_PERMISSIONS.items():
+        if source in granted:
+            required.update(companions)
+
+    if not required:
+        return permissions
+
+    # Drop any existing entry for a required pair so a stale "Deny" cannot
+    # survive and shadow the grant, then re-add each as "Allow".
+    result = [p for p in permissions if _pair(p) not in required]
+    result.extend(
+        {"action": action, "resource": resource, "effect": "Allow"}
+        for resource, action in sorted(required)
+    )
+    return result
 
 
 def _create_permission_set_for_group(
@@ -431,7 +572,7 @@ def handle_put_group_permissions(
             return _create_error_response(404, f"Group '{group_id}' not found")
 
         group_name = group_item.get("name", group_id)
-        permissions_list = [p.model_dump() for p in update_request.permissions]
+        incoming_permissions = [p.model_dump() for p in update_request.permissions]
 
         # 2. Check if group has a linked permission set
         permission_set_id = group_item.get("permissionSetId")
@@ -441,22 +582,42 @@ def handle_put_group_permissions(
             permission_set_id = assigned_ps[0]
 
         if permission_set_id:
-            # 3a. Update existing permission set
+            # 3a. Update existing permission set.
+            # Merge onto the stored permissions rather than replacing them, so
+            # permissions the UI cannot render are not silently dropped.
+            existing_ps = _get_permission_set(table, permission_set_id)
+            existing_permissions = _stored_permissions_to_array(
+                existing_ps.get("permissions") if existing_ps else None
+            )
+            permissions_list = _apply_implied_permissions(
+                _merge_permissions(existing_permissions, incoming_permissions)
+            )
+
             logger.info(
-                f"Updating existing permission set",
+                "Updating existing permission set",
                 extra={
                     "group_id": group_id,
                     "permission_set_id": permission_set_id,
+                    "incoming_count": len(incoming_permissions),
+                    "existing_count": len(existing_permissions),
+                    "preserved_count": len(permissions_list)
+                    - len(incoming_permissions),
                 },
             )
             _update_permission_set_permissions(
                 table, permission_set_id, permissions_list, user_id
             )
         else:
-            # 3b. Create a new permission set and link it
+            # 3b. Create a new permission set and link it. Nothing to merge, but
+            # companion permissions still have to be derived.
+            permissions_list = _apply_implied_permissions(incoming_permissions)
             logger.info(
-                f"Creating new permission set for group",
-                extra={"group_id": group_id},
+                "Creating new permission set for group",
+                extra={
+                    "group_id": group_id,
+                    "incoming_count": len(incoming_permissions),
+                    "implied_count": len(permissions_list) - len(incoming_permissions),
+                },
             )
             permission_set_id = _create_permission_set_for_group(
                 table, group_id, group_name, permissions_list, user_id

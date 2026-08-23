@@ -64,6 +64,10 @@ def lambda_handler(event, context):
         pre_token_generation_lambda_arn = event["ResourceProperties"][
             "PreTokenGenerationLambdaArn"
         ]
+        # Optional: only present when the inbound federation trigger is enabled.
+        inbound_federation_lambda_arn = event["ResourceProperties"].get(
+            "InboundFederationLambdaArn", ""
+        )
         cloudfront_domain_ssm_param = event["ResourceProperties"].get(
             "CloudFrontDomainSsmParam", ""
         )
@@ -90,11 +94,31 @@ def lambda_handler(event, context):
             current_config = response["UserPool"]
             lambda_config = current_config.get("LambdaConfig", {})
 
-            # Add or update the Pre-Token Generation trigger
+            # Add or update the Pre-Token Generation trigger.
+            #
+            # Note that lambda_config is the full configuration read back from
+            # the pool, so any trigger this stack does not manage (a pre sign-up
+            # trigger attached out of band, for example) is preserved.
             lambda_config["PreTokenGenerationConfig"] = {
                 "LambdaArn": pre_token_generation_lambda_arn,
                 "LambdaVersion": "V2_0",
             }
+
+            # Add, update or remove the inbound federation trigger. This trigger
+            # transforms the attributes an external identity provider sends
+            # before Cognito creates or updates the federated user profile.
+            if inbound_federation_lambda_arn:
+                lambda_config["InboundFederation"] = {
+                    "LambdaArn": inbound_federation_lambda_arn,
+                    # V1_0 is the only version this trigger accepts.
+                    "LambdaVersion": "V1_0",
+                }
+                logger.info("Attaching inbound federation trigger")
+            elif "InboundFederation" in lambda_config:
+                # The feature was turned off, so detach it rather than leaving a
+                # trigger pointing at a Lambda that may no longer exist.
+                lambda_config.pop("InboundFederation", None)
+                logger.info("Detaching inbound federation trigger")
 
             # Update the user pool with the new Lambda configuration
             # Only include parameters that are valid for update_user_pool API
@@ -176,11 +200,24 @@ def lambda_handler(event, context):
                 response = cognito.describe_user_pool(UserPoolId=user_pool_id)
                 lambda_config = response["UserPool"].get("LambdaConfig", {})
 
-                # Remove our Pre-Token Generation trigger if it matches
+                # Remove only the triggers this resource owns, leaving any
+                # others on the pool untouched.
+                changed = False
+
                 pre_token_config = lambda_config.get("PreTokenGenerationConfig", {})
                 if pre_token_config.get("LambdaArn") == pre_token_generation_lambda_arn:
                     lambda_config.pop("PreTokenGenerationConfig", None)
+                    changed = True
 
+                inbound_config = lambda_config.get("InboundFederation", {})
+                if (
+                    inbound_federation_lambda_arn
+                    and inbound_config.get("LambdaArn") == inbound_federation_lambda_arn
+                ):
+                    lambda_config.pop("InboundFederation", None)
+                    changed = True
+
+                if changed:
                     cognito.update_user_pool(
                         UserPoolId=user_pool_id, LambdaConfig=lambda_config
                     )

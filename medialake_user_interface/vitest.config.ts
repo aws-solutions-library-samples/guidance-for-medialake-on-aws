@@ -8,6 +8,13 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Vitest defaults to 5s. Rendering-heavy suites -- particularly the axe
+    // accessibility scans -- land in the 5-7s range once the full suite runs in
+    // parallel and the workers contend for CPU, so they failed intermittently
+    // while passing in isolation. This is headroom for that contention, not for
+    // genuinely hung tests, which still fail well before a CI timeout.
+    testTimeout: 20000,
+    hookTimeout: 20000,
     env: {
       VITE_WAF_CAPTCHA_API_KEY: "test-captcha-api-key",
     },

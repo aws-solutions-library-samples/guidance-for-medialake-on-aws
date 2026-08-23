@@ -74,6 +74,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   // Stable accessors and actions (from parent)
   getAssetId,
   getAssetName,
+  getAssetDisplayName,
   getAssetType,
   getAssetThumbnail,
   getAssetProxy,
@@ -106,6 +107,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   confidenceThreshold: number;
   getAssetId: (a: T) => string;
   getAssetName: (a: T) => string;
+  getAssetDisplayName?: (a: T) => string;
   getAssetType: (a: T) => string;
   getAssetThumbnail: (a: T) => string;
   getAssetProxy?: (a: T) => string;
@@ -161,7 +163,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   return (
     <AssetCard
       id={assetId}
-      name={getAssetName(asset)}
+      name={(getAssetDisplayName ?? getAssetName)(asset)}
       thumbnailUrl={getAssetThumbnail(asset)}
       proxyUrl={getAssetProxy ? getAssetProxy(asset) : undefined}
       assetType={getAssetType(asset)}

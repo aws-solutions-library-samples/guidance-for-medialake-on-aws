@@ -26,7 +26,8 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import AudiotrackOutlinedIcon from "@mui/icons-material/AudiotrackOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import { useRightSidebar } from "./SidebarContext";
-import { useGetPipelines } from "@/features/pipelines/api/pipelinesController";
+import { useGetPipelinesOptional } from "@/features/pipelines/api/pipelinesController";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 
 interface BatchOperationsProps {
   selectedAssets: Array<{
@@ -94,7 +95,37 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   const { setHasSelectedItems } = useRightSidebar();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [collapsedTypes, setCollapsedTypes] = useState<Record<string, boolean>>({});
-  const { data: pipelinesData, isLoading: isPipelinesLoading } = useGetPipelines();
+
+  // Pipelines are an optional add-on in the sidebar: everything else here
+  // (download, delete, the selected-items list) must keep working for users who
+  // have no pipeline access at all.
+  //
+  // Running a pipeline on the selection needs BOTH:
+  //   - list  → GET  /pipelines                        → pipelines:view → can("view", "pipeline")
+  //   - run   → POST /pipelines/{id}/trigger           → pipelines:edit → can("edit", "pipeline")
+  //
+  // If either is missing we hide the pipeline UI and never issue the request,
+  // otherwise the 403 from GET /pipelines trips the global access-denied
+  // redirect and throws the user off the page just for opening the sidebar.
+  // `useActionPermission` reports allowed === false while the ability is still
+  // loading, so the query stays disabled until permissions resolve — no 403 and
+  // no flash of pipeline UI.
+  const canListPipelines = useActionPermission("view", "pipeline").allowed;
+  const canRunPipelines = useActionPermission("edit", "pipeline").allowed;
+  const canUsePipelines = canListPipelines && canRunPipelines;
+
+  // Bulk download hits POST /download/bulk, which requires `assets:download`.
+  // Same story as pipelines: without the permission the click would 403 and
+  // bounce the user to /access-denied, so hide the button instead.
+  const canDownload = useActionPermission("download", "asset").allowed;
+
+  // `canDelete` is supplied by the parent (it already derives it from
+  // useActionPermission("delete", "asset")) so per-page overrides keep working.
+  const hasQuickActions = canDownload || canDelete;
+
+  const { data: pipelinesData, isLoading: isPipelinesLoading } = useGetPipelinesOptional({
+    enabled: canUsePipelines,
+  });
 
   // Filter manual pipelines based on selected asset types
   const filteredManualPipelines = useMemo(() => {
@@ -126,7 +157,7 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   }, [pipelinesData, selectedAssets]);
 
   const handlePipelineRun = () => {
-    if (!selectedPipelineId) return;
+    if (!canUsePipelines || !selectedPipelineId) return;
     const pipeline = filteredManualPipelines.find((p) => p.id === selectedPipelineId);
     if (!pipeline) return;
 
@@ -205,9 +236,14 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 1,
+          // Keep the header the same height whether or not any action icons are
+          // permitted, so the sidebar's vertical rhythm doesn't shift between
+          // users with different permissions. 30px === IconButton size="small".
+          minHeight: (theme) => `calc(30px + ${theme.spacing(3.5)})`,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, letterSpacing: "0.01em" }}>
             {selectedAssets.length}{" "}
             {selectedAssets.length === 1 ? t("common.item") : t("common.items")}
@@ -225,60 +261,68 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           </Typography>
         </Box>
 
-        {/* Compact action icons */}
-        <Box sx={{ display: "flex", gap: 0.25 }}>
-          <Tooltip title={t("common.actions.downloadSelected")} arrow>
-            <span>
-              <IconButton
-                size="small"
-                onClick={onBatchDownload}
-                disabled={isDownloadLoading}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": {
-                    color: "primary.main",
-                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
-                  },
-                }}
-              >
-                {isDownloadLoading ? (
-                  <CircularProgress size={18} />
-                ) : (
-                  <FileDownloadOutlinedIcon fontSize="small" />
-                )}
-              </IconButton>
-            </span>
-          </Tooltip>
-          {canDelete && (
-            <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
-              <span>
-                <IconButton
-                  size="small"
-                  data-testid="batch-delete-button"
-                  onClick={() => onBatchDelete?.()}
-                  disabled={isDeleteLoading || !onBatchDelete}
-                  sx={{
-                    color: "text.secondary",
-                    "&:hover": {
-                      color: "error.main",
-                      bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                    },
-                  }}
-                >
-                  {isDeleteLoading ? (
-                    <CircularProgress size={18} />
-                  ) : (
-                    <DeleteOutlineIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
-          )}
-        </Box>
+        {/* Compact action icons — omitted entirely when the user has none, so no
+            empty flex child is left behind pushing the layout around. */}
+        {hasQuickActions && (
+          <Box sx={{ display: "flex", gap: 0.25, flexShrink: 0 }}>
+            {canDownload && (
+              <Tooltip title={t("common.actions.downloadSelected")} arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label={t("common.actions.downloadSelected")}
+                    data-testid="batch-download-button"
+                    onClick={() => onBatchDownload?.()}
+                    disabled={isDownloadLoading || !onBatchDownload}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": {
+                        color: "primary.main",
+                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                      },
+                    }}
+                  >
+                    {isDownloadLoading ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <FileDownloadOutlinedIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+            {canDelete && (
+              <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label={t("common.batchOperations.deleteSelected")}
+                    data-testid="batch-delete-button"
+                    onClick={() => onBatchDelete?.()}
+                    disabled={isDeleteLoading || !onBatchDelete}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": {
+                        color: "error.main",
+                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+                      },
+                    }}
+                  >
+                    {isDeleteLoading ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <DeleteOutlineIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </Box>
+        )}
       </Box>
 
-      {/* ── Pipeline execution row ── */}
-      {(hasPipelines || isPipelinesLoading) && (
+      {/* ── Pipeline execution row (only for users who can list AND run pipelines) ── */}
+      {canUsePipelines && (hasPipelines || isPipelinesLoading) && (
         <Box
           sx={{
             mx: 2,

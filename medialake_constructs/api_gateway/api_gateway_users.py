@@ -131,6 +131,9 @@ class UsersApi(Construct):
         # /users/{user_id}/reset-password resource
         user_reset_password_resource = user_id_resource.add_resource("reset-password")
 
+        # /users/password-recovery resource (self-service temp password resend)
+        password_recovery_resource = users_resource.add_resource("password-recovery")
+
         # /users/profile resource
         profile_resource = users_resource.add_resource("profile")
 
@@ -231,6 +234,18 @@ class UsersApi(Construct):
         cfn_method = user_reset_password_method.node.default_child
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        # POST /users/password-recovery - Self-service temporary password
+        # resend. Intentionally UNAUTHENTICATED: it serves users who cannot
+        # sign in (FORCE_CHANGE_PASSWORD with an expired/lost temporary
+        # password). The handler is enumeration-safe (constant generic
+        # response) and the endpoint is rate-limited by a scoped WAF
+        # rate-based rule on the API's web ACL.
+        password_recovery_resource.add_method(
+            "POST",
+            lambda_integration,
+            authorization_type=api_gateway.AuthorizationType.NONE,
+        )
 
         # GET /users/profile - Get user profile
         profile_get_method = profile_resource.add_method(

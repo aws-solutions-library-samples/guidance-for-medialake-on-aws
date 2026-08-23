@@ -1052,7 +1052,6 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
     """
     return {
         # Assets endpoints
-        "get /assets": "assets:view",
         "post /assets/upload": "assets:upload",
         "delete /assets/{id}": "assets:delete",
         "put /assets/{id}": "assets:edit",
@@ -1061,6 +1060,24 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /assets/{id}/transcript": "assets:view",
         "get /assets/{id}/related_versions": "assets:view",
         "post /assets/generate_presigned_url": "assets:upload",
+        # Batch-delete job routes. A batch delete is an asset-delete
+        # operation, so the mutating routes require assets:delete; listing
+        # your own jobs is a read gated on assets:view.
+        #
+        # IMPORTANT — get /assets/batch/user must stay on assets:view, NOT
+        # assets:delete. The notification center polls it every 15s for every
+        # authenticated user and pops a user-facing error modal on failure
+        # (useUserBatchDeleteJobs -> showError). Read-only viewers hold
+        # assets:view but not assets:delete, so gating the poll on delete
+        # would spam them with an error modal on a loop. The query is scoped
+        # to the caller's own USER#{sub} partition, so a viewer only ever
+        # sees their own (empty) job list — no cross-user exposure.
+        "delete /assets/batch": "assets:delete",
+        "put /assets/batch/{jobId}/cancel": "assets:delete",
+        "get /assets/batch/user": "assets:view",
+        # Clearing a finished batch-delete job (BUG-26) is a delete op on the
+        # caller's own delete artifact and requires assets:delete.
+        "delete /assets/batch/{jobId}": "assets:delete",
         # Download endpoints
         "get /download/bulk": "assets:download",
         "post /download/bulk": "assets:download",
@@ -1117,8 +1134,10 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "post /groups": "groups:create",
         "put /groups/{id}": "groups:edit",
         "delete /groups/{id}": "groups:delete",
-        "post /groups/add_group_members": "groups:edit",
-        "post /groups/remove_group_member": "groups:edit",
+        # Group membership is managed through the users endpoints below, which
+        # write Cognito group membership. The former /groups/{groupId}/members
+        # routes have been removed; note the entries here never matched them
+        # anyway (wrong path shape), which left those writes ungated.
         # Integrations endpoints
         "get /integrations": "integrations:view",
         "post /integrations": "integrations:create",
@@ -1163,15 +1182,6 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "delete /reviews/{id}/annotations": "reviews:delete",
         "get /reviews/{id}/status": "reviews:view",
         "post /reviews/{id}/status": "reviews:edit",
-        # Roles endpoints
-        "get /roles": "permissions:view",
-        "post /roles": "permissions:create",
-        "put /roles/{role_id}": "permissions:edit",
-        "delete /roles/{role_id}": "permissions:delete",
-        "get /settings/roles": "permissions:view",
-        "post /settings/roles": "permissions:create",
-        "put /settings/roles/{id}": "permissions:edit",
-        "delete /settings/roles/{id}": "permissions:delete",
         # Search endpoints - accessible to all authenticated users
         "get /search": None,
         "get /search/fields": None,
@@ -1199,6 +1209,11 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /settings/system/search": None,
         "post /settings/system/search": "system:edit",
         "put /settings/system/search": "system:edit",
+        # Just-in-time provisioning policy for federated users. Readable by
+        # anyone holding system:view (present in every seeded permission set, so
+        # the settings page can render); only administrators may change it.
+        "get /settings/system/jit-provisioning": "system:view",
+        "put /settings/system/jit-provisioning": "system:edit",
         # User profile - accessible to all authenticated users
         "get /settings/userprofile": None,
         "get /settings/users": "users:view",
@@ -1212,16 +1227,109 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /aws/regions": "regions:view",
         # Users endpoints
         "get /users": "users:view",
+        # POST /users creates arbitrary Cognito users and — critically — assigns
+        # them to any group in the request body (including superAdministrators),
+        # so it MUST be permission-mapped. Prior to this entry it fell through
+        # to "no permission required" and every authenticated caller including
+        # read-only viewers could escalate themselves to super admin.
+        "post /users": "users:create",
         "get /users/{user_id}": "users:view",
         "put /users/{user_id}": "users:edit",
         "delete /users/{user_id}": "users:delete",
         "post /users/{user_id}/enable": "users:edit",
         "post /users/{user_id}/disable": "users:edit",
+        # reset-password issues a new temporary password on someone else's
+        # account — it is a write on the user record and needs users:edit.
+        "post /users/{user_id}/reset-password": "users:edit",
         # User favorites - accessible to all authenticated users (no permission required)
         "get /users/favorites": None,
         "post /users/favorites": None,
         "delete /users/favorites/{itemType}/{itemId}": None,
     }
+
+
+@tracer.capture_method
+def create_advisory_permission_mapping() -> Dict[str, str]:
+    """Permissions that are checked and reported, but not yet enforced.
+
+    Some routes were shipped without an entry in ``create_permission_mapping``,
+    which means they fall through to "no permission required" -- any
+    authenticated caller can use them. Enforcing a permission on them now would
+    be a breaking change for anyone currently relying on the gap.
+
+    Routes listed here are still allowed, but a warning and a metric are emitted
+    when the caller does not hold the permission they will eventually need. That
+    turns "we think nobody depends on this" into something measurable: if
+    ``authz.advisory.<resource>_<action>.denied_would_be`` stays at zero for a
+    release, the entry can be moved into ``create_permission_mapping`` safely.
+    """
+    return {
+        # Metadata field definitions are a system-wide search schema, so this
+        # should require system:edit like every other system-settings write.
+        # Today it is ungated, and editors and viewers can reach the Metadata
+        # Fields tab in System Settings, so enforcing immediately would take away
+        # something they can currently do.
+        "put /settings/system/metadata-fields": "system:edit",
+    }
+
+
+@tracer.capture_method
+def report_advisory_permission(
+    http_method: str,
+    resource_path: str,
+    path_parameters: Dict[str, str],
+    parsed_token: Dict[str, Any],
+    correlation_id: str,
+) -> None:
+    """Log and count callers who would be denied once enforcement is enabled.
+
+    Never affects the authorization outcome.
+    """
+    try:
+        advisory = create_advisory_permission_mapping()
+        normalized_path = normalize_resource_path(resource_path, path_parameters)
+        action_key = f"{http_method.lower()} {normalized_path}"
+
+        required = advisory.get(action_key)
+        if not required:
+            for pattern, permission in advisory.items():
+                if not pattern.startswith(f"{http_method.lower()} "):
+                    continue
+                if _paths_match(normalized_path, pattern[len(http_method) + 1 :]):
+                    required = permission
+                    break
+        if not required:
+            return
+
+        raw = parsed_token.get("custom:permissions")
+        held: List[str] = []
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    held = parsed
+            except (TypeError, ValueError):
+                held = []
+
+        if _jwt_permission_present(required, held, correlation_id):
+            return
+
+        metric_name = (
+            "authz.advisory." + required.replace(":", "_") + ".denied_would_be"
+        )
+        logger.warning(
+            "Advisory permission check would deny this request once enforced",
+            extra={
+                "correlation_id": correlation_id,
+                "action": action_key,
+                "required_permission": required,
+                "subject": parsed_token.get("sub"),
+            },
+        )
+        metrics.add_metric(name=metric_name, unit=MetricUnit.Count, value=1)
+    except Exception as e:  # noqa: BLE001
+        # Reporting must never change the outcome of an authorization decision.
+        logger.warning(f"Advisory permission check failed: {str(e)}")
 
 
 @tracer.capture_method
@@ -2347,6 +2455,16 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     extra={"correlation_id": correlation_id},
                 )
                 required_permission = None
+
+            # Report (without enforcing) permissions that are scheduled to be
+            # required on routes that are currently ungated.
+            report_advisory_permission(
+                http_method,
+                resource_path,
+                path_parameters,
+                parsed_token,
+                correlation_id,
+            )
 
             # Initialize authorization variables
             is_authorized = False

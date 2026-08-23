@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Uppy from "@uppy/core";
 import Dashboard from "@uppy/react/dashboard";
 import AwsS3, { type AwsS3Options } from "@uppy/aws-s3";
@@ -9,24 +9,32 @@ import {
   Button,
   Chip,
   FormControl,
+  IconButton,
   InputLabel,
+  ListSubheader,
   MenuItem,
   Paper,
   Select,
   SelectChangeEvent,
+  Tooltip,
   Typography,
   Alert,
 } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import PersonIcon from "@mui/icons-material/Person";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
 import { useTranslation } from "react-i18next";
 import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
+import { useGetAllCollections } from "@/api/hooks/useCollections";
 import { usePermission } from "@/permissions";
 import useS3Upload from "../hooks/useS3Upload";
 import { MultipartUploadMetadata } from "../types/upload.types";
 import PathBrowser from "./PathBrowser";
 import CollectionSelector, { CollectionRef } from "./CollectionSelector";
+import { useUploadLocations } from "../hooks/useUploadLocations";
+import { normalizeUploadPath, type UploadLocation } from "../types/uploadLocation.types";
 import { typography } from "@/theme/tokens";
 
 // Define meta type to make typings clearer
@@ -89,6 +97,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   // Shared (non-My-Assets) connectors are only offered as upload destinations
   // to users who can upload into connectors. My Assets is always exempt.
   const canUploadToConnectors = can("upload", "connector");
+  // Browsing paths calls GET /connectors/s3/explorer/{id}, which requires connectors:view.
+  // Without it the request 403s and the global interceptor would bounce the user to
+  // /access-denied, so hide the browse affordance instead and leave them on the default path.
+  const canBrowsePaths = can("view", "connector");
   const [uppy, setUppy] = useState<Uppy<Meta> | null>(null);
   const [selectedConnector, setSelectedConnector] = useState<string>("");
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -116,7 +128,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     ) || [];
 
   // Memoize collection ids for the upload request body and Uppy meta
-  const collectionIds = useMemo(() => selectedCollections.map((c) => c.id), [selectedCollections]);
+  // (defined after the saved-locations hook, which supplies the reconciler)
 
   // Connectors the user can pick from, excluding the My Assets virtual connector.
   // When the connector is locked (e.g. "Upload to My Assets"), or the user
@@ -128,13 +140,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   // My Assets is a valid destination only when a defaultConnectorId is provided.
   const hasMyAssets = !!defaultConnectorId;
 
-  // Total destinations available to the user. If the user can't read any
-  // connectors (e.g. no permission) and has no personal My Assets space,
-  // this is 0 and uploads are blocked.
-  const destinationCount = (hasMyAssets ? 1 : 0) + selectableConnectors.length;
-  const hasNoDestinations = destinationCount === 0;
-  const hasSingleDestination = destinationCount === 1;
-
   // The single connector destination (when My Assets is not present).
   const singleConnector = !hasMyAssets ? selectableConnectors[0] : undefined;
 
@@ -143,21 +148,211 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const autoSelectConnectorId =
     !hasMyAssets && selectableConnectors.length === 1 ? selectableConnectors[0].id : undefined;
 
+  // ── Saved upload locations ────────────────────────────────────────────────
+  // Live collections, used to drop saved collections that no longer resolve.
+  // CollectionSelector already issues this query, so this shares its cache.
+  const { data: allCollectionsData } = useGetAllCollections();
+  const liveCollections = allCollectionsData?.data;
+
+  const {
+    isLoading: isLoadingSavedLocations,
+    availableFavorites,
+    isSaved,
+    isAtCapacity,
+    maxFavorites,
+    toggleSaved,
+    rememberLastLocation,
+    restorableLastLocation,
+    reconcileCollections,
+  } = useUploadLocations({
+    selectableConnectors,
+    myAssetsConnectorId: defaultConnectorId,
+    myAssetsObjectPrefix: defaultObjectPrefix,
+    liveCollections,
+  });
+
+  // Surfaced when a saved location referenced collections that no longer resolve.
+  const [droppedCollectionNotice, setDroppedCollectionNotice] = useState<string>("");
+
+  /**
+   * Validate the selected collections on every upload.
+   *
+   * `POST /assets/upload` caps the number of collections but never checks that they exist —
+   * it just stamps the ids into S3 user-metadata for a downstream step to consume. A
+   * collection can be deleted, or the user can lose edit rights on it, while the uploader
+   * is open or between saving a location and using it. Reconciling here means the request
+   * only ever carries ids that currently exist and are still addable.
+   *
+   * The stale entries are deliberately left visible in the picker rather than silently
+   * deselected: a transient collections-query failure should not destroy the user's
+   * selection. The warning explains what will not be applied.
+   */
+  const { collections: validatedCollections, dropped: droppedSelectedCollections } = useMemo(
+    () =>
+      reconcileCollections(
+        selectedCollections.map((collection) => ({ id: collection.id, name: collection.name }))
+      ),
+    [reconcileCollections, selectedCollections]
+  );
+
+  // Memoized collection ids for the upload request body and Uppy meta
+  const collectionIds = useMemo(
+    () => validatedCollections.map((collection) => collection.id),
+    [validatedCollections]
+  );
+
+  const collectionWarnings = useMemo(() => {
+    const messages: string[] = [];
+    if (droppedCollectionNotice) messages.push(droppedCollectionNotice);
+    if (droppedSelectedCollections.length > 0) {
+      messages.push(
+        t("upload.savedLocations.selectedCollectionsUnavailable", {
+          count: droppedSelectedCollections.length,
+          names: droppedSelectedCollections.map((collection) => collection.name).join(", "),
+          defaultValue_one:
+            "A selected collection is no longer available and will not be applied: {{names}}",
+          defaultValue_other:
+            "{{count}} selected collections are no longer available and will not be applied: {{names}}",
+        })
+      );
+    }
+    return messages;
+  }, [droppedCollectionNotice, droppedSelectedCollections, t]);
+
+  /**
+   * Selectable destinations. A destination is (connector, path), so favorites are listed
+   * as first-class options alongside connectors — two favorites on the same connector
+   * with different paths are two distinct destinations, which a connector-keyed dropdown
+   * could not express.
+   */
+  const favoriteOptions = useMemo(
+    () =>
+      availableFavorites.map((favorite) => ({
+        key: `fav:${favorite.id}`,
+        label: favorite.label,
+        connectorId: favorite.connectorId,
+        path: favorite.path,
+        collections: favorite.collections,
+      })),
+    [availableFavorites]
+  );
+
+  const connectorOptions = useMemo(() => {
+    const options: Array<{
+      key: string;
+      label: string;
+      connectorId: string;
+      isMyAssets: boolean;
+    }> = [];
+
+    if (hasMyAssets && defaultConnectorId) {
+      options.push({
+        key: `conn:${defaultConnectorId}`,
+        label: "My Assets",
+        connectorId: defaultConnectorId,
+        isMyAssets: true,
+      });
+    }
+    for (const connector of selectableConnectors) {
+      options.push({
+        key: `conn:${connector.id}`,
+        label: `${connector.name} (${connector.storageIdentifier})`,
+        connectorId: connector.id,
+        isMyAssets: false,
+      });
+    }
+    return options;
+  }, [hasMyAssets, defaultConnectorId, selectableConnectors]);
+
+  // Total destinations available to the user. If the user can't read any
+  // connectors (e.g. no permission) and has no personal My Assets space,
+  // this is 0 and uploads are blocked.
+  const destinationCount = favoriteOptions.length + connectorOptions.length;
+  const hasNoDestinations = destinationCount === 0;
+  const hasSingleDestination = destinationCount === 1;
+
   // Sync uploadPath with path prop
   useEffect(() => {
     setUploadPath(path || "");
   }, [path]);
 
-  // Pre-select the destination automatically:
-  // - My Assets when a defaultConnectorId is provided
-  // - the only connector when it is the single available destination
+  /**
+   * Apply a destination: connector, path and (for saved locations) target collections,
+   * all in one go. Doing it atomically matters — `handleConnectorChange` clears the path,
+   * so setting the two separately would lose a saved location's path.
+   */
+  const applyUploadLocation = useCallback(
+    (location: UploadLocation) => {
+      setSelectedConnector(location.connectorId);
+
+      const nextPath = normalizeUploadPath(location.path);
+      setUploadPath(nextPath);
+      if (onPathChange) {
+        onPathChange(nextPath);
+      }
+
+      // `POST /assets/upload` does not verify that collection ids still exist, so a saved
+      // location could otherwise silently carry dead references. Reconcile against the
+      // live list and tell the user what was dropped.
+      const { collections, dropped } = reconcileCollections(location.collections);
+      setSelectedCollections(collections);
+      setDroppedCollectionNotice(
+        dropped.length > 0
+          ? t("upload.savedLocations.collectionsUnavailable", {
+              count: dropped.length,
+              names: dropped.map((collection) => collection.name).join(", "),
+              defaultValue_one:
+                "A collection saved with this location is no longer available and was removed: {{names}}",
+              defaultValue_other:
+                "{{count}} collections saved with this location are no longer available and were removed: {{names}}",
+            })
+          : ""
+      );
+    },
+    [onPathChange, reconcileCollections, t]
+  );
+
+  // Pre-select the destination automatically, in two layers.
+  //
+  // Layer 1 (unchanged from before this feature) selects My Assets as soon as a
+  // defaultConnectorId is available, or the sole connector. It deliberately still re-fires
+  // when defaultConnectorId changes, because TopBar passes it as undefined until
+  // useMyAssetsConnector resolves. Keeping it ungated means the uploader is usable
+  // immediately and never waits on an optional preference request.
+  //
+  // Layer 2 then refines the choice to the last location this user uploaded to, once the
+  // saved settings and the connector list have both arrived. It yields to layer 1 for the
+  // initial paint and bows out entirely if the user has already touched the destination —
+  // saved locations load asynchronously, so without that guard a slow response could yank
+  // the destination out from under someone who had already picked one.
+  const hasRestoredLastLocationRef = useRef(false);
+  const userTouchedDestinationRef = useRef(false);
+  const isResolvingSavedLocation = isLoadingConnectors || isLoadingSavedLocations;
+
   useEffect(() => {
+    if (hasRestoredLastLocationRef.current) return;
     if (defaultConnectorId) {
       setSelectedConnector(defaultConnectorId);
     } else if (autoSelectConnectorId) {
       setSelectedConnector(autoSelectConnectorId);
     }
   }, [defaultConnectorId, autoSelectConnectorId]);
+
+  useEffect(() => {
+    if (hasRestoredLastLocationRef.current) return;
+    if (userTouchedDestinationRef.current) return;
+    if (isResolvingSavedLocation) return;
+
+    // A caller-pinned destination always wins: an explicit path prop or a locked connector
+    // means the caller chose deliberately (e.g. "Upload to My Assets", or a
+    // connector-scoped upload), so a remembered location must not override it.
+    if (lockConnector || path) return;
+
+    if (!restorableLastLocation) return;
+
+    hasRestoredLastLocationRef.current = true;
+    applyUploadLocation(restorableLastLocation);
+  }, [isResolvingSavedLocation, lockConnector, path, restorableLastLocation, applyUploadLocation]);
 
   // Helper function to parse objectPrefix into array
   const parseObjectPrefix = (objectPrefix: string | string[] | undefined): string[] => {
@@ -180,26 +375,51 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
   // Extract and parse allowedPrefixes from selected connector
   // Fallback to configuration.objectPrefix if top-level objectPrefix is undefined
+  //
+  // My Assets is not in the connectors list (FileUploader filters it out to render it
+  // separately), so its prefix comes from the caller-provided defaultObjectPrefix — the
+  // user's own `personal/{sub}/`. It is treated as an allowed prefix rather than a hardcoded
+  // value so the generic defaulting below fills it in, but the personal bucket and path are
+  // never surfaced to the user: they are shared-infrastructure details.
   const allowedPrefixes = useMemo(() => {
+    if (isMyAssetsSelected) {
+      return parseObjectPrefix(defaultObjectPrefix);
+    }
     const topLevelPrefix = selectedConnectorObj?.objectPrefix;
     const configPrefix = selectedConnectorObj?.configuration?.objectPrefix;
     const prefixToUse = topLevelPrefix !== undefined ? topLevelPrefix : configPrefix;
     return parseObjectPrefix(prefixToUse);
-  }, [selectedConnectorObj]);
+  }, [selectedConnectorObj, isMyAssetsSelected, defaultObjectPrefix]);
 
-  // Automatically default to first allowed prefix when connector has restrictions
-  // For My Assets, use the fixed defaultObjectPrefix
+  /**
+   * The destination as it is saved and remembered.
+   *
+   * For My Assets the path is deliberately empty rather than the resolved
+   * `personal/{sub}/`. The personal bucket is shared infrastructure and that prefix is an
+   * internal detail, so it must never be persisted into a user-visible saved location or
+   * rendered in a label. An empty path means "the connector's default root", which the
+   * prefix-defaulting effect resolves back to `personal/{sub}/` when the location is applied.
+   *
+   * It also keeps identity consistent: My Assets is one destination with no path dimension,
+   * which is accurate now that browsing inside it is not offered.
+   *
+   * For every other connector the *resolved* path is stored, not the raw `uploadPath`. A
+   * connector with allowed prefixes has its empty path replaced by `allowedPrefixes[0]` by
+   * the defaulting effect, so storing "" would leave the entry permanently unmatched: the
+   * user would pick it and immediately see the dropdown fall back to the plain connector
+   * entry with the star showing "not saved".
+   *
+   * Declared here, above the Uppy effects, because those depend on it.
+   */
+  const persistablePath = isMyAssetsSelected
+    ? ""
+    : normalizeUploadPath(uploadPath || allowedPrefixes[0]);
+
+  // Default the path to the first allowed prefix when the connector restricts them and no
+  // path is set yet. This covers My Assets too, whose only allowed prefix is the user's
+  // personal folder — so it lands on `personal/{sub}/` by default but no longer forces the
+  // path back there on every render, which would have discarded a chosen sub-path.
   useEffect(() => {
-    if (isMyAssetsSelected && defaultObjectPrefix) {
-      const normalizedPrefix = defaultObjectPrefix.endsWith("/")
-        ? defaultObjectPrefix
-        : `${defaultObjectPrefix}/`;
-      setUploadPath(normalizedPrefix);
-      if (onPathChange) {
-        onPathChange(normalizedPrefix);
-      }
-      return;
-    }
     if (selectedConnector && allowedPrefixes.length > 0 && (!uploadPath || uploadPath === "/")) {
       const firstPrefix = allowedPrefixes[0];
       const normalizedPrefix = firstPrefix.endsWith("/") ? firstPrefix : `${firstPrefix}/`;
@@ -208,14 +428,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         onPathChange(normalizedPrefix);
       }
     }
-  }, [
-    selectedConnector,
-    allowedPrefixes,
-    uploadPath,
-    onPathChange,
-    isMyAssetsSelected,
-    defaultObjectPrefix,
-  ]);
+  }, [selectedConnector, allowedPrefixes, uploadPath, onPathChange]);
 
   // Initialize Uppy when the component mounts
   useEffect(() => {
@@ -309,6 +522,16 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           5000
         );
       }
+      // Remember where this actually went so the next uploader open restores it.
+      // Written on completion rather than per file, so one upload session is one write.
+      // persistablePath, not uploadPath — see its definition for why My Assets stores no path.
+      if (result.successful?.length > 0 && selectedConnector) {
+        rememberLastLocation({
+          connectorId: selectedConnector,
+          path: persistablePath,
+          collections: validatedCollections,
+        });
+      }
       if (onUploadComplete) {
         onUploadComplete(result.successful);
       }
@@ -332,8 +555,16 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       uppy.off("complete", handleComplete);
       uppy.off("cancel-all", handleCancelAll);
     };
-  }, [uppy, onUploadComplete, onUploadError, selectedCollections]);
-
+  }, [
+    uppy,
+    onUploadComplete,
+    onUploadError,
+    selectedCollections,
+    selectedConnector,
+    persistablePath,
+    validatedCollections,
+    rememberLastLocation,
+  ]);
   // Configure S3 upload when connector is selected
   useEffect(() => {
     if (!uppy || !selectedConnector) return;
@@ -519,13 +750,85 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     collectionIds,
   ]);
 
-  const handleConnectorChange = (event: SelectChangeEvent<string>) => {
-    // Prevent connector change during active uploads
+  /**
+   * Which dropdown entry is currently active. Derived from the destination rather than held
+   * in its own state, so the control always reflects reality: browse away from a saved
+   * location's path and it falls back to the plain connector entry; browse back and the
+   * saved entry lights up again.
+   */
+  const selectedDestinationKey = useMemo(() => {
+    if (!selectedConnector) return "";
+    const favorite = favoriteOptions.find(
+      (option) =>
+        option.connectorId === selectedConnector &&
+        normalizeUploadPath(option.path) === persistablePath
+    );
+    return favorite ? favorite.key : `conn:${selectedConnector}`;
+  }, [selectedConnector, persistablePath, favoriteOptions]);
+
+  const currentUploadLocation = useMemo<UploadLocation | null>(
+    () =>
+      selectedConnector
+        ? {
+            connectorId: selectedConnector,
+            path: persistablePath,
+            // Validated, not raw: saving, matching and remembering must all use one source,
+            // or a saved entry could carry dead collection ids (and then warn every time it
+            // is picked), and isSaved could stop matching an entry saved from a reconciled
+            // state.
+            collections: validatedCollections,
+          }
+        : null,
+    [selectedConnector, persistablePath, validatedCollections]
+  );
+
+  const currentConnectorName = isMyAssetsSelected
+    ? "My Assets"
+    : (selectedConnectorObj?.name ?? "");
+
+  /**
+   * Whether the destination can be named yet. For a shared connector the name comes from the
+   * connectors query, which is undefined until it resolves — saving before then would produce
+   * an unlabelled entry, so the control is disabled rather than silently doing nothing.
+   */
+  const isDestinationNamed = !!currentConnectorName;
+
+  const isCurrentLocationSaved = isSaved(currentUploadLocation);
+
+  const handleToggleSavedLocation = () => {
+    if (!currentUploadLocation || !currentConnectorName) return;
+    setDroppedCollectionNotice("");
+    toggleSavedLocation(currentUploadLocation);
+  };
+
+  const toggleSavedLocation = (location: UploadLocation) =>
+    toggleSaved(location, currentConnectorName, selectedConnectorObj?.storageIdentifier);
+
+  const handleDestinationChange = (event: SelectChangeEvent<string>) => {
+    // Prevent destination change during active uploads
     if (isUploading) {
-      console.warn("Cannot change connector while uploads are in progress");
+      console.warn("Cannot change destination while uploads are in progress");
       return;
     }
-    setSelectedConnector(event.target.value);
+
+    const key = event.target.value;
+    userTouchedDestinationRef.current = true;
+    setDroppedCollectionNotice("");
+
+    const favorite = favoriteOptions.find((option) => option.key === key);
+    if (favorite) {
+      applyUploadLocation({
+        connectorId: favorite.connectorId,
+        path: favorite.path,
+        collections: favorite.collections,
+      });
+      return;
+    }
+
+    const connectorOption = connectorOptions.find((option) => option.key === key);
+    if (!connectorOption) return;
+
+    setSelectedConnector(connectorOption.connectorId);
     // Reset path when connector changes - the useEffect will auto-set to first prefix if restricted
     setUploadPath("");
   };
@@ -589,24 +892,46 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           <Select
             labelId="connector-select-label"
             id="connector-select"
-            value={selectedConnector}
+            value={selectedDestinationKey}
             label={t("upload.connectorLabel")}
-            onChange={handleConnectorChange}
+            onChange={handleDestinationChange}
             disabled={isUploading}
           >
-            {hasMyAssets && (
-              <MenuItem value={defaultConnectorId}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <PersonIcon fontSize="small" color="primary" />
-                  My Assets
+            {favoriteOptions.length > 0 && (
+              <ListSubheader>
+                {t("upload.savedLocations.sectionTitle", "Saved locations")}
+              </ListSubheader>
+            )}
+            {favoriteOptions.map((option) => (
+              <MenuItem key={option.key} value={option.key}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                  <StarIcon fontSize="small" sx={{ color: "warning.main" }} />
+                  <Typography variant="body2" noWrap>
+                    {option.label}
+                  </Typography>
                 </Box>
               </MenuItem>
-            )}
-            {selectableConnectors.map((connector) => (
-              <MenuItem key={connector.id} value={connector.id}>
-                {connector.name} ({connector.storageIdentifier})
-              </MenuItem>
             ))}
+
+            {favoriteOptions.length > 0 && (
+              <ListSubheader>
+                {t("upload.savedLocations.allDestinations", "All destinations")}
+              </ListSubheader>
+            )}
+            {connectorOptions.map((option) =>
+              option.isMyAssets ? (
+                <MenuItem key={option.key} value={option.key}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <PersonIcon fontSize="small" color="primary" />
+                    My Assets
+                  </Box>
+                </MenuItem>
+              ) : (
+                <MenuItem key={option.key} value={option.key}>
+                  {option.label}
+                </MenuItem>
+              )
+            )}
           </Select>
         </FormControl>
       )}
@@ -661,20 +986,22 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 )}
               </Typography>
             </Box>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setIsPathBrowserOpen(true)}
-              disabled={!selectedConnector || isUploading}
-              startIcon={<FolderIcon />}
-              sx={{
-                textTransform: "none",
-                borderRadius: "8px",
-                minWidth: "120px",
-              }}
-            >
-              {t("upload.browsePath")}
-            </Button>
+            {canBrowsePaths && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setIsPathBrowserOpen(true)}
+                disabled={!selectedConnector || isUploading}
+                startIcon={<FolderIcon />}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  minWidth: "120px",
+                }}
+              >
+                {t("upload.browsePath")}
+              </Button>
+            )}
           </Box>
           {allowedPrefixes.length > 0 && (
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
@@ -684,6 +1011,72 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             </Typography>
           )}
         </Paper>
+      )}
+
+      {/* Save the whole destination — connector, path and selected collections — so it can
+          be picked straight from the dropdown next time. The destination itself is already
+          displayed above, so this is the action only. Rename/reorder and marking one as the
+          default are a later phase; the last-used location is what auto-populates today. */}
+      {selectedConnector && (
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Tooltip
+            title={
+              isCurrentLocationSaved
+                ? t("upload.savedLocations.remove", "Remove this saved location")
+                : isAtCapacity
+                  ? t("upload.savedLocations.atCapacity", {
+                      count: maxFavorites,
+                      defaultValue: "You can save up to {{count}} locations",
+                    })
+                  : t("upload.savedLocations.save", "Save this location")
+            }
+            arrow
+          >
+            <span>
+              <IconButton
+                size="small"
+                data-testid="save-upload-location-button"
+                onClick={handleToggleSavedLocation}
+                disabled={
+                  isUploading || !isDestinationNamed || (!isCurrentLocationSaved && isAtCapacity)
+                }
+                aria-label={
+                  isCurrentLocationSaved
+                    ? t("upload.savedLocations.remove", "Remove this saved location")
+                    : t("upload.savedLocations.save", "Save this location")
+                }
+                sx={{ color: isCurrentLocationSaved ? "warning.main" : "text.secondary" }}
+              >
+                {isCurrentLocationSaved ? (
+                  <StarIcon fontSize="small" />
+                ) : (
+                  <StarBorderIcon fontSize="small" />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      )}
+
+      {collectionWarnings.length > 0 && (
+        <Alert
+          severity="warning"
+          data-testid="dropped-collections-notice"
+          // Only offer dismissal when the message is the dismissible one. The
+          // selected-collections message is derived from current state and would reappear on
+          // the next render, and a close button that does nothing is worse than none.
+          onClose={
+            droppedCollectionNotice && droppedSelectedCollections.length === 0
+              ? () => setDroppedCollectionNotice("")
+              : undefined
+          }
+        >
+          {collectionWarnings.map((message) => (
+            <Typography key={message} variant="body2">
+              {message}
+            </Typography>
+          ))}
+        </Alert>
       )}
 
       <Box sx={{ mt: 2 }}>
@@ -709,7 +1102,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         )}
       </Box>
 
-      {selectedConnector && !isMyAssetsSelected && (
+      {selectedConnector && !isMyAssetsSelected && canBrowsePaths && (
         <PathBrowser
           open={isPathBrowserOpen}
           onClose={() => setIsPathBrowserOpen(false)}
@@ -717,6 +1110,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           allowedPrefixes={allowedPrefixes}
           initialPath={uploadPath}
           onPathSelect={(newPath) => {
+            userTouchedDestinationRef.current = true;
             // Normalize path format: ensure consistent trailing slash if not root
             const normalizedPath =
               newPath && newPath !== "/"

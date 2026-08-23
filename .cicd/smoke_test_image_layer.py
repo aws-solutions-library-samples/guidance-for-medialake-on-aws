@@ -110,7 +110,9 @@ for fmt, alpha in [("jpg", False), ("png", True)]:
         print(f"[smoke] FAIL proxy src={fmt} alpha={alpha}: {e}")
         failures += 1
 
-# thumbnail: resize to 300w, always PNG
+# thumbnail: resize to 300w, always WebP (BUG-23 — new thumbnails use WebP for
+# ~10-20x bytes savings over the previous lossless PNG). Existing PNG thumbnails
+# on S3 are left as-is; only newly-generated ones are WebP.
 for crop in (False, True):
     for fmt, alpha in [("jpg", False), ("png", True)]:
         try:
@@ -121,11 +123,16 @@ for crop in (False, True):
                 thumb = thumb.flatten(background=[255, 255, 255])
             if thumb.bands > 3:
                 thumb = thumb.extract_band(0, n=3)
-            data = thumb.write_to_buffer(".png[compression=9,strip]")
+            data = thumb.write_to_buffer(".webp[Q=85,strip]")
             out = pyvips.Image.new_from_buffer(data, "")
             assert out.width <= 301, f"thumb too wide: {out.width}"
+            # WebP files start with "RIFF"..."WEBP" magic. Confirm we didn't
+            # silently fall back to another format when libwebp is missing.
+            assert (
+                data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+            ), f"thumbnail buffer is not WebP (first 12 bytes: {data[:12]!r})"
             print(
-                f"[smoke] thumb crop={crop} src={fmt} alpha={alpha} -> PNG {out.width}x{out.height} OK"
+                f"[smoke] thumb crop={crop} src={fmt} alpha={alpha} -> WebP {out.width}x{out.height} OK"
             )
         except Exception as e:  # noqa: BLE001
             print(f"[smoke] FAIL thumb crop={crop} src={fmt} alpha={alpha}: {e}")

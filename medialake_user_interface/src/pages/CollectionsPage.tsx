@@ -77,6 +77,8 @@ import { ActiveFilterChips } from "../components/collections/ActiveFilterChips";
 import { CollectionGroupsList, CollectionGroupForm } from "@/features/collection-groups";
 import type { CollectionGroup } from "@/features/collection-groups";
 import AssetPagination from "@/components/shared/AssetPagination";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { jwtDecode } from "jwt-decode";
 
@@ -484,6 +486,19 @@ const CollectionsPage: React.FC = () => {
 
   const rootCollections = filteredCollections;
 
+  // The shared tabs come back whole from their own hooks rather than paged by
+  // the server, so they paginate on the client.
+  const isSharedTab = activeTab === "sharedWithMe" || activeTab === "sharedByMe";
+  const {
+    page: sharedPage,
+    pageSize: sharedPageSize,
+    paginatedItems: paginatedSharedCollections,
+    setPage: setSharedPage,
+    setPageSize: setSharedPageSize,
+  } = usePagination(rootCollections, { resetOn: [activeTab, searchText] });
+
+  const displayedCollections = isSharedTab ? paginatedSharedCollections : rootCollections;
+
   // Total count: use API pagination for all/myCollections tabs, local count for shared tabs
   const totalCollections = useMemo(() => {
     if (activeTab === "sharedWithMe" || activeTab === "sharedByMe") {
@@ -497,7 +512,7 @@ const CollectionsPage: React.FC = () => {
     setPage(1);
   }, [activeTab, searchText, sortField, sortDirection, pageSize, appliedFilters]);
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (value: number) => {
     setPage(value);
     // Scroll to top of the collections grid
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1032,24 +1047,32 @@ const CollectionsPage: React.FC = () => {
         ) : (
           /* Card grid — see `cardGridSx` for the column rule. */
           <Box sx={cardGridSx}>
-            {rootCollections.map((collection) =>
+            {displayedCollections.map((collection) =>
               renderCollectionCard(collection, { withActions: true, withSearchContext: true })
             )}
           </Box>
         )}
-        {/* Pagination — only for tabs with server-side pagination */}
-        {totalCollections > 0 &&
-          activeTab !== "sharedWithMe" &&
-          activeTab !== "sharedByMe" &&
-          !isGroupsTab && (
-            <AssetPagination
-              page={page}
-              pageSize={pageSize}
-              totalResults={totalCollections}
-              onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
-            />
-          )}
+        {/* Server-side pagination for the tabs the API pages for us. */}
+        {totalCollections > 0 && !isSharedTab && !isGroupsTab && (
+          <AssetPagination
+            page={page}
+            pageSize={pageSize}
+            totalResults={totalCollections}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
+        {/* Client-side pagination for the shared tabs. */}
+        {totalCollections > 0 && isSharedTab && (
+          <PaginationFooter
+            page={sharedPage}
+            pageSize={sharedPageSize}
+            totalItems={rootCollections.length}
+            onPageChange={setSharedPage}
+            onPageSizeChange={setSharedPageSize}
+            sx={{ mt: 6, mb: 2 }}
+          />
+        )}
       </PageContent>
 
       {/* Edit Collection Modal */}

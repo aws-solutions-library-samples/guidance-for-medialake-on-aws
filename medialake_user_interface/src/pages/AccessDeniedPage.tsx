@@ -37,12 +37,37 @@ const AccessDeniedPage: React.FC = () => {
     }
   }, []);
 
-  const handleGoBack = () => {
-    navigate(-1);
+  /**
+   * Whether there is an in-app history entry behind this one.
+   *
+   * React Router tracks its index into the session history on
+   * `window.history.state.idx`. An index of 0 means this page is the first entry
+   * in the session, so `navigate(-1)` would leave the app entirely rather than
+   * return to it — which happens on a deep link into a guarded route, a link
+   * opened from another app, a fresh tab, or a refresh while already here.
+   * Denials redirect with `replace`, so the route that was denied is overwritten
+   * rather than left behind, making index 0 a normal occurrence.
+   *
+   * A missing or non-numeric index is treated as "no history" so the fallback
+   * keeps the user inside the app.
+   */
+  const canGoBackInApp = (): boolean => {
+    const index = (window.history.state as { idx?: number } | null)?.idx;
+    return typeof index === "number" && index > 0;
   };
 
+  // Replace so this page leaves the history stack — otherwise a single press of
+  // browser Back lands the user right back on the access-denied screen.
   const handleGoHome = () => {
-    navigate("/");
+    navigate("/", { replace: true });
+  };
+
+  const handleGoBack = () => {
+    if (canGoBackInApp()) {
+      navigate(-1);
+    } else {
+      handleGoHome();
+    }
   };
 
   return (

@@ -42,35 +42,33 @@ function computeChipDisplay(
 // ---------------------------------------------------------------------------
 
 /** A non-empty metadata key. */
-const metadataKey = fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.length > 0);
+const metadataKey = fc.string({ minLength: 1, maxLength: 20 });
 
 /** A metadata value (may be empty). */
 const metadataValue = fc.string({ maxLength: 30 });
 
 /**
- * Generate a customMetadata object with exactly `n` unique entries.
- * Uses a set-based approach to guarantee uniqueness.
+ * Generate a customMetadata object whose key count is within [minKeys, maxKeys].
+ *
+ * `fc.dictionary` enforces the key count on the object it produces. The earlier
+ * version drew a count with `fc.integer` and then `chain`ed an array of that
+ * length, which fast-check cannot shrink coherently: shrinking the count and
+ * shrinking the array happen independently, so a counterexample could pair a
+ * "4 or more" count with a 3-key object. That made the `n > 3` test below fail
+ * intermittently, depending only on the random seed.
  */
-function metadataWithExactCount(n: number) {
-  return fc.uniqueArray(metadataKey, { minLength: n, maxLength: n }).chain((keys) =>
-    fc.tuple(...keys.map(() => metadataValue)).map((values) => {
-      const obj: Record<string, string> = {};
-      keys.forEach((k, i) => {
-        obj[k] = values[i];
-      });
-      return obj;
-    })
-  );
+function metadataWithKeyCount(minKeys: number, maxKeys: number) {
+  return fc.dictionary(metadataKey, metadataValue, { minKeys, maxKeys });
 }
 
 /** Metadata with 1-3 entries. */
-const smallMetadataArb = fc.integer({ min: 1, max: 3 }).chain(metadataWithExactCount);
+const smallMetadataArb = metadataWithKeyCount(1, 3);
 
 /** Metadata with >3 entries (4-15). */
-const largeMetadataArb = fc.integer({ min: 4, max: 15 }).chain(metadataWithExactCount);
+const largeMetadataArb = metadataWithKeyCount(4, 15);
 
 /** Metadata with 0+ entries (general). */
-const anyMetadataArb = fc.integer({ min: 0, max: 15 }).chain(metadataWithExactCount);
+const anyMetadataArb = metadataWithKeyCount(0, 15);
 
 // ---------------------------------------------------------------------------
 // Property 7: metadata chips display correct count with overflow
@@ -106,6 +104,11 @@ describe("Feature: collections-custom-metadata, Property 7: metadata chips displ
     fc.assert(
       fc.property(smallMetadataArb, (metadata) => {
         const n = Object.keys(metadata).length;
+        // Assert the generator's own contract, so a bad arbitrary fails here
+        // rather than surfacing as a confusing assertion further down.
+        expect(n).toBeGreaterThanOrEqual(1);
+        expect(n).toBeLessThanOrEqual(3);
+
         const result = computeChipDisplay(metadata);
 
         expect(result).not.toBeNull();
@@ -126,6 +129,10 @@ describe("Feature: collections-custom-metadata, Property 7: metadata chips displ
     fc.assert(
       fc.property(largeMetadataArb, (metadata) => {
         const n = Object.keys(metadata).length;
+        // Assert the generator's own contract. Previously this precondition
+        // could be violated silently, which is what made the test flaky.
+        expect(n).toBeGreaterThan(3);
+
         const result = computeChipDisplay(metadata);
 
         expect(result).not.toBeNull();

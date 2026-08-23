@@ -47,6 +47,7 @@ const EnvironmentList: React.FC<EnvironmentListProps> = memo(({ table, onFilterC
         activeSorting={activeSorting}
         onRemoveFilter={onRemoveFilter}
         onRemoveSort={onRemoveSort}
+        enablePagination
         emptyState={{
           message: t("common.noEnvironmentsFound"),
           icon: <EnvironmentIcon sx={{ fontSize: 40 }} />,

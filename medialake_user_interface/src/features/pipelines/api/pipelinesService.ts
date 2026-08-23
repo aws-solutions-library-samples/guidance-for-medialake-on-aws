@@ -1,4 +1,5 @@
 import { apiClient } from "@/api/apiClient";
+import type { AxiosRequestConfig } from "axios";
 import { PIPELINES_API } from "./pipelines.endpoints";
 import type {
   Pipeline,
@@ -11,8 +12,24 @@ import type {
 import type { TriggerPipelineGroup, TriggerPipelineResponse } from "@/api/types/pipeline.types";
 
 export class PipelinesService {
-  static async getPipelines(): Promise<PipelinesResponse> {
-    const response = await apiClient.get<PipelinesResponse>(PIPELINES_API.endpoints.GET_PIPELINES);
+  /**
+   * List pipelines.
+   *
+   * @param options.skipAccessDeniedRedirect When true, a 403 from this request will
+   *   be rejected to the caller instead of navigating the whole app to
+   *   /access-denied. Use this from surfaces where pipelines are an optional
+   *   add-on (e.g. the batch operations sidebar) so users without
+   *   `pipelines:view` are not ejected from the page they are on.
+   */
+  static async getPipelines(options?: {
+    skipAccessDeniedRedirect?: boolean;
+  }): Promise<PipelinesResponse> {
+    const response = await apiClient.get<PipelinesResponse>(
+      PIPELINES_API.endpoints.GET_PIPELINES,
+      options?.skipAccessDeniedRedirect
+        ? ({ skipAccessDeniedRedirect: true } as AxiosRequestConfig)
+        : undefined
+    );
     return response.data;
   }
 

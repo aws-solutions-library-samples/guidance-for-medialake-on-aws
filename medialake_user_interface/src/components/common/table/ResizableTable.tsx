@@ -16,6 +16,7 @@ import { Virtualizer } from "@tanstack/react-virtual";
 import { TableHeader } from "./TableHeader";
 import { TableCellContent } from "./TableCellContent";
 import { EmptyTableState, EmptyTableStateProps } from "./EmptyTableState";
+import { TablePaginationFooter } from "./TablePaginationFooter";
 import { useTableDensity } from "../../../contexts/TableDensityContext";
 import { useTranslation } from "react-i18next";
 
@@ -36,6 +37,18 @@ interface ResizableTableProps<T> {
   onToggleActive?: (id: string, active: boolean) => void;
   // Empty state configuration
   emptyState?: EmptyTableStateProps;
+  /**
+   * Render the shared pagination footer. The table must be built with
+   * `getPaginationRowModel()` and supply `pagination` state for this to work.
+   */
+  enablePagination?: boolean;
+  /** Page-size choices for the footer. Defaults to PAGE_SIZE_OPTIONS. */
+  pageSizeOptions?: number[];
+  /**
+   * For cursor paginated sources where more rows may still be fetched. See
+   * `useInfiniteTablePagination`.
+   */
+  hasMorePages?: boolean;
 }
 
 const useTableStyles = (
@@ -177,6 +190,9 @@ export function ResizableTable<T>({
   onRowClick,
   onFilterClick,
   emptyState,
+  enablePagination = false,
+  pageSizeOptions,
+  hasMorePages,
 }: ResizableTableProps<T>) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -206,8 +222,6 @@ export function ResizableTable<T>({
         display: "flex",
         flexDirection: "column",
       }}
-      role="grid"
-      aria-label={t("common.breadcrumb.ariaLabels.dataTable", "Data table")}
     >
       <Paper
         elevation={0}
@@ -242,7 +256,11 @@ export function ResizableTable<T>({
           }}
           component={Box}
         >
-          <Table stickyHeader sx={styles.table} role="grid">
+          <Table
+            stickyHeader
+            sx={styles.table}
+            aria-label={t("common.breadcrumb.ariaLabels.dataTable", "Data table")}
+          >
             <TableHead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} role="row">
@@ -291,7 +309,6 @@ export function ResizableTable<T>({
                             position: "relative",
                             overflow: "visible",
                           }}
-                          role="gridcell"
                         >
                           {React.isValidElement(content) ? (
                             content
@@ -308,6 +325,13 @@ export function ResizableTable<T>({
           </Table>
         </TableContainer>
       </Paper>
+      {enablePagination && (
+        <TablePaginationFooter
+          table={table}
+          pageSizeOptions={pageSizeOptions}
+          hasMore={hasMorePages}
+        />
+      )}
     </Box>
   );
 }

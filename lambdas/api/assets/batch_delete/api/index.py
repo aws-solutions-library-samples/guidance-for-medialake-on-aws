@@ -3,6 +3,7 @@ Batch Asset Deletion API Handler
 =================================
 Handles batch deletion operations:
 - DELETE /assets/batch - Create a new batch delete job
+- DELETE /assets/batch/{jobId} - Delete a terminal batch delete job record
 - GET /assets/batch/user - List user's batch delete jobs
 - PUT /assets/batch/{jobId}/cancel - Cancel a running batch delete job
 
@@ -411,6 +412,80 @@ def cancel_job(user_id: str, job_id: str) -> Dict[str, Any]:
         raise BatchDeleteError(f"Failed to cancel job: {str(e)}")
 
 
+# Statuses from which a job record may be removed. A job still in flight is
+# deliberately NOT deletable — deleting the record out from under a running
+# Step Functions execution orphans the execution and makes the aggregator
+# write to a row that no longer exists. Callers must cancel first.
+TERMINAL_JOB_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+
+
+@tracer.capture_method
+def delete_job(user_id: str, job_id: str) -> Dict[str, Any]:
+    """Delete a terminal batch-delete job record.
+
+    BUG-26 (backend half). The notification panel surfaces batch-delete jobs
+    as ``sticky-dismissible`` entries, but there was no endpoint that could
+    actually remove one — ``endpoints.ts`` only exposed
+    ``BATCH_DELETE_CANCEL`` (``/assets/batch/{jobId}/cancel``), which stops an
+    in-flight execution rather than clearing a finished job. The result was
+    that clicking Dismiss on a completed batch-delete hid the entry for that
+    browser only; the row stayed in DynamoDB and reappeared on reload or for
+    any other session.
+
+    Ownership is enforced structurally: ``get_job`` queries the caller's own
+    ``USER#{sub}`` partition, so a caller can only ever address their own
+    jobs. A job id belonging to someone else simply isn't found and returns
+    404 rather than leaking its existence.
+    """
+    try:
+        job = get_job(user_id, job_id)
+
+        current_status = job.get("status", "UNKNOWN")
+        if current_status not in TERMINAL_JOB_STATUSES:
+            # 409 rather than 400: the request is well-formed, it's the
+            # resource's current state that makes it unsatisfiable. Tell the
+            # caller exactly how to proceed.
+            raise BatchDeleteError(
+                (
+                    f"Cannot delete a job with status {current_status}. "
+                    f"Cancel the job first (PUT /assets/batch/{job_id}/cancel), "
+                    "then delete it."
+                ),
+                HTTPStatus.CONFLICT,
+            )
+
+        jobs_table.delete_item(
+            Key={
+                "userId": job["userId"],
+                "itemKey": job["itemKey"],
+            }
+        )
+
+        logger.info(
+            "Deleted batch delete job record",
+            extra={"job_id": job_id, "status": current_status},
+        )
+        metrics.add_metric("BatchDeleteJobsDeleted", MetricUnit.Count, 1)
+
+        return {
+            "status": "success",
+            "message": "Job deleted successfully",
+            "job": {
+                "jobId": job_id,
+                "status": current_status,
+            },
+        }
+
+    except BatchDeleteError:
+        raise
+    except ClientError as e:
+        logger.error(f"DynamoDB error deleting job {job_id}: {e}", exc_info=True)
+        raise BatchDeleteError(f"Failed to delete job: {e}")
+    except Exception as e:
+        logger.error(f"Error deleting job {job_id}: {str(e)}", exc_info=True)
+        raise BatchDeleteError(f"Failed to delete job: {str(e)}")
+
+
 def create_response(
     status: int, msg: str, data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
@@ -590,6 +665,56 @@ def handle_cancel_job(event: Dict[str, Any]) -> Dict[str, Any]:
         )
 
 
+@tracer.capture_method
+def handle_delete_job(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle DELETE /assets/batch/{jobId} — remove a finished job record.
+
+    BUG-26: paired with the UI-half fix that routes the notification Dismiss
+    action by ``jobType``. With this endpoint in place a completed
+    batch-delete notification can be cleared for real instead of hidden
+    per-browser.
+    """
+    if not jobs_table:
+        return create_response(
+            HTTPStatus.INTERNAL_SERVER_ERROR, "Jobs table not configured"
+        )
+
+    try:
+        user_id = get_user_id_from_event(event)
+        path_params = event.get("pathParameters") or {}
+        job_id = path_params.get("jobId")
+
+        if not job_id:
+            return create_response(HTTPStatus.BAD_REQUEST, "Job ID is required")
+
+        logger.info(f"Deleting batch delete job {job_id} for user {user_id}")
+
+        result = delete_job(user_id, job_id)
+
+        return {
+            "statusCode": HTTPStatus.OK,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Content-Type,Authorization",
+                "Access-Control-Allow-Methods": "GET,DELETE,PUT,OPTIONS",
+            },
+            "body": json.dumps(result, cls=DecimalEncoder),
+        }
+
+    except BatchDeleteError as e:
+        return create_response(e.status_code, str(e))
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        return create_response(HTTPStatus.UNAUTHORIZED, "Unauthorized")
+    except Exception as e:
+        logger.error(f"Error deleting job: {str(e)}", exc_info=True)
+        return create_response(
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            "Failed to delete batch delete job",
+        )
+
+
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
@@ -598,16 +723,32 @@ def lambda_handler(event: Dict[str, Any], _ctx: LambdaContext) -> Dict[str, Any]
     Lambda handler for batch asset deletion operations.
     Supports:
     - DELETE /assets/batch - Create batch delete job
+    - DELETE /assets/batch/{jobId} - Delete a terminal batch delete job record
     - GET /assets/batch/user - List user's jobs
     - PUT /assets/batch/{jobId}/cancel - Cancel a job
     """
     try:
         http_method = event.get("httpMethod", "")
         path = event.get("path", "")
+        path_params = event.get("pathParameters") or {}
 
         logger.info(f"Batch delete API: {http_method} {path}")
 
-        if http_method == "DELETE" and not path.endswith("/cancel"):
+        if http_method == "DELETE" and path.endswith("/cancel"):
+            # Defensive: no DELETE is wired to /cancel, but never let a
+            # cancel-shaped path fall through to create.
+            return create_response(
+                HTTPStatus.METHOD_NOT_ALLOWED,
+                f"Method {http_method} not allowed for path {path}",
+            )
+        elif http_method == "DELETE" and path_params.get("jobId"):
+            # DELETE /assets/batch/{jobId} — remove a finished job record.
+            # Discriminated from the create route by the presence of the
+            # {jobId} path parameter, which API Gateway only populates on the
+            # {jobId} resource. Create (DELETE /assets/batch) has none.
+            return handle_delete_job(event)
+        elif http_method == "DELETE":
+            # DELETE /assets/batch — create a new batch delete job.
             return handle_create_job(event)
         elif http_method == "GET" and path.endswith("/user"):
             return handle_list_jobs(event)

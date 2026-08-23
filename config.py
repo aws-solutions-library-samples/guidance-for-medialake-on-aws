@@ -14,7 +14,6 @@ from pydantic import (
     field_validator,
     model_validator,
     root_validator,
-    validator,
 )
 
 
@@ -261,68 +260,307 @@ class UserConfig(BaseModel):
     last_name: str
 
 
+# Group ids that ship with every MediaLake deployment. Kept in sync with the
+# Cognito groups created in ``medialake_constructs/cognito.py`` and the DynamoDB
+# group records seeded by ``lambdas/auth/auth_seeder/index.py``.
+SYSTEM_GROUP_IDS = ("superAdministrators", "editors", "read-only")
+
+# Making one of these the JIT default would silently grant every federated user
+# full administrative access, so it requires an explicit opt-in.
+PRIVILEGED_GROUP_IDS = ("superAdministrators",)
+
+IDENTITY_PROVIDER_METHODS = ("cognito", "saml", "oidc")
+
+
 class IdentityProviderConfig(BaseModel):
+    """A single identity provider attached to the Cognito user pool.
+
+    ``identity_provider_method`` selects the shape of the remaining fields:
+
+    * ``cognito`` — the built-in user directory. No other fields are used.
+    * ``saml``    — requires ``identity_provider_name`` and
+      ``identity_provider_metadata_url``.
+    * ``oidc``    — requires ``identity_provider_name``, ``oidc_issuer_url``,
+      ``oidc_client_id`` and one of ``oidc_client_secret_arn`` (preferred) or
+      ``oidc_client_secret``.
+    """
+
     identity_provider_method: str
     identity_provider_name: Optional[str] = None
     identity_provider_metadata_url: Optional[str] = None
     identity_provider_metadata_path: Optional[str] = None
     identity_provider_arn: Optional[str] = None
 
-    @validator("identity_provider_method")
+    # ── OIDC-specific settings ───────────────────────────────────────────
+    oidc_issuer_url: Optional[str] = None
+    oidc_client_id: Optional[str] = None
+    # Preferred: the secret is resolved by CloudFormation at deploy time via a
+    # dynamic reference, so the value never lands in config.json or the
+    # synthesized template.
+    oidc_client_secret_arn: Optional[str] = None
+    oidc_client_secret_json_key: Optional[str] = None
+    # Escape hatch for environments without Secrets Manager. Discouraged: the
+    # literal value ends up in the CloudFormation template.
+    oidc_client_secret: Optional[str] = None
+    oidc_authorize_scopes: List[str] = Field(
+        default_factory=lambda: ["openid", "email", "profile"]
+    )
+    oidc_attributes_request_method: str = "GET"
+    # Claim on the IdP response that carries group membership. Mapped to the
+    # ``custom:groups`` user pool attribute and consumed by the inbound
+    # federation trigger when IdP group assertions are enabled.
+    oidc_groups_claim: str = "groups"
+    oidc_email_claim: str = "email"
+    oidc_given_name_claim: str = "given_name"
+    oidc_family_name_claim: str = "family_name"
+
+    @field_validator("identity_provider_method")
     @classmethod
-    def validate_provider_method(cls, v):
-        if v not in ["cognito", "saml"]:
-            raise ValueError(
-                'identity_provider_method must be either "cognito" or "saml"'
-            )
+    def validate_provider_method(cls, v: str) -> str:
+        if v not in IDENTITY_PROVIDER_METHODS:
+            allowed = ", ".join(f'"{m}"' for m in IDENTITY_PROVIDER_METHODS)
+            raise ValueError(f"identity_provider_method must be one of {allowed}")
         return v
 
-    @validator("identity_provider_name", "identity_provider_metadata_url")
+    @field_validator("oidc_attributes_request_method")
     @classmethod
-    def validate_saml_fields(cls, v, values):
-        if values.get("identity_provider_method") == "saml" and not v:
+    def validate_attributes_request_method(cls, v: str) -> str:
+        normalized = (v or "GET").upper()
+        if normalized not in ("GET", "POST"):
+            raise ValueError('oidc_attributes_request_method must be "GET" or "POST"')
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_provider_fields(self):
+        method = self.identity_provider_method
+
+        if method == "saml":
+            if not self.identity_provider_name:
+                raise ValueError("SAML provider requires identity_provider_name")
+            if not self.identity_provider_metadata_url:
+                raise ValueError(
+                    "SAML provider requires identity_provider_metadata_url"
+                )
+
+        elif method == "oidc":
+            missing = [
+                name
+                for name, value in (
+                    ("identity_provider_name", self.identity_provider_name),
+                    ("oidc_issuer_url", self.oidc_issuer_url),
+                    ("oidc_client_id", self.oidc_client_id),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError(
+                    "OIDC provider requires " + ", ".join(missing) + " to be set"
+                )
+            if not self.oidc_client_secret_arn and not self.oidc_client_secret:
+                raise ValueError(
+                    "OIDC provider requires either oidc_client_secret_arn "
+                    "(preferred) or oidc_client_secret"
+                )
+            if self.oidc_client_secret and not self.oidc_client_secret_arn:
+                warnings.warn(
+                    f"Identity provider '{self.identity_provider_name}' uses a "
+                    "literal oidc_client_secret. The value will be embedded in "
+                    "the CloudFormation template. Prefer oidc_client_secret_arn."
+                )
+            if not self.oidc_authorize_scopes:
+                raise ValueError(
+                    "OIDC provider requires at least one entry in oidc_authorize_scopes"
+                )
+            if "openid" not in [s.lower() for s in self.oidc_authorize_scopes]:
+                raise ValueError(
+                    'OIDC provider requires the "openid" scope in oidc_authorize_scopes'
+                )
+
+        return self
+
+
+class JitProvisioningConfig(BaseModel):
+    """Just-in-time (JIT) provisioning for federated (SAML/OIDC) users.
+
+    When ``enabled``, the first time a user signs in through an external
+    identity provider they are added to a default group so that they receive
+    baseline permissions in their very first token.
+
+    The assignment happens **exactly once per user**. A sentinel record is
+    written to the authorization table on first assignment, so group changes
+    made later by an administrator are never undone by a subsequent sign-in —
+    including the case where an administrator removes every group in order to
+    revoke access.
+
+    The *runtime* value of the default group lives in the system-settings
+    DynamoDB table and is editable from System Settings in the UI.
+    ``default_group`` here seeds that record and acts as the fallback when the
+    record is absent, so the feature still behaves predictably before an
+    administrator has visited the settings page.
+    """
+
+    enabled: bool = False
+    default_group: str = "read-only"
+
+    # Guard rail: assigning a privileged group by default would silently grant
+    # every federated user full administrative access.
+    allow_privileged_default_group: bool = False
+
+    # ── Phase 2: IdP group mapping ───────────────────────────────────────
+    # Attach the inbound federation trigger, which normalizes and remaps the
+    # group assertion coming from the IdP on every federated sign-in.
+    inbound_federation_trigger_enabled: bool = False
+    # Honour group assertions from the IdP. Off by default: an IdP that can
+    # assert arbitrary group names is a privilege-escalation path, so
+    # assertions are only ever accepted through ``idp_group_mapping``.
+    allow_idp_group_assertions: bool = False
+    # Maps a group name as asserted by the IdP to a MediaLake group id. Acts as
+    # the allowlist — an asserted group with no entry here is discarded.
+    idp_group_mapping: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("default_group")
+    @classmethod
+    def validate_default_group(cls, v: str) -> str:
+        if not v or not v.strip():
             raise ValueError(
-                "SAML provider requires identity_provider_name and identity_provider_metadata_url"
+                "jit_provisioning.default_group must be a non-empty group id"
             )
-        return v
+        return v.strip()
+
+    @model_validator(mode="after")
+    def validate_jit_settings(self):
+        if not self.enabled:
+            # Nothing is deployed or enforced when the feature is off, so skip
+            # the guard rails rather than blocking unrelated deployments.
+            return self
+
+        if (
+            self.default_group in PRIVILEGED_GROUP_IDS
+            and not self.allow_privileged_default_group
+        ):
+            raise ValueError(
+                f"jit_provisioning.default_group is '{self.default_group}', which grants "
+                "full administrative access to every user provisioned through an external "
+                "identity provider. If that is genuinely intended, set "
+                "jit_provisioning.allow_privileged_default_group to true. Otherwise choose "
+                f"a lower-privilege group such as 'read-only'. Built-in groups: "
+                f"{', '.join(SYSTEM_GROUP_IDS)}."
+            )
+
+        if self.default_group not in SYSTEM_GROUP_IDS:
+            # A custom group is legitimate, but it must exist as both a Cognito
+            # group and a GROUP#<id> record before the first federated sign-in.
+            # It cannot be verified at synth time because it lives in DynamoDB.
+            warnings.warn(
+                f"jit_provisioning.default_group '{self.default_group}' is not one of the "
+                f"built-in groups ({', '.join(SYSTEM_GROUP_IDS)}). Make sure a Cognito group "
+                "and a matching group record with that exact id exist, otherwise assigning "
+                "it during sign-in will fail."
+            )
+
+        for asserted, group_id in self.idp_group_mapping.items():
+            if not asserted or not str(asserted).strip():
+                raise ValueError(
+                    "jit_provisioning.idp_group_mapping contains an empty IdP group name"
+                )
+            if not group_id or not str(group_id).strip():
+                raise ValueError(
+                    "jit_provisioning.idp_group_mapping entry "
+                    f"'{asserted}' maps to an empty group id"
+                )
+            if (
+                group_id in PRIVILEGED_GROUP_IDS
+                and not self.allow_privileged_default_group
+            ):
+                raise ValueError(
+                    f"jit_provisioning.idp_group_mapping maps IdP group '{asserted}' to "
+                    f"'{group_id}', which grants full administrative access. Set "
+                    "jit_provisioning.allow_privileged_default_group to true to allow this."
+                )
+
+        if self.allow_idp_group_assertions and not self.idp_group_mapping:
+            warnings.warn(
+                "jit_provisioning.allow_idp_group_assertions is true but "
+                "idp_group_mapping is empty, so every group asserted by the identity "
+                "provider will be discarded and users will fall back to "
+                f"'{self.default_group}'."
+            )
+
+        if (
+            self.allow_idp_group_assertions
+            and not self.inbound_federation_trigger_enabled
+        ):
+            warnings.warn(
+                "jit_provisioning.allow_idp_group_assertions is true but "
+                "inbound_federation_trigger_enabled is false. Group assertions are read "
+                "from the custom:groups attribute, which is only populated when the "
+                "inbound federation trigger is attached."
+            )
+
+        return self
 
 
 class AuthConfig(BaseModel):
     identity_providers: List[IdentityProviderConfig] = [
         IdentityProviderConfig(identity_provider_method="cognito")
     ]
+    jit_provisioning: JitProvisioningConfig = Field(
+        default_factory=JitProvisioningConfig
+    )
 
-    @validator("identity_providers")
+    @field_validator("identity_providers")
     @classmethod
     def validate_providers(cls, v):
         if not v:
             raise ValueError("At least one identity provider must be configured")
 
-        # Check if at least one provider has valid method
-        valid_methods = ["saml", "cognito"]
-        has_valid_provider = False
-
-        for provider in v:
-            if provider.identity_provider_method in valid_methods:
-                has_valid_provider = True
-
-                # Additional validation for SAML providers
-                if provider.identity_provider_method == "saml":
-                    if not provider.identity_provider_name:
-                        raise ValueError(
-                            "SAML provider requires identity_provider_name"
-                        )
-                    if not provider.identity_provider_metadata_url:
-                        raise ValueError(
-                            "SAML provider requires identity_provider_metadata_url"
-                        )
-
-        if not has_valid_provider:
+        # Per-provider field requirements are enforced by
+        # IdentityProviderConfig.validate_provider_fields; this only checks the
+        # collection as a whole.
+        names = [
+            p.identity_provider_name
+            for p in v
+            if p.identity_provider_method in ("saml", "oidc")
+        ]
+        duplicates = {n for n in names if names.count(n) > 1}
+        if duplicates:
             raise ValueError(
-                "At least one provider must have identity_provider_method of 'saml' or 'cognito'"
+                "identity_provider_name must be unique across identity providers; "
+                f"duplicated: {', '.join(sorted(duplicates))}"
             )
 
+        # Cognito reserves these prefixes for its own social providers.
+        for name in names:
+            if name and name.lower() in (
+                "cognito",
+                "google",
+                "facebook",
+                "amazon",
+                "apple",
+            ):
+                raise ValueError(
+                    f"identity_provider_name '{name}' is reserved by Cognito; choose another name"
+                )
+
         return v
+
+    @model_validator(mode="after")
+    def validate_jit_requires_external_idp(self):
+        if not self.jit_provisioning.enabled:
+            return self
+
+        has_external_idp = any(
+            p.identity_provider_method in ("saml", "oidc")
+            for p in self.identity_providers
+        )
+        if not has_external_idp:
+            warnings.warn(
+                "authZ.jit_provisioning.enabled is true but no SAML or OIDC identity "
+                "provider is configured. Just-in-time provisioning only applies to "
+                "users arriving from an external identity provider, so it will never "
+                "take effect."
+            )
+        return self
 
 
 class ExistingVpcConfig(BaseModel):
@@ -597,6 +835,26 @@ class CDKConfig(BaseModel):
     external_nodes_bucket: Optional[str] = None
     ses_from_address: Optional[str] = None
     portal_rate_limit_per_5min: Optional[int] = 1000
+    temporary_password_validity_days: int = 7
+
+    @field_validator("temporary_password_validity_days", mode="before")
+    @classmethod
+    def _validate_temporary_password_validity_days(cls, v: Any) -> int:
+        """Days a Cognito temporary password stays valid before the user must
+        request a new one. Cognito allows 1-365 days; defaults to 7."""
+        if v is None or v == "":
+            return 7
+        if isinstance(v, bool):
+            raise ValueError(
+                "temporary_password_validity_days must be an integer, not a boolean"
+            )
+        v = int(v)
+        if not (1 <= v <= 365):
+            raise ValueError(
+                "temporary_password_validity_days must be between 1 and 365 "
+                "(Cognito maximum)"
+            )
+        return v
 
     @field_validator("portal_rate_limit_per_5min", mode="before")
     @classmethod

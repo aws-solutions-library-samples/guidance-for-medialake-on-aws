@@ -24,6 +24,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from connector_eventbridge_reconcile import sweep_orphan_rules_for_bucket
 from pydantic import BaseModel
 
 tracer = Tracer()
@@ -969,11 +970,25 @@ def update_bucket_notifications(
     return errors
 
 
+def _merge_cors_values(existing_values, required_values):
+    """Existing values first, then any required value not already present.
+
+    Used to reconcile an existing ``medialake-upload-*`` CORS rule rather than replacing
+    it: another deployment may legitimately share the bucket, so its origins/methods must
+    survive while the current deployment's are added.
+    """
+    merged = [value for value in (existing_values or [])]
+    for value in required_values or []:
+        if value not in merged:
+            merged.append(value)
+    return merged
+
+
 def manage_bucket_cors(
     s3_client, bucket_name: str, allow_uploads: bool, region: str
 ) -> dict | None:
     """
-    Add or skip CORS configuration for MediaLake uploads.
+    Add, reconcile, or skip CORS configuration for MediaLake uploads.
 
     Args:
         s3_client: S3 client instance
@@ -1096,17 +1111,27 @@ def manage_bucket_cors(
             "MaxAgeSeconds": 3600,
         }
 
-        # Check if a MediaLake upload rule already exists
-        has_medialake_rule = False
-        for rule in existing_rules:
-            rule_id = rule.get("ID", "")
-            if rule_id.startswith("medialake-upload-"):
-                has_medialake_rule = True
-                logger.info(f"Found existing MediaLake CORS rule: {rule_id}")
+        # Reconcile an existing MediaLake upload rule instead of skipping.
+        #
+        # The old behaviour bailed out as soon as any `medialake-upload-*` rule was
+        # present. A bucket reused across deployments (or any redeploy that changes
+        # the CloudFront domain) therefore kept a rule listing only the *previous*
+        # origin, so the connector reported success while every browser upload failed
+        # preflight with "No 'Access-Control-Allow-Origin' header is present".
+        #
+        # Existing origins are preserved — other deployments may legitimately share
+        # the bucket — we only ensure the current ones are present, and likewise
+        # top up the methods/headers the uploader relies on.
+        existing_rule = None
+        existing_rule_index = None
+        for index, rule in enumerate(existing_rules):
+            if str(rule.get("ID", "")).startswith("medialake-upload-"):
+                existing_rule = rule
+                existing_rule_index = index
+                logger.info(f"Found existing MediaLake CORS rule: {rule.get('ID')}")
                 break
 
-        # Append new rule if needed
-        if not has_medialake_rule:
+        if existing_rule is None:
             existing_rules.append(medialake_cors_rule)
             cors_rule_index = len(existing_rules) - 1
             logger.info(f"Adding MediaLake CORS rule at index {cors_rule_index}")
@@ -1120,11 +1145,54 @@ def manage_bucket_cors(
             )
 
             return {"corsRuleId": cors_rule_id, "corsRuleIndex": cors_rule_index}
-        else:
-            logger.warning(
-                f"MediaLake CORS rule already exists for bucket {bucket_name}, skipping creation"
+
+        def _merged(existing_values, required_values):
+            return _merge_cors_values(existing_values, required_values)
+
+        reconciled_rule = dict(existing_rule)
+        missing_origins = [
+            origin
+            for origin in allowed_origins
+            if origin not in (existing_rule.get("AllowedOrigins") or [])
+        ]
+        reconciled_rule["AllowedOrigins"] = _merged(
+            existing_rule.get("AllowedOrigins"), allowed_origins
+        )
+        reconciled_rule["AllowedMethods"] = _merged(
+            existing_rule.get("AllowedMethods"), medialake_cors_rule["AllowedMethods"]
+        )
+        reconciled_rule["AllowedHeaders"] = _merged(
+            existing_rule.get("AllowedHeaders"), medialake_cors_rule["AllowedHeaders"]
+        )
+        reconciled_rule["ExposeHeaders"] = _merged(
+            existing_rule.get("ExposeHeaders"), medialake_cors_rule["ExposeHeaders"]
+        )
+
+        existing_rule_id = str(existing_rule.get("ID", "")) or cors_rule_id
+
+        if reconciled_rule == existing_rule:
+            logger.info(
+                f"Existing MediaLake CORS rule {existing_rule_id} on bucket "
+                f"{bucket_name} already covers the current origins; no change needed"
             )
-            return None
+            return {
+                "corsRuleId": existing_rule_id,
+                "corsRuleIndex": existing_rule_index,
+            }
+
+        existing_rules[existing_rule_index] = reconciled_rule
+        s3_client.put_bucket_cors(
+            Bucket=bucket_name, CORSConfiguration={"CORSRules": existing_rules}
+        )
+        logger.info(
+            f"Reconciled MediaLake CORS rule {existing_rule_id} on bucket {bucket_name}; "
+            f"added origins: {missing_origins or 'none'}"
+        )
+
+        return {
+            "corsRuleId": existing_rule_id,
+            "corsRuleIndex": existing_rule_index,
+        }
 
     except Exception as e:
         error_msg = f"Error configuring CORS for bucket {bucket_name}: {str(e)}"
@@ -1753,10 +1821,18 @@ def create_connector(createconnector: S3Connector) -> dict:
             # Add user table for WRITE access (activity tracking, §9.3, Req 11.3).
             # The ingest lambda calls record_collection_activity to upsert
             # recency rows after upload-source association.
+            #
+            # BUG-9 cascade: the ingest lambda also invokes AssetDeletionService
+            # when a source S3 object is deleted, which cleans up user favorites
+            # referencing that asset via a Query on the user table's GSI2. Grant
+            # the index resource explicitly so the query does not fail closed
+            # (the favorites cleanup is best-effort, but silent auth failures
+            # would leave orphans without any signal).
             user_table_name = os.environ.get("USER_TABLE_NAME", "")
             if user_table_name:
                 user_table_arn = f"arn:aws:dynamodb:{bucket_region}:{account_id}:table/{user_table_name}"
                 dynamodb_resources.append(user_table_arn)
+                dynamodb_resources.append(f"{user_table_arn}/index/*")
 
             dynamodb_policy = {
                 "Version": "2012-10-17",
@@ -2343,6 +2419,41 @@ def create_connector(createconnector: S3Connector) -> dict:
             except Exception as cleanup_error:
                 logger.error(
                     f"Error cleaning up {resource_type} {resource_id}: {str(cleanup_error)}"
+                )
+
+        # BUG-22 belt-and-suspenders sweep. The reverse-walk above only cleans
+        # up resources that made it into ``created_resources``. If the Lambda
+        # timed out between ``eventbridge.put_rule`` and the corresponding
+        # ``created_resources.append`` (or if the cleanup's ``delete_rule``
+        # itself raised), an orphan rule can still be left on the bucket —
+        # every S3 object event then fires it and every invocation fails,
+        # forever, with no signal in the deploy account other than a growing
+        # ``FailedInvocations`` metric. Confirmed on ml-uat-small during QA
+        # passes 2 and 3 (rules ...-0eza and ...-9ncp).
+        #
+        # After the reverse-walk, defensively scan every rule named after
+        # this bucket and delete the ones whose SQS targets no longer resolve.
+        # Uses the shared helper so the connector-DELETE handler and the
+        # scheduled reconciler can behave identically.
+        if eventbridge is not None and sqs is not None and s3_bucket:
+            try:
+                sweep_result = sweep_orphan_rules_for_bucket(
+                    eventbridge, sqs, s3_bucket, logger=logger
+                )
+                if sweep_result.deleted:
+                    logger.info(
+                        "create-failure sweep cleaned up orphan EventBridge rules",
+                        extra={
+                            "bucket": s3_bucket,
+                            "deleted": sweep_result.deleted,
+                            "skipped_live": sweep_result.skipped_live,
+                            "skipped_error": sweep_result.skipped_error,
+                        },
+                    )
+            except Exception as sweep_error:  # noqa: BLE001
+                logger.warning(
+                    "create-failure orphan sweep raised; ignoring so response is not blocked",
+                    extra={"bucket": s3_bucket, "error": str(sweep_error)},
                 )
 
         return {

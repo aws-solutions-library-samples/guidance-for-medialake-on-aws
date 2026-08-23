@@ -8,6 +8,9 @@ export default {
     hindi: "हिन्दी",
     arabic: "अरबी",
     hebrew: "हिब्रू",
+    spanish: "स्पेनिश",
+    japanese: "जापानी",
+    korean: "कोरियाई",
   },
   assetsPage: {
     title: "संपत्तियाँ",
@@ -59,6 +62,21 @@ export default {
       emptySection: "कोई संग्रह नहीं",
       loading: "लोड हो रहा है\u2026",
       more: "और",
+    },
+    savedLocations: {
+      sectionTitle: "सहेजे गए गंतव्य",
+      allDestinations: "सभी गंतव्य",
+      save: "इस गंतव्य को सहेजें",
+      remove: "इस सहेजे गए गंतव्य को हटाएँ",
+      atCapacity: "आप अधिकतम {{count}} गंतव्य सहेज सकते हैं",
+      collectionsUnavailable_one:
+        "इस गंतव्य के साथ सहेजा गया कलेक्शन अब उपलब्ध नहीं है और हटा दिया गया: {{names}}",
+      collectionsUnavailable_other:
+        "इस गंतव्य के साथ सहेजे गए {{count}} कलेक्शन अब उपलब्ध नहीं हैं और हटा दिए गए: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "चयनित कलेक्शन अब उपलब्ध नहीं है और लागू नहीं किया जाएगा: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "चयनित {{count}} कलेक्शन अब उपलब्ध नहीं हैं और लागू नहीं किए जाएंगे: {{names}}",
     },
   },
   pathBrowser: {
@@ -844,7 +862,6 @@ export default {
   },
   roles: {
     title: "भूमिका प्रबंधन",
-    description: "सिस्टम भूमिकाओं और उनके अनुमतियों का प्रबंधन करें",
     actions: {
       addRole: "भूमिका जोड़ें",
     },
@@ -895,6 +912,23 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "मेटाडेटा फ़ील्ड्स",
+        jitProvisioning: "उपयोगकर्ता प्रावधान",
+      },
+      jitProvisioning: {
+        title: "जस्ट-इन-टाइम उपयोगकर्ता प्रावधान",
+        description:
+          "वह समूह चुनें जो उपयोगकर्ताओं को बाहरी पहचान प्रदाता के माध्यम से पहली बार साइन इन करने पर सौंपा जाए। समूह प्रति उपयोगकर्ता केवल एक बार लागू होता है, इसलिए बाद में किसी को दूसरे समूह में ले जाने पर अगली साइन-इन से वह पूर्ववत नहीं होता।",
+        enabledLabel: "नए फ़ेडरेटेड उपयोगकर्ताओं को डिफ़ॉल्ट समूह सौंपें",
+        defaultGroupLabel: "डिफ़ॉल्ट समूह",
+        defaultGroupHelp:
+          "नए फ़ेडरेटेड उपयोगकर्ताओं को पहली साइन-इन पर इस समूह की अनुमतियाँ मिलती हैं।",
+        groupRequired: "जस्ट-इन-टाइम प्रावधान सक्षम करने से पहले एक समूह चुनें।",
+        noGroups: "कोई समूह उपलब्ध नहीं",
+        capabilityDisabled:
+          "इस परिनियोजन में जस्ट-इन-टाइम प्रावधान सक्षम नहीं है। परिनियोजन कॉन्फ़िगरेशन में authZ.jit_provisioning.enabled सेट करें और फिर से परिनियोजित करें, तभी ये सेटिंग्स प्रभावी होंगी।",
+        lastUpdated: "अंतिम अद्यतन",
+        loadError: "जस्ट-इन-टाइम प्रावधान सेटिंग्स लोड नहीं हो सकीं।",
+        saveSuccess: "जस्ट-इन-टाइम प्रावधान सेटिंग्स सहेजी गईं।",
       },
       search: {
         title: "खोज विन्यास",
@@ -1066,6 +1100,16 @@ export default {
     error: "त्रुटि",
     language: "भाषा",
     noResults: "कोई परिणाम नहीं मिला",
+    pagination: {
+      showingRange: "{{total}} परिणामों में से {{first}} - {{last}} दिखा रहे हैं",
+      showingFiltered: "{{count}} फ़िल्टर किए गए परिणाम दिखा रहे हैं",
+      rowsPerPage: "प्रति पृष्ठ पंक्तियाँ",
+      goToPage: "पृष्ठ {{page}} पर जाएँ",
+      first: "पहले पृष्ठ पर जाएँ",
+      last: "अंतिम पृष्ठ पर जाएँ",
+      next: "अगले पृष्ठ पर जाएँ",
+      previous: "पिछले पृष्ठ पर जाएँ",
+    },
     selectFilter: "फ़िल्टर चुनें",
     textFilter: "पाठ फ़िल्टर",
     all: "सभी",
@@ -1282,8 +1326,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "संपादित करें type",
       deleteType: "हटाएं type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "अनुमति set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1723,6 +1765,8 @@ export default {
       errorResettingPassword:
         "पासवर्ड रीसेट करने में विफल। कृपया अपना कोड जांचें और पुनः प्रयास करें।",
       passwordMismatch: "पासवर्ड मेल नहीं खाते।",
+      tempPasswordResent:
+        "आपके खाते में अभी भी एक अस्थायी पासवर्ड लंबित है, इसलिए एक नया अस्थायी पासवर्ड आपको ईमेल कर दिया गया है। अस्थायी पासवर्ड से साइन इन करें और आपसे स्थायी पासवर्ड सेट करने के लिए कहा जाएगा।",
     },
   },
   permissions: {

@@ -13,6 +13,7 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import { useCollectionAssetPermissions } from "@/permissions";
+import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 
 interface AssetCardActionsProps {
   isClipMode: boolean;
@@ -45,6 +46,10 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
   }) => {
     const { t } = useTranslation();
     const { canAdd, canRemove, addTooltip, removeTooltip } = useCollectionAssetPermissions();
+    // Hidden rather than disabled, matching the bin sidebar's bulk-download gating.
+    // Left ungated, this icon 403s and bounces the user to the global access-denied page —
+    // the exact failure the permission-gating work set out to remove.
+    const { allowed: canDownload } = useActionPermission("download", "asset");
 
     // The collection button toggles between add/remove depending on context;
     // gate it with the matching permission (with collections:edit fallback).
@@ -73,7 +78,7 @@ const AssetCardActions: React.FC<AssetCardActionsProps> = React.memo(
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {!isClipMode && (
+        {!isClipMode && canDownload && (
           <IconButton
             size="small"
             onClick={(e) => {

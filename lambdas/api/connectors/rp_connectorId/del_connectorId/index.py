@@ -8,6 +8,7 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from connector_eventbridge_reconcile import sweep_orphan_rules_for_bucket
 from cors_utils import create_error_response, create_response
 
 # Initialize AWS Lambda Powertools
@@ -213,6 +214,47 @@ def lambda_handler(event: APIGatewayProxyEvent, context: LambdaContext):
                 )
             except Exception as e:
                 logger.warning(f"Error removing EventBridge rule: {str(e)}")
+
+            # BUG-22 belt-and-suspenders sweep on tear-down. The primary
+            # ``remove_eventbridge_rule`` above targets this connector's own
+            # rule (stored name + legacy fallback). It does NOT touch orphans
+            # created by *earlier* failed connector-CREATE attempts on the
+            # same bucket — QA pass 3 verified two such orphans on
+            # ``ml-uat-small-…`` targeting SQS queues that no longer exist.
+            #
+            # Delete is the right moment to sweep because:
+            #   1. we already have the bucket name and a running events client,
+            #   2. the caller holds ``connector:delete`` on this environment,
+            #   3. any orphan on the bucket is polluting the same event stream
+            #      the deleted connector was in — cleaning it up leaves the
+            #      bucket in a clean state for the next connector to bind to.
+            # The sweep only deletes rules whose SQS targets don't resolve,
+            # so a live connector on the same bucket is not affected.
+            if bucket_name:
+                try:
+                    sweep_result = sweep_orphan_rules_for_bucket(
+                        eventbridge, sqs, bucket_name, logger=logger
+                    )
+                    if sweep_result.deleted:
+                        logger.info(
+                            "delete-time orphan sweep removed additional rules",
+                            extra={
+                                "connector_id": connector_id,
+                                "bucket": bucket_name,
+                                "deleted": sweep_result.deleted,
+                                "skipped_live": sweep_result.skipped_live,
+                                "skipped_error": sweep_result.skipped_error,
+                            },
+                        )
+                except Exception as sweep_error:  # noqa: BLE001
+                    logger.warning(
+                        "delete-time orphan sweep raised; ignoring",
+                        extra={
+                            "connector_id": connector_id,
+                            "bucket": bucket_name,
+                            "error": str(sweep_error),
+                        },
+                    )
 
         # Remove CORS configuration if allowUploads was enabled and corsRuleId exists
         allow_uploads = connector.get("allowUploads", False)

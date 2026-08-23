@@ -28,6 +28,8 @@ import {
 import { useNavigate } from "react-router";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import { useListTemplates, useDeleteTemplate } from "@/api/hooks/useTemplates";
 import type { PortalTemplate } from "@/api/types/api.types";
@@ -56,6 +58,13 @@ const TemplatesListPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const templates = response?.data ?? [];
+  const {
+    page,
+    pageSize,
+    paginatedItems: visibleTemplates,
+    setPage,
+    setPageSize,
+  } = usePagination(templates);
 
   const handleCreate = () => navigate("/settings/upload-portals/templates/new");
   const handleEdit = (template: PortalTemplate) =>
@@ -116,7 +125,7 @@ const TemplatesListPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {templates.map((template) => (
+                {visibleTemplates.map((template) => (
                   <TableRow key={template.templateId}>
                     <TableCell>{template.name}</TableCell>
                     <TableCell>{template.description || "—"}</TableCell>
@@ -146,6 +155,14 @@ const TemplatesListPage: React.FC = () => {
             </Table>
           </TableContainer>
         )}
+
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalItems={templates.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>

@@ -472,6 +472,10 @@ class ConnectorsConstruct(Construct):
                     "sqs:CreateQueue",
                     "sqs:DeleteQueue",
                     "sqs:SetQueueAttributes",
+                    # BUG-22: the delete-time sweep resolves target queue
+                    # ARNs via GetQueueUrl to distinguish live-but-idle rules
+                    # from actual orphans.
+                    "sqs:GetQueueUrl",
                 ],
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
@@ -669,6 +673,10 @@ class ConnectorsConstruct(Construct):
                     "sqs:CreateQueue",
                     "sqs:DeleteQueue",
                     "sqs:SetQueueAttributes",
+                    # BUG-22: the create-failure sweep resolves target queue
+                    # ARNs via GetQueueUrl. A NonExistentQueue response is the
+                    # signal that a rule is orphaned.
+                    "sqs:GetQueueUrl",
                 ],
                 resources=[f"arn:aws:sqs:*:{account_id}:*"],
             )
@@ -849,10 +857,26 @@ class ConnectorsConstruct(Construct):
                     "events:PutTargets",
                     "events:DeleteRule",
                     "events:RemoveTargets",
+                    # BUG-22: create-failure sweep needs to enumerate and
+                    # inspect rules matching the connector name pattern so
+                    # it can delete orphans left when the reverse-walk
+                    # cleanup missed them (Lambda timeout, unappended
+                    # created_resources entry, or a raise inside the
+                    # cleanup loop).
+                    "events:ListTargetsByRule",
+                    "events:DescribeRule",
                 ],
                 resources=[
                     f"arn:aws:events:{scope.region}:{account_id}:rule/*",
                 ],
+            )
+        )
+        # ListRules is list-level, no resource-level ARN. Same scoping as the
+        # DELETE Lambda: full account is fine because ListRules only reads.
+        connector_s3_post_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["events:ListRules"],
+                resources=["*"],
             )
         )
 
@@ -1136,6 +1160,60 @@ class ConnectorsConstruct(Construct):
             apigateway.LambdaIntegration(my_assets_get_lambda.function),
         )
         apply_custom_authorization(my_assets_get, props.authorizer)
+
+        # BUG-22 — orphan reconciler. Standalone Lambda for ad-hoc cleanup of
+        # ``medialake-{bucket}-s3-events*`` rules whose SQS target queues no
+        # longer exist. Not hooked into API Gateway — invocable via AWS CLI
+        # by an operator with lambda:InvokeFunction on this account. Same
+        # sweep code path the create-failure and delete-time sweeps use, so
+        # a single fix drives all three surfaces.
+        self._orphan_reconciler_lambda = Lambda(
+            self,
+            "ConnectorOrphanReconcilerLambda",
+            config=LambdaConfig(
+                name="connector_orphan_reconciler",
+                entry="lambdas/back_end/connector_orphan_reconciler",
+                memory_size=256,
+                timeout_minutes=5,
+                environment_variables={
+                    "MEDIALAKE_CONNECTOR_TABLE_NAME": (
+                        self.connectors_table.table.table_name
+                    ),
+                },
+            ),
+        )
+        # Read the connectors table so an operator can invoke with no
+        # payload and have every referenced bucket reconciled.
+        self.connectors_table.table.grant_read_data(
+            self._orphan_reconciler_lambda.function
+        )
+        # EventBridge read + delete on rules matching the connector shape,
+        # plus SQS GetQueueUrl to distinguish orphans from live rules.
+        self._orphan_reconciler_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:ListTargetsByRule",
+                    "events:DescribeRule",
+                    "events:RemoveTargets",
+                    "events:DeleteRule",
+                ],
+                resources=[
+                    f"arn:aws:events:{scope.region}:{account_id}:rule/*",
+                ],
+            )
+        )
+        self._orphan_reconciler_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["events:ListRules"],
+                resources=["*"],
+            )
+        )
+        self._orphan_reconciler_lambda.function.role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["sqs:GetQueueUrl", "sqs:GetQueueAttributes"],
+                resources=[f"arn:aws:sqs:*:{account_id}:*"],
+            )
+        )
 
         # Add CORS OPTIONS methods to all resources for proper preflight handling
         # This ensures browsers can make CORS preflight requests successfully

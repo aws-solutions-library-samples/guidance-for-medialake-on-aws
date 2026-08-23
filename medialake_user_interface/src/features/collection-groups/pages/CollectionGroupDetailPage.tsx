@@ -50,6 +50,8 @@ import {
   useRemoveCollectionsFromGroup,
 } from "../hooks/useCollectionGroups";
 import { useGetAllCollections } from "@/api/hooks/useCollections";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { useCollectionCollectionTypes } from "@/api/hooks/useCollectionCollectionTypes";
 import { CollectionGroupForm } from "../components/CollectionGroupForm";
 import { formatDate } from "@/utils/dateFormat";
@@ -169,6 +171,31 @@ export const CollectionGroupDetailPage: React.FC = () => {
       !(groupData?.data?.collectionIds || []).includes(col.id)
   );
 
+  // Derived here, above the early returns below, so the pagination hooks that
+  // depend on it stay unconditional.
+  const groupCollections = availableCollections.filter((col) =>
+    (groupData?.data?.collectionIds || []).includes(col.id)
+  );
+
+  const {
+    page: groupCollectionsPage,
+    pageSize: groupCollectionsPageSize,
+    paginatedItems: visibleGroupCollections,
+    setPage: setGroupCollectionsPage,
+    setPageSize: setGroupCollectionsPageSize,
+  } = usePagination(groupCollections);
+
+  const {
+    page: availablePage,
+    pageSize: availablePageSize,
+    paginatedItems: visibleAvailableCollections,
+    setPage: setAvailablePage,
+    setPageSize: setAvailablePageSize,
+  } = usePagination(filteredAvailableCollections, {
+    initialPageSize: 25,
+    resetOn: [searchQuery],
+  });
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -193,9 +220,6 @@ export const CollectionGroupDetailPage: React.FC = () => {
   }
 
   const group = groupData.data;
-  const groupCollections = availableCollections.filter((col) =>
-    (group?.collectionIds || []).includes(col.id)
-  );
 
   return (
     <Box>
@@ -340,7 +364,7 @@ export const CollectionGroupDetailPage: React.FC = () => {
               pt: 0.5,
             }}
           >
-            {groupCollections.map((collection) => {
+            {visibleGroupCollections.map((collection) => {
               const style = getCollectionStyle(collection);
               return (
                 <Card
@@ -538,6 +562,14 @@ export const CollectionGroupDetailPage: React.FC = () => {
           </Box>
         )}
 
+        <PaginationFooter
+          page={groupCollectionsPage}
+          pageSize={groupCollectionsPageSize}
+          totalItems={groupCollections.length}
+          onPageChange={setGroupCollectionsPage}
+          onPageSizeChange={setGroupCollectionsPageSize}
+        />
+
         {/* Edit Form Dialog */}
         <CollectionGroupForm
           open={editFormOpen}
@@ -572,26 +604,38 @@ export const CollectionGroupDetailPage: React.FC = () => {
                   : t("collectionGroups.detailPage.addCollectionsDialog.allInGroup")}
               </Typography>
             ) : (
-              <List>
-                {filteredAvailableCollections.map((collection) => (
-                  <ListItemButton
-                    key={collection.id}
-                    onClick={() => toggleCollectionSelection(collection.id)}
-                  >
-                    <Checkbox
-                      checked={selectedCollections.includes(collection.id)}
-                      tabIndex={-1}
-                      disableRipple
-                    />
-                    <ListItemText
-                      primary={collection.name}
-                      secondary={`${collection.itemCount} ${
-                        collection.itemCount !== 1 ? t("common.items") : t("common.item")
-                      }`}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
+              <>
+                <List>
+                  {visibleAvailableCollections.map((collection) => (
+                    <ListItemButton
+                      key={collection.id}
+                      onClick={() => toggleCollectionSelection(collection.id)}
+                    >
+                      <Checkbox
+                        checked={selectedCollections.includes(collection.id)}
+                        tabIndex={-1}
+                        disableRipple
+                      />
+                      <ListItemText
+                        primary={collection.name}
+                        secondary={`${collection.itemCount} ${
+                          collection.itemCount !== 1 ? t("common.items") : t("common.item")
+                        }`}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+                {/* Selections are kept in state, so they survive paging. */}
+                <PaginationFooter
+                  page={availablePage}
+                  pageSize={availablePageSize}
+                  totalItems={filteredAvailableCollections.length}
+                  onPageChange={setAvailablePage}
+                  onPageSizeChange={setAvailablePageSize}
+                  hideOnSinglePage
+                  sx={{ mt: 0 }}
+                />
+              </>
             )}
           </DialogContent>
           <DialogActions>

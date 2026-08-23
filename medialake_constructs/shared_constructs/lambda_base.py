@@ -47,6 +47,10 @@ DEFAULT_SNAP_START = False
 MAX_LAMBDA_NAME_LENGTH = 64
 MAX_ROLE_NAME_LENGTH = 64
 MAX_LOG_GROUP_NAME_LENGTH = 512
+# Single source of truth for the log-retention fallback so the value actually
+# applied (get_log_retention_from_config) and the value logged for diagnostics
+# (Lambda.__init__) can never disagree.
+DEFAULT_LOG_RETENTION_DAYS = 90
 
 
 def get_log_retention_from_config() -> logs.RetentionDays:
@@ -64,12 +68,22 @@ def get_log_retention_from_config() -> logs.RetentionDays:
     try:
         if hasattr(env_config, "logging") and env_config.logging:
             retention_days = getattr(
-                env_config.logging, "lambda_cloudwatch_log_retention_days", 90
+                env_config.logging,
+                "lambda_cloudwatch_log_retention_days",
+                DEFAULT_LOG_RETENTION_DAYS,
             )
         else:
-            retention_days = 90  # Default fallback
+            retention_days = DEFAULT_LOG_RETENTION_DAYS  # Default fallback
     except (AttributeError, TypeError):
-        retention_days = 90  # Default fallback
+        retention_days = DEFAULT_LOG_RETENTION_DAYS  # Default fallback
+
+    # `getattr` above returns whatever the config holds, and the comparison
+    # further down needs a number. Fall back to the default for anything else
+    # (a malformed override, or a mocked config object in tests) so synthesis
+    # degrades gracefully instead of raising an opaque TypeError. bool is
+    # excluded explicitly because it is a subclass of int.
+    if isinstance(retention_days, bool) or not isinstance(retention_days, (int, float)):
+        retention_days = DEFAULT_LOG_RETENTION_DAYS
 
     # Map days to RetentionDays enum values
     retention_mapping = {
@@ -267,12 +281,14 @@ class Lambda(Construct):
         try:
             if hasattr(env_config, "logging") and env_config.logging:
                 config_retention_days = getattr(
-                    env_config.logging, "lambda_cloudwatch_log_retention_days", 180
+                    env_config.logging,
+                    "lambda_cloudwatch_log_retention_days",
+                    DEFAULT_LOG_RETENTION_DAYS,
                 )
             else:
-                config_retention_days = 180
+                config_retention_days = DEFAULT_LOG_RETENTION_DAYS
         except (AttributeError, TypeError):
-            config_retention_days = 180
+            config_retention_days = DEFAULT_LOG_RETENTION_DAYS
 
         logger.debug(
             f"Using log retention from config: {LOG_RETENTION} (based on {config_retention_days} days)"

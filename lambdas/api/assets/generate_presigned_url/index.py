@@ -8,6 +8,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.config import Config
+from personal_asset_access import caller_owns_personal_asset, get_caller_sub
 from pydantic import BaseModel, Field
 
 # Initialize AWS X-Ray, metrics, and logger
@@ -130,6 +131,17 @@ def lambda_handler(
 
         # Get asset details
         asset = get_asset_details(request.inventory_id)
+
+        # Personal ("My Assets") storage is private to its owner. Without this check any
+        # authenticated caller could mint a download URL for another user's private asset,
+        # which is direct access to the content rather than just its metadata.
+        if not caller_owns_personal_asset(asset, get_caller_sub(event)):
+            logger.warning(
+                "Denying presigned URL for personal asset: caller is not the owner",
+                extra={"asset_id": request.inventory_id},
+            )
+            metrics.add_metric(name="PersonalAssetAccessDenied", value=1, unit="Count")
+            raise APIError("Access denied", 403)
 
         # Determine which representation to use based on purpose
         purpose = request.purpose

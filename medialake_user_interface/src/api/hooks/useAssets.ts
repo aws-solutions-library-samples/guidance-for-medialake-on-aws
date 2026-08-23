@@ -587,6 +587,35 @@ export const useDeleteBulkDownloadJob = () => {
   });
 };
 
+// BUG-26: Hook to delete a finished batch-delete job record. Pairs with the
+// notification-dismiss routing so a completed batch-delete notification can be
+// cleared server-side (previously it could only be hidden client-side because
+// no delete endpoint existed — only cancel).
+export const useDeleteBatchDeleteJob = () => {
+  const { showError } = useErrorModal();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      try {
+        const response = await apiClient.delete<{
+          status: string;
+          message: string;
+        }>(API_ENDPOINTS.ASSETS.BATCH_DELETE_DELETE(jobId));
+        return response.data;
+      } catch (error) {
+        logger.error("Error deleting batch delete job:", error);
+        showError("Failed to delete batch delete job");
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch user jobs so the dismissed job doesn't rehydrate
+      queryClient.invalidateQueries({ queryKey: ["userBatchDeleteJobs"] });
+    },
+  });
+};
+
 // Hook to initiate batch delete
 export const useBatchDelete = () => {
   const queryClient = useQueryClient();

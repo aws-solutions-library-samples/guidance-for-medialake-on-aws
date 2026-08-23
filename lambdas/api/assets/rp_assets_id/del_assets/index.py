@@ -18,6 +18,7 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from personal_asset_access import caller_owns_personal_asset, get_caller_sub
 from pydantic import BaseModel, Field
 
 # ── Powertools ───────────────────────────────────────────────────────────────
@@ -27,6 +28,65 @@ metrics = Metrics(namespace="AssetDeletionAPI", service="asset-deletion-api")
 
 # ── Environment ──────────────────────────────────────────────────────────────
 DYNAMODB_TABLE_NAME = os.environ.get("MEDIALAKE_ASSET_TABLE", "")
+
+# Module-level so the client is reused across invocations. Created lazily because the
+# table name comes from the environment and is empty in some test contexts.
+_asset_table = None
+
+
+def _get_asset_table():
+    global _asset_table
+    if _asset_table is None and DYNAMODB_TABLE_NAME:
+        import boto3
+
+        _asset_table = boto3.resource("dynamodb").Table(DYNAMODB_TABLE_NAME)
+    return _asset_table
+
+
+@tracer.capture_method
+def check_personal_asset_ownership(
+    event, inventory_id: str
+) -> Optional[Dict[str, Any]]:
+    """Deny deleting another user's personal ("My Assets") asset.
+
+    Deletion is delegated to AssetDeletionService, which does not authorize the caller, so
+    without this check any authenticated user could destroy another user's private asset.
+
+    Returns None when the delete may proceed, or a response to return to the caller.
+    Fails closed: if ownership cannot be established the delete is refused, because the
+    operation is irreversible. A missing asset is allowed through so the deletion service
+    reports the usual 404 rather than this check leaking existence via 403.
+    """
+    table = _get_asset_table()
+    if table is None:
+        logger.error("Cannot verify asset ownership: asset table is not configured")
+        return create_response(
+            HTTPStatus.INTERNAL_SERVER_ERROR, "Internal configuration error"
+        )
+
+    try:
+        item = (table.get_item(Key={"InventoryID": inventory_id}) or {}).get("Item")
+    except Exception:
+        logger.exception(
+            "Cannot verify asset ownership; refusing delete",
+            extra={"inventory_id": inventory_id},
+        )
+        return create_response(
+            HTTPStatus.INTERNAL_SERVER_ERROR, "Unable to verify asset ownership"
+        )
+
+    if item is None:
+        return None
+
+    if not caller_owns_personal_asset(item, get_caller_sub(event)):
+        logger.warning(
+            "Denying personal asset delete: caller is not the owner",
+            extra={"inventory_id": inventory_id},
+        )
+        metrics.add_metric(name="PersonalAssetAccessDenied", unit="Count", value=1)
+        return create_response(HTTPStatus.FORBIDDEN, "Access denied")
+
+    return None
 
 
 class DeleteRequest(BaseModel):
@@ -86,6 +146,10 @@ def lambda_handler(event: APIGatewayProxyEvent, _ctx: LambdaContext) -> Dict[str
             )
 
         logger.info(f"Starting deletion for asset: {inventory_id}")
+
+        ownership_denial = check_personal_asset_ownership(event, inventory_id)
+        if ownership_denial is not None:
+            return ownership_denial
 
         # Use centralized deletion service
         deletion_service = AssetDeletionService(

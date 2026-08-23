@@ -51,6 +51,36 @@ class ApiGatewayConstruct(Construct):
             },
             rules=[
                 {
+                    # Rate-limit the unauthenticated self-service password
+                    # recovery endpoint to blunt email-bombing / abuse. Scoped
+                    # to the recovery path only so normal API traffic is
+                    # unaffected.
+                    "name": "PasswordRecoveryRateLimit",
+                    "priority": 0,
+                    "action": {"block": {}},
+                    "statement": {
+                        "rateBasedStatement": {
+                            "limit": 100,
+                            "aggregateKeyType": "IP",
+                            "scopeDownStatement": {
+                                "byteMatchStatement": {
+                                    "searchString": "/users/password-recovery",
+                                    "fieldToMatch": {"uriPath": {}},
+                                    "textTransformations": [
+                                        {"priority": 0, "type": "LOWERCASE"}
+                                    ],
+                                    "positionalConstraint": "ENDS_WITH",
+                                }
+                            },
+                        }
+                    },
+                    "visibilityConfig": {
+                        "sampledRequestsEnabled": True,
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "PasswordRecoveryRateLimitMetric",
+                    },
+                },
+                {
                     "name": "AWSManagedRulesCommonRuleSet",
                     "priority": 1,
                     "overrideAction": {"none": {}},

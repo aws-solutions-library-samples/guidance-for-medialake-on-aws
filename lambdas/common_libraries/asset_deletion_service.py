@@ -56,6 +56,8 @@ DYNAMODB_TABLE_NAME = os.getenv("MEDIALAKE_ASSET_TABLE", "")
 # to preserve backward compatibility in environments without the variable.
 EVENT_BUS_NAME = os.getenv("ASSET_EVENT_BUS_NAME", "")
 
+USER_TABLE_NAME = os.getenv("USER_TABLE_NAME", "")
+
 _session = boto3.Session()
 _credentials = _session.get_credentials()
 
@@ -72,6 +74,7 @@ class DeletionResult:
     external_services_deleted: list = None
     dynamodb_deleted: bool = False
     event_published: bool = False
+    favorites_deleted: int = 0
     error: Optional[str] = None
 
     def __post_init__(self):
@@ -166,6 +169,18 @@ class AssetDeletionService:
             # 6. Delete DynamoDB record
             self._delete_dynamodb_record(inventory_id)
             result.dynamodb_deleted = True
+
+            # 6a. Cascade-delete user favorites referencing this asset (BUG-9).
+            # Kept AFTER the asset record delete so the row is gone even if the
+            # favorites cleanup partially fails — cleanup is best-effort and
+            # never blocks the delete.
+            try:
+                result.favorites_deleted = self._delete_asset_favorites(inventory_id)
+            except Exception as fav_error:
+                self.logger.warning(
+                    f"Favorites cleanup failed for {inventory_id}: {fav_error}",
+                    exc_info=True,
+                )
 
             # 7. Publish deletion event
             if publish_event:
@@ -655,6 +670,67 @@ class AssetDeletionService:
             raise AssetDeletionError(
                 f"Failed to delete DynamoDB record: {e}", inventory_id
             )
+
+    @tracer.capture_method
+    def _delete_asset_favorites(self, inventory_id: str) -> int:
+        """Remove every user's favorite row that references this asset.
+
+        BUG-9 fix: prior to this cascade, ``DELETE /assets/{id}`` cleaned up S3,
+        OpenSearch, vectors, external services and the asset record, but user
+        favorites (``PK=USER#<sub>``, ``SK=FAV#ASSET#…``) were left orphaned —
+        they continued to appear in ``GET /users/favorites`` and rendered as
+        broken/placeholder cards in the Favorite Assets home widget.
+
+        Unlike COLLECTION favorites, ASSET favorites don't carry a per-item
+        reverse index (see the schema note in ``favorites_post.py``), so we
+        query GSI2 (``gsi2Pk = "ITEM_TYPE#ASSET"``) with a filter on ``itemId``.
+        The partition is scoped to just ASSET favorites and the delete is
+        best-effort — a failure is logged but does not fail the surrounding
+        asset delete.
+        """
+        from boto3.dynamodb.conditions import Attr, Key
+
+        if not USER_TABLE_NAME:
+            self.logger.warning(
+                "USER_TABLE_NAME env var not set; skipping asset favorites cleanup",
+                extra={"inventory_id": inventory_id},
+            )
+            return 0
+
+        user_table = dynamodb.Table(USER_TABLE_NAME)
+        deleted = 0
+        query_kwargs: Dict[str, Any] = {
+            "IndexName": "GSI2",
+            "KeyConditionExpression": Key("gsi2Pk").eq("ITEM_TYPE#ASSET"),
+            "FilterExpression": Attr("itemId").eq(inventory_id),
+            "ProjectionExpression": "userId, itemKey",
+        }
+        while True:
+            response = user_table.query(**query_kwargs)
+            items = response.get("Items", [])
+            if items:
+                with user_table.batch_writer() as batch:
+                    for item in items:
+                        batch.delete_item(
+                            Key={
+                                "userId": item["userId"],
+                                "itemKey": item["itemKey"],
+                            }
+                        )
+                        deleted += 1
+            last_key = response.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            query_kwargs["ExclusiveStartKey"] = last_key
+
+        if deleted:
+            self.logger.info(
+                f"[CASCADE] Removed {deleted} favorite(s) referencing {inventory_id}"
+            )
+            self.metrics.add_metric(
+                "AssetFavoritesCascadeDeleted", MetricUnit.Count, deleted
+            )
+        return deleted
 
     @tracer.capture_method
     def _publish_deletion_event(self, inventory_id: str) -> None:

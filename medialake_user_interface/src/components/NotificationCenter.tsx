@@ -20,7 +20,7 @@ import {
 } from "@mui/icons-material";
 import { DownloadLinksDisplay } from "./DownloadLinksDisplay";
 import { DismissConfirmationDialog } from "./DismissConfirmationDialog";
-import { useDeleteBulkDownloadJob } from "@/api/hooks/useAssets";
+import { useDeleteBulkDownloadJob, useDeleteBatchDeleteJob } from "@/api/hooks/useAssets";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
 
 // Helper function to format file sizes
@@ -103,6 +103,15 @@ export interface Notification {
   autoCloseMs?: number;
   /** Job ID for tracking backend jobs */
   jobId?: string;
+  /**
+   * Which job kind produced this notification. Set to ``"download"`` for
+   * bulk-download jobs (which have a real DELETE endpoint the Dismiss action
+   * can call, ``/assets/download/bulk/{jobId}``), and ``"delete"`` for
+   * batch-delete jobs (which have no server-side delete endpoint — dismiss is
+   * local-only, see BUG-26 backend half). Callers must set this so the
+   * NotificationCenter can route the correct API call on Dismiss.
+   */
+  jobType?: "download" | "delete";
   /** Current job status */
   jobStatus?: "INITIATED" | "ASSESSED" | "STAGING" | "PROCESSING" | "COMPLETED" | "FAILED";
   /** Download URLs for completed jobs */
@@ -234,6 +243,7 @@ export const NotificationCenter: React.FC = () => {
   const { notifications, markAsSeen, dismiss } = useNotifications();
   const { dismissJobNotification } = useJobNotifications();
   const deleteBulkDownloadJob = useDeleteBulkDownloadJob();
+  const deleteBatchDeleteJob = useDeleteBatchDeleteJob();
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const [dismissDialog, setDismissDialog] = useState<{
@@ -343,14 +353,23 @@ export const NotificationCenter: React.FC = () => {
     dismissNotification(dismissDialog.notificationId);
     setDismissDialog({ open: false, notificationId: "", message: "" });
 
-    // Delete the job from database if it has a jobId
+    // BUG-26: route the delete call to the endpoint that matches the job kind.
+    // Bulk-download jobs use DELETE /assets/download/bulk/{jobId}; batch-delete
+    // jobs now have their own DELETE /assets/batch/{jobId} (backend half of
+    // BUG-26). Both remove the job record server-side so the notification does
+    // not rehydrate on reload or for another session.
     if (notification?.jobId) {
       try {
-        await deleteBulkDownloadJob.mutateAsync(notification.jobId);
+        if (notification.jobType === "download") {
+          await deleteBulkDownloadJob.mutateAsync(notification.jobId);
+        } else if (notification.jobType === "delete") {
+          await deleteBatchDeleteJob.mutateAsync(notification.jobId);
+        }
       } catch (error) {
-        console.error("Failed to delete bulk download job:", error);
-        // Note: We don't show an error to the user since the notification is already dismissed
-        // and the job will eventually be cleaned up by the backend
+        console.error("Failed to delete job record on dismiss:", error);
+        // The notification is already dismissed locally; a failed server-side
+        // delete is non-fatal (the record will fall out of the notification
+        // window eventually, and a retry on next dismiss is harmless).
       }
     }
   };

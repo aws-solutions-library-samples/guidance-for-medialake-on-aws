@@ -460,6 +460,16 @@ class PortalApiStack(cdk.NestedStack):
                     "CLOUDFRONT_DOMAIN": props.cloudfront_domain,
                     "SES_FROM_ARN": ses_from_arn,
                     "SES_FROM_EMAIL": config.ses_from_address or "",
+                    # BUG-11 fallback: props.cloudfront_domain can synthesize to
+                    # "" on stack-order-sensitive deploys (the UI stack that
+                    # resolves it runs later). Give the handler a stable
+                    # runtime resolution path via SSM so token creation always
+                    # returns a populated shareableUrl.
+                    "CLOUDFRONT_DOMAIN_SSM_PARAM": config.ssm_param(
+                        "cloudfront-distribution-domain"
+                    ),
+                    "ENVIRONMENT": config.environment,
+                    "SSM_PREFIX": config.ssm_prefix,
                 },
             ),
         )
@@ -479,6 +489,22 @@ class PortalApiStack(cdk.NestedStack):
                 resources=[
                     system_settings_table_arn,
                     f"{system_settings_table_arn}/index/*",
+                ],
+            )
+        )
+
+        # BUG-11: allow the handler to look up the CloudFront distribution
+        # domain from SSM as a runtime fallback when the CLOUDFRONT_DOMAIN env
+        # var was empty at deploy time (the UI stack that resolves it runs
+        # later than this one, so first-time deploys can synthesize the empty
+        # string). Scoped to just the single parameter this handler reads.
+        self._portal_management_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:parameter"
+                    f"{config.ssm_param('cloudfront-distribution-domain')}"
                 ],
             )
         )

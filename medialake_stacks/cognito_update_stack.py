@@ -9,7 +9,9 @@ applied after the core Cognito resources are created. This includes:
 """
 
 import datetime
+import json
 from dataclasses import dataclass
+from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import Stack
@@ -29,6 +31,10 @@ class CognitoUpdateStackProps:
     cognito_user_pool_id: str
     cognito_user_pool_arn: str
     auth_table_name: str
+    # Passed as a name rather than a table object: the pre-token-generation
+    # Lambda's IAM policy is built here with an inline ARN to avoid the
+    # cross-stack dependency cycle that importing the table would create.
+    system_settings_table_name: Optional[str] = None
 
 
 class CognitoUpdateStack(Stack):
@@ -65,9 +71,24 @@ class CognitoUpdateStack(Stack):
         # )
 
         # Create the Pre-Token Generation Lambda
+        from config import config as app_config
+
+        jit = app_config.authZ.jit_provisioning
+
         pre_token_env_vars = {
             **common_env_vars,
             "DEBUG_MODE": "true",
+            # Just-in-time provisioning for first-time federated users. The
+            # master switch is deploy-time because it also controls whether the
+            # IAM permissions below exist; the default group itself is a runtime
+            # setting an administrator edits in System Settings.
+            "JIT_PROVISIONING_ENABLED": str(jit.enabled).lower(),
+            "JIT_DEFAULT_GROUP": jit.default_group,
+            "JIT_ALLOW_IDP_GROUP_ASSERTIONS": str(
+                jit.allow_idp_group_assertions
+            ).lower(),
+            "JIT_IDP_GROUP_MAPPING": json.dumps(jit.idp_group_mapping or {}),
+            "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
         }
 
         self._pre_token_generation_lambda = Lambda(
@@ -99,6 +120,82 @@ class CognitoUpdateStack(Stack):
             )
         )
 
+        # Extra permissions required only by just-in-time provisioning. Granted
+        # conditionally so that deployments with the feature off do not hand the
+        # token-path Lambda the ability to change group membership.
+        if jit.enabled:
+            self._pre_token_generation_lambda.function.add_to_role_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "cognito-idp:AdminAddUserToGroup",
+                        "cognito-idp:AdminListGroupsForUser",
+                    ],
+                    resources=[props.cognito_user_pool_arn],
+                )
+            )
+
+            if props.system_settings_table_name:
+                system_settings_table_arn = (
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:"
+                    f"table/{props.system_settings_table_name}"
+                )
+                self._pre_token_generation_lambda.function.add_to_role_policy(
+                    iam.PolicyStatement(
+                        actions=["dynamodb:GetItem"],
+                        resources=[system_settings_table_arn],
+                    )
+                )
+
+        # Inbound federation trigger. Normalizes and remaps the group assertion
+        # coming from an external identity provider before Cognito creates or
+        # updates the federated user profile. Only created when configured,
+        # since attaching it changes how provider attributes are stored.
+        self._inbound_federation_lambda = None
+        if jit.enabled and jit.inbound_federation_trigger_enabled:
+            # Which raw provider attribute carries group membership, per
+            # provider. Cognito applies the provider's attribute mapping to
+            # whatever the trigger returns, so the trigger has to write back to
+            # the raw claim name rather than to custom:groups directly.
+            provider_groups_claims = {}
+            for provider in app_config.authZ.identity_providers:
+                if provider.identity_provider_method == "oidc":
+                    provider_groups_claims[provider.identity_provider_name] = (
+                        provider.oidc_groups_claim
+                    )
+                elif provider.identity_provider_method == "saml":
+                    # Matches the SAML attribute mapping in CognitoConstruct.
+                    provider_groups_claims[provider.identity_provider_name] = (
+                        "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+                    )
+
+            self._inbound_federation_lambda = Lambda(
+                self,
+                "InboundFederationLambda",
+                config=LambdaConfig(
+                    name="inbound_federation",
+                    entry="lambdas/auth/inbound_federation",
+                    # Cognito allows this trigger 5 seconds.
+                    timeout_minutes=1,
+                    lambda_handler="handler",
+                    snap_start=False,
+                    environment_variables={
+                        "JIT_ALLOW_IDP_GROUP_ASSERTIONS": str(
+                            jit.allow_idp_group_assertions
+                        ).lower(),
+                        "JIT_IDP_GROUP_MAPPING": json.dumps(
+                            jit.idp_group_mapping or {}
+                        ),
+                        "JIT_PROVIDER_GROUPS_CLAIM": json.dumps(provider_groups_claims),
+                    },
+                ),
+            )
+
+            self._inbound_federation_lambda.function.add_permission(
+                "CognitoInvokePermissionInboundFederation",
+                principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+                source_arn=props.cognito_user_pool_arn,
+            )
+
         # Create a Lambda function for updating Cognito User Pool triggers
         self._cognito_trigger_update_lambda = Lambda(
             self,
@@ -124,8 +221,6 @@ class CognitoUpdateStack(Stack):
         )
 
         # Grant permission to read CloudFront domain from SSM for email templates
-        from config import config as app_config
-
         cloudfront_domain_ssm_param = app_config.ssm_param(
             "cloudfront-distribution-domain"
         )
@@ -154,6 +249,13 @@ class CognitoUpdateStack(Stack):
                 "UserPoolId": props.cognito_user_pool_id,
                 # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
                 "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
+                # Empty when the inbound federation trigger is not enabled, which
+                # the custom resource treats as "detach it if present".
+                "InboundFederationLambdaArn": (
+                    self._inbound_federation_lambda.function.function_arn
+                    if self._inbound_federation_lambda
+                    else ""
+                ),
                 "CloudFrontDomainSsmParam": cloudfront_domain_ssm_param,
                 "Timestamp": str(
                     datetime.datetime.now().timestamp()
@@ -185,6 +287,15 @@ class CognitoUpdateStack(Stack):
     def pre_token_generation_lambda(self):
         """Return the pre-token generation Lambda function"""
         return self._pre_token_generation_lambda.function
+
+    @property
+    def inbound_federation_lambda(self):
+        """Return the inbound federation Lambda function, if it was created."""
+        return (
+            self._inbound_federation_lambda.function
+            if self._inbound_federation_lambda
+            else None
+        )
 
     @property
     def cognito_trigger_update(self):

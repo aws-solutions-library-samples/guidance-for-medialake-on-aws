@@ -1,5 +1,6 @@
 """PUT /users/settings/{namespace}/{key} - Update user setting"""
 
+import json
 import time
 from typing import Any, Dict
 
@@ -7,6 +8,17 @@ from auth_utils import get_authenticated_user_id
 from aws_lambda_powertools.metrics import MetricUnit
 from botocore.exceptions import ClientError
 from response_utils import error_response, success_response
+
+# Cap the stored value so a single caller cannot bloat their row toward DynamoDB's 400KB
+# item limit. This endpoint accepts arbitrary JSON by design, so the size limit is the only
+# generic protection available. 64KB is far more than any current preference needs.
+MAX_SETTING_VALUE_BYTES = 64 * 1024
+
+# The sort key is composed as "SETTING#{namespace}#{key}" and settings_get parses it by
+# splitting on "#" and taking parts[1] and parts[2]. A namespace or key containing "#"
+# would therefore be written successfully but read back mis-parsed, silently corrupting the
+# response. Reject it at the door instead.
+_RESERVED_KEY_SEPARATOR = "#"
 
 
 def _update_user_setting(
@@ -90,6 +102,16 @@ def handle_put_setting(
             )
             return error_response(400, "Missing namespace or key parameters")
 
+        if _RESERVED_KEY_SEPARATOR in namespace or _RESERVED_KEY_SEPARATOR in key:
+            logger.error(
+                "Namespace or key contains the reserved '#' separator",
+                extra={"namespace": namespace, "key": key},
+            )
+            metrics.add_metric(
+                name="InvalidParametersError", unit=MetricUnit.Count, value=1
+            )
+            return error_response(400, "Namespace and key must not contain '#'")
+
         try:
             setting_data = app.current_event.json_body
         except Exception:
@@ -105,6 +127,30 @@ def handle_put_setting(
                 name="InvalidRequestError", unit=MetricUnit.Count, value=1
             )
             return error_response(400, "Request body must contain a 'value' field")
+
+        try:
+            value_size = len(
+                json.dumps(setting_data["value"], default=str).encode("utf-8")
+            )
+        except (TypeError, ValueError):
+            logger.error("Setting value is not JSON-serialisable")
+            metrics.add_metric(
+                name="InvalidRequestError", unit=MetricUnit.Count, value=1
+            )
+            return error_response(400, "Setting value must be JSON-serialisable")
+
+        if value_size > MAX_SETTING_VALUE_BYTES:
+            logger.error(
+                "Setting value exceeds the maximum size",
+                extra={"size": value_size, "limit": MAX_SETTING_VALUE_BYTES},
+            )
+            metrics.add_metric(
+                name="SettingValueTooLarge", unit=MetricUnit.Count, value=1
+            )
+            return error_response(
+                400,
+                f"Setting value exceeds the maximum size of {MAX_SETTING_VALUE_BYTES} bytes",
+            )
 
         updated_setting = _update_user_setting(
             dynamodb,

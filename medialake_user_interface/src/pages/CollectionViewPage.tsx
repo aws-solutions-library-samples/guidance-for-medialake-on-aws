@@ -71,7 +71,12 @@ import { useViewPreferences } from "@/hooks/useViewPreferences";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useAssetFavorites } from "@/hooks/useAssetFavorites";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
-import { getOriginalAssetId, isClipAsset, getClipDisplayName } from "@/utils/clipTransformation";
+import {
+  getOriginalAssetId,
+  isClipAsset,
+  getClipDisplayName,
+  getCollectionItemDisplayName,
+} from "@/utils/clipTransformation";
 import { resolveDotPath } from "@/utils/dotPathResolve";
 import { ChipArrayField } from "@/components/common/ChipArrayField";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
@@ -105,6 +110,25 @@ interface Filters {
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 60;
+
+/**
+ * The asset's raw filename. Kept separate from the displayed label because this value is also
+ * written to bin and favorites records and drives the rename flow.
+ */
+const rawAssetName = (asset: AssetItem): string =>
+  asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name;
+
+/**
+ * The label shown for a collection item, with a clip's timecode range appended.
+ *
+ * Module scope rather than a hook, because the table's column definition needs it too: that
+ * column carries its own accessor and sorting function, so a callback inside the component
+ * would leave the table showing bare filenames while the cards showed ranges.
+ */
+const collectionItemLabel = (asset: AssetItem): string =>
+  isClipAsset(asset)
+    ? getClipDisplayName(asset)
+    : getCollectionItemDisplayName(rawAssetName(asset), asset.clipBoundary);
 
 const CollectionViewPage: React.FC = () => {
   const { t } = useTranslation();
@@ -224,12 +248,15 @@ const CollectionViewPage: React.FC = () => {
       return `${baseId}#FULL#${asset.addedAt}`;
     }
   }, []);
-  const getAssetName = useCallback(
-    (asset: AssetItem) =>
-      asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
-    []
-  );
+  const getAssetName = useCallback((asset: AssetItem) => rawAssetName(asset), []);
   const getAssetType = useCallback((asset: AssetItem) => asset.DigitalSourceAsset.Type, []);
+
+  /**
+   * Label shown in the UI. Deliberately distinct from `getAssetName`: that value is also
+   * written to bin and favorites records and used by the rename flow, so the clip's
+   * timecode range is appended here only, for display.
+   */
+  const getAssetDisplayName = useCallback((asset: AssetItem) => collectionItemLabel(asset), []);
   const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
   const getAssetProxy = useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
 
@@ -421,15 +448,14 @@ const CollectionViewPage: React.FC = () => {
       label: "Name",
       visible: true,
       minWidth: 200,
-      accessorFn: (row: AssetItem) =>
-        row.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name,
+      // Same label as the cards. Without this the table showed the bare filename, so several
+      // clips of one asset were indistinguishable and sorting by Name was a no-op between
+      // them; sorting on the label orders those clips by their timecode range.
+      accessorFn: (row: AssetItem) => collectionItemLabel(row),
       cell: (info: CellContext<AssetItem, unknown>) => info.getValue() as string,
       sortable: true,
       sortingFn: (rowA, rowB) =>
-        rowA.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.localeCompare(
-          rowB.original.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey
-            .Name
-        ),
+        collectionItemLabel(rowA.original).localeCompare(collectionItemLabel(rowB.original)),
     },
     {
       id: "type",
@@ -595,7 +621,7 @@ const CollectionViewPage: React.FC = () => {
     (fieldId: string, asset: AssetItem): React.ReactNode => {
       switch (fieldId) {
         case "name":
-          return isClipAsset(asset) ? getClipDisplayName(asset) : getAssetName(asset);
+          return getAssetDisplayName(asset);
         case "type":
           return getAssetType(asset);
         case "format":
@@ -628,7 +654,7 @@ const CollectionViewPage: React.FC = () => {
         }
       }
     },
-    [getAssetName, getAssetType]
+    [getAssetDisplayName, getAssetType]
   );
 
   // Helper to get collection type info for sub-collection cards
@@ -1320,6 +1346,7 @@ const CollectionViewPage: React.FC = () => {
                   canDelete: deleteAssetPermission.allowed,
                   getAssetId,
                   getAssetName,
+                  getAssetDisplayName,
                   getAssetType,
                   getAssetThumbnail,
                   getAssetProxy,

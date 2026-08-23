@@ -37,6 +37,30 @@ import { useTranslation } from "react-i18next";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useDirection } from "../../contexts/DirectionContext";
 
+// BUG-19 fix: every locale registered in ``src/i18n/i18n.ts`` MUST appear here,
+// or the Profile language selector renders a subset that ships translation
+// weight but is unreachable. Adding a locale is now a one-line change instead
+// of a duplicated 55-line MenuItem block. Keep in sync with ``i18n/i18n.ts``.
+type ProfileLocale = {
+  code: string;
+  flag: string; // 2-letter country code shown as a text-only "flag" placeholder
+  translationKey: string; // key under ``languages`` in each locale bundle
+};
+
+const PROFILE_LOCALES: ReadonlyArray<ProfileLocale> = [
+  { code: "en", flag: "GB", translationKey: "languages.english" },
+  { code: "de", flag: "DE", translationKey: "languages.german" },
+  { code: "es", flag: "ES", translationKey: "languages.spanish" },
+  { code: "pt", flag: "PT", translationKey: "languages.portuguese" },
+  { code: "fr", flag: "FR", translationKey: "languages.french" },
+  { code: "ja", flag: "JP", translationKey: "languages.japanese" },
+  { code: "ko", flag: "KR", translationKey: "languages.korean" },
+  { code: "zh", flag: "CN", translationKey: "languages.chinese" },
+  { code: "hi", flag: "IN", translationKey: "languages.hindi" },
+  { code: "ar", flag: "SA", translationKey: "languages.arabic" },
+  { code: "he", flag: "IL", translationKey: "languages.hebrew" },
+];
+
 const ProfilePage: React.FC = () => {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
@@ -458,454 +482,65 @@ const ProfilePage: React.FC = () => {
                             const isRtlLanguage = ["ar", "he"].includes(newLanguage);
                           }}
                         >
-                          <MenuItem
-                            value="en"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
+                          {PROFILE_LOCALES.map((locale) => (
+                            <MenuItem
+                              key={locale.code}
+                              value={locale.code}
                               sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
+                                textAlign: isRTL ? "right" : "left",
                                 justifyContent: isRTL ? "flex-end" : "flex-start",
                               }}
                             >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.english")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    GB
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    GB
-                                  </Box>
-                                  <span>{t("languages.english")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="de"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.german")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    DE
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    DE
-                                  </Box>
-                                  <span>{t("languages.german")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="pt"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.portuguese")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    PT
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    PT
-                                  </Box>
-                                  <span>{t("languages.portuguese")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="fr"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.french")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    FR
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    FR
-                                  </Box>
-                                  <span>{t("languages.french")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="zh"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.chinese")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    CN
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    CN
-                                  </Box>
-                                  <span>{t("languages.chinese")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="hi"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.hindi")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    IN
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    IN
-                                  </Box>
-                                  <span>{t("languages.hindi")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="ar"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.arabic")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    SA
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    SA
-                                  </Box>
-                                  <span>{t("languages.arabic")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
-                          <MenuItem
-                            value="he"
-                            sx={{
-                              textAlign: isRTL ? "right" : "left",
-                              justifyContent: isRTL ? "flex-end" : "flex-start",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexDirection: isRTL ? "row-reverse" : "row",
-                                alignItems: "center",
-                                gap: "8px",
-                                width: "100%",
-                                justifyContent: isRTL ? "flex-end" : "flex-start",
-                              }}
-                            >
-                              {isRTL ? (
-                                <>
-                                  <span>{t("languages.hebrew")}</span>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    IL
-                                  </Box>
-                                </>
-                              ) : (
-                                <>
-                                  <Box
-                                    sx={{
-                                      width: 24,
-                                      height: 16,
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                    }}
-                                  >
-                                    IL
-                                  </Box>
-                                  <span>{t("languages.hebrew")}</span>
-                                </>
-                              )}
-                            </Box>
-                          </MenuItem>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: isRTL ? "row-reverse" : "row",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  width: "100%",
+                                  justifyContent: isRTL ? "flex-end" : "flex-start",
+                                }}
+                              >
+                                {isRTL ? (
+                                  <>
+                                    <span>{t(locale.translationKey)}</span>
+                                    <Box
+                                      sx={{
+                                        width: 24,
+                                        height: 16,
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "10px",
+                                      }}
+                                    >
+                                      {locale.flag}
+                                    </Box>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Box
+                                      sx={{
+                                        width: 24,
+                                        height: 16,
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "10px",
+                                      }}
+                                    >
+                                      {locale.flag}
+                                    </Box>
+                                    <span>{t(locale.translationKey)}</span>
+                                  </>
+                                )}
+                              </Box>
+                            </MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     }

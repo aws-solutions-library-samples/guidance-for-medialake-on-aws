@@ -219,20 +219,108 @@ export interface ShareCollectionRequest {
   message?: string;
 }
 
-export interface AddItemToCollectionRequest {
+/**
+ * A clip's time range, in HH:MM:SS:FF. Both ends are required — the API rejects a boundary
+ * carrying only one of them.
+ */
+export interface ClipBoundary {
+  startTime: string;
+  endTime: string;
+}
+
+/** One asset in a bulk add, with its own clip boundary. */
+export interface AddCollectionItemSpec {
   assetId: string;
-  clipBoundary?: {
-    startTime?: string;
-    endTime?: string;
-  };
+  clipBoundary?: ClipBoundary;
   addAllClips?: boolean;
+}
+
+/** Fields that apply to the whole request in either form. */
+interface AddItemToCollectionRequestBase {
+  sortOrder?: number;
   // Legacy fields for backward compatibility
   type?: "asset" | "workflow" | "collection";
   id?: string;
-  sortOrder?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
+
+/** Single-asset form. Clip fields apply to that one asset. */
+export interface AddSingleItemRequest extends AddItemToCollectionRequestBase {
+  assetId: string;
+  items?: never;
+  clipBoundary?: ClipBoundary;
+  addAllClips?: boolean;
+}
+
+/**
+ * Bulk form: several assets in one request, each carrying its own clip boundary.
+ *
+ * The clip fields are absent here by design — the API reads them per item and rejects
+ * request-level values, since silently ignoring them would store a clip selection as the
+ * whole asset and still report success.
+ *
+ * `items` is a plain array rather than a non-empty tuple: the server rejects an empty list,
+ * and a tuple type would force a cast at every caller that builds the list with `.map()`.
+ */
+export interface AddBulkItemsRequest extends AddItemToCollectionRequestBase {
+  items: AddCollectionItemSpec[];
+  assetId?: never;
+  clipBoundary?: never;
+  addAllClips?: never;
+}
+
+/**
+ * Request body for `POST /collections/{id}/items`.
+ *
+ * A union rather than one loose type, so the mutually exclusive shapes are enforced at
+ * compile time instead of surfacing as a 400 at runtime.
+ */
+export type AddItemToCollectionRequest = AddSingleItemRequest | AddBulkItemsRequest;
+
+/**
+ * Response from `POST /collections/{id}/items`.
+ *
+ * The counts distinguish a genuine add from a no-op: re-adding something already in the
+ * collection reports it under `alreadyPresentCount` and adds nothing, so callers must not
+ * assume every accepted request changed the collection.
+ */
+export interface AddItemToCollectionResponse {
+  success?: boolean;
+  data?: {
+    addedCount?: number;
+    alreadyPresentCount?: number;
+    failedCount?: number;
+    /**
+     * Non-zero only when the server ran out of execution budget partway through a large
+     * request. Those items were never written and are safe to retry.
+     */
+    notAttemptedCount?: number;
+    results?: Array<{
+      assetId: string;
+      status: "alreadyPresent" | "failed" | "notAttempted";
+    }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items?: any[];
+  };
+}
+
+/**
+ * How many items an add request actually added to the collection.
+ *
+ * Not simply 1: a bulk request adds several, `addAllClips` expands one asset into several,
+ * and re-adding something already present adds none (the API reports it under
+ * `alreadyPresentCount`). Falls back to the request's own size when the server omits
+ * `addedCount`, so a client running against an older API keeps the previous behaviour
+ * rather than dropping the optimistic update entirely.
+ */
+export const resolveAddedCount = (
+  response: AddItemToCollectionResponse | undefined,
+  request: AddItemToCollectionRequest
+): number => {
+  const requestedCount = request.items?.length ?? 1;
+  return response?.data?.addedCount ?? requestedCount;
+};
 
 export interface CollectionShare {
   id?: string;
@@ -888,20 +976,28 @@ export const useAddItemToCollection = () => {
   const queryClient = useQueryClient();
   const { showError } = useErrorModal();
 
-  return useMutation<void, Error, { collectionId: string; data: AddItemToCollectionRequest }>({
+  return useMutation<
+    AddItemToCollectionResponse | undefined,
+    Error,
+    { collectionId: string; data: AddItemToCollectionRequest }
+  >({
     mutationFn: async ({ collectionId, data }) => {
       try {
-        await apiClient.post(API_ENDPOINTS.COLLECTIONS.ITEMS(collectionId), data);
+        const response = await apiClient.post<AddItemToCollectionResponse>(
+          API_ENDPOINTS.COLLECTIONS.ITEMS(collectionId),
+          data
+        );
+        return response.data;
       } catch (error) {
         logger.error("Add item to collection error:", error);
         showError("Failed to add item to collection");
         throw error;
       }
     },
-    onSuccess: (data, { collectionId }) => {
-      // Optimistically increment itemCount so the card updates immediately
-      // without waiting for the refetch (which may still show the old count
-      // due to OpenSearch eventual consistency).
+    onSuccess: (response, { collectionId, data }) => {
+      // Optimistically bump itemCount so the card updates immediately without
+      // waiting for the refetch (which may still show the old count due to
+      // OpenSearch eventual consistency).
       const detail = queryClient.getQueryData<CollectionResponse>(
         QUERY_KEYS.COLLECTIONS.detail(collectionId)
       );
@@ -919,8 +1015,13 @@ export const useAddItemToCollection = () => {
           }
         }
       }
+
+      // Use the server's own count rather than assuming one item was added — hardcoding
+      // +1 made the card briefly show an inflated number until the refetch corrected it.
+      const addedCount = resolveAddedCount(response, data);
+
       patchCollectionInCache(queryClient, collectionId, {
-        itemCount: (currentCount ?? 0) + 1,
+        itemCount: (currentCount ?? 0) + addedCount,
       });
 
       // Invalidate so the next natural refetch reconciles with the server.

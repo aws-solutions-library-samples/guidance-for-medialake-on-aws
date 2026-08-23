@@ -8,6 +8,9 @@ export default {
     hindi: "الهندية",
     arabic: "العربية",
     hebrew: "العبرية",
+    spanish: "الإسبانية",
+    japanese: "اليابانية",
+    korean: "الكورية",
   },
   assetsPage: {
     title: "الأصول",
@@ -57,6 +60,21 @@ export default {
       emptySection: "لا توجد مجموعات",
       loading: "جارٍ التحميل\u2026",
       more: "المزيد",
+    },
+    savedLocations: {
+      sectionTitle: "الوجهات المحفوظة",
+      allDestinations: "جميع الوجهات",
+      save: "حفظ هذه الوجهة",
+      remove: "إزالة هذه الوجهة المحفوظة",
+      atCapacity: "يمكنك حفظ ما يصل إلى {{count}} وجهة",
+      collectionsUnavailable_one:
+        "لم تعد المجموعة المحفوظة مع هذه الوجهة متوفرة وتمت إزالتها: {{names}}",
+      collectionsUnavailable_other:
+        "لم تعد {{count}} من المجموعات المحفوظة مع هذه الوجهة متوفرة وتمت إزالتها: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "لم تعد المجموعة المحددة متوفرة ولن يتم تطبيقها: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "لم تعد {{count}} من المجموعات المحددة متوفرة ولن يتم تطبيقها: {{names}}",
     },
   },
   pathBrowser: {
@@ -836,7 +854,6 @@ export default {
   },
   roles: {
     title: "إدارة الأدوار",
-    description: "قم بإدارة أدوار النظام وأذوناتهم",
     actions: {
       addRole: "إضافة دور",
     },
@@ -887,6 +904,23 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "حقول البيانات الوصفية",
+        jitProvisioning: "تزويد المستخدمين",
+      },
+      jitProvisioning: {
+        title: "تزويد المستخدمين في الوقت المناسب",
+        description:
+          "اختر المجموعة التي تُسنَد إلى المستخدمين عند تسجيل الدخول لأول مرة عبر موفّر هوية خارجي. تُطبَّق المجموعة مرة واحدة لكل مستخدم، لذا فإن نقل شخص إلى مجموعة أخرى لاحقًا لا يُلغى عند تسجيل الدخول التالي.",
+        enabledLabel: "إسناد مجموعة افتراضية إلى المستخدمين الموحَّدين الجدد",
+        defaultGroupLabel: "المجموعة الافتراضية",
+        defaultGroupHelp:
+          "يحصل المستخدمون الموحَّدون الجدد على صلاحيات هذه المجموعة عند أول تسجيل دخول.",
+        groupRequired: "اختر مجموعة قبل تمكين التزويد في الوقت المناسب.",
+        noGroups: "لا توجد مجموعات متاحة",
+        capabilityDisabled:
+          "التزويد في الوقت المناسب غير مُمكَّن في هذا النشر. اضبط authZ.jit_provisioning.enabled في إعدادات النشر ثم أعد النشر حتى تصبح هذه الإعدادات فعّالة.",
+        lastUpdated: "آخر تحديث",
+        loadError: "تعذّر تحميل إعدادات التزويد في الوقت المناسب.",
+        saveSuccess: "تم حفظ إعدادات التزويد في الوقت المناسب.",
       },
       search: {
         title: "إعدادات البحث",
@@ -1055,6 +1089,16 @@ export default {
     error: "خطأ",
     language: "اللغة",
     noResults: "لم يتم العثور على نتائج",
+    pagination: {
+      showingRange: "عرض {{first}} - {{last}} من {{total}} نتيجة",
+      showingFiltered: "عرض {{count}} نتيجة مُرشَّحة",
+      rowsPerPage: "الصفوف في كل صفحة",
+      goToPage: "الانتقال إلى الصفحة {{page}}",
+      first: "الانتقال إلى الصفحة الأولى",
+      last: "الانتقال إلى الصفحة الأخيرة",
+      next: "الانتقال إلى الصفحة التالية",
+      previous: "الانتقال إلى الصفحة السابقة",
+    },
     selectFilter: "اختر الفلتر",
     textFilter: "تصفية نصية",
     all: "الكل",
@@ -1271,8 +1315,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "تحرير type",
       deleteType: "حذف type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "الإذن set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1711,6 +1753,8 @@ export default {
       errorResettingPassword:
         "فشل إعادة تعيين كلمة المرور. يرجى التحقق من الرمز والمحاولة مرة أخرى.",
       passwordMismatch: "كلمات المرور غير متطابقة.",
+      tempPasswordResent:
+        "لا يزال حسابك يحتوي على كلمة مرور مؤقتة معلقة، لذا تم إرسال كلمة مرور مؤقتة جديدة إلى بريدك الإلكتروني. سجّل الدخول باستخدام كلمة المرور المؤقتة وسيُطلب منك تعيين كلمة مرور دائمة.",
     },
   },
   permissions: {

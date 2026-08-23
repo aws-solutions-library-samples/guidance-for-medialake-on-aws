@@ -2,12 +2,7 @@ import React from "react";
 import { Suspense } from "react";
 import { Box, CircularProgress, Typography, Grid, Button } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import {
-  useGetConnectors,
-  useDeleteConnector,
-  useToggleConnector,
-  useSyncConnector,
-} from "@/api/hooks/useConnectors";
+import { useGetConnectors, useDeleteConnector, useSyncConnector } from "@/api/hooks/useConnectors";
 import { ConnectorResponse, ConnectorListResponse } from "@/api/types/api.types";
 import ConnectorCard from "./ConnectorCard";
 import { UseQueryResult } from "@tanstack/react-query";
@@ -43,7 +38,6 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
   }: UseQueryResult<ConnectorListResponse, Error> = useGetConnectors();
 
   const deleteConnector = useDeleteConnector();
-  const toggleConnector = useToggleConnector();
   const syncConnector = useSyncConnector();
 
   const handleEdit = (connector: ConnectorResponse) => {
@@ -55,14 +49,6 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
       await deleteConnector.mutateAsync(id);
     } catch (error) {
       console.error("Failed to delete connector:", error);
-    }
-  };
-
-  const handleToggleStatus = async (id: string, enabled: boolean) => {
-    try {
-      await toggleConnector.mutateAsync({ id, enabled });
-    } catch (error) {
-      console.error("Failed to toggle connector status:", error);
     }
   };
 
@@ -105,7 +91,6 @@ const ConnectorsListContent: React.FC<ConnectorsListContentProps> = ({ onAddConn
                 connector={connector}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onToggleStatus={handleToggleStatus}
                 onSync={handleSync}
               />
             </Grid>

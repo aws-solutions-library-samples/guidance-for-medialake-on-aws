@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
+import { useQueries } from "@tanstack/react-query";
 import {
   Dialog,
   DialogTitle,
@@ -13,6 +14,9 @@ import { useTranslation } from "react-i18next";
 import { useGetFavorites, useRemoveFavorite } from "@/api/hooks/useFavorites";
 import AssetCard from "@/components/shared/AssetCard";
 import { getOriginalAssetId } from "@/utils/clipTransformation";
+import { apiClient } from "@/api/apiClient";
+import { QUERY_KEYS } from "@/api/queryKeys";
+import { logger } from "@/common/helpers/logger";
 import { WidgetContainer } from "../WidgetContainer";
 import { EmptyState } from "../EmptyState";
 import { AssetCarousel } from "../AssetCarousel";
@@ -49,22 +53,85 @@ type FavoriteAsset = {
   };
 };
 
-// Helper to convert Favorite to asset-like object for useAssetOperations
-const favoriteToAsset = (favorite: Favorite): FavoriteAsset => ({
+// Shape of the resolved asset record returned by GET /assets/{id}. Kept
+// permissive because we only read a handful of fields.
+type ResolvedAssetRecord = {
+  asset?: {
+    InventoryID?: string;
+    DigitalSourceAsset?: {
+      Type?: string;
+      CreateDate?: string;
+      MainRepresentation?: {
+        Format?: string;
+        StorageInfo?: {
+          PrimaryLocation?: {
+            ObjectKey?: {
+              Name?: string;
+              FullPath?: string;
+            };
+            FileInfo?: { Size?: number };
+          };
+        };
+      };
+    };
+    DerivedRepresentations?: Array<{
+      Purpose?: string;
+      URL?: string;
+    }>;
+  };
+};
+
+const findPurposeUrl = (
+  resolved: ResolvedAssetRecord | undefined,
+  purpose: "thumbnail" | "proxy"
+): string => {
+  const rep = resolved?.asset?.DerivedRepresentations?.find((r) => r?.Purpose === purpose);
+  return rep?.URL ?? "";
+};
+
+const nameFromResolved = (resolved: ResolvedAssetRecord | undefined): string =>
+  resolved?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation?.ObjectKey
+    ?.Name ?? "";
+
+const formatFromResolved = (resolved: ResolvedAssetRecord | undefined): string =>
+  resolved?.asset?.DigitalSourceAsset?.MainRepresentation?.Format ?? "";
+
+const typeFromResolved = (resolved: ResolvedAssetRecord | undefined): string =>
+  resolved?.asset?.DigitalSourceAsset?.Type ?? "";
+
+// Helper to convert Favorite to asset-like object for useAssetOperations,
+// preferring live-resolved data over the metadata snapshot stored at
+// favorite-add time (which may have stale presigned thumbnail URLs, or may
+// be entirely missing for favorites added via direct API calls).
+const favoriteToAsset = (
+  favorite: Favorite,
+  resolved: ResolvedAssetRecord | undefined
+): FavoriteAsset => ({
   InventoryID: favorite.itemId,
   DigitalSourceAsset: {
-    Type: favorite.metadata?.assetType || "Unknown",
-    CreateDate: favorite.addedAt || new Date().toISOString(),
+    Type: typeFromResolved(resolved) || favorite.metadata?.assetType || "Unknown",
+    CreateDate:
+      resolved?.asset?.DigitalSourceAsset?.CreateDate ||
+      favorite.addedAt ||
+      new Date().toISOString(),
     MainRepresentation: {
-      Format: favorite.metadata?.format || "unknown",
+      Format: formatFromResolved(resolved) || favorite.metadata?.format || "unknown",
       StorageInfo: {
         PrimaryLocation: {
           ObjectKey: {
-            Name: favorite.metadata?.name || favorite.itemId,
-            FullPath: favorite.metadata?.fullPath || "",
+            Name: nameFromResolved(resolved) || favorite.metadata?.name || favorite.itemId,
+            FullPath:
+              resolved?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                ?.ObjectKey?.FullPath ||
+              favorite.metadata?.fullPath ||
+              "",
           },
           FileInfo: {
-            Size: favorite.metadata?.size || 0,
+            Size:
+              resolved?.asset?.DigitalSourceAsset?.MainRepresentation?.StorageInfo?.PrimaryLocation
+                ?.FileInfo?.Size ??
+              favorite.metadata?.size ??
+              0,
           },
         },
       },
@@ -125,6 +192,55 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
 
   // Handle error gracefully - don't show error for empty/undefined data
   const error = queryError;
+
+  // BUG-8: the previous implementation relied entirely on the metadata snapshot
+  // stored at favorite-add time. That snapshot's thumbnailUrl is a 60-second S3
+  // presigned URL that expires, and favorites added via the API directly carry
+  // no metadata at all — both cases rendered a raw asset:uuid caption and the
+  // generic SVG placeholder. Resolve each visible favorite against the live
+  // GET /assets/{id} endpoint (fresh CloudFront-signed URLs, deduped/cached by
+  // react-query) and fall back to the stored snapshot only if the fetch is
+  // pending or fails (e.g. the asset was deleted — see BUG-9).
+  const visibleFavorites = React.useMemo(() => favorites.slice(0, 20), [favorites]);
+
+  const resolvedAssetQueries = useQueries({
+    queries: visibleFavorites.map((favorite) => ({
+      queryKey: QUERY_KEYS.ASSETS.detail(favorite.itemId),
+      queryFn: async (): Promise<ResolvedAssetRecord | null> => {
+        try {
+          const inventoryId = getOriginalAssetId({
+            InventoryID: favorite.itemId,
+          });
+          const response = await apiClient.get<{ data: ResolvedAssetRecord }>(
+            `assets/${inventoryId}`
+          );
+          return response.data?.data ?? null;
+        } catch (err) {
+          logger.debug(
+            "FavoritesWidget: failed to resolve favorite asset — falling back to stored metadata",
+            { itemId: favorite.itemId, error: err }
+          );
+          return null;
+        }
+      },
+      // Match useAsset() elsewhere in the app so cache is shared across pages.
+      staleTime: 1000 * 60 * 30,
+      gcTime: 1000 * 60 * 60,
+      retry: 1,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
+  const resolvedByItemId = React.useMemo(() => {
+    const map = new Map<string, ResolvedAssetRecord | undefined>();
+    visibleFavorites.forEach((favorite, index) => {
+      const query = resolvedAssetQueries[index];
+      map.set(favorite.itemId, query?.data ?? undefined);
+    });
+    return map;
+  }, [visibleFavorites, resolvedAssetQueries]);
 
   const handleAssetClick = useCallback(
     (assetId: string, assetType: string) => {
@@ -204,7 +320,7 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
 
     return (
       <AssetCarousel
-        items={favorites.slice(0, 20)}
+        items={visibleFavorites}
         isLoading={isLoading}
         getItemKey={(favorite: Favorite) => favorite.itemId}
         emptyState={
@@ -215,32 +331,36 @@ export const FavoritesWidget: React.FC<BaseWidgetProps> = ({ widgetId, isExpande
           />
         }
         renderCard={(favorite: Favorite) => {
-          const asset = favoriteToAsset(favorite);
+          const resolved = resolvedByItemId.get(favorite.itemId);
+          const asset = favoriteToAsset(favorite, resolved);
           const isSelected = dashboardSelection?.isAssetSelected(favorite.itemId) ?? false;
-          const thumbnailUrl = favorite.metadata?.thumbnailUrl || "";
-          const proxyUrl = favorite.metadata?.proxyUrl || "";
+          const thumbnailUrl =
+            findPurposeUrl(resolved, "thumbnail") || favorite.metadata?.thumbnailUrl || "";
+          const proxyUrl = findPurposeUrl(resolved, "proxy") || favorite.metadata?.proxyUrl || "";
+          const displayName =
+            nameFromResolved(resolved) || favorite.metadata?.name || favorite.itemId;
+          const displayFormat = formatFromResolved(resolved) || favorite.metadata?.format || "";
+          const displayType =
+            typeFromResolved(resolved) || favorite.metadata?.assetType || "Unknown";
           return (
             <AssetCard
               id={favorite.itemId}
-              name={favorite.metadata?.name || favorite.itemId}
+              name={displayName}
               thumbnailUrl={thumbnailUrl}
               proxyUrl={proxyUrl}
-              assetType={favorite.metadata?.assetType || "Unknown"}
+              assetType={displayType}
               fields={[
                 { id: "name", label: "Name", visible: true },
                 { id: "format", label: "Format", visible: true },
               ]}
               renderField={(fieldId) => {
-                if (fieldId === "name") return favorite.metadata?.name || favorite.itemId;
+                if (fieldId === "name") return displayName;
                 if (fieldId === "format") {
-                  const fmt = favorite.metadata?.format;
-                  return fmt ? fmt.toUpperCase() : "";
+                  return displayFormat ? displayFormat.toUpperCase() : "";
                 }
                 return "";
               }}
-              onAssetClick={() =>
-                handleAssetClick(favorite.itemId, favorite.metadata?.assetType || "Unknown")
-              }
+              onAssetClick={() => handleAssetClick(favorite.itemId, displayType)}
               onDeleteClick={(e) => assetOperations.handleDeleteClick(asset, e)}
               onDownloadClick={(e) => assetOperations.handleDownloadClick(asset, e)}
               onAddToCollectionClick={(e) => handleAddToCollectionClick(favorite, e)}

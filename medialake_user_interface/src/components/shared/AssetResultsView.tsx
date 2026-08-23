@@ -131,6 +131,7 @@ function AssetResultsView<T>({
   const {
     getAssetId,
     getAssetName,
+    getAssetDisplayName,
     getAssetType,
     getAssetThumbnail,
     getAssetProxy,
@@ -356,6 +357,7 @@ function AssetResultsView<T>({
           editedName={editedName}
           getAssetId={getAssetId}
           getAssetName={getAssetName}
+          getAssetDisplayName={getAssetDisplayName}
           getAssetType={getAssetType}
           getAssetThumbnail={getAssetThumbnail}
           isSelected={isAssetSelected ? (asset) => isAssetSelected(getAssetId(asset)) : undefined}
@@ -374,7 +376,7 @@ function AssetResultsView<T>({
         page={searchMetadata.page}
         pageSize={searchMetadata.pageSize}
         totalResults={isConfidenceFiltered ? results.length : searchMetadata.totalResults}
-        onPageChange={(_, page) => onPageChange(page)}
+        onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
         isFiltered={isConfidenceFiltered}
       />

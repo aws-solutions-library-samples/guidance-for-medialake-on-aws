@@ -19,6 +19,8 @@ interface ExecutionsTableProps {
   activeSorting?: { columnId: string; desc: boolean }[];
   onRemoveFilter?: (columnId: string) => void;
   onRemoveSort?: (columnId: string) => void;
+  /** True while the server still has further pages to hand over. */
+  hasMorePages?: boolean;
 }
 
 export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
@@ -30,6 +32,7 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
   activeSorting = [],
   onRemoveFilter,
   onRemoveSort,
+  hasMorePages,
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,6 +81,8 @@ export const ExecutionsTable: React.FC<ExecutionsTableProps> = ({
         onRemoveFilter={onRemoveFilter}
         onRemoveSort={onRemoveSort}
         maxHeight="none"
+        enablePagination
+        hasMorePages={hasMorePages}
         emptyState={{
           message: t("common.noPipelineExecutionsFound"),
           icon: <ExecutionsIcon sx={{ fontSize: 40 }} />,

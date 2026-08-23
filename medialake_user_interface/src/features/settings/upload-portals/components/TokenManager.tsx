@@ -28,6 +28,8 @@ import {
   useRevokePortalToken,
 } from "@/api/hooks/usePortals";
 import type { PortalListItem, PortalToken } from "@/api/types/api.types";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Props {
   open: boolean;
@@ -59,6 +61,13 @@ const TokenManager: React.FC<Props> = ({ open, onClose, portalId, portalSlug, po
 
   // Backend returns flat array in data
   const tokens = response?.data ?? [];
+  const {
+    page,
+    pageSize,
+    paginatedItems: visibleTokens,
+    setPage,
+    setPageSize,
+  } = usePagination(tokens, { initialPageSize: 10 });
 
   // Derive available pre-populated param fields from portal config
   const paramFields = useMemo(() => {
@@ -227,7 +236,7 @@ const TokenManager: React.FC<Props> = ({ open, onClose, portalId, portalSlug, po
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {tokens.map((token) => (
+                    {visibleTokens.map((token) => (
                       <TableRow key={token.tokenId}>
                         <TableCell>{token.associatedEmail}</TableCell>
                         <TableCell>{new Date(token.createdAt).toLocaleDateString()}</TableCell>
@@ -251,6 +260,18 @@ const TokenManager: React.FC<Props> = ({ open, onClose, portalId, portalSlug, po
                   </TableBody>
                 </Table>
               </TableContainer>
+            )}
+
+            {tokens.length > 0 && (
+              <PaginationFooter
+                page={page}
+                pageSize={pageSize}
+                totalItems={tokens.length}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                hideOnSinglePage
+                sx={{ mt: 0 }}
+              />
             )}
 
             {tokens.length === 0 && (

@@ -108,14 +108,10 @@ export const QUERY_KEYS = {
     lists: () => [...QUERY_KEYS.FAVORITES.all, "list"] as const,
     list: (itemType?: string) => [...QUERY_KEYS.FAVORITES.lists(), { itemType }] as const,
   },
-  ROLES: {
-    all: ["roles"] as const,
-    lists: () => [...QUERY_KEYS.ROLES.all, "list"] as const,
-    list: (filters: string) => [...QUERY_KEYS.ROLES.lists(), { filters }] as const,
-    details: () => [...QUERY_KEYS.ROLES.all, "detail"] as const,
-    detail: (id: string) => [...QUERY_KEYS.ROLES.details(), id] as const,
+  USER_SETTINGS: {
+    all: ["userSettings"] as const,
+    namespace: (namespace: string) => [...QUERY_KEYS.USER_SETTINGS.all, { namespace }] as const,
   },
-
   API_KEYS: {
     all: ["api-keys"] as const,
     lists: () => [...QUERY_KEYS.API_KEYS.all, "list"] as const,
@@ -129,7 +125,6 @@ export const QUERY_KEYS = {
     list: (filters: string) => [...QUERY_KEYS.GROUPS.lists(), { filters }] as const,
     details: () => [...QUERY_KEYS.GROUPS.all, "detail"] as const,
     detail: (id: string) => [...QUERY_KEYS.GROUPS.details(), id] as const,
-    members: (id: string) => [...QUERY_KEYS.GROUPS.detail(id), "members"] as const,
   },
 
   GROUP_PERMISSIONS: {
@@ -149,6 +144,7 @@ export const QUERY_KEYS = {
     all: ["system-settings"] as const,
     search: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "search"] as const,
     metadataFields: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "metadata-fields"] as const,
+    jitProvisioning: () => [...QUERY_KEYS.SYSTEM_SETTINGS.all, "jit-provisioning"] as const,
   },
   COLLECTIONS: {
     all: ["collections"] as const,

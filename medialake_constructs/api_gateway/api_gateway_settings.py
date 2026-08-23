@@ -70,6 +70,11 @@ class SettingsApi(Construct):
             config=LambdaConfig(
                 name="settings_api",
                 entry="lambdas/api/settings",
+                # GET /settings/users drains the whole user directory and
+                # resolves group membership concurrently. Lambda scales CPU with
+                # memory, so the 128 MB default would leave the worker threads
+                # fighting over a fraction of a vCPU.
+                memory_size=512,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "COLLECTIONS_TABLE_NAME": props.collections_table.table_name,
@@ -80,6 +85,17 @@ class SettingsApi(Construct):
                     "API_KEYS_TABLE_ARN": props.api_keys_table.table_arn,
                     "COGNITO_USER_POOL_ID": props.cognito_user_pool.user_pool_id,
                     "ENVIRONMENT": config.environment,
+                    # Just-in-time provisioning deploy-time defaults. The
+                    # runtime policy lives in the system-settings table; these
+                    # describe what the deployment supports and seed the
+                    # response before an administrator has saved anything.
+                    "JIT_PROVISIONING_ENABLED": str(
+                        config.authZ.jit_provisioning.enabled
+                    ).lower(),
+                    "JIT_DEFAULT_GROUP": config.authZ.jit_provisioning.default_group,
+                    "JIT_ALLOW_PRIVILEGED_DEFAULT_GROUP": str(
+                        config.authZ.jit_provisioning.allow_privileged_default_group
+                    ).lower(),
                 },
             ),
         )
@@ -116,6 +132,9 @@ class SettingsApi(Construct):
                     "cognito-idp:AdminGetUser",
                     "cognito-idp:AdminListGroupsForUser",
                     "cognito-idp:ListGroups",
+                    # Group membership is resolved group-first (one call per
+                    # group) instead of user-first (one call per user).
+                    "cognito-idp:ListUsersInGroup",
                 ],
                 resources=[props.cognito_user_pool.user_pool_arn],
             )
@@ -192,6 +211,19 @@ class SettingsApi(Construct):
             cfn_method.authorizer_id = props.authorizer.authorizer_id
 
         add_cors_options_method(metadata_fields_resource)
+
+        # /settings/system/jit-provisioning resource
+        # Controls the default group assigned to users provisioned just-in-time
+        # from an external identity provider.
+        jit_provisioning_resource = system_resource.add_resource("jit-provisioning")
+
+        for method in ["GET", "PUT"]:
+            m = jit_provisioning_resource.add_method(method, lambda_integration)
+            cfn_method = m.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
+        add_cors_options_method(jit_provisioning_resource)
 
         # ===================================================================
         # /settings/api-keys resource and methods

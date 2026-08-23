@@ -8,6 +8,9 @@ export default {
     hindi: "Hindi",
     arabic: "Arabe",
     hebrew: "Hébreu",
+    spanish: "Espagnol",
+    japanese: "Japonais",
+    korean: "Coréen",
   },
   assetsPage: {
     title: "Actifs",
@@ -59,6 +62,21 @@ export default {
       emptySection: "Aucune collection",
       loading: "Chargement\u2026",
       more: "Plus",
+    },
+    savedLocations: {
+      sectionTitle: "Emplacements enregistrés",
+      allDestinations: "Toutes les destinations",
+      save: "Enregistrer cet emplacement",
+      remove: "Supprimer cet emplacement enregistré",
+      atCapacity: "Vous pouvez enregistrer jusqu'à {{count}} emplacements",
+      collectionsUnavailable_one:
+        "Une collection enregistrée avec cet emplacement n'est plus disponible et a été supprimée : {{names}}",
+      collectionsUnavailable_other:
+        "{{count}} collections enregistrées avec cet emplacement ne sont plus disponibles et ont été supprimées : {{names}}",
+      selectedCollectionsUnavailable_one:
+        "Une collection sélectionnée n'est plus disponible et ne sera pas appliquée : {{names}}",
+      selectedCollectionsUnavailable_other:
+        "{{count}} collections sélectionnées ne sont plus disponibles et ne seront pas appliquées : {{names}}",
     },
   },
   pathBrowser: {
@@ -804,7 +822,6 @@ export default {
   },
   roles: {
     title: "Gestion des rôles",
-    description: "Gérez les rôles du système et leurs permissions",
     actions: {
       addRole: "Ajouter un rôle",
     },
@@ -855,6 +872,23 @@ export default {
         collections: "Collections",
         upgrades: "Mises à jour",
         metadataFields: "Champs de métadonnées",
+        jitProvisioning: "Provisionnement des utilisateurs",
+      },
+      jitProvisioning: {
+        title: "Provisionnement des utilisateurs à la demande",
+        description:
+          "Choisissez le groupe attribué aux utilisateurs lors de leur première connexion via un fournisseur d'identité externe. Le groupe n'est appliqué qu'une seule fois par utilisateur : si vous déplacez ensuite une personne vers un autre groupe, une connexion ultérieure ne l'annulera jamais.",
+        enabledLabel: "Attribuer un groupe par défaut aux nouveaux utilisateurs fédérés",
+        defaultGroupLabel: "Groupe par défaut",
+        defaultGroupHelp:
+          "Les nouveaux utilisateurs fédérés reçoivent les autorisations de ce groupe lors de leur première connexion.",
+        groupRequired: "Choisissez un groupe avant d'activer le provisionnement à la demande.",
+        noGroups: "Aucun groupe disponible",
+        capabilityDisabled:
+          "Le provisionnement à la demande n'est pas activé pour ce déploiement. Définissez authZ.jit_provisioning.enabled dans la configuration du déploiement puis redéployez pour que ces paramètres prennent effet.",
+        lastUpdated: "Dernière mise à jour",
+        loadError: "Impossible de charger les paramètres de provisionnement à la demande.",
+        saveSuccess: "Paramètres de provisionnement à la demande enregistrés.",
       },
       search: {
         title: "Configuration de la recherche",
@@ -1038,6 +1072,16 @@ export default {
     noCollectionTypesFound: "Aucun type de collection trouvé. Créez-en un pour commencer.",
     noUpgradeHistory: "Aucun historique de mise à niveau disponible",
     noResults: "Aucun résultat trouvé",
+    pagination: {
+      showingRange: "Affichage de {{first}} - {{last}} sur {{total}} résultats",
+      showingFiltered: "Affichage de {{count}} résultats filtrés",
+      rowsPerPage: "Lignes par page",
+      goToPage: "Aller à la page {{page}}",
+      first: "Aller à la première page",
+      last: "Aller à la dernière page",
+      next: "Aller à la page suivante",
+      previous: "Aller à la page précédente",
+    },
     selectFilter: "Sélectionner un filtre",
     textFilter: "Filtre textuel",
     all: "Tous",
@@ -1064,8 +1108,6 @@ export default {
       cannotDeleteSystemTypes: "Impossible de supprimer les types système",
       editType: "Modifier le type",
       deleteType: "Supprimer le type",
-      errorSavingRole: "Une erreur s'est produite lors de l'enregistrement du rôle",
-      errorDeletingRole: "Une erreur s'est produite lors de la suppression du rôle",
       permissionSetNotFound: "Ensemble de permissions introuvable",
       noUsersAssigned: "Aucun utilisateur assigné",
       noGroupsAssigned: "Aucun groupe assigné",
@@ -1738,6 +1780,8 @@ export default {
       errorResettingPassword:
         "Échec de la réinitialisation du mot de passe. Veuillez vérifier votre code et réessayer.",
       passwordMismatch: "Les mots de passe ne correspondent pas.",
+      tempPasswordResent:
+        "Votre compte a encore un mot de passe temporaire en attente, un nouveau vous a donc été envoyé par e-mail. Connectez-vous avec le mot de passe temporaire et vous serez invité à en définir un permanent.",
     },
   },
   permissions: {

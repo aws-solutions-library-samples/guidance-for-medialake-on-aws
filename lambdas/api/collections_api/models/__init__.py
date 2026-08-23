@@ -20,6 +20,8 @@ from .common_models import (
     SortDirection,
 )
 from .item_models import (
+    MAX_ITEMS_PER_REQUEST,
+    AddCollectionItemSpec,
     AddItemToCollectionRequest,
     CollectionItem,
 )
@@ -34,6 +36,8 @@ __all__ = [
     "UpdateCollectionRequest",
     "CollectionListResponse",
     # Item models
+    "MAX_ITEMS_PER_REQUEST",
+    "AddCollectionItemSpec",
     "AddItemToCollectionRequest",
     "CollectionItem",
     # Share models

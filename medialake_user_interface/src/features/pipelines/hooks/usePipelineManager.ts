@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ColumnFiltersState, PaginationState } from "@tanstack/react-table";
+import { ColumnFiltersState } from "@tanstack/react-table";
 import {
   useGetPipelines,
   useDeletePipeline,
@@ -23,10 +23,6 @@ export const usePipelineManager = () => {
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: PAGE_SIZE,
-  });
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -154,7 +150,6 @@ export const usePipelineManager = () => {
     columnMenuAnchor,
     filterMenuAnchor,
     activeFilterColumn,
-    pagination,
     deleteDialog,
     snackbar,
     isLoading,
@@ -276,7 +271,6 @@ export const usePipelineManager = () => {
     refetch,
 
     // Actions
-    setPagination,
     setGlobalFilter,
     setColumnFilters,
     setColumnVisibility,

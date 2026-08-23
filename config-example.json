@@ -73,5 +73,6 @@
   "video_download_enabled": true,
   "ses_from_address": "noreply@example.com",
   "portal_rate_limit_per_5min": 1000,
+  "temporary_password_validity_days": 7,
   "external_nodes_bucket": "my-custom-pipeline-nodes"
 }

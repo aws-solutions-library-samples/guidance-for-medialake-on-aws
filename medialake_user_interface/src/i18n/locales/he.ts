@@ -8,6 +8,9 @@ export default {
     hindi: "הינדי",
     arabic: "ערבית",
     hebrew: "עברית",
+    spanish: "ספרדית",
+    japanese: "יפנית",
+    korean: "קוריאנית",
   },
   assetsPage: {
     title: "נכסים",
@@ -57,6 +60,19 @@ export default {
       emptySection: "אין אוספים",
       loading: "טוען\u2026",
       more: "עוד",
+    },
+    savedLocations: {
+      sectionTitle: "יעדים שמורים",
+      allDestinations: "כל היעדים",
+      save: "שמור יעד זה",
+      remove: "הסר יעד שמור זה",
+      atCapacity: "ניתן לשמור עד {{count}} יעדים",
+      collectionsUnavailable_one: "אוסף שנשמר עם יעד זה אינו זמין יותר והוסר: {{names}}",
+      collectionsUnavailable_other:
+        "{{count}} אוספים שנשמרו עם יעד זה אינם זמינים יותר והוסרו: {{names}}",
+      selectedCollectionsUnavailable_one: "אוסף שנבחר אינו זמין יותר ולא יוחל: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "{{count}} אוספים שנבחרו אינם זמינים יותר ולא יוחלו: {{names}}",
     },
   },
   pathBrowser: {
@@ -834,7 +850,6 @@ export default {
   },
   roles: {
     title: "ניהול תפקידים",
-    description: "נהל את התפקידים במערכת ואת ההרשאות שלהם",
     actions: {
       addRole: "הוסף תפקיד",
     },
@@ -885,6 +900,22 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "שדות מטא-נתונים",
+        jitProvisioning: "הקצאת משתמשים",
+      },
+      jitProvisioning: {
+        title: "הקצאת משתמשים בזמן אמת",
+        description:
+          "בחר את הקבוצה שתוקצה למשתמשים בפעם הראשונה שהם מתחברים דרך ספק זהות חיצוני. הקבוצה מוחלת פעם אחת בלבד לכל משתמש, ולכן העברה של מישהו לקבוצה אחרת בהמשך לא תתבטל בהתחברות הבאה.",
+        enabledLabel: "הקצה קבוצת ברירת מחדל למשתמשים מאוחדים חדשים",
+        defaultGroupLabel: "קבוצת ברירת מחדל",
+        defaultGroupHelp: "משתמשים מאוחדים חדשים מקבלים את ההרשאות של קבוצה זו בהתחברות הראשונה.",
+        groupRequired: "בחר קבוצה לפני הפעלת הקצאה בזמן אמת.",
+        noGroups: "אין קבוצות זמינות",
+        capabilityDisabled:
+          "הקצאה בזמן אמת אינה מופעלת בפריסה זו. הגדר authZ.jit_provisioning.enabled בתצורת הפריסה ובצע פריסה מחדש כדי שהגדרות אלו ייכנסו לתוקף.",
+        lastUpdated: "עודכן לאחרונה",
+        loadError: "לא ניתן לטעון את הגדרות ההקצאה בזמן אמת.",
+        saveSuccess: "הגדרות ההקצאה בזמן אמת נשמרו.",
       },
       search: {
         title: "הגדרות חיפוש",
@@ -1053,6 +1084,16 @@ export default {
     error: "שגיאה",
     language: "שפה",
     noResults: "לא נמצאו תוצאות",
+    pagination: {
+      showingRange: "מציג {{first}} - {{last}} מתוך {{total}} תוצאות",
+      showingFiltered: "מציג {{count}} תוצאות מסוננות",
+      rowsPerPage: "שורות בעמוד",
+      goToPage: "עבור לעמוד {{page}}",
+      first: "עבור לעמוד הראשון",
+      last: "עבור לעמוד האחרון",
+      next: "עבור לעמוד הבא",
+      previous: "עבור לעמוד הקודם",
+    },
     selectFilter: "בחר סינון",
     textFilter: "סינון טקסט",
     all: "הכל",
@@ -1237,8 +1278,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "ערוך type",
       deleteType: "מחק type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "הרשאה set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1707,6 +1746,8 @@ export default {
       errorSendingCode: 'שליחת קוד האיפוס נכשלה. אנא בדוק את הדוא"ל שלך ונסה שוב.',
       errorResettingPassword: "איפוס הסיסמה נכשל. אנא בדוק את הקוד שלך ונסה שוב.",
       passwordMismatch: "הסיסמאות אינן תואמות.",
+      tempPasswordResent:
+        'לחשבון שלך עדיין יש סיסמה זמנית ממתינה, ולכן סיסמה זמנית חדשה נשלחה אליך בדוא"ל. היכנס עם הסיסמה הזמנית ותתבקש להגדיר סיסמה קבועה.',
     },
   },
   permissions: {

@@ -11,6 +11,7 @@ from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_cognito as cognito
 from constructs import Construct
 
+from config import config
 from medialake_constructs.cognito import CognitoConstruct, CognitoProps
 
 
@@ -46,6 +47,7 @@ class CognitoStack(Stack):
                 user_password=True,
                 user_srp=True,
                 removal_policy=RemovalPolicy.DESTROY,
+                temporary_password_validity_days=config.temporary_password_validity_days,
             ),
         )
 

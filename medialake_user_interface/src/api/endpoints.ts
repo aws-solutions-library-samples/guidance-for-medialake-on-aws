@@ -33,10 +33,13 @@ export const API_ENDPOINTS = {
     BATCH_DELETE: "/assets/batch",
     BATCH_DELETE_USER_JOBS: "/assets/batch/user",
     BATCH_DELETE_CANCEL: (jobId: string) => `/assets/batch/${jobId}/cancel`,
+    // BUG-26: delete a finished batch-delete job record so its notification
+    // can be cleared for real (not just hidden client-side). Distinct from
+    // BATCH_DELETE_CANCEL, which stops an in-flight execution.
+    BATCH_DELETE_DELETE: (jobId: string) => `/assets/batch/${jobId}`,
   },
   USERS: "/settings/users",
   USER: "/users",
-  ROLES: "/settings/roles",
 
   API_KEYS: {
     BASE: "/settings/api-keys",
@@ -50,8 +53,6 @@ export const API_ENDPOINTS = {
     GET: (id: string) => `/groups/${id}`,
     UPDATE: (id: string) => `/groups/${id}`,
     DELETE: (id: string) => `/groups/${id}`,
-    ADD_MEMBERS: (id: string) => `/groups/${id}/members`,
-    REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
   },
 
   GROUP_PERMISSIONS: {
@@ -67,10 +68,16 @@ export const API_ENDPOINTS = {
     GET: "/settings/system",
     SEARCH: "/settings/system/search",
     METADATA_FIELDS: "/settings/system/metadata-fields",
+    JIT_PROVISIONING: "/settings/system/jit-provisioning",
   },
   FAVORITES: {
     BASE: "/users/favorites",
     DELETE: (itemType: string, itemId: string) => `/users/favorites/${itemType}/${itemId}`,
+  },
+  USER_SETTINGS: {
+    BASE: "/users/settings",
+    SETTING: (namespace: string, key: string) =>
+      `/users/settings/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`,
   },
   COLLECTIONS: {
     BASE: "/collections",

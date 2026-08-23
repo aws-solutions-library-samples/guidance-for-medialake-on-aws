@@ -3,6 +3,8 @@ import {
   transformResultsToClipMode,
   isClipAsset,
   getClipDisplayName,
+  getCollectionItemDisplayName,
+  formatClipBoundaryLabel,
   getOriginalAssetId,
   clearTransformationCache,
   detectModelVersionFromResults,
@@ -164,6 +166,78 @@ describe("getClipDisplayName", () => {
       clipIndex: 0,
     };
     expect(getClipDisplayName(clipAsset)).toBe("video.mp4 (1:05 - 2:10)");
+  });
+});
+
+describe("formatClipBoundaryLabel", () => {
+  it("formats a boundary with both ends as a range", () => {
+    expect(formatClipBoundaryLabel({ startTime: "00:01:00:00", endTime: "00:02:00:00" })).toBe(
+      "00:01:00:00 - 00:02:00:00"
+    );
+  });
+
+  it("returns null when the item is a whole asset rather than a clip", () => {
+    expect(formatClipBoundaryLabel(undefined)).toBeNull();
+    expect(formatClipBoundaryLabel(null)).toBeNull();
+    expect(formatClipBoundaryLabel({})).toBeNull();
+  });
+
+  it("returns null for a half-open range rather than rendering a dangling separator", () => {
+    expect(formatClipBoundaryLabel({ startTime: "00:01:00:00" })).toBeNull();
+    expect(formatClipBoundaryLabel({ endTime: "00:02:00:00" })).toBeNull();
+  });
+
+  it("treats blank timecodes as absent", () => {
+    expect(formatClipBoundaryLabel({ startTime: "  ", endTime: "00:02:00:00" })).toBeNull();
+    expect(formatClipBoundaryLabel({ startTime: "00:01:00:00", endTime: "" })).toBeNull();
+  });
+});
+
+describe("getCollectionItemDisplayName", () => {
+  it("appends the timecode range for a collection clip", () => {
+    expect(
+      getCollectionItemDisplayName("video.mp4", {
+        startTime: "00:01:00:00",
+        endTime: "00:02:00:00",
+      })
+    ).toBe("video.mp4 (00:01:00:00 - 00:02:00:00)");
+  });
+
+  it("matches the getClipDisplayName format so clips read alike everywhere", () => {
+    const clipAsset = {
+      DigitalSourceAsset: {
+        Type: "Video",
+        MainRepresentation: {
+          StorageInfo: { PrimaryLocation: { ObjectKey: { Name: "video.mp4" } } },
+        },
+      },
+      clipData: { start_timecode: "00:01:00:00", end_timecode: "00:02:00:00" },
+      originalAssetId: "abc",
+      clipIndex: 0,
+    };
+    expect(
+      getCollectionItemDisplayName("video.mp4", {
+        startTime: "00:01:00:00",
+        endTime: "00:02:00:00",
+      })
+    ).toBe(getClipDisplayName(clipAsset));
+  });
+
+  it("returns the bare name for a whole-asset item", () => {
+    expect(getCollectionItemDisplayName("video.mp4")).toBe("video.mp4");
+    expect(getCollectionItemDisplayName("video.mp4", {})).toBe("video.mp4");
+  });
+
+  it("distinguishes two clips taken from the same asset", () => {
+    const first = getCollectionItemDisplayName("video.mp4", {
+      startTime: "00:00:05:00",
+      endTime: "00:00:10:00",
+    });
+    const second = getCollectionItemDisplayName("video.mp4", {
+      startTime: "00:00:20:00",
+      endTime: "00:00:25:00",
+    });
+    expect(first).not.toBe(second);
   });
 });
 

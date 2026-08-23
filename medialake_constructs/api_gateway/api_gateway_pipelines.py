@@ -259,6 +259,13 @@ class ApiGatewayPipelinesConstruct(Construct):
             config=LambdaConfig(
                 name="GetPipelinesHandler",
                 entry="lambdas/api/pipelines/get_pipelines",
+                # This handler returns the full pipeline list in one response so
+                # the UI can sort, filter and paginate across everything. It
+                # holds every item (including the heavy `definition` graphs)
+                # in memory while draining, and Lambda scales CPU with memory,
+                # so the 128 MB default would both risk an OOM and starve the
+                # parallel scan segments.
+                memory_size=512,
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
                     "PIPELINES_TABLE_NAME": props.pipeline_table.table_name,

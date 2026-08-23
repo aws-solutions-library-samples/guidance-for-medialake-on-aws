@@ -8,6 +8,9 @@ export default {
     hindi: "Hindi",
     arabic: "Arabic",
     hebrew: "Hebrew",
+    spanish: "Spanish",
+    japanese: "Japanese",
+    korean: "Korean",
   },
   assetsPage: {
     title: "Assets",
@@ -58,6 +61,21 @@ export default {
       emptySection: "No collections",
       loading: "Loading\u2026",
       more: "More",
+    },
+    savedLocations: {
+      sectionTitle: "Saved locations",
+      allDestinations: "All destinations",
+      save: "Save this location",
+      remove: "Remove this saved location",
+      atCapacity: "You can save up to {{count}} locations",
+      collectionsUnavailable_one:
+        "A collection saved with this location is no longer available and was removed: {{names}}",
+      collectionsUnavailable_other:
+        "{{count}} collections saved with this location are no longer available and were removed: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "A selected collection is no longer available and will not be applied: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "{{count}} selected collections are no longer available and will not be applied: {{names}}",
     },
   },
   pathBrowser: {
@@ -795,7 +813,6 @@ export default {
   },
   roles: {
     title: "Role Management",
-    description: "Manage system roles and their permissions",
     actions: {
       addRole: "Add Role",
     },
@@ -845,10 +862,27 @@ export default {
         security: "Security",
         apiKeys: "API Keys",
         collections: "Collections",
+        jitProvisioning: "User Provisioning",
         upgrades: "Upgrades",
       },
       metadataFields: {
         searchPlaceholder: "Search fields...",
+      },
+      jitProvisioning: {
+        title: "Just-In-Time User Provisioning",
+        description:
+          "Choose the group assigned to users the first time they sign in through an external identity provider. The group is applied once per user, so moving somebody to a different group later is never undone by a subsequent sign-in.",
+        enabledLabel: "Assign a default group to new federated users",
+        defaultGroupLabel: "Default group",
+        defaultGroupHelp:
+          "New federated users receive this group's permissions on their first sign-in.",
+        groupRequired: "Choose a group before enabling just-in-time provisioning.",
+        noGroups: "No groups available",
+        capabilityDisabled:
+          "Just-in-time provisioning is not enabled for this deployment. Set authZ.jit_provisioning.enabled in the deployment configuration and redeploy before these settings take effect.",
+        lastUpdated: "Last updated",
+        loadError: "Could not load the just-in-time provisioning settings.",
+        saveSuccess: "Just-in-time provisioning settings saved.",
       },
       upgrade: {
         title: "System Upgrade",
@@ -1029,6 +1063,16 @@ export default {
     noCollectionTypesFound: "No collection types found. Create one to get started.",
     noUpgradeHistory: "No upgrade history available",
     noResults: "No results found",
+    pagination: {
+      showingRange: "Showing {{first}} - {{last}} of {{total}} results",
+      showingFiltered: "Showing {{count}} filtered results",
+      rowsPerPage: "Rows per page",
+      goToPage: "Go to page {{page}}",
+      first: "Go to first page",
+      last: "Go to last page",
+      next: "Go to next page",
+      previous: "Go to previous page",
+    },
     selectFilter: "Select Filter",
     textFilter: "Text Filter",
     all: "All",
@@ -1055,8 +1099,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "Edit type",
       deleteType: "Delete type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "Permission set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1716,6 +1758,8 @@ export default {
       errorSendingCode: "Failed to send reset code. Please check your email and try again.",
       errorResettingPassword: "Failed to reset password. Please check your code and try again.",
       passwordMismatch: "Passwords do not match.",
+      tempPasswordResent:
+        "Your account still has a pending temporary password, so a new one has been emailed to you. Sign in with the temporary password and you'll be prompted to set a permanent one.",
     },
   },
   permissions: {

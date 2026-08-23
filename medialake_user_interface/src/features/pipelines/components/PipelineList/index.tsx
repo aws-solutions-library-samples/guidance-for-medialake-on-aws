@@ -52,6 +52,7 @@ const PipelineList: React.FC<PipelineListProps> = memo(
           onRemoveSort={onRemoveSort}
           togglingPipelines={togglingPipelines}
           onToggleActive={onToggleActive}
+          enablePagination
           emptyState={{
             message: t("common.noPipelinesFound"),
             icon: <PipelineIcon sx={{ fontSize: 40 }} />,

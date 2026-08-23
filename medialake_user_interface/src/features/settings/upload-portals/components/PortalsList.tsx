@@ -36,6 +36,8 @@ import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import type { PortalListItem, PortalResponse } from "@/api/types/api.types";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface PortalsListProps {
   onOpenTokenManager: (portalId: string, portalSlug: string, portal: PortalListItem) => void;
@@ -89,6 +91,13 @@ const PortalsList: React.FC<PortalsListProps> = ({ onOpenTokenManager }) => {
   } | null>(null);
 
   const portals = response?.data ?? [];
+  const {
+    page,
+    pageSize,
+    paginatedItems: visiblePortals,
+    setPage,
+    setPageSize,
+  } = usePagination(portals);
 
   const handleCreateClick = () => navigate("/settings/upload-portals/new");
 
@@ -156,7 +165,7 @@ const PortalsList: React.FC<PortalsListProps> = ({ onOpenTokenManager }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {portals.map((portal) => (
+            {visiblePortals.map((portal) => (
               <TableRow key={portal.portalId}>
                 <TableCell>{portal.name.replace(/[#*_~`>]/g, "")}</TableCell>
                 <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
@@ -213,6 +222,14 @@ const PortalsList: React.FC<PortalsListProps> = ({ onOpenTokenManager }) => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        totalItems={portals.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>{t("uploadPortals.list.deletePortal")}</DialogTitle>

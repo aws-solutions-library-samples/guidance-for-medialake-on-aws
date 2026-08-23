@@ -29,7 +29,7 @@ import { theme, components } from "./auth/theme";
 import { colorTokens } from "../theme/tokens";
 import { useTranslation } from "react-i18next";
 
-type ForgotPasswordStep = "idle" | "enterEmail" | "enterCode" | "success";
+type ForgotPasswordStep = "idle" | "enterEmail" | "enterCode" | "tempResent" | "success";
 
 const inputSx = {
   "& .MuiOutlinedInput-root": {
@@ -95,9 +95,52 @@ const AuthPage = () => {
       await resetPassword({ username: fpEmail });
       setForgotPasswordStep("enterCode");
     } catch (error: any) {
+      // Users who never completed first sign-in (FORCE_CHANGE_PASSWORD) cannot
+      // use the standard reset flow — Cognito rejects with NotAuthorizedException
+      // "User password cannot be reset in the current state". Fall back to the
+      // backend recovery endpoint, which resends a fresh temporary password.
+      // Other NotAuthorizedException causes (e.g. disabled user) follow the
+      // standard error handling.
+      const isPendingTempPassword =
+        error?.name === "NotAuthorizedException" &&
+        /cannot be reset in the current state/i.test(error?.message ?? "");
+      if (isPendingTempPassword) {
+        const recovered = await requestTemporaryPasswordResend();
+        if (recovered) {
+          setForgotPasswordStep("tempResent");
+          return;
+        }
+      }
+      // Never let an unknown email be distinguishable from a known one. The
+      // pool client sets PreventUserExistenceErrors, so Cognito normally
+      // returns success here, but older pools (and pools reconfigured out of
+      // band) still raise UserNotFoundException — surfacing it as an error
+      // would let an unauthenticated visitor enumerate accounts from this
+      // form. Advance to the code step exactly as for a real account; an
+      // attacker learns nothing and a legitimate user simply has no code that
+      // validates.
+      if (error?.name === "UserNotFoundException") {
+        setForgotPasswordStep("enterCode");
+        return;
+      }
       setFpError(t("auth.forgotPassword.errorSendingCode"));
     } finally {
       setFpLoading(false);
+    }
+  };
+
+  const requestTemporaryPasswordResend = async (): Promise<boolean> => {
+    try {
+      const apiEndpoint = awsConfig?.API?.REST?.RestApi?.endpoint;
+      if (!apiEndpoint) return false;
+      const response = await fetch(`${apiEndpoint}/users/password-recovery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: fpEmail }),
+      });
+      return response.ok;
+    } catch {
+      return false;
     }
   };
 
@@ -262,6 +305,29 @@ const AuthPage = () => {
           >
             {t("auth.forgotPassword.backToSignIn")}
           </Link>
+        </Stack>
+      );
+    }
+
+    if (forgotPasswordStep === "tempResent") {
+      return (
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Alert severity="info" sx={{ fontSize: "0.85rem" }}>
+            {t("auth.forgotPassword.tempPasswordResent")}
+          </Alert>
+          <Button
+            fullWidth
+            onClick={handleBackToSignIn}
+            sx={{
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              color: "white",
+              height: "40px",
+              textTransform: "none",
+              "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+            }}
+          >
+            {t("auth.forgotPassword.backToSignIn")}
+          </Button>
         </Stack>
       );
     }

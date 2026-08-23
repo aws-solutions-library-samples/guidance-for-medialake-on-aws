@@ -12,6 +12,7 @@ import boto3
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from lambda_middleware import is_lambda_warmer_event
@@ -379,7 +380,6 @@ _metadata_fields_cache_version: Optional[str] = None  # updatedAt value
 
 def _get_metadata_fields_version() -> Optional[str]:
     """Lightweight DynamoDB read that returns only the updatedAt timestamp."""
-    version_check_start = time.time()
     try:
         table = _dynamodb_resource.Table(os.environ["SYSTEM_SETTINGS_TABLE_NAME"])
         resp = table.get_item(
@@ -388,10 +388,6 @@ def _get_metadata_fields_version() -> Optional[str]:
             ConsistentRead=True,
         )
         item = resp.get("Item")
-        logger.info(
-            f"[PERF] Metadata fields version check (DynamoDB ConsistentRead) took: "
-            f"{time.time() - version_check_start:.3f}s"
-        )
         return item.get("updatedAt") if item else None
     except Exception:
         logger.warning("Failed to check metadata fields version")
@@ -408,7 +404,6 @@ def fetch_metadata_fields_config() -> Optional[List[Dict]]:
     """
     global _metadata_fields_cache, _metadata_fields_cache_version
 
-    fetch_start = time.time()
     current_version = _get_metadata_fields_version()
 
     # Cache hit — version hasn't changed
@@ -417,15 +412,10 @@ def fetch_metadata_fields_config() -> Optional[List[Dict]]:
         and current_version is not None
         and current_version == _metadata_fields_cache_version
     ):
-        logger.info(
-            f"[PERF] Metadata fields config CACHE HIT, total took: "
-            f"{time.time() - fetch_start:.3f}s"
-        )
         return _metadata_fields_cache
 
     # Cache miss or version changed — full fetch
     try:
-        full_fetch_start = time.time()
         table = _dynamodb_resource.Table(os.environ["SYSTEM_SETTINGS_TABLE_NAME"])
         resp = table.get_item(
             Key={"PK": "SYSTEM_SETTINGS", "SK": "METADATA_FIELDS"},
@@ -434,11 +424,6 @@ def fetch_metadata_fields_config() -> Optional[List[Dict]]:
         result = item.get("fields") if item else None
         _metadata_fields_cache = result
         _metadata_fields_cache_version = current_version
-        logger.info(
-            f"[PERF] Metadata fields config CACHE MISS - full DynamoDB fetch took: "
-            f"{time.time() - full_fetch_start:.3f}s, total (incl. version check): "
-            f"{time.time() - fetch_start:.3f}s, fields: {len(result) if result else 0}"
-        )
         return result
     except Exception:
         logger.exception("Failed to fetch metadata fields config from DynamoDB")
@@ -696,11 +681,6 @@ def build_search_query(
 
     parse_start = time.time()
     clean_query, parsed_filters = parse_search_query(params.q)
-    # Pure-wildcard queries (the UI browse view sends "*") must fall through
-    # to match_all: the prefix/phrase clauses below analyze "*" to zero
-    # tokens and would match NOTHING, making the browse view appear empty.
-    if clean_query and not clean_query.strip("*"):
-        clean_query = ""
     query_terms = clean_query.split() if clean_query else []
     logger.info(f"[PERF] Query parsing took: {time.time() - parse_start:.3f}s")
     logger.info(
@@ -778,58 +758,66 @@ def build_search_query(
                 },
             ]
         else:
-            # Single term - heavily prioritize ObjectKey.Name prefix matching
-            # (instance customization: filename prefix/phrase-prefix only, no
-            # fuzzy/type/wildcard/metadata clauses)
+            # Single term - use the original complex query structure
             query["bool"]["should"] = [
-                # 1. HIGHEST PRIORITY: Exact full-name phrase match (boost 10.0).
-                # VERIFIED 2026-07-22 via diagnostic lambda: the live "media"
-                # index has NO Name.keyword subfield, so prefix/term/wildcard
-                # queries against Name.keyword match nothing. match_phrase on
-                # the analyzed field is the strongest exact-name signal
-                # available (6ms, correct doc, score ~29). If Name.keyword is
-                # ever added to the mapping, a prefix clause on it can be
-                # restored here for true literal starts-with semantics.
+                # Exact prefix match on the file name with highest boost
                 {
-                    "match_phrase": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
-                            "query": clean_query,
-                            "boost": 10.0,
+                    "prefix": {
+                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name.keyword": {
+                            "value": clean_query,
+                            "boost": 4.0,
                         }
                     }
                 },
-                # 2. Phrase prefix matching on Name (boost 8.0).
-                # NOTE: match_phrase_prefix only expands the trailing token to
-                # max_expansions terms (default 50, raised here), so on crowded
-                # prefixes (e.g. hundreds of nm_* files) it can miss valid
-                # matches. Clause 3 backstops it without any expansion cap.
+                # Enhanced phrase prefix matching
                 {
                     "match_phrase_prefix": {
                         "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
                             "query": clean_query,
-                            "boost": 8.0,
-                            # 50 (default) misses matches on crowded prefixes;
-                            # very high values make phrase matching expensive
-                            # on common tokens (observed 2.8-4.8s). 200 is the
-                            # measured compromise.
-                            "max_expansions": 200,
+                            "boost": 3.0,
                         }
                     }
                 },
-                # 3. Token-prefix on the analyzed Name field (boost 6.0).
-                # Uses constant-score rewrite: matches ALL terms with this
-                # prefix, no expansion cap. Filenames analyze to (mostly) a
-                # single token, so this is a reliable starts-with match.
-                # prefix queries are not analyzed, so lowercase to align with
-                # the analyzed (lowercased) index terms.
                 {
-                    "prefix": {
-                        "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
-                            "value": clean_query.lower(),
-                            "boost": 6.0,
-                        }
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": name_fields,
+                        "type": "best_fields",
+                        "fuzziness": "AUTO",
+                        "prefix_length": 10,
+                        "minimum_should_match": "80%",
+                        "boost": 2,
                     }
                 },
+                {
+                    "multi_match": {
+                        "query": clean_query,
+                        "fields": type_fields,
+                        "type": "cross_fields",
+                        "operator": "or",
+                        "minimum_should_match": "1",
+                        "boost": 1,
+                    }
+                },
+                {
+                    "query_string": {
+                        "query": f"*{clean_query}*",
+                        "fields": name_fields,
+                        "analyze_wildcard": True,
+                        "boost": 0.7,
+                    }
+                },
+                # Metadata search disabled to avoid field expansion limit (1024 fields)
+                # The Metadata.* wildcard was causing: "field expansion matches too many fields, limit: 1024, got: 1065"
+                # {
+                #     "multi_match": {
+                #         "query": clean_query,
+                #         "fields": ["Metadata.*"],
+                #         "type": "best_fields",
+                #         "boost": 0.8,
+                #         "lenient": True,
+                #     }
+                # },
             ]
 
         query["bool"]["minimum_should_match"] = 1
@@ -947,12 +935,17 @@ def build_search_query(
         "size": params.size,
         "from": params.from_,
         "aggs": {
-            "asset_types": {
-                "terms": {"field": "DigitalSourceAsset.Type.keyword", "size": 20}
-            },
+            # BUG-17 fix: DigitalSourceAsset.Type and
+            # DigitalSourceAsset.MainRepresentation.Format are already keyword-typed
+            # in the live 'media' index (no ``.keyword`` subfield). The neighbouring
+            # filters below use the base fields without ``.keyword`` and empirically
+            # work (?extension=TIFF → 126, ?type=Audio → 3), so the aggregations
+            # must use the same paths. Corroborated by the 2026-07-22 diagnostic
+            # note attached to the search revert commit.
+            "asset_types": {"terms": {"field": "DigitalSourceAsset.Type", "size": 20}},
             "file_extensions": {
                 "terms": {
-                    "field": "DigitalSourceAsset.MainRepresentation.Format.keyword",
+                    "field": "DigitalSourceAsset.MainRepresentation.Format",
                     "size": 50,
                 }
             },
@@ -989,13 +982,8 @@ def build_search_query(
     # Merge dynamic aggregations from metadata fields config
     facets_info = None
     if metadata_fields_config is not None:
-        aggs_start = time.time()
         dynamic_aggs, facets_info = build_dynamic_aggregations(metadata_fields_config)
         query_body["aggs"].update(dynamic_aggs)
-        logger.info(
-            f"[PERF] Dynamic aggregations build took: {time.time() - aggs_start:.3f}s "
-            f"({len(dynamic_aggs)} dynamic aggs, {len(query_body['aggs'])} total aggs)"
-        )
 
     # Add sort clause if sort parameters are present
     if params.sort_by:
@@ -1538,12 +1526,7 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
             }
 
     try:
-        metadata_config_start = time.time()
         metadata_fields_config = fetch_metadata_fields_config()
-        logger.info(
-            f"[PERF] Metadata fields config retrieval took: "
-            f"{time.time() - metadata_config_start:.3f}s"
-        )
 
         query_build_start = time.time()
         search_body, facets_info = build_search_query(
@@ -1604,10 +1587,6 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
                                         "match": {
                                             "DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation.ObjectKey.Name": {
                                                 "query": params.q,
-                                                # Require ALL tokens to match so a
-                                                # shared extension token (e.g. "png")
-                                                # can't match every asset of that type
-                                                "operator": "and",
                                                 "boost": 2.0,
                                             }
                                         }
@@ -1616,7 +1595,6 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
                                         "match": {
                                             "DigitalSourceAsset.Type": {
                                                 "query": params.q,
-                                                "operator": "and",
                                                 "boost": 1.0,
                                             }
                                         }
@@ -1643,33 +1621,9 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
                     raise e
 
             opensearch_time = time.time() - opensearch_start
-            # response["took"] is OpenSearch's server-side execution time in ms.
-            # A large gap between it and the round-trip time points at
-            # network/connection overhead rather than query cost.
             logger.info(
-                f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s "
-                f"(server-side took: {response.get('took', '?')}ms, "
-                f"timed_out: {response.get('timed_out', '?')})"
+                f"[PERF] OpenSearch query execution took: {opensearch_time:.3f}s"
             )
-            # Partial-result detection: OpenSearch silently drops shards that
-            # fail or time out (allow_partial_search_results defaults to true),
-            # which makes identical queries return different results minutes
-            # apart. Surface it loudly so inconsistency is diagnosable.
-            shards_info = response.get("_shards", {})
-            if response.get("timed_out") or shards_info.get("failed", 0) > 0:
-                logger.warning(
-                    "PARTIAL SEARCH RESULTS - some shards failed or timed out; "
-                    "result set is incomplete for this request",
-                    extra={
-                        "timed_out": response.get("timed_out"),
-                        "shards_total": shards_info.get("total"),
-                        "shards_successful": shards_info.get("successful"),
-                        "shards_skipped": shards_info.get("skipped"),
-                        "shards_failed": shards_info.get("failed"),
-                        "shard_failures": shards_info.get("failures", [])[:3],
-                        "query": params.q,
-                    },
-                )
 
             hits = response.get("hits", {}).get("hits", [])
             total_results = response["hits"]["total"]["value"]
@@ -1884,27 +1838,15 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
             batch_processing_start = time.time()
 
             # Step 1: Collect all CloudFront URL requests
-            collect_start = time.time()
             processed_hits_data, url_requests = collect_cloudfront_url_requests(hits)
-            logger.info(
-                f"[PERF] CloudFront URL request collection took: "
-                f"{time.time() - collect_start:.3f}s ({len(url_requests)} URLs "
-                f"for {len(processed_hits_data)} hits)"
-            )
 
             # Step 2: Generate all CloudFront URLs in parallel
-            url_gen_start = time.time()
             if url_requests:
                 cloudfront_urls = generate_cloudfront_urls_batch(url_requests)
             else:
                 cloudfront_urls = {}
-            logger.info(
-                f"[PERF] CloudFront URL batch generation took: "
-                f"{time.time() - url_gen_start:.3f}s"
-            )
 
             # Step 3: Process all hits with pre-generated URLs
-            hit_processing_start = time.time()
             results = []
 
             for hit_data in processed_hits_data:
@@ -1916,10 +1858,6 @@ def perform_search(params: SearchParams, user_sub: Optional[str] = None) -> Dict
                 except Exception as e:
                     logger.warning(f"Error processing hit: {str(e)}")
                     continue
-            logger.info(
-                f"[PERF] Hit processing took: "
-                f"{time.time() - hit_processing_start:.3f}s ({len(results)} results)"
-            )
 
             logger.info(
                 f"[PERF] Total batch processing took: {time.time() - batch_processing_start:.3f}s"
@@ -2059,13 +1997,21 @@ def handle_search():
         if "fields" in multi_value_params:
             query_params["fields"] = multi_value_params["fields"]
 
-        # Ensure required parameter exists
+        # Missing `q` used to short-circuit with a dict carrying an inner
+        # "status": "400" — API Gateway then wrapped that as HTTP 200, and
+        # status-code-driven clients treated the failure as success (BUG-18).
+        # Two possible reads of the request exist:
+        #   (a) accept it and browse-all — but that risks changing the meaning
+        #       of empty-q calls silently for anyone relying on the reject.
+        #   (b) reject it with a real 4xx that reaches the HTTP layer.
+        # Going with (b): raise BadRequestError so the resolver surfaces an
+        # actual HTTP 400. Callers who want the whole corpus already have
+        # `q=*`, which continues to work.
         if "q" not in query_params:
-            return {
-                "status": "400",
-                "message": "Missing required parameter 'q'",
-                "data": None,
-            }
+            raise BadRequestError(
+                "Missing required parameter 'q'. Use q=* to browse the whole "
+                "corpus, or combine q with filters like extension=/type=."
+            )
 
         # Extract user sub for personal-asset ownership guard
         user_sub = _get_user_sub_from_event(app.current_event.raw_event)
@@ -2089,6 +2035,12 @@ def handle_search():
         )
         return result
 
+    except BadRequestError:
+        # Let powertools HTTP exceptions (e.g. missing required `q`, BUG-18)
+        # propagate to the ApiGatewayResolver so they surface as real 4xx
+        # responses. Without this, the broad `except Exception` below would
+        # swallow them into an HTTP-200 body carrying an inner "status": "500".
+        raise
     except ValueError as e:
         logger.warning(f"Invalid input parameters: {str(e)}")
         return {"status": "400", "message": str(e), "data": None}

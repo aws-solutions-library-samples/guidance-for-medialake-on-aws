@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from functools import lru_cache
@@ -138,18 +139,113 @@ def validate_prefix_access(requested_prefix, allowed_prefixes):
     return False
 
 
+def get_caller_sub(event):
+    """Extract the caller's Cognito sub from the authorizer context.
+
+    Checks ``requestContext.authorizer.sub`` first (custom authorizer), then falls back to
+    ``requestContext.authorizer.claims.sub`` (Cognito). Returns None when it cannot be
+    determined; callers decide how to handle that.
+    """
+    try:
+        authorizer = event.get("requestContext", {}).get("authorizer", {})
+        if not isinstance(authorizer, dict):
+            return None
+
+        sub = authorizer.get("sub")
+        if sub:
+            return sub
+
+        claims = authorizer.get("claims")
+        if isinstance(claims, str):
+            try:
+                claims = json.loads(claims)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        if isinstance(claims, dict):
+            return claims.get("sub")
+    except Exception:
+        logger.warning("Could not determine caller sub from authorizer context")
+    return None
+
+
+def is_personal_connector(connector):
+    """Whether this connector addresses a single user's personal ("My Assets") storage.
+
+    Mirrors ``_is_personal_target`` in the upload handler: true for the per-user my-assets
+    connector, and for any connector confined to the reserved ``personal/`` key prefix.
+    """
+    if connector.get("type") == "my-assets":
+        return True
+
+    object_prefix = connector.get("objectPrefix") or ""
+    if isinstance(object_prefix, list):
+        return any(
+            str(prefix).lstrip("/").startswith("personal/") for prefix in object_prefix
+        )
+    return str(object_prefix).lstrip("/").startswith("personal/")
+
+
+def validate_personal_connector_access(event, connector, connector_id):
+    """Deny listing another user's personal storage.
+
+    The prefix allow-list alone is not sufficient protection here. My Assets connectors are
+    per-user records (``id = my-assets-{sub}``, ``objectPrefix = personal/{sub}/``), so a
+    caller who supplies someone else's connector id would pass the allow-list check against
+    *that* connector's prefix and list the other user's private files. Ownership therefore
+    has to be checked explicitly, the same way the upload handler enforces
+    ``personal/{user_sub}/`` on writes.
+
+    Returns None when access is allowed, or a 403 response to return to the caller.
+    """
+    if not is_personal_connector(connector):
+        return None
+
+    caller_sub = get_caller_sub(event)
+    if not caller_sub:
+        logger.warning(
+            f"Denying personal connector access for {connector_id}: caller sub unavailable"
+        )
+        metrics.add_metric(name="PersonalConnectorAccessDenied", unit="Count", value=1)
+        return create_response(
+            403,
+            {"status": "error", "message": "Access denied"},
+        )
+
+    owner_sub = connector.get("userId")
+    expected_prefix = f"personal/{caller_sub}/"
+    object_prefix = connector.get("objectPrefix") or ""
+    prefixes = object_prefix if isinstance(object_prefix, list) else [object_prefix]
+    prefix_matches_caller = any(
+        normalize_prefix(str(prefix)) == expected_prefix for prefix in prefixes
+    )
+
+    if (owner_sub and owner_sub == caller_sub) or prefix_matches_caller:
+        return None
+
+    logger.warning(
+        f"Denying personal connector access for {connector_id}: "
+        "caller does not own this personal storage"
+    )
+    metrics.add_metric(name="PersonalConnectorAccessDenied", unit="Count", value=1)
+    return create_response(
+        403,
+        {"status": "error", "message": "Access denied"},
+    )
+
+
 @logger.inject_lambda_context(correlation_id_path="requestContext.requestId")
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event, context):
     """Main handler for S3 explorer API endpoint"""
     try:
-        # Extract parameters
+        # Extract parameters. API Gateway sends queryStringParameters as null
+        # (present, valued null) when the request has no query string, so a
+        # `.get("queryStringParameters", {})` default never applies — coerce it.
         connector_id = event["pathParameters"]["connector_id"]
-        prefix = event.get("queryStringParameters", {}).get("prefix", "")
-        continuation_token = event.get("queryStringParameters", {}).get(
-            "continuationToken"
-        )
+        query_params = event.get("queryStringParameters") or {}
+        prefix = query_params.get("prefix", "")
+        continuation_token = query_params.get("continuationToken")
 
         logger.info(
             f"S3 Explorer request for connector: {connector_id}, prefix: {prefix}"
@@ -182,6 +278,16 @@ def lambda_handler(event, context):
             )
 
         bucket = connector.get("storageIdentifier")
+
+        # A personal ("My Assets") connector may only be browsed by its owner. This is
+        # checked before any prefix handling, because the allow-list is derived from the
+        # connector record itself and so cannot distinguish one user's personal storage
+        # from another's.
+        personal_access_denied = validate_personal_connector_access(
+            event, connector, connector_id
+        )
+        if personal_access_denied:
+            return personal_access_denied
 
         # Parse objectPrefix into list format
         allowed_prefixes = parse_object_prefixes(connector.get("objectPrefix"))

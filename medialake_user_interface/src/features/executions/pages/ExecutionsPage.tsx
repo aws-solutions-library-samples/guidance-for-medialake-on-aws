@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { Box, Button, useTheme, alpha, Chip, IconButton, Tooltip } from "@mui/material";
+import { Box, useTheme, alpha, Chip, IconButton, Tooltip } from "@mui/material";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -14,6 +14,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   ColumnDef,
   SortingState,
   ColumnFiltersState,
@@ -24,6 +25,7 @@ import {
 import { PageHeader, PageContent } from "@/components/common/layout";
 import { RefreshButton } from "@/components/common";
 import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
+import { useInfiniteTablePagination } from "@/components/common/table/useInfiniteTablePagination";
 import { ExecutionsTable } from "../components/ExecutionsTable";
 import { TableCellContent } from "@/components/common/table";
 import { BaseFilterPopover } from "@/components/common/table/BaseFilterPopover";
@@ -88,6 +90,18 @@ const ExecutionsPage: React.FC = () => {
     if (!data?.pages) return [];
     return data.pages.flatMap((page) => page.data.executions);
   }, [data]);
+
+  // Executions grow without bound, so the full set is never fetched. Page
+  // controls run over the loaded window and pull the next server page when the
+  // user navigates past it.
+  const { pagination, setPagination, autoResetPageIndex, hasMore } = useInfiniteTablePagination({
+    initialPageSize: PAGE_SIZE,
+    resetOn: [debouncedGlobalFilter, columnFilters, sorting],
+    loadedCount: executions.length,
+    hasNextPage: Boolean(hasNextPage),
+    isFetchingNextPage,
+    fetchNextPage,
+  });
 
   // Track previous sort values to detect changes
   const prevSortRef = useRef({
@@ -307,6 +321,7 @@ const ExecutionsPage: React.FC = () => {
             <Tooltip title={t("common.actions.viewDetails")} arrow>
               <IconButton
                 size="small"
+                aria-label={t("common.actions.viewDetails")}
                 onClick={() => handleViewDetails(row.original)}
                 sx={{
                   color: "text.secondary",
@@ -325,6 +340,7 @@ const ExecutionsPage: React.FC = () => {
                   <span>
                     <IconButton
                       size="small"
+                      aria-label={t("executions.actions.retryFromCurrent")}
                       onClick={() => handleRetryFromCurrent(row.original.execution_id)}
                       disabled={
                         retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
@@ -345,6 +361,7 @@ const ExecutionsPage: React.FC = () => {
                   <span>
                     <IconButton
                       size="small"
+                      aria-label={t("executions.actions.retryFromStart")}
                       onClick={() => handleRetryFromStart(row.original.execution_id)}
                       disabled={
                         retryFromCurrentMutation.isPending || retryFromStartMutation.isPending
@@ -389,19 +406,23 @@ const ExecutionsPage: React.FC = () => {
       columnVisibility,
       columnSizing,
       globalFilter,
+      pagination,
     },
     enableSorting: true,
     enableFilters: true,
     manualSorting: true,
     manualFiltering: true,
+    autoResetPageIndex,
     onSortingChange: handleSortingChange,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode: "onChange" as ColumnResizeMode,
     filterFns: {
       includesString: (row, columnId, filterValue) => {
@@ -490,6 +511,7 @@ const ExecutionsPage: React.FC = () => {
               onRemoveSort={(columnId) => {
                 setSorting((prev) => prev.filter((s) => s.id !== columnId));
               }}
+              hasMorePages={hasMore}
             />
           </Box>
           {/* Sidebar panel */}
@@ -502,32 +524,6 @@ const ExecutionsPage: React.FC = () => {
             }}
           />
         </Box>
-
-        {hasNextPage && (
-          <Box
-            sx={{
-              p: 2,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Button
-              onClick={() => fetchNextPage()}
-              disabled={!hasNextPage || isFetchingNextPage}
-              sx={{
-                textTransform: "none",
-                borderRadius: "8px",
-                color: theme.palette.text.secondary,
-                "&:hover": {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                },
-              }}
-            >
-              {isFetchingNextPage ? t("common.loading") : t("common.loadMore")}
-            </Button>
-          </Box>
-        )}
       </PageContent>
       <BaseFilterPopover
         anchorEl={columnMenuAnchor}

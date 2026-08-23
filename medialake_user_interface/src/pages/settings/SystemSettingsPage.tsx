@@ -50,6 +50,7 @@ import { UpgradeSection } from "@/components/settings/UpgradeSection";
 import { Can } from "@/permissions/components/Can";
 import CollectionTypesManagement from "@/components/settings/CollectionTypesManagement";
 import MetadataFieldsSettings from "@/components/settings/MetadataFieldsSettings";
+import JitProvisioningSettings from "@/components/settings/JitProvisioningSettings";
 import { useFeatureFlag } from "@/contexts/FeatureFlagsContext";
 
 // Fallback notification hook
@@ -340,6 +341,7 @@ const SystemSettingsPage: React.FC = () => {
             <Tab label={t("settings.systemSettings.tabs.metadataFields", "Metadata Fields")} />
             <Tab label={t("settings.systemSettings.tabs.apiKeys", "API Keys")} />
             <Tab label={t("settings.systemSettings.tabs.collections", "Collections")} />
+            <Tab label={t("settings.systemSettings.tabs.jitProvisioning", "User Provisioning")} />
             {systemUpgradesEnabled && (
               <Tab label={t("settings.systemSettings.tabs.upgrades", "Upgrades")} />
             )}
@@ -972,12 +974,44 @@ const SystemSettingsPage: React.FC = () => {
               }
             </Can>
           </TabPanel>
+          <TabPanel value={tabValue} index={4}>
+            <Can I="edit" a="system-settings">
+              <JitProvisioningSettings />
+            </Can>
+            <Can I="edit" a="system-settings">
+              {(allowed) =>
+                !allowed && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      textAlign: "center",
+                      py: 8,
+                    }}
+                  >
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      {t("permissions.accessDenied", "Access Denied")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t(
+                        "permissions.systemSettingsAccessDenied",
+                        "You don't have permission to manage system settings."
+                      )}
+                    </Typography>
+                  </Box>
+                )
+              }
+            </Can>
+          </TabPanel>
           {systemUpgradesEnabled && (
-            <TabPanel value={tabValue} index={4}>
-              <Can I="manage" a="system-settings">
+            <TabPanel value={tabValue} index={5}>
+              <Can I="edit" a="system-settings">
                 <UpgradeSection />
               </Can>
-              <Can I="manage" a="system-settings">
+              <Can I="edit" a="system-settings">
                 {(allowed) =>
                   !allowed && (
                     <Box

@@ -228,6 +228,54 @@ export function getClipDisplayName(asset: any): string {
 }
 
 /**
+ * A clip's time range as persisted on a collection item.
+ *
+ * Note this is a different shape from `ClipAssetItem.clipData`: search results carry
+ * `clipData` plus `originalAssetId` (so `isClipAsset` recognises them), whereas a
+ * collection item carries only `clipBoundary` with HH:MM:SS:FF timecodes. Collection
+ * clips therefore never satisfy `isClipAsset`, which is why they need their own label
+ * helper rather than reusing `getClipDisplayName`.
+ */
+export interface ClipBoundary {
+  startTime?: string;
+  endTime?: string;
+}
+
+/**
+ * Formats a collection item's clip boundary as a `start - end` range, or returns null
+ * when the item is a whole asset rather than a clip.
+ *
+ * Returns null unless both ends are present: a half-open range would render as
+ * "00:00:10:00 - " and read as though the data were truncated.
+ */
+export function formatClipBoundaryLabel(boundary?: ClipBoundary | null): string | null {
+  const startTime = boundary?.startTime?.trim();
+  const endTime = boundary?.endTime?.trim();
+
+  if (!startTime || !endTime) {
+    return null;
+  }
+
+  return `${startTime} - ${endTime}`;
+}
+
+/**
+ * Display name for a collection item, appending the clip's timecode range when the item
+ * is a clip.
+ *
+ * Without this, several clips taken from one asset all render under the same filename and
+ * are indistinguishable on the collection page. The `name (start - end)` form matches
+ * `getClipDisplayName` so clips read the same wherever they appear.
+ */
+export function getCollectionItemDisplayName(
+  assetName: string,
+  boundary?: ClipBoundary | null
+): string {
+  const range = formatClipBoundaryLabel(boundary);
+  return range ? `${assetName} (${range})` : assetName;
+}
+
+/**
  * Gets the original asset ID from either a clip asset or regular asset
  * For clip assets, returns the originalAssetId property
  * For regular assets, returns the InventoryID

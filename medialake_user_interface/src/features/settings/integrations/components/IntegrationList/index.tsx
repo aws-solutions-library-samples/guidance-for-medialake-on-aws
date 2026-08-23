@@ -1,14 +1,16 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Box } from "@mui/material";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
 } from "@tanstack/react-table";
 import { Extension as IntegrationIcon } from "@mui/icons-material";
 import { ResizableTable } from "@/components/common/table";
 import { BaseTableToolbar } from "@/components/common/table";
+import { useTablePagination } from "@/components/common/table/useTablePagination";
 import { useTableVirtualizer } from "@/features/settings/integrations/hooks/useTableVirtualizer";
 import { useColumns } from "@/features/settings/integrations/hooks/useColumns";
 import { IntegrationListProps, ColumnSort, ColumnFilter } from "./types";
@@ -29,6 +31,11 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useColumns({ onEditIntegration, onDeleteIntegration });
+  // Promoted from the table's internal state so page resets can react to it.
+  const [globalFilter, setGlobalFilter] = useState("");
+  const { pagination, setPagination, autoResetPageIndex } = useTablePagination({
+    resetOn: [globalFilter, activeFilters],
+  });
 
   const table = useReactTable({
     data: integrations,
@@ -36,10 +43,16 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    autoResetPageIndex,
     state: {
       sorting: activeSorting,
       columnFilters: activeFilters,
+      globalFilter,
+      pagination,
     },
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     onSortingChange: (updater) => {
       const newSorting = typeof updater === "function" ? updater(activeSorting) : updater;
       if (newSorting.length === 0 && activeSorting.length > 0) {
@@ -81,8 +94,8 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
   return (
     <Box ref={containerRef} sx={{ height: "100%", overflow: "auto" }}>
       <BaseTableToolbar
-        globalFilter={table.getState().globalFilter}
-        onGlobalFilterChange={(value) => table.setGlobalFilter(value)}
+        globalFilter={globalFilter}
+        onGlobalFilterChange={setGlobalFilter}
         activeFilters={mappedActiveFilters}
         activeSorting={mappedActiveSorting}
         onRemoveFilter={onRemoveFilter}
@@ -103,6 +116,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({
           activeSorting={mappedActiveSorting}
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={handleRemoveSort}
+          enablePagination
           emptyState={{
             message: t("common.noIntegrationsFound"),
             icon: <IntegrationIcon sx={{ fontSize: 40 }} />,

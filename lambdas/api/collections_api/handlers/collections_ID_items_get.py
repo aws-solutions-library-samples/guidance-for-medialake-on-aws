@@ -22,6 +22,19 @@ tracer = Tracer(service="collections-ID-items-get")
 metrics = Metrics(namespace="medialake", service="collection-items")
 
 
+def _map_to_dict(attr):
+    """Convert a PynamoDB MapAttribute to a plain dict.
+
+    ``as_dict()``, not ``dict()``: iterating a MapAttribute yields attribute-name strings,
+    so ``dict(attr)`` raises ``dictionary update sequence element #0 has length 9; 2 is
+    required``. Both call sites below sit inside a broad ``except`` that swallows the error
+    into a warning and returns whatever had accumulated, so a single clip item made the
+    whole response come back empty — every collection containing a clip looked empty on
+    this endpoint. The POST handler already used ``as_dict()``; this matches it.
+    """
+    return attr.as_dict()
+
+
 def register_route(app):
     """Register GET /collections/<collection_id>/items route"""
 
@@ -60,9 +73,9 @@ def register_route(app):
                     if item.itemId:
                         item_dict["itemId"] = item.itemId
                     if item.clipBoundary:
-                        item_dict["clipBoundary"] = dict(item.clipBoundary)
+                        item_dict["clipBoundary"] = _map_to_dict(item.clipBoundary)
                     if item.metadata:
-                        item_dict["metadata"] = dict(item.metadata)
+                        item_dict["metadata"] = _map_to_dict(item.metadata)
 
                     all_items.append(item_dict)
             except Exception as e:
@@ -87,9 +100,9 @@ def register_route(app):
                     if item.itemId:
                         item_dict["itemId"] = item.itemId
                     if item.clipBoundary:
-                        item_dict["clipBoundary"] = dict(item.clipBoundary)
+                        item_dict["clipBoundary"] = _map_to_dict(item.clipBoundary)
                     if item.metadata:
-                        item_dict["metadata"] = dict(item.metadata)
+                        item_dict["metadata"] = _map_to_dict(item.metadata)
 
                     all_items.append(item_dict)
             except Exception as e:

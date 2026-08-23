@@ -8,6 +8,9 @@ export default {
     hindi: "印地语",
     arabic: "阿拉伯语",
     hebrew: "希伯来语",
+    spanish: "西班牙语",
+    japanese: "日语",
+    korean: "韩语",
   },
   assetsPage: {
     title: "资产",
@@ -56,6 +59,19 @@ export default {
       emptySection: "没有集合",
       loading: "加载中\u2026",
       more: "更多",
+    },
+    savedLocations: {
+      sectionTitle: "已保存的上传目标",
+      allDestinations: "所有上传目标",
+      save: "保存此上传目标",
+      remove: "移除此已保存的上传目标",
+      atCapacity: "最多可保存 {{count}} 个上传目标",
+      collectionsUnavailable_one: "随此上传目标保存的收藏集已不可用，已被移除：{{names}}",
+      collectionsUnavailable_other:
+        "随此上传目标保存的 {{count}} 个收藏集已不可用，已被移除：{{names}}",
+      selectedCollectionsUnavailable_one: "所选收藏集已不可用，将不会应用：{{names}}",
+      selectedCollectionsUnavailable_other:
+        "所选的 {{count}} 个收藏集已不可用，将不会应用：{{names}}",
     },
   },
   pathBrowser: {
@@ -833,7 +849,6 @@ export default {
   },
   roles: {
     title: "角色管理",
-    description: "管理系统角色及其权限",
     actions: {
       addRole: "添加角色",
     },
@@ -884,6 +899,22 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "元数据字段",
+        jitProvisioning: "用户预配",
+      },
+      jitProvisioning: {
+        title: "即时用户预配",
+        description:
+          "选择用户首次通过外部身份提供商登录时分配的组。该组对每个用户仅应用一次，因此之后将某人移到其他组不会在后续登录时被撤销。",
+        enabledLabel: "为新的联合用户分配默认组",
+        defaultGroupLabel: "默认组",
+        defaultGroupHelp: "新的联合用户首次登录时将获得此组的权限。",
+        groupRequired: "启用即时预配前请先选择一个组。",
+        noGroups: "没有可用的组",
+        capabilityDisabled:
+          "此部署未启用即时预配。请在部署配置中设置 authZ.jit_provisioning.enabled 并重新部署，这些设置才会生效。",
+        lastUpdated: "上次更新",
+        loadError: "无法加载即时预配设置。",
+        saveSuccess: "即时预配设置已保存。",
       },
       search: {
         title: "搜索配置",
@@ -1049,6 +1080,16 @@ export default {
     error: "错误",
     language: "语言",
     noResults: "未找到结果",
+    pagination: {
+      showingRange: "显示第 {{first}} - {{last}} 条，共 {{total}} 条",
+      showingFiltered: "显示 {{count}} 条筛选结果",
+      rowsPerPage: "每页行数",
+      goToPage: "转到第 {{page}} 页",
+      first: "转到第一页",
+      last: "转到最后一页",
+      next: "转到下一页",
+      previous: "转到上一页",
+    },
     selectFilter: "选择筛选",
     textFilter: "文本筛选",
     all: "全部",
@@ -1245,8 +1286,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "编辑 type",
       deleteType: "删除 type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "权限 set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1703,6 +1742,8 @@ export default {
       errorSendingCode: "发送重置验证码失败。请检查您的电子邮件并重试。",
       errorResettingPassword: "重置密码失败。请检查您的验证码并重试。",
       passwordMismatch: "密码不匹配。",
+      tempPasswordResent:
+        "您的账户仍有待处理的临时密码，因此新的临时密码已通过电子邮件发送给您。使用临时密码登录后，系统将提示您设置永久密码。",
     },
   },
   permissions: {

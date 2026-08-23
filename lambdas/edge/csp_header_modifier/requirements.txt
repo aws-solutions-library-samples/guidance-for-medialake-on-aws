@@ -1,2 +1,0 @@
-# Edge Lambda function for CSP header modification
-# No external dependencies required for this function

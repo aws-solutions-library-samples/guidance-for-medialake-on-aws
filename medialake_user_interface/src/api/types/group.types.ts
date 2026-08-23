@@ -42,15 +42,6 @@ export interface GroupResponse {
   data: Group;
 }
 
-export interface AddGroupMembersRequest {
-  userIds: string[];
-}
-
-export interface GroupMembersResponse {
-  status: string;
-  message: string;
-  data: {
-    groupId: string;
-    members: string[];
-  };
-}
+// AddGroupMembersRequest and GroupMembersResponse were removed along with the
+// /groups/{id}/members endpoints. Group membership is set through the users
+// endpoints, which write Cognito group membership.

@@ -5,13 +5,11 @@ import { API_ENDPOINTS } from "@/api/endpoints";
 import { QUERY_KEYS } from "@/api/queryKeys";
 import { logger } from "@/common/helpers/logger";
 import { useErrorModal } from "@/hooks/useErrorModal";
-import { useInfiniteQuery } from "@tanstack/react-query";
 
 import type {
   CreatePipelineRequest,
   PipelineResponse,
   PipelineListResponse,
-  PipelineFilters,
 } from "@/api/types/pipeline.types";
 
 const validatePipelineRequest = (data: any) => {
@@ -88,57 +86,7 @@ export const useDeletePipeline = () => {
   });
 };
 
-export const usePipeline = (pageSize: number = 20, filters?: PipelineFilters) => {
-  const { showError } = useErrorModal();
-
-  return useInfiniteQuery({
-    queryKey: [QUERY_KEYS.PIPELINES.all, pageSize, filters] as const,
-    initialPageParam: null as string | null,
-    queryFn: async ({ pageParam }) => {
-      try {
-        const params: Record<string, string> = {
-          pageSize: pageSize.toString(),
-        };
-
-        if (pageParam) {
-          params.nextToken = pageParam;
-        }
-        if (filters?.status) {
-          params.status = filters.status;
-        }
-        if (filters?.system) {
-          params.system = filters.system;
-        }
-        if (filters?.startDate) {
-          params.startDate = filters.startDate;
-        }
-        if (filters?.endDate) {
-          params.endDate = filters.endDate;
-        }
-        if (filters?.sortBy) {
-          params.sortBy = filters.sortBy;
-        }
-        if (filters?.sortOrder) {
-          params.sortOrder = filters.sortOrder;
-        }
-
-        const searchParams = new URLSearchParams(params);
-        const response = await apiClient.get<PipelineResponse>(
-          `${API_ENDPOINTS.PIPELINES}?${searchParams.toString()}`
-        );
-        return response.data;
-      } catch (error) {
-        logger.error("Fetch pipelines error:", error);
-        showError("Failed to fetch pipelines");
-        throw error;
-      }
-    },
-    getNextPageParam: (lastPage) => {
-      return lastPage.data.searchMetadata.nextToken || null;
-    },
-    select: (data) => ({
-      pages: data.pages,
-      pageParams: data.pageParams,
-    }),
-  });
-};
+// The token-paginated `usePipeline` infinite query that used to live here was
+// never imported, and GET /pipelines now returns the full list in one response
+// so the UI can sort, filter and paginate across every pipeline. Pipelines are
+// fetched via `features/pipelines/api/pipelinesController.useGetPipelines`.

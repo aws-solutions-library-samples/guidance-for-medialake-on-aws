@@ -164,6 +164,13 @@ class StorageConnectorsStack(cdk.NestedStack):
                 environment_variables={
                     "PIPELINES_EVENT_BUS": props.pipelines_event_bus_name,
                     "MEDIALAKE_ASSET_TABLE": props.asset_table_arn,
+                    # Same handler as the per-connector ingest lambda created in
+                    # lambdas/api/connectors/s3/post_s3, which sets both of these.
+                    # Without the namespace, Powertools raises
+                    # SchemaValidationError("Must contain a metric namespace") when
+                    # flushing metrics, so every invocation logged an error.
+                    "POWERTOOLS_SERVICE_NAME": "asset-processor",
+                    "POWERTOOLS_METRICS_NAMESPACE": "AssetProcessor",
                     "ASSETS_TABLE": props.asset_table_arn,
                     "EVENT_BUS_NAME": props.pipelines_event_bus_name,
                     "DO_NOT_INGEST_DUPLICATES": "True",
@@ -201,6 +208,14 @@ class StorageConnectorsStack(cdk.NestedStack):
                     "dynamodb:UpdateItem",
                     "dynamodb:Query",
                     "dynamodb:BatchWriteItem",
+                    # The handler takes a "LOCK::{bucket}:{key}" item to serialise
+                    # processing of the same object and deletes it when done
+                    # (lambdas/ingest/s3/index.py). Without DeleteItem the release
+                    # fails and the stale lock blocks every later ingest of that
+                    # object. DescribeTable is used for the table-status
+                    # preflight in the same handler.
+                    "dynamodb:DeleteItem",
+                    "dynamodb:DescribeTable",
                 ],
                 resources=[props.asset_table_arn, f"{props.asset_table_arn}/index/*"],
             )

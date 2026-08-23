@@ -1,23 +1,29 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  Pagination,
-  Select,
-  MenuItem,
-  FormControl,
-  SelectChangeEvent,
-} from "@mui/material";
+import { PaginationFooter } from "@/components/common/pagination/PaginationFooter";
+
+/**
+ * Page-size choices for asset browsing.
+ *
+ * Deliberately wider than the shared PAGE_SIZE_OPTIONS: asset grids are
+ * routinely scanned in large batches, so the bigger steps are kept.
+ */
+const ASSET_PAGE_SIZE_OPTIONS = [20, 50, 75, 100, 150, 200, 250];
 
 interface AssetPaginationProps {
   page: number;
   pageSize: number;
   totalResults: number;
-  onPageChange: (event: React.ChangeEvent<unknown>, value: number) => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (newPageSize: number) => void;
   isFiltered?: boolean;
 }
 
+/**
+ * Asset-flavoured wrapper around the shared PaginationFooter.
+ *
+ * Keeps the wider asset page-size options; `onPageChange` receives just the
+ * 1-indexed page number, matching PaginationFooter.
+ */
 const AssetPagination: React.FC<AssetPaginationProps> = ({
   page,
   pageSize,
@@ -25,85 +31,17 @@ const AssetPagination: React.FC<AssetPaginationProps> = ({
   onPageChange,
   onPageSizeChange,
   isFiltered = false,
-}) => {
-  if (totalResults === 0) {
-    return null;
-  }
-
-  const handlePageSizeChange = (event: SelectChangeEvent<number>) => {
-    onPageSizeChange(event.target.value as number);
-  };
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        mt: 6,
-        mb: 2,
-        backgroundColor: "transparent",
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          {isFiltered
-            ? `Showing ${totalResults} filtered results`
-            : `Showing ${(page - 1) * pageSize + 1} - ${Math.min(
-                page * pageSize,
-                totalResults
-              )} of ${totalResults} results`}
-        </Typography>
-        <FormControl size="small" variant="outlined">
-          <Select
-            value={pageSize}
-            onChange={handlePageSizeChange}
-            sx={{
-              minWidth: 80,
-              height: 32,
-              "& .MuiSelect-select": {
-                py: 0.5,
-                px: 1.5,
-              },
-            }}
-          >
-            <MenuItem value={20}>20</MenuItem>
-            <MenuItem value={50}>50</MenuItem>
-            <MenuItem value={75}>75</MenuItem>
-            <MenuItem value={100}>100</MenuItem>
-            <MenuItem value={150}>150</MenuItem>
-            <MenuItem value={200}>200</MenuItem>
-            <MenuItem value={250}>250</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-      <Pagination
-        count={Math.ceil(totalResults / pageSize)}
-        page={page}
-        onChange={onPageChange}
-        color="primary"
-        size="medium"
-        shape="circular"
-        showFirstButton
-        showLastButton
-        sx={{
-          "& .MuiPaginationItem-root": {
-            borderRadius: "50%",
-            minWidth: 40,
-            height: 40,
-            "&.Mui-selected": {
-              fontWeight: "bold",
-              backgroundColor: "primary.main",
-              color: "white",
-              "&:hover": {
-                backgroundColor: "primary.dark",
-              },
-            },
-          },
-        }}
-      />
-    </Box>
-  );
-};
+}) => (
+  <PaginationFooter
+    page={page}
+    pageSize={pageSize}
+    totalItems={totalResults}
+    onPageChange={onPageChange}
+    onPageSizeChange={onPageSizeChange}
+    pageSizeOptions={ASSET_PAGE_SIZE_OPTIONS}
+    isFiltered={isFiltered}
+    sx={{ mt: 6, mb: 2 }}
+  />
+);
 
 export default AssetPagination;

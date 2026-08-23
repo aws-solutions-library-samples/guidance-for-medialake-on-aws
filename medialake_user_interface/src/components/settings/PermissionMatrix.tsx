@@ -24,7 +24,11 @@ type PermissionStatus = "Allow" | "Deny" | "Not Set";
 type ResourceType = "assets" | "pipelines" | "pipelinesExecutions" | "collections" | "settings";
 
 // Define the action types
-type ActionType = "view" | "edit" | "delete" | "create" | "admin" | "retry" | "cancel";
+// BUG-14: ``cancel`` used to be here to render a checkbox for the (never
+// implemented) execution-cancel capability. It's gone from the seeder and from
+// the actions list above; keep the type union clean too so the matrix's
+// display-name map doesn't advertise a phantom action.
+type ActionType = "view" | "edit" | "delete" | "create" | "admin" | "retry";
 
 // Interface for the permission matrix props
 interface PermissionMatrixProps {
@@ -135,7 +139,13 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
   const getActionsForResource = (resource: ResourceType): ActionType[] => {
     switch (resource) {
       case "pipelinesExecutions":
-        return ["view", "retry", "cancel"];
+        // BUG-14: `cancel` was granted in the seeder and rendered here as a
+        // permission checkbox, but no backend cancel route exists on
+        // pipeline executions and no UI control invokes it. Removing it
+        // keeps the permission matrix from advertising a capability the
+        // system doesn't have. If a real cancel endpoint is added later,
+        // reinstate the action here AND on the seeder.
+        return ["view", "retry"];
       case "settings":
         return ["view", "edit", "admin"];
       default:
@@ -160,7 +170,6 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
     delete: "DELETE",
     admin: "ADMIN",
     retry: "RETRY",
-    cancel: "CANCEL",
   };
 
   // Handle export button click

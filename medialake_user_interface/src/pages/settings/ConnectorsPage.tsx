@@ -5,11 +5,12 @@ import { Add as AddIcon } from "@mui/icons-material";
 import ConnectorCard from "@/features/settings/connectors/components/ConnectorCard";
 import ConnectorModal from "@/features/settings/connectors/components/ConnectorModal";
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import {
   useGetConnectors,
   useDeleteConnector,
-  useToggleConnector,
   useCreateS3Connector,
   useUpdateConnector,
   useSyncConnector,
@@ -35,7 +36,6 @@ const ConnectorsPage: React.FC = () => {
   const { data: connectorsResponse, isLoading, error } = useGetConnectors();
 
   const { mutateAsync: deleteConnector } = useDeleteConnector();
-  const { mutateAsync: toggleConnector } = useToggleConnector();
   const { mutateAsync: syncConnector } = useSyncConnector();
   const { mutateAsync: createS3Connector, isPending: isCreatingConnector } = useCreateS3Connector();
   const { mutateAsync: updateConnector } = useUpdateConnector();
@@ -43,6 +43,13 @@ const ConnectorsPage: React.FC = () => {
   // Safely pull out the connectors array
   const rawConnectors = connectorsResponse?.data?.connectors;
   const connectors = Array.isArray(rawConnectors) ? rawConnectors.filter(Boolean) : [];
+  const {
+    page,
+    pageSize,
+    paginatedItems: visibleConnectors,
+    setPage,
+    setPageSize,
+  } = usePagination(connectors);
 
   const handleAddClick = () => {
     setEditingConnector(undefined);
@@ -70,22 +77,6 @@ const ConnectorsPage: React.FC = () => {
     } catch (error) {
       setAlert({
         message: t("connectors.apiMessages.deleting.error"),
-        severity: "error",
-      });
-    }
-  };
-
-  const handleToggleStatus = async (id: string, enabled: boolean) => {
-    try {
-      await toggleConnector({ id, enabled });
-      await queryClient.invalidateQueries({ queryKey: ["connectors"] });
-      setAlert({
-        message: `Connector ${enabled ? "enabled" : "disabled"} successfully`,
-        severity: "success",
-      });
-    } catch (error) {
-      setAlert({
-        message: `Failed to ${enabled ? "enable" : "disable"} connector`,
         severity: "error",
       });
     }
@@ -196,7 +187,7 @@ const ConnectorsPage: React.FC = () => {
             gap: 3,
           }}
         >
-          {connectors.map((connector, index) => {
+          {visibleConnectors.map((connector, index) => {
             if (!connector) return null;
 
             return (
@@ -205,13 +196,20 @@ const ConnectorsPage: React.FC = () => {
                   connector={connector}
                   onEdit={editConnectorPermission.allowed ? handleEditClick : undefined}
                   onDelete={deleteConnectorPermission.allowed ? handleDelete : undefined}
-                  onToggleStatus={handleToggleStatus}
                   onSync={handleSync}
                 />
               </Box>
             );
           })}
         </Box>
+
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalItems={connectors.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </PageContent>
 
       <ConnectorModal

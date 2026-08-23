@@ -21,7 +21,14 @@ class GroupResponse(BaseModel):
 
 def _get_group_members(table, group_id: str, logger, metrics) -> List[Dict[str, Any]]:
     """
-    Get all members of a group
+    Get all members of a group.
+
+    Note: this reads ``MEMBERSHIP#USER#`` rows from the authorization table, and
+    nothing writes those rows any more. Group membership is held in Cognito
+    groups and managed through the users API, so in practice this returns an
+    empty list. It is left in place because the response shape is part of the
+    published API. Making it truthful means reading Cognito
+    (``ListUsersInGroup``), which needs an additional IAM grant on this Lambda.
     """
     try:
         # Query for all items with PK=GROUP#{group_id} and SK starting with MEMBERSHIP#USER#

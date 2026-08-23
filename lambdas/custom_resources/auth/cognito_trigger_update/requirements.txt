@@ -1,0 +1,5 @@
+# The Lambda runtime bundles a boto3 that predates LambdaConfig.InboundFederation,
+# and update_user_pool rejects parameters an older botocore does not know about.
+# Pinned rather than floored so the bundle stays reproducible; bump deliberately.
+# Minimum required for InboundFederation support: boto3 1.43.46.
+boto3==1.43.46

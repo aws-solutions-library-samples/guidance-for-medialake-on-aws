@@ -1,7 +1,7 @@
 import hashlib
 from dataclasses import dataclass
 
-from aws_cdk import CfnOutput, RemovalPolicy, Stack
+from aws_cdk import CfnOutput, RemovalPolicy, SecretValue, Stack
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import custom_resources as cr
@@ -34,6 +34,9 @@ class CognitoProps:
     user_password: bool = True
     user_srp: bool = True
     removal_policy: RemovalPolicy = RemovalPolicy.DESTROY
+    # Days a temporary password (initial user / admin-created user) stays
+    # valid before a new one must be issued. Cognito allows 1-365.
+    temporary_password_validity_days: int = 7
 
 
 class CognitoConstruct(Construct):
@@ -149,7 +152,7 @@ class CognitoConstruct(Construct):
                     require_numbers=True,
                     require_symbols=True,
                     require_uppercase=True,
-                    temporary_password_validity_days=7,
+                    temporary_password_validity_days=self.props.temporary_password_validity_days,
                 )
             ),
             # "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
@@ -297,11 +300,19 @@ class CognitoConstruct(Construct):
                 user_password=self.props.user_password,
                 user_srp=self.props.user_srp,
             ),
+            # Do not disclose whether an account exists. Without this, Cognito
+            # raises UserNotFoundException for unknown emails on sign-in and
+            # ForgotPassword, letting an unauthenticated visitor enumerate
+            # accounts from the sign-in and reset-password forms. With it,
+            # Cognito returns a generic response instead.
+            "prevent_user_existence_errors": True,
         }
 
         # Configure identity providers
         supported_providers = []
-        saml_providers = []
+        # Providers the client must depend on, so CloudFormation creates them
+        # before the client references them.
+        external_providers = []
 
         # Process each configured identity provider
         for provider in config.authZ.identity_providers:
@@ -331,7 +342,48 @@ class CognitoConstruct(Construct):
                         provider.identity_provider_name
                     )
                 )
-                saml_providers.append(saml_provider)
+                external_providers.append(saml_provider)
+            elif provider.identity_provider_method == "oidc":
+                # Resolve the client secret through CloudFormation at deploy
+                # time when an ARN is supplied, so the value never appears in
+                # config.json or the synthesized template.
+                if provider.oidc_client_secret_arn:
+                    client_secret = SecretValue.secrets_manager(
+                        provider.oidc_client_secret_arn,
+                        json_field=provider.oidc_client_secret_json_key,
+                    ).unsafe_unwrap()
+                else:
+                    client_secret = provider.oidc_client_secret
+
+                oidc_provider = cognito.CfnUserPoolIdentityProvider(
+                    self,
+                    f"OIDCProvider-{provider.identity_provider_name}",
+                    user_pool_id=cfn_user_pool.ref,
+                    provider_name=provider.identity_provider_name,
+                    provider_type="OIDC",
+                    provider_details={
+                        "oidc_issuer": provider.oidc_issuer_url,
+                        "client_id": provider.oidc_client_id,
+                        "client_secret": client_secret,
+                        "authorize_scopes": " ".join(provider.oidc_authorize_scopes),
+                        "attributes_request_method": provider.oidc_attributes_request_method,
+                    },
+                    attribute_mapping={
+                        "email": provider.oidc_email_claim,
+                        "given_name": provider.oidc_given_name_claim,
+                        "family_name": provider.oidc_family_name_claim,
+                        # Consumed by the inbound federation trigger when IdP
+                        # group assertions are enabled.
+                        "custom:groups": provider.oidc_groups_claim,
+                    },
+                    idp_identifiers=[provider.identity_provider_name],
+                )
+                supported_providers.append(
+                    cognito.UserPoolClientIdentityProvider.custom(
+                        provider.identity_provider_name
+                    )
+                )
+                external_providers.append(oidc_provider)
             elif provider.identity_provider_method == "cognito":
                 supported_providers.append(
                     cognito.UserPoolClientIdentityProvider.COGNITO
@@ -369,8 +421,8 @@ class CognitoConstruct(Construct):
             "MediaLakeUserPoolClient", **user_pool_client_props
         )
 
-        # Add dependencies for SAML providers if any
-        for provider in saml_providers:
+        # Add dependencies for external (SAML/OIDC) providers if any
+        for provider in external_providers:
             self._user_pool_client.node.add_dependency(provider)
 
         # Create Identity Pool
@@ -484,11 +536,15 @@ class CognitoConstruct(Construct):
                     "AllowedOAuthFlows": ["code", "implicit"],
                     "AllowedOAuthScopes": ["email", "openid", "profile"],
                     "AllowedOAuthFlowsUserPoolClient": True,
+                    # Every external provider must be listed here. This call
+                    # replaces the client's provider list wholesale, so omitting
+                    # a provider silently detaches it from the client and breaks
+                    # sign-in through it.
                     "SupportedIdentityProviders": ["COGNITO"]
                     + [
                         provider.identity_provider_name
                         for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method == "saml"
+                        if provider.identity_provider_method in ("saml", "oidc")
                     ],
                 },
                 physical_resource_id=cr.PhysicalResourceId.of(

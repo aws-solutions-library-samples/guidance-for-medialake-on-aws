@@ -23,6 +23,12 @@ interface AssetTableViewProps<T> {
   editedName?: string;
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
+  /**
+   * Display-only name override. Defaults to `getAssetName`. Kept separate because
+   * `getAssetName` is also the value fed to bin/favorites records and rename flows, so
+   * pages that want a decorated label (e.g. a clip's timecode range) must not change it.
+   */
+  getAssetDisplayName?: (asset: T) => string;
   getAssetType: (asset: T) => string;
   getAssetThumbnail: (asset: T) => string;
   isSelected?: (asset: T) => boolean;
@@ -54,6 +60,7 @@ function AssetTableView<T>({
   editedName,
   getAssetId,
   getAssetName,
+  getAssetDisplayName,
   getAssetType,
   getAssetThumbnail,
   isSelected,
@@ -86,7 +93,7 @@ function AssetTableView<T>({
         onEditClick={onEditClick}
         onAssetClick={onAssetClick}
         getThumbnailUrl={getAssetThumbnail}
-        getName={getAssetName}
+        getName={getAssetDisplayName ?? getAssetName}
         getId={getAssetId}
         getAssetType={getAssetType}
         editingId={editingAssetId}
@@ -139,7 +146,7 @@ function AssetTableView<T>({
               onEditClick={onEditClick}
               onAssetClick={onAssetClick}
               getThumbnailUrl={getAssetThumbnail}
-              getName={getAssetName}
+              getName={getAssetDisplayName ?? getAssetName}
               getId={getAssetId}
               getAssetType={getAssetType}
               editingId={editingAssetId}

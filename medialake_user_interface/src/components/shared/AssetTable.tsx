@@ -424,7 +424,21 @@ export function AssetTable<T>({
                       </Box>
                     ) : (
                       <>
-                        <Typography noWrap>{info.getValue()}</Typography>
+                        {/* The cell is fixed-width and ellipsised, so a long value is
+                            unreadable without this — and two collection items that differ
+                            only in a trailing clip range read identically on screen. Native
+                            title rather than MUI Tooltip, matching what the cards already do
+                            for the same value. */}
+                        <Typography
+                          noWrap
+                          title={
+                            typeof info.getValue() === "string"
+                              ? (info.getValue() as string)
+                              : undefined
+                          }
+                        >
+                          {info.getValue()}
+                        </Typography>
                         <IconButton
                           size="small"
                           onClick={(e) => {

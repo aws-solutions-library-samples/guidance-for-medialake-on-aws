@@ -8,8 +8,6 @@ import {
   UpdateGroupRequest,
   GroupListResponse,
   GroupResponse,
-  AddGroupMembersRequest,
-  GroupMembersResponse,
 } from "../types/group.types";
 
 export const useGetGroups = (enabled: boolean = true) => {
@@ -132,57 +130,8 @@ export const useDeleteGroup = () => {
   });
 };
 
-export const useAddGroupMembers = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    GroupMembersResponse,
-    Error,
-    { groupId: string; request: AddGroupMembersRequest }
-  >({
-    mutationFn: async ({ groupId, request }) => {
-      const { data } = await apiClient.post<any>(
-        API_ENDPOINTS.GROUPS.ADD_MEMBERS(groupId),
-        request
-      );
-
-      if (typeof data.body === "string") {
-        return JSON.parse(data.body);
-      }
-      if (data.body && typeof data.body === "object") {
-        return data.body;
-      }
-      return data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.GROUPS.detail(variables.groupId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.GROUPS.members(variables.groupId),
-      });
-      // Also invalidate users query to refresh their group memberships
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USERS.all });
-    },
-  });
-};
-
-export const useRemoveGroupMember = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation<void, Error, { groupId: string; userId: string }>({
-    mutationFn: async ({ groupId, userId }) => {
-      await apiClient.delete(API_ENDPOINTS.GROUPS.REMOVE_MEMBER(groupId, userId));
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.GROUPS.detail(variables.groupId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.GROUPS.members(variables.groupId),
-      });
-      // Also invalidate users query to refresh their group memberships
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USERS.all });
-    },
-  });
-};
+// Group membership is not managed here. It lives in Cognito groups and is set
+// through the users endpoints (see useUsers), which are the single source of
+// truth. The former useAddGroupMembers / useRemoveGroupMember hooks called
+// /groups/{id}/members, which wrote DynamoDB rows nothing read, and had no call
+// sites; both they and the endpoints they used have been removed.

@@ -1,4 +1,3 @@
-export * from "./PipelineTable";
 export * from "./PipelineToolbar";
 export * from "./PipelineDeleteDialog";
 export * from "./PipelineColumnMenu";

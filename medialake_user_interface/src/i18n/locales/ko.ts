@@ -8,6 +8,9 @@ export default {
     hindi: "힌디어",
     arabic: "아랍어",
     hebrew: "히브리어",
+    spanish: "스페인어",
+    japanese: "일본어",
+    korean: "한국어",
   },
   assetsPage: {
     title: "자산",
@@ -58,6 +61,21 @@ export default {
       emptySection: "컬렉션 없음",
       loading: "로딩 중\u2026",
       more: "더 보기",
+    },
+    savedLocations: {
+      sectionTitle: "저장된 업로드 대상",
+      allDestinations: "모든 업로드 대상",
+      save: "이 업로드 대상 저장",
+      remove: "저장된 업로드 대상 제거",
+      atCapacity: "최대 {{count}}개의 업로드 대상을 저장할 수 있습니다",
+      collectionsUnavailable_one:
+        "이 업로드 대상에 저장된 컬렉션을 더 이상 사용할 수 없어 제거되었습니다: {{names}}",
+      collectionsUnavailable_other:
+        "이 업로드 대상에 저장된 컬렉션 {{count}}개를 더 이상 사용할 수 없어 제거되었습니다: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "선택한 컬렉션을 더 이상 사용할 수 없어 적용되지 않습니다: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "선택한 컬렉션 {{count}}개를 더 이상 사용할 수 없어 적용되지 않습니다: {{names}}",
     },
   },
   pathBrowser: {
@@ -839,7 +857,6 @@ export default {
   },
   roles: {
     title: "역할 관리",
-    description: "시스템 역할 및 권한 관리",
     actions: {
       addRole: "역할 추가",
     },
@@ -890,6 +907,22 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "메타데이터 필드",
+        jitProvisioning: "사용자 프로비저닝",
+      },
+      jitProvisioning: {
+        title: "적시(Just-In-Time) 사용자 프로비저닝",
+        description:
+          "외부 자격 증명 공급자를 통해 처음 로그인하는 사용자에게 할당할 그룹을 선택하세요. 그룹은 사용자당 한 번만 적용되므로 이후에 다른 그룹으로 이동해도 다음 로그인에서 되돌아가지 않습니다.",
+        enabledLabel: "새 페더레이션 사용자에게 기본 그룹 할당",
+        defaultGroupLabel: "기본 그룹",
+        defaultGroupHelp: "새 페더레이션 사용자는 첫 로그인 시 이 그룹의 권한을 받습니다.",
+        groupRequired: "적시 프로비저닝을 활성화하기 전에 그룹을 선택하세요.",
+        noGroups: "사용 가능한 그룹이 없습니다",
+        capabilityDisabled:
+          "이 배포에서는 적시 프로비저닝이 활성화되지 않았습니다. 배포 구성에서 authZ.jit_provisioning.enabled를 설정하고 다시 배포하면 이 설정이 적용됩니다.",
+        lastUpdated: "마지막 업데이트",
+        loadError: "적시 프로비저닝 설정을 불러올 수 없습니다.",
+        saveSuccess: "적시 프로비저닝 설정이 저장되었습니다.",
       },
       search: {
         title: "검색 구성",
@@ -1059,6 +1092,16 @@ export default {
     error: "오류",
     language: "언어",
     noResults: "결과를 찾을 수 없습니다",
+    pagination: {
+      showingRange: "{{total}}개 중 {{first}} - {{last}}개 표시",
+      showingFiltered: "필터링된 결과 {{count}}개 표시",
+      rowsPerPage: "페이지당 행 수",
+      goToPage: "{{page}}페이지로 이동",
+      first: "첫 페이지로 이동",
+      last: "마지막 페이지로 이동",
+      next: "다음 페이지로 이동",
+      previous: "이전 페이지로 이동",
+    },
     selectFilter: "필터 선택",
     textFilter: "텍스트 필터",
     all: "모두",
@@ -1275,8 +1318,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "편집 type",
       deleteType: "삭제 type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "권한 set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1713,6 +1754,8 @@ export default {
       errorSendingCode: "재설정 코드 전송에 실패했습니다. 이메일을 확인하고 다시 시도해 주세요.",
       errorResettingPassword: "비밀번호 재설정에 실패했습니다. 코드를 확인하고 다시 시도해 주세요.",
       passwordMismatch: "비밀번호가 일치하지 않습니다.",
+      tempPasswordResent:
+        "계정에 아직 임시 비밀번호가 대기 중이므로 새 임시 비밀번호가 이메일로 전송되었습니다. 임시 비밀번호로 로그인하면 영구 비밀번호를 설정하라는 메시지가 표시됩니다.",
     },
   },
   permissions: {

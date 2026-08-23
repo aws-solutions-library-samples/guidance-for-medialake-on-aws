@@ -63,6 +63,8 @@ import collection_types_ID_delete  # noqa: E402
 import collection_types_ID_migrate_post  # noqa: E402
 import collection_types_ID_put  # noqa: E402
 import collection_types_post  # noqa: E402
+import jit_provisioning_get  # noqa: E402
+import jit_provisioning_put  # noqa: E402
 import metadata_fields_get  # noqa: E402
 import metadata_fields_put  # noqa: E402
 import settings_users_get  # noqa: E402
@@ -87,6 +89,9 @@ system_search_delete.register_route(app)
 
 metadata_fields_get.register_route(app)
 metadata_fields_put.register_route(app)
+
+jit_provisioning_get.register_route(app)
+jit_provisioning_put.register_route(app)
 
 api_keys_get.register_route(app)
 api_keys_post.register_route(app)

@@ -153,6 +153,7 @@ export const useJobNotifications = () => {
         const deleteJob = job as DeleteJobData & { jobType: "delete" };
         const baseNotification = {
           jobId: deleteJob.jobId,
+          jobType: "delete" as const,
           jobStatus: deleteJob.status as any,
           createdAt: deleteJob.createdAt,
           updatedAt: deleteJob.updatedAt,
@@ -211,6 +212,7 @@ export const useJobNotifications = () => {
       const downloadJob = job as DownloadJobData;
       const baseNotification = {
         jobId: downloadJob.jobId,
+        jobType: "download" as const,
         jobStatus: downloadJob.status as any,
         createdAt: downloadJob.createdAt,
         updatedAt: downloadJob.updatedAt,

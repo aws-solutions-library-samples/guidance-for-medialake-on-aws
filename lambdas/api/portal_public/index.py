@@ -1283,6 +1283,72 @@ def post_multipart_sign(slug: str):
     }
 
 
+MAX_MULTIPART_PARTS = 10000
+
+
+def _normalize_multipart_parts(parts):
+    """Reduce client-supplied parts to exactly what CompleteMultipartUpload accepts.
+
+    Returns ``(normalized_parts, error_message)``; exactly one is meaningful.
+
+    Browser multipart clients build each part from the CORS-exposed response headers, so a
+    part can arrive with lowercase keys or extra ones, e.g.
+    ``{"PartNumber": 1, "etag": "...", "x-amz-request-id": "..."}``. boto3's
+    CompleteMultipartUpload accepts only ``ETag`` and ``PartNumber`` and raises
+    ParamValidationError on anything else, which would surface as a 500.
+
+    This deliberately mirrors the validation the authenticated path already gets for free
+    from its pydantic model in ``lambdas/api/assets/upload/multipart_complete`` (``Part``
+    with ``PartNumber`` constrained to 1..10000, ``ETag`` required, extra keys ignored, and
+    a 10,000-part cap). Both endpoints are fed by the same browser client, so they should
+    not differ in strictness. It is written in plain Python rather than with pydantic to
+    avoid adding a runtime dependency to this unauthenticated public Lambda, whose bundle
+    does not currently ship one.
+
+    S3 also requires parts in ascending PartNumber order, so the result is sorted.
+    """
+    if not isinstance(parts, list) or not parts:
+        return None, "parts is required and must be a non-empty list"
+
+    if len(parts) > MAX_MULTIPART_PARTS:
+        return None, f"parts cannot exceed {MAX_MULTIPART_PARTS} entries"
+
+    normalized = []
+    seen_part_numbers = set()
+
+    for part in parts:
+        if not isinstance(part, dict):
+            return None, "Each part must be an object with an ETag and PartNumber"
+
+        etag = part.get("ETag") or part.get("etag")
+        raw_part_number = part.get("PartNumber")
+        if raw_part_number is None:
+            raw_part_number = part.get("partNumber")
+
+        if not etag or not isinstance(etag, str) or raw_part_number is None:
+            return None, "Each part must include an ETag and PartNumber"
+
+        # bool is an int subclass, so reject it explicitly rather than coercing True to 1.
+        if isinstance(raw_part_number, bool):
+            return None, "PartNumber must be an integer"
+        try:
+            part_number = int(raw_part_number)
+        except (TypeError, ValueError):
+            return None, "PartNumber must be an integer"
+
+        if not 1 <= part_number <= MAX_MULTIPART_PARTS:
+            return None, f"PartNumber must be between 1 and {MAX_MULTIPART_PARTS}"
+
+        if part_number in seen_part_numbers:
+            return None, f"Duplicate PartNumber {part_number}"
+        seen_part_numbers.add(part_number)
+
+        normalized.append({"ETag": etag, "PartNumber": part_number})
+
+    normalized.sort(key=lambda part: part["PartNumber"])
+    return normalized, None
+
+
 @app.post("/<slug>/upload/multipart/complete")
 @tracer.capture_method
 def post_multipart_complete(slug: str):
@@ -1301,6 +1367,10 @@ def post_multipart_complete(slug: str):
         return _error(400, "key is required")
     if not isinstance(parts, list) or not parts:
         return _error(400, "parts is required and must be a non-empty list")
+
+    normalized_parts, parts_error = _normalize_multipart_parts(parts)
+    if parts_error:
+        return _error(400, parts_error)
 
     portal_id, portal = _get_portal_by_slug(slug)
     if not portal:
@@ -1327,7 +1397,7 @@ def post_multipart_complete(slug: str):
         Bucket=bucket,
         Key=key,
         UploadId=upload_id,
-        MultipartUpload={"Parts": parts},
+        MultipartUpload={"Parts": normalized_parts},
     )
 
     max_size = portal.get("maxFileSizeBytes")

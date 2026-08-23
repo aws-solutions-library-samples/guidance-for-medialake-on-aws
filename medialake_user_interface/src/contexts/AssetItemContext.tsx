@@ -13,6 +13,12 @@ import React, { createContext, useContext, useMemo } from "react";
 export interface AssetAccessors<T = any> {
   getAssetId: (asset: T) => string;
   getAssetName: (asset: T) => string;
+  /**
+   * Display-only name override. Defaults to `getAssetName` where consumed. Kept separate
+   * because `getAssetName` is also the value written to bin/favorites records, so pages
+   * that want a decorated label (e.g. a clip's timecode range) must not change it.
+   */
+  getAssetDisplayName?: (asset: T) => string;
   getAssetType: (asset: T) => string;
   getAssetThumbnail: (asset: T) => string;
   getAssetProxy?: (asset: T) => string;
@@ -67,6 +73,7 @@ export function AssetItemProvider<T>({
     () => ({
       getAssetId: value.getAssetId,
       getAssetName: value.getAssetName,
+      getAssetDisplayName: value.getAssetDisplayName,
       getAssetType: value.getAssetType,
       getAssetThumbnail: value.getAssetThumbnail,
       getAssetProxy: value.getAssetProxy,
@@ -75,6 +82,7 @@ export function AssetItemProvider<T>({
     [
       value.getAssetId,
       value.getAssetName,
+      value.getAssetDisplayName,
       value.getAssetType,
       value.getAssetThumbnail,
       value.getAssetProxy,

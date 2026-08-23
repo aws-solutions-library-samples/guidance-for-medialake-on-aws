@@ -33,7 +33,7 @@ interface Props {
   onPortalUnavailable: (reason: "inactive" | "expired") => void;
 }
 
-type GateStep = "loading" | "email" | "passphrase" | "cognito-redirect";
+type GateStep = "loading" | "email" | "passphrase" | "cognito-redirect" | "token-required";
 
 const PortalAccessGate: React.FC<Props> = ({
   slug,
@@ -103,7 +103,16 @@ const PortalAccessGate: React.FC<Props> = ({
           /token and email are required/i.test(msg) ||
           /passphrase is required/i.test(msg)
         ) {
-          setStep(urlToken ? "email" : "passphrase");
+          // BUG-10: a token-protected portal opened without ?token=... used to
+          // land on the passphrase form, which can never authenticate because
+          // the backend requires X-Portal-Token + X-Portal-Email headers, not
+          // a passphrase body. Route that case to a clear dead-end message
+          // instead so the recipient knows they need a real invitation link.
+          if (!urlToken && /token and email are required/i.test(msg)) {
+            setStep("token-required");
+          } else {
+            setStep(urlToken ? "email" : "passphrase");
+          }
         } else {
           setStep("passphrase");
         }
@@ -273,6 +282,17 @@ const PortalAccessGate: React.FC<Props> = ({
           <Button variant="contained" onClick={handleCognitoRedirect} disabled={submitting}>
             Sign In
           </Button>
+        </Box>
+      )}
+
+      {step === "token-required" && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Typography variant="body1">This portal requires an invitation link.</Typography>
+          <Typography variant="body2" color="text.secondary">
+            The link you opened is missing its access token. Contact the portal administrator to
+            request a fresh invitation link — the URL they send you will include the access token
+            you need.
+          </Typography>
         </Box>
       )}
     </Card>

@@ -32,6 +32,7 @@ from users_delete import handle_delete_user
 from users_disable_post import handle_disable_user
 from users_enable_post import handle_enable_user
 from users_get import handle_get_user
+from users_password_recovery_post import handle_password_recovery
 from users_post import handle_create_user
 from users_put import handle_put_user
 from users_reset_password_post import handle_reset_password
@@ -151,6 +152,22 @@ def reset_password(user_id: str):
     """POST /users/{user_id}/reset-password - Reset a user's password"""
     return handle_reset_password(
         user_id, cognito, USER_POOL_ID, logger, metrics, tracer
+    )
+
+
+@app.post("/users/password-recovery")
+@tracer.capture_method
+def password_recovery():
+    """POST /users/password-recovery - Self-service temporary password resend
+    (unauthenticated; enumeration-safe; per-account cooldown)."""
+    return handle_password_recovery(
+        app,
+        cognito,
+        dynamodb.Table(USER_TABLE_NAME),
+        USER_POOL_ID,
+        logger,
+        metrics,
+        tracer,
     )
 
 

@@ -22,6 +22,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   ColumnFiltersState,
   SortingState,
   ColumnSizingState,
@@ -32,6 +33,7 @@ import { RefreshButton } from "@/components/common";
 import { BaseTableToolbar } from "@/components/common/table/BaseTableToolbar";
 import { BaseFilterPopover } from "@/components/common/table/BaseFilterPopover";
 import { ColumnVisibilityMenu } from "@/components/common/table/ColumnVisibilityMenu";
+import { useTablePagination } from "@/components/common/table/useTablePagination";
 import ApiStatusModal from "@/components/ApiStatusModal";
 import queryClient from "@/api/queryClient";
 import { PipelinesService } from "../api/pipelinesService";
@@ -90,6 +92,10 @@ const PipelinesPage: React.FC = () => {
   });
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [globalFilter, setGlobalFilter] = useState("");
+  // The pipelines query polls every 15s, so page index must not auto-reset.
+  const { pagination, setPagination, autoResetPageIndex } = useTablePagination({
+    resetOn: [globalFilter, columnFilters],
+  });
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
   const [filterMenuAnchor, setFilterMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
@@ -339,17 +345,21 @@ const PipelinesPage: React.FC = () => {
       columnVisibility,
       columnSizing,
       globalFilter,
+      pagination,
     },
     enableSorting: true,
     enableColumnFilters: true,
+    autoResetPageIndex,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: handleColumnVisibilityChange,
     onColumnSizingChange: setColumnSizing,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     filterFns: {
       includesString: (row, columnId, filterValue) => {
         const value = String(row.getValue(columnId) || "").toLowerCase();

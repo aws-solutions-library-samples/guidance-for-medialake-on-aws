@@ -263,6 +263,7 @@ Key configuration parameters include:
 - **vpc**: VPC configuration for using existing or creating new VPC
 - **authZ**: Identity provider configuration (Cognito, SAML)
 - **video_download_enabled** (optional): Enable/disable video download functionality (defaults to `true`)
+- **temporary_password_validity_days** (optional): Number of days a new user's temporary password remains valid before they must sign in and set a permanent password (defaults to `7`, maximum `365` — the Cognito limit). If a temporary password expires, an administrator can resend a new one from **Settings > User Management > Reset Password**, or the user can request one via the "Forgot password?" link on the sign-in page.
 - **external_nodes_bucket** (optional): Name of an external S3 bucket containing custom pipeline nodes. The bucket must exist in the same AWS account and follow S3 naming rules (3-63 characters, lowercase letters, numbers, and hyphens only). Leave empty or omit if not needed.
 - **cloudfront_custom_domain** (optional): Custom domain configuration for CloudFront distribution
   - **domain_name**: Your custom domain name (e.g., "medialake.example.com")

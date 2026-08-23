@@ -7,6 +7,10 @@ PyYAML
 cdk_nag
 python-dotenv
 pydantic
+# Required by aws-lambda-powertools' Tracer, which several Lambda modules
+# construct at import time. Without it those modules cannot be imported during
+# tests or cdk synth. Not part of any Lambda bundle (those come from the layers).
+aws-xray-sdk
 Jinja2>=3.1.5
 aws-lambda-powertools
 click

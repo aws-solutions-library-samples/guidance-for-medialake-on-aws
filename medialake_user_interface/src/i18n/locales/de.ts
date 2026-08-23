@@ -8,6 +8,9 @@ export default {
     hindi: "Hindi",
     arabic: "Arabisch",
     hebrew: "Hebräisch",
+    spanish: "Spanisch",
+    japanese: "Japanisch",
+    korean: "Koreanisch",
   },
   assetsPage: {
     title: "Assets",
@@ -60,6 +63,21 @@ export default {
       emptySection: "Keine Sammlungen",
       loading: "Wird geladen\u2026",
       more: "Mehr",
+    },
+    savedLocations: {
+      sectionTitle: "Gespeicherte Ziele",
+      allDestinations: "Alle Ziele",
+      save: "Dieses Ziel speichern",
+      remove: "Dieses gespeicherte Ziel entfernen",
+      atCapacity: "Sie können bis zu {{count}} Ziele speichern",
+      collectionsUnavailable_one:
+        "Eine mit diesem Ziel gespeicherte Sammlung ist nicht mehr verfügbar und wurde entfernt: {{names}}",
+      collectionsUnavailable_other:
+        "{{count}} mit diesem Ziel gespeicherte Sammlungen sind nicht mehr verfügbar und wurden entfernt: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "Eine ausgewählte Sammlung ist nicht mehr verfügbar und wird nicht angewendet: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "{{count}} ausgewählte Sammlungen sind nicht mehr verfügbar und werden nicht angewendet: {{names}}",
     },
   },
   pathBrowser: {
@@ -849,7 +867,6 @@ export default {
   },
   roles: {
     title: "Rollenverwaltung",
-    description: "Systemrollen und deren Berechtigungen verwalten",
     actions: {
       addRole: "Rolle hinzufügen",
     },
@@ -900,6 +917,25 @@ export default {
         collections: "Collections",
         upgrades: "Upgrades",
         metadataFields: "Metadatenfelder",
+        jitProvisioning: "Benutzerbereitstellung",
+      },
+      jitProvisioning: {
+        title: "Just-in-Time-Benutzerbereitstellung",
+        description:
+          "Wählen Sie die Gruppe, die Benutzern bei ihrer ersten Anmeldung über einen externen Identitätsanbieter zugewiesen wird. Die Gruppe wird pro Benutzer nur einmal angewendet; wenn Sie jemanden später in eine andere Gruppe verschieben, wird das durch eine spätere Anmeldung nicht rückgängig gemacht.",
+        enabledLabel: "Neuen föderierten Benutzern eine Standardgruppe zuweisen",
+        defaultGroupLabel: "Standardgruppe",
+        defaultGroupHelp:
+          "Neue föderierte Benutzer erhalten bei ihrer ersten Anmeldung die Berechtigungen dieser Gruppe.",
+        groupRequired:
+          "Wählen Sie eine Gruppe aus, bevor Sie die Just-in-Time-Bereitstellung aktivieren.",
+        noGroups: "Keine Gruppen verfügbar",
+        capabilityDisabled:
+          "Die Just-in-Time-Bereitstellung ist für diese Bereitstellung nicht aktiviert. Setzen Sie authZ.jit_provisioning.enabled in der Bereitstellungskonfiguration und stellen Sie erneut bereit, damit diese Einstellungen wirksam werden.",
+        lastUpdated: "Zuletzt aktualisiert",
+        loadError:
+          "Die Einstellungen für die Just-in-Time-Bereitstellung konnten nicht geladen werden.",
+        saveSuccess: "Einstellungen für die Just-in-Time-Bereitstellung gespeichert.",
       },
       search: {
         title: "Suchkonfiguration",
@@ -1076,6 +1112,16 @@ export default {
     error: "Fehler",
     language: "Sprache",
     noResults: "Keine Ergebnisse gefunden",
+    pagination: {
+      showingRange: "Zeige {{first}} - {{last}} von {{total}} Ergebnissen",
+      showingFiltered: "Zeige {{count}} gefilterte Ergebnisse",
+      rowsPerPage: "Zeilen pro Seite",
+      goToPage: "Gehe zu Seite {{page}}",
+      first: "Zur ersten Seite",
+      last: "Zur letzten Seite",
+      next: "Zur nächsten Seite",
+      previous: "Zur vorherigen Seite",
+    },
     selectFilter: "Filter auswählen",
     textFilter: "Textfilter",
     all: "Alle",
@@ -1292,8 +1338,6 @@ export default {
       cannotDeleteSystemTypes: "Cannot delete system types",
       editType: "Bearbeiten type",
       deleteType: "Löschen type",
-      errorSavingRole: "An error occurred while saving the role",
-      errorDeletingRole: "An error occurred while deleting the role",
       permissionSetNotFound: "Berechtigung set not found",
       noUsersAssigned: "No users assigned",
       noGroupsAssigned: "No groups assigned",
@@ -1741,6 +1785,8 @@ export default {
       errorResettingPassword:
         "Passwort konnte nicht zurückgesetzt werden. Bitte überprüfen Sie Ihren Code und versuchen Sie es erneut.",
       passwordMismatch: "Passwörter stimmen nicht überein.",
+      tempPasswordResent:
+        "Ihr Konto hat noch ein ausstehendes temporäres Passwort, daher wurde Ihnen ein neues per E-Mail zugesandt. Melden Sie sich mit dem temporären Passwort an und Sie werden aufgefordert, ein dauerhaftes Passwort festzulegen.",
     },
   },
   permissions: {

@@ -1,16 +1,18 @@
-import base64
+import concurrent.futures
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
-from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
+from aws_lambda_powertools.event_handler import APIGatewayRestResolver, Response
+from aws_lambda_powertools.event_handler.api_gateway import CORSConfig, content_types
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.metrics import Metrics
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from boto3.dynamodb.types import TypeDeserializer
+from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 # Import centralized file extension constants from common_libraries layer
@@ -39,16 +41,53 @@ app = APIGatewayRestResolver(
     cors=cors_config,
 )
 
-# Initialize DynamoDB client
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["PIPELINES_TABLE_NAME"])
+PIPELINES_TABLE_NAME = os.environ["PIPELINES_TABLE_NAME"]
 
-# Default pagination values
-DEFAULT_PAGE_SIZE = 20
+# Parallel scan tuning. Segments run concurrently, so the connection pool has to
+# be at least as large as the worker count or threads serialize on sockets.
+SCAN_TOTAL_SEGMENTS = max(1, int(os.environ.get("PIPELINES_SCAN_SEGMENTS", "4")))
+
+# Safety valve: stop draining well before the 6 MB Lambda response limit can be
+# reached. Applied per segment, so the effective ceiling is approximate.
+MAX_PIPELINES = max(1, int(os.environ.get("PIPELINES_MAX_ITEMS", "5000")))
+
+# The boto3 resource/Table API is NOT thread safe, so the parallel scan uses the
+# low-level client (which is) and deserializes items by hand.
+dynamodb_client = boto3.client(
+    "dynamodb",
+    config=BotoConfig(
+        max_pool_connections=max(10, SCAN_TOTAL_SEGMENTS * 2),
+        retries={"max_attempts": 5, "mode": "adaptive"},
+    ),
+)
+
+# TypeDeserializer holds no mutable state, so one shared instance is safe.
+_deserializer = TypeDeserializer()
 
 
 class PipelineError(Exception):
     """Custom exception for pipeline errors"""
+
+
+def _error_body(message: str) -> Dict[str, Any]:
+    """Build the error body, keeping the response shape the UI expects."""
+    return {
+        "status": "500",
+        "message": message,
+        "data": {
+            "searchMetadata": {"totalResults": 0, "pageSize": 0, "nextToken": None},
+            "s": [],
+        },
+    }
+
+
+def _error_response(message: str) -> Response:
+    """Return a genuine HTTP 500 rather than a 200 with an error in the body."""
+    return Response(
+        status_code=500,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps(_error_body(message)),
+    )
 
 
 def extract_event_rule_info(pipeline: dict) -> dict:
@@ -184,155 +223,242 @@ def extract_event_rule_info(pipeline: dict) -> dict:
     return event_rule_info
 
 
-def encode_last_evaluated_key(last_evaluated_key: Dict) -> str:
-    """Encode the LastEvaluatedKey to a base64 string"""
-    if not last_evaluated_key:
-        return ""
-    return base64.b64encode(json.dumps(last_evaluated_key).encode()).decode()
+def _deserialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert a low-level DynamoDB item into plain Python types."""
+    return {key: _deserializer.deserialize(value) for key, value in item.items()}
 
 
-def decode_last_evaluated_key(encoded_key: str) -> Dict:
-    """Decode the base64 string back to LastEvaluatedKey"""
-    if not encoded_key:
-        return None
-    try:
-        return json.loads(base64.b64decode(encoded_key.encode()).decode())
-    except:
-        return None
-        return None
+def _build_scan_filter(
+    status: Optional[str],
+) -> Tuple[str, Dict[str, str], Dict[str, Any]]:
+    """
+    Build the filter for the pipeline list.
+
+    Returns a (FilterExpression, ExpressionAttributeNames, ExpressionAttributeValues)
+    triple in low-level client form.
+    """
+    if status:
+        return (
+            "#status = :status",
+            {"#status": "status"},
+            {":status": {"S": status}},
+        )
+
+    # Default: hide soft-deleted pipelines.
+    return (
+        "attribute_not_exists(#ds) OR #ds <> :deleted",
+        {"#ds": "deploymentStatus"},
+        {":deleted": {"S": "DELETED"}},
+    )
+
+
+def _scan_segment(
+    segment: int,
+    total_segments: int,
+    filter_expression: str,
+    attribute_names: Dict[str, str],
+    attribute_values: Dict[str, Any],
+    max_items: int,
+) -> List[Dict[str, Any]]:
+    """
+    Drain a single parallel-scan segment.
+
+    DynamoDB applies Limit *before* FilterExpression, so a page can come back
+    short (or empty) while LastEvaluatedKey is still set. This loops until the
+    segment is genuinely exhausted and re-sends the filter on every page rather
+    than dropping it after the first call.
+    """
+    items: List[Dict[str, Any]] = []
+    start_key = None
+
+    while True:
+        scan_kwargs: Dict[str, Any] = {
+            "TableName": PIPELINES_TABLE_NAME,
+            "FilterExpression": filter_expression,
+            "ExpressionAttributeNames": attribute_names,
+            "ExpressionAttributeValues": attribute_values,
+        }
+
+        # Omit segment args entirely when not doing a parallel scan; DynamoDB
+        # rejects TotalSegments=1 paired with Segment on some API versions.
+        if total_segments > 1:
+            scan_kwargs["Segment"] = segment
+            scan_kwargs["TotalSegments"] = total_segments
+
+        if start_key:
+            scan_kwargs["ExclusiveStartKey"] = start_key
+
+        response = dynamodb_client.scan(**scan_kwargs)
+        items.extend(_deserialize_item(item) for item in response.get("Items", []))
+
+        start_key = response.get("LastEvaluatedKey")
+        if not start_key or len(items) >= max_items:
+            break
+
+    return items
 
 
 @tracer.capture_method
-def get_pipelines(
-    page_size: int, next_token: str = None, status: str = None
-) -> Dict[str, Any]:
+def scan_all_pipelines(
+    status: Optional[str] = None,
+) -> Tuple[List[Dict[str, Any]], bool]:
     """
-    Retrieve paginated pipelines from DynamoDB using Scan operation with filtering
+    Read every matching pipeline, fanning the scan out across segments.
+
+    The table has no sort key and no GSIs (PK `id` only), so Scan is the only
+    way to list. Segments run in parallel to keep wall-clock time flat as the
+    table grows.
+
+    Returns:
+        (items, truncated). `truncated` is True when any segment hit its item
+        cap, meaning the list may be incomplete. The per-segment cap splits
+        MAX_PIPELINES evenly, so a hot segment can be cut short even when other
+        segments are nearly empty -- the flag is deliberately conservative.
+    """
+    filter_expression, attribute_names, attribute_values = _build_scan_filter(status)
+    segments = SCAN_TOTAL_SEGMENTS
+    per_segment_cap = max(1, MAX_PIPELINES // segments)
+
+    if segments == 1:
+        items = _scan_segment(
+            0, 1, filter_expression, attribute_names, attribute_values, MAX_PIPELINES
+        )
+        return items, len(items) >= MAX_PIPELINES
+
+    items: List[Dict[str, Any]] = []
+    truncated = False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=segments) as pool:
+        futures = [
+            pool.submit(
+                _scan_segment,
+                segment,
+                segments,
+                filter_expression,
+                attribute_names,
+                attribute_values,
+                per_segment_cap,
+            )
+            for segment in range(segments)
+        ]
+        # Surfaces the first segment failure instead of returning a partial list.
+        for future in concurrent.futures.as_completed(futures):
+            segment_items = future.result()
+            if len(segment_items) >= per_segment_cap:
+                truncated = True
+            items.extend(segment_items)
+
+    if truncated:
+        logger.warning(
+            "Pipeline scan truncated by cap; list may be incomplete",
+            extra={"returned": len(items), "max_pipelines": MAX_PIPELINES},
+        )
+    return items, truncated
+
+
+def format_pipeline_for_list(pipeline: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Derive the list-view fields, then drop the heavy pipeline definition.
+
+    `definition` carries the whole visual node graph and dwarfs every other
+    attribute; shipping it for hundreds of pipelines is what puts the response
+    near Lambda's 6 MB limit. The detail endpoint still returns it.
+    """
+    # Note: also sets `supported_content_types` on the pipeline as a side effect,
+    # so it has to run before `definition` is removed.
+    event_rule_info = extract_event_rule_info(pipeline)
+
+    if not pipeline.get("type"):
+        pipeline["type"] = ",".join(event_rule_info["triggerTypes"])
+
+    pipeline["eventRuleInfo"] = event_rule_info
+
+    definition = pipeline.pop("definition", None)
+    if isinstance(definition, dict):
+        # name/description are not reliably top-level, so hoist them out of the
+        # definition before it goes away.
+        if not pipeline.get("name"):
+            pipeline["name"] = definition.get("name", "")
+        if not pipeline.get("description"):
+            pipeline["description"] = definition.get("description", "")
+
+    return pipeline
+
+
+@tracer.capture_method
+def get_pipelines(status: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Retrieve every pipeline the caller is allowed to list.
+
+    The full set is returned in one response so the UI can sort, filter and
+    paginate across all pipelines rather than across an arbitrary first page.
+    `searchMetadata` is kept for response-shape compatibility, but `nextToken`
+    is now always None because there is never a further page to fetch.
 
     Args:
-        page_size: Number of items per page
-        next_token: Base64 encoded LastEvaluatedKey for pagination
         status: Optional status filter
 
     Returns:
-        Dict containing status, message, and paginated pipeline s data
+        Dict containing status, message, and the full pipeline list
     """
     try:
-        # Base scan parameters
-        scan_params = {"Limit": page_size}
+        scanned_pipelines, truncated = scan_all_pipelines(status)
+        pipelines = [
+            format_pipeline_for_list(pipeline) for pipeline in scanned_pipelines
+        ]
 
-        # Add status filter if provided
-        if status:
-            scan_params.update(
-                {
-                    "FilterExpression": "#status = :status",
-                    "ExpressionAttributeNames": {"#status": "status"},
-                    "ExpressionAttributeValues": {":status": status},
-                }
-            )
-        else:
-            # By default, exclude DELETED pipelines from the list
-            scan_params.update(
-                {
-                    "FilterExpression": "attribute_not_exists(#ds) OR #ds <> :deleted",
-                    "ExpressionAttributeNames": {"#ds": "deploymentStatus"},
-                    "ExpressionAttributeValues": {":deleted": "DELETED"},
-                }
-            )
+        # Sort across the whole set. The previous implementation sorted a single
+        # scan page, which is meaningless given Scan returns items in hash order.
+        pipelines.sort(key=lambda item: str(item.get("start_time") or ""), reverse=True)
 
-        # Add LastEvaluatedKey if next_token is provided
-        if next_token:
-            last_evaluated_key = decode_last_evaluated_key(next_token)
-            if last_evaluated_key:
-                scan_params["ExclusiveStartKey"] = last_evaluated_key
-
-        # Execute scan
-        response = table.scan(**scan_params)
-        s = response.get("Items", [])
-
-        # Process each pipeline to add event rule information and update type
-        for pipeline in s:
-            # Extract event rule information
-            event_rule_info = extract_event_rule_info(pipeline)
-
-            # Use the type from the database if set, otherwise use determined trigger types
-            if not pipeline.get("type"):
-                pipeline["type"] = ",".join(event_rule_info["triggerTypes"])
-
-            # Add event rule information to the pipeline
-            pipeline["eventRuleInfo"] = event_rule_info
-
-        # Sort s by start_time in descending order
-        s.sort(key=lambda x: x.get("start_time", ""), reverse=True)
-
-        # Get the next token for pagination
-        next_token = None
-        if "LastEvaluatedKey" in response:
-            next_token = encode_last_evaluated_key(response["LastEvaluatedKey"])
-
-        # Add metrics for monitoring
         metrics.add_metric(name="SuccessfulQueries", unit="Count", value=1)
+        metrics.add_metric(name="PipelinesReturned", unit="Count", value=len(pipelines))
 
         return {
             "status": "200",
             "message": "ok",
             "data": {
                 "searchMetadata": {
-                    "totalResults": response.get("Count", 0),
-                    "pageSize": page_size,
-                    "nextToken": next_token,
+                    # Real total, not the post-filter count of one page.
+                    "totalResults": len(pipelines),
+                    "pageSize": len(pipelines),
+                    "nextToken": None,
+                    # True when the scan hit its cap and the list may be
+                    # incomplete, so clients don't mistake a partial list for
+                    # the full set.
+                    "truncated": truncated,
                 },
-                "s": s,
+                "s": pipelines,
             },
         }
 
     except ClientError as e:
-        logger.exception("Failed to retrieve pipeline s")
+        logger.exception("Failed to retrieve pipelines")
         metrics.add_metric(name="FailedQueries", unit="Count", value=1)
         raise PipelineError(f"Failed to retrieve pipelines: {str(e)}")
 
 
 @app.get("/pipelines")
 @tracer.capture_method
-def handle_get_pipelines() -> Dict[str, Any]:
+def handle_get_pipelines() -> Any:
     """
-    Handle GET request for pipelines with pagination
+    Handle GET request for the pipeline list.
+
+    Returns the complete list; the client paginates. `pageSize`/`nextToken` are
+    still accepted for backward compatibility but no longer affect the result.
 
     Returns:
-        Dict containing response with paginated pipelines
+        The pipeline list response, or a 500 Response on failure.
     """
     try:
-        # Get query parameters
         query_string = app.current_event.query_string_parameters or {}
-
-        # Parse pagination parameters
-        try:
-            page_size = int(query_string.get("pageSize", DEFAULT_PAGE_SIZE))
-            page_size = max(1, min(100, page_size))  # Limit page size between 1 and 100
-        except (ValueError, TypeError):
-            page_size = DEFAULT_PAGE_SIZE
-
-        # Get the next token for pagination
-        next_token = query_string.get("nextToken")
-
-        # Get status filter if provided
         status = query_string.get("status")
 
-        return get_pipelines(page_size, next_token, status)
+        return get_pipelines(status)
     except PipelineError as e:
         logger.exception("Error processing pipelines request")
-        return {
-            "status": "500",
-            "message": str(e),
-            "data": {
-                "searchMetadata": {
-                    "totalResults": 0,
-                    "pageSize": DEFAULT_PAGE_SIZE,
-                    "nextToken": None,
-                },
-                "s": [],
-            },
-        }
+        # Report failure as a real 500. Returning 200 with a "500" in the body
+        # made the UI render an empty table as if there were no pipelines.
+        return _error_response(str(e))
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
@@ -355,18 +481,13 @@ def lambda_handler(
         return app.resolve(event, context)
     except Exception:
         logger.exception("Error in lambda handler")
+        # `body` has to be a JSON string for the proxy integration; the previous
+        # version returned a dict, which API Gateway rejects.
         return {
             "statusCode": 500,
-            "body": {
-                "status": "500",
-                "message": "Internal server error",
-                "data": {
-                    "searchMetadata": {
-                        "totalResults": 0,
-                        "pageSize": DEFAULT_PAGE_SIZE,
-                        "nextToken": None,
-                    },
-                    "s": [],
-                },
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
             },
+            "body": json.dumps(_error_body("Internal server error")),
         }

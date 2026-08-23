@@ -58,7 +58,6 @@ const LazyMediaDetailPage = lazyLoad(() => import("@/pages/MediaDetailPage"));
 const LazyConnectorsPage = lazyLoad(() => import("@/pages/settings/ConnectorsPage"));
 const LazyProfilePage = lazyLoad(() => import("@/pages/settings/ProfilePage"));
 const LazyUserManagement = lazyLoad(() => import("@/pages/settings/UserManagement"));
-const LazyRoleManagement = lazyLoad(() => import("@/pages/settings/RoleManagement"));
 const LazyPermissionsPage = lazyLoad(() => import("@/pages/settings/PermissionsPage"));
 const LazyIntegrationsPage = lazyLoad(() => import("@/pages/settings/IntegrationsPage"));
 const LazyEnvironmentsPage = lazyLoad(() => import("@/pages/settings/EnvironmentsPage"));
@@ -254,15 +253,6 @@ export const router = createBrowserRouter([
           <RoutePermissionGuard
             permission={{ action: "view", subject: "user" }}
             element={LazyUserManagement}
-          />
-        ),
-      },
-      {
-        path: "settings/roles",
-        element: (
-          <RoutePermissionGuard
-            permission={{ action: "manage", subject: "permission-set" }}
-            element={LazyRoleManagement}
           />
         ),
       },

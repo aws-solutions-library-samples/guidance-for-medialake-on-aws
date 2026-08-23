@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.20.0] - 2026-08-23
+
+### Features
+
+- feat(collections): accept multiple assets per add, surface clip timecodes
+- feat(upload): Remember and save upload destinations
+- feat(auth): JIT provisioning with configurable default group and OIDC support
+- feat(auth): Configurable temp password validity + recovery for pending users
+
+### Bug Fixes
+
+- fix: unblock JIT settings tab, repair CORS reconcile, explorer 500, user enumeration
+- fix(favorites): resolve widget assets live; cascade favorites on asset delete
+- fix: add DELETE /assets/batch/{jobId} + map remaining batch routes
+- fix: a11y labels, remove dead capabilities, route notification dismiss
+- fix(connectors): sweep orphan EventBridge rules on create failure, delete, and on demand
+- fix(ui): wire snackbars, expose es/ja/ko locales, acknowledge bulk download
+- fix(search): keyword-query revert, facet restore, portals/users
+- fix(security): owner-scope personal My Assets across the asset API
+- fix(upload): preserve saved upload destinations, plus three adjacent fixes
+- fix(portal): normalize multipart parts before CompleteMultipartUpload
+- fix(cdk): resolve SSM_PREFIX via config.ssm_prefix for legacy deployments
+- fix(ui): Conditional UI rendering for bin sidebar actions on permissions
+- fix: Add pagination to all tables and fix truncated list APIs
+- fix: Preserve unmanaged permissions on group saves; unbreak access-denied page
+
+### Code Refactoring
+
+- refactor(image_thumbnail): encode new thumbnails as WebP
+- refactor: remove the dead roles API and its orphaned UI
+- refactor: retire the GET /assets list endpoint
+- refactor(security): Harden CloudFront CSP, remove unsafe-eval from prod
+
+### Other Changes
+
+- ci: cover the dropped-collection notice; complete its translations
+
 ## [1.19.0] - 2026-07-31
 
 ### Features

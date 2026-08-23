@@ -15,6 +15,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   ColumnDef,
   SortingState,
   ColumnFiltersState,
@@ -35,7 +36,12 @@ import { useGetGroups } from "@/api/hooks/useGroups";
 import { useUpdateUser } from "@/api/hooks/useUsers";
 import { useTranslation } from "react-i18next";
 import { UserFilterPopover } from "./UserFilterPopover";
-import { ResizableTable, ColumnVisibilityMenu, TableCellContent } from "@/components/common/table";
+import {
+  ResizableTable,
+  ColumnVisibilityMenu,
+  TableCellContent,
+  useTablePagination,
+} from "@/components/common/table";
 import { UserTableToolbar } from "./UserTableToolbar";
 import {
   TableFiltersProvider,
@@ -251,6 +257,11 @@ const UserList: React.FC<UserListProps> = ({
     }
   };
   const [globalFilter, setGlobalFilter] = useState("");
+  // Page state lives here with the table rather than in UserManagement, so it
+  // stays out of the existing activeFilters/activeSorting mirroring.
+  const { pagination, setPagination, autoResetPageIndex } = useTablePagination({
+    resetOn: [globalFilter, columnFilters],
+  });
   const [columnVisibility, setColumnVisibility] = useState({
     username: false,
     modified: true, // Show modified column by default
@@ -539,15 +550,19 @@ const UserList: React.FC<UserListProps> = ({
       globalFilter,
       columnVisibility,
       columnSizing,
+      pagination,
     },
+    autoResetPageIndex,
     onSortingChange: handleSortingChange,
     onColumnFiltersChange: handleFilterChange,
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode: "onChange" as ColumnResizeMode,
   });
 
@@ -634,6 +649,7 @@ const UserList: React.FC<UserListProps> = ({
           activeSorting={activeSorting}
           onRemoveFilter={onRemoveFilter}
           onRemoveSort={onRemoveSort}
+          enablePagination
           emptyState={{
             message: t("common.noUsersFound"),
             icon: <GroupIcon sx={{ fontSize: 40 }} />,

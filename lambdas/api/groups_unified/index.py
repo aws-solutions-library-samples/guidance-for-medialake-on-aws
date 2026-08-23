@@ -19,8 +19,6 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from groups_get import handle_get_groups
 from groups_groupId_delete import handle_delete_group
 from groups_groupId_get import handle_get_group
-from groups_groupId_members_post import handle_post_group_members
-from groups_groupId_members_userId_delete import handle_delete_group_member
 from groups_groupId_permissions import (
     handle_get_group_permissions,
     handle_put_group_permissions,
@@ -144,23 +142,10 @@ def put_group_permissions(group_id: str):
     )
 
 
-# Group members routes
-@app.post("/groups/<group_id>/members")
-@tracer.capture_method
-def post_group_members(group_id: str):
-    """POST /groups/{groupId}/members - Add members to group"""
-    return handle_post_group_members(
-        group_id, app, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer
-    )
-
-
-@app.delete("/groups/<group_id>/members/<user_id>")
-@tracer.capture_method
-def delete_group_member(group_id: str, user_id: str):
-    """DELETE /groups/{groupId}/members/{userId} - Remove member from group"""
-    return handle_delete_group_member(
-        group_id, user_id, dynamodb, AUTH_TABLE_NAME, logger, metrics, tracer
-    )
+# Group membership is held in Cognito groups and is managed through the users
+# API (POST/PUT /users), which is the single source of truth. The former
+# /groups/{groupId}/members routes wrote DynamoDB rows that nothing read, so they
+# have been removed rather than left as a trap.
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)

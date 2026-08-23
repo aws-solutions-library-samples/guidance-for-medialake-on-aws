@@ -213,21 +213,40 @@ class ApiClient extends ApiClientBase {
               return Promise.reject(error);
             }
 
-            // Extract error details from response
+            // Only trust `authError` — the structured field this application sets on its
+            // own authorization denials. `data.message` is whatever the upstream returned,
+            // and for an API Gateway/SigV4 rejection that is raw AWS text such as
+            // "Invalid key=value pair (missing equal-sign) in Authorization header
+            // (hashed with SHA-256 and encoded with Base64): '<fragment>'". Rendering it
+            // on the access-denied page presented an infrastructure error as a permission
+            // explanation and disclosed a hashed credential fragment to the user.
             const authError =
-              error.response?.data?.authError ||
-              error.response?.data?.message ||
-              "You don't have permission to perform this action";
+              typeof error.response?.data?.authError === "string" &&
+              error.response.data.authError.trim() !== ""
+                ? error.response.data.authError
+                : "You don't have permission to perform this action";
             const requiredPermission = error.response?.data?.requiredPermission;
+
+            // Capture the route the user is on *right now*, synchronously,
+            // before the dynamic import below defers execution to a later tick.
+            // Without this, a 403 that resolves after the user has already
+            // clicked "Go to Home" or edited the URL would drag them back to
+            // the access-denied page — the request belongs to a route they have
+            // already left. navigateToAccessDenied compares against
+            // window.location, so read it from the same source here.
+            const originPath = window.location.pathname;
 
             // Use dynamic import to avoid circular dependency issues
             import("@/utils/navigation").then(({ navigateToAccessDenied }) => {
-              navigateToAccessDenied({
-                message: authError,
-                requiredPermission,
-                attemptedUrl: error.config?.url,
-                timestamp: new Date().toISOString(),
-              });
+              navigateToAccessDenied(
+                {
+                  message: authError,
+                  requiredPermission,
+                  attemptedUrl: error.config?.url,
+                  timestamp: new Date().toISOString(),
+                },
+                originPath
+              );
             });
 
             // Still reject the promise so calling code can handle it if needed

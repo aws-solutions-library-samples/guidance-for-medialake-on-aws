@@ -8,6 +8,9 @@ export default {
     hindi: "Hindi",
     arabic: "Árabe",
     hebrew: "Hebraico",
+    spanish: "Espanhol",
+    japanese: "Japonês",
+    korean: "Coreano",
   },
   assetsPage: {
     title: "Ativos",
@@ -59,6 +62,21 @@ export default {
       emptySection: "Nenhuma coleção",
       loading: "Carregando\u2026",
       more: "Mais",
+    },
+    savedLocations: {
+      sectionTitle: "Locais salvos",
+      allDestinations: "Todos os destinos",
+      save: "Salvar este local",
+      remove: "Remover este local salvo",
+      atCapacity: "Você pode salvar até {{count}} locais",
+      collectionsUnavailable_one:
+        "Uma coleção salva com este local não está mais disponível e foi removida: {{names}}",
+      collectionsUnavailable_other:
+        "{{count}} coleções salvas com este local não estão mais disponíveis e foram removidas: {{names}}",
+      selectedCollectionsUnavailable_one:
+        "Uma coleção selecionada não está mais disponível e não será aplicada: {{names}}",
+      selectedCollectionsUnavailable_other:
+        "{{count}} coleções selecionadas não estão mais disponíveis e não serão aplicadas: {{names}}",
     },
   },
   pathBrowser: {
@@ -848,7 +866,6 @@ export default {
   },
   roles: {
     title: "Gerenciamento de Funções",
-    description: "Gerencie funções do sistema e suas permissões",
     actions: {
       addRole: "Adicionar Função",
     },
@@ -905,6 +922,23 @@ export default {
         collections: "Coleções",
         upgrades: "Atualizações",
         metadataFields: "Campos de Metadados",
+        jitProvisioning: "Provisionamento de usuários",
+      },
+      jitProvisioning: {
+        title: "Provisionamento de usuários just-in-time",
+        description:
+          "Escolha o grupo atribuído aos usuários na primeira vez que fizerem login por meio de um provedor de identidade externo. O grupo é aplicado apenas uma vez por usuário, portanto mover alguém para outro grupo depois nunca é desfeito por um login posterior.",
+        enabledLabel: "Atribuir um grupo padrão a novos usuários federados",
+        defaultGroupLabel: "Grupo padrão",
+        defaultGroupHelp:
+          "Novos usuários federados recebem as permissões deste grupo no primeiro login.",
+        groupRequired: "Escolha um grupo antes de habilitar o provisionamento just-in-time.",
+        noGroups: "Nenhum grupo disponível",
+        capabilityDisabled:
+          "O provisionamento just-in-time não está habilitado nesta implantação. Defina authZ.jit_provisioning.enabled na configuração da implantação e implante novamente para que estas configurações tenham efeito.",
+        lastUpdated: "Última atualização",
+        loadError: "Não foi possível carregar as configurações de provisionamento just-in-time.",
+        saveSuccess: "Configurações de provisionamento just-in-time salvas.",
       },
       search: {
         title: "Configuração de Pesquisa",
@@ -1082,6 +1116,16 @@ export default {
     noCollectionTypesFound: "Nenhum tipo de coleção encontrado. Crie um para começar.",
     noUpgradeHistory: "Nenhum histórico de upgrade disponível",
     noResults: "Nenhum resultado encontrado",
+    pagination: {
+      showingRange: "Mostrando {{first}} - {{last}} de {{total}} resultados",
+      showingFiltered: "Mostrando {{count}} resultados filtrados",
+      rowsPerPage: "Linhas por página",
+      goToPage: "Ir para a página {{page}}",
+      first: "Ir para a primeira página",
+      last: "Ir para a última página",
+      next: "Ir para a próxima página",
+      previous: "Ir para a página anterior",
+    },
     selectFilter: "Selecionar Filtro",
     textFilter: "Filtro de Texto",
     all: "Todos",
@@ -1108,8 +1152,6 @@ export default {
       cannotDeleteSystemTypes: "Não é possível excluir tipos de sistema",
       editType: "Editar tipo",
       deleteType: "Excluir tipo",
-      errorSavingRole: "Ocorreu um erro ao salvar a função",
-      errorDeletingRole: "Ocorreu um erro ao excluir a função",
       permissionSetNotFound: "Conjunto de permissões não encontrado",
       noUsersAssigned: "Nenhum usuário atribuído",
       noGroupsAssigned: "Nenhum grupo atribuído",
@@ -1732,6 +1774,8 @@ export default {
         "Falha ao enviar o código de redefinição. Verifique seu e-mail e tente novamente.",
       errorResettingPassword: "Falha ao redefinir a senha. Verifique seu código e tente novamente.",
       passwordMismatch: "As senhas não coincidem.",
+      tempPasswordResent:
+        "Sua conta ainda tem uma senha temporária pendente, então uma nova foi enviada por e-mail. Faça login com a senha temporária e você será solicitado a definir uma permanente.",
     },
   },
   permissions: {

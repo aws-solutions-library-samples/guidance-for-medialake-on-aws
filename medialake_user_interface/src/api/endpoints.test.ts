@@ -69,14 +69,11 @@ describe("API_ENDPOINTS", () => {
       expect(API_ENDPOINTS.GROUPS.GET("grp-1")).toBe("/groups/grp-1");
     });
 
-    it("generates ADD_MEMBERS url", () => {
-      expect(API_ENDPOINTS.GROUPS.ADD_MEMBERS("grp-1")).toBe("/groups/grp-1/members");
-    });
-
-    it("generates REMOVE_MEMBER url", () => {
-      expect(API_ENDPOINTS.GROUPS.REMOVE_MEMBER("grp-1", "user-1")).toBe(
-        "/groups/grp-1/members/user-1"
-      );
+    it("exposes no membership endpoints", () => {
+      // Group membership is managed through the users endpoints; the
+      // /groups/{id}/members routes were removed along with their handlers.
+      expect("ADD_MEMBERS" in API_ENDPOINTS.GROUPS).toBe(false);
+      expect("REMOVE_MEMBER" in API_ENDPOINTS.GROUPS).toBe(false);
     });
   });
 

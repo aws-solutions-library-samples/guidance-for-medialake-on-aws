@@ -133,49 +133,6 @@ class AssetsConstruct(Construct):
 
         search_layer = SearchLayer(self, "SearchLayer")
 
-        # GET /assets Lambda
-        get_assets_lambda = Lambda(
-            self,
-            "GetAssetsLambda",
-            config=LambdaConfig(
-                name="assets-get",
-                entry="lambdas/api/assets/get_assets",
-                layers=[search_layer.layer],
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
-                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
-                },
-            ),
-        )
-
-        get_assets_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:GetObject",
-                    "kms:Decrypt",
-                ],
-                resources=[
-                    "arn:aws:s3:::*/*",
-                    "arn:aws:s3:::*",
-                    "arn:aws:kms:*:*:key/*",
-                ],
-            )
-        )
-
-        # Add DynamoDB permissions for GET Lambda
-        get_assets_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"],
-                resources=[props.asset_table.table_arn],
-            )
-        )
-
-        assets_get = self._assets_resource.add_method(
-            "GET",
-            api_gateway.LambdaIntegration(get_assets_lambda.function),
-        )
-        apply_custom_authorization(assets_get, props.authorizer)
         # /{id} Lambda
         # High-traffic asset retrieval API with VPC access
         get_asset_lambda = Lambda(
@@ -195,7 +152,12 @@ class AssetsConstruct(Construct):
                     "OPENSEARCH_INDEX": props.opensearch_index,
                     "ASSET_EMBEDDINGS_INDEX": "asset-embeddings",
                     "SCOPE": "es",
-                    "SSM_PREFIX": f"/{config.resource_prefix}/{config.environment}",
+                    # Must be config.ssm_prefix, not f"/{resource_prefix}/{environment}".
+                    # ssm_prefix branches on use_prefixed_names (default False), returning
+                    # "/medialake/{env}" for legacy deployments. Hardcoding the prefixed form
+                    # overrides url_utils' correct "/medialake/{env}" fallback and breaks
+                    # CloudFront URL resolution on every non-prefixed deployment.
+                    "SSM_PREFIX": config.ssm_prefix,
                 },
             ),
         )
@@ -250,6 +212,9 @@ class AssetsConstruct(Construct):
                     "VECTOR_INDEX_NAME": props.s3_vector_index_name,
                     "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table,
                     "ASSET_EVENT_BUS_NAME": props.asset_events_bus.event_bus_name,
+                    # BUG-9 cascade: the AssetDeletionService cleans up user
+                    # favorites that reference the deleted asset.
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
                 },
             ),
         )
@@ -354,6 +319,28 @@ class AssetsConstruct(Construct):
                 resources=[
                     props.asset_table.table_arn,
                     system_settings_table_arn,
+                ],
+            )
+        )
+
+        # BUG-9 cascade: allow the DELETE Lambda to remove favorite rows that
+        # reference the deleted asset. Uses GSI2 (partition ITEM_TYPE#ASSET)
+        # with a filter on itemId, then batch-deletes matching rows by their
+        # base key. Least privilege: no access to unrelated user data.
+        user_table_arn = (
+            f"arn:aws:dynamodb:{Stack.of(self).region}:{Stack.of(self).account}:"
+            f"table/{config.resource_prefix}-user-{config.environment}"
+        )
+        delete_asset_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "dynamodb:Query",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DeleteItem",
+                ],
+                resources=[
+                    user_table_arn,
+                    f"{user_table_arn}/index/*",
                 ],
             )
         )
@@ -2585,6 +2572,10 @@ class AssetsConstruct(Construct):
                         "dynamodb:UpdateItem",
                         "dynamodb:DeleteItem",
                         "dynamodb:Query",
+                        # BUG-9 cascade: the processor uses batch_writer() to
+                        # remove any user favorites referencing the deleted
+                        # asset (see AssetDeletionService._delete_asset_favorites).
+                        "dynamodb:BatchWriteItem",
                     ],
                     resources=[
                         self._users_table.table_arn,
@@ -2842,6 +2833,15 @@ class AssetsConstruct(Construct):
             api_gateway.LambdaIntegration(self._batch_delete_lambda.function),
         )
         apply_custom_authorization(cancel_put, props.authorizer)
+
+        # DELETE /assets/batch/{jobId} - Delete a terminal batch delete job
+        # record (BUG-26). Distinct from DELETE /assets/batch (create) — the
+        # handler discriminates on the presence of the {jobId} path parameter.
+        job_id_delete = job_id_resource.add_method(
+            "DELETE",
+            api_gateway.LambdaIntegration(self._batch_delete_lambda.function),
+        )
+        apply_custom_authorization(job_id_delete, props.authorizer)
 
         # Add CORS support
         add_cors_options_method(batch_resource)

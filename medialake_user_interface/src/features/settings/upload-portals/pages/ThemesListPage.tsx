@@ -23,6 +23,8 @@ import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from "@mui/ico
 import { useNavigate } from "react-router";
 
 import { PageHeader, PageContent } from "@/components/common/layout";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
 import { useListThemes, useDeleteTheme } from "@/api/hooks/useThemes";
 import type { PortalTheme } from "@/api/types/api.types";
@@ -47,6 +49,13 @@ const ThemesListPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const themes = response?.data ?? [];
+  const {
+    page,
+    pageSize,
+    paginatedItems: visibleThemes,
+    setPage,
+    setPageSize,
+  } = usePagination(themes);
 
   const handleCreate = () => navigate("/settings/upload-portals/themes/new");
   const handleEdit = (theme: PortalTheme) =>
@@ -105,7 +114,7 @@ const ThemesListPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {themes.map((theme) => (
+                {visibleThemes.map((theme) => (
                   <TableRow key={theme.themeId}>
                     <TableCell>{theme.name}</TableCell>
                     <TableCell>{theme.description || "—"}</TableCell>
@@ -130,6 +139,14 @@ const ThemesListPage: React.FC = () => {
             </Table>
           </TableContainer>
         )}
+
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalItems={themes.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </PageContent>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSnackbar } from "notistack";
 import {
   useBulkDownload,
   useBatchDelete,
@@ -94,6 +95,10 @@ export function useAssetSelection<T>({
   onDownloadSuccess?: () => void; // Callback to close side panel
 }) {
   const queryClient = useQueryClient();
+  // BUG-20: give bulk-download a fast, definitive toast so the click isn't
+  // silent. The ApiStatusModal already exists but is not surfaced with the
+  // consistency users expect for a job that takes ~90 seconds.
+  const { enqueueSnackbar } = useSnackbar();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssets, setSelectedAssets] = useState<SelectedAsset[]>([]);
   const [bulkDownloadJobId, setBulkDownloadJobId] = useState<string | null>(null);
@@ -545,6 +550,17 @@ export function useAssetSelection<T>({
 
     setIsDownloadLoading(true);
 
+    // BUG-20: definitive immediate feedback for the click. The modal below is
+    // transient (loading -> success flips quickly) and the resulting job takes
+    // ~90 s to complete via Step Functions, so without this toast the click
+    // felt like a no-op until the notification bell badge appeared.
+    enqueueSnackbar(
+      `Preparing ${selectedAssets.length} ${
+        selectedAssets.length === 1 ? "asset" : "assets"
+      } for download…`,
+      { variant: "info" }
+    );
+
     // Show loading modal
     setModalState({
       open: true,
@@ -576,6 +592,14 @@ export function useAssetSelection<T>({
       if (response.data?.jobId) {
         setBulkDownloadJobId(response.data.jobId);
 
+        // BUG-20: reinforce the acknowledgment with a durable success toast
+        // that mentions the notification bell — the completion notification
+        // appears there ~90 s later. This tells the user where to look
+        // without demanding they leave their current task.
+        enqueueSnackbar("Download queued — you'll be notified in the bell when it's ready.", {
+          variant: "success",
+        });
+
         // Success: Clear selection and close side panel
         handleClearSelection();
 
@@ -601,6 +625,8 @@ export function useAssetSelection<T>({
       const errorMessage =
         error instanceof Error ? error.message : "Failed to start bulk download. Please try again.";
 
+      enqueueSnackbar(errorMessage, { variant: "error" });
+
       setModalState({
         open: true,
         status: "error",
@@ -616,6 +642,7 @@ export function useAssetSelection<T>({
     isDownloadLoading,
     handleClearSelection,
     onDownloadSuccess,
+    enqueueSnackbar,
   ]);
 
   const handleBatchShare = useCallback(() => {

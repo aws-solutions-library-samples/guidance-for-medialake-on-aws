@@ -64,43 +64,6 @@ export interface ToggleUserStatusRequest {
   enabled: boolean;
 }
 
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface CreateRoleRequest {
-  name: string;
-  description: string;
-  permissions: string[];
-}
-
-export interface UpdateRoleRequest {
-  name?: string;
-  description?: string;
-  permissions?: string[];
-}
-
-export interface RoleListResponse {
-  status: string;
-  message: string;
-  data: {
-    roles: Role[];
-  };
-}
-
-export interface RoleResponse {
-  status: string;
-  message: string;
-  data: {
-    role: Role;
-  };
-}
-
 export interface ApiError {
   message: string;
   status?: number;

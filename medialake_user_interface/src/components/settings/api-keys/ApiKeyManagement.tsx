@@ -42,6 +42,8 @@ import ApiKeyFormDialog from "./ApiKeyFormDialog";
 import DeleteApiKeyDialog from "./DeleteApiKeyDialog";
 import ApiKeyDetailsDialog from "./ApiKeyDetailsDialog";
 import { EmptyTableState } from "@/components/common/table";
+import { PaginationFooter } from "@/components/common/pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 type SortField = "name" | "status" | "scope" | "createdAt" | "lastUsed";
 type SortDirection = "asc" | "desc";
@@ -108,6 +110,18 @@ const ApiKeyManagement: React.FC = () => {
 
     return sorted;
   }, [apiKeys, searchTerm, filterCategory, sortField, sortDirection]);
+
+  // Sorting and filtering above run over the full set, so paging only slices
+  // the already-ordered result.
+  const {
+    page,
+    pageSize,
+    paginatedItems: visibleApiKeys,
+    setPage,
+    setPageSize,
+  } = usePagination(filteredApiKeys, {
+    resetOn: [searchTerm, filterCategory, sortField, sortDirection],
+  });
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -369,7 +383,7 @@ const ApiKeyManagement: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredApiKeys.map((apiKey) => (
+                visibleApiKeys.map((apiKey) => (
                   <TableRow
                     key={apiKey.id}
                     hover
@@ -529,6 +543,16 @@ const ApiKeyManagement: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {!isLoading && !error && (
+        <PaginationFooter
+          page={page}
+          pageSize={pageSize}
+          totalItems={filteredApiKeys.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* Dialogs */}

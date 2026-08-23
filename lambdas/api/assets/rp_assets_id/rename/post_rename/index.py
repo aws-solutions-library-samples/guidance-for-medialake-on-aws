@@ -25,6 +25,7 @@ from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
+from personal_asset_access import caller_owns_personal_asset, get_caller_sub
 
 # Initialize AWS Lambda Powertools
 logger = Logger(service="asset-rename-service")
@@ -1038,6 +1039,19 @@ def lambda_handler(
         # 3) Load current asset metadata and snapshot for S3 operations
         asset = get_asset(inventory_id)
         original_asset = copy.deepcopy(asset)
+
+        # Personal ("My Assets") storage is private to its owner. Renaming rewrites paths
+        # and copies then deletes S3 objects, so without this check any authenticated caller
+        # could mutate another user's private asset.
+        if not caller_owns_personal_asset(asset, get_caller_sub(event)):
+            logger.warning(
+                "Denying personal asset rename: caller is not the owner",
+                extra={"inventory_id": inventory_id},
+            )
+            metrics.add_metric(
+                name="PersonalAssetAccessDenied", unit=MetricUnit.Count, value=1
+            )
+            return create_response(HTTPStatus.FORBIDDEN, "Access denied")
 
         logger.info(
             "Starting full rename: DB update → S3 copy → S3 delete",

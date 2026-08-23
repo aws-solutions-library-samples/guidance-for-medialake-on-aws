@@ -2,9 +2,11 @@
 
 import hashlib
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from urllib.parse import urlencode, urlparse
 
 import boto3
@@ -34,6 +36,58 @@ ALLOWED_SHAREABLE_DOMAINS = [
 
 ses_client = boto3.client("ses")
 
+# BUG-11 — CLOUDFRONT_DOMAIN is set at CDK deploy time from props.cloudfront_domain,
+# but on first-time and stack-order-sensitive deploys this can synthesize to an
+# empty string (the UI stack that resolves the domain runs after this stack).
+# When the env var is empty we look up the SSM parameter at request time, cache
+# it on the module for the life of the Lambda container, and fall back to that.
+# Without this fallback `shareableUrl` is returned empty, which forces recipients
+# into the broken passphrase gate (BUG-10) — see QA pass-2 report.
+_SSM_RESOLVED_CLOUDFRONT_DOMAIN: Optional[str] = None
+_ssm_client = None
+
+
+def _get_ssm_client():
+    global _ssm_client
+    if _ssm_client is None:
+        _ssm_client = boto3.client("ssm")
+    return _ssm_client
+
+
+def _cloudfront_domain_from_ssm() -> str:
+    """Resolve the CloudFront domain from SSM Parameter Store.
+
+    Uses the same convention as ``lambdas/common_libraries/url_utils.py``:
+    ``CLOUDFRONT_DOMAIN_SSM_PARAM`` env var if set, otherwise
+    ``{SSM_PREFIX}/cloudfront-distribution-domain`` (with a sensible default
+    prefix). Cached on the module after the first successful call.
+    """
+    global _SSM_RESOLVED_CLOUDFRONT_DOMAIN
+    if _SSM_RESOLVED_CLOUDFRONT_DOMAIN is not None:
+        return _SSM_RESOLVED_CLOUDFRONT_DOMAIN
+    ssm_parameter_name = os.environ.get("CLOUDFRONT_DOMAIN_SSM_PARAM")
+    if not ssm_parameter_name:
+        environment = os.environ.get("ENVIRONMENT", "dev")
+        ssm_prefix = os.environ.get("SSM_PREFIX", f"/medialake/{environment}")
+        ssm_parameter_name = f"{ssm_prefix}/cloudfront-distribution-domain"
+    try:
+        response = _get_ssm_client().get_parameter(
+            Name=ssm_parameter_name, WithDecryption=True
+        )
+        raw = response["Parameter"]["Value"].strip()
+        domain = re.sub(r"^https?://", "", raw).rstrip("/")
+        _SSM_RESOLVED_CLOUDFRONT_DOMAIN = domain
+        return domain
+    except Exception as exc:  # noqa: BLE001 — logged and treated as unresolved
+        logger.warning(
+            "Failed to resolve CloudFront domain from SSM",
+            extra={
+                "ssm_parameter_name": ssm_parameter_name,
+                "error": str(exc),
+            },
+        )
+        return ""
+
 
 def _mask_email(email: str) -> str:
     """Return a masked email suitable for logs.
@@ -50,11 +104,19 @@ def _mask_email(email: str) -> str:
     return f"{local[0]}***@{domain}"
 
 
+def _resolved_cloudfront_domain() -> str:
+    """Return the deployed CloudFront domain, resolving via SSM if needed."""
+    if CLOUDFRONT_DOMAIN:
+        return CLOUDFRONT_DOMAIN
+    return _cloudfront_domain_from_ssm()
+
+
 def _allowed_shareable_domains() -> set:
     """Return the lowercase set of domains we'll trust for shareable URLs."""
     allowed = set(ALLOWED_SHAREABLE_DOMAINS)
-    if CLOUDFRONT_DOMAIN:
-        allowed.add(CLOUDFRONT_DOMAIN.strip().lower())
+    resolved = _resolved_cloudfront_domain()
+    if resolved:
+        allowed.add(resolved.strip().lower())
     return allowed
 
 
@@ -115,11 +177,19 @@ def _get_shareable_domain(app) -> str:
     if CLOUDFRONT_DOMAIN:
         return CLOUDFRONT_DOMAIN
 
+    # BUG-11 fallback: env var was empty, but the deployment does have a
+    # CloudFront domain — read it from SSM. This handles the CDK deploy-order
+    # case where props.cloudfront_domain synthesized to "".
+    resolved = _cloudfront_domain_from_ssm()
+    if resolved:
+        return resolved
+
     logger.warning(
         "No allowlisted Origin, Referer, X-Forwarded-Host, or Host headers "
-        "present and CLOUDFRONT_DOMAIN is not set; shareable URLs will be "
-        "empty. Set cloudfront_domain in config or configure "
-        "ALLOWED_SHAREABLE_DOMAINS."
+        "present, CLOUDFRONT_DOMAIN env var is unset, and the SSM parameter "
+        "did not resolve; shareable URLs will be empty. Set cloudfront_domain "
+        "in config, populate /{prefix}/{env}/cloudfront-distribution-domain in "
+        "SSM, or configure ALLOWED_SHAREABLE_DOMAINS."
     )
     return ""
 

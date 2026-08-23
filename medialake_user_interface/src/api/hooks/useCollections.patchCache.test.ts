@@ -10,6 +10,7 @@ vi.mock("@/hooks/useErrorModal", () => ({
 
 import {
   patchCollectionInCache,
+  resolveAddedCount,
   type Collection,
   type PaginatedCollectionsResponse,
   type CollectionsResponse,
@@ -257,5 +258,53 @@ describe("patchCollectionInCache", () => {
       expect(source?.thumbnailUrl).toBe("https://cdn/new.png?v=2");
       expect(source?.updatedAt).toBe("2024-12-01T00:00:00Z");
     }
+  });
+});
+
+describe("resolveAddedCount", () => {
+  it("uses the server's count for a single add", () => {
+    expect(resolveAddedCount({ data: { addedCount: 1 } }, { assetId: "a1" })).toBe(1);
+  });
+
+  it("uses the server's count for a bulk add rather than counting one", () => {
+    expect(
+      resolveAddedCount(
+        { data: { addedCount: 3 } },
+        { items: [{ assetId: "a1" }, { assetId: "a2" }, { assetId: "a3" }] }
+      )
+    ).toBe(3);
+  });
+
+  it("returns 0 when everything requested was already in the collection", () => {
+    // The API accepts the request but adds nothing, so the count must not move.
+    expect(
+      resolveAddedCount(
+        { data: { addedCount: 0, alreadyPresentCount: 2 } },
+        { items: [{ assetId: "a1" }, { assetId: "a2" }] }
+      )
+    ).toBe(0);
+  });
+
+  it("counts only what was added when part of a bulk request was already present", () => {
+    expect(
+      resolveAddedCount(
+        { data: { addedCount: 1, alreadyPresentCount: 1 } },
+        { items: [{ assetId: "a1" }, { assetId: "a2" }] }
+      )
+    ).toBe(1);
+  });
+
+  it("reflects an addAllClips expansion adding more items than assets requested", () => {
+    expect(
+      resolveAddedCount({ data: { addedCount: 4 } }, { assetId: "a1", addAllClips: true })
+    ).toBe(4);
+  });
+
+  it("falls back to the request size when the server omits addedCount", () => {
+    expect(resolveAddedCount(undefined, { assetId: "a1" })).toBe(1);
+    expect(resolveAddedCount({ data: {} }, { assetId: "a1" })).toBe(1);
+    expect(
+      resolveAddedCount({ success: true }, { items: [{ assetId: "a1" }, { assetId: "a2" }] })
+    ).toBe(2);
   });
 });

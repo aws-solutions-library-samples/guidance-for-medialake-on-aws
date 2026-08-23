@@ -31,6 +31,7 @@ from opensearchpy import (
     RequestsAWSV4SignerAuth,
     RequestsHttpConnection,
 )
+from personal_asset_access import get_caller_sub, personal_owner_sub
 from url_utils import generate_cloudfront_url
 from utils import replace_binary_data
 
@@ -113,8 +114,6 @@ def get_asset_details(inventory_id: str) -> Dict[str, Any]:
             Key={"InventoryID": inventory_id},
             ConsistentRead=True,  # Ensure we get the latest data
         )
-        print(response)
-
         if "Item" not in response:
             raise AssetDetailsError(
                 f"Asset with ID {inventory_id} not found", HTTPStatus.NOT_FOUND
@@ -203,9 +202,25 @@ def lambda_handler(
         # Get asset details
         asset_data = get_asset_details(asset_id)
 
+        # Personal ("My Assets") storage is private to its owner. This endpoint previously
+        # returned any asset to any authenticated caller, so a low-privilege user could read
+        # another user's private asset — including the derived media URLs, which are served
+        # without authentication and therefore hand over the content itself.
+        owner_sub = personal_owner_sub(asset_data)
+        if owner_sub is not None:
+            caller_sub = get_caller_sub(event)
+            if not caller_sub or caller_sub != owner_sub:
+                logger.warning(
+                    "Denying personal asset read: caller does not own this asset",
+                    extra={"asset_id": asset_id, "caller_identified": bool(caller_sub)},
+                )
+                metrics.add_metric(
+                    name="PersonalAssetAccessDenied", unit=MetricUnit.Count, value=1
+                )
+                return create_response(HTTPStatus.FORBIDDEN, "Access denied")
+
         # Add any additional metadata or computed fields
         enriched_asset = enrich_asset_data(asset_data)
-        print(enriched_asset)
 
         return create_response(
             HTTPStatus.OK,
@@ -213,6 +228,14 @@ def lambda_handler(
             {"asset": enriched_asset},
         )
 
+    except AssetDetailsError as e:
+        # Carry the intended status through instead of letting the generic handler below
+        # report every failure as a 500 — a missing asset was answering 500, not 404.
+        logger.warning(
+            f"Asset retrieval failed: {e}",
+            extra={"asset_id": asset_id, "status_code": int(e.status_code)},
+        )
+        return create_response(e.status_code, str(e))
     except Exception as e:
         error_message = (
             str(e)

@@ -198,6 +198,7 @@ const ApiStatusModal: React.FC<ApiStatusModalProps> = ({
       {status !== "loading" && onClose && (
         <IconButton
           onClick={onClose}
+          aria-label="Close"
           sx={{
             position: "absolute",
             right: 8,
