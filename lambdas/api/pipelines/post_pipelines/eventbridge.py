@@ -3,7 +3,7 @@ import json
 import os
 import re
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 import shortuuid
@@ -401,6 +401,419 @@ def build_upload_batch_completed_pattern(node: Any) -> Dict[str, Any]:
     return pattern
 
 
+class InvalidCollectionNameFilter(ValueError):
+    """A collection-name filter entry is not a valid EventBridge matcher.
+
+    Raised while building the rule pattern so the pipeline-create request fails
+    with an actionable message instead of deploying a rule that silently never
+    matches.
+    """
+
+
+# Operators that are meaningful for a *string* field like ``detail.collectionName``
+# and are supported on EventBridge **event bus** rules (which is what collection
+# triggers create). ``numeric`` and ``cidr`` are deliberately excluded: a
+# collection name is never a number or an IP, so accepting them would only let a
+# user build a rule that cannot match.
+_NAME_MATCH_OPERATORS = frozenset(
+    {"prefix", "suffix", "equals-ignore-case", "wildcard", "anything-but", "exists"}
+)
+
+# Operators that may be nested inside ``anything-but``.
+_ANYTHING_BUT_NESTED_OPERATORS = frozenset(
+    {"prefix", "suffix", "equals-ignore-case", "wildcard"}
+)
+
+
+def _active_wildcard_positions(value: str) -> List[int]:
+    """Return the indices of unescaped ``*`` characters, validating escapes.
+
+    EventBridge supports ``\\*`` for a literal asterisk and ``\\\\`` for a
+    literal backslash; escaping anything else is not supported, so we reject it
+    up front rather than letting EventBridge fail the rule creation later.
+    """
+    positions: List[int] = []
+    index = 0
+    length = len(value)
+    while index < length:
+        char = value[index]
+        if char == "\\":
+            following = value[index + 1] if index + 1 < length else ""
+            if following not in ("*", "\\"):
+                shown = f"\\{following}" if following else "trailing backslash"
+                raise InvalidCollectionNameFilter(
+                    f"invalid escape sequence ({shown}) in collection name filter "
+                    f"{value!r}. EventBridge only supports \\* (literal asterisk) "
+                    "and \\\\ (literal backslash)."
+                )
+            index += 2
+            continue
+        if char == "*":
+            positions.append(index)
+        index += 1
+    return positions
+
+
+def _unescape_wildcard_literal(value: str) -> str:
+    """Resolve ``\\*``/``\\\\`` escapes to the literal characters they denote."""
+    out: List[str] = []
+    index = 0
+    length = len(value)
+    while index < length:
+        if (
+            value[index] == "\\"
+            and index + 1 < length
+            and value[index + 1] in ("*", "\\")
+        ):
+            out.append(value[index + 1])
+            index += 2
+            continue
+        out.append(value[index])
+        index += 1
+    return "".join(out)
+
+
+def _validate_wildcard_expression(value: str, *, context: str) -> str:
+    """Validate a single EventBridge ``wildcard`` expression."""
+    if not isinstance(value, str) or not value:
+        raise InvalidCollectionNameFilter(
+            f"{context}: wildcard value must be a non-empty string, got {value!r}."
+        )
+    positions = _active_wildcard_positions(value)
+    for earlier, later in zip(positions, positions[1:]):
+        if later == earlier + 1:
+            raise InvalidCollectionNameFilter(
+                f"{context}: consecutive '*' characters are not supported by "
+                f"EventBridge (in {value!r}). Use a single '*' instead."
+            )
+    return value
+
+
+def _validate_string_or_list(
+    value: Any, operator: str, *, context: str, allow_list: bool = False
+) -> None:
+    """Validate an operator's value against what EventBridge actually accepts.
+
+    Standalone ``prefix``/``suffix``/``wildcard``/``equals-ignore-case`` take a
+    single string; a list is only valid for ``anything-but`` and the operators
+    nested inside it. Accepting a list for a standalone operator would let an
+    unusable pattern reach ``put_rule``, which fails with
+    ``InvalidEventPatternException`` at pipeline-create time — exactly the
+    late failure this validation exists to prevent.
+    """
+    if isinstance(value, list):
+        if not allow_list:
+            raise InvalidCollectionNameFilter(
+                f"{context}: '{operator}' takes a single string, not a list. "
+                "EventBridge only accepts a list for 'anything-but' (and the "
+                "operators nested inside it)."
+            )
+        if not value:
+            raise InvalidCollectionNameFilter(
+                f"{context}: '{operator}' was given an empty list."
+            )
+    candidates = value if isinstance(value, list) else [value]
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate:
+            expected = (
+                "a non-empty string (or list of them)"
+                if allow_list
+                else "a non-empty string"
+            )
+            raise InvalidCollectionNameFilter(
+                f"{context}: '{operator}' expects {expected}, got {candidate!r}."
+            )
+        if operator == "wildcard":
+            _validate_wildcard_expression(candidate, context=context)
+
+
+def _validate_name_matcher(matcher: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate a user-supplied EventBridge matcher for ``detail.collectionName``.
+
+    Returns the matcher unchanged when valid; raises
+    :class:`InvalidCollectionNameFilter` with an actionable message otherwise.
+    """
+    context = f"collection name filter {json.dumps(matcher, default=str)}"
+
+    if len(matcher) != 1:
+        raise InvalidCollectionNameFilter(
+            f"{context}: a matcher must contain exactly one operator, found "
+            f"{sorted(matcher) or 'none'}."
+        )
+
+    operator, value = next(iter(matcher.items()))
+    if operator not in _NAME_MATCH_OPERATORS:
+        raise InvalidCollectionNameFilter(
+            f"{context}: unsupported operator '{operator}' for a collection name. "
+            f"Supported operators: {', '.join(sorted(_NAME_MATCH_OPERATORS))}."
+        )
+
+    if operator == "exists":
+        if not isinstance(value, bool):
+            raise InvalidCollectionNameFilter(
+                f"{context}: 'exists' expects true or false, got {value!r}."
+            )
+        return matcher
+
+    if operator == "wildcard":
+        _validate_string_or_list(value, operator, context=context)
+        return matcher
+
+    if operator in ("prefix", "suffix"):
+        # Both accept a plain string or a nested {"equals-ignore-case": "..."}.
+        if isinstance(value, dict):
+            if sorted(value) != ["equals-ignore-case"]:
+                raise InvalidCollectionNameFilter(
+                    f"{context}: '{operator}' may only nest 'equals-ignore-case', "
+                    f"found {sorted(value) or 'none'}."
+                )
+            _validate_string_or_list(
+                value["equals-ignore-case"], "equals-ignore-case", context=context
+            )
+            return matcher
+        _validate_string_or_list(value, operator, context=context)
+        return matcher
+
+    if operator == "equals-ignore-case":
+        _validate_string_or_list(value, operator, context=context)
+        return matcher
+
+    # anything-but: string, list of strings, or a nested single-operator object.
+    if isinstance(value, dict):
+        if len(value) != 1:
+            raise InvalidCollectionNameFilter(
+                f"{context}: 'anything-but' must nest exactly one operator, found "
+                f"{sorted(value) or 'none'}."
+            )
+        nested_operator, nested_value = next(iter(value.items()))
+        if nested_operator not in _ANYTHING_BUT_NESTED_OPERATORS:
+            raise InvalidCollectionNameFilter(
+                f"{context}: 'anything-but' cannot nest '{nested_operator}'. "
+                f"Allowed: {', '.join(sorted(_ANYTHING_BUT_NESTED_OPERATORS))}."
+            )
+        # Nested under anything-but, EventBridge documents list forms
+        # (e.g. {"anything-but": {"prefix": ["init", "stop"]}}).
+        _validate_string_or_list(
+            nested_value, nested_operator, context=context, allow_list=True
+        )
+        return matcher
+    _validate_string_or_list(value, operator, context=context, allow_list=True)
+    return matcher
+
+
+def build_collection_name_filter(entries: Any) -> List[Any]:
+    """Translate user-entered collection-name filters into EventBridge matchers.
+
+    Each entry may be:
+
+    * ``"Marketing"``          -> exact match (``"Marketing"``)
+    * ``"Marketing*"``         -> ``{"prefix": "Marketing"}`` (starts with)
+    * ``"*2026"`` / ``"a*b"``  -> ``{"wildcard": "..."}`` (wildcard anywhere)
+    * ``"Marketing\\*"``       -> exact match on the literal ``Marketing*``
+    * ``{"suffix": "-archive"}`` or its JSON string form -> validated passthrough,
+      so any EventBridge string operator can be used directly.
+
+    A trailing-only ``*`` is emitted as ``prefix`` rather than ``wildcard``
+    because it is exactly equivalent, cheaper for EventBridge to evaluate, and
+    keeps simple "starts with" rules well within the wildcard complexity limits.
+
+    Raises:
+        InvalidCollectionNameFilter: if an entry is not a usable matcher.
+    """
+    if entries is None:
+        return []
+
+    # Normalize the incoming parameter into discrete entries.
+    #
+    # Comma-splitting is applied to plain text only (so "Marketing*, Archive"
+    # works in a single text field) but never to JSON, because a raw matcher can
+    # legitimately contain commas, e.g. {"anything-but": ["a", "b"]}.
+    raw_entries: List[Any]
+    if isinstance(entries, list):
+        raw_entries = list(entries)
+    elif isinstance(entries, str):
+        text = entries.strip()
+        if text.startswith("["):
+            try:
+                decoded = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise InvalidCollectionNameFilter(
+                    f"collection name filter {text!r} looks like a JSON list but "
+                    f"could not be parsed: {exc}."
+                ) from exc
+            if not isinstance(decoded, list):
+                raise InvalidCollectionNameFilter(
+                    f"collection name filter {text!r} must decode to a JSON list."
+                )
+            raw_entries = decoded
+        elif text.startswith("{"):
+            raw_entries = [text]
+        else:
+            raw_entries = [part for part in text.split(",")]
+    else:
+        raw_entries = [entries]
+
+    matchers: List[Any] = []
+    for raw in raw_entries:
+        # Already-structured matcher (UI may send parsed JSON).
+        if isinstance(raw, dict):
+            matchers.append(_validate_name_matcher(raw))
+            continue
+
+        if not isinstance(raw, str):
+            raise InvalidCollectionNameFilter(
+                f"collection name filter entries must be strings or matcher "
+                f"objects, got {raw!r}."
+            )
+
+        text = raw.strip()
+        if not text:
+            continue
+
+        # A JSON object means the user typed a raw EventBridge matcher.
+        if text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise InvalidCollectionNameFilter(
+                    f"collection name filter {text!r} looks like JSON but could "
+                    f"not be parsed: {exc}."
+                ) from exc
+            if not isinstance(parsed, dict):
+                raise InvalidCollectionNameFilter(
+                    f"collection name filter {text!r} must be a JSON object."
+                )
+            matchers.append(_validate_name_matcher(parsed))
+            continue
+
+        positions = _active_wildcard_positions(text)
+        for earlier, later in zip(positions, positions[1:]):
+            if later == earlier + 1:
+                raise InvalidCollectionNameFilter(
+                    f"consecutive '*' characters are not supported by EventBridge "
+                    f"(in {text!r}). Use a single '*' instead."
+                )
+
+        if not positions:
+            matchers.append(_unescape_wildcard_literal(text))
+            continue
+
+        if len(positions) == 1 and positions[0] == len(text) - 1:
+            literal = _unescape_wildcard_literal(text[:-1])
+            if not literal:
+                raise InvalidCollectionNameFilter(
+                    "a bare '*' matches every collection name; leave the "
+                    "collection name filter empty instead."
+                )
+            matchers.append({"prefix": literal})
+            continue
+
+        matchers.append({"wildcard": text})
+
+    return matchers
+
+
+def build_collection_event_pattern(node: Any) -> Dict[str, Any]:
+    """Build the EventBridge pattern for the ``trigger_collection_event`` node.
+
+    Collection lifecycle events are published with::
+
+        source = "custom.collection.processor"
+        detail-type in {CollectionCreated, CollectionDeleted,
+                        CollectionMetadataUpdated, CollectionAssetAdded,
+                        CollectionAssetRemoved, CollectionShared,
+                        CollectionShareRemoved, CollectionChildAdded,
+                        CollectionChildRemoved, CollectionThumbnailUpdated,
+                        CollectionThumbnailRemoved}
+
+    The node's ``event_types`` parameter (a multi-select, so usually a list) maps
+    to ``detail-type``. When it is empty the pattern omits ``detail-type`` so the
+    rule matches every collection event on that source.
+
+    A dedicated builder is used (rather than the generic placeholder substitution
+    in ``process_pattern_parameters``) because that path calls ``.upper()`` /
+    ``in`` on the value and cannot handle a multi-select list.
+
+    Optional filters:
+
+      * ``collection_names`` / ``collection_name`` -> ``detail.collectionName``,
+        supporting exact names, ``Name*`` prefix matching, ``*`` wildcards, and
+        raw EventBridge matcher objects (validated — see
+        :func:`build_collection_name_filter`).
+
+    Optional, currently-unexposed filters are supported here so they can be
+    enabled later simply by adding the parameters to the node template (the
+    plumbing is already in place):
+
+      * ``collection_id`` / ``collection_ids`` -> ``detail.collectionId``
+      * ``collection_type`` / ``collection_type_id`` -> ``detail.collectionTypeId``
+
+    Args:
+        node: Node object whose configuration carries the parameters.
+
+    Returns:
+        EventBridge-compatible event pattern dictionary.
+
+    Raises:
+        InvalidCollectionNameFilter: if a collection-name filter entry is not a
+            valid EventBridge matcher.
+    """
+    # Retrieve parameters from both the parameters dict and top-level config,
+    # mirroring build_upload_batch_completed_pattern.
+    parameters = node.data.configuration.get("parameters", {})
+    for key, value in node.data.configuration.items():
+        if key != "parameters" and isinstance(value, (str, int, float, bool)):
+            if key not in parameters:
+                parameters[key] = value
+
+    def _as_list(value: Any) -> list:
+        """Normalize a param (list, comma-separated string, or scalar) to a list of str."""
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if str(v).strip()]
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        if value is not None:
+            text = str(value).strip()
+            return [text] if text else []
+        return []
+
+    pattern: Dict[str, Any] = {"source": ["custom.collection.processor"]}
+
+    # detail-type from the multi-select event_types (omit -> match all events).
+    event_types = _as_list(parameters.get("event_types"))
+    if event_types:
+        pattern["detail-type"] = event_types
+
+    # Optional collection-id / collection-type filters (deferred — not yet
+    # surfaced in the node template, but honored if present).
+    detail: Dict[str, Any] = {}
+    collection_ids = _as_list(parameters.get("collection_ids")) or _as_list(
+        parameters.get("collection_id")
+    )
+    if collection_ids:
+        detail["collectionId"] = collection_ids
+    collection_types = _as_list(parameters.get("collection_type_id")) or _as_list(
+        parameters.get("collection_type")
+    )
+    if collection_types:
+        detail["collectionTypeId"] = collection_types
+
+    # Collection-name filter: exact names, "Name*" prefixes, "*" wildcards, or
+    # raw EventBridge matchers. Validated so an unusable filter fails the
+    # pipeline-create request instead of deploying a rule that never matches.
+    name_param = parameters.get("collection_names")
+    if name_param in (None, "", []):
+        name_param = parameters.get("collection_name")
+    name_matchers = build_collection_name_filter(name_param)
+    if name_matchers:
+        detail["collectionName"] = name_matchers
+
+    if detail:
+        pattern["detail"] = detail
+
+    return pattern
+
+
 def get_event_pattern_for_rule(
     rule_name: str, node: Any, pipeline_name: str, yaml_data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
@@ -549,6 +962,14 @@ def get_event_pattern_for_rule(
             # Map outcome_filter to detail.outcome with a default of ["COMPLETE"].
             pattern = build_upload_batch_completed_pattern(node)
             logger.info(f"Built upload_batch_completed pattern: {json.dumps(pattern)}")
+            return pattern
+        elif rule_name == "collection_event_trigger":
+            # Build the collection-event pattern from the node's event_types
+            # multi-select (and optional collection-id/type filters). Uses a
+            # dedicated builder because the generic placeholder path cannot
+            # handle multi-select list values.
+            pattern = build_collection_event_pattern(node)
+            logger.info(f"Built collection_event pattern: {json.dumps(pattern)}")
             return pattern
         else:
             # For other rules, use the pattern from YAML

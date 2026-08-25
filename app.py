@@ -410,6 +410,7 @@ class MediaLakeStack(cdk.Stack):
                 media_assets_bucket=props.base_infrastructure.media_assets_s3_bucket,
                 asset_table=props.base_infrastructure.asset_table,
                 asset_events_bus=props.base_infrastructure.application_service_events_internal_event_bus,
+                pipelines_event_bus=props.base_infrastructure.pipelines_event_bus,
             ),
         )
         collections_stack.add_dependency(props.authorization_stack)

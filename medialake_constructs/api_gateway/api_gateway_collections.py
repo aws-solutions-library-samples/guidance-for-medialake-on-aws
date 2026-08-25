@@ -58,6 +58,11 @@ class CollectionsApiProps:
     asset_table: dynamodb.ITable  # For copying asset thumbnails to collections
     # Internal application-service-events bus delivering AssetDeleted events.
     asset_events_bus: events.IEventBus
+    # Pipelines event bus — collection lifecycle events (CollectionCreated,
+    # CollectionAssetAdded, ...) are published here so the "Collection Event"
+    # trigger node can start pipelines off them. This is the same bus the
+    # ingest asset processor and pipeline triggers already use.
+    pipelines_event_bus: events.IEventBus
     cognito_user_pool: Optional[cognito.UserPool] = (
         None  # For /collections/users endpoint
     )
@@ -182,6 +187,8 @@ class CollectionsApi(Construct):
                 memory_size=1024,  # VPC Lambdas need more memory for ENI setup
                 environment_variables={
                     "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
+                    # Pipelines event bus for publishing collection lifecycle events.
+                    "EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
                     "COLLECTIONS_TABLE_ARN": self._collections_table.table_arn,
                     "OPENSEARCH_ENDPOINT": props.open_search_endpoint,
@@ -231,6 +238,10 @@ class CollectionsApi(Construct):
 
         # Grant DynamoDB permissions
         self._collections_table.table.grant_read_write_data(collections_lambda.function)
+
+        # Allow the Collections API to publish collection lifecycle events to the
+        # pipelines event bus (CollectionCreated, CollectionAssetAdded, ...).
+        props.pipelines_event_bus.grant_put_events_to(collections_lambda.function)
 
         # Grant read access to asset table (for copying asset thumbnails)
         props.asset_table.grant_read_data(collections_lambda.function)
@@ -283,6 +294,9 @@ class CollectionsApi(Construct):
                 timeout_minutes=5,
                 environment_variables={
                     "COLLECTIONS_TABLE_NAME": self._collections_table.table_name,
+                    # Publishes CollectionAssetRemoved when an asset deletion
+                    # strips it from collections, so pipelines can react.
+                    "EVENT_BUS_NAME": props.pipelines_event_bus.event_bus_name,
                 },
             ),
         )
@@ -292,6 +306,9 @@ class CollectionsApi(Construct):
         self._collections_table.table.grant_read_write_data(
             asset_cleanup_lambda.function
         )
+
+        # Allow the cleanup Lambda to publish CollectionAssetRemoved events.
+        props.pipelines_event_bus.grant_put_events_to(asset_cleanup_lambda.function)
 
         # Route AssetDeleted events from the internal bus to the cleanup Lambda
         events.Rule(

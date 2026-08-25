@@ -7,6 +7,7 @@ from urllib.parse import unquote
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from collection_activity import record_collection_activity
+from collection_events import publish_collection_assets_removed
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     create_error_response,
@@ -24,6 +25,23 @@ logger = Logger(
 )
 tracer = Tracer(service="collections-ID-items-ID-delete")
 metrics = Metrics(namespace="medialake", service="collection-items")
+
+
+def _is_conditional_check_failure(error: DeleteError) -> bool:
+    """True when a DeleteError was caused by the SK-does-not-exist condition failing.
+
+    Reads PynamoDB's structured cause code (``cause_response_code``, which resolves
+    to the wrapped botocore ``Error.Code``) rather than the exception's message text,
+    mirroring the equivalent helper in ``collections_ID_items_post``.
+
+    An error that cannot be classified is deliberately *not* treated as
+    "row absent": it is re-raised. Misclassifying a genuine delete failure as an
+    absent row would swallow the failure and report ``removed: true`` for an item
+    that is still in the collection.
+    """
+    return (
+        getattr(error, "cause_response_code", None) == "ConditionalCheckFailedException"
+    )
 
 
 def register_route(app):
@@ -67,22 +85,50 @@ def register_route(app):
             logger.info(f"[DELETE] PK: {COLLECTION_PK_PREFIX}{collection_id}")
 
             # Delete the item using PynamoDB
+            #
+            # The delete is conditional on the row existing. DynamoDB's DeleteItem
+            # is unconditional by nature and reports success even when the key is
+            # absent, so PynamoDB raises nothing for an item that was never in the
+            # collection — which previously produced a 200 "removed": true for a
+            # request that removed nothing.
+            item_deleted = False
             try:
                 item = CollectionItemModel(f"{COLLECTION_PK_PREFIX}{collection_id}", sk)
                 logger.info(
                     f"[DELETE] Attempting to delete item with PK={item.PK}, SK={item.SK}"
                 )
-                item.delete()
+                item.delete(condition=CollectionItemModel.SK.exists())
+                item_deleted = True
                 logger.info(f"[DELETE] Successfully deleted item")
             except DoesNotExist:
                 logger.warning(
                     f"[DELETE] Item not found: {decoded_item_id} (SK: {sk}) in collection {collection_id}"
                 )
             except DeleteError as e:
-                logger.error(f"[DELETE] Error deleting item: {e}")
-                raise
+                # A failed condition means the row was not there; anything else is a
+                # real failure and must not be reported as a successful removal.
+                if _is_conditional_check_failure(e):
+                    logger.warning(
+                        f"[DELETE] Item not present, nothing deleted: {decoded_item_id} "
+                        f"(SK: {sk}) in collection {collection_id}"
+                    )
+                else:
+                    logger.error(f"[DELETE] Error deleting item: {e}")
+                    raise
+
+            if not item_deleted:
+                # Nothing was removed. 404 is the contract this handler already
+                # applies to a missing collection (require_collection_role) and how
+                # the rest of the collections API reports an absent resource.
+                raise NotFoundError(
+                    f"Item '{decoded_item_id}' not found in collection '{collection_id}'"
+                )
 
             # Update collection: decrement itemCount atomically and refresh timestamps
+            #
+            # Only reached when a row was actually deleted (the 404 above returns
+            # otherwise), so the stored counter cannot drift below the true item
+            # count and updatedAt is not bumped for a request that changed nothing.
             # Note: itemCount is maintained as a stored counter for efficient listing.
             try:
                 # Reuse the collection loaded during the authorization check
@@ -118,6 +164,21 @@ def register_route(app):
             # Record activity for the recent-collections tracker (Req 11.2)
             if user_id:
                 record_collection_activity(user_id, collection_id)
+
+            # Emit CollectionAssetRemoved referencing the underlying asset id.
+            # ASSET# rows encode the asset id as ASSET#{asset_id}#...; legacy
+            # ITEM# rows have no clean asset id, so fall back to the item id.
+            if sk.startswith(ASSET_SK_PREFIX):
+                asset_ref = sk[len(ASSET_SK_PREFIX) :].split("#", 1)[0]
+            else:
+                asset_ref = decoded_item_id
+            publish_collection_assets_removed(
+                collection_id,
+                [asset_ref],
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
+            )
 
             return create_success_response(
                 data={"id": decoded_item_id, "removed": True},

@@ -23,6 +23,10 @@ from botocore.awsrequest import AWSRequest
 from botocore.config import Config
 from collection_activity import record_collection_activity
 
+# Publish collection lifecycle events (CollectionAssetAdded) for portal/upload
+# driven additions so collection-event pipelines can trigger on them.
+from collection_events import publish_collection_assets_added
+
 # Import shared helpers from common_libraries layer for collection association
 from collections_utils import get_user_collection_role
 
@@ -71,6 +75,12 @@ connector_dynamodb_client = None
 # Lazily-initialized DynamoDB Table resource for the collections table (Layer C
 # upload-portal collection-add). Cached for container reuse.
 collections_table = None
+
+# Last-read collection METADATA item, keyed by collection id. Populated by
+# _collection_exists() so CollectionAssetAdded events can carry the collection
+# name/type (which collection-name trigger filters match on) without a second
+# DynamoDB read.
+_collection_meta_cache: Dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +204,11 @@ def _collection_exists(collection_id: str) -> bool:
             Key={"PK": f"{COLLECTION_PK_PREFIX}{collection_id}", "SK": "METADATA"}
         )
         item = resp.get("Item")
+        # Remember the metadata so the CollectionAssetAdded event below can be
+        # labelled with the collection's name/type without a second read. This
+        # is refreshed on every association attempt (this function runs in the
+        # same loop iteration that publishes), so it can never go stale.
+        _collection_meta_cache[collection_id] = item or {}
         return bool(item) and item.get("status", "ACTIVE") != "DELETED"
     except Exception as e:
         logger.warning(f"Failed to check collection existence {collection_id}: {e}")
@@ -307,6 +322,18 @@ def associate_upload_collections(inventory_id: str, asset_metadata) -> None:
                 # Record activity for the upload source when uploader is known (Req 11.3)
                 if source == UPLOAD_SOURCE_VALUE and uploader_id:
                     record_collection_activity(uploader_id, collection_id)
+                # Emit CollectionAssetAdded so collection-event pipelines can
+                # trigger on portal/upload-driven additions. One event per
+                # collection referencing the added asset. Best-effort.
+                _event_meta = _collection_meta_cache.get(collection_id) or {}
+                publish_collection_assets_added(
+                    collection_id,
+                    [inventory_id],
+                    collection_name=_event_meta.get("name"),
+                    collection_type_id=_event_meta.get("collectionTypeId"),
+                    user_id=uploader_id or None,
+                    origin="ingest-portal",
+                )
             except (
                 Exception
             ) as item_err:  # noqa: BLE001 — failure isolation per item (Req 10.2, 10.5)

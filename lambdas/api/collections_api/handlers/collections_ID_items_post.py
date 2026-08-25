@@ -12,6 +12,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
 from collection_activity import record_collection_activity
+from collection_events import publish_collection_assets_added
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     create_error_response,
@@ -457,6 +458,18 @@ def register_route(app):
             # Record activity for the recent-collections tracker (Req 11.1)
             if added_items and user_id:
                 record_collection_activity(user_id, collection_id)
+
+            # Emit one batched CollectionAssetAdded referencing the distinct asset
+            # ids added in this call (clips of the same asset collapse to one id).
+            # Best-effort: never blocks the add-item response.
+            if added_items:
+                publish_collection_assets_added(
+                    collection_id,
+                    [item["assetId"] for item in added_items],
+                    collection_name=getattr(collection, "name", None),
+                    collection_type_id=getattr(collection, "collectionTypeId", None),
+                    user_id=user_id,
+                )
 
             from aws_lambda_powertools.event_handler import Response, content_types
 

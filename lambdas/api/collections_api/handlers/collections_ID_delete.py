@@ -9,6 +9,10 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
+from collection_events import (
+    publish_collection_child_removed,
+    publish_collection_deleted,
+)
 from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
@@ -291,6 +295,21 @@ def register_route(app):
                 unit=MetricUnit.Count,
                 value=total_deleted,
             )
+
+            # Publish lifecycle events for the deleted collection (and, when it
+            # was nested, signal that its parent lost a child). Best-effort.
+            publish_collection_deleted(
+                collection_id,
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
+                parent_id=parent_id,
+                items_deleted=total_deleted,
+            )
+            if parent_id:
+                publish_collection_child_removed(
+                    parent_id, collection_id, user_id=user_id
+                )
 
             return {
                 "success": True,

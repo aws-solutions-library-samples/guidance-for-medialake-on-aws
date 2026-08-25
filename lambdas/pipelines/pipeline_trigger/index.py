@@ -19,6 +19,11 @@ EXECUTION_COUNT_CACHE_TTL = 20  # seconds
 # Default State Machine ARN for EventBridge-style messages
 DEFAULT_STATE_MACHINE_ARN = os.environ["DEFAULT_STATE_MACHINE_ARN"]
 
+# Source used by every collection lifecycle event (see
+# common_libraries/collection_events.py). Collection events carry asset *ids*
+# rather than asset records, so they are expanded before starting executions.
+COLLECTION_EVENT_SOURCE = "custom.collection.processor"
+
 logger = Logger()
 tracer = Tracer()
 metrics = Metrics(namespace="PipelineTrigger")
@@ -92,14 +97,95 @@ def _count_running_executions(state_machine_arn):
     return total
 
 
-def start_execution_with_backoff(state_machine_arn, execution_input):
+def _sanitize_execution_name(raw: str) -> str:
+    """Coerce a string into a legal Step Functions execution name (<=80 chars)."""
+    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in raw)
+    return cleaned[:80].strip("-") or "collection-event"
+
+
+def _expand_execution_inputs(body):
+    """Turn one queued message into the execution inputs to start.
+
+    Non-collection events keep today's behaviour exactly: the matched event is
+    passed straight through as the state machine input.
+
+    Collection events are different. They deliberately carry only asset *ids*
+    (``detail.assetIds``) plus collection metadata, so passing the raw event
+    through would leave ``lambda_middleware`` treating the collection metadata
+    itself as the asset (its plain-EventBridge branch sets
+    ``payload.assets = [event["detail"]]``), and any asset-processing node would
+    fail on the missing ``DigitalSourceAsset``.
+
+    Instead each asset id is expanded into the *same* shape the manual/bin
+    trigger uses (``lambdas/api/pipelines/trigger_pipeline``)::
+
+        {"item": {"inventory_id": "asset:uuid:...", "params": {}}}
+
+    ``lambda_middleware`` already recognises ``item.inventory_id``: it fetches
+    the full record from the asset table and populates ``payload.assets``. So
+    collection-triggered pipelines reuse the existing hydration path and any
+    pipeline that works from the bin works from a collection trigger unchanged —
+    no hydration node and no conditional branch required.
+
+    One execution is started per asset (mirroring the bin's per-asset model), so
+    a bulk add fans out correctly. Execution names are derived from the event id
+    so an SQS redelivery is idempotent rather than duplicating work.
+
+    Returns:
+        List of ``(execution_input, execution_name_or_None)`` tuples.
+    """
+    if not isinstance(body, dict):
+        return [(body, None)]
+
+    detail = body.get("detail")
+    if body.get("source") != COLLECTION_EVENT_SOURCE or not isinstance(detail, dict):
+        return [(body, None)]
+
+    asset_ids = [a for a in (detail.get("assetIds") or []) if a]
+    if not asset_ids:
+        # Collection events that aren't about assets (CollectionCreated,
+        # CollectionDeleted, ...) have nothing to expand — pass them through so
+        # non-asset pipelines still see the raw event.
+        return [(body, None)]
+
+    collection_context = {
+        "collectionId": detail.get("collectionId"),
+        "collectionName": detail.get("collectionName"),
+        "collectionTypeId": detail.get("collectionTypeId"),
+    }
+    event_id = str(body.get("id") or "")
+
+    expanded = []
+    for index, asset_id in enumerate(asset_ids):
+        execution_input = {
+            "item": {"inventory_id": asset_id, "params": {}},
+            "trigger_type": "collection_event",
+            "detail_type": body.get("detail-type"),
+            "collection": collection_context,
+            "timestamp": detail.get("timestamp"),
+        }
+        name = (
+            _sanitize_execution_name(f"{event_id}-{index}")
+            if event_id
+            else None  # let Step Functions generate one
+        )
+        expanded.append((execution_input, name))
+    return expanded
+
+
+def start_execution_with_backoff(
+    state_machine_arn, execution_input, execution_name=None
+):
     """Start execution with exponential backoff on ThrottlingException."""
     for attempt in range(MAX_API_RETRIES):
         try:
-            return sfn_client.start_execution(
-                stateMachineArn=state_machine_arn,
-                input=json.dumps(execution_input),
-            )
+            params = {
+                "stateMachineArn": state_machine_arn,
+                "input": json.dumps(execution_input),
+            }
+            if execution_name:
+                params["name"] = execution_name
+            return sfn_client.start_execution(**params)
         except ClientError as e:
             if (
                 e.response["Error"]["Code"] == "ThrottlingException"
@@ -168,11 +254,48 @@ def lambda_handler(event, context):
                 continue
 
         try:
-            resp = start_execution_with_backoff(state_machine_arn, body)
-            logger.info("Started %s ", resp["executionArn"])
-            processed.append({"execution_arn": resp["executionArn"]})
-            # optimistic cache bump
-            execution_count_cache["count"] += 1
+            # One queued event can fan out to several executions (a collection
+            # add carrying multiple assetIds); everything else stays 1:1.
+            expanded = _expand_execution_inputs(body)
+            fanned_out = len(expanded) > 1
+            for execution_input, execution_name in expanded:
+                # The guard above only covered the first execution. A fan-out
+                # starts many from a single message, so the limit has to be
+                # re-checked per execution — otherwise a bulk collection add
+                # walks straight past MAX_CONCURRENT_EXECUTIONS and re-introduces
+                # the MediaConvert throttling this guard exists to prevent.
+                # The optimistic cache bump below keeps this from adding an API
+                # call per asset.
+                if fanned_out:
+                    running = get_running_executions_count(state_machine_arn)
+                    if running >= MAX_CONCURRENT_EXECUTIONS:
+                        logger.info(
+                            "Concurrency limit reached mid fan-out (%d/%d), "
+                            "message will be retried; executions already started "
+                            "are skipped on redelivery by their deterministic names",
+                            running,
+                            MAX_CONCURRENT_EXECUTIONS,
+                        )
+                        failures.append(record["messageId"])
+                        break
+                try:
+                    resp = start_execution_with_backoff(
+                        state_machine_arn, execution_input, execution_name
+                    )
+                except ClientError as inner:
+                    if inner.response["Error"]["Code"] == "ExecutionAlreadyExists":
+                        # Deterministic names make SQS redelivery a no-op rather
+                        # than a duplicate run.
+                        logger.info(
+                            "Execution %s already exists, skipping duplicate",
+                            execution_name,
+                        )
+                        continue
+                    raise
+                logger.info("Started %s ", resp["executionArn"])
+                processed.append({"execution_arn": resp["executionArn"]})
+                # optimistic cache bump
+                execution_count_cache["count"] += 1
 
         except ClientError as e:
             logger.error("Failed processing %s:", e)

@@ -11,6 +11,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
+from collection_events import publish_collection_shared
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -120,6 +121,16 @@ def register_route(app):
             logger.info(f"Collection {collection_id} shared with {target_id}")
             metrics.add_metric(
                 name="SuccessfulShareOperations", unit=MetricUnit.Count, value=1
+            )
+
+            # Emit CollectionShared so pipelines can react to new grants. Best-effort.
+            publish_collection_shared(
+                collection_id,
+                shared_with_user_id=target_id,
+                permission=role,
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=granter_id,
             )
 
             # Convert to dict for formatting

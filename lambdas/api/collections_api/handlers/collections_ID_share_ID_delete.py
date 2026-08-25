@@ -3,6 +3,7 @@
 import os
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
+from collection_events import publish_collection_share_removed
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -99,6 +100,15 @@ def register_route(app):
 
             logger.info(
                 f"Share removed for user {user_id} from collection {collection_id}"
+            )
+
+            # Emit CollectionShareRemoved so pipelines can react to revoked access.
+            publish_collection_share_removed(
+                collection_id,
+                shared_with_user_id=user_id,
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=caller_id,
             )
 
             return create_success_response(

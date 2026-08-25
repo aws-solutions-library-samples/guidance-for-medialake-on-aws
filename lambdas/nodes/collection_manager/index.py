@@ -24,16 +24,19 @@ from typing import Any, Dict, List
 
 import boto3
 from aws_lambda_powertools import Logger, Tracer
+from collection_events import (
+    publish_collection_assets_added,
+    publish_collection_created,
+    publish_collection_metadata_updated,
+)
 from lambda_middleware import lambda_middleware
 
 logger = Logger(service="collection-manager-node")
 tracer = Tracer(service="collection-manager-node")
 
 dynamodb = boto3.resource("dynamodb")
-events_client = boto3.client("events")
 
 COLLECTIONS_TABLE_NAME = os.environ.get("COLLECTIONS_TABLE_NAME", "")
-EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "default")
 
 COLLECTION_PK_PREFIX = "COLL#"
 METADATA_SK = "METADATA"
@@ -197,23 +200,6 @@ def _write_owner_relationship(
     )
 
 
-def _put_event(detail_type: str, detail: Dict[str, Any]) -> None:
-    """Publish an event to EventBridge so downstream consumers can react."""
-    try:
-        events_client.put_events(
-            Entries=[
-                {
-                    "Source": "medialake.pipeline.collection-manager",
-                    "DetailType": detail_type,
-                    "Detail": json.dumps(detail, default=str),
-                    "EventBusName": EVENT_BUS_NAME,
-                }
-            ]
-        )
-    except Exception as e:
-        logger.warning("Failed to publish EventBridge event", extra={"error": str(e)})
-
-
 @lambda_middleware(event_bus_name=os.getenv("EVENT_BUS_NAME", "default-event-bus"))
 @logger.inject_lambda_context
 @tracer.capture_lambda_handler
@@ -299,13 +285,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             },
         )
 
-        _put_event(
-            "CollectionCreated",
-            {
-                "collectionId": collection_id,
-                "name": collection_name,
-                "source": "pipeline-node",
-            },
+        publish_collection_created(
+            collection_id,
+            collection_name=collection_name,
+            collection_type_id=collection_type_id or None,
+            user_id=owner_id,
+            origin="pipeline-node",
         )
 
         return {
@@ -395,12 +380,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             },
         )
 
-        _put_event(
-            "CollectionUpdated",
-            {
-                "collectionId": collection_id,
-                "source": "pipeline-node",
-            },
+        publish_collection_metadata_updated(
+            collection_id,
+            collection_name=collection_name or None,
+            collection_type_id=collection_type_id or None,
+            user_id=owner_id or None,
+            updated_fields=list(attr_names.values()),
+            origin="pipeline-node",
         )
 
         return {
@@ -463,13 +449,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             extra={"collection_id": collection_id, "asset_count": len(added)},
         )
 
-        _put_event(
-            "CollectionItemsAdded",
-            {
-                "collectionId": collection_id,
-                "assetIds": added,
-                "source": "pipeline-node",
-            },
+        publish_collection_assets_added(
+            collection_id,
+            added,
+            collection_name=meta.get("name"),
+            collection_type_id=meta.get("collectionTypeId"),
+            user_id=owner_id or None,
+            origin="pipeline-node",
         )
 
         return {

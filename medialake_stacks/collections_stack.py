@@ -34,6 +34,9 @@ class CollectionsStackProps:
     # Internal application-service-events bus that delivers AssetDeleted events
     # so orphaned collection items can be cleaned up automatically.
     asset_events_bus: events.IEventBus
+    # Pipelines event bus — collection lifecycle events are published here so the
+    # "Collection Event" trigger node can start pipelines off them.
+    pipelines_event_bus: events.IEventBus
 
 
 class CollectionsStack(cdk.NestedStack):
@@ -74,6 +77,7 @@ class CollectionsStack(cdk.NestedStack):
                 asset_table=props.asset_table,
                 cognito_user_pool=props.cognito_user_pool,
                 asset_events_bus=props.asset_events_bus,
+                pipelines_event_bus=props.pipelines_event_bus,
             ),
         )
 

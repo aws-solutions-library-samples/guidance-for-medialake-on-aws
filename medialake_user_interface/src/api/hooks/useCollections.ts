@@ -905,6 +905,15 @@ export const useDeleteItemFromCollection = () => {
         const encodedItemId = encodeURIComponent(itemId);
         await apiClient.delete(`/collections/${collectionId}/items/${encodedItemId}`);
       } catch (error) {
+        // The API returns 404 when the item is not in the collection. The caller's
+        // intent (the item should not be there) is already satisfied, and this is
+        // reachable benignly from a double-click or a stale list, so treat it as
+        // success and let the cache invalidation below reconcile the view. Any
+        // other failure is still surfaced.
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          logger.info("Collection item already absent, treating removal as complete");
+          return;
+        }
         logger.error("Delete item from collection error:", error);
         showError("Failed to remove item from collection");
         throw error;

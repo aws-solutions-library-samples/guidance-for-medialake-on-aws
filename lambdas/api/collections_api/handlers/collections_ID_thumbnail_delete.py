@@ -10,6 +10,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
+from collection_events import publish_collection_thumbnail_removed
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -124,6 +125,17 @@ def register_route(app):
                     "thumbnailS3Key": None,
                     "updatedAt": current_timestamp,
                 },
+            )
+
+            # Emit CollectionThumbnailRemoved after the write-through, so a
+            # consumer reacting to the event cannot read a search document that
+            # still advertises the removed thumbnail. Matches the ordering already
+            # used by the thumbnail-post and patch handlers. Best-effort.
+            publish_collection_thumbnail_removed(
+                collection_id,
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
             )
 
             return {

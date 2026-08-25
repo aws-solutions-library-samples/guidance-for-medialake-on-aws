@@ -46,6 +46,7 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Attr
+from collection_events import publish_collection_assets_removed
 
 logger = Logger(service="collections-asset-cleanup")
 tracer = Tracer(service="collections-asset-cleanup")
@@ -159,6 +160,19 @@ def lambda_handler(event: Dict[str, Any], _context: LambdaContext) -> Dict[str, 
     metrics.add_metric(
         name="OrphanedCollectionItemsRemoved", unit=MetricUnit.Count, value=removed
     )
+
+    # Emit one CollectionAssetRemoved per affected collection so pipelines can
+    # react to the asset leaving a collection. This is a system-driven removal
+    # (the asset itself was deleted), so there is no acting user. The PK is
+    # COLL#{collection_id}; strip the prefix to recover the collection id.
+    # Best-effort: the publisher never raises, so it cannot fail the cleanup.
+    for pk in affected_collections:
+        collection_id = pk.split("#", 1)[1] if "#" in pk else pk
+        publish_collection_assets_removed(
+            collection_id,
+            [inventory_id],
+            origin="asset-cleanup",
+        )
 
     return {
         "removed": removed,

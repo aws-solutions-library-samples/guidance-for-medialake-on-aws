@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.21.0] - 2026-08-25
+
+### Features
+
+- feat: Collection Event trigger with collection-name filter ability
+
+### Bug Fixes
+
+- fix(collections): return 404 when the collection item is not present
+
 ## [1.20.0] - 2026-08-23
 
 ### Features

@@ -10,6 +10,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 )
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
+from collection_events import publish_collection_metadata_updated
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -168,6 +169,21 @@ def register_route(app):
                 os_updates["thumbnailValue"] = request_data.thumbnailValue
 
             update_collection_document(collection_id, os_updates)
+
+            # Emit a metadata-updated event listing exactly which fields changed
+            # (OpenSearch doc field names, minus the always-present updatedAt).
+            # Best-effort: never blocks the update response.
+            publish_collection_metadata_updated(
+                collection_id,
+                collection_name=(
+                    request_data.name
+                    if request_data.name is not None
+                    else getattr(collection, "name", None)
+                ),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
+                updated_fields=[k for k in os_updates if k != "updatedAt"],
+            )
 
             return {
                 "success": True,

@@ -9,6 +9,10 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.metrics import MetricUnit
 from aws_lambda_powertools.utilities.parser import ValidationError, parse
+from collection_events import (
+    publish_collection_child_added,
+    publish_collection_created,
+)
 from collections_utils import (
     CHILD_SK_PREFIX,
     COLLECTION_PK_PREFIX,
@@ -123,6 +127,10 @@ def register_route(app):
             # Execute transactional write
             # Create a proper Connection object for transactions
             connection = Connection(region=os.environ.get("AWS_REGION", "us-east-1"))
+            # Parent's name, captured from the record already read below so the
+            # CollectionChildAdded event can carry detail.collectionName (what
+            # collection-name trigger filters match on) without an extra read.
+            parent_name = None
             with TransactWrite(connection=connection) as transaction:
                 transaction.save(collection)
                 transaction.save(user_relationship)
@@ -149,6 +157,7 @@ def register_route(app):
                     # Increment parent's childCollectionCount and update timestamp
                     parent_pk = f"{COLLECTION_PK_PREFIX}{request_data.parentId}"
                     parent = CollectionModel.get(parent_pk, METADATA_SK)
+                    parent_name = getattr(parent, "name", None)
                     transaction.update(
                         parent,
                         actions=[
@@ -190,6 +199,27 @@ def register_route(app):
                 os_doc["tags"] = list(request_data.tags)
 
             index_collection(collection_id, os_doc)
+
+            # Publish collection lifecycle events to the pipelines event bus so
+            # the "Collection Event" trigger node can start pipelines. Best-effort:
+            # the publisher never raises, so it cannot break collection creation.
+            publish_collection_created(
+                collection_id,
+                collection_name=collection.name,
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
+                parent_id=request_data.parentId,
+                is_public=collection.isPublic,
+            )
+            if request_data.parentId:
+                # A nested collection was created — also signal the parent changed.
+                publish_collection_child_added(
+                    request_data.parentId,
+                    collection_id,
+                    collection_name=parent_name,
+                    child_collection_name=collection.name,
+                    user_id=user_id,
+                )
 
             # Format response - convert PynamoDB model to dict for formatting
             collection_dict = {

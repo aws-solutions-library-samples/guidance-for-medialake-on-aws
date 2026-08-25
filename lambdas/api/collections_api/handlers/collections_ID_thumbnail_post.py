@@ -13,6 +13,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.metrics import MetricUnit
+from collection_events import publish_collection_thumbnail_updated
 from collections_utils import (
     COLLECTION_PK_PREFIX,
     METADATA_SK,
@@ -191,6 +192,16 @@ def register_route(app):
                 # Explicitly clear prior asset references on upload/frame
                 os_updates["thumbnailValue"] = None
             update_collection_document(collection_id, os_updates)
+
+            # Emit CollectionThumbnailUpdated (covers both set and change, since
+            # the POST endpoint upserts the thumbnail). Best-effort.
+            publish_collection_thumbnail_updated(
+                collection_id,
+                thumbnail_type=source_type.value,
+                collection_name=getattr(collection, "name", None),
+                collection_type_id=getattr(collection, "collectionTypeId", None),
+                user_id=user_id,
+            )
 
             return {
                 "success": True,

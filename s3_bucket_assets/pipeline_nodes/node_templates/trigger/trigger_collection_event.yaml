@@ -1,0 +1,104 @@
+spec: v1.0.0
+node:
+  id: trigger_collection_event
+  title: Collection Event
+  description: >-
+    Trigger a pipeline when a collection changes — created, deleted, metadata
+    updated, an asset added or removed, shared/unshared, a child collection
+    added or removed, or its thumbnail updated/removed. Fires for changes from
+    the Collections API and from internal paths (the Collection Manager node,
+    portal uploads, and automatic cleanup when an asset is deleted). The event
+    detail carries collectionId, collectionName, collectionTypeId, and (for
+    asset add/remove) the affected assetIds. Collection events do not embed full
+    asset payloads; for asset add/remove the pipeline starts once per affected
+    asset with that asset already loaded, so media-processing nodes can run
+    directly. The other collection events concern no specific asset, so
+    asset-processing nodes do not apply to them.
+  version: 1.0.0
+  type: trigger
+  integration:
+    config:
+      aws_eventbridge:
+        aws_eventbridge_rule: collection_event_trigger
+        # The concrete pattern is built by build_collection_event_pattern() in
+        # post_pipelines/eventbridge.py from the node parameters below. Keeping
+        # source here ensures the deployer enters the YAML-pattern branch.
+        event_pattern:
+          source: ["custom.collection.processor"]
+          detail-type: ["${event_types}"]
+actions:
+  trigger:
+    summary: Trigger on collection events
+    description: >-
+      Start this pipeline when one of the selected collection events occurs.
+    operationId: triggerCollectionEvent
+    parameters:
+      - in: body
+        name: event_types
+        label: Event Types
+        description: >-
+          Which collection events start the pipeline. Leave empty to match every
+          collection event.
+        required: false
+        default:
+          - CollectionCreated
+          - CollectionDeleted
+          - CollectionMetadataUpdated
+          - CollectionAssetAdded
+          - CollectionAssetRemoved
+        schema:
+          type: select
+          multiple: true
+          options:
+            - label: "Collection Created"
+              value: "CollectionCreated"
+            - label: "Collection Deleted"
+              value: "CollectionDeleted"
+            - label: "Collection Metadata Updated"
+              value: "CollectionMetadataUpdated"
+            - label: "Asset Added to Collection"
+              value: "CollectionAssetAdded"
+            - label: "Asset Removed from Collection"
+              value: "CollectionAssetRemoved"
+            - label: "Collection Shared"
+              value: "CollectionShared"
+            - label: "Collection Share Removed"
+              value: "CollectionShareRemoved"
+            - label: "Child Collection Added"
+              value: "CollectionChildAdded"
+            - label: "Child Collection Removed"
+              value: "CollectionChildRemoved"
+            - label: "Collection Thumbnail Updated"
+              value: "CollectionThumbnailUpdated"
+            - label: "Collection Thumbnail Removed"
+              value: "CollectionThumbnailRemoved"
+      - in: body
+        name: collection_names
+        label: Collection Names
+        description: >-
+          Optional. Only start the pipeline for collections whose name matches.
+          Leave empty to match any collection. Enter one or more comma-separated
+          values: an exact name ("Marketing Assets"), a "starts with" pattern
+          using a trailing asterisk ("Marketing*"), or an asterisk anywhere for
+          wildcard matching ("*2026", "Q*Review"). Use \* for a literal
+          asterisk. Advanced: enter a raw EventBridge matcher as JSON — for
+          example {"suffix": "-archive"}, {"equals-ignore-case": "marketing"},
+          or {"anything-but": {"prefix": "tmp-"}}. Patterns are validated when
+          the pipeline is saved.
+        required: false
+        schema:
+          type: string
+      - in: body
+        name: Max Concurrent Executions
+        label: Max Concurrent Executions
+        required: false
+        default: 10
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+    connections:
+      incoming:
+        type: [any]
+      outgoing:
+        type: [any]
