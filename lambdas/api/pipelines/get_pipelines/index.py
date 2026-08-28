@@ -148,6 +148,12 @@ def extract_event_rule_info(pipeline: dict) -> dict:
                                 ct.strip().lower()
                                 for ct in content_types_param.split(",")
                             ]
+
+                    # Check for "Per Segment Execution" parameter
+                    per_segment_flag = parameters.get("Per Segment Execution")
+                    if per_segment_flag in (True, "true", "Enabled"):
+                        pipeline["per_segment_execution"] = True
+
                     break
 
         # Set supported content types for frontend
