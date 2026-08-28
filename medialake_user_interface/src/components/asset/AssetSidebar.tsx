@@ -544,8 +544,9 @@ const AssetVersions: React.FC<AssetVersionProps> = ({
 };
 
 /**
- * Per-segment workflow menu shown on each marker card. Lists pipelines whose
- * manual trigger has "Per Segment Execution" enabled and runs the selected one
+ * Per-segment workflow menu shown on each marker card. Lists pipelines that
+ * have `per_segment_execution: true` (set by the BE based on the trigger
+ * node's "Per Segment Execution" parameter) and runs the selected one
  * against this segment's time range (passed as start_time/end_time params).
  * Renders nothing when the feature is unavailable or there are no eligible
  * pipelines. Gated by the caller via the segment-workflows feature flag.
@@ -720,7 +721,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
-  // Per-segment workflows: list manual-trigger pipelines flagged for per-segment
+  // Per-segment workflows: list pipelines flagged by the backend for per-segment
   // execution so each marker card can launch one against its own time range.
   // Gated behind a feature flag; the pipelines query is skipped when disabled.
   const segmentWorkflowsEnabled = useFeatureFlag("segment-workflows-enabled", false);
@@ -729,15 +730,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   });
   const perSegmentPipelines = useMemo(() => {
     if (!segmentWorkflowsEnabled || !segmentPipelinesData?.data?.s) return [];
-    return segmentPipelinesData.data.s.filter((pipeline: any) => {
-      if (!pipeline.type?.includes("Manual Trigger")) return false;
-      // The list API returns the graph under definition.configuration.nodes;
-      // fall back to definition.nodes for any older/transformed payloads.
-      const nodes = pipeline.definition?.configuration?.nodes ?? pipeline.definition?.nodes ?? [];
-      const triggerNode = nodes.find((n: any) => n.data?.nodeId === "trigger_manual");
-      const flag = triggerNode?.data?.configuration?.parameters?.["Per Segment Execution"];
-      return flag === true || flag === "true" || flag === "Enabled";
-    });
+    return segmentPipelinesData.data.s.filter(
+      (pipeline: any) => pipeline.per_segment_execution === true
+    );
   }, [segmentWorkflowsEnabled, segmentPipelinesData]);
 
   // State to track editable marker names
