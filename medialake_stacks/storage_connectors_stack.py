@@ -70,11 +70,17 @@ class StorageConnectorsStack(cdk.NestedStack):
             self,
             "PersonalAssetsBucket",
             props=S3BucketProps(
-                bucket_name=(
-                    f"{config.resource_prefix}-personal-assets-"
-                    f"{config.account_id[:7]}-{config.primary_region}-"
-                    f"{config.environment}"
-                ).lower(),
+                # Name is built by CDKConfig so the unique/legacy choice lives in
+                # one place and is unit-testable without synthesizing this stack.
+                #
+                # Defaults to the globally-unique form (full account id). An
+                # existing deployment created before that default landed MUST set
+                # `unique_personal_assets_bucket_name: false` in config.json —
+                # BucketName forces replacement and this bucket is
+                # destroy_on_delete, so changing the name deletes the old bucket
+                # and every personal asset in it. See the flag's definition in
+                # config.py for the full explanation.
+                bucket_name=config.personal_assets_bucket_name,
                 destroy_on_delete=True,
                 versioned=False,
                 cors=[

@@ -276,6 +276,13 @@ Key configuration parameters include:
     - After deployment, you must create a DNS CNAME or Alias record pointing your domain to the CloudFront distribution domain
   - **Note**: This configuration is entirely optional. If omitted, MediaLake will use the default CloudFront domain name
 - **use_prefixed_names** (optional): Set to `true` for additional deployments in the same account/region. When enabled, all CloudFormation stack names, SSM parameters, and exports are prefixed with `resource_prefix` and `environment` to avoid collisions. Defaults to `false` for backward compatibility with existing deployments.
+- **unique_personal_assets_bucket_name** (optional): Controls how much of the AWS account ID appears in the personal-assets S3 bucket name. Defaults to `true`, which uses the full account ID and makes the name globally unique.
+
+  > ⚠️ **Existing deployments must set this to `false`.** If your deployment was created before this option existed, its bucket name contains only the first 7 digits of the account ID. `BucketName` forces resource replacement in CloudFormation and this bucket is created with `destroy_on_delete`, so letting the name change will **delete the existing bucket and every personal asset stored in it**. Set `"unique_personal_assets_bucket_name": false` in `config.json` before your next deploy to keep the current bucket.
+  >
+  > To check which form you are on, read the SSM parameter `/medialake/<environment>/personal-assets-bucket-name` (or `/<resource_prefix>/<environment>/...` when `use_prefixed_names` is enabled). If the segment after `-personal-assets-` is 7 digits rather than 12, you need `false`.
+  >
+  > New deployments should leave this at `true`. The 7-digit form does not contain enough of the account ID to guarantee global uniqueness: another AWS account whose ID shares those 7 digits and that deploys the same `resource_prefix`, region, and `environment` produces an identical bucket name, and your deployment then fails with `BucketAlreadyExists` — unrecoverably, since the name is owned by an account you cannot access.
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSnackbar } from "notistack";
 import {
   Box,
   Typography,
@@ -10,17 +11,19 @@ import {
   Tooltip,
   CircularProgress,
   Chip,
-  Select,
-  MenuItem,
-  FormControl,
   Collapse,
+  Button,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, type Theme } from "@mui/material/styles";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+// Quick Access is disabled for now — see the commented-out block below.
+// import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import CreateNewFolderOutlinedIcon from "@mui/icons-material/CreateNewFolderOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import AudiotrackOutlinedIcon from "@mui/icons-material/AudiotrackOutlined";
@@ -28,6 +31,25 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import { useRightSidebar } from "./SidebarContext";
 import { useGetPipelinesOptional } from "@/features/pipelines/api/pipelinesController";
 import { useActionPermission } from "@/permissions/hooks/useActionPermission";
+import { useCollectionAssetPermissions } from "@/permissions/hooks/useCollectionAssetPermissions";
+import {
+  useAddItemToCollection,
+  resolveAddedCount,
+  type AddCollectionItemSpec,
+} from "@/api/hooks/useCollections";
+import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
+import WorkflowPickerModal, {
+  type WorkflowPickerItem,
+} from "@/components/pipelines/WorkflowPickerModal";
+import { segmentToClipBoundary } from "@/hooks/useAssetSelection";
+import { useRecentBinActions } from "@/hooks/useRecentBinActions";
+import { accentColor, type AccentRole } from "@/theme/accessibleAccent";
+
+/**
+ * How many entries the Quick Access row shows, across both kinds.
+ * Unused while Quick Access is commented out below.
+ */
+// const QUICK_ACCESS_LIMIT = 3;
 
 interface BatchOperationsProps {
   selectedAssets: Array<{
@@ -78,6 +100,17 @@ const displayNameFor = (asset: {
       )})`
     : asset.name;
 
+/**
+ * A collection that has been deleted (or unshared) still lives in the recents
+ * store until we learn otherwise. The API answers 404 in that case, which is
+ * our signal to drop the stale shortcut rather than leave a chip that can never
+ * succeed.
+ */
+const isNotFoundError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  (error as { response?: { status?: number } }).response?.status === 404;
+
 const BatchOperations: React.FC<BatchOperationsProps> = ({
   selectedAssets,
   onBatchDelete,
@@ -93,12 +126,16 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
 }) => {
   const { t } = useTranslation();
   const { setHasSelectedItems } = useRightSidebar();
-  const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
+  const { enqueueSnackbar } = useSnackbar();
   const [collapsedTypes, setCollapsedTypes] = useState<Record<string, boolean>>({});
 
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
+  const [isAddingToCollection, setIsAddingToCollection] = useState(false);
+
   // Pipelines are an optional add-on in the sidebar: everything else here
-  // (download, delete, the selected-items list) must keep working for users who
-  // have no pipeline access at all.
+  // (download, delete, collections, the selected-items list) must keep working
+  // for users who have no pipeline access at all.
   //
   // Running a pipeline on the selection needs BOTH:
   //   - list  → GET  /pipelines                        → pipelines:view → can("view", "pipeline")
@@ -119,13 +156,24 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   // bounce the user to /access-denied, so hide the button instead.
   const canDownload = useActionPermission("download", "asset").allowed;
 
+  // POST /collections/{id}/items accepts `collections:add_assets` OR the broader
+  // `collections:edit`; this hook encodes that same OR so the button only shows
+  // when the request would actually be authorized.
+  const { canAdd: canAddToCollections } = useCollectionAssetPermissions();
+
   // `canDelete` is supplied by the parent (it already derives it from
   // useActionPermission("delete", "asset")) so per-page overrides keep working.
-  const hasQuickActions = canDownload || canDelete;
 
   const { data: pipelinesData, isLoading: isPipelinesLoading } = useGetPipelinesOptional({
     enabled: canUsePipelines,
   });
+
+  // Only `recordUse` is live: usage is still recorded so the commented-out Quick
+  // Access row works the moment it is switched back on. `recents` and `forget`
+  // are read by that block alone, so they are left out of the destructure until
+  // then rather than sitting here unused.
+  const { recordUse } = useRecentBinActions();
+  const addItemToCollectionMutation = useAddItemToCollection();
 
   // Filter manual pipelines based on selected asset types
   const filteredManualPipelines = useMemo(() => {
@@ -156,17 +204,47 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     });
   }, [pipelinesData, selectedAssets]);
 
-  const handlePipelineRun = () => {
-    if (!canUsePipelines || !selectedPipelineId) return;
-    const pipeline = filteredManualPipelines.find((p) => p.id === selectedPipelineId);
-    if (!pipeline) return;
+  /** Eligible workflows in the narrow shape the picker and menus need. */
+  const availableWorkflows = useMemo<WorkflowPickerItem[]>(
+    () =>
+      filteredManualPipelines.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        createdAt: p.createdAt,
+      })),
+    [filteredManualPipelines]
+  );
 
-    if (onBatchPipelineExecutionRequest) {
-      onBatchPipelineExecutionRequest(pipeline.id, pipeline.name);
-    } else if (onBatchPipelineExecution) {
-      onBatchPipelineExecution(pipeline.id);
-    }
-  };
+  /**
+   * Quick Access — DISABLED FOR NOW.
+   *
+   * Kept intact (rather than deleted) so it can be switched back on: it is the
+   * MRU across both kinds, filtered down to entries the user can actually act on
+   * right now — collections need add permission, workflows need pipeline
+   * permission *and* must still exist and accept the selected asset types, since
+   * a shortcut that would fail on click is worse than no shortcut.
+   *
+   * The recents store itself stays in use: the Workflow and Collection dropdowns
+   * below still read from it.
+   */
+  // const quickAccess = useMemo(() => {
+  //   const workflowsById = new Map(availableWorkflows.map((w) => [w.id, w]));
+  //   return recents
+  //     .filter((entry) => {
+  //       if (entry.kind === "collection") return canAddToCollections;
+  //       return canUsePipelines && workflowsById.has(entry.id);
+  //     })
+  //     .slice(0, QUICK_ACCESS_LIMIT)
+  //     .map((entry) => ({
+  //       ...entry,
+  //       // Prefer the live name for workflows — a rename should be reflected.
+  //       name:
+  //         entry.kind === "workflow"
+  //           ? (workflowsById.get(entry.id)?.name ?? entry.name)
+  //           : entry.name,
+  //     }));
+  // }, [recents, availableWorkflows, canAddToCollections, canUsePipelines]);
 
   // Update selected items state
   React.useEffect(() => {
@@ -219,28 +297,225 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     setCollapsedTypes((prev) => ({ ...prev, [type]: !prev[type] }));
   };
 
+  const runWorkflow = useCallback(
+    (workflow: WorkflowPickerItem) => {
+      if (!canUsePipelines) return;
+      recordUse("workflow", workflow.id, workflow.name);
+      setIsWorkflowModalOpen(false);
+
+      // Prefer the confirm-dialog path so the user still gets the execution
+      // options (output packaging) they'd get from the old select-and-run row.
+      if (onBatchPipelineExecutionRequest) {
+        onBatchPipelineExecutionRequest(workflow.id, workflow.name);
+      } else {
+        onBatchPipelineExecution?.(workflow.id);
+      }
+    },
+    [canUsePipelines, recordUse, onBatchPipelineExecutionRequest, onBatchPipelineExecution]
+  );
+
+  /**
+   * Add the whole selection to a collection in one request.
+   *
+   * Segment (clip) entries carry their own boundary so a bin holding both a full
+   * asset and two of its clips stores three distinct items — the same rule the
+   * bulk-download path follows. Throws on failure so the modal can surface the
+   * message inline; the menu/chip callers catch it themselves.
+   */
+  const addSelectionToCollection = useCallback(
+    async (collectionId: string, collectionName?: string) => {
+      if (!canAddToCollections || selectedAssets.length === 0) return;
+
+      const items: AddCollectionItemSpec[] = selectedAssets.map((asset) => ({
+        assetId: asset.inventoryID || asset.id,
+        clipBoundary: asset.segment ? segmentToClipBoundary(asset.segment) : undefined,
+      }));
+
+      setIsAddingToCollection(true);
+      try {
+        const response = await addItemToCollectionMutation.mutateAsync({
+          collectionId,
+          data: { items },
+        });
+
+        const label =
+          collectionName?.trim() || t("common.batchOperations.collection", "Collection");
+        recordUse("collection", collectionId, label);
+
+        const added = resolveAddedCount(response, { items });
+        const alreadyPresent = response?.data?.alreadyPresentCount ?? 0;
+
+        // The add endpoint is quiet on its own, and the modal closes on success,
+        // so without this the user gets no confirmation that anything happened.
+        if (added > 0) {
+          enqueueSnackbar(
+            t("common.batchOperations.addedToCollection", "Added {{count}} to {{name}}", {
+              count: added,
+              name: label,
+            }),
+            { variant: "success" }
+          );
+        } else {
+          enqueueSnackbar(
+            t("common.batchOperations.alreadyInCollection", "{{count}} already in {{name}}", {
+              count: alreadyPresent || items.length,
+              name: label,
+            }),
+            { variant: "info" }
+          );
+        }
+      } finally {
+        setIsAddingToCollection(false);
+      }
+    },
+    [
+      canAddToCollections,
+      selectedAssets,
+      addItemToCollectionMutation,
+      recordUse,
+      enqueueSnackbar,
+      t,
+    ]
+  );
+
+  // Shortcut path for acting on a remembered target without opening the picker.
+  // Disabled with Quick Access below; the pickers are the only live entry points.
+  // /** Menu/chip path: swallow the error (the hook already surfaced it) and drop dead shortcuts. */
+  // const addToCollectionShortcut = useCallback(
+  //   async (collectionId: string, collectionName: string) => {
+  //     try {
+  //       await addSelectionToCollection(collectionId, collectionName);
+  //     } catch (error) {
+  //       if (isNotFoundError(error)) {
+  //         forget("collection", collectionId);
+  //       }
+  //     }
+  //   },
+  //   [addSelectionToCollection, forget]
+  // );
+
+  // Quick Access click handler — disabled along with the row above.
+  // const handleQuickAccessClick = useCallback(
+  //   (entry: { kind: "collection" | "workflow"; id: string; name: string }) => {
+  //     if (entry.kind === "workflow") {
+  //       const workflow = availableWorkflows.find((w) => w.id === entry.id);
+  //       if (workflow) runWorkflow(workflow);
+  //       return;
+  //     }
+  //     void addToCollectionShortcut(entry.id, entry.name);
+  //   },
+  //   [availableWorkflows, runWorkflow, addToCollectionShortcut]
+  // );
+
   if (selectedAssets.length === 0) {
     return null;
   }
 
   const hasPipelines = filteredManualPipelines.length > 0;
+  // The workflow control is only meaningful when there is (or may still be) a
+  // compatible pipeline to run — otherwise the picker would open empty, so the
+  // control is omitted rather than shown dead.
+  const showWorkflowAction = canUsePipelines && (hasPipelines || isPipelinesLoading);
+
+  // Two explicit rows: the "choose a target" actions, then the direct actions.
+  const pickerRowCount = (showWorkflowAction ? 1 : 0) + (canAddToCollections ? 1 : 0);
+  const directRowCount = (canDownload ? 1 : 0) + (canDelete ? 1 : 0);
+  const hasAnyAction = pickerRowCount + directRowCount > 0;
+
+  const workflowsBusy = isPipelineExecutionLoading;
+  const collectionsBusy = isAddingToCollection;
+
+  /**
+   * One action, one button, one click — it opens the relevant picker modal.
+   *
+   * There used to be a dropdown arrow next to the label offering recent targets.
+   * It cost ~28px of every control, which is what forced labels to ellipsise
+   * ("Wo…" / "Col…") when several shared a row. The shortcut lists live inside the
+   * modals instead, so the full label always has room: two controls fit a row at
+   * the 375px default and each still reads correctly at the 275px drag minimum.
+   */
+  const renderAction = (opts: {
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    /** Palette entry driving text/border/hover tint. */
+    paletteKey: AccentRole;
+    onClick: () => void;
+    busy: boolean;
+    disabled?: boolean;
+    testId: string;
+  }) => (
+    <Button
+      key={opts.key}
+      variant="outlined"
+      size="small"
+      onClick={opts.onClick}
+      disabled={opts.busy || opts.disabled}
+      data-testid={opts.testId}
+      startIcon={opts.busy ? <CircularProgress size={14} color="inherit" /> : opts.icon}
+      sx={(theme) => {
+        const c = accentColor(theme, opts.paletteKey);
+        const isDark = theme.palette.mode === "dark";
+        return {
+          // 130px basis: with ~38px of chrome (borders, padding, icon) two
+          // controls share a row at the default width with ~129px for the label —
+          // more than the longest translation needs (pt "Fluxo de trabalho" ≈
+          // 93px). At the 275px minimum the pair no longer fits, so the row wraps
+          // to one full-width control each rather than truncating.
+          flex: "1 1 130px",
+          minWidth: 0,
+          px: 1,
+          py: 0.6,
+          justifyContent: "flex-start",
+          textTransform: "none",
+          fontSize: "0.78rem",
+          fontWeight: 600,
+          borderRadius: 2,
+          color: c,
+          // Borders are non-text UI, so they answer to WCAG 1.4.11 (3:1) rather
+          // than 4.5:1. The old 0.4 alpha measured ~1.9:1 in light mode and
+          // ~1.8:1 in dark — effectively invisible outlines. Measured minimums to
+          // reach 3:1 are 0.75 light / 0.60 dark, so both are set a touch above.
+          borderColor: alpha(c, isDark ? 0.7 : 0.8),
+          // Kept shallow on purpose: every percent of tint lightens the surface
+          // and eats into the label's contrast ratio.
+          bgcolor: alpha(c, 0.04),
+          "&:hover": {
+            borderColor: c,
+            bgcolor: alpha(c, 0.1),
+          },
+          // Keyboard users get an explicit ring: the tinted hover background
+          // alone is far too subtle to serve as a focus indicator.
+          "&.Mui-focusVisible": {
+            outline: `2px solid ${c}`,
+            outlineOffset: 2,
+          },
+          "& .MuiButton-startIcon": { mr: 0.5, ml: 0 },
+          "& .MuiButton-startIcon > *:first-of-type": { fontSize: 16 },
+        };
+      }}
+    >
+      <Box
+        component="span"
+        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
+        {opts.label}
+      </Box>
+    </Button>
+  );
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* ── Header: count + quick actions ── */}
+      {/* ── Header: count + clear ── */}
       <Box
         sx={{
           px: 2,
           pt: 2,
-          pb: 1.5,
+          pb: 1.25,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 1,
-          // Keep the header the same height whether or not any action icons are
-          // permitted, so the sidebar's vertical rhythm doesn't shift between
-          // users with different permissions. 30px === IconButton size="small".
-          minHeight: (theme) => `calc(30px + ${theme.spacing(3.5)})`,
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
@@ -260,157 +535,135 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             {t("common.clear")}
           </Typography>
         </Box>
-
-        {/* Compact action icons — omitted entirely when the user has none, so no
-            empty flex child is left behind pushing the layout around. */}
-        {hasQuickActions && (
-          <Box sx={{ display: "flex", gap: 0.25, flexShrink: 0 }}>
-            {canDownload && (
-              <Tooltip title={t("common.actions.downloadSelected")} arrow>
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label={t("common.actions.downloadSelected")}
-                    data-testid="batch-download-button"
-                    onClick={() => onBatchDownload?.()}
-                    disabled={isDownloadLoading || !onBatchDownload}
-                    sx={{
-                      color: "text.secondary",
-                      "&:hover": {
-                        color: "primary.main",
-                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
-                      },
-                    }}
-                  >
-                    {isDownloadLoading ? (
-                      <CircularProgress size={18} />
-                    ) : (
-                      <FileDownloadOutlinedIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-            )}
-            {canDelete && (
-              <Tooltip title={t("common.batchOperations.deleteSelected")} arrow>
-                <span>
-                  <IconButton
-                    size="small"
-                    aria-label={t("common.batchOperations.deleteSelected")}
-                    data-testid="batch-delete-button"
-                    onClick={() => onBatchDelete?.()}
-                    disabled={isDeleteLoading || !onBatchDelete}
-                    sx={{
-                      color: "text.secondary",
-                      "&:hover": {
-                        color: "error.main",
-                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
-                      },
-                    }}
-                  >
-                    {isDeleteLoading ? (
-                      <CircularProgress size={18} />
-                    ) : (
-                      <DeleteOutlineIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                </span>
-              </Tooltip>
-            )}
-          </Box>
-        )}
       </Box>
 
-      {/* ── Pipeline execution row (only for users who can list AND run pipelines) ── */}
-      {canUsePipelines && (hasPipelines || isPipelinesLoading) && (
-        <Box
-          sx={{
-            mx: 2,
-            mb: 1.5,
-            p: 1.25,
-            borderRadius: 2,
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
-            border: "1px solid",
-            borderColor: (theme) => alpha(theme.palette.primary.main, 0.12),
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              display: "block",
-              mb: 0.75,
-              fontWeight: 600,
-              color: "text.secondary",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              fontSize: "0.65rem",
-            }}
-          >
-            {t("common.batchOperations.runPipeline")}
-          </Typography>
-          <Box sx={{ display: "flex", gap: 0.75, alignItems: "center" }}>
-            <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
-              <Select
-                value={selectedPipelineId}
-                onChange={(e) => setSelectedPipelineId(e.target.value)}
-                displayEmpty
-                disabled={isPipelinesLoading || filteredManualPipelines.length === 0}
-                sx={{
-                  fontSize: "0.8125rem",
-                  bgcolor: "background.paper",
-                  "& .MuiSelect-select": {
-                    py: 0.75,
-                    px: 1.25,
-                  },
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: (theme) => alpha(theme.palette.divider, 0.6),
-                  },
-                }}
-              >
-                <MenuItem value="" disabled>
-                  <Typography variant="body2" color="text.secondary">
-                    {isPipelinesLoading
-                      ? t("common.batchOperations.pipelineLoading")
-                      : t("common.batchOperations.selectPipeline")}
-                  </Typography>
-                </MenuItem>
-                {filteredManualPipelines.map((pipeline) => (
-                  <MenuItem key={pipeline.id} value={pipeline.id}>
-                    <Typography variant="body2" noWrap>
-                      {pipeline.name}
-                    </Typography>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Tooltip title={t("common.actions.executePipeline")} arrow>
-              <span>
-                <IconButton
+      {/* ── Quick Access: DISABLED FOR NOW ──
+          Most recently used collections / workflows as one-click chips. Left in
+          place so it can be re-enabled without rebuilding it; the recents store
+          it reads from is still used by the dropdowns below.
+
+      {quickAccess.length > 0 && (
+        <Box sx={{ px: 2, pb: 1.25 }} data-testid="bin-quick-access">
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
+            <StarRoundedIcon sx={{ fontSize: 15, color: "warning.main" }} />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 600,
+                color: "text.secondary",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                fontSize: "0.65rem",
+              }}
+            >
+              {t("common.batchOperations.quickAccess", "Quick Access")}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+            {quickAccess.map((entry) => {
+              const paletteKey = entry.kind === "collection" ? "secondary" : "primary";
+              const busy = entry.kind === "collection" ? collectionsBusy : workflowsBusy;
+              return (
+                <Chip
+                  key={`${entry.kind}:${entry.id}`}
                   size="small"
-                  onClick={handlePipelineRun}
-                  disabled={!selectedPipelineId || isPipelineExecutionLoading}
+                  clickable
+                  disabled={busy}
+                  onClick={() => handleQuickAccessClick(entry)}
+                  icon={
+                    entry.kind === "collection" ? (
+                      <FolderOutlinedIcon sx={{ fontSize: 14 }} />
+                    ) : (
+                      <AccountTreeOutlinedIcon sx={{ fontSize: 14 }} />
+                    )
+                  }
+                  label={entry.name}
                   sx={{
-                    bgcolor: "primary.main",
-                    color: "primary.contrastText",
-                    width: 32,
-                    height: 32,
-                    flexShrink: 0,
-                    "&:hover": { bgcolor: "primary.dark" },
-                    "&.Mui-disabled": {
-                      bgcolor: "action.disabledBackground",
-                      color: "action.disabled",
+                    maxWidth: "100%",
+                    height: 26,
+                    fontSize: "0.73rem",
+                    fontWeight: 500,
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: (theme) => alpha(theme.palette[paletteKey].main, 0.35),
+                    bgcolor: (theme) => alpha(theme.palette[paletteKey].main, 0.06),
+                    color: `${paletteKey}.main`,
+                    "& .MuiChip-icon": { color: `${paletteKey}.main`, ml: 0.75 },
+                    "&:hover": {
+                      bgcolor: (theme) => alpha(theme.palette[paletteKey].main, 0.14),
                     },
                   }}
-                >
-                  {isPipelineExecutionLoading ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    <PlayArrowRoundedIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
+                />
+              );
+            })}
           </Box>
+        </Box>
+      )}
+      ── end Quick Access ── */}
+
+      {/* ── Primary actions ── */}
+      {hasAnyAction && (
+        <Box sx={{ px: 2, pb: 1.25, display: "flex", flexDirection: "column", gap: 1 }}>
+          {/* Row 1 — pick a target: both open a picker modal. */}
+          {pickerRowCount > 0 && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }} data-testid="bin-picker-row">
+              {showWorkflowAction &&
+                renderAction({
+                  key: "workflow",
+                  label: t("common.batchOperations.workflow", "Workflow"),
+                  icon: <AccountTreeOutlinedIcon />,
+                  paletteKey: "primary",
+                  onClick: () => setIsWorkflowModalOpen(true),
+                  busy: workflowsBusy,
+                  testId: "batch-workflow-button",
+                })}
+
+              {canAddToCollections &&
+                renderAction({
+                  key: "collection",
+                  label: t("common.batchOperations.collection", "Collection"),
+                  icon: <CreateNewFolderOutlinedIcon />,
+                  paletteKey: "secondary",
+                  onClick: () => setIsCollectionModalOpen(true),
+                  busy: collectionsBusy,
+                  testId: "batch-collection-button",
+                })}
+            </Box>
+          )}
+
+          {/* Row 2 — act on the selection directly, no modal in between.
+              Delete keeps error styling so it stays visually distinct from
+              Download despite sharing the row. */}
+          {directRowCount > 0 && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }} data-testid="bin-direct-row">
+              {canDownload &&
+                renderAction({
+                  key: "download",
+                  label: t("common.actions.download", "Download"),
+                  icon: <FileDownloadOutlinedIcon />,
+                  // Neutral would be ideal for a tertiary action, but paired with
+                  // Delete on one row the two need to read as clearly different
+                  // things, so Download takes the theme primary.
+                  paletteKey: "primary",
+                  onClick: () => onBatchDownload?.(),
+                  busy: isDownloadLoading,
+                  disabled: !onBatchDownload,
+                  testId: "batch-download-button",
+                })}
+
+              {canDelete &&
+                renderAction({
+                  key: "delete",
+                  label: t("common.actions.delete", "Delete"),
+                  icon: <DeleteOutlineIcon />,
+                  paletteKey: "error",
+                  onClick: () => onBatchDelete?.(),
+                  busy: isDeleteLoading,
+                  disabled: !onBatchDelete,
+                  testId: "batch-delete-button",
+                })}
+            </Box>
+          )}
         </Box>
       )}
 
@@ -549,7 +802,10 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                             sx: {
                               fontSize: "0.7rem",
                               fontWeight: 600,
-                              color: "primary.main",
+                              // Same reasoning as the action buttons: primary.main
+                              // only reaches 2.68:1 on the dark paper, so the clip
+                              // timecode was as unreadable as the labels were.
+                              color: (theme: Theme) => accentColor(theme, "primary"),
                               fontVariantNumeric: "tabular-nums",
                             },
                           }}
@@ -563,6 +819,32 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
           );
         })}
       </Box>
+
+      {/* ── Modals ── */}
+      {canUsePipelines && (
+        <WorkflowPickerModal
+          open={isWorkflowModalOpen}
+          onClose={() => setIsWorkflowModalOpen(false)}
+          workflows={availableWorkflows}
+          isLoading={isPipelinesLoading}
+          selectedCount={selectedAssets.length}
+          onRun={runWorkflow}
+          isRunning={isPipelineExecutionLoading}
+        />
+      )}
+
+      {canAddToCollections && isCollectionModalOpen && (
+        <AddToCollectionModal
+          open={isCollectionModalOpen}
+          onClose={() => setIsCollectionModalOpen(false)}
+          assetId={selectedAssets[0]?.inventoryID || selectedAssets[0]?.id || ""}
+          assetName={t("common.batchOperations.itemsSelected", "{{count}} selected", {
+            count: selectedAssets.length,
+          })}
+          assetType={selectedAssets[0]?.type || ""}
+          onAddToCollection={addSelectionToCollection}
+        />
+      )}
     </Box>
   );
 };

@@ -38,7 +38,7 @@
     "@uppy/core": "^5.0.0",
     "@uppy/dashboard": "^5.0.0",
     "@uppy/react": "^5.0.0",
-    "@xyflow/react": "^12.6.0",
+    "@xyflow/react": "12.10.1",
     "amazon-cognito-identity-js": "^6.3.12",
     "aws-amplify": "^6.15.7",
     "axios": "^1.7.7",
@@ -100,6 +100,9 @@
     "vite": "^7.3.0",
     "vitest": "^4.0.17",
     "vitest-axe": "^0.1.0"
+  },
+  "overrides": {
+    "@xyflow/system": "0.0.75"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx,js,jsx,json,css,scss}": [

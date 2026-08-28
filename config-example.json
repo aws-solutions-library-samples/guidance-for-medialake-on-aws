@@ -43,6 +43,7 @@
   "resource_application_tag": "medialake",
   "resource_prefix": "medialake",
   "use_prefixed_names": false,
+  "unique_personal_assets_bucket_name": true,
   "cloudfront_custom_domain": {
     "domain_name": "medialake.example.com",
     "certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"

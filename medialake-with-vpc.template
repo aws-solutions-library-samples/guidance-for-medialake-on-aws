@@ -716,14 +716,14 @@ Resources:
             build:
               commands:
                 - cd $CODEBUILD_SRC_DIR/$CDK_DIR
-                # Start frontend build in background
-                - |
-                  (
-                    echo "Building frontend"
-                    cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
-                    if [ -f "package.json" ]; then npm run build; fi
-                  ) &
-                  FRONTEND_PID=$!
+                # The frontend is built synchronously further down, just before it is
+                # staged into assets/dist. It used to start here as a background job,
+                # but each buildspec command runs as its own script, so the later
+                # `wait $FRONTEND_PID` was always reaching for a pid that was not its
+                # child ("wait: pid N is not a child of this shell") and always
+                # reported failure. Building it where its exit status is actually
+                # observable costs the small overlap with the native layer builds and
+                # removes the whole class of bug.
                 # Build native layers in parallel (skip if cached)
                 - |
                   echo "Building native layers in parallel..."
@@ -763,12 +763,47 @@ Resources:
                 - python3 .cicd/build_lambdas.py build
                 # Wait for frontend build to finish
                 - |
-                  wait $FRONTEND_PID || (echo "Frontend build failed" && exit 1)
+                  # Build the frontend here, synchronously, so its exit status belongs to
+                  # this block and a failure stops the build.
+                  #
+                  # Two bugs previously cancelled each other out and shipped an empty
+                  # UI with a green pipeline: `wait $FRONTEND_PID` always failed because
+                  # the background job was started by a different script and was not
+                  # this shell's child, and the `|| ( ... exit 1 )` that was meant to
+                  # catch it only exited the subshell, so the block continued, and
+                  # fabricated an empty build directory. Both are gone: the build is
+                  # synchronous, and every failure path below exits this block.
+                  echo "Building frontend"
+                  if [ ! -f "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/package.json" ]; then
+                    echo "No package.json in $FRONTEND_DIR - cannot build the frontend"
+                    exit 1
+                  fi
+                  if ! ( cd "$CODEBUILD_SRC_DIR/$FRONTEND_DIR" && npm run build ); then
+                    echo "Frontend build failed"
+                    exit 1
+                  fi
                   export BUILD_DIR=$(cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR && if [ -d "build" ]; then echo "build"; elif [ -d "dist" ]; then echo "dist"; else find . -maxdepth 2 -type d -name "build" -o -name "dist" | head -1 | xargs basename; fi)
-                  if [ -z "$BUILD_DIR" ]; then echo "Could not find build output directory, creating empty one"; mkdir -p $CODEBUILD_SRC_DIR/$FRONTEND_DIR/build; export BUILD_DIR="build"; fi
+                  if [ -z "$BUILD_DIR" ]; then
+                    echo "Frontend build produced no output directory (expected build/ or dist/ in $FRONTEND_DIR)"
+                    exit 1
+                  fi
                   echo "Build output directory $BUILD_DIR"
+                  if [ ! -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then
+                    echo "Frontend build directory $CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR does not exist"
+                    exit 1
+                  fi
                   mkdir -p assets/dist
-                  if [ -d "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR" ]; then echo "Copying frontend build to assets/dist"; cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/; else echo "No frontend build found to copy"; fi
+                  echo "Copying frontend build to assets/dist"
+                  cp -r "$CODEBUILD_SRC_DIR/$FRONTEND_DIR/$BUILD_DIR/." assets/dist/
+                  # Final gate: the UI is deployed straight from assets/dist, and an
+                  # empty directory uploads "successfully". Without index.html the site
+                  # serves 403 from S3, so refuse to continue rather than ship a blank UI.
+                  if [ ! -f assets/dist/index.html ]; then
+                    echo "assets/dist/index.html is missing after copy - refusing to deploy an empty UI"
+                    ls -la assets/dist || true
+                    exit 1
+                  fi
+                  echo "Frontend staged for deployment: $(find assets/dist -type f | wc -l) files"
                 - echo "Checking CDK bootstrap status"
                 - |
                   cleanup_and_bootstrap() {

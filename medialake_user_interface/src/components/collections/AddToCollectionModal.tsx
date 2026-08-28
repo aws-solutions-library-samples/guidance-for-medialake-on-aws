@@ -47,7 +47,13 @@ interface AddToCollectionModalProps {
   assetId: string;
   assetName: string;
   assetType: string;
-  onAddToCollection: (collectionId: string) => Promise<void>;
+  /**
+   * Called with the chosen collection. The name is passed alongside the id so
+   * callers can label a confirmation or remember the collection as a shortcut
+   * without re-querying the collection list; callers that don't need it can
+   * ignore the second argument.
+   */
+  onAddToCollection: (collectionId: string, collectionName?: string) => Promise<void>;
 }
 
 export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
@@ -131,7 +137,8 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
     setIsAdding(true);
     setError(null);
     try {
-      await onAddToCollection(selectedCollectionId);
+      const chosen = collections.find((c) => c.id === selectedCollectionId);
+      await onAddToCollection(selectedCollectionId, chosen?.name);
       resetAndClose();
     } catch (err: any) {
       setError(err.message || "Failed to add asset to collection");

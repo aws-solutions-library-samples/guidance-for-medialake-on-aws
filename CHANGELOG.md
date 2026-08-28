@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.22.0] - 2026-08-28
+
+### Features
+
+- feat(storage): make the unique personal-assets bucket name an opt-out flag
+
+### Bug Fixes
+
+- fix(ci): build the frontend synchronously instead of waiting on a foreign pid
+- fix(ci): fail the pipeline when the frontend build fails, and pin xyflow
+- fix(storage): use the full account id in the personal-assets bucket name
+
+### Code Refactoring
+
+- refactor: rework the selection bin actions to add collections and fix dark-mode contrast
+
+### Other Changes
+
+- Merge branch 'fix/codebuild-frontend-build' into main
+- Merge branch 'feat/unique-personal-assets-bucket-name' into main
+- Merge branch 'fix/personal-assets-bucket-name-collision' into main
+
 ## [1.21.0] - 2026-08-25
 
 ### Features

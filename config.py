@@ -869,6 +869,39 @@ class CDKConfig(BaseModel):
         return v
 
     use_prefixed_names: bool = False  # Opt-in for multi-deployment isolation
+
+    # ── Personal-assets bucket naming ────────────────────────────────────
+    #
+    # Controls whether the personal-assets bucket name carries the full AWS
+    # account id (True, the default) or only its first 7 digits (False, the
+    # historical behaviour).
+    #
+    # ⚠️  SET THIS TO ``false`` FOR ANY DEPLOYMENT CREATED BEFORE THIS FLAG
+    #     EXISTED, OTHERWISE THE BUCKET IS REPLACED AND ITS OBJECTS ARE LOST.
+    #
+    # ``BucketName`` is a replacement-triggering CloudFormation property, and
+    # this bucket is declared ``destroy_on_delete=True``. Flipping the name on a
+    # live deployment therefore makes CloudFormation create a new empty bucket
+    # and *delete* the old one along with every personal asset in it — there is
+    # no rename in place and nothing is left behind to recover from.
+    #
+    # Why the default is True: S3 bucket names are globally unique across all
+    # AWS accounts, and the 7-digit form does not contain enough of the account
+    # id to guarantee that. Two accounts whose ids share those 7 digits,
+    # deploying the same resource_prefix / region / environment, generate an
+    # identical name; the second deployment fails with BucketAlreadyExists
+    # (S3 409), which takes down the MediaLakeStorageConnectors nested stack and
+    # rolls back MediaLakeStack with it. That failure is unrecoverable from the
+    # operator's side, because the name is owned by an account they cannot
+    # access. New deployments are correct out of the box with the full id, which
+    # is also what every other bucket in this project uses (-vectors-,
+    # -nodes-templates-, -access-logs-, -user-interface-).
+    #
+    # Existing deployment checklist: set this to ``false`` in config.json before
+    # your next deploy. To confirm which name you are currently on, read
+    # ``{ssm_prefix}/personal-assets-bucket-name`` — if the segment after
+    # "-personal-assets-" is 7 digits rather than 12, you need ``false``.
+    unique_personal_assets_bucket_name: bool = True
     deployment_options: DeploymentOptionsConfig = Field(
         default_factory=DeploymentOptionsConfig
     )
@@ -914,6 +947,52 @@ class CDKConfig(BaseModel):
         if not self.use_prefixed_names:
             return ""
         return f"{self.resource_prefix}-{self.environment}-"
+
+    @property
+    def personal_assets_bucket_name(self) -> str:
+        """Physical name of the personal-assets S3 bucket.
+
+        Unique (default):  ``{resource_prefix}-personal-assets-{account_id}-{region}-{environment}``
+        Legacy (opt-out):  ``{resource_prefix}-personal-assets-{account_id[:7]}-{region}-{environment}``
+
+        The account id is the only component that makes the name globally unique,
+        so the truncated legacy form can collide with an unrelated AWS account
+        and permanently block a deployment. See
+        ``unique_personal_assets_bucket_name`` for the full rationale and for the
+        data-loss warning that applies when switching an existing deployment
+        between the two forms.
+
+        Lowercased because S3 rejects uppercase characters in bucket names, and
+        ``resource_prefix`` is not otherwise constrained to lowercase here.
+        """
+        account_segment = (
+            self.account_id
+            if self.unique_personal_assets_bucket_name
+            else self.account_id[:7]
+        )
+        name = (
+            f"{self.resource_prefix}-personal-assets-"
+            f"{account_segment}-{self.primary_region}-"
+            f"{self.environment}"
+        ).lower()
+
+        # Fail here rather than let S3 reject it mid-deploy. The fixed segments
+        # ("-personal-assets-" plus the account id and region) consume ~40-55
+        # characters, so a long resource_prefix combined with a long environment
+        # can breach the 63-char ceiling. Raising names the two knobs the
+        # operator can actually shorten; the alternative is an opaque
+        # InvalidBucketName failure partway through MediaLakeStorageConnectors.
+        #
+        # This cannot fire for an already-deployed name: a bucket over the limit
+        # could never have been created in the first place.
+        if len(name) > 63:
+            raise ValueError(
+                f"personal-assets bucket name is {len(name)} characters, over the "
+                f"63-character S3 limit: {name!r}. Shorten `resource_prefix` "
+                f"(currently {len(self.resource_prefix)} chars) or `environment` "
+                f"(currently {len(self.environment)} chars)."
+            )
+        return name
 
     def stack_name(self, base_name: str) -> str:
         """Return the full CloudFormation stack name for a given base name.

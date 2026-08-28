@@ -22,7 +22,7 @@ import { PipelinesService } from "@/features/pipelines/api/pipelinesService";
  * and syncs them with the notification system.
  */
 
-interface SelectedSegment {
+export interface SelectedSegment {
   startTime: number; // seconds
   endTime: number; // seconds
   label?: string;
@@ -44,11 +44,15 @@ const secondsToTimecode = (seconds: number): string => {
   return `${hh}:${mm}:${ss}:00`;
 };
 
-// Build the bulk-download clipBoundary for a segment entry. Prefers exact
+// Build the clipBoundary for a segment entry. Prefers exact
 // source timecodes; falls back to second-accurate conversion. Guarantees
 // start < end (backend rejects identical/inverted boundaries) by extending
 // sub-second segments to a 1-second window.
-const segmentToClipBoundary = (
+//
+// Exported because the selection bin builds the same boundary when adding a
+// segment entry to a collection — the two paths must agree, and the backend
+// rejects a partial or inverted boundary either way.
+export const segmentToClipBoundary = (
   segment: SelectedSegment
 ): { startTime: string; endTime: string } => {
   if (
