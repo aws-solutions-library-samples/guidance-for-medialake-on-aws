@@ -25,16 +25,6 @@ PROVIDER_METADATA = {
         "dimensions": [1024],
         "inference_provider": "twelvelabs_api",
     },
-    "twelvelabs-bedrock": {
-        "id": "twelvelabs-bedrock",
-        "name": "TwelveLabs Marengo Embed 2.7 on Bedrock",
-        "type": "twelvelabs-bedrock",
-        "requiresApiKey": False,
-        "isExternal": False,
-        "supportedMediaTypes": ["image", "video", "audio"],
-        "dimensions": [1024],
-        "inference_provider": "aws_bedrock",
-    },
     "twelvelabs-bedrock-3-0": {
         "id": "twelvelabs-bedrock-3-0",
         "name": "TwelveLabs Marengo Embed 3.0 on Bedrock",

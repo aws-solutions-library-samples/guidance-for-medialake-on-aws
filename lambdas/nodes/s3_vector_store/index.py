@@ -20,6 +20,7 @@ from botocore.config import Config
 from distributed_map_utils import download_s3_external_payload, is_s3_reference
 from lambda_middleware import lambda_middleware
 from lambda_utils import _truncate_floats
+from metadata_config import NON_FILTERABLE_METADATA_KEYS
 from nodes_utils import seconds_to_smpte
 
 # S3 client for downloading external payloads
@@ -647,6 +648,11 @@ def ensure_index_exists(
                 dimension=vector_dimension,
                 dataType="float32",
                 distanceMetric="cosine",
+                # Match the CDK construct: declare return-only keys non-filterable
+                # so filterability is deterministic (prevents the filter race).
+                metadataConfiguration={
+                    "nonFilterableMetadataKeys": NON_FILTERABLE_METADATA_KEYS
+                },
             )
             logger.info(f"Created index {index_name} (dim={vector_dimension})")
             # Add throttling delay after create operation

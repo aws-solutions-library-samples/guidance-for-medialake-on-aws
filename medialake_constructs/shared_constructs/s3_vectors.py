@@ -7,11 +7,37 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3vectors as s3vectors
 from constructs import Construct
 
+# Metadata keys stored on every vector that search NEVER filters on — declared
+# non-filterable so the index's filterable schema is small and deterministic.
+#
+# Why this matters: S3 Vectors treats all metadata keys as filterable-by-default
+# unless declared otherwise at index creation. Leaving all 14 keys filterable let
+# a schema-establishment race silently drop `embedding_option` filterability for
+# vectors written into a fresh index under concurrent bulk load. Declaring the
+# return-only keys as non-filterable removes that inference step. The keys search
+# DOES filter on (inventory_id, embedding_option, embedding_scope, content_type)
+# are intentionally absent here and stay filterable.
+#
+# NOTE: this takes effect only on a NEWLY created index — non-filterable keys are
+# immutable after creation. Existing indexes must be recreated + re-ingested.
+NON_FILTERABLE_METADATA_KEYS = [
+    "timestamp",
+    "start_offset_sec",
+    "end_offset_sec",
+    "start_timecode",
+    "end_timecode",
+    "embedding_dimension",
+    "space_type",
+    "model_provider",
+    "model_name",
+    "model_version",
+]
+
 
 @dataclass
 class S3VectorClusterProps:
     bucket_name: str
-    vector_dimension: int = 1024
+    vector_dimension: int = 512
     collection_indexes: List[str] = field(default_factory=lambda: ["media"])
     vpc: Optional[ec2.IVpc] = None
     security_group: Optional[ec2.SecurityGroup] = None
@@ -90,6 +116,11 @@ class S3VectorCluster(Construct):
                 dimension=self._vector_dimension,
                 data_type="float32",  # Standard data type for embeddings
                 distance_metric="cosine",  # Cosine similarity for semantic search
+                # Declare return-only keys non-filterable so the filterable schema
+                # is small and deterministic (prevents the filterability race).
+                metadata_configuration=s3vectors.CfnIndex.MetadataConfigurationProperty(
+                    non_filterable_metadata_keys=NON_FILTERABLE_METADATA_KEYS,
+                ),
                 encryption_configuration=s3vectors.CfnIndex.EncryptionConfigurationProperty(
                     sse_type="AES256"  # Match bucket encryption per FR-5
                 ),
