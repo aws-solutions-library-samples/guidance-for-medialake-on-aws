@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.22.1] - 2026-08-30
+
+### Bug Fixes
+
+- fix: order the WAF ACL lookup after the stack that writes it (GitHub #31)
+- fix: stop handing the player an S3 object key as a media URL (GitHub #27)
+- fix(pipelines): derive per-segment execution flag server-side
+- fix: use updated delete API and harden asset deletion
+
+### Code Refactoring
+
+- refactor: Upgrade Omakase Player to 1.1.1, move markers onto MarkerTracks, and deep-link clicked clips
+- refactor: one timecode formatter, shown wherever a clip appears
+
 ## [1.22.0] - 2026-08-28
 
 ### Features

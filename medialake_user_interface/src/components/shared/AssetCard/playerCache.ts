@@ -73,7 +73,7 @@ export function parkPlayer(
 ): void {
   // Pause playback but keep the src so buffered data is retained
   try {
-    const videoEl = player.video?.getHTMLVideoElement();
+    const videoEl = player.player.htmlMediaElement;
     if (videoEl) {
       videoEl.pause();
     }
@@ -113,7 +113,7 @@ export function evictStale(assetId: string): void {
   parkedPlayers.delete(assetId);
 
   try {
-    const videoEl = entry.player.video?.getHTMLVideoElement();
+    const videoEl = entry.player.player.htmlMediaElement;
     if (videoEl) {
       videoEl.pause();
       videoEl.removeAttribute("src");
@@ -142,7 +142,7 @@ function destroyEntry(assetId: string): void {
   if (!entry) return;
 
   try {
-    const videoEl = entry.player.video?.getHTMLVideoElement();
+    const videoEl = entry.player.player.htmlMediaElement;
     if (videoEl) {
       videoEl.pause();
       videoEl.removeAttribute("src");

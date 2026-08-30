@@ -8,6 +8,7 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 import SkipPreviousIcon from "@mui/icons-material/SkipPrevious";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import { formatTimecode } from "@/utils/timecode";
 
 interface AssetAudioProps {
   src: string;
@@ -61,11 +62,12 @@ const getSizeStyles = (size: "small" | "medium" | "large") => {
   }
 };
 
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-};
+/**
+ * The scrubber clock. Delegates to the shared formatter so a long asset reads as
+ * "01:30:00" rather than "90:00" — the local implementation this replaces never
+ * carried minutes into hours.
+ */
+const formatTime = (seconds: number): string => formatTimecode(seconds) ?? "00:00";
 
 const AssetAudio: React.FC<AssetAudioProps> = ({
   src,

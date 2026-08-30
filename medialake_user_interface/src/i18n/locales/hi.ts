@@ -384,6 +384,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "संग्रह बनाने में विफल। कृपया पुनः प्रयास करें।",
     addToCollection: "कलेक्शन में जोड़ें",
+    itemsBeingAdded: "जोड़े जा रहे आइटम",
     searchCollections: "कलेक्शन खोजें...",
     createNew: "नया कलेक्शन बनाएं",
     noSharedWithMe: "आपके साथ कोई कलेक्शन साझा नहीं किया गया",
@@ -1365,6 +1366,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "पूर्वावलोकन अभी उपलब्ध नहीं है",
+      previewUnavailableBody:
+        "इस एसेट के लिए चलाने योग्य प्रॉक्सी अभी तैयार नहीं हुई है। यदि इसकी इनजेस्ट पाइपलाइन अभी चल रही है, तो पूरा होने पर पूर्वावलोकन यहाँ दिखाई देगा।",
+    },
     tabs: {
       summary: "सारांश",
       technical: "तकनीकी मेटाडाटा",

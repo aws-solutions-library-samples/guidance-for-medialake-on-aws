@@ -377,6 +377,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "فشل إنشاء المجموعة. يرجى المحاولة مرة أخرى.",
     addToCollection: "إضافة إلى المجموعة",
+    itemsBeingAdded: "العناصر التي يتم إضافتها",
     searchCollections: "البحث في المجموعات...",
     createNew: "إنشاء مجموعة جديدة",
     noSharedWithMe: "لا توجد مجموعات مشتركة معك",
@@ -1354,6 +1355,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "المعاينة غير متوفرة بعد",
+      previewUnavailableBody:
+        "لم يتم إنشاء ملف وسيط قابل للتشغيل لهذا الأصل بعد. إذا كان خط معالجة الاستيراد لا يزال قيد التشغيل، فستظهر المعاينة هنا بعد اكتماله.",
+    },
     tabs: {
       summary: "الملخص",
       technical: "البيانات الوصفية التقنية",

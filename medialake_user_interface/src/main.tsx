@@ -22,9 +22,13 @@ window.addEventListener("vite:preloadError", (event) => {
 window.addEventListener("load", () => sessionStorage.removeItem("chunk-reload"));
 
 // Omakase player styles — imported globally so both grid-card (Stamp theme)
-// and detail-view (Omakase theme) players render correctly.
-import "@byomakase/omakase-player/dist/style.css";
-import "@byomakase/omakase-player/style/player-chroming/player-chroming.css";
+// and detail-view (Default theme) players render correctly.
+//
+// 1.1.1 ships a single stylesheet. The 0.25.x layout had two entry points
+// (`dist/style.css` plus `style/player-chroming/player-chroming.css`); the
+// chroming styles are now bundled into `dist/omakase-player.css`, and the old
+// paths no longer exist in the package.
+import "@byomakase/omakase-player/dist/omakase-player.css";
 import "./styles/player-overrides.css";
 
 // Create a loading component that uses translations

@@ -216,6 +216,13 @@ class MediaLakeExternalServiceManager:
                         "auth": provider_config.auth,
                         "endpoint": provider_config.endpoint,
                         "capabilities": provider_config.capabilities,
+                        # Forwarded so a provider configured with custom
+                        # endpoints actually uses them. These were previously
+                        # dropped here, leaving the plugins on their defaults.
+                        "auth_endpoint": provider_config.auth_endpoint,
+                        "dataset_endpoint": provider_config.dataset_endpoint,
+                        "search_endpoint": provider_config.search_endpoint,
+                        "delete_endpoint": provider_config.delete_endpoint,
                     }
 
                     plugin = self.plugin_manager.create_plugin(

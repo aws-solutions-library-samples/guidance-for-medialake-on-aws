@@ -386,6 +386,7 @@ export default {
     collectionDeleteFailed: "Falha ao excluir coleção",
     createFailed: "Falha ao criar coleção. Por favor, tente novamente.",
     addToCollection: "Adicionar à coleção",
+    itemsBeingAdded: "Itens sendo adicionados",
     searchCollections: "Pesquisar coleções...",
     createNew: "Criar nova coleção",
     noSharedWithMe: "Nenhuma coleção compartilhada com você",
@@ -1374,6 +1375,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "Pré-visualização ainda não disponível",
+      previewUnavailableBody:
+        "Ainda não foi gerado um proxy reproduzível para este ativo. Se o pipeline de ingestão ainda estiver em execução, a pré-visualização aparecerá aqui quando terminar.",
+    },
     tabs: {
       summary: "Resumo",
       technical: "Metadados Técnicos",

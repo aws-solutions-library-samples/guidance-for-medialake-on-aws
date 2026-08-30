@@ -374,6 +374,7 @@ export default {
     collectionDeleteFailed: "מחיקת האוסף נכשלה",
     createFailed: "יצירת האוסף נכשלה. אנא נסה שוב.",
     addToCollection: "הוסף לאוסף",
+    itemsBeingAdded: "פריטים שנוספים",
     searchCollections: "חיפוש אוספים...",
     createNew: "צור אוסף חדש",
     noSharedWithMe: "אין אוספים ששותפו איתך",
@@ -1349,6 +1350,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "התצוגה המקדימה אינה זמינה עדיין",
+      previewUnavailableBody:
+        "עדיין לא נוצר קובץ פרוקסי הניתן לניגון עבור נכס זה. אם צינור הקליטה עדיין פועל, התצוגה המקדימה תופיע כאן בסיום.",
+    },
     tabs: {
       summary: "סיכום",
       technical: "מטא-דאטה טכני",

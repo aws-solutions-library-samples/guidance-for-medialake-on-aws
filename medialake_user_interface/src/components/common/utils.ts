@@ -92,3 +92,54 @@ export function getConfidenceLabel(score: number | undefined, modelVersion?: str
     return "Low";
   }
 }
+
+/**
+ * A deterministic colour for a given id.
+ *
+ * Used as a fallback when a marker has no stored colour. `randomHexColor()` is
+ * wrong for that job: the value is recomputed on every render pass, so a marker
+ * relying on the fallback visibly changed colour as the user worked. Hashing the
+ * id keeps it stable for the marker's lifetime while still spreading colours.
+ */
+export function stableColorForId(id: string): string {
+  // FNV-1a, 32-bit. Small, well-distributed, and no dependencies.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < id.length; i += 1) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  // Pick from the hue wheel at full saturation so every result is legible
+  // against both light and dark marker cards, rather than any 24-bit value.
+  const hue = Math.abs(hash) % 360;
+  return hslToHex(hue, 65, 55);
+}
+
+/** HSL -> #rrggbb. Local to keep `stableColorForId` self-contained. */
+function hslToHex(h: number, s: number, l: number): string {
+  const saturation = s / 100;
+  const lightness = l / 100;
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const secondary = chroma * (1 - Math.abs(((h / 60) % 2) - 1));
+  const match = lightness - chroma / 2;
+
+  const [r, g, b] =
+    h < 60
+      ? [chroma, secondary, 0]
+      : h < 120
+        ? [secondary, chroma, 0]
+        : h < 180
+          ? [0, chroma, secondary]
+          : h < 240
+            ? [0, secondary, chroma]
+            : h < 300
+              ? [secondary, 0, chroma]
+              : [chroma, 0, secondary];
+
+  const toHex = (value: number) =>
+    Math.round((value + match) * 255)
+      .toString(16)
+      .padStart(2, "0");
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}

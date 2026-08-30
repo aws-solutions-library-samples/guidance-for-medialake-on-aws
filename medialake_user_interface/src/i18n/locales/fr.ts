@@ -387,6 +387,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "Échec de la création de la collection. Veuillez réessayer.",
     addToCollection: "Ajouter à la collection",
+    itemsBeingAdded: "Éléments en cours d'ajout",
     searchCollections: "Rechercher des collections...",
     createNew: "Créer une nouvelle collection",
     noSharedWithMe: "Aucune collection partagée avec vous",
@@ -1330,6 +1331,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "Aperçu pas encore disponible",
+      previewUnavailableBody:
+        "Aucun proxy lisible n'a encore été généré pour cet élément. Si son pipeline d'ingestion est toujours en cours, l'aperçu apparaîtra ici une fois terminé.",
+    },
     tabs: {
       summary: "Résumé",
       technical: "Métadonnées techniques",

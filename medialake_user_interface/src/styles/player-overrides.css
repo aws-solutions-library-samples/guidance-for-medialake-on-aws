@@ -7,16 +7,25 @@
 
 /* ===== OMAKASE PLAYER OVERRIDES ===== */
 
-/* Remove poster frame/watermark from Omakase video player */
-.omakase-player .omakase-player-wrapper .omakase-background-image {
-  background-image: none !important;
-}
+/*
+ * Omakase 1.1.1 restructured its DOM. There is no longer an `.omakase-player`
+ * wrapper div with an inner `.omakase-player-wrapper`; the player container now
+ * holds the chroming <template> plus a
+ * `<media-theme class="omakase-media-theme omakase-media-theme-{theme}">` that
+ * owns the media element. Every selector below was rewritten for that — the old
+ * ones matched nothing after the upgrade, so the player lost its sizing and
+ * background overrides silently.
+ *
+ * Sizing is now expressed with the CSS custom properties Omakase documents,
+ * rather than by forcing width/height with !important on an internal wrapper.
+ */
+media-theme.omakase-media-theme {
+  --omakase-player-width: 100%;
+  --omakase-player-height: 100%;
 
-/* Make video fill full container height and width */
-.omakase-player .omakase-player-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  aspect-ratio: unset !important;
+  display: block;
+  width: 100%;
+  height: 100%;
   background-color: black;
 }
 
@@ -25,32 +34,28 @@ media-theme {
   overflow: hidden;
 }
 
-/* Additional Omakase player customizations can be added here */
-/* Example: Hide specific UI elements, adjust colors, etc. */
+/*
+ * The Stamp theme (grid cards) sizes itself from its container, and the
+ * documentation notes the width/height variables have no effect there — so the
+ * card wrapper only needs to fill its cell.
+ */
+media-theme.omakase-media-theme-stamp {
+  width: 100%;
+  height: 100%;
+}
 
-/* ===== OMAKASE MARKER TRACK STYLING ===== */
+/* ===== OMAKASE MARKER BAR STYLING ===== */
 
-/* Chroming marker track (created via createMarkerTrack) */
-omakase-marker-track {
-  min-height: 14px;
+/*
+ * Marker bars replaced the 0.25.x `omakase-marker-track`: markers now live on
+ * MarkerTracks and are rendered by `<omakase-marker-bars>` containing one
+ * `<omakase-marker-bar>` per track.
+ */
+omakase-marker-bars {
   display: block;
 }
 
-/* Period marker styling within the chroming track */
-omakase-marker-track .omakase-period-marker {
-  border-radius: 2px;
-  opacity: 0.85;
-  transition: opacity 0.15s ease;
-}
-
-omakase-marker-track .omakase-period-marker:hover {
-  opacity: 1;
-  cursor: grab;
-}
-
-/* Active/selected marker emphasis */
-omakase-marker-track .omakase-period-marker.selected {
-  opacity: 1;
-  outline: 2px solid rgba(255, 255, 255, 0.6);
-  outline-offset: 1px;
+omakase-marker-bar {
+  min-height: 14px;
+  display: block;
 }

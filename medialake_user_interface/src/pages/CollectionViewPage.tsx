@@ -78,6 +78,7 @@ import {
   getCollectionItemDisplayName,
 } from "@/utils/clipTransformation";
 import { resolveDotPath } from "@/utils/dotPathResolve";
+import { getAssetFrameRate, formatTimecodeRange, parseTimecode } from "@/utils/timecode";
 import { ChipArrayField } from "@/components/common/ChipArrayField";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 import { springEasing } from "@/constants";
@@ -260,11 +261,50 @@ const CollectionViewPage: React.FC = () => {
   const getAssetThumbnail = useCallback((asset: AssetItem) => asset.thumbnailUrl || "", []);
   const getAssetProxy = useCallback((asset: AssetItem) => asset.proxyUrl || "", []);
 
+  /**
+   * The real InventoryID for API calls.
+   *
+   * Required because `getAssetId` returns a synthetic, clip-qualified key
+   * (`{id}#CLIP#{start}_{end}`) to keep several clips of one asset distinct in
+   * the grid. Without this the bin would send that synthetic key to the download
+   * and collection APIs as though it were an asset id.
+   */
+  const getInventoryId = useCallback((asset: AssetItem) => asset.InventoryID, []);
+
+  /**
+   * The clip's time range, for bin entries added from a collection.
+   *
+   * Collection items persist the range as `HH:MM:SS:FF` strings, while the bin
+   * works in seconds, so both are carried: the seconds drive display and
+   * per-segment pipeline runs, and the original timecodes are preserved so
+   * `segmentToClipBoundary` can round-trip them frame-accurately instead of
+   * re-deriving a second-accurate approximation.
+   *
+   * Previously omitted entirely, which meant selecting a clip inside a
+   * collection produced a bin entry with no time range — it rendered as though
+   * it were the whole asset, and the clip boundary was dropped from any
+   * subsequent download or add-to-collection.
+   */
+  const getAssetSegment = useCallback((asset: AssetItem) => {
+    const startTimecode = asset.clipBoundary?.startTime?.trim();
+    const endTimecode = asset.clipBoundary?.endTime?.trim();
+    if (!startTimecode || !endTimecode) return undefined;
+
+    const fps = getAssetFrameRate(asset);
+    const startTime = parseTimecode(startTimecode, fps);
+    const endTime = parseTimecode(endTimecode, fps);
+    if (startTime === null || endTime === null || endTime <= startTime) return undefined;
+
+    return { startTime, endTime, startTimecode, endTimecode };
+  }, []);
+
   // Use custom hooks for asset selection and favorites
   const assetSelection = useAssetSelection({
     getAssetId,
     getAssetName,
     getAssetType,
+    getInventoryId,
+    getAssetSegment,
   });
 
   const assetFavorites = useAssetFavorites({
@@ -466,6 +506,38 @@ const CollectionViewPage: React.FC = () => {
       sortable: true,
       sortingFn: (rowA, rowB) =>
         rowA.original.DigitalSourceAsset.Type.localeCompare(rowB.original.DigitalSourceAsset.Type),
+    },
+    {
+      // A dedicated range column, so a clip's timecodes are readable as data
+      // rather than only as a suffix buried in the name. Sorting is chronological
+      // on the start timecode -- sorting by Name orders clips lexicographically,
+      // which agrees with time only by accident of zero-padding.
+      id: "timecode",
+      label: "Timecode",
+      visible: true,
+      minWidth: 170,
+      accessorFn: (row: AssetItem) =>
+        formatTimecodeRange(row.clipBoundary?.startTime, row.clipBoundary?.endTime) ?? "",
+      cell: (info: CellContext<AssetItem, unknown>) => (
+        // A range is one value, so it must not wrap mid-value. The separator uses
+        // narrow no-break spaces, but Chromium still takes the line-break
+        // opportunity that UAX #14 allows immediately after an en dash, so the
+        // guarantee has to come from CSS rather than the character choice.
+        <Box component="span" sx={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+          {(info.getValue() as string) || "\u2014"}
+        </Box>
+      ),
+      sortable: true,
+      sortingFn: (rowA, rowB) => {
+        // Whole assets have no range; keep them together at one end rather than
+        // interleaved with clips by an empty-string comparison.
+        const a = rowA.original.clipBoundary?.startTime?.trim() ?? "";
+        const b = rowB.original.clipBoundary?.startTime?.trim() ?? "";
+        if (!a && !b) return 0;
+        if (!a) return 1;
+        if (!b) return -1;
+        return a.localeCompare(b);
+      },
     },
     {
       id: "format",
@@ -1620,6 +1692,18 @@ const CollectionViewPage: React.FC = () => {
                 .PrimaryLocation.ObjectKey.Name
             }
             assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            // Surface the clip's range: re-filing a clip from one collection
+            // into another otherwise gave no indication which clip was in hand.
+            items={[
+              {
+                id: getAssetId(selectedAssetForCollection),
+                name: rawAssetName(selectedAssetForCollection),
+                timeRange: formatTimecodeRange(
+                  selectedAssetForCollection.clipBoundary?.startTime,
+                  selectedAssetForCollection.clipBoundary?.endTime
+                ),
+              },
+            ]}
             onAddToCollection={handleAddToCollection}
           />
         )}

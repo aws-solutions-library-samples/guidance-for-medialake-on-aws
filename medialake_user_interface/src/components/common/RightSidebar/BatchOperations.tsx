@@ -44,6 +44,7 @@ import WorkflowPickerModal, {
 import { segmentToClipBoundary } from "@/hooks/useAssetSelection";
 import { useRecentBinActions } from "@/hooks/useRecentBinActions";
 import { accentColor, type AccentRole } from "@/theme/accessibleAccent";
+import { formatTimeRange } from "@/utils/timecode";
 
 /**
  * How many entries the Quick Access row shows, across both kinds.
@@ -57,7 +58,7 @@ interface BatchOperationsProps {
     name: string;
     type: string;
     inventoryID?: string;
-    segment?: { startTime: number; endTime: number; label?: string };
+    segment?: BinSegment;
   }>;
   onBatchDelete?: () => void;
   onBatchDownload?: () => void;
@@ -80,25 +81,30 @@ const getAssetTypeIcon = (type: string) => {
   return <InsertDriveFileOutlinedIcon fontSize="small" />;
 };
 
-// Format a number of seconds as m:ss for segment (clip) bin entries.
-const formatClock = (seconds: number): string => {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-};
+/** A bin entry's segment, when the entry is a clip rather than a whole asset. */
+type BinSegment = { startTime: number; endTime: number; label?: string };
+
+/**
+ * The time range shown for a segment (clip) bin entry, or null for a whole
+ * asset.
+ *
+ * Delegates to the shared timecode formatter so the range reads identically
+ * here, in the add-to-collection modal and in a collection listing. The local
+ * `m:ss` formatter this replaces had no hours carry, so a clip an hour into an
+ * asset rendered as "65:00".
+ */
+const segmentRange = (segment?: BinSegment): string | null =>
+  segment ? formatTimeRange(segment.startTime, segment.endTime) : null;
 
 // Display name for a bin entry; appends the time range for segment entries so
 // multiple segments of the same asset are distinguishable.
-const displayNameFor = (asset: {
-  name: string;
-  segment?: { startTime: number; endTime: number };
-}): string =>
-  asset.segment
-    ? `${asset.name} (${formatClock(asset.segment.startTime)}\u2013${formatClock(
-        asset.segment.endTime
-      )})`
-    : asset.name;
+const displayNameFor = (asset: { name: string; segment?: BinSegment }): string => {
+  const range = segmentRange(asset.segment);
+  const label = asset.segment?.label?.trim();
+
+  if (!range) return asset.name;
+  return label ? `${asset.name} (${range} · ${label})` : `${asset.name} (${range})`;
+};
 
 /**
  * A collection that has been deleted (or unshared) still lives in the recents
@@ -269,9 +275,18 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
     );
 
     for (const type of Object.keys(grouped)) {
-      grouped[type].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
-      );
+      grouped[type].sort((a, b) => {
+        const byName = a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (byName !== 0) return byName;
+
+        // Several clips of one asset share a name, so name comparison leaves
+        // them in arbitrary order. Order those chronologically instead —
+        // reading a clip list out of time order is disorienting.
+        return (a.segment?.startTime ?? 0) - (b.segment?.startTime ?? 0);
+      });
     }
 
     return grouped;
@@ -789,12 +804,14 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
                           }}
                           // Segment entries get a dedicated, always-visible line
                           // for their time range so it can't be ellipsized away
-                          // by long filenames.
+                          // by long filenames. The marker label, when the segment
+                          // carries one, follows the range on the same line — it
+                          // is the only place that label is ever surfaced.
                           secondary={
-                            asset.segment
-                              ? `${formatClock(asset.segment.startTime)}\u2013${formatClock(
-                                  asset.segment.endTime
-                                )}`
+                            segmentRange(asset.segment)
+                              ? [segmentRange(asset.segment), asset.segment?.label?.trim()]
+                                  .filter(Boolean)
+                                  .join(" \u00b7 ")
                               : undefined
                           }
                           secondaryTypographyProps={{
@@ -842,6 +859,26 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
             count: selectedAssets.length,
           })}
           assetType={selectedAssets[0]?.type || ""}
+          // Pass the whole selection so the modal can show each clip's time
+          // range. The header count alone left several clips of one asset
+          // indistinguishable at the point of choosing a destination.
+          //
+          // Ordered by start time to match the bin listing behind the modal;
+          // selection order would show the same three clips in a different
+          // order in two panels that are visible at once.
+          items={[...selectedAssets]
+            .sort(
+              (a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }) || (a.segment?.startTime ?? 0) - (b.segment?.startTime ?? 0)
+            )
+            .map((asset) => ({
+              id: asset.id,
+              name: asset.name,
+              timeRange: segmentRange(asset.segment),
+            }))}
           onAddToCollection={addSelectionToCollection}
         />
       )}

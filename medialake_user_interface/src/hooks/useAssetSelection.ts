@@ -10,6 +10,7 @@ import {
   useCancelBatchDelete,
 } from "@/api/hooks/useAssets";
 import { PipelinesService } from "@/features/pipelines/api/pipelinesService";
+import { formatTimecode } from "@/utils/timecode";
 
 /**
  * Hook for managing asset selection and bulk operations.
@@ -36,13 +37,13 @@ const TIMECODE_RE = /^\d{2}:\d{2}:\d{2}[:;]\d{2}$/;
 
 // Convert seconds to an HH:MM:SS:FF timecode with FF=00 (second-accurate).
 // Used when a segment only carries seconds (e.g. user markers).
-const secondsToTimecode = (seconds: number): string => {
-  const s = Math.max(0, Math.floor(seconds));
-  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${hh}:${mm}:${ss}:00`;
-};
+//
+// Truncating to a whole second before formatting is deliberate: the source has
+// no frame information, so emitting a real frame number would imply a precision
+// the value does not have. `formatTimecode` supplies the HH:MM:SS:FF shape so
+// there is one implementation of it rather than one per call site.
+const secondsToTimecode = (seconds: number): string =>
+  formatTimecode(Math.max(0, Math.floor(seconds)), { showFrames: true }) ?? "00:00:00:00";
 
 // Build the clipBoundary for a segment entry. Prefers exact
 // source timecodes; falls back to second-accurate conversion. Guarantees

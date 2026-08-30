@@ -37,6 +37,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // @byomakase/omakase-player 1.1.1 declares only `module` and `types` in its
+      // package.json — no `main`, no `exports` map. Vite's browser resolution
+      // uses `module` so the app builds, but Node-side resolution (vitest) fails
+      // with "Failed to resolve entry for package" — even for a mocked module,
+      // because the specifier still has to resolve.
+      "@byomakase/omakase-player": path.resolve(
+        __dirname,
+        "./node_modules/@byomakase/omakase-player/dist/omakase-player.es.js"
+      ),
     },
   },
 });

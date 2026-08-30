@@ -375,6 +375,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "Failed to create collection. Please try again.",
     addToCollection: "Add to Collection",
+    itemsBeingAdded: "Items being added",
     searchCollections: "Search collections...",
     createNew: "Create New Collection",
     noSharedWithMe: "No collections shared with you",
@@ -1316,6 +1317,11 @@ export default {
     },
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "Preview not available yet",
+      previewUnavailableBody:
+        "A playable proxy has not been generated for this asset yet. If its ingest pipeline is still running, the preview will appear here once it finishes.",
+    },
     tabs: {
       summary: "Summary",
       technical: "Technical Metadata",

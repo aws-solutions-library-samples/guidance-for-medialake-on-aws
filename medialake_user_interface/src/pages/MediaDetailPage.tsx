@@ -16,6 +16,10 @@ import BreadcrumbNavigation from "../components/common/BreadcrumbNavigation";
 import { OmakaseDetailPlayer } from "../components/player/OmakaseDetailPlayer";
 import type { UseDetailPlayerResult } from "../components/player/useDetailPlayer";
 import { getPlayerCurrentTime } from "../components/player/playerTimeStore";
+import { getAssetFrameRate } from "@/utils/timecode";
+import { readClipDeepLink } from "@/utils/clipDeepLink";
+import { resolvePlayableMediaUrl } from "@/utils/playableMedia";
+import MovieCreationOutlinedIcon from "@mui/icons-material/MovieCreationOutlined";
 import { formatLocalDateTime } from "@/shared/utils/dateUtils";
 import { RelatedItemsView } from "../components/shared/RelatedItemsView";
 import { AssetResponse } from "../api/types/asset.types";
@@ -322,8 +326,15 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
 
   const { t } = useTranslation();
   const playerResultRef = useRef<UseDetailPlayerResult | null>(null);
+  // The sidebar's marker panel renders from this, so it has to be state: a ref
+  // mutation would not re-render, which is exactly why the panel used to sit at
+  // "0 markers" while the player's marker bars showed the real contents.
+  const [playerResult, setPlayerResult] = useState<UseDetailPlayerResult | null>(null);
   const [markerReady, setMarkerReady] = useState(false);
   const playerSeekRef = useRef<((time: number) => void) | null>(null);
+  // registerVideoElement only needs to happen once per player, but the player now
+  // republishes its result whenever markers or playback state change.
+  const videoElementRegisteredRef = useRef(false);
   // Throttle mediaController time updates to ~10 Hz (transcript highlighting doesn't need 60 Hz)
   const lastMediaControllerUpdate = useRef(0);
   const { id } = useParams<{ id: string }>();
@@ -352,8 +363,12 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
   const handlePlayerReady = useCallback(
     (result: UseDetailPlayerResult) => {
       playerResultRef.current = result;
-      setMarkerReady(result.isMarkerReady);
+      setPlayerResult(result);
+      setMarkerReady(result.isReady);
       playerSeekRef.current = result.seek;
+
+      if (videoElementRegisteredRef.current) return;
+      videoElementRegisteredRef.current = true;
       const refLike = {
         current: { seek: result.seek, getCurrentTime: () => getPlayerCurrentTime() },
       };
@@ -412,9 +427,30 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
     };
   }, []);
 
-  const searchParams = new URLSearchParams(location.search);
-  const urlSearchTerm = searchParams.get("q") || searchParams.get("searchTerm") || "";
-  const effectiveSearchTerm = searchTerm || urlSearchTerm;
+  const { searchTerm: urlSearchTerm, startTime: deepLinkStartTime } = readClipDeepLink(
+    location.search
+  );
+  const effectiveSearchTerm = searchTerm || urlSearchTerm || "";
+
+  // Seek to the clip named in the URL, once.
+  //
+  // Keyed on asset + time rather than a bare boolean so that navigating to a
+  // different clip of the same asset seeks again, while the player republishing
+  // its result (which now happens on every marker change) does not yank the
+  // playhead back from wherever the user has since scrubbed to.
+  const appliedDeepLinkSeekRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (deepLinkStartTime === undefined || !markerReady) return;
+
+    const key = `${id ?? ""}:${deepLinkStartTime}`;
+    if (appliedDeepLinkSeekRef.current === key) return;
+
+    const seek = playerSeekRef.current;
+    if (!seek) return;
+
+    appliedDeepLinkSeekRef.current = key;
+    seek(deepLinkStartTime);
+  }, [deepLinkStartTime, markerReady, id]);
 
   const versions = useMemo(() => {
     if (!assetData?.data?.asset) return [];
@@ -592,16 +628,15 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
     );
   }
 
-  const proxyUrl = (() => {
-    const proxyRep = assetData.data.asset.DerivedRepresentations.find(
-      (rep) => rep.Purpose === "proxy"
-    );
-    return (
-      proxyRep?.URL ||
-      assetData.data.asset.DigitalSourceAsset.MainRepresentation.StorageInfo.PrimaryLocation
-        .ObjectKey.FullPath
-    );
-  })();
+  // The URL to play, or undefined when no proxy has been generated yet.
+  //
+  // This used to fall back to the main representation's `ObjectKey.FullPath`, but
+  // the assets API only attaches a playable `URL` to derived representations — so
+  // that fallback handed the player a bare S3 object key and it failed with
+  // "invalid url" where the media should be. A proxy is produced asynchronously,
+  // so having none is a normal transient state worth stating plainly instead.
+  // https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws/issues/27
+  const playableUrl = viewedVersion?.url ?? resolvePlayableMediaUrl(assetData.data.asset);
 
   return (
     <Box
@@ -669,19 +704,45 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
               `width ${theme.transitions.duration.enteringScreen}ms ${springEasing}, max-width ${theme.transitions.duration.enteringScreen}ms ${springEasing}`,
           }}
         >
-          <OmakaseDetailPlayer
-            src={viewedVersion?.url ?? proxyUrl}
-            mediaType={mediaType}
-            assetId={id || ""}
-            onTimeUpdate={(time) => {
-              const now = performance.now();
-              if (now - lastMediaControllerUpdate.current > 100) {
-                lastMediaControllerUpdate.current = now;
-                mediaController.updateCurrentTime(time);
-              }
-            }}
-            onPlayerReady={handlePlayerReady}
-          />
+          {playableUrl ? (
+            <OmakaseDetailPlayer
+              src={playableUrl}
+              mediaType={mediaType}
+              assetId={id || ""}
+              frameRate={getAssetFrameRate(asset)}
+              onTimeUpdate={(time) => {
+                const now = performance.now();
+                if (now - lastMediaControllerUpdate.current > 100) {
+                  lastMediaControllerUpdate.current = now;
+                  mediaController.updateCurrentTime(time);
+                }
+              }}
+              onPlayerReady={handlePlayerReady}
+            />
+          ) : (
+            <Box
+              sx={{
+                height: "100%",
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1,
+                p: 3,
+                textAlign: "center",
+                bgcolor: (theme) => alpha(theme.palette.background.default, 0.4),
+              }}
+            >
+              <MovieCreationOutlinedIcon sx={{ fontSize: 40, opacity: 0.3 }} />
+              <Typography variant="subtitle1">
+                {t("detailPages.player.previewUnavailableTitle")}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460 }}>
+                {t("detailPages.player.previewUnavailableBody")}
+              </Typography>
+            </Box>
+          )}
         </Paper>
       </Box>
 
@@ -804,8 +865,9 @@ const MediaDetailContent: React.FC<MediaDetailContentProps> = ({ asset, searchTe
         versions={versions}
         comments={comments}
         onAddComment={handleAddComment}
-        markerAdapter={playerResultRef.current?.markerAdapter}
+        playerMarkers={playerResult}
         isMarkerReady={markerReady}
+        focusTime={deepLinkStartTime}
         seek={playerSeekRef.current ?? undefined}
         assetId={assetData?.data?.asset?.InventoryID}
         asset={asset}

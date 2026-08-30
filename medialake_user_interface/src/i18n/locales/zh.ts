@@ -373,6 +373,7 @@ export default {
     collectionDeleteFailed: "收藏集删除失败",
     createFailed: "创建收藏失败。请重试。",
     addToCollection: "添加到收藏集",
+    itemsBeingAdded: "正在添加的项目",
     searchCollections: "搜索收藏集...",
     createNew: "创建新收藏集",
     noSharedWithMe: "没有与您共享的收藏集",
@@ -1345,6 +1346,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "预览尚不可用",
+      previewUnavailableBody:
+        "尚未为此资产生成可播放的代理文件。如果其摄取管道仍在运行，预览将在完成后显示在此处。",
+    },
     tabs: {
       summary: "摘要",
       technical: "技术元数据",

@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.13.0",
-    "@byomakase/omakase-player": "0.25.3",
+    "@byomakase/omakase-player": "1.1.1",
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@dnd-kit/core": "6.3.1",

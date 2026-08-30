@@ -1,4 +1,11 @@
 import { type ImageItem, type VideoItem, type AudioItem } from "@/types/search/searchResults";
+import {
+  formatTimeRange,
+  formatTimecodeRange,
+  getAssetFrameRate,
+  isValidTime,
+  parseTimecode,
+} from "@/utils/timecode";
 
 type AssetItem = (ImageItem | VideoItem | AudioItem) & {
   DigitalSourceAsset: {
@@ -211,14 +218,14 @@ export function getClipDisplayName(asset: any): string {
 
     // For video clips with time markers
     if (clipData.start_timecode && clipData.end_timecode) {
-      return `${originalName} (${clipData.start_timecode} - ${clipData.end_timecode})`;
+      const range = formatTimecodeRange(clipData.start_timecode, clipData.end_timecode);
+      return range ? `${originalName} (${range})` : originalName;
     } else if (clipData.start !== undefined && clipData.end !== undefined) {
-      const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, "0")}`;
-      };
-      return `${originalName} (${formatTime(clipData.start)} - ${formatTime(clipData.end)})`;
+      // Same formatter as every other clip surface, so a clip discovered by
+      // search reads identically to the same clip sitting in a collection or
+      // the selection bin.
+      const range = formatTimeRange(clipData.start, clipData.end);
+      return range ? `${originalName} (${range})` : originalName;
     } else {
       return `${originalName} (Clip ${asset.clipIndex + 1})`;
     }
@@ -242,21 +249,17 @@ export interface ClipBoundary {
 }
 
 /**
- * Formats a collection item's clip boundary as a `start - end` range, or returns null
- * when the item is a whole asset rather than a clip.
+ * Formats a collection item's clip boundary as a range, or returns null when the item is
+ * a whole asset rather than a clip.
  *
  * Returns null unless both ends are present: a half-open range would render as
  * "00:00:10:00 - " and read as though the data were truncated.
+ *
+ * Delegates to the shared timecode formatter so this range uses the same separator as the
+ * selection bin, the add-to-collection modal and the collection table's Timecode column.
  */
 export function formatClipBoundaryLabel(boundary?: ClipBoundary | null): string | null {
-  const startTime = boundary?.startTime?.trim();
-  const endTime = boundary?.endTime?.trim();
-
-  if (!startTime || !endTime) {
-    return null;
-  }
-
-  return `${startTime} - ${endTime}`;
+  return formatTimecodeRange(boundary?.startTime, boundary?.endTime);
 }
 
 /**
@@ -273,6 +276,82 @@ export function getCollectionItemDisplayName(
 ): string {
   const range = formatClipBoundaryLabel(boundary);
   return range ? `${assetName} (${range})` : assetName;
+}
+
+/**
+ * The display-ready time range for a search-result clip, or null when the asset
+ * is not a clip (or carries no usable range).
+ *
+ * Prefers the source timecodes, which are frame-accurate, and falls back to the
+ * numeric seconds. Exists so callers that need the range on its own -- a chip, a
+ * table cell, the add-to-collection manifest -- don't have to re-derive it from
+ * `getClipDisplayName`, which bakes it into a filename.
+ */
+export function getClipTimeRange(asset: any): string | null {
+  if (!isClipAsset(asset)) return null;
+
+  const clipData = asset.clipData;
+  if (!clipData) return null;
+
+  return (
+    formatTimecodeRange(clipData.start_timecode, clipData.end_timecode) ??
+    formatTimeRange(clipData.start, clipData.end)
+  );
+}
+
+/**
+ * The time range of a search-result clip, in the shape the selection bin uses.
+ *
+ * Returns undefined when the asset is not a clip, or carries no usable range.
+ *
+ * Both representations are returned when available: `startTime`/`endTime` in
+ * seconds drive display and per-segment pipeline runs, while the original
+ * `HH:MM:SS:FF` timecodes are preserved so `segmentToClipBoundary` can send
+ * frame-accurate boundaries to the download and collection APIs rather than
+ * re-deriving a second-accurate approximation.
+ *
+ * The seconds are derived from the timecodes when the payload has no numeric
+ * ones -- which is the normal case. The search API returns clips as
+ * `{start_timecode, end_timecode, score}` (see
+ * collections_ID_assets_get.py and the OpenSearch clip documents), so a guard
+ * requiring numeric `start`/`end` rejects every real clip: the bin then showed
+ * no time range, and, because `segmentToClipBoundary` was never reached, a
+ * bulk download or add-to-collection silently processed the whole asset instead
+ * of the selected clip.
+ *
+ * `fps` is taken from the asset's embedded metadata so a frame offset inside the
+ * timecode converts correctly; it falls back to DEFAULT_FPS when unknown.
+ */
+export function getClipSegment(asset: any):
+  | {
+      startTime: number;
+      endTime: number;
+      startTimecode?: string;
+      endTimecode?: string;
+    }
+  | undefined {
+  const clip = asset?.clipData;
+  if (!clip) return undefined;
+
+  const fps = getAssetFrameRate(asset);
+
+  const startTimecode =
+    typeof clip.start_timecode === "string" && clip.start_timecode.trim()
+      ? clip.start_timecode.trim()
+      : undefined;
+  const endTimecode =
+    typeof clip.end_timecode === "string" && clip.end_timecode.trim()
+      ? clip.end_timecode.trim()
+      : undefined;
+
+  const startTime = typeof clip.start === "number" ? clip.start : parseTimecode(startTimecode, fps);
+  const endTime = typeof clip.end === "number" ? clip.end : parseTimecode(endTimecode, fps);
+
+  if (!isValidTime(startTime) || !isValidTime(endTime) || endTime <= startTime) {
+    return undefined;
+  }
+
+  return { startTime, endTime, startTimecode, endTimecode };
 }
 
 /**

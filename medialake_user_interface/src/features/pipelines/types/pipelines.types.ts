@@ -34,6 +34,24 @@ export interface Pipeline {
   webhookUrl?: string;
   webhookAuthMethod?: string;
   webhookCredentialHint?: string;
+  /**
+   * Asset types this pipeline accepts in batch operations. Set by the list API
+   * from the manual trigger node's "Supported Content Types" parameter, so it is
+   * only present on manual-trigger pipelines.
+   */
+  supported_content_types?: string[];
+  /**
+   * True when this pipeline can be launched against a single video segment (an
+   * AI or user marker). Set by the list API from the manual trigger node's
+   * "Per Segment Execution" parameter, so it is only present on manual-trigger
+   * pipelines. Derived server-side because the list response omits `definition`.
+   */
+  per_segment_execution?: boolean;
+  /**
+   * The full node graph. Returned by the pipeline *detail* endpoint only -- the
+   * list endpoint strips it to keep the response under Lambda's payload limit,
+   * so treat it as absent when working with list results.
+   */
   definition: {
     nodes: PipelineNode[];
     edges: PipelineEdge[];

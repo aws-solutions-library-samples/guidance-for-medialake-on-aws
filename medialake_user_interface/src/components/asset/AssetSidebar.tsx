@@ -54,16 +54,29 @@ import TimelineIcon from "@mui/icons-material/Timeline";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import AspectRatioIcon from "@mui/icons-material/AspectRatio";
-import { randomHexColor, getMarkerColorByConfidence } from "../common/utils";
-import type { DetailMarkerAdapter, MarkerApi } from "../player/marker-sync/ports";
+import { getMarkerColorByConfidence, randomHexColor, stableColorForId } from "../common/utils";
+import type { UseDetailPlayerResult } from "../player/useDetailPlayer";
+import type { DetailMarker } from "../player/markerTracks";
 import { getPlayerCurrentTime } from "../player/playerTimeStore";
+import {
+  formatDuration,
+  formatSmpte,
+  formatTimeRange,
+  getAssetFrameRate,
+  parseTimecode,
+} from "@/utils/timecode";
 
-/** Marker display info used by the sidebar UI. Extends MarkerApi with display-only fields. */
-interface MarkerInfo extends MarkerApi {
+/**
+ * Marker display info used by the sidebar UI.
+ *
+ * Extends the player's `DetailMarker` read model with display-only fields. The
+ * marker itself lives on a `MarkerTrack`; this is a projection, so nothing here
+ * is authoritative.
+ */
+interface MarkerInfo extends DetailMarker {
   name?: string;
   style: { color: string };
   createdAt?: number;
-  model_version?: string;
 }
 
 // Storage utilities for confidence level persistence
@@ -88,86 +101,34 @@ const saveConfidenceLevelToStorage = (confidenceLevel: number): void => {
 };
 
 // Utility functions for timecode editing
-const parseTimecodeToSeconds = (timecode: string): number | null => {
-  // Support formats: HH:MM:SS:FF, HH:MM:SS.mmm, MM:SS.mmm, SS.mmm, or just seconds
-  const patterns = [
-    /^(\d{1,2}):(\d{2}):(\d{2}):(\d{2})$/, // HH:MM:SS:FF (frames)
-    /^(\d{1,2}):(\d{2}):(\d{2})\.(\d{3})$/, // HH:MM:SS.mmm
-    /^(\d{1,2}):(\d{2})\.(\d{3})$/, // MM:SS.mmm
-    /^(\d{1,2})\.(\d{3})$/, // SS.mmm
-    /^(\d+(?:\.\d+)?)$/, // Just seconds (decimal)
-  ];
-
-  for (let i = 0; i < patterns.length; i++) {
-    const match = timecode.match(patterns[i]);
-
-    if (match) {
-      let result: number;
-      switch (i) {
-        case 0: // HH:MM:SS:FF (frames) - assume 30fps
-          result =
-            parseInt(match[1]) * 3600 +
-            parseInt(match[2]) * 60 +
-            parseInt(match[3]) +
-            parseInt(match[4]) / 30;
-          break;
-        case 1: // HH:MM:SS.mmm
-          result =
-            parseInt(match[1]) * 3600 +
-            parseInt(match[2]) * 60 +
-            parseInt(match[3]) +
-            parseInt(match[4]) / 1000;
-          break;
-        case 2: // MM:SS.mmm
-          result = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3]) / 1000;
-          break;
-        case 3: // SS.mmm
-          result = parseInt(match[1]) + parseInt(match[2]) / 1000;
-          break;
-        case 4: // Just seconds
-          result = parseFloat(match[1]);
-          break;
-        default:
-          result = 0;
-      }
-      return result;
-    }
-  }
-
-  return null;
-};
-
-const formatSecondsToTimecode = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const frames = Math.floor((seconds % 1) * 30); // Assume 30fps
-
-  // Always use HH:MM:SS:FF format to match the system
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs
-    .toString()
-    .padStart(2, "0")}:${frames.toString().padStart(2, "0")}`;
-};
+//
+// Both directions delegate to the shared `utils/timecode` module. The local
+// implementations they replace hardcoded 30fps, while the rest of the app -- the
+// player load options, the keyboard-shortcut shuttle, `markerHelpers` -- assumed
+// 25, so a marker's displayed frame number disagreed with the frame the player
+// actually seeked to. The frame rate is now the asset's real one where the
+// metadata reports it.
 
 // Editable Timecode Component
 const EditableTimecode: React.FC<{
   value: number;
   markerId: string;
   field: "start" | "end";
+  /** The asset's frame rate, when known. Falls back to DEFAULT_FPS. */
+  fps?: number;
   onUpdate: (markerId: string, field: "start" | "end", newTimeSeconds: number) => void;
-}> = ({ value, markerId, field, onUpdate }) => {
+}> = ({ value, markerId, field, fps, onUpdate }) => {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
 
   const handleStartEdit = () => {
-    const formattedTime = formatSecondsToTimecode(value);
-    setEditValue(formattedTime);
+    setEditValue(formatSmpte(value, fps) ?? "");
     setIsEditing(true);
   };
 
   const handleSaveEdit = () => {
-    const newTimeSeconds = parseTimecodeToSeconds(editValue);
+    const newTimeSeconds = parseTimecode(editValue, fps);
 
     if (newTimeSeconds !== null) {
       onUpdate(markerId, field, newTimeSeconds);
@@ -228,7 +189,7 @@ const EditableTimecode: React.FC<{
       onClick={handleStartEdit}
       title={t("common.clickToEdit")}
     >
-      {formatSecondsToTimecode(value)}
+      {formatSmpte(value, fps)}
     </Typography>
   );
 };
@@ -237,9 +198,15 @@ interface AssetSidebarProps {
   versions?: any[];
   comments?: any[];
   onAddComment?: (comment: string) => void;
-  markerAdapter?: DetailMarkerAdapter;
+  playerMarkers?: UseDetailPlayerResult | null;
   isMarkerReady?: boolean;
   seek?: (time: number) => void;
+  /**
+   * Seconds of the clip the user arrived from (the `?t=` deep link). The marker
+   * covering this time is emphasised and scrolled into view, so a semantic result
+   * click lands on the matching entry instead of the top of a 38-item list.
+   */
+  focusTime?: number;
   assetId?: string;
   asset?: any;
   assetType?: string;
@@ -257,28 +224,33 @@ interface AssetVersionProps {
 }
 
 // Parse a smartcrop Segment string ("HH:MM:SS:FF/HH:MM:SS:FF") into a compact
-// display like "0:02–0:08 · 6s". Frames are ignored (display precision only).
+// display like "00:02 – 00:08 · 6s".
+//
+// Frames are deliberately dropped: this is a duration summary on a version card,
+// where frame precision is noise. The range and the duration both come from the
+// shared formatters so the range matches every other clip surface.
 const formatSegmentInfo = (segment?: string): string | null => {
   if (!segment || typeof segment !== "string" || !segment.includes("/")) return null;
-  const toSeconds = (tc: string): number | null => {
-    const parts = tc.replace(/;/g, ":").split(":").map(Number);
-    if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  };
-  const clock = (s: number): string =>
-    `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
   const [startTc, endTc] = segment.split("/");
-  const start = toSeconds(startTc);
-  const end = toSeconds(endTc);
+  const start = parseTimecode(startTc?.replace(/;/g, ":"));
+  const end = parseTimecode(endTc?.replace(/;/g, ":"));
   if (start === null || end === null || end <= start) return null;
-  return `${clock(start)}\u2013${clock(end)} \u00b7 ${end - start}s`;
+
+  const range = formatTimeRange(start, end);
+  const duration = formatDuration(end - start);
+  if (!range) return null;
+
+  return duration ? `${range} \u00b7 ${duration}` : range;
 };
 
 interface AssetMarkersProps {
   onMarkerAdd?: () => void;
-  markerAdapter?: DetailMarkerAdapter;
+  playerMarkers?: UseDetailPlayerResult | null;
   isMarkerReady?: boolean;
   seek?: (time: number) => void;
+  /** See `AssetSidebarProps.focusTime`. */
+  focusTime?: number;
   markers?: MarkerInfo[];
   setMarkers?: React.Dispatch<React.SetStateAction<MarkerInfo[]>>;
   asset: any;
@@ -544,8 +516,9 @@ const AssetVersions: React.FC<AssetVersionProps> = ({
 };
 
 /**
- * Per-segment workflow menu shown on each marker card. Lists pipelines whose
- * manual trigger has "Per Segment Execution" enabled and runs the selected one
+ * Per-segment workflow menu shown on each marker card. Lists pipelines the API
+ * flagged with `per_segment_execution` (derived server-side from the manual
+ * trigger node's "Per Segment Execution" parameter) and runs the selected one
  * against this segment's time range (passed as start_time/end_time params).
  * Renders nothing when the feature is unavailable or there are no eligible
  * pipelines. Gated by the caller via the segment-workflows feature flag.
@@ -706,9 +679,10 @@ const SegmentWorkflowMenu: React.FC<{
 const AssetMarkers: React.FC<AssetMarkersProps> = ({
   markers,
   setMarkers,
-  markerAdapter,
+  playerMarkers,
   isMarkerReady,
   seek,
+  focusTime,
   asset,
   assetId,
 
@@ -720,8 +694,10 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   const theme = useTheme();
   const { enqueueSnackbar } = useSnackbar();
 
-  // Per-segment workflows: list manual-trigger pipelines flagged for per-segment
+  // Per-segment workflows: list pipelines the API flagged for per-segment
   // execution so each marker card can launch one against its own time range.
+  // The list endpoint omits the node graph, so this flag has to come from the
+  // backend -- parsing `definition` here silently matched nothing.
   // Gated behind a feature flag; the pipelines query is skipped when disabled.
   const segmentWorkflowsEnabled = useFeatureFlag("segment-workflows-enabled", false);
   const { data: segmentPipelinesData } = useGetPipelines({
@@ -729,15 +705,11 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
   });
   const perSegmentPipelines = useMemo(() => {
     if (!segmentWorkflowsEnabled || !segmentPipelinesData?.data?.s) return [];
-    return segmentPipelinesData.data.s.filter((pipeline: any) => {
-      if (!pipeline.type?.includes("Manual Trigger")) return false;
-      // The list API returns the graph under definition.configuration.nodes;
-      // fall back to definition.nodes for any older/transformed payloads.
-      const nodes = pipeline.definition?.configuration?.nodes ?? pipeline.definition?.nodes ?? [];
-      const triggerNode = nodes.find((n: any) => n.data?.nodeId === "trigger_manual");
-      const flag = triggerNode?.data?.configuration?.parameters?.["Per Segment Execution"];
-      return flag === true || flag === "true" || flag === "Enabled";
-    });
+    // The API only sets the flag on manual-trigger pipelines, so no separate
+    // trigger-type check is needed here.
+    return segmentPipelinesData.data.s.filter(
+      (pipeline: any) => pipeline.per_segment_execution === true
+    );
   }, [segmentWorkflowsEnabled, segmentPipelinesData]);
 
   // State to track editable marker names
@@ -842,61 +814,94 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     }
   }, [asset?.clips, scoreThresholdInitialized]);
 
-  // Refresh markers from adapter whenever adapter readiness changes
-  const refreshMarkers = useCallback(() => {
-    if (!markerAdapter?.isReady()) return;
-    const adapterMarkers = markerAdapter.list();
+  // Project the player's marker tracks into the sidebar's display model.
+  //
+  // The tracks are the source of truth, so this derives rather than stores: it
+  // runs whenever either track changes, including for markers created by the `I`
+  // shortcut or moved by dragging a marker bar. The implementation this replaces
+  // only re-projected on the sidebar's own writes, so those two paths were
+  // invisible here until something else forced a refresh.
+  const markerNamesState = markerNames;
+  useEffect(() => {
+    if (!playerMarkers?.isReady) return;
+
     const names = markerNamesRef.current;
-    const mapped: MarkerInfo[] = adapterMarkers.map((m) => ({
-      ...m,
-      name: names[m.id] || m.label,
+    const project = (marker: DetailMarker): MarkerInfo => ({
+      ...marker,
+      name: names[marker.id] || marker.label,
       style: {
         color:
-          m.color ||
-          (m.type === "semantic" ? getMarkerColorByConfidence(m.score) : randomHexColor()),
+          marker.color ??
+          (marker.kind === "semantic"
+            ? getMarkerColorByConfidence(marker.score, marker.modelVersion)
+            : // A user marker always carries a colour from creation. This branch is
+              // a last resort, and uses a stable hash of the id rather than
+              // `randomHexColor()` — the old code re-randomised on every
+              // projection, so such markers changed colour as you used the page.
+              stableColorForId(marker.id)),
       },
-    }));
-    setMarkers(mapped);
-  }, [markerAdapter, setMarkers]);
+    });
 
-  // Refresh marker list when adapter becomes ready
-  useEffect(() => {
-    if (isMarkerReady) {
-      refreshMarkers();
+    setMarkers?.([
+      ...playerMarkers.userMarkers.map(project),
+      ...playerMarkers.semanticMarkers.map(project),
+    ]);
+  }, [
+    playerMarkers?.isReady,
+    playerMarkers?.userMarkers,
+    playerMarkers?.semanticMarkers,
+    markerNamesState,
+    setMarkers,
+  ]);
+
+  const assetFps = useMemo(() => getAssetFrameRate(asset), [asset]);
+
+  // The marker the user arrived at, from the `?t=` deep link.
+  //
+  // Containment rather than equality: `t` is the clip's start, but a rounded or
+  // reformatted value should still resolve to the clip it names. Ties go to the
+  // latest start, which is the innermost span when clips overlap.
+  const focusedMarkerId = useMemo(() => {
+    if (focusTime === undefined || !markers?.length) return null;
+
+    const EPSILON = 0.001;
+    let best: MarkerInfo | null = null;
+    for (const marker of markers) {
+      const covers =
+        focusTime >= marker.startTime - EPSILON && focusTime <= marker.endTime + EPSILON;
+      if (!covers) continue;
+      if (!best || marker.startTime > best.startTime) best = marker;
     }
-  }, [isMarkerReady, refreshMarkers]);
+    return best?.id ?? null;
+  }, [focusTime, markers]);
 
-  // Subscribe to MARKER_COMMIT_FAILED_ROLLBACK_APPLIED for rollback warning
+  // Bring the focused marker into view once it exists. Semantic lists run to
+  // dozens of entries, so without this the deep link lands on a list scrolled to
+  // the top with the relevant entry somewhere below the fold.
+  const focusedMarkerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!markerAdapter) return;
-    const handler = () => {
-      enqueueSnackbar(
-        t("common.markerRollbackWarning", "A marker change was rolled back due to a sync error."),
-        {
-          variant: "warning",
-          autoHideDuration: 4000,
-        }
-      );
-      refreshMarkers();
-    };
-    markerAdapter.on("MARKER_COMMIT_FAILED_ROLLBACK_APPLIED", handler);
-    return () => {
-      markerAdapter.off("MARKER_COMMIT_FAILED_ROLLBACK_APPLIED", handler);
-    };
-  }, [markerAdapter, refreshMarkers, enqueueSnackbar, t]);
+    if (!focusedMarkerId) return;
+    focusedMarkerRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusedMarkerId]);
 
-  // Create semantic markers from clips via adapter
+  // Helper function to convert timecode to seconds using actual asset frame rate
+  const timecodeToSeconds = useCallback(
+    (timecode: string): number => parseTimecode(timecode, assetFps) ?? 0,
+    [assetFps]
+  );
+
+  // Publish the asset's clips onto the semantic marker track.
+  //
+  // The whole clip set goes on the track regardless of the confidence threshold —
+  // thresholding is a rendering decision applied below. The implementation this
+  // replaces removed and re-added markers on every threshold change, which reset
+  // their revisions and discarded any edits.
   useEffect(() => {
-    if (
-      !markerAdapter?.isReady() ||
-      !asset?.clips ||
-      !Array.isArray(asset.clips) ||
-      clipsMarkersCreated
-    )
-      return;
+    if (!playerMarkers?.isReady || !asset?.clips || !Array.isArray(asset.clips)) return;
+    if (clipsMarkersCreated) return;
 
-    const allVisualTextClips = asset.clips
-      .filter((clip) => {
+    const clips = asset.clips
+      .filter((clip: any) => {
         const isValidEmbedding =
           clip.embedding_option === "visual-text" ||
           clip.embedding_option === "visual" ||
@@ -906,268 +911,113 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           (clip.start_timecode || clip.start_time) && (clip.end_timecode || clip.end_time);
         return isValidEmbedding && hasValidScore && hasValidTimes;
       })
-      .sort((a, b) => (b.score || 0) - (a.score || 0));
+      .map((clip: any) => {
+        const startTime = timecodeToSeconds(clip.start_timecode || clip.start_time);
+        const endTime = timecodeToSeconds(clip.end_timecode || clip.end_time);
+        return {
+          startTime,
+          endTime,
+          label: searchTerm || "Clip",
+          color: getMarkerColorByConfidence(clip.score, clip.model_version),
+          score: clip.score,
+          modelVersion: clip.model_version,
+        };
+      })
+      .filter((clip: any) => clip.endTime > clip.startTime);
 
-    setIsLoadingSemanticMarkers(true);
-
-    allVisualTextClips.forEach((clip) => {
-      const startTime = clip.start_timecode || clip.start_time;
-      const endTime = clip.end_timecode || clip.end_time;
-      const startSeconds = timecodeToSeconds(startTime);
-      const endSeconds = timecodeToSeconds(endTime);
-      const clipScore = clip.score !== undefined ? clip.score : undefined;
-      const markerColor = getMarkerColorByConfidence(clipScore, clip.model_version);
-      const defaultName = searchTerm || `Clip`;
-
-      markerAdapter.add(
-        {
-          timeObservation: { start: startSeconds, end: endSeconds },
-          label: defaultName,
-          color: markerColor,
-          score: clipScore,
-          type: "semantic",
-        },
-        "sidebar"
-      );
-    });
-
+    playerMarkers.setSemanticMarkers(clips);
     setClipsMarkersCreated(true);
-    setIsLoadingSemanticMarkers(false);
-    refreshMarkers();
   }, [
-    markerAdapter,
-    isMarkerReady,
+    playerMarkers,
     asset?.clips,
     clipsMarkersCreated,
     searchTerm,
     setClipsMarkersCreated,
-    refreshMarkers,
-  ]);
-
-  // Sync confidence threshold → coordinator: remove semantic markers below threshold,
-  // re-add ones above threshold that were previously removed.
-  // This keeps the player's progressMarkerTrack in sync via the MARKER_ADDED/REMOVED events.
-  const prevThresholdRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!markerAdapter?.isReady() || !clipsMarkersCreated) return;
-    // Skip the first run (initial threshold set before markers exist)
-    if (prevThresholdRef.current === null) {
-      prevThresholdRef.current = scoreThreshold;
-      return;
-    }
-    prevThresholdRef.current = scoreThreshold;
-
-    // Get current semantic markers in the coordinator
-    const currentMarkers = markerAdapter.list().filter((m) => m.type === "semantic");
-    const currentIds = new Set(currentMarkers.map((m) => m.id));
-
-    // Remove semantic markers that are now below threshold
-    for (const m of currentMarkers) {
-      if ((m.score ?? 0) < scoreThreshold) {
-        markerAdapter.remove(m.id, "sidebar");
-      }
-    }
-
-    // Re-add semantic markers from clips that are now above threshold but missing
-    if (asset?.clips && Array.isArray(asset.clips)) {
-      // Snapshot current marker IDs to avoid calling list() inside the loop
-      const currentMarkerIds = new Set(markerAdapter.list().map((m) => m.id));
-
-      const eligibleClips = asset.clips.filter((clip: any) => {
-        const isValidEmbedding =
-          clip.embedding_option === "visual-text" ||
-          clip.embedding_option === "visual" ||
-          clip.embedding_scope === "clip";
-        const hasValidScore = clip.score !== null && clip.score !== undefined;
-        const hasValidTimes =
-          (clip.start_timecode || clip.start_time) && (clip.end_timecode || clip.end_time);
-        return (
-          isValidEmbedding && hasValidScore && hasValidTimes && (clip.score ?? 0) >= scoreThreshold
-        );
-      });
-
-      for (const clip of eligibleClips) {
-        const startTime = clip.start_timecode || clip.start_time;
-        const endTime = clip.end_timecode || clip.end_time;
-        const startSeconds = timecodeToSeconds(startTime);
-        const endSeconds = timecodeToSeconds(endTime);
-        // Reconstruct the expected coordinator ID for semantic markers
-        const expectedId = `clip-${startSeconds}-${endSeconds}-${assetId}`;
-        // Only add if not already present in the coordinator
-        if (!currentMarkerIds.has(expectedId)) {
-          const clipScore = clip.score !== undefined ? clip.score : undefined;
-          const markerColor = getMarkerColorByConfidence(clipScore, clip.model_version);
-          markerAdapter.add(
-            {
-              timeObservation: { start: startSeconds, end: endSeconds },
-              label: searchTerm || "Clip",
-              color: markerColor,
-              score: clipScore,
-              type: "semantic",
-            },
-            "sidebar"
-          );
-        }
-      }
-    }
-
-    refreshMarkers();
-  }, [
-    scoreThreshold,
-    markerAdapter,
-    clipsMarkersCreated,
-    asset?.clips,
-    assetId,
-    searchTerm,
-    refreshMarkers,
+    timecodeToSeconds,
   ]);
 
   const deleteMarker = (markerId: string) => {
-    if (!markerAdapter) return;
-
-    try {
-      markerAdapter.remove(markerId, "sidebar");
-      setMarkerNames((prev) => {
-        const newNames = { ...prev };
-        delete newNames[markerId];
-        return newNames;
-      });
-      refreshMarkers();
-    } catch (error) {
-      console.error("Error deleting marker:", error);
-    }
+    playerMarkers?.removeUserMarker(markerId);
+    setMarkerNames((prev) => {
+      const next = { ...prev };
+      delete next[markerId];
+      return next;
+    });
   };
 
-  // Function to reset a specific semantic marker to original values
+  /**
+   * Restore a semantic marker to the clip range the pipeline produced.
+   *
+   * Matching is by time proximity rather than by a reconstructed id: marker ids
+   * are Omakase uuids now, so the old string-built `clip-{start}-{end}-{assetId}`
+   * id no longer exists to compare against.
+   */
   const resetSemanticMarker = (markerId: string) => {
-    if (!markerAdapter || !asset?.clips) return;
+    if (!playerMarkers || !asset?.clips) return;
 
-    try {
-      const originalClip = asset.clips.find((clip) => {
-        const startTime = clip.start_time || clip.start_timecode;
-        const endTime = clip.end_time || clip.end_timecode;
-        if (!startTime || !endTime) return false;
-        const clipId = `clip_${startTime}_${endTime}`;
-        return markerId.includes(clipId) || markerId.includes(startTime.toString());
-      });
+    const marker = markers.find((m) => m.id === markerId);
+    if (!marker) return;
 
-      if (!originalClip) return;
+    let best: { startTime: number; endTime: number } | null = null;
+    let bestDelta = Number.POSITIVE_INFINITY;
 
-      const startTime = originalClip.start_time || originalClip.start_timecode;
-      const endTime = originalClip.end_time || originalClip.end_timecode;
-      if (!startTime || !endTime) return;
+    for (const clip of asset.clips as any[]) {
+      const rawStart = clip.start_timecode || clip.start_time;
+      const rawEnd = clip.end_timecode || clip.end_time;
+      if (!rawStart || !rawEnd) continue;
 
-      const startSeconds = timecodeToSeconds(startTime);
-      const endSeconds = timecodeToSeconds(endTime);
+      const startTime = timecodeToSeconds(rawStart);
+      const endTime = timecodeToSeconds(rawEnd);
+      if (endTime <= startTime) continue;
 
-      markerAdapter.update(
-        markerId,
-        { timeObservation: { start: startSeconds, end: endSeconds } },
-        "sidebar"
-      );
-      refreshMarkers();
-    } catch (error) {
-      console.error("Error resetting semantic marker:", error);
+      const delta = Math.abs(startTime - marker.startTime);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        best = { startTime, endTime };
+      }
+    }
+
+    if (best) {
+      playerMarkers.updateMarker(markerId, { startTime: best.startTime, endTime: best.endTime });
     }
   };
 
-  // Function to update marker time (start or end) for both user and semantic markers
   const updateMarkerTime = (markerId: string, field: "start" | "end", newTimeSeconds: number) => {
-    if (!markerAdapter) return;
-
-    try {
-      const marker = markers.find((m) => m.id === markerId);
-      if (!marker) return;
-
-      const currentTimeObservation = marker.timeObservation;
-      const newTimeObservation = {
-        start: field === "start" ? newTimeSeconds : currentTimeObservation.start,
-        end: field === "end" ? newTimeSeconds : currentTimeObservation.end,
-      };
-
-      if (newTimeObservation.start >= newTimeObservation.end) {
-        console.warn("Invalid time range: start must be less than end", newTimeObservation);
-        return;
-      }
-
-      markerAdapter.update(markerId, { timeObservation: newTimeObservation }, "sidebar");
-      refreshMarkers();
-    } catch (error) {
-      console.error("Error updating marker time:", error);
-    }
+    // The track rejects an inverted range, so no guard is needed here.
+    playerMarkers?.updateMarker(
+      markerId,
+      field === "start" ? { startTime: newTimeSeconds } : { endTime: newTimeSeconds }
+    );
   };
 
   const addMarker = () => {
-    if (!markerAdapter?.isReady()) return;
+    if (!playerMarkers?.isReady) return;
 
-    try {
-      const time = getPlayerCurrentTime();
-      const color = randomHexColor();
-      const userMarkerCount = markers.filter((m) => m.type === "user").length;
-      const defaultName = `Marker ${userMarkerCount + 1}`;
+    const time = getPlayerCurrentTime();
+    const userMarkerCount = markers.filter((m) => m.kind === "user").length;
+    const defaultName = `Marker ${userMarkerCount + 1}`;
 
-      const created = markerAdapter.add(
-        {
-          timeObservation: { start: time, end: time + 5 },
-          label: defaultName,
-          color,
-          type: "user",
-        },
-        "sidebar"
-      );
+    const created = playerMarkers.addUserMarker({
+      startTime: time,
+      endTime: time + 5,
+      label: defaultName,
+      color: randomHexColor(),
+    });
 
-      if (created) {
-        setMarkerNames((prev) => ({ ...prev, [created.id]: defaultName }));
-        refreshMarkers();
-      }
-    } catch (error) {
-      console.error("Error adding marker:", error);
+    if (created) {
+      setMarkerNames((prev) => ({ ...prev, [created.id]: defaultName }));
     }
   };
 
-  // Cache the extracted frame rate so we don't re-parse metadata on every call
-  const cachedFpsRef = useRef<number | null>(null);
-
-  // Reset cached FPS when asset changes
-  useEffect(() => {
-    cachedFpsRef.current = null;
-  }, [asset]);
-
-  // Helper function to convert timecode to seconds using actual asset frame rate
-  const timecodeToSeconds = (timecode: string): number => {
-    const [hours, minutes, seconds, frames] = timecode.split(":").map(Number);
-
-    if (cachedFpsRef.current === null) {
-      let framesPerSecond = 25;
-      try {
-        const videoMetadata = asset?.Metadata?.EmbeddedMetadata?.video;
-        if (videoMetadata && Array.isArray(videoMetadata) && videoMetadata[0]) {
-          const frameRate = videoMetadata[0].FrameRate;
-          if (frameRate && typeof frameRate === "string") {
-            framesPerSecond = parseFloat(frameRate);
-          } else if (frameRate && typeof frameRate === "number") {
-            framesPerSecond = frameRate;
-          }
-        }
-        if (framesPerSecond === 25) {
-          const generalMetadata = asset?.Metadata?.EmbeddedMetadata?.general;
-          if (generalMetadata?.FrameRate) {
-            const frameRate = generalMetadata.FrameRate;
-            if (typeof frameRate === "string") {
-              framesPerSecond = parseFloat(frameRate);
-            } else if (typeof frameRate === "number") {
-              framesPerSecond = frameRate;
-            }
-          }
-        }
-      } catch {
-        /* use default */
-      }
-      cachedFpsRef.current = framesPerSecond;
-    }
-
-    return hours * 3600 + minutes * 60 + seconds + frames / cachedFpsRef.current;
-  };
+  /**
+   * The asset's real frame rate, when its metadata reports one.
+   *
+   * Memoized on the asset rather than lazily cached in a ref: the previous
+   * version used `if (fps === 25)` as a "not found yet" sentinel, so an asset
+   * genuinely shot at 25fps fell through to the general-metadata lookup.
+   * `getAssetFrameRate` returns undefined for unknown instead, and also handles
+   * the ffprobe rational form ("30000/1001") that the old parser produced NaN for.
+   */
 
   // Helper function to convert score threshold to human-friendly confidence label
   const getConfidenceLabel = (threshold: number): string => {
@@ -1178,9 +1028,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
     return "Very Low";
   };
 
-  const userMarkerCount = markers?.filter((m) => m.type === "user").length || 0;
+  const userMarkerCount = markers?.filter((m) => m.kind === "user").length || 0;
   const aiMarkerCount =
-    markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold).length || 0;
+    markers?.filter((m) => m.kind === "semantic" && (m.score || 0) >= scoreThreshold).length || 0;
 
   return (
     <Box sx={{ p: 1.5, pt: 1 }}>
@@ -1373,9 +1223,9 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             }}
           >
             <PersonIcon sx={{ fontSize: 14 }} />
-            User Markers ({markers?.filter((m) => m.type === "user").length || 0})
+            User Markers ({markers?.filter((m) => m.kind === "user").length || 0})
           </Typography>
-          {markers?.filter((m) => m.type === "user").length === 0 ? (
+          {markers?.filter((m) => m.kind === "user").length === 0 ? (
             <Box
               sx={{
                 p: 2.5,
@@ -1395,14 +1245,15 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             </Box>
           ) : (
             markers
-              .filter((m) => m.type === "user")
+              .filter((m) => m.kind === "user")
               .sort((a, b) => b.id.localeCompare(a.id)) // Sort by ID descending (newest first)
               .map((marker, index) => (
                 <Box
                   key={marker.id}
+                  ref={marker.id === focusedMarkerId ? focusedMarkerRef : undefined}
                   onClick={() => {
                     if (seek) {
-                      seek(marker.timeObservation.start);
+                      seek(marker.startTime);
                     }
                   }}
                   sx={{
@@ -1410,11 +1261,15 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     p: 1.25,
                     pr: 4,
                     position: "relative",
-                    bgcolor: (theme) => alpha(marker.style.color, 0.05),
+                    bgcolor: (theme) =>
+                      alpha(marker.style.color, marker.id === focusedMarkerId ? 0.14 : 0.05),
                     borderRadius: "10px",
-                    border: `1px solid ${alpha(marker.style.color, 0.15)}`,
+                    border: `1px solid ${alpha(marker.style.color, marker.id === focusedMarkerId ? 0.5 : 0.15)}`,
                     borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
+                    ...(marker.id === focusedMarkerId
+                      ? { boxShadow: `0 0 0 2px ${alpha(marker.style.color, 0.35)}` }
+                      : {}),
                     transition:
                       "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
@@ -1456,7 +1311,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                             ...prev,
                             [marker.id]: newName,
                           }));
-                          markerAdapter?.update(marker.id, { label: newName }, "sidebar");
+                          playerMarkers?.updateMarker(marker.id, { label: newName });
                         }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                         onKeyDown={(e: React.KeyboardEvent) => {
@@ -1498,18 +1353,20 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       }}
                     >
                       <EditableTimecode
-                        value={marker.timeObservation.start}
+                        value={marker.startTime}
                         markerId={marker.id}
                         field="start"
+                        fps={assetFps}
                         onUpdate={updateMarkerTime}
                       />
                       <Typography variant="caption" sx={{ color: "text.secondary" }}>
                         {" - "}
                       </Typography>
                       <EditableTimecode
-                        value={marker.timeObservation.end}
+                        value={marker.endTime}
                         markerId={marker.id}
                         field="end"
+                        fps={assetFps}
                         onUpdate={updateMarkerTime}
                       />
                     </Box>
@@ -1536,8 +1393,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     <SegmentWorkflowMenu
                       pipelines={perSegmentPipelines}
                       assetId={assetId}
-                      startTime={marker.timeObservation.start}
-                      endTime={marker.timeObservation.end}
+                      startTime={marker.startTime}
+                      endTime={marker.endTime}
                     />
                   </Box>
                   <IconButton
@@ -1592,7 +1449,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
           >
             <SmartToyIcon sx={{ fontSize: 14 }} />
             Semantic Markers (
-            {markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+            {markers?.filter((m) => m.kind === "semantic" && (m.score || 0) >= scoreThreshold)
               .length || 0}
             )
           </Typography>
@@ -1718,7 +1575,7 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                 </Typography>
               </Box>
             </Box>
-          ) : markers?.filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+          ) : markers?.filter((m) => m.kind === "semantic" && (m.score || 0) >= scoreThreshold)
               .length === 0 ? (
             <Box
               sx={{
@@ -1739,14 +1596,15 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
             </Box>
           ) : (
             markers
-              .filter((m) => m.type === "semantic" && (m.score || 0) >= scoreThreshold)
+              .filter((m) => m.kind === "semantic" && (m.score || 0) >= scoreThreshold)
               .sort((a, b) => (b.score || 0) - (a.score || 0)) // Sort by score descending
               .map((marker, index) => (
                 <Box
                   key={marker.id}
+                  ref={marker.id === focusedMarkerId ? focusedMarkerRef : undefined}
                   onClick={() => {
                     if (seek) {
-                      seek(marker.timeObservation.start);
+                      seek(marker.startTime);
                     }
                   }}
                   sx={{
@@ -1754,11 +1612,16 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     p: 1.25,
                     pr: 4, // Add padding-right to make space for reset button
                     position: "relative",
-                    bgcolor: alpha(marker.style.color, 0.05),
+                    bgcolor: alpha(marker.style.color, marker.id === focusedMarkerId ? 0.14 : 0.05),
                     borderRadius: "10px",
-                    border: `1px solid ${alpha(marker.style.color, 0.15)}`,
+                    border: `1px solid ${alpha(marker.style.color, marker.id === focusedMarkerId ? 0.5 : 0.15)}`,
                     borderLeft: `3px solid ${marker.style.color}`,
                     cursor: "pointer",
+                    // The clip the user clicked through from. Emphasised so a deep
+                    // link lands somewhere obvious in a long list.
+                    ...(marker.id === focusedMarkerId
+                      ? { boxShadow: `0 0 0 2px ${alpha(marker.style.color, 0.35)}` }
+                      : {}),
                     transition:
                       "background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                     "&:hover": {
@@ -1819,18 +1682,20 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                     <Box sx={{ flexShrink: 0, position: "relative" }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <EditableTimecode
-                          value={marker.timeObservation.start}
+                          value={marker.startTime}
                           markerId={marker.id}
                           field="start"
+                          fps={assetFps}
                           onUpdate={updateMarkerTime}
                         />
                         <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {" - "}
                         </Typography>
                         <EditableTimecode
-                          value={marker.timeObservation.end}
+                          value={marker.endTime}
                           markerId={marker.id}
                           field="end"
+                          fps={assetFps}
                           onUpdate={updateMarkerTime}
                         />
                       </Box>
@@ -1885,8 +1750,8 @@ const AssetMarkers: React.FC<AssetMarkersProps> = ({
                       <SegmentWorkflowMenu
                         pipelines={perSegmentPipelines}
                         assetId={assetId}
-                        startTime={marker.timeObservation.start}
-                        endTime={marker.timeObservation.end}
+                        startTime={marker.startTime}
+                        endTime={marker.endTime}
                       />
                     </Box>
                   </Box>
@@ -2232,9 +2097,10 @@ const _AssetActivity: React.FC<AssetActivityProps> = () => {
 export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
   const { t } = useTranslation();
   const {
-    markerAdapter,
+    playerMarkers,
     isMarkerReady,
     seek,
+    focusTime,
     versions = [],
     assetId,
     asset,
@@ -2360,9 +2226,10 @@ export const AssetSidebar: React.FC<AssetSidebarProps> = (props) => {
           >
             {currentTab === 0 && (
               <AssetMarkers
-                markerAdapter={markerAdapter}
+                playerMarkers={playerMarkers}
                 isMarkerReady={isMarkerReady}
                 seek={seek}
+                focusTime={focusTime}
                 markers={markers}
                 setMarkers={setMarkers}
                 asset={asset}

@@ -388,6 +388,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "Sammlung konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
     addToCollection: "Zur Sammlung hinzufügen",
+    itemsBeingAdded: "Hinzugefügte Elemente",
     searchCollections: "Sammlungen durchsuchen...",
     createNew: "Neue Sammlung erstellen",
     noSharedWithMe: "Keine mit Ihnen geteilten Sammlungen",
@@ -1378,6 +1379,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "Vorschau noch nicht verfügbar",
+      previewUnavailableBody:
+        "Für dieses Asset wurde noch kein abspielbarer Proxy erzeugt. Wenn die Ingest-Pipeline noch läuft, erscheint die Vorschau nach Abschluss hier.",
+    },
     tabs: {
       summary: "Zusammenfassung",
       technical: "Technische Metadaten",

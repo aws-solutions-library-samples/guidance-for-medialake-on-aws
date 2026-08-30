@@ -65,8 +65,83 @@ dynamodb_client = boto3.client(
 _deserializer = TypeDeserializer()
 
 
+# Template id of the manual trigger node, as stored on `data.nodeId` / `data.id`.
+MANUAL_TRIGGER_NODE_ID = "trigger_manual"
+
+# Parameter names on the manual trigger node that the list view surfaces as
+# top-level pipeline fields.
+SUPPORTED_CONTENT_TYPES_PARAM = "Supported Content Types"
+PER_SEGMENT_EXECUTION_PARAM = "Per Segment Execution"
+
+# Accepted truthy spellings for a boolean node parameter. The node template
+# declares `Per Segment Execution` as a real boolean, but definitions imported
+# from hand-written JSON have been seen carrying strings, so both are tolerated.
+_TRUTHY_STRINGS = frozenset({"true", "enabled", "yes", "1"})
+
+
 class PipelineError(Exception):
     """Custom exception for pipeline errors"""
+
+
+def _node_template_id(node: Any) -> Optional[str]:
+    """
+    Return a node's template id (e.g. "trigger_manual").
+
+    `data.nodeId` is the canonical field; `data.id` is the pre-`nodeId` spelling
+    kept for definitions written before the normalizer mirrored the two. Reading
+    both matches `trigger_pipeline` and the post_pipelines graph helpers, so a
+    definition stored by an older release still resolves here.
+    """
+    if not isinstance(node, dict):
+        return None
+    data = node.get("data")
+    if not isinstance(data, dict):
+        return None
+    return data.get("nodeId") or data.get("id")
+
+
+def _find_node_by_template_id(nodes: Any, template_id: str) -> Optional[Dict[str, Any]]:
+    """Return the first node with the given template id, or None."""
+    if not isinstance(nodes, list):
+        return None
+    for node in nodes:
+        if _node_template_id(node) == template_id:
+            return node
+    return None
+
+
+def _node_parameters(node: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return a node's configured parameters, or an empty dict."""
+    if not isinstance(node, dict):
+        return {}
+    configuration = node.get("data", {}).get("configuration")
+    if not isinstance(configuration, dict):
+        return {}
+    parameters = configuration.get("parameters")
+    return parameters if isinstance(parameters, dict) else {}
+
+
+def _as_bool(value: Any) -> bool:
+    """
+    Coerce a node parameter into a bool.
+
+    Booleans pass through; strings are matched case-insensitively against the
+    known truthy spellings. Anything else (None, numbers, lists) is False.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUTHY_STRINGS
+    return False
+
+
+def _parse_content_types(value: Any) -> List[str]:
+    """Normalize the Supported Content Types parameter into a lowercase list."""
+    if isinstance(value, list):
+        return [str(item).strip().lower() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [part.strip().lower() for part in value.split(",") if part.strip()]
+    return []
 
 
 def _error_body(message: str) -> Dict[str, Any]:
@@ -94,6 +169,12 @@ def extract_event_rule_info(pipeline: dict) -> dict:
     """
     Extract and format event rule information from a pipeline.
 
+    Also hoists the manual trigger node's parameters onto the pipeline as
+    top-level fields (`supported_content_types`, `per_segment_execution`).
+    That has to happen here because the list response drops `definition`
+    entirely (see `format_pipeline_for_list`), so the client has no way to read
+    those parameters back out of the node graph.
+
     Args:
         pipeline: The pipeline object from DynamoDB
 
@@ -102,59 +183,38 @@ def extract_event_rule_info(pipeline: dict) -> dict:
     """
     event_rule_info = {"triggerTypes": [], "eventRules": []}
 
-    # Check if this is a manual trigger pipeline by examining the pipeline definition
-    is_manual_trigger = False
-    if "definition" in pipeline and isinstance(pipeline["definition"], dict):
-        configuration = pipeline["definition"].get("configuration", {})
-        nodes = configuration.get("nodes", [])
+    # Locate the manual trigger node once and reuse it for every parameter the
+    # list view surfaces.
+    manual_trigger_node = None
+    definition = pipeline.get("definition")
+    if isinstance(definition, dict):
+        configuration = definition.get("configuration", {})
+        nodes = (
+            configuration.get("nodes", []) if isinstance(configuration, dict) else []
+        )
+        manual_trigger_node = _find_node_by_template_id(nodes, MANUAL_TRIGGER_NODE_ID)
 
-        # Look for trigger_manual node in the pipeline definition
-        for node in nodes:
-            if (
-                isinstance(node, dict)
-                and node.get("data", {}).get("id") == "trigger_manual"
-            ):
-                is_manual_trigger = True
-                break
-
-    if is_manual_trigger:
+    if manual_trigger_node is not None:
         event_rule_info["triggerTypes"].append("Manual Trigger")
 
-        # Extract supported content types from the manual trigger node if available
-        supported_content_types = []
-        if "definition" in pipeline and isinstance(pipeline["definition"], dict):
-            configuration = pipeline["definition"].get("configuration", {})
-            nodes = configuration.get("nodes", [])
+        parameters = _node_parameters(manual_trigger_node)
 
-            for node in nodes:
-                if (
-                    isinstance(node, dict)
-                    and node.get("data", {}).get("id") == "trigger_manual"
-                ):
-                    # Look for supported content types in the node configuration
-                    node_config = node.get("data", {}).get("configuration", {})
-                    parameters = node_config.get("parameters", {})
+        # Restrict which asset types can trigger the pipeline in batch
+        # operations. Empty means "no restriction", which the UI reads as all.
+        supported_content_types = _parse_content_types(
+            parameters.get(SUPPORTED_CONTENT_TYPES_PARAM)
+        )
+        pipeline["supported_content_types"] = supported_content_types or [
+            "video",
+            "audio",
+            "image",
+        ]
 
-                    # Check for "Supported Content Types" parameter
-                    content_types_param = parameters.get("Supported Content Types", "")
-                    if content_types_param:
-                        # Handle both list format (from multiselect) and comma-separated string
-                        if isinstance(content_types_param, list):
-                            supported_content_types = [
-                                ct.strip().lower() for ct in content_types_param
-                            ]
-                        else:
-                            supported_content_types = [
-                                ct.strip().lower()
-                                for ct in content_types_param.split(",")
-                            ]
-                    break
-
-        # Set supported content types for frontend
-        pipeline["supported_content_types"] = (
-            supported_content_types
-            if supported_content_types
-            else ["video", "audio", "image"]
+        # Whether this pipeline can be launched against a single video segment
+        # (an AI or user marker). Always set for manual-trigger pipelines so the
+        # field is a dependable boolean rather than sometimes-absent.
+        pipeline["per_segment_execution"] = _as_bool(
+            parameters.get(PER_SEGMENT_EXECUTION_PARAM)
         )
 
     # Check for Event Triggered (EventBridge rules) - this can coexist with manual triggers

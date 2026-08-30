@@ -380,6 +380,7 @@ export default {
     collectionDeleteFailed: "컬렉션 삭제에 실패했습니다",
     createFailed: "컬렉션 생성에 실패했습니다. 다시 시도하세요.",
     addToCollection: "컬렉션에 추가",
+    itemsBeingAdded: "추가할 항목",
     searchCollections: "컬렉션 검색...",
     createNew: "새 컬렉션 만들기",
     noSharedWithMe: "공유된 컬렉션이 없습니다",
@@ -1357,6 +1358,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "미리 보기를 아직 사용할 수 없습니다",
+      previewUnavailableBody:
+        "이 애셋에 대해 재생 가능한 프록시가 아직 생성되지 않았습니다. 수집 파이프라인이 계속 실행 중이면 완료된 후 여기에 미리 보기가 표시됩니다.",
+    },
     tabs: {
       summary: "요약",
       technical: "기술 메타데이터",

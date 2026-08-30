@@ -51,6 +51,15 @@ class SearchProviderConfig:
     metadata_mapping: Optional[Dict[str, Any]] = None
     callbacks: Optional[Dict[str, Any]] = None
     dataset_id: Optional[str] = None
+    # Per-provider endpoint overrides. Without these the deletion path could
+    # only ever use a plugin's hardcoded defaults: the plugins read
+    # auth_endpoint / dataset_endpoint / search_endpoint / delete_endpoint from
+    # their config, but nothing populated them, so configured endpoints were
+    # silently ignored.
+    auth_endpoint: Optional[str] = None
+    dataset_endpoint: Optional[str] = None
+    search_endpoint: Optional[str] = None
+    delete_endpoint: Optional[str] = None
 
 
 @dataclass
@@ -142,6 +151,10 @@ def create_search_provider_config(
         metadata_mapping=provider_data.get("metadata_mapping"),
         callbacks=provider_data.get("callbacks"),
         dataset_id=provider_data.get("dataset_id"),
+        auth_endpoint=provider_data.get("auth_endpoint"),
+        dataset_endpoint=provider_data.get("dataset_endpoint"),
+        search_endpoint=provider_data.get("search_endpoint"),
+        delete_endpoint=provider_data.get("delete_endpoint"),
     )
 
 

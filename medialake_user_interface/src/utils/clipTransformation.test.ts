@@ -3,12 +3,15 @@ import {
   transformResultsToClipMode,
   isClipAsset,
   getClipDisplayName,
+  getClipTimeRange,
+  getClipSegment,
   getCollectionItemDisplayName,
   formatClipBoundaryLabel,
   getOriginalAssetId,
   clearTransformationCache,
   detectModelVersionFromResults,
 } from "./clipTransformation";
+import { RANGE_SEPARATOR } from "./timecode";
 import { createTestAsset, createVideoAssetWithClips } from "../test/factories";
 
 beforeEach(() => {
@@ -150,7 +153,9 @@ describe("getClipDisplayName", () => {
       originalAssetId: "abc",
       clipIndex: 0,
     };
-    expect(getClipDisplayName(clipAsset)).toBe("video.mp4 (00:01:00:00 - 00:02:00:00)");
+    expect(getClipDisplayName(clipAsset)).toBe(
+      `video.mp4 (00:01:00:00${RANGE_SEPARATOR}00:02:00:00)`
+    );
   });
 
   it("formats seconds for clips without timecodes", () => {
@@ -165,14 +170,130 @@ describe("getClipDisplayName", () => {
       originalAssetId: "abc",
       clipIndex: 0,
     };
-    expect(getClipDisplayName(clipAsset)).toBe("video.mp4 (1:05 - 2:10)");
+    expect(getClipDisplayName(clipAsset)).toBe(`video.mp4 (01:05${RANGE_SEPARATOR}02:10)`);
+  });
+});
+
+describe("getClipTimeRange", () => {
+  const clipAsset = (clipData: Record<string, unknown>) => ({
+    DigitalSourceAsset: {
+      Type: "Video",
+      MainRepresentation: {
+        StorageInfo: { PrimaryLocation: { ObjectKey: { Name: "video.mp4" } } },
+      },
+    },
+    clipData,
+    originalAssetId: "abc",
+    clipIndex: 0,
+  });
+
+  it("prefers the frame-accurate source timecodes", () => {
+    expect(
+      getClipTimeRange(
+        clipAsset({
+          start_timecode: "00:01:00:00",
+          end_timecode: "00:02:00:00",
+          start: 60,
+          end: 120,
+        })
+      )
+    ).toBe(`00:01:00:00${RANGE_SEPARATOR}00:02:00:00`);
+  });
+
+  it("falls back to the numeric seconds", () => {
+    expect(getClipTimeRange(clipAsset({ start: 65, end: 130 }))).toBe(
+      `01:05${RANGE_SEPARATOR}02:10`
+    );
+  });
+
+  it("returns null for a whole asset", () => {
+    expect(getClipTimeRange(createTestAsset())).toBeNull();
+  });
+
+  it("returns null when the clip carries no usable range", () => {
+    expect(getClipTimeRange(clipAsset({}))).toBeNull();
+    expect(getClipTimeRange(clipAsset({ start: 65 }))).toBeNull();
+  });
+});
+
+describe("getClipSegment", () => {
+  const clipAsset = (clipData: Record<string, unknown>, metadata?: unknown) => ({
+    DigitalSourceAsset: {
+      Type: "Video",
+      MainRepresentation: {
+        StorageInfo: { PrimaryLocation: { ObjectKey: { Name: "video.mp4" } } },
+      },
+    },
+    ...(metadata ? { Metadata: metadata } : {}),
+    clipData,
+    originalAssetId: "abc",
+    clipIndex: 0,
+  });
+
+  it("derives seconds from the timecode-only payload the search API returns", () => {
+    // Regression: the previous guard required numeric start/end, which the API
+    // never sends. Every real clip therefore produced no segment -- the bin
+    // showed no range, and bulk download/add-to-collection silently fell back to
+    // the whole asset.
+    const segment = getClipSegment(
+      clipAsset({ start_timecode: "00:00:56:00", end_timecode: "00:01:03:00", score: 0.57 })
+    );
+    expect(segment).toEqual({
+      startTime: 56,
+      endTime: 63,
+      startTimecode: "00:00:56:00",
+      endTimecode: "00:01:03:00",
+    });
+  });
+
+  it("uses the asset's frame rate for a frame offset inside the timecode", () => {
+    const segment = getClipSegment(
+      clipAsset(
+        { start_timecode: "00:00:01:12", end_timecode: "00:00:02:00" },
+        { EmbeddedMetadata: { video: [{ FrameRate: "24.000" }] } }
+      )
+    );
+    expect(segment?.startTime).toBeCloseTo(1.5, 5);
+  });
+
+  it("prefers numeric seconds when the payload carries them", () => {
+    const segment = getClipSegment(
+      clipAsset({ start: 10.25, end: 20.5, start_timecode: "00:00:11:00" })
+    );
+    expect(segment?.startTime).toBe(10.25);
+    expect(segment?.endTime).toBe(20.5);
+    // The source timecode is still carried through for frame-accurate boundaries.
+    expect(segment?.startTimecode).toBe("00:00:11:00");
+  });
+
+  it("returns undefined for a whole asset", () => {
+    expect(getClipSegment(createTestAsset())).toBeUndefined();
+  });
+
+  it("returns undefined for an inverted or zero-length range", () => {
+    expect(
+      getClipSegment(clipAsset({ start_timecode: "00:01:00:00", end_timecode: "00:00:30:00" }))
+    ).toBeUndefined();
+    expect(
+      getClipSegment(clipAsset({ start_timecode: "00:01:00:00", end_timecode: "00:01:00:00" }))
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when a timecode is missing, blank or unparseable", () => {
+    expect(getClipSegment(clipAsset({ start_timecode: "00:00:56:00" }))).toBeUndefined();
+    expect(
+      getClipSegment(clipAsset({ start_timecode: "  ", end_timecode: "00:01:03:00" }))
+    ).toBeUndefined();
+    expect(
+      getClipSegment(clipAsset({ start_timecode: "junk", end_timecode: "00:01:03:00" }))
+    ).toBeUndefined();
   });
 });
 
 describe("formatClipBoundaryLabel", () => {
   it("formats a boundary with both ends as a range", () => {
     expect(formatClipBoundaryLabel({ startTime: "00:01:00:00", endTime: "00:02:00:00" })).toBe(
-      "00:01:00:00 - 00:02:00:00"
+      `00:01:00:00${RANGE_SEPARATOR}00:02:00:00`
     );
   });
 
@@ -200,7 +321,7 @@ describe("getCollectionItemDisplayName", () => {
         startTime: "00:01:00:00",
         endTime: "00:02:00:00",
       })
-    ).toBe("video.mp4 (00:01:00:00 - 00:02:00:00)");
+    ).toBe(`video.mp4 (00:01:00:00${RANGE_SEPARATOR}00:02:00:00)`);
   });
 
   it("matches the getClipDisplayName format so clips read alike everywhere", () => {

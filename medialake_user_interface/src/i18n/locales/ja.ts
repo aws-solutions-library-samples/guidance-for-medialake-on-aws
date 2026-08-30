@@ -384,6 +384,7 @@ export default {
     collectionDeleteFailed: "コレクションの削除に失敗しました",
     createFailed: "コレクションの作成に失敗しました。もう一度お試しください。",
     addToCollection: "コレクションに追加",
+    itemsBeingAdded: "追加する項目",
     searchCollections: "コレクションを検索...",
     createNew: "新しいコレクションを作成",
     noSharedWithMe: "共有されたコレクションはありません",
@@ -1364,6 +1365,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "プレビューはまだ利用できません",
+      previewUnavailableBody:
+        "このアセットの再生可能なプロキシはまだ生成されていません。取り込みパイプラインが実行中の場合、完了後にここにプレビューが表示されます。",
+    },
     tabs: {
       summary: "概要",
       technical: "技術的メタデータ",

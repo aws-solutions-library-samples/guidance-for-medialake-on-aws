@@ -386,6 +386,7 @@ export default {
     collectionDeleteFailed: "Failed to delete collection",
     createFailed: "Error al crear la colección. Por favor, inténtelo de nuevo.",
     addToCollection: "Añadir a la colección",
+    itemsBeingAdded: "Elementos que se van a añadir",
     searchCollections: "Buscar colecciones...",
     createNew: "Crear nueva colección",
     noSharedWithMe: "No hay colecciones compartidas contigo",
@@ -1374,6 +1375,11 @@ export default {
     toggleTheme: "Toggle theme",
   },
   detailPages: {
+    player: {
+      previewUnavailableTitle: "Vista previa aún no disponible",
+      previewUnavailableBody:
+        "Todavía no se ha generado un proxy reproducible para este activo. Si su canalización de ingesta sigue en curso, la vista previa aparecerá aquí cuando termine.",
+    },
     tabs: {
       summary: "Resumen",
       technical: "Metadatos técnicos",

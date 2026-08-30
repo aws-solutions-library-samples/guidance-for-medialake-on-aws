@@ -20,6 +20,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import MarkdownRenderer from "../common/MarkdownRenderer";
 import TabContentContainer from "../common/TabContentContainer";
+import { formatDuration, formatTimeRange } from "@/utils/timecode";
 
 interface DescriptiveTabProps {
   assetData: any;
@@ -79,17 +80,6 @@ export function sortDescriptiveEntries(entries: DescriptiveEntry[]): Descriptive
     .map((group) => group.sort((a, b) => (a.data.chunk_index ?? 0) - (b.data.chunk_index ?? 0)));
 
   return [...sortedGroups.flat(), ...nonChunkEntries];
-}
-
-/** Format seconds into MM:SS or HH:MM:SS */
-function formatTimecode(seconds: number | undefined): string {
-  if (seconds === undefined || seconds === null) return "--:--";
-  const s = Math.round(seconds);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 }
 
 /** Extract a clean model display name from a full model_id */
@@ -295,12 +285,13 @@ const ChunkCard: React.FC<ChunkCardProps> = ({ entry, isLast, expanded, onToggle
   const isFailed = data.chunk_status === "failed";
   const chunkNum = data.chunk_index ?? "?";
 
-  const timeRange =
-    data.chunk_start_time !== undefined && data.chunk_end_time !== undefined
-      ? `${formatTimecode(data.chunk_start_time)} → ${formatTimecode(data.chunk_end_time)}`
-      : null;
+  // Same range formatter as every other clip surface, so a transcript chunk and
+  // the clip it overlaps read with the same separator and precision.
+  const timeRange = formatTimeRange(data.chunk_start_time, data.chunk_end_time);
 
-  const durationLabel = data.chunk_duration ? formatTimecode(data.chunk_duration) : null;
+  // A chunk's duration answers "how long", so it reads as a duration rather than
+  // as a clock — "45s", not "00:45".
+  const durationLabel = data.chunk_duration ? formatDuration(data.chunk_duration) : null;
 
   return (
     <Box sx={{ position: "relative", pl: 3.5 }}>

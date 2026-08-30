@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from aws_cdk import CfnOutput, Fn, Stack, Token
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_ssm as ssm
 from aws_cdk import custom_resources as cr
@@ -64,7 +65,24 @@ class UserInterfaceStack(Stack):
         # If props.cloudfront_waf_acl_arn starts with '/', assume it's an SSM parameter path
         waf_acl_arn = props.cloudfront_waf_acl_arn
         if props.cloudfront_waf_acl_arn.startswith("/"):
-            # Use a custom resource to get the parameter from us-east-1
+            # A CloudFront web ACL must live in us-east-1 regardless of the
+            # deployment region, so CloudFrontWafStack writes its ARN to SSM there
+            # and this stack reads it back cross-region through a custom resource.
+            #
+            # `app.py` registers a dependency on CloudFrontWafStack so the
+            # parameter is always written before this read. Without that there was
+            # no ordering between the two stacks at all, and a missing parameter
+            # failed this stack with a bare `UnknownError` — the real cause never
+            # reached the CloudFormation event. See
+            # https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws/issues/31
+            #
+            # `log_retention` keeps the custom resource's own log group after the
+            # stack rolls back, which is where the underlying SDK error (e.g.
+            # `ParameterNotFound`) is actually recorded. The dependency prevents
+            # the ordering case; retained logs make the remaining case — the
+            # parameter deleted out from under a stack CloudFormation still
+            # believes owns it, which is what happened in that report after a
+            # partial teardown — diagnosable instead of a dead end.
             waf_acl_param = cr.AwsCustomResource(
                 self,
                 "GetWafAclArnFromSsm",
@@ -85,6 +103,7 @@ class UserInterfaceStack(Stack):
                         )
                     ]
                 ),
+                log_retention=logs.RetentionDays.ONE_MONTH,
             )
             waf_acl_arn = waf_acl_param.get_response_field("Parameter.Value")
 

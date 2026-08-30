@@ -45,7 +45,12 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
 };
 import { useSearchState } from "../hooks/useSearchState";
 import { FacetFilters } from "../types/facetSearch";
-import { getOriginalAssetId } from "@/utils/clipTransformation";
+import {
+  getClipSegment,
+  getClipTimeRange as clipTimeRange,
+  getOriginalAssetId,
+} from "@/utils/clipTransformation";
+import { buildClipDeepLinkSearch, clipStartSeconds } from "@/utils/clipDeepLink";
 import { useSemanticMode, useSearchModes } from "@/stores/searchStore";
 import { useUIActions as useSearchUIActions } from "@/stores/searchStore";
 import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSystemSettings";
@@ -296,23 +301,7 @@ const SearchPage: React.FC = () => {
     // Carry a clip's time range so batch pipeline runs (e.g. reframe) and
     // bulk downloads process just that segment. Undefined for whole assets.
     // Source timecodes are included when present for frame-accurate subclips.
-    getAssetSegment: (asset) => {
-      const clip = (asset as any).clipData;
-      if (
-        clip &&
-        typeof clip.start === "number" &&
-        typeof clip.end === "number" &&
-        clip.end > clip.start
-      ) {
-        return {
-          startTime: clip.start,
-          endTime: clip.end,
-          startTimecode: clip.start_timecode,
-          endTimecode: clip.end_timecode,
-        };
-      }
-      return undefined;
-    },
+    getAssetSegment: (asset) => getClipSegment(asset),
   });
 
   const assetFavorites = useAssetFavorites({
@@ -352,7 +341,15 @@ const SearchPage: React.FC = () => {
       const pathPrefix = assetType === "audio" ? "/audio/" : `/${assetType}s/`;
       // Always use the original asset ID, not the clip ID
       const originalAssetId = getOriginalAssetId(asset);
-      navigate(`${pathPrefix}${originalAssetId}`, {
+      // Carry the search term and the clicked clip's start in the URL as well as
+      // in router state. State alone is lost on reload or when the link is
+      // shared, which left a refreshed detail page with no search breadcrumb and
+      // the playhead at 00:00 instead of the moment that was clicked.
+      const deepLinkSearch = buildClipDeepLinkSearch({
+        searchTerm: currentQuery,
+        startTime: clipStartSeconds(asset),
+      });
+      navigate(`${pathPrefix}${originalAssetId}${deepLinkSearch}`, {
         state: {
           assetType: asset.DigitalSourceAsset.Type,
           searchTerm: currentQuery,
@@ -852,6 +849,17 @@ const SearchPage: React.FC = () => {
                 .PrimaryLocation.ObjectKey.Name
             }
             assetType={selectedAssetForCollection.DigitalSourceAsset.Type}
+            // Surface the clip's range when filing a single semantic clip. The
+            // modal previously showed only the filename, which is shared by
+            // every clip cut from the same asset.
+            items={[
+              {
+                id: selectedAssetForCollection.InventoryID,
+                name: selectedAssetForCollection.DigitalSourceAsset.MainRepresentation.StorageInfo
+                  .PrimaryLocation.ObjectKey.Name,
+                timeRange: clipTimeRange(selectedAssetForCollection),
+              },
+            ]}
             onAddToCollection={handleAddToCollection}
           />
         )}

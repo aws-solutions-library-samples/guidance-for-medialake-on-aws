@@ -828,6 +828,13 @@ user_interface_stack.add_dependency(edge_lambda_stack)
 user_interface_stack.add_dependency(
     api_gateway_deployment_stack
 )  # Must wait for SSM parameter
+# This stack reads the CloudFront WAF ACL ARN from SSM in us-east-1 (a CloudFront
+# web ACL cannot live anywhere else), which is written by CloudFrontWafStack.
+# Reading a parameter creates no CloudFormation dependency, so without this the
+# two stacks had no ordering and the read could run first — failing the UI stack
+# with an opaque `UnknownError` from its lookup custom resource.
+# https://github.com/aws-solutions-library-samples/guidance-for-medialake-on-aws/issues/31
+user_interface_stack.add_dependency(cloudfront_waf_stack)
 
 # Create the Cognito Update Stack (between user_interface_stack and cleanup_stack)
 cognito_update_stack = CognitoUpdateStack(

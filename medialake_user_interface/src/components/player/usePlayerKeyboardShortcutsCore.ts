@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { OmakasePlayer } from "@byomakase/omakase-player";
-import type { DetailMarkerAdapter, MarkerApi } from "./marker-sync/ports";
+import {
+  MediaTemporalFormat,
+  PlayerEventType,
+  type MarkerTrack,
+  type OmakasePlayer,
+} from "@byomakase/omakase-player";
 import { randomHexColor } from "../common/utils";
 import { getPlayerCurrentTime, getPlayerDuration } from "./playerTimeStore";
+import { readTrackMarkers, type CreateMarkerInput, type DetailMarker } from "./markerTracks";
 
 export interface UsePlayerKeyboardShortcutsCoreProps {
   play: () => void;
@@ -16,7 +21,11 @@ export interface UsePlayerKeyboardShortcutsCoreProps {
   setPlayerVolume: (volume: number) => void;
   mute: () => void;
   unmute: () => void;
-  markerAdapter: DetailMarkerAdapter;
+  /** Creates a marker at the playhead (the `I` shortcut). */
+  addUserMarker: (input: Omit<CreateMarkerInput, "kind">) => DetailMarker | undefined;
+  userTrackRef: React.MutableRefObject<MarkerTrack | null>;
+  semanticTrackRef: React.MutableRefObject<MarkerTrack | null>;
+  isMarkersReady: boolean;
   omakaseRef: React.MutableRefObject<OmakasePlayer | null>;
 }
 
@@ -32,7 +41,10 @@ export const usePlayerKeyboardShortcutsCore = ({
   setPlayerVolume,
   mute,
   unmute,
-  markerAdapter,
+  addUserMarker,
+  userTrackRef,
+  semanticTrackRef,
+  isMarkersReady,
   omakaseRef,
 }: UsePlayerKeyboardShortcutsCoreProps) => {
   // Store high-frequency values in refs so the keydown effect doesn't
@@ -80,7 +92,7 @@ export const usePlayerKeyboardShortcutsCore = ({
 
   // Prevent video element from receiving focus
   useEffect(() => {
-    const htmlVideoElement = omakaseRef?.current?.video?.getHTMLVideoElement();
+    const htmlVideoElement = omakaseRef?.current?.player.htmlMediaElement;
     if (htmlVideoElement) {
       htmlVideoElement.setAttribute("tabindex", "-1");
       htmlVideoElement.blur();
@@ -94,16 +106,20 @@ export const usePlayerKeyboardShortcutsCore = ({
     }
   }, []);
 
-  // Pick up actual frame rate once video is loaded
+  // Pick up the real frame rate once media is loaded.
+  //
+  // `getFrameRate()` is gone; the rate now lives on the loaded media's
+  // `frameRateModel`, and load completion arrives on the joint event stream
+  // rather than a dedicated `onVideoLoaded$`.
   useEffect(() => {
-    const v = omakaseRef.current?.video;
-    if (!v?.onVideoLoaded$) return;
-    const sub = v.onVideoLoaded$.subscribe(() => {
-      try {
-        const fr = v.getFrameRate();
-        if (Number.isFinite(fr) && fr > 0) fpsRef.current = fr;
-      } catch {
-        // Ignore frame rate detection errors
+    const p = omakaseRef.current?.player;
+    if (!p) return;
+    const sub = p.onEvent$.subscribe((event) => {
+      if (event.type === PlayerEventType.PLAYER_MAIN_MEDIA_LOADED) {
+        const rate = event.data.mainMediaState.frameRateModel?.value;
+        if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+          fpsRef.current = rate;
+        }
       }
     });
     return () => sub?.unsubscribe();
@@ -141,7 +157,9 @@ export const usePlayerKeyboardShortcutsCore = ({
 
         reverseTimerRef.current = window.setInterval(
           () => {
-            omakaseRef.current?.video.seekFromCurrentFrame(-framesPerTick).subscribe();
+            omakaseRef.current?.player
+              .seekFromCurrentTime(-framesPerTick, MediaTemporalFormat.FRAME_COUNT)
+              .subscribe({ error: () => undefined });
           },
           Math.max(8, intervalMs)
         );
@@ -177,12 +195,12 @@ export const usePlayerKeyboardShortcutsCore = ({
       return;
     }
 
-    const videoElement = omakaseRef?.current?.video?.getHTMLVideoElement();
+    const videoElement = omakaseRef?.current?.player.htmlMediaElement;
     const actuallyPlaying = videoElement ? !videoElement.paused : isPlaying;
 
     if (actuallyPlaying) {
       pause();
-      const htmlVideoElement = omakaseRef?.current?.video?.getHTMLVideoElement();
+      const htmlVideoElement = omakaseRef?.current?.player.htmlMediaElement;
       if (htmlVideoElement) {
         htmlVideoElement.blur();
         htmlVideoElement.setAttribute("tabindex", "-1");
@@ -216,18 +234,22 @@ export const usePlayerKeyboardShortcutsCore = ({
   const stepFrame = useCallback(
     (dir: -1 | 1) => {
       stopTransport();
-      omakaseRef.current?.video.seekFromCurrentFrame(dir).subscribe();
+      omakaseRef.current?.player
+        .seekFromCurrentTime(dir, MediaTemporalFormat.FRAME_COUNT)
+        .subscribe({ error: () => undefined });
     },
     [stopTransport, omakaseRef]
   );
 
   // Keep UI rate in sync when forward rate changes
   useEffect(() => {
-    const v = omakaseRef.current?.video;
-    if (!v?.onPlaybackRateChange$) return;
-    const sub = v.onPlaybackRateChange$.subscribe(({ playbackRate }) => {
-      if (reverseTimerRef.current === null) {
-        setCurrentPlaybackRate(playbackRate);
+    const p = omakaseRef.current?.player;
+    if (!p) return;
+    const sub = p.onEvent$.subscribe((event) => {
+      if (event.type === PlayerEventType.PLAYER_PLAYBACK_RATE_UPDATE) {
+        if (reverseTimerRef.current === null) {
+          setCurrentPlaybackRate(event.data.playbackRate);
+        }
       }
     });
     return () => sub?.unsubscribe();
@@ -266,60 +288,50 @@ export const usePlayerKeyboardShortcutsCore = ({
     toggleFullscreen();
   }, [toggleFullscreen]);
 
-  // Marker navigation
-  const navigateToNextMarker = useCallback(() => {
-    if (!markerAdapter.isReady()) return;
+  // Marker navigation.
+  //
+  // Stepping is relative to the playhead rather than to a "selected marker"
+  // cursor. The old version tracked selection in the coordinator and advanced an
+  // index, which drifted from what the user saw whenever they scrubbed: after
+  // seeking elsewhere, `N` jumped to the marker after the last *clicked* one
+  // rather than the next one ahead. Reading the playhead makes the shortcut mean
+  // what it looks like it means, and needs no selection state at all.
+  //
+  // Both tracks participate, so `N`/`P` walk user markers and clip matches
+  // together in time order.
+  const collectMarkers = useCallback((): DetailMarker[] => {
+    const markers = [
+      ...readTrackMarkers(userTrackRef.current ?? undefined),
+      ...readTrackMarkers(semanticTrackRef.current ?? undefined),
+    ];
+    return markers.sort((a, b) => a.startTime - b.startTime);
+  }, [userTrackRef, semanticTrackRef]);
 
-    const markers = markerAdapter.list();
+  const navigateToNextMarker = useCallback(() => {
+    if (!isMarkersReady) return;
+
+    const markers = collectMarkers();
     if (markers.length === 0) return;
 
-    const sortedMarkers = [...markers].sort(
-      (a, b) => (a.timeObservation?.start || 0) - (b.timeObservation?.start || 0)
-    );
-
-    const currentMarker = markerAdapter.selected();
-    let nextIndex = 0;
-
-    if (currentMarker) {
-      const currentIndex = sortedMarkers.findIndex((m) => m.id === currentMarker.id);
-      nextIndex = (currentIndex + 1) % sortedMarkers.length;
-    }
-
-    const nextMarker = sortedMarkers[nextIndex];
-    if (nextMarker) {
-      markerAdapter.select(nextMarker.id);
-      if (nextMarker.timeObservation?.start !== undefined) {
-        seek(nextMarker.timeObservation.start);
-      }
-    }
-  }, [markerAdapter, seek]);
+    // Small epsilon so repeated presses advance instead of re-selecting the
+    // marker we just seeked to.
+    const now = getPlayerCurrentTime() + 0.01;
+    const next = markers.find((marker) => marker.startTime > now) ?? markers[0];
+    seek(next.startTime);
+  }, [collectMarkers, isMarkersReady, seek]);
 
   const navigateToPreviousMarker = useCallback(() => {
-    if (!markerAdapter.isReady()) return;
+    if (!isMarkersReady) return;
 
-    const markers = markerAdapter.list();
+    const markers = collectMarkers();
     if (markers.length === 0) return;
 
-    const sortedMarkers = [...markers].sort(
-      (a, b) => (a.timeObservation?.start || 0) - (b.timeObservation?.start || 0)
-    );
-
-    const currentMarker = markerAdapter.selected();
-    let prevIndex = sortedMarkers.length - 1;
-
-    if (currentMarker) {
-      const currentIndex = sortedMarkers.findIndex((m) => m.id === currentMarker.id);
-      prevIndex = currentIndex > 0 ? currentIndex - 1 : sortedMarkers.length - 1;
-    }
-
-    const prevMarker = sortedMarkers[prevIndex];
-    if (prevMarker) {
-      markerAdapter.select(prevMarker.id);
-      if (prevMarker.timeObservation?.start !== undefined) {
-        seek(prevMarker.timeObservation.start);
-      }
-    }
-  }, [markerAdapter, seek]);
+    const now = getPlayerCurrentTime() - 0.01;
+    const previous =
+      [...markers].reverse().find((marker) => marker.startTime < now) ??
+      markers[markers.length - 1];
+    seek(previous.startTime);
+  }, [collectMarkers, isMarkersReady, seek]);
 
   // Keyboard event handler with capture-phase blocking
   useEffect(() => {
@@ -420,16 +432,13 @@ export const usePlayerKeyboardShortcutsCore = ({
         case "i":
         case "I":
           event.preventDefault();
-          if (markerAdapter.isReady()) {
+          if (isMarkersReady) {
             const t = getPlayerCurrentTime();
-            markerAdapter.add(
-              {
-                timeObservation: { start: t, end: t + 2 },
-                color: randomHexColor(),
-                type: "user",
-              },
-              "sidebar"
-            );
+            addUserMarker({
+              startTime: t,
+              endTime: t + 2,
+              color: randomHexColor(),
+            });
           }
           break;
         case ",":
@@ -508,14 +517,15 @@ export const usePlayerKeyboardShortcutsCore = ({
     adjustVolume,
     handleMuteToggle,
     handleFullscreenToggle,
-    markerAdapter,
+    addUserMarker,
+    isMarkersReady,
     navigateToNextMarker,
     navigateToPreviousMarker,
   ]);
 
   // Prevent video element from holding focus after mouse clicks
   useEffect(() => {
-    const htmlVideoElement = omakaseRef?.current?.video?.getHTMLVideoElement();
+    const htmlVideoElement = omakaseRef?.current?.player.htmlMediaElement;
     if (!htmlVideoElement) return;
 
     const blurAfterPointer = () => {
@@ -594,16 +604,13 @@ export const usePlayerKeyboardShortcutsCore = ({
       description: "Add marker",
       category: "Markers",
       action: () => {
-        if (markerAdapter.isReady()) {
+        if (isMarkersReady) {
           const t = getPlayerCurrentTime();
-          markerAdapter.add(
-            {
-              timeObservation: { start: t, end: t + 2 },
-              color: randomHexColor(),
-              type: "user",
-            },
-            "sidebar"
-          );
+          addUserMarker({
+            startTime: t,
+            endTime: t + 2,
+            color: randomHexColor(),
+          });
         }
       },
     },

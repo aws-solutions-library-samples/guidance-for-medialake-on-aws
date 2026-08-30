@@ -11,7 +11,15 @@
  * - LRU cache survives page navigation within the SPA — max 12 parked players
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { OmakasePlayer, PlayerChromingTheme, StampThemeScale } from "@byomakase/omakase-player";
+import {
+  ChromingTheme,
+  MainMediaType,
+  OmakasePlayer,
+  PlayerAudioEventType,
+  PlayerAudioType,
+  StampThemeScale,
+  type MainMediaLoadOptions,
+} from "@byomakase/omakase-player";
 import { addMarkersToPlayer, type ClipData } from "./markerHelpers";
 import { parkPlayer, unpark, getCached, evictStale, type CachedEntry } from "./playerCache";
 
@@ -160,6 +168,8 @@ export function useOmakasePlayer({
   const isMountedRef = useRef(true);
   const loadSubscriptionRef = useRef<Unsubscribable | null>(null);
   const markerCleanupRef = useRef<(() => void) | null>(null);
+  const audioSubscriptionRef = useRef<Unsubscribable | null>(null);
+  const audioDefaultAppliedRef = useRef(false);
   const abortedRef = useRef(false);
 
   // Store clips/semantic in refs so the init effect can read current values
@@ -170,11 +180,106 @@ export function useOmakasePlayer({
   const confidenceRef = useRef(confidenceThreshold);
   confidenceRef.current = confidenceThreshold;
 
-  const getLoadOptions = useCallback(() => {
-    if (assetType === "Audio") return { protocol: "audio" as const };
+  const getLoadOptions = useCallback((): MainMediaLoadOptions | undefined => {
+    // 0.25.x took `{protocol: "audio"}` to force audio handling. 1.1.1 replaced
+    // that with an explicit media type; the old key is not in
+    // `MainMediaLoadOptions` and would be ignored without any error, leaving
+    // audio cards to be auto-detected from the URL.
+    if (assetType === "Audio") return { mainMediaType: MainMediaType.AUDIO_FILE };
     if (assetType === "Video" && thumbnailUrl) return { poster: thumbnailUrl };
     return undefined;
   }, [assetType, thumbnailUrl]);
+
+  /**
+   * Start each newly loaded card audible, and make sure the STAMP mute button has
+   * a state to render.
+   *
+   * Two things are going on:
+   *
+   * 1. Cards came up muted, with no way to express otherwise — neither
+   *    `OmakasePlayerConfig` nor `MainMediaLoadOptions` carries an initial volume
+   *    or muted value, so the only way to set it is imperatively once the audio
+   *    sub-system exists.
+   *
+   * 2. `omakase-mute-button` assigns its `omakaseVolumeLevel` attribute *only*
+   *    from inside its `PLAYER_AUDIO_CHANGE` subscription — it never derives an
+   *    initial value. Its shadow CSS falls back to the `high` slot when the
+   *    attribute is absent (`:host(:not([omakaseVolumeLevel]))`), so a card whose
+   *    audio sub-system never emits shows the *sound-on* icon while actually
+   *    being muted, and clicking it appears to do nothing. Setting the state
+   *    explicitly emits the event the button is waiting for, so the icon always
+   *    starts out reflecting reality.
+   *
+   * Applied once per media load. Reapplying on every `PLAYER_AUDIO_CHANGE` would
+   * fight the user: their mute click emits that event, and we would immediately
+   * unmute again.
+   */
+  const applyDefaultAudio = useCallback((player: OmakasePlayer) => {
+    audioSubscriptionRef.current?.unsubscribe();
+    audioSubscriptionRef.current = null;
+    audioDefaultAppliedRef.current = false;
+
+    // The whole audio surface is only present on a live player; a card can be
+    // parked or destroyed between media load completing and this running.
+    let audio: OmakasePlayer["player"]["audio"];
+    try {
+      audio = player.player.audio;
+    } catch {
+      return;
+    }
+    if (!audio) return;
+
+    const apply = () => {
+      if (audioDefaultAppliedRef.current) return;
+      // `getHandler` is the safe probe. The `volume` / `muted` getters and the
+      // setters route through `getOutputHandlerOrFail()`, which throws
+      // `Error("Audio not set up")` until the OUTPUT handler exists.
+      let handler;
+      try {
+        handler = audio.getHandler(PlayerAudioType.OUTPUT);
+      } catch {
+        return;
+      }
+      if (!handler) return;
+
+      // Set the flag before the calls: each one emits PLAYER_AUDIO_CHANGE, which
+      // re-enters this handler.
+      audioDefaultAppliedRef.current = true;
+      try {
+        // These route through `getOutputHandlerOrFail()` too, so they can throw
+        // *synchronously* if the handler goes away between the probe above and
+        // here — which `subscribe({error})` would not catch.
+        audio.setVolume(1).subscribe({ error: () => undefined });
+        audio.setMuted(false).subscribe({ error: () => undefined });
+      } catch {
+        // Audio went away (media reloaded or player torn down). Allow a retry on
+        // the next event rather than leaving the card silently muted.
+        audioDefaultAppliedRef.current = false;
+      }
+    };
+
+    // The handler can already be in place by the time media load completes.
+    apply();
+
+    try {
+      audioSubscriptionRef.current = audio.onEvent$.subscribe({
+        next: (event) => {
+          // PLAYER_AUDIO_LOADED is the documented "audio sub-system is ready"
+          // signal; PLAYER_AUDIO_CHANGE is the catch-all the mute button itself
+          // keys on, and covers players whose setup order differs.
+          if (
+            event.type === PlayerAudioEventType.PLAYER_AUDIO_LOADED ||
+            event.type === PlayerAudioEventType.PLAYER_AUDIO_CHANGE
+          ) {
+            apply();
+          }
+        },
+        error: () => undefined,
+      });
+    } catch {
+      // Player torn down; nothing to subscribe to.
+    }
+  }, []);
 
   const scheduleMarkers = useCallback(() => {
     markerCleanupRef.current?.();
@@ -198,6 +303,9 @@ export function useOmakasePlayer({
     loadSubscriptionRef.current?.unsubscribe();
     loadSubscriptionRef.current = null;
 
+    audioSubscriptionRef.current?.unsubscribe();
+    audioSubscriptionRef.current = null;
+
     markerCleanupRef.current?.();
     markerCleanupRef.current = null;
 
@@ -211,7 +319,7 @@ export function useOmakasePlayer({
       } else {
         // No wrapper tracked — fall back to full destroy
         try {
-          const videoEl = playerRef.current.video?.getHTMLVideoElement();
+          const videoEl = playerRef.current.player.htmlMediaElement;
           if (videoEl) {
             videoEl.pause();
             videoEl.removeAttribute("src");
@@ -353,13 +461,15 @@ export function useOmakasePlayer({
         }
 
         try {
+          // 1.1.1 config keys are flat and prefixed — `playerHtmlElementId`,
+          // `chromingTheme`, `chromingThemeConfig`. The 0.25.x nested
+          // `playerChroming: {theme, themeConfig}` form is gone, and passing it
+          // would be silently ignored rather than rejected.
           const player = new OmakasePlayer({
-            playerHTMLElementId: playerId,
-            playerChroming: {
-              theme: PlayerChromingTheme.Stamp,
-              themeConfig: {
-                stampScale: thumbnailScale === "fit" ? StampThemeScale.Fit : StampThemeScale.Fill,
-              },
+            playerHtmlElementId: playerId,
+            chromingTheme: ChromingTheme.STAMP,
+            chromingThemeConfig: {
+              stampScale: thumbnailScale === "fit" ? StampThemeScale.FIT : StampThemeScale.FILL,
             },
           });
 
@@ -367,17 +477,28 @@ export function useOmakasePlayer({
           playerInitializedRef.current = true;
           currentProxyUrlRef.current = proxyUrl;
 
-          // Track the wrapper element so doParkPlayer can find it
-          // even after React removes the container from the DOM.
-          const wrapper = div.querySelector(".omakase-player") as HTMLElement | null;
+          // Track the wrapper element so doParkPlayer can find it even after
+          // React removes the container from the DOM.
+          //
+          // 1.1.1 no longer renders a `.omakase-player` div. The container now
+          // holds the chroming `<template>` plus a
+          // `<media-theme class="omakase-media-theme ...">` that owns the video.
+          // The old selector silently returned null, which left the wrapper ref
+          // unset and made doParkPlayer take its destroy fallback every time — so
+          // the LRU cache never re-attached anything and each scroll-in paid for
+          // a fresh player construction.
+          const wrapper = div.querySelector(
+            "media-theme.omakase-media-theme"
+          ) as HTMLElement | null;
           playerWrapperRef.current = wrapper;
 
           setVideoLoadError(false);
 
-          loadSubscriptionRef.current = player.loadVideo(proxyUrl, getLoadOptions()).subscribe({
+          loadSubscriptionRef.current = player.loadMainMedia(proxyUrl, getLoadOptions()).subscribe({
             next: () => {
               if (!isMountedRef.current) return;
               setIsPlayerActive(true);
+              applyDefaultAudio(player);
               scheduleMarkers();
             },
             error: (error: unknown) => {
@@ -404,11 +525,12 @@ export function useOmakasePlayer({
       currentProxyUrlRef.current = proxyUrl;
       loadSubscriptionRef.current?.unsubscribe();
       loadSubscriptionRef.current = playerRef.current
-        .loadVideo(proxyUrl, getLoadOptions())
+        .loadMainMedia(proxyUrl, getLoadOptions())
         .subscribe({
           next: () => {
             if (!isMountedRef.current) return;
             setIsPlayerActive(true);
+            if (playerRef.current) applyDefaultAudio(playerRef.current);
             scheduleMarkers();
           },
           error: (error: unknown) => {
@@ -432,6 +554,7 @@ export function useOmakasePlayer({
     isMediaAsset,
     getLoadOptions,
     scheduleMarkers,
+    applyDefaultAudio,
     doParkPlayer,
     reattachCached,
     cardContainerRef,
@@ -459,7 +582,7 @@ export function useOmakasePlayer({
     if (!isMediaAsset || !playerRef.current || !playerInitializedRef.current) return;
     try {
       const objectFit = thumbnailScale === "fit" ? "contain" : "cover";
-      const videoEl = playerRef.current.video.getHTMLVideoElement();
+      const videoEl = playerRef.current.player.htmlMediaElement;
       if (videoEl) videoEl.style.objectFit = objectFit;
       const container = document.getElementById(playerId);
       container?.querySelectorAll("video").forEach((v) => {

@@ -41,12 +41,39 @@ import {
   type CreateCollectionRequest,
 } from "../../api/hooks/useCollections";
 
+/**
+ * One item in the set being added, as shown in the modal's manifest.
+ *
+ * `timeRange` is a preformatted, display-ready range (see `utils/timecode`)
+ * rather than raw seconds or timecodes: the callers already hold the range in
+ * different shapes — the bin has seconds, a collection item has HH:MM:SS:FF
+ * strings — and formatting at the call site keeps a single convention without
+ * this modal needing to know about either.
+ */
+export interface AddToCollectionItemSummary {
+  id: string;
+  name: string;
+  /** Display-ready clip range, or null/undefined for a whole asset. */
+  timeRange?: string | null;
+}
+
 interface AddToCollectionModalProps {
   open: boolean;
   onClose: () => void;
   assetId: string;
   assetName: string;
   assetType: string;
+  /**
+   * The items being added, used to show a manifest so the user can confirm
+   * *which* clips they are filing before choosing a destination.
+   *
+   * Optional: callers adding a single whole asset can omit it and rely on
+   * `assetName` alone. The manifest is only rendered when at least one item
+   * carries a time range — for whole assets a list of filenames repeats what
+   * the caller already showed, whereas a clip's range is otherwise invisible
+   * at this point in the flow.
+   */
+  items?: AddToCollectionItemSummary[];
   /**
    * Called with the chosen collection. The name is passed alongside the id so
    * callers can label a confirmation or remember the collection as a shortcut
@@ -60,6 +87,7 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   open,
   onClose,
   assetName,
+  items,
   onAddToCollection,
 }) => {
   const { t } = useTranslation();
@@ -80,6 +108,16 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
   const { data: collectionsResponse, isLoading, refetch } = useGetAllCollections();
   const createCollectionMutation = useCreateCollection();
   const collections = collectionsResponse?.data || [];
+
+  /**
+   * Clip entries in the set being added.
+   *
+   * The manifest exists to answer "which clips am I filing?", so it is only
+   * worth the vertical space when at least one item actually carries a range.
+   * A list of bare filenames would just repeat the count already in the header.
+   */
+  const clipItems = useMemo(() => (items ?? []).filter((item) => Boolean(item.timeRange)), [items]);
+  const showManifest = clipItems.length > 0;
 
   // Refetch collections each time the modal opens to ensure item counts are current
   useEffect(() => {
@@ -302,6 +340,75 @@ export const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({
           >
             {assetName}
           </Typography>
+          {/*
+            Clip manifest. Without this, filing clips from the selection bin
+            showed only "N selected" and the time ranges — the one thing that
+            distinguishes several clips of the same asset — were invisible at
+            the moment of choosing a destination.
+
+            Capped in height and scrollable so a large selection cannot push the
+            collection list out of the dialog.
+          */}
+          {showManifest && (
+            <Box
+              component="ul"
+              sx={{
+                listStyle: "none",
+                m: 0,
+                mt: 1,
+                p: 0,
+                pr: 0.5,
+                maxHeight: 104,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.25,
+              }}
+              aria-label={t("collectionsPage.itemsBeingAdded", "Items being added")}
+            >
+              {clipItems.map((item) => (
+                <Box
+                  component="li"
+                  key={item.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                      color: "primary.main",
+                      // Ranges line up as a column, which is the whole point of
+                      // listing them.
+                      fontVariantNumeric: "tabular-nums",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.timeRange}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "0.7rem",
+                      color: "text.secondary",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                    title={item.name}
+                  >
+                    {item.name}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
         <IconButton
           onClick={handleClose}

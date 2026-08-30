@@ -2,8 +2,26 @@
  * Marker helper functions for Omakase player clip markers.
  * Pure functions — no React dependencies.
  */
-import { OmakasePlayer, PeriodMarker } from "@byomakase/omakase-player";
+import {
+  ChromingTrackDestination,
+  MarkerTrack,
+  MediaTemporalFormat,
+  TrackSource,
+  TrackType,
+  type OmakasePlayer,
+} from "@byomakase/omakase-player";
 import { getMarkerColorByConfidence } from "../../common/utils";
+import { DEFAULT_FPS, parseTimecode } from "@/utils/timecode";
+import { createMarker } from "@/components/player/markerTracks";
+
+/**
+ * Label for the single marker track each card player owns.
+ *
+ * Used to find the existing track on re-runs instead of registering another —
+ * cards re-render on clip and threshold changes, and Omakase has no
+ * "replace the bar" call.
+ */
+const CARD_MARKER_TRACK_LABEL = "clips";
 
 export interface ClipData {
   start_timecode?: string;
@@ -15,10 +33,19 @@ export interface ClipData {
   model_version?: string;
 }
 
-export function timecodeToSeconds(tc: string): number {
-  const [hh, mm, ss, ff] = tc.split(":").map(Number);
-  const fps = 25;
-  return hh * 3600 + mm * 60 + ss + (isNaN(ff) ? 0 : ff / fps);
+/**
+ * Convert a source timecode to seconds for marker placement.
+ *
+ * `fps` is optional because a card only has the clip payload, not the asset's
+ * embedded metadata; it falls back to `DEFAULT_FPS`, the same rate the player is
+ * loaded with. Callers that do know the asset's real rate should pass it.
+ *
+ * Returns 0 for unparseable input, matching the previous behaviour — a marker at
+ * the head of the timeline is a visible, recoverable error, whereas NaN silently
+ * breaks the player's marker track.
+ */
+export function timecodeToSeconds(tc: string, fps: number = DEFAULT_FPS): number {
+  return parseTimecode(tc, fps) ?? 0;
 }
 
 export function getFilteredClips(
@@ -53,16 +80,39 @@ export function addMarkersToPlayer(
   const isClip = id.includes("#CLIP#") || id.includes("_clip_");
   const filteredClips = getFilteredClips(id, clips, isSemantic, confidenceThreshold);
 
-  // Get the marker track — try chroming API (0.25.x) first, fall back to legacy
-  const markerTrack =
-    player.chroming?.progressMarkerTrack ?? (player as any).progressMarkerTrack ?? null;
+  // One marker track per card, reused across re-renders. 1.1.1 has no
+  // `chroming.progressMarkerTrack` to write into: markers live on a MarkerTrack
+  // registered in the track repository, and a chroming marker bar renders it.
+  // `find` keeps this idempotent — the effect re-runs whenever clips or the
+  // confidence threshold change, and re-registering would stack duplicate bars.
+  const existing = player.track.findFirst(
+    (track) => (track as MarkerTrack).label === CARD_MARKER_TRACK_LABEL
+  ) as MarkerTrack | undefined;
 
-  if (markerTrack) {
-    try {
-      markerTrack.removeAllMarkers();
-    } catch {
-      /* ok */
-    }
+  const markerTrack =
+    existing ??
+    (player.track.add(new MarkerTrack({ label: CARD_MARKER_TRACK_LABEL })) as MarkerTrack);
+
+  if (!existing) {
+    // Register the bar on the progress bar so clip matches read as segments of
+    // the scrubber, which is what the card's Stamp chroming shows.
+    player.chroming
+      .addMarkerBar(TrackSource.fromTrack(markerTrack), ChromingTrackDestination.PROGRESS_BAR, {
+        trackType: TrackType.MARKER_TRACK,
+      })
+      .subscribe({
+        error: () => {
+          // A card can be parked before the bar resolves; nothing to recover.
+        },
+      });
+  }
+
+  // Replace the previous set wholesale — the threshold filter changes which
+  // clips qualify, and diffing a read-only derived set buys nothing.
+  try {
+    markerTrack.deleteTimedItems(markerTrack.timedItems.map((item) => item.id));
+  } catch {
+    /* track may be locked or already gone */
   }
 
   filteredClips.forEach((clip, index) => {
@@ -83,23 +133,29 @@ export function addMarkersToPlayer(
     if ((start === 0 && end - start < 1) || (start < 2 && end - start < 1)) return;
     if (end - start < 1) return;
 
-    const marker = new PeriodMarker({
-      timeObservation: { start, end },
-      style: { color: getMarkerColorByConfidence(clip.score, clip.model_version) },
+    const marker = createMarker({
+      kind: "semantic",
+      startTime: start,
+      endTime: end,
+      color: getMarkerColorByConfidence(clip.score, clip.model_version),
+      score: clip.score,
+      modelVersion: clip.model_version,
     });
 
     try {
-      if (markerTrack) {
-        markerTrack.addMarker(marker);
-      }
-      markerIds.push(marker.id || `${start}-${end}`);
+      markerTrack.addTimedItems(marker);
+      markerIds.push(marker.id);
       if (isClip || (filteredClips.length === 1 && index === 0)) {
         // Fire-and-forget seek — don't subscribe synchronously as it blocks the main thread
         // when multiple cards load simultaneously. The seek is best-effort.
         try {
-          player.video.seekToTime(start);
+          player.player.seekTo(start, MediaTemporalFormat.SECONDS).subscribe({
+            error: () => {
+              /* media may not be ready */
+            },
+          });
         } catch {
-          /* video may not be ready */
+          /* media may not be ready */
         }
       }
     } catch {
