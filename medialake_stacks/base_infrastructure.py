@@ -15,6 +15,10 @@ from medialake_constructs.asset_table_stream import (
     AssetTableStream,
     AssetTableStreamProps,
 )
+from medialake_constructs.shared_constructs.cr_owned_tag_stripper import (
+    STRIPPER_PRIORITY,
+    StripCrOwnedBucketTags,
+)
 from medialake_constructs.shared_constructs.dynamodb import DynamoDB, DynamoDBProps
 from medialake_constructs.shared_constructs.eventbridge import EventBus, EventBusConfig
 from medialake_constructs.shared_constructs.opensearch_managed_cluster import (
@@ -405,6 +409,18 @@ class BaseInfrastructureStack(Stack):
                 access_logs=True,
                 access_logs_bucket=self.access_logs_bucket,
             ),
+        )
+
+        # Every BucketDeployment writing node Lambda code into this bucket also tags it
+        # with an `aws-cdk:cr-owned:*` marker, and there is one deployment per pipeline
+        # node — so the bucket approaches S3's hard 50-tag limit as nodes are added, and
+        # the overflow fails *this* stack rather than the nodes stack that grew. Those
+        # deployments pass prune=False, which is what the marker guards, so strip it.
+        # Applied at STRIPPER_PRIORITY: the markers only appear in the bucket's tag
+        # manager once READONLY-priority aspects run; see the aspect's module docstring.
+        cdk.Aspects.of(self).add(
+            StripCrOwnedBucketTags(self.iac_assets_bucket.bucket),
+            priority=STRIPPER_PRIORITY,
         )
 
         self._pipelines_event_bus = EventBus(

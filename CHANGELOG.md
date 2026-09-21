@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.3] - 2026-09-21
+
+### Bug Fixes
+
+- fix(nodes): stop node deployments consuming the IAC bucket's 50 tag slots
+- fix(deploy): stop installing the frontend over a cached node_modules
+
 ## [1.22.2] - 2026-09-21
 
 ### Bug Fixes

@@ -121,7 +121,12 @@ class LambdaDeployment(Construct):
                 destination_bucket=destination_bucket,
                 destination_key_prefix=destination_key_prefix,
                 extract=False,
-                prune=False,  # Disable pruning to avoid S3 50-tag limit on shared bucket
+                # Pruning is disabled because every deployment here shares one bucket, so
+                # a prune would let one node's sync delete another's object. Note this does
+                # NOT avoid the bucket's 50-tag limit: BucketDeployment tags the
+                # destination with an `aws-cdk:cr-owned:*` marker either way. That marker
+                # is stripped by StripCrOwnedBucketTags where the bucket is defined.
+                prune=False,
             )
 
     def _package_python_lambda(self, source_path, package_path, zip_path):

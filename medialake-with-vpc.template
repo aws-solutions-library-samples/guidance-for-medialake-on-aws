@@ -629,7 +629,11 @@ Resources:
               CDK_DEFAULT_REGION: ${AWS::Region}
           cache:
             paths:
-              - 'medialake_user_interface/node_modules/**/*'
+              # node_modules is deliberately NOT cached. npm install reconciles package.json
+              # against whatever tree is already on disk, so a cached tree from before a
+              # dependency bump fails to resolve (ERESOLVE) even though a clean install is
+              # fine — e.g. a cached @uppy/aws-s3@5 against a package.json asking for 6.
+              # The npm HTTP cache below keeps installs fast without that hazard.
               - '/root/.npm/**/*'
               - '/root/.cache/pip/**/*'
               - 'dist/lambdas/layers/ffprobe/**/*'
@@ -664,7 +668,11 @@ Resources:
                   PIP_PID=$!
                   (
                     cd $CODEBUILD_SRC_DIR/$FRONTEND_DIR
-                    if [ -f "package.json" ]; then npm install; fi
+                    if [ -f "package.json" ]; then
+                      # Never install on top of a pre-existing tree: see the cache note above.
+                      rm -rf node_modules
+                      npm install --prefer-offline --no-audit --no-fund
+                    fi
                   ) &
                   NPM_PID=$!
                   wait $PIP_PID || exit 1
