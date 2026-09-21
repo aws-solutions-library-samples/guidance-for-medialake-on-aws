@@ -76,6 +76,7 @@ import {
   isClipAsset,
   getClipDisplayName,
   getCollectionItemDisplayName,
+  collectionItemClipBoundary,
 } from "@/utils/clipTransformation";
 import { resolveDotPath } from "@/utils/dotPathResolve";
 import { getAssetFrameRate, formatTimecodeRange, parseTimecode } from "@/utils/timecode";
@@ -91,6 +92,8 @@ type AssetItem = (ImageItem | VideoItem | AudioItem) & {
     startTime?: string;
     endTime?: string;
   };
+  /** The collection row's SK (`ASSET#{id}#FULL` / `ASSET#{id}#CLIP#…`); the only per-clip unique id. */
+  collectionItemId?: string;
   addedAt?: string;
   addedBy?: string;
 };
@@ -366,8 +369,7 @@ const CollectionViewPage: React.FC = () => {
 
       // Use the collectionItemId (SK) if available, otherwise fall back to InventoryID
       // The collectionItemId is the SK from DynamoDB (e.g., "ITEM#uuid" or "ASSET#uuid")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const itemId = (asset as any).collectionItemId || asset.InventoryID;
+      const itemId = asset.collectionItemId || asset.InventoryID;
 
       if (id && itemId) {
         deleteItemMutation.mutate({ collectionId: id, itemId });
@@ -383,17 +385,11 @@ const CollectionViewPage: React.FC = () => {
 
       const assetId = getOriginalAssetId(selectedAssetForCollection);
 
-      // Check if this asset has clip data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clipData = (selectedAssetForCollection as any).clipData;
-      let clipBoundary = undefined;
-
-      if (clipData && clipData.start_timecode && clipData.end_timecode) {
-        clipBoundary = {
-          startTime: clipData.start_timecode,
-          endTime: clipData.end_timecode,
-        };
-      }
+      // A collection row carries its range as `clipBoundary` (HH:MM:SS:FF), not the
+      // search-result `clipData` shape — so read the boundary the item actually has.
+      // Previously only `clipData` was consulted, which a collection item never has, so a
+      // clip copied to another collection was silently stored there as the whole asset.
+      const clipBoundary = collectionItemClipBoundary(selectedAssetForCollection.clipBoundary);
 
       await addItemToCollectionMutation.mutateAsync({
         collectionId,

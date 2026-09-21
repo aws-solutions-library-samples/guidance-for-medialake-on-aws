@@ -103,13 +103,20 @@ export function usePortalApi(
     }
   }, [authClient, slug]);
 
-  const getPresignedUrl = useCallback(
+  /**
+   * Sign the request that creates the object — a PUT for a single-part upload or a
+   * CreateMultipartUpload POST — and register the key against the session. The browser
+   * performs the S3 request itself (Uppy 6 @uppy/aws-s3 signRequest). `key` is the
+   * server's choice and must be used for the rest of the upload.
+   */
+  const createUpload = useCallback(
     async (fileData: {
       filename: string;
       contentType: string;
       fileSize: number;
       path: string;
       destinationId: string;
+      method: "PUT" | "POST";
       metadata?: Record<string, string>;
       sessionId?: string;
       batchToken?: string;
@@ -119,11 +126,12 @@ export function usePortalApi(
         const { data } = await authClient.post(`/portal/${slug}/upload`, fileData);
         return data as {
           sessionId?: string;
-          multipart?: boolean;
-          presignedPost?: { url: string; fields: Record<string, string> };
-          uploadId?: string;
-          key?: string;
-          bucket?: string;
+          multipart: boolean;
+          bucket: string;
+          key: string;
+          url: string;
+          method: "PUT" | "POST";
+          expiresIn: number;
         };
       } catch (e) {
         return handleApiError(e);
@@ -132,50 +140,25 @@ export function usePortalApi(
     [authClient, slug]
   );
 
-  const signPart = useCallback(
-    async (partData: {
+  /** Sign one request of an in-flight multipart upload (part, list, complete, abort). */
+  const signMultipart = useCallback(
+    async (request: {
       uploadId: string;
       key: string;
-      partNumber: number;
       destinationId: string;
+      operation: "part" | "list" | "complete" | "abort";
+      partNumber?: number;
     }) => {
       if (!authClient) throw new PortalNotAuthenticatedError();
       try {
-        const { data } = await authClient.post(`/portal/${slug}/upload/multipart/sign`, partData);
-        return data;
-      } catch (e) {
-        return handleApiError(e);
-      }
-    },
-    [authClient, slug]
-  );
-
-  const completeMultipart = useCallback(
-    async (payload: {
-      uploadId: string;
-      key: string;
-      parts: Array<{ PartNumber: number; ETag: string }>;
-      destinationId: string;
-    }) => {
-      if (!authClient) throw new PortalNotAuthenticatedError();
-      try {
-        const { data } = await authClient.post(
-          `/portal/${slug}/upload/multipart/complete`,
-          payload
-        );
-        return data;
-      } catch (e) {
-        return handleApiError(e);
-      }
-    },
-    [authClient, slug]
-  );
-
-  const abortMultipart = useCallback(
-    async (payload: { uploadId: string; key: string; destinationId: string }) => {
-      if (!authClient) throw new PortalNotAuthenticatedError();
-      try {
-        await authClient.post(`/portal/${slug}/upload/multipart/abort`, payload);
+        const { data } = await authClient.post(`/portal/${slug}/upload/multipart/sign`, request);
+        return data as {
+          presignedUrl: string;
+          operation: string;
+          method: "PUT" | "GET" | "POST" | "DELETE";
+          expiresIn: number;
+          partNumber?: number;
+        };
       } catch (e) {
         return handleApiError(e);
       }
@@ -297,10 +280,8 @@ export function usePortalApi(
   return {
     authenticate,
     getPortalConfig,
-    getPresignedUrl,
-    signPart,
-    completeMultipart,
-    abortMultipart,
+    createUpload,
+    signMultipart,
     browse,
     createFolder,
     startSession,

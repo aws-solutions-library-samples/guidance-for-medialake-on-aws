@@ -4,6 +4,7 @@ import AppConfigured from "./components/app-configured";
 import { Amplify } from "aws-amplify";
 import { useTranslation } from "react-i18next";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import { registerGoldenRetrieverServiceWorker } from "./features/upload/utils/uppySignRequest";
 
 // Import and initialize i18next configuration
 import "./i18n/i18n";
@@ -20,6 +21,13 @@ window.addEventListener("vite:preloadError", (event) => {
 });
 // Clear the flag on successful page load so future deploys can trigger a reload again.
 window.addEventListener("load", () => sessionStorage.removeItem("chunk-reload"));
+
+// Golden Retriever's service worker keeps references to files selected for upload so a
+// refresh or closed tab does not lose them. Deferred to `load` so it never competes with
+// the first paint; failure is non-fatal (see registerGoldenRetrieverServiceWorker).
+window.addEventListener("load", () => {
+  void registerGoldenRetrieverServiceWorker();
+});
 
 // Omakase player styles — imported globally so both grid-card (Stamp theme)
 // and detail-view (Default theme) players render correctly.

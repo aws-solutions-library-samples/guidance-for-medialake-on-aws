@@ -183,7 +183,7 @@ export default {
       fileFilterMimeTypesPlaceholder: "Add a MIME type",
       supportedFormatsTitle: "Supported formats",
       allowUploadsHelper:
-        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
+        "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, POST, and DELETE requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache).",
       indexingDefaultsNote:
         "Supported image, video, and audio formats are fully processed by the default pipelines. Any other file types you choose to ingest are stored as searchable, preview-only items with a file-type badge, without default-pipeline processing. Expand the section below to view the full list of supported formats.",
       editNote:

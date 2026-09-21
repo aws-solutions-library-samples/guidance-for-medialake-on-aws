@@ -4,9 +4,8 @@ Portal Public API Lambda Handler.
 Handles all public-facing portal routes:
   GET  /<slug>                          – portal details
   POST /<slug>/upload                   – initiate upload
-  POST /<slug>/upload/multipart/sign    – sign a multipart part
-  POST /<slug>/upload/multipart/complete – complete multipart upload
-  POST /<slug>/upload/multipart/abort   – abort multipart upload
+  POST /<slug>/upload/multipart/sign    – sign any multipart operation
+                                          (part / list / complete / abort)
   POST /<slug>/upload-session           – create/resume upload session
   GET  /<slug>/upload-session/<id>      – get session status
   POST /<slug>/upload-session/<id>/heartbeat – session heartbeat
@@ -20,6 +19,7 @@ import json
 import os
 import re
 import sys
+import time
 from decimal import Decimal
 from typing import Any, Dict, List
 
@@ -34,7 +34,6 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from botocore.config import Config
-from botocore.exceptions import ClientError
 
 # Upload session store — vendored into the Lambda package at deploy time.
 # The shared module lives at lambdas/shared/upload_session/session_store.py;
@@ -64,6 +63,12 @@ CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "")
 RESOURCE_PREFIX = os.environ.get("RESOURCE_PREFIX", "")
 UPLOAD_SESSIONS_TABLE_NAME = os.environ.get("UPLOAD_SESSIONS_TABLE_NAME", "")
 SESSION_RETENTION_DAYS = int(os.environ.get("SESSION_RETENTION_DAYS", "7"))
+# Upload directives table. The browser (Uppy 6 @uppy/aws-s3) uploads straight to S3 with
+# presigned URLs and sends no object metadata, so the ml-* directives that used to be
+# stamped as x-amz-meta-* are recorded here, keyed UPLOADDIR#<bucket>#<key>, and merged
+# into the object's user metadata by the ingest Lambda.
+UPLOAD_DIRECTIVES_TABLE_NAME = os.environ.get("UPLOAD_DIRECTIVES_TABLE_NAME", "")
+DIRECTIVE_TTL_SECONDS = 7 * 24 * 60 * 60
 HEARTBEAT_MIN_INTERVAL_SECONDS = int(
     os.environ.get("HEARTBEAT_MIN_INTERVAL_SECONDS", "30")
 )
@@ -244,59 +249,77 @@ def is_multipart_upload_required(file_size: int) -> bool:
     return file_size > 100 * 1024 * 1024
 
 
-def generate_presigned_post_url(
+SIGN_METHOD_PUT = "PUT"
+SIGN_METHOD_POST = "POST"
+
+
+def resolve_sign_method(requested, file_size) -> str:
+    """The S3 request to presign: the client's choice, or the size-based default."""
+    if requested in (SIGN_METHOD_PUT, SIGN_METHOD_POST):
+        return requested
+    return (
+        SIGN_METHOD_POST if is_multipart_upload_required(file_size) else SIGN_METHOD_PUT
+    )
+
+
+def generate_presigned_put_url(
     bucket: str,
     key: str,
     content_type: str,
+    file_size: int,
     expiration: int = DEFAULT_EXPIRATION,
-    metadata: dict | None = None,
-    max_size_bytes: int | None = None,
-) -> Dict[str, Any]:
-    """Generate a presigned POST URL for the S3 object."""
+) -> str:
+    """Presigned PutObject URL for a single-part upload.
+
+    ``content-type`` and ``content-length`` are signed headers, so S3 only accepts the
+    declared type and the exact declared size — which is how the portal's per-file size
+    limit is enforced now that there is no POST policy ``content-length-range``.
+    """
     s3_client = _get_s3_client_for_bucket(bucket)
-    _100MB = 100 * 1024 * 1024
-    try:
-        max_size_bytes = int(max_size_bytes) if max_size_bytes is not None else None
-    except (TypeError, ValueError):
-        max_size_bytes = None
-    upper = (
-        min(_100MB, max_size_bytes) if max_size_bytes and max_size_bytes > 0 else _100MB
-    )
-    fields = {"Content-Type": content_type}
-    conditions = [
-        {"bucket": bucket},
-        {"key": key},
-        ["content-length-range", 1, upper],
-        {"Content-Type": content_type},
-    ]
-    if metadata:
-        for k, v in metadata.items():
-            header = f"x-amz-meta-{k}"
-            fields[header] = v
-            conditions.append(["starts-with", f"${header}", ""])
-    return s3_client.generate_presigned_post(
-        Bucket=bucket,
-        Key=key,
-        Fields=fields,
-        Conditions=conditions,
+    return s3_client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ContentType": content_type,
+            "ContentLength": int(file_size),
+        },
         ExpiresIn=expiration,
     )
 
 
-def create_multipart_upload(
-    bucket: str, key: str, content_type: str, metadata: Dict[str, str] | None = None
+def generate_create_multipart_url(
+    bucket: str, key: str, content_type: str, expiration: int = DEFAULT_EXPIRATION
 ) -> str:
-    """Initiate a multipart upload and return the upload ID."""
+    """Presigned CreateMultipartUpload URL; the browser POSTs to it and reads the UploadId."""
     s3_client = _get_s3_client_for_bucket(bucket)
-    kwargs: Dict[str, Any] = {
-        "Bucket": bucket,
-        "Key": key,
-        "ContentType": content_type,
-    }
-    if metadata:
-        kwargs["Metadata"] = metadata
-    response = s3_client.create_multipart_upload(**kwargs)
-    return response["UploadId"]
+    return s3_client.generate_presigned_url(
+        "create_multipart_upload",
+        Params={"Bucket": bucket, "Key": key, "ContentType": content_type},
+        ExpiresIn=expiration,
+    )
+
+
+def _write_upload_directives(
+    bucket: str, key: str, directives: Dict[str, str], portal_id, session_id
+) -> None:
+    """Record the ml-* directive map for the object about to be uploaded.
+
+    Same key shape as the authenticated upload API's row so ingest's lookup is shared.
+    Raises when the table is not configured or the write fails: without its row the object
+    would ingest with no ml-batch-id, and the upload session would never see it complete.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        raise RuntimeError("UPLOAD_DIRECTIVES_TABLE_NAME is not configured")
+    boto3.resource("dynamodb").Table(UPLOAD_DIRECTIVES_TABLE_NAME).put_item(
+        Item={
+            "PK": f"UPLOADDIR#{bucket}#{key}",
+            "directives": directives,
+            "portalId": str(portal_id),
+            "sessionId": session_id,
+            "expiresAt": int(time.time()) + DIRECTIVE_TTL_SECONDS,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -525,32 +548,6 @@ def _get_authorizer_portal_id() -> str | None:
     request_context = app.current_event.raw_event.get("requestContext", {})
     authorizer = request_context.get("authorizer", {})
     return authorizer.get("portalId")
-
-
-def _calculate_part_size(file_size):
-    """Calculate optimal part size and total parts for multipart upload."""
-    GB = 1024 * 1024 * 1024
-    MB = 1024 * 1024
-
-    if file_size >= 100 * GB:
-        part_size = 500 * MB
-    elif file_size >= 10 * GB:
-        part_size = 200 * MB
-    elif file_size >= 1 * GB:
-        part_size = 100 * MB
-    elif file_size >= 100 * MB:
-        part_size = 50 * MB
-    else:
-        part_size = 5 * MB
-
-    total_parts = (file_size + part_size - 1) // part_size
-
-    if total_parts > 10000:
-        part_size = (file_size + 9999) // 10000
-        part_size = ((part_size + MB - 1) // MB) * MB
-        total_parts = (file_size + part_size - 1) // part_size
-
-    return part_size, total_parts
 
 
 def _resolve_allowed_types(portal):
@@ -1044,6 +1041,14 @@ def post_upload(slug: str):
     file_count = body.get("fileCount", 1)
     session_id = body.get("sessionId") or None
     batch_token = body.get("batchToken") or None
+    # Which S3 request the client is about to make (Uppy's signRequest method): PUT for a
+    # single-part object, POST for CreateMultipartUpload. Omitted → decided by size.
+    requested_method = body.get("method")
+    if requested_method is not None and requested_method not in (
+        SIGN_METHOD_PUT,
+        SIGN_METHOD_POST,
+    ):
+        return _error(400, "method must be PUT or POST")
 
     if not filename:
         return _error(400, "filename is required")
@@ -1188,47 +1193,68 @@ def post_upload(slug: str):
     # ml-batch-id) resolved above so downstream processing can associate the
     # asset with its batch; the form VALUES travel on the submit event.
 
-    if is_multipart_upload_required(file_size):
-        upload_id = create_multipart_upload(
-            bucket, s3_key, content_type, metadata=s3_metadata or None
-        )
-        part_size, total_parts = _calculate_part_size(file_size)
-        return {
-            "multipart": True,
-            "sessionId": session_id,
-            "bucket": bucket,
-            "key": s3_key,
-            "uploadId": upload_id,
-            "partSize": part_size,
-            "totalParts": total_parts,
-        }
+    # Recorded before the URL is handed out: if this fails the upload must fail too.
+    if s3_metadata:
+        try:
+            _write_upload_directives(bucket, s3_key, s3_metadata, portal_id, session_id)
+        except Exception as e:
+            logger.error(
+                "Failed to record upload directives",
+                error=str(e),
+                bucket=bucket,
+                key=s3_key,
+            )
+            return _error(500, "Failed to record upload directives")
 
-    presigned_post = generate_presigned_post_url(
-        bucket,
-        s3_key,
-        content_type,
-        metadata=s3_metadata or None,
-        max_size_bytes=portal.get("maxFileSizeBytes"),
-    )
+    method = resolve_sign_method(requested_method, file_size)
+    multipart = method == SIGN_METHOD_POST
+    if multipart:
+        url = generate_create_multipart_url(bucket, s3_key, content_type)
+    else:
+        url = generate_presigned_put_url(bucket, s3_key, content_type, file_size)
+
     return {
-        "multipart": False,
+        "multipart": multipart,
         "sessionId": session_id,
-        "presignedPost": {
-            "url": presigned_post["url"],
-            "fields": presigned_post["fields"],
-        },
+        "bucket": bucket,
+        # Authoritative: the client proposed a placeholder and must use this key for the
+        # rest of the upload.
+        "key": s3_key,
+        "url": url,
+        "method": method,
+        "expiresIn": DEFAULT_EXPIRATION,
     }
+
+
+MULTIPART_OPERATIONS = {
+    # operation → (boto3 client method, HTTP verb the browser uses)
+    "part": ("upload_part", "PUT"),
+    "list": ("list_parts", "GET"),
+    "complete": ("complete_multipart_upload", "POST"),
+    "abort": ("abort_multipart_upload", "DELETE"),
+}
 
 
 @app.post("/<slug>/upload/multipart/sign")
 @tracer.capture_method
 def post_multipart_sign(slug: str):
-    """Generate a presigned URL for a single multipart part."""
+    """Presign one S3 request of an in-flight multipart upload.
+
+    The browser performs UploadPart, ListParts (resume after a refresh),
+    CompleteMultipartUpload and AbortMultipartUpload itself, so all four are signed here.
+    ``operation`` defaults to ``part`` so the previous request shape keeps working. Only
+    ``host`` is a signed header, matching what the browser sends.
+
+    The portal's total-size limit for multipart uploads used to be enforced by a HEAD after
+    a server-side complete; with the browser completing, single-part size is enforced by the
+    signed content-length and multipart totals rely on the client-side restriction.
+    """
     body = app.current_event.json_body or {}
     destination_id = body.get("destinationId")
     upload_id = body.get("uploadId")
     key = body.get("key")
     part_number = body.get("partNumber")
+    operation = body.get("operation", "part")
 
     if not destination_id:
         return _error(400, "destinationId is required")
@@ -1236,14 +1262,21 @@ def post_multipart_sign(slug: str):
         return _error(400, "uploadId is required")
     if not key:
         return _error(400, "key is required")
-    if part_number is None:
-        return _error(400, "partNumber is required")
-    if (
-        not isinstance(part_number, int)
-        or isinstance(part_number, bool)
-        or part_number < 1
-    ):
-        return _error(400, "partNumber must be a positive integer")
+    if operation not in MULTIPART_OPERATIONS:
+        return _error(
+            400, f"operation must be one of {', '.join(sorted(MULTIPART_OPERATIONS))}"
+        )
+    if operation == "part":
+        if part_number is None:
+            return _error(400, "partNumber is required")
+        if (
+            not isinstance(part_number, int)
+            or isinstance(part_number, bool)
+            or not 1 <= part_number <= 10000
+        ):
+            return _error(400, "partNumber must be an integer between 1 and 10000")
+    else:
+        part_number = None
 
     portal_id, portal = _get_portal_by_slug(slug)
     if not portal:
@@ -1266,217 +1299,22 @@ def post_multipart_sign(slug: str):
 
     bucket = connector["storageIdentifier"]
     s3_client = _get_s3_client_for_bucket(bucket)
+    client_method, http_method = MULTIPART_OPERATIONS[operation]
+    params: Dict[str, Any] = {"Bucket": bucket, "Key": key, "UploadId": upload_id}
+    if operation == "part":
+        params["PartNumber"] = part_number
     url = s3_client.generate_presigned_url(
-        "upload_part",
-        Params={
-            "Bucket": bucket,
-            "Key": key,
-            "UploadId": upload_id,
-            "PartNumber": part_number,
-        },
-        ExpiresIn=DEFAULT_EXPIRATION,
+        client_method, Params=params, ExpiresIn=DEFAULT_EXPIRATION
     )
-    return {
+    response = {
         "presignedUrl": url,
-        "partNumber": part_number,
+        "operation": operation,
+        "method": http_method,
         "expiresIn": DEFAULT_EXPIRATION,
     }
-
-
-MAX_MULTIPART_PARTS = 10000
-
-
-def _normalize_multipart_parts(parts):
-    """Reduce client-supplied parts to exactly what CompleteMultipartUpload accepts.
-
-    Returns ``(normalized_parts, error_message)``; exactly one is meaningful.
-
-    Browser multipart clients build each part from the CORS-exposed response headers, so a
-    part can arrive with lowercase keys or extra ones, e.g.
-    ``{"PartNumber": 1, "etag": "...", "x-amz-request-id": "..."}``. boto3's
-    CompleteMultipartUpload accepts only ``ETag`` and ``PartNumber`` and raises
-    ParamValidationError on anything else, which would surface as a 500.
-
-    This deliberately mirrors the validation the authenticated path already gets for free
-    from its pydantic model in ``lambdas/api/assets/upload/multipart_complete`` (``Part``
-    with ``PartNumber`` constrained to 1..10000, ``ETag`` required, extra keys ignored, and
-    a 10,000-part cap). Both endpoints are fed by the same browser client, so they should
-    not differ in strictness. It is written in plain Python rather than with pydantic to
-    avoid adding a runtime dependency to this unauthenticated public Lambda, whose bundle
-    does not currently ship one.
-
-    S3 also requires parts in ascending PartNumber order, so the result is sorted.
-    """
-    if not isinstance(parts, list) or not parts:
-        return None, "parts is required and must be a non-empty list"
-
-    if len(parts) > MAX_MULTIPART_PARTS:
-        return None, f"parts cannot exceed {MAX_MULTIPART_PARTS} entries"
-
-    normalized = []
-    seen_part_numbers = set()
-
-    for part in parts:
-        if not isinstance(part, dict):
-            return None, "Each part must be an object with an ETag and PartNumber"
-
-        etag = part.get("ETag") or part.get("etag")
-        raw_part_number = part.get("PartNumber")
-        if raw_part_number is None:
-            raw_part_number = part.get("partNumber")
-
-        if not etag or not isinstance(etag, str) or raw_part_number is None:
-            return None, "Each part must include an ETag and PartNumber"
-
-        # bool is an int subclass, so reject it explicitly rather than coercing True to 1.
-        if isinstance(raw_part_number, bool):
-            return None, "PartNumber must be an integer"
-        try:
-            part_number = int(raw_part_number)
-        except (TypeError, ValueError):
-            return None, "PartNumber must be an integer"
-
-        if not 1 <= part_number <= MAX_MULTIPART_PARTS:
-            return None, f"PartNumber must be between 1 and {MAX_MULTIPART_PARTS}"
-
-        if part_number in seen_part_numbers:
-            return None, f"Duplicate PartNumber {part_number}"
-        seen_part_numbers.add(part_number)
-
-        normalized.append({"ETag": etag, "PartNumber": part_number})
-
-    normalized.sort(key=lambda part: part["PartNumber"])
-    return normalized, None
-
-
-@app.post("/<slug>/upload/multipart/complete")
-@tracer.capture_method
-def post_multipart_complete(slug: str):
-    """Complete a multipart upload."""
-    body = app.current_event.json_body or {}
-    destination_id = body.get("destinationId")
-    upload_id = body.get("uploadId")
-    key = body.get("key")
-    parts = body.get("parts", [])
-
-    if not destination_id:
-        return _error(400, "destinationId is required")
-    if not upload_id:
-        return _error(400, "uploadId is required")
-    if not key:
-        return _error(400, "key is required")
-    if not isinstance(parts, list) or not parts:
-        return _error(400, "parts is required and must be a non-empty list")
-
-    normalized_parts, parts_error = _normalize_multipart_parts(parts)
-    if parts_error:
-        return _error(400, parts_error)
-
-    portal_id, portal = _get_portal_by_slug(slug)
-    if not portal:
-        return _error(404, "Portal not found")
-
-    destination = _get_destination(portal_id, destination_id)
-    if not destination:
-        return _error(400, "Destination not found")
-
-    key = _sanitize_path(key)
-    if key is None:
-        return _error(400, "Invalid key: traversal segments are not allowed")
-
-    if not _validate_path_within_root(key, destination["rootPath"]):
-        return _error(400, "Key is outside the allowed root")
-
-    connector = _get_connector(destination["connectorId"])
-    if not connector:
-        return _error(500, "Connector not found")
-
-    bucket = connector["storageIdentifier"]
-    s3_client = _get_s3_client_for_bucket(bucket)
-    s3_client.complete_multipart_upload(
-        Bucket=bucket,
-        Key=key,
-        UploadId=upload_id,
-        MultipartUpload={"Parts": normalized_parts},
-    )
-
-    max_size = portal.get("maxFileSizeBytes")
-    if max_size and max_size > 0:
-        try:
-            head = s3_client.head_object(Bucket=bucket, Key=key)
-            content_length = head["ContentLength"]
-            if content_length > max_size:
-                s3_client.delete_object(Bucket=bucket, Key=key)
-                return _error(
-                    400,
-                    f"Uploaded file size {content_length} bytes exceeds the portal maximum of {max_size} bytes. The upload has been removed.",
-                )
-        except ClientError as e:
-            logger.error(
-                "HEAD after multipart complete failed",
-                error=str(e),
-                bucket=bucket,
-                key=key,
-            )
-            try:
-                s3_client.delete_object(Bucket=bucket, Key=key)
-            except ClientError:
-                logger.error(
-                    "Best-effort cleanup failed after HEAD error",
-                    bucket=bucket,
-                    key=key,
-                )
-            return _error(
-                500,
-                "Upload size verification failed. The upload has been removed as a precaution.",
-            )
-
-    return {"location": f"s3://{bucket}/{key}", "bucket": bucket, "key": key}
-
-
-@app.post("/<slug>/upload/multipart/abort")
-@tracer.capture_method
-def post_multipart_abort(slug: str):
-    """Abort a multipart upload."""
-    body = app.current_event.json_body or {}
-    destination_id = body.get("destinationId")
-    upload_id = body.get("uploadId")
-    key = body.get("key")
-
-    if not destination_id:
-        return _error(400, "destinationId is required")
-    if not upload_id:
-        return _error(400, "uploadId is required")
-    if not key:
-        return _error(400, "key is required")
-
-    portal_id, portal = _get_portal_by_slug(slug)
-    if not portal:
-        return _error(404, "Portal not found")
-
-    destination = _get_destination(portal_id, destination_id)
-    if not destination:
-        return _error(400, "Destination not found")
-
-    key = _sanitize_path(key)
-    if key is None:
-        return _error(400, "Invalid key: traversal segments are not allowed")
-
-    if not _validate_path_within_root(key, destination["rootPath"]):
-        return _error(400, "Key is outside the allowed root")
-
-    connector = _get_connector(destination["connectorId"])
-    if not connector:
-        return _error(500, "Connector not found")
-
-    bucket = connector["storageIdentifier"]
-    s3_client = _get_s3_client_for_bucket(bucket)
-    try:
-        s3_client.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
-    except ClientError as e:
-        if e.response["Error"]["Code"] != "NoSuchUpload":
-            raise
-    return {"message": "Multipart upload aborted"}
+    if part_number is not None:
+        response["partNumber"] = part_number
+    return response
 
 
 @app.get("/<slug>/browse")

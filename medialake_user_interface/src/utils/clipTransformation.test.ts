@@ -7,6 +7,7 @@ import {
   getClipSegment,
   getCollectionItemDisplayName,
   formatClipBoundaryLabel,
+  collectionItemClipBoundary,
   getOriginalAssetId,
   clearTransformationCache,
   detectModelVersionFromResults,
@@ -311,6 +312,32 @@ describe("formatClipBoundaryLabel", () => {
   it("treats blank timecodes as absent", () => {
     expect(formatClipBoundaryLabel({ startTime: "  ", endTime: "00:02:00:00" })).toBeNull();
     expect(formatClipBoundaryLabel({ startTime: "00:01:00:00", endTime: "" })).toBeNull();
+  });
+});
+
+describe("collectionItemClipBoundary", () => {
+  it("carries a collection clip's boundary so a copy lands as the same clip, not the whole asset", () => {
+    expect(
+      collectionItemClipBoundary({ startTime: "00:00:10:00", endTime: "00:00:20:00" })
+    ).toEqual({ startTime: "00:00:10:00", endTime: "00:00:20:00" });
+  });
+
+  it("returns undefined for a whole-asset item", () => {
+    expect(collectionItemClipBoundary(undefined)).toBeUndefined();
+    expect(collectionItemClipBoundary(null)).toBeUndefined();
+    expect(collectionItemClipBoundary({})).toBeUndefined();
+  });
+
+  it("never sends a partial boundary, which the API rejects", () => {
+    expect(collectionItemClipBoundary({ startTime: "00:00:10:00" })).toBeUndefined();
+    expect(collectionItemClipBoundary({ endTime: "00:00:20:00" })).toBeUndefined();
+    expect(collectionItemClipBoundary({ startTime: " ", endTime: "00:00:20:00" })).toBeUndefined();
+  });
+
+  it("trims whitespace around the timecodes", () => {
+    expect(
+      collectionItemClipBoundary({ startTime: " 00:00:10:00 ", endTime: "00:00:20:00 " })
+    ).toEqual({ startTime: "00:00:10:00", endTime: "00:00:20:00" });
   });
 });
 

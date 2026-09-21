@@ -18,7 +18,15 @@ export default defineConfig({
     // Raise the warning threshold so noisy warnings don't hide real issues
     chunkSizeWarningLimit: 600,
     rollupOptions: {
+      // The app plus the Golden Retriever service worker. The worker must be served from
+      // the site root under a stable name so `navigator.serviceWorker.register("/sw.js")`
+      // finds it; everything else keeps Vite's hashed asset names.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        sw: path.resolve(__dirname, "sw.js"),
+      },
       output: {
+        entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
         manualChunks(id) {
           // React + AWS Amplify bundled together to guarantee initialization order.
           // @aws-amplify/ui-react and @xstate/react have deep runtime deps on React

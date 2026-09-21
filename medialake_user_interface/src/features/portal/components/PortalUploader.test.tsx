@@ -10,12 +10,21 @@ const mockGetSession = vi.fn();
 const mockHeartbeat = vi.fn();
 const mockSubmit = vi.fn();
 const mockReleaseKey = vi.fn();
-const mockGetPresignedUrl = vi.fn();
+const mockCreateUpload = vi.fn();
 const mockBrowse = vi.fn();
-const mockSignPart = vi.fn();
-const mockCompleteMultipart = vi.fn();
-const mockAbortMultipart = vi.fn();
+const mockSignMultipart = vi.fn();
 const mockStartSession = vi.fn();
+
+/** What the portal API answers for a single-part create request. */
+const createUploadResponse = (sessionId: string) => ({
+  sessionId,
+  multipart: false,
+  bucket: "portal-bucket",
+  key: "root/subdir/file",
+  url: "https://s3.example.com/put",
+  method: "PUT",
+  expiresIn: 3600,
+});
 
 vi.mock("../hooks/usePortalApi", () => ({
   usePortalApi: () => ({
@@ -23,11 +32,9 @@ vi.mock("../hooks/usePortalApi", () => ({
     heartbeat: mockHeartbeat,
     submit: mockSubmit,
     releaseKey: mockReleaseKey,
-    getPresignedUrl: mockGetPresignedUrl,
+    createUpload: mockCreateUpload,
     browse: mockBrowse,
-    signPart: mockSignPart,
-    completeMultipart: mockCompleteMultipart,
-    abortMultipart: mockAbortMultipart,
+    signMultipart: mockSignMultipart,
     authenticate: vi.fn(),
     getPortalConfig: vi.fn(),
     startSession: mockStartSession,
@@ -56,15 +63,20 @@ const mockUppyGetFiles = vi.fn(() => []);
 const mockUppyCancelAll = vi.fn();
 const mockUppyUpload = vi.fn();
 const mockUppyRemoveFile = vi.fn();
-// Capture the AwsS3 plugin options the component registers via setOptions so
-// tests can invoke getUploadParameters/createMultipartUpload directly.
+// Capture the AwsS3 plugin options the component passes to uppy.use(AwsS3, opts) so tests
+// can drive its signRequest the way the plugin would.
 let capturedS3Options: any = null;
-const mockUppyGetPlugin = vi.fn((_name?: string) => ({
-  setOptions: (opts: any) => {
-    capturedS3Options = opts;
-  },
-}));
-const mockUppyUse = vi.fn().mockReturnThis();
+// Files "in" the mock Uppy, keyed by id; the create request resolves its file through here.
+const mockFiles = new Map<string, any>();
+const mockUppyUse = vi.fn((_plugin: unknown, opts: any) => {
+  if (opts?.signRequest) capturedS3Options = opts;
+});
+
+/** Register a file and sign its single-part create request, as the plugin would. */
+const signCreate = (file: { id: string; name: string; type: string; size: number }) => {
+  mockFiles.set(file.id, { ...file, meta: {} });
+  return capturedS3Options.signRequest({ method: "PUT", key: file.id });
+};
 
 // Track event listeners registered with uppy.on()
 let uppyEventListeners: Record<string, ((...args: any[]) => void)[]> = {};
@@ -91,6 +103,13 @@ vi.mock("@uppy/core", () => {
       getFiles() {
         return mockUppyGetFiles();
       }
+      getFile(id: string) {
+        return mockFiles.get(id);
+      }
+      setFileMeta(id: string, meta: Record<string, unknown>) {
+        const file = mockFiles.get(id);
+        if (file) file.meta = { ...(file.meta ?? {}), ...meta };
+      }
       cancelAll() {
         mockUppyCancelAll();
       }
@@ -100,11 +119,8 @@ vi.mock("@uppy/core", () => {
       removeFile(id: string) {
         mockUppyRemoveFile(id);
       }
-      getPlugin(name: string) {
-        return mockUppyGetPlugin(name);
-      }
       use(...args: any[]) {
-        mockUppyUse(...args);
+        mockUppyUse(args[0], args[1]);
         return this;
       }
     },
@@ -112,6 +128,7 @@ vi.mock("@uppy/core", () => {
 });
 
 vi.mock("@uppy/aws-s3", () => ({ default: class {} }));
+vi.mock("@uppy/golden-retriever", () => ({ default: class {} }));
 vi.mock("@uppy/react/dashboard", () => ({
   default: () => <div data-testid="uppy-dashboard" />,
 }));
@@ -164,6 +181,7 @@ describe("PortalUploader — session integration", () => {
     vi.clearAllMocks();
     uppyEventListeners = {};
     capturedS3Options = null;
+    mockFiles.clear();
     sessionStorage.clear();
   });
 
@@ -175,7 +193,7 @@ describe("PortalUploader — session integration", () => {
   // Single-flight session creation (concurrency regression)
   //
   // Regression for the multi-file fragmentation bug: AwsS3 fires up to `limit`
-  // concurrent getUploadParameters/createMultipartUpload calls. Previously each
+  // concurrent signRequest create calls. Previously each
   // read sessionIdRef.current === null before any response returned and POSTed
   // /upload with no sessionId, so the server minted a separate session per file.
   // ensureSession() must collapse the whole first wave onto ONE session.
@@ -189,21 +207,17 @@ describe("PortalUploader — session integration", () => {
       });
       mockStartSession.mockReturnValueOnce(startPromise);
 
-      mockGetPresignedUrl.mockResolvedValue({
-        sessionId: "session-AAA",
-        presignedPost: { url: "https://s3.example.com", fields: {} },
-      });
+      mockCreateUpload.mockResolvedValue(createUploadResponse("session-AAA"));
 
       render(<PortalUploader {...defaultProps} />);
 
-      // Wait for the S3 plugin callbacks to be registered.
+      // Wait for the AwsS3 plugin to be installed with its signRequest.
       await waitFor(() => expect(capturedS3Options).not.toBeNull());
-      const getUploadParameters = capturedS3Options.getUploadParameters;
 
-      // Fire two concurrent uploads BEFORE the session create resolves — this
+      // Fire two concurrent create requests BEFORE the session create resolves — this
       // is the exact race that previously fragmented the batch.
-      const p1 = getUploadParameters({ name: "a.txt", type: "text/plain", size: 10 });
-      const p2 = getUploadParameters({ name: "b.txt", type: "text/plain", size: 20 });
+      const p1 = signCreate({ id: "f-a", name: "a.txt", type: "text/plain", size: 10 });
+      const p2 = signCreate({ id: "f-b", name: "b.txt", type: "text/plain", size: 20 });
 
       // Resolve the single in-flight session creation.
       resolveStart({
@@ -220,9 +234,9 @@ describe("PortalUploader — session integration", () => {
       // startSession invoked exactly once despite two concurrent uploads.
       expect(mockStartSession).toHaveBeenCalledTimes(1);
 
-      // Both presigned-URL requests carried the SAME sessionId and a batchToken.
-      expect(mockGetPresignedUrl).toHaveBeenCalledTimes(2);
-      const bodies = mockGetPresignedUrl.mock.calls.map((c) => c[0]);
+      // Both create requests carried the SAME sessionId and a batchToken.
+      expect(mockCreateUpload).toHaveBeenCalledTimes(2);
+      const bodies = mockCreateUpload.mock.calls.map((c) => c[0]);
       expect(bodies[0].sessionId).toBe("session-AAA");
       expect(bodies[1].sessionId).toBe("session-AAA");
       expect(bodies[0].sessionId).toBe(bodies[1].sessionId);
@@ -239,10 +253,7 @@ describe("PortalUploader — session integration", () => {
         expectedCount: 0,
         completedCount: 0,
       });
-      mockGetPresignedUrl.mockResolvedValue({
-        sessionId: "resumed-session",
-        presignedPost: { url: "https://s3.example.com", fields: {} },
-      });
+      mockCreateUpload.mockResolvedValue(createUploadResponse("resumed-session"));
 
       render(<PortalUploader {...defaultProps} />);
 
@@ -254,15 +265,11 @@ describe("PortalUploader — session integration", () => {
       });
 
       await act(async () => {
-        await capturedS3Options.getUploadParameters({
-          name: "a.txt",
-          type: "text/plain",
-          size: 10,
-        });
+        await signCreate({ id: "f-a", name: "a.txt", type: "text/plain", size: 10 });
       });
 
       expect(mockStartSession).not.toHaveBeenCalled();
-      const body = mockGetPresignedUrl.mock.calls[0][0];
+      const body = mockCreateUpload.mock.calls[0][0];
       expect(body.sessionId).toBe("resumed-session");
       expect(body.batchToken).toBeTruthy();
     });
@@ -398,10 +405,7 @@ describe("PortalUploader — session integration", () => {
         expectedCount: 0,
         completedCount: 0,
       });
-      mockGetPresignedUrl.mockResolvedValue({
-        sessionId: "release-session-id",
-        presignedPost: { url: "https://s3.example.com", fields: { key: "k" } },
-      });
+      mockCreateUpload.mockResolvedValue(createUploadResponse("release-session-id"));
       mockReleaseKey.mockResolvedValue(undefined);
 
       render(<PortalUploader {...defaultProps} />);
@@ -412,11 +416,11 @@ describe("PortalUploader — session integration", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      // Register a file through the captured AwsS3 getUploadParameters so the
-      // per-file locator (filename, path) is recorded.
+      // Sign the file's create request so the per-file locator (filename, path) is
+      // recorded.
       const file = { id: "file-1", name: "broken.mp4", type: "video/mp4", size: 100 };
       await act(async () => {
-        await capturedS3Options.getUploadParameters(file);
+        await signCreate(file);
       });
 
       // The upload then fails → the key is released against the session.

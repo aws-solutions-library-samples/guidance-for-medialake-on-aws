@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Uppy from "@uppy/core";
 import Dashboard from "@uppy/react/dashboard";
-import AwsS3, { type AwsS3Options } from "@uppy/aws-s3";
+import AwsS3 from "@uppy/aws-s3";
+import GoldenRetriever from "@uppy/golden-retriever";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import {
@@ -30,7 +31,21 @@ import { useSearchConnectors } from "@/api/hooks/useSearchConnectors";
 import { useGetAllCollections } from "@/api/hooks/useCollections";
 import { usePermission } from "@/permissions";
 import useS3Upload from "../hooks/useS3Upload";
-import { MultipartUploadMetadata } from "../types/upload.types";
+import { useServiceWorkerKeepalive } from "../hooks/useServiceWorkerKeepalive";
+import {
+  GOLDEN_RETRIEVER_EXPIRES_MS,
+  MULTIPART_THRESHOLD_BYTES,
+  S3_META_CONNECTOR_ID,
+  contentTypeForSigning,
+  createMethodOf,
+  findFileForS3Key,
+  getChunkSize,
+  isCreateRequest,
+  multipartOperationOf,
+  stampS3Meta,
+  type SignRequestInput,
+  type SignRequestResult,
+} from "../utils/uppySignRequest";
 import PathBrowser from "./PathBrowser";
 import CollectionSelector, { CollectionRef } from "./CollectionSelector";
 import { useUploadLocations } from "../hooks/useUploadLocations";
@@ -108,15 +123,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   const [isPathBrowserOpen, setIsPathBrowserOpen] = useState<boolean>(false);
   const [selectedCollections, setSelectedCollections] = useState<CollectionRef[]>([]);
   const { data: connectorsResponse, isLoading: isLoadingConnectors } = useSearchConnectors();
-  const {
-    getPresignedUrl,
-    signPart: signPartBackend,
-    completeMultipartUpload,
-    abortMultipartUpload,
-  } = useS3Upload();
-
-  // Store multipart upload metadata keyed by file ID
-  const multipartDataRef = useRef<Map<string, MultipartUploadMetadata>>(new Map());
+  const { createUpload, signMultipart } = useS3Upload();
+  // Keep the Golden Retriever service worker (and the blobs it holds) alive during long uploads.
+  useServiceWorkerKeepalive(uppy);
 
   // Filter only S3 connectors that are active and have uploads enabled
   const connectors =
@@ -430,16 +439,96 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     }
   }, [selectedConnector, allowedPrefixes, uploadPath, onPathChange]);
 
+  const uppyRef = useRef<Uppy<Meta> | null>(null);
+
+  // The destination Uppy should sign against. Kept in a ref because signRequest is bound
+  // once, when the plugin is installed, but the user can change connector, path and
+  // collections until the upload starts.
+  const destinationRef = useRef({
+    connectorId: "",
+    path: "",
+    collectionIds: [] as string[],
+  });
+  destinationRef.current = {
+    connectorId: selectedConnector,
+    path: uploadPath,
+    collectionIds,
+  };
+
+  /**
+   * Uppy 6's `signRequest`: one presigned URL per S3 request the browser is about to make.
+   *
+   * The create request (PUT for a single-part object, POST for CreateMultipartUpload)
+   * arrives with `file.id` as its key — see `generateObjectKey` — and goes to
+   * `POST /assets/upload`, which validates the destination, records the collection
+   * directives and returns the key it chose. That key is stamped onto the file so every
+   * later request (part, list, complete, abort; all carry the server key and an uploadId)
+   * can be routed to the same connector, including after a Golden Retriever restore.
+   */
+  const signRequestRef = useRef<
+    ((request: SignRequestInput) => Promise<SignRequestResult>) | undefined
+  >(undefined);
+  signRequestRef.current = async (request) => {
+    const instance = uppyRef.current;
+    if (!instance) {
+      throw new Error("Uploader is not ready");
+    }
+
+    if (isCreateRequest(request)) {
+      const file = instance.getFile(request.key);
+      if (!file) {
+        throw new Error(`Unknown file for upload key ${request.key}`);
+      }
+      const { connectorId, path, collectionIds: collections } = destinationRef.current;
+      if (!connectorId) {
+        throw new Error("Select a destination before uploading");
+      }
+      const result = await createUpload({
+        connector_id: connectorId,
+        filename: file.name ?? "",
+        content_type: contentTypeForSigning(file),
+        file_size: file.size ?? 0,
+        path,
+        collection_ids: collections,
+        method: createMethodOf(request),
+      });
+      stampS3Meta(instance, file.id, {
+        key: result.key,
+        bucket: result.bucket,
+        connectorId,
+      });
+      return { url: result.url, key: result.key };
+    }
+
+    const file = findFileForS3Key(instance, request.key);
+    const connectorId =
+      (file?.meta as Record<string, unknown> | undefined)?.[S3_META_CONNECTOR_ID] ??
+      destinationRef.current.connectorId;
+    if (typeof connectorId !== "string" || !connectorId) {
+      throw new Error(`No connector recorded for upload key ${request.key}`);
+    }
+    const operation = multipartOperationOf(request);
+    const result = await signMultipart({
+      connector_id: connectorId,
+      upload_id: request.uploadId as string,
+      key: request.key,
+      operation,
+      ...(operation === "part" ? { part_number: request.partNumber } : {}),
+    });
+    return { url: result.presigned_url };
+  };
+
   // Initialize Uppy when the component mounts
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     // Create Uppy instance
     const uppyInstance = getUppy();
+    uppyRef.current = uppyInstance;
 
     // Validate filenames
     uppyInstance.on("file-added", (file) => {
-      if (!FILENAME_REGEX.test(file.name)) {
+      if (!FILENAME_REGEX.test(file.name ?? "")) {
         uppyInstance.info(
           `Filename "${file.name}" contains characters not supported by S3. Avoid: \\ { } ^ \` ~ | % < > " # [ ]`, // i18n-ignore
           "error",
@@ -449,42 +538,42 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       }
     });
 
-    // Add AWS S3 plugin with multipart support
+    // The browser performs every S3 request itself; the server only presigns.
     uppyInstance.use(AwsS3, {
       id: "S3Uploader",
-      // Concurrent file uploads — kept conservative since S3 uses HTTP/1.1
-      // and each multipart file generates many sign requests
+      // Concurrent requests — conservative since S3 uses HTTP/1.1 and each multipart
+      // file generates many sign requests.
       limit: 6,
-      // Scale chunk size with file size to reduce sign round-trips.
-      // Each chunk requires a sign API call (~2-3s) so fewer, larger chunks
-      // dramatically reduce overhead for big files.
-      getChunkSize: (file: { size: number }) => {
-        const GB = 1024 * 1024 * 1024;
-        const MB = 1024 * 1024;
-        if (file.size >= 100 * GB) return 500 * MB; // 100GB+ → 500MB chunks (~200-1000 parts)
-        if (file.size >= 10 * GB) return 200 * MB; // 10-100GB → 200MB chunks
-        if (file.size >= 1 * GB) return 100 * MB; // 1-10GB → 100MB chunks (~10-100 parts)
-        if (file.size >= 100 * MB) return 50 * MB; // 100MB-1GB → 50MB chunks
-        return 5 * MB; // <100MB → 5MB chunks (S3 minimum)
+      shouldUseMultipart: (file) => (file.size ?? 0) > MULTIPART_THRESHOLD_BYTES,
+      getChunkSize,
+      // The placeholder the create request carries; the server replaces it with the real
+      // key, which signRequest reads back from the response.
+      generateObjectKey: (file) => file.id,
+      signRequest: (request) => {
+        const sign = signRequestRef.current;
+        if (!sign) throw new Error("Uploader is not ready");
+        return sign(request);
       },
-      // More aggressive retries for large/long uploads
-      retryDelays: [0, 1000, 3000, 5000, 10000],
-    } as any);
+    });
+
+    // Recover the selection and in-flight multipart uploads after a crash, a closed tab or
+    // an accidental refresh. State and small files live in IndexedDB; the service worker
+    // (registered at app start, see main.tsx) keeps references to larger files.
+    uppyInstance.use(GoldenRetriever, {
+      serviceWorker: true,
+      expires: GOLDEN_RETRIEVER_EXPIRES_MS,
+    });
 
     setUppy(uppyInstance);
 
     // Clean up function
     return () => {
-      if (uppyInstance) {
-        try {
-          // Cancel any ongoing uploads and remove all files
-          uppyInstance.cancelAll();
-
-          // Clean up multipart metadata
-          multipartDataRef.current.clear();
-        } catch (e) {
-          console.error("Error cleaning up Uppy instance:", e);
-        }
+      uppyRef.current = null;
+      try {
+        // Cancel any ongoing uploads and remove all files
+        uppyInstance.cancelAll();
+      } catch (e) {
+        console.error("Error cleaning up Uppy instance:", e);
       }
     };
   }, []);
@@ -565,11 +654,11 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     validatedCollections,
     rememberLastLocation,
   ]);
-  // Configure S3 upload when connector is selected
+  // Keep the per-file meta the server relies on in sync with the destination, so anything
+  // reading uppy.getState().meta (and Golden Retriever\'s persisted state) sees where the
+  // files were headed.
   useEffect(() => {
     if (!uppy || !selectedConnector) return;
-
-    // Merge new meta with existing meta to avoid clobbering future meta fields
     const existingMeta = uppy.getState().meta;
     uppy.setOptions({
       meta: {
@@ -579,176 +668,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         collection_ids: collectionIds,
       },
     });
-
-    // Configure S3 upload parameters with multipart support
-    // Works for both regular S3 connectors and My Assets virtual connectors
-    const awsS3 = uppy.getPlugin("S3Uploader") as typeof AwsS3.prototype;
-    if (awsS3) {
-      try {
-        const options: Partial<AwsS3Options<Meta, Record<string, never>>> = {
-          // Enable multipart upload for files larger than 100MB
-          shouldUseMultipart: (file) => file.size > 100 * 1024 * 1024,
-
-          // Get upload parameters from backend (single-part presigned POST only)
-          getUploadParameters: async (file: any) => {
-            try {
-              const result = await getPresignedUrl({
-                connector_id: selectedConnector,
-                filename: file.name,
-                content_type: file.type,
-                file_size: file.size,
-                path: uploadPath,
-                collection_ids: collectionIds,
-              });
-
-              // Single-part upload
-              if (!result.presigned_post) {
-                throw new Error("Missing presigned post data");
-              }
-
-              return {
-                method: "POST" as const,
-                url: result.presigned_post.url,
-                fields: result.presigned_post.fields,
-              };
-            } catch (error) {
-              console.error("Error getting upload parameters:", error);
-              throw error;
-            }
-          },
-
-          // Create multipart upload - calls backend and stores metadata
-          createMultipartUpload: async (file: any) => {
-            try {
-              const result = await getPresignedUrl({
-                connector_id: selectedConnector,
-                filename: file.name,
-                content_type: file.type,
-                file_size: file.size,
-                path: uploadPath,
-                collection_ids: collectionIds,
-              });
-
-              if (!result.multipart) {
-                throw new Error(
-                  `Expected multipart upload for file ${file.name}, but backend returned single-part.`
-                );
-              }
-
-              if (!result.upload_id || !result.key || !result.bucket) {
-                throw new Error(`Missing required multipart data for file ${file.name}.`);
-              }
-
-              // Store multipart data for later use in signPart (on-demand)
-              multipartDataRef.current.set(file.id, {
-                uploadId: result.upload_id,
-                key: result.key,
-                bucket: result.bucket,
-                connector_id: selectedConnector,
-              });
-
-              return {
-                uploadId: result.upload_id,
-                key: result.key,
-              };
-            } catch (error) {
-              console.error("Error creating multipart upload:", error);
-              throw error;
-            }
-          },
-
-          // Sign individual parts on-demand - calls backend for each part
-          signPart: async (file: any, partData: any) => {
-            const data = multipartDataRef.current.get(file.id);
-            if (!data) {
-              throw new Error(
-                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`
-              );
-            }
-
-            const partNumber = partData.partNumber;
-
-            try {
-              // Call backend to sign this specific part on-demand
-              const signResponse = await signPartBackend({
-                connector_id: data.connector_id,
-                upload_id: data.uploadId,
-                key: data.key,
-                part_number: partNumber,
-              });
-
-              return {
-                url: signResponse.presigned_url,
-              };
-            } catch (error) {
-              console.error(`Failed to sign part ${partNumber} for ${file.name}:`, error);
-              throw error;
-            }
-          },
-
-          // Complete multipart upload - calls backend to finalize
-          completeMultipartUpload: async (file: any, data: any) => {
-            const multipartData = multipartDataRef.current.get(file.id);
-            if (!multipartData) {
-              throw new Error(
-                `Multipart data not found for file ${file.name}. Please try uploading again or contact support if the issue persists.`
-              );
-            }
-
-            try {
-              const result = await completeMultipartUpload({
-                connector_id: selectedConnector,
-                upload_id: multipartData.uploadId,
-                key: multipartData.key,
-                parts: data.parts,
-              });
-
-              // Clean up stored metadata
-              multipartDataRef.current.delete(file.id);
-
-              return {
-                location: result.location,
-              };
-            } catch (error) {
-              console.error(`Error completing multipart upload for ${file.name}:`, error);
-              multipartDataRef.current.delete(file.id);
-              throw error;
-            }
-          },
-
-          // Abort multipart upload - calls backend to abort
-          abortMultipartUpload: async (file: any) => {
-            const multipartData = multipartDataRef.current.get(file.id);
-            if (multipartData) {
-              try {
-                await abortMultipartUpload({
-                  connector_id: selectedConnector,
-                  upload_id: multipartData.uploadId,
-                  key: multipartData.key,
-                });
-              } catch (error) {
-                console.error(`Error aborting multipart upload for ${file.name}:`, error);
-              }
-              // Clean up stored metadata regardless of abort success
-              multipartDataRef.current.delete(file.id);
-            }
-          },
-        };
-
-        awsS3.setOptions(options);
-      } catch (error) {
-        console.error("Error configuring S3 plugin:", error);
-      }
-    }
-  }, [
-    uppy,
-    selectedConnector,
-    getPresignedUrl,
-    completeMultipartUpload,
-    abortMultipartUpload,
-    uploadPath,
-    collectionIds,
-  ]);
+  }, [uppy, selectedConnector, uploadPath, collectionIds]);
 
   /**
    * Which dropdown entry is currently active. Derived from the destination rather than held
@@ -944,81 +864,89 @@ const FileUploader: React.FC<FileUploaderProps> = ({
         />
       )}
 
-      {selectedConnector && !isMyAssetsSelected && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 2,
-            borderRadius: "8px",
-            border: `1px solid`,
-            borderColor: "divider",
-            backgroundColor: "background.paper",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 0.5 }}
-              >
-                {t("upload.uploadDestination")}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontFamily: typography.monoFontFamily,
-                  fontWeight: 500,
-                  color: uploadPath ? "primary.main" : "text.secondary",
-                }}
-              >
-                {uploadPath || "/"}
-                {allowedPrefixes.length > 0 && (
+      {/* Destination path and the save-location star share one row: the panel takes the
+          remaining width and the star sits to its right, so the row spans the same width as
+          the inputs above and the dropzone below. */}
+      {selectedConnector && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          {!isMyAssetsSelected && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                flex: 1,
+                minWidth: 0,
+                borderRadius: "8px",
+                border: `1px solid`,
+                borderColor: "divider",
+                backgroundColor: "background.paper",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Box sx={{ flex: 1 }}>
                   <Typography
-                    component="span"
                     variant="caption"
                     color="text.secondary"
-                    sx={{ ml: 1 }}
+                    sx={{ display: "block", mb: 0.5 }}
                   >
-                    ({t("upload.restrictedToPrefix")})
+                    {t("upload.uploadDestination")}
                   </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontFamily: typography.monoFontFamily,
+                      fontWeight: 500,
+                      color: uploadPath ? "primary.main" : "text.secondary",
+                    }}
+                  >
+                    {uploadPath || "/"}
+                    {allowedPrefixes.length > 0 && (
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ ml: 1 }}
+                      >
+                        ({t("upload.restrictedToPrefix")})
+                      </Typography>
+                    )}
+                  </Typography>
+                </Box>
+                {canBrowsePaths && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setIsPathBrowserOpen(true)}
+                    disabled={!selectedConnector || isUploading}
+                    startIcon={<FolderIcon />}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      minWidth: "120px",
+                    }}
+                  >
+                    {t("upload.browsePath")}
+                  </Button>
                 )}
-              </Typography>
-            </Box>
-            {canBrowsePaths && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setIsPathBrowserOpen(true)}
-                disabled={!selectedConnector || isUploading}
-                startIcon={<FolderIcon />}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  minWidth: "120px",
-                }}
-              >
-                {t("upload.browsePath")}
-              </Button>
-            )}
-          </Box>
-          {allowedPrefixes.length > 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-              {t("upload.allowedPrefixesInfo", {
-                count: allowedPrefixes.length,
-              })}
-            </Typography>
+              </Box>
+              {allowedPrefixes.length > 0 && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 1 }}
+                >
+                  {t("upload.allowedPrefixesInfo", {
+                    count: allowedPrefixes.length,
+                  })}
+                </Typography>
+              )}
+            </Paper>
           )}
-        </Paper>
-      )}
 
-      {/* Save the whole destination — connector, path and selected collections — so it can
+          {/* Save the whole destination — connector, path and selected collections — so it can
           be picked straight from the dropdown next time. The destination itself is already
-          displayed above, so this is the action only. Rename/reorder and marking one as the
+          displayed alongside, so this is the action only. Rename/reorder and marking one as the
           default are a later phase; the last-used location is what auto-populates today. */}
-      {selectedConnector && (
-        <Box sx={{ display: "flex", alignItems: "center" }}>
           <Tooltip
             title={
               isCurrentLocationSaved

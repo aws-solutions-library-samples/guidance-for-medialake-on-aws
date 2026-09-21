@@ -1,17 +1,28 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Uppy from "@uppy/core";
 import AwsS3 from "@uppy/aws-s3";
+import GoldenRetriever from "@uppy/golden-retriever";
 import Dashboard from "@uppy/react/dashboard";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import { Alert, Box, Button } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { usePortalApi, PortalSessionExpiredError } from "../hooks/usePortalApi";
-import type {
-  PortalDestination,
-  PortalMultipartMetadata,
-  ConflictResolutionResult,
-} from "../types/portal.types";
+import type { PortalDestination, ConflictResolutionResult } from "../types/portal.types";
+import {
+  GOLDEN_RETRIEVER_EXPIRES_MS,
+  MULTIPART_THRESHOLD_BYTES,
+  contentTypeForSigning,
+  createMethodOf,
+  findFileForS3Key,
+  getChunkSize,
+  isCreateRequest,
+  multipartOperationOf,
+  stampS3Meta,
+  type SignRequestInput,
+  type SignRequestResult,
+} from "@/features/upload/utils/uppySignRequest";
+import { useServiceWorkerKeepalive } from "@/features/upload/hooks/useServiceWorkerKeepalive";
 import UploadQueueTable from "./UploadQueueTable";
 import ConflictResolutionDialog from "./ConflictResolutionDialog";
 import type { UppyFile, Meta, Body } from "@uppy/core";
@@ -52,7 +63,6 @@ interface Props {
 }
 
 const GB = 1024 * 1024 * 1024;
-const MB = 1024 * 1024;
 
 const PortalUploader: React.FC<Props> = ({
   portalSlug,
@@ -81,11 +91,13 @@ const PortalUploader: React.FC<Props> = ({
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [showConflicts, setShowConflicts] = useState(false);
 
-  const multipartDataRef = useRef<Map<string, PortalMultipartMetadata>>(new Map());
-  // Per-file (filename, relative path) captured at upload-parameter time so a
+  // Per-file (filename, relative path) captured when the create request is signed so a
   // failed upload can be released against the session by rebuilding its key.
   const fileLocatorRef = useRef<Map<string, { filename: string; path: string }>>(new Map());
+  const uppyRef = useRef<Uppy | null>(null);
   const portalApi = usePortalApi(portalSlug, sessionJwt, useCaptchaIntegration);
+  // Keep the Golden Retriever service worker (and the blobs it holds) alive during long uploads.
+  useServiceWorkerKeepalive(uppy);
 
   // Latest bridge callbacks held in refs so the Uppy event subscription does
   // not need to re-bind when the parent passes new closures.
@@ -188,26 +200,35 @@ const PortalUploader: React.FC<Props> = ({
         ...(allowedFileTypes && allowedFileTypes.length > 0 ? { allowedFileTypes } : {}),
       },
     });
+    uppyRef.current = instance;
 
+    // The browser performs every S3 request itself; the portal API only presigns. The
+    // callback is bound once, so it reads the latest implementation through a ref.
     instance.use(AwsS3, {
       id: "PortalS3",
       limit: 6,
-      getChunkSize: (file: { size: number }) => {
-        if (file.size >= 100 * GB) return 500 * MB;
-        if (file.size >= 10 * GB) return 200 * MB;
-        if (file.size >= 1 * GB) return 100 * MB;
-        if (file.size >= 100 * MB) return 50 * MB;
-        return 5 * MB;
+      getChunkSize,
+      shouldUseMultipart: (file) => (file.size ?? 0) > MULTIPART_THRESHOLD_BYTES,
+      // Placeholder key; the server returns the real one from the create request.
+      generateObjectKey: (file) => file.id,
+      signRequest: (request) => {
+        const sign = signRequestRef.current;
+        if (!sign) throw new Error("Uploader is not ready");
+        return sign(request);
       },
-      retryDelays: [0, 1000, 3000, 5000, 10000],
-      shouldUseMultipart: (file: { size: number }) => file.size > 100 * MB,
-    } as any);
+    });
+
+    // Recover the selection and in-flight multipart uploads after a refresh or crash.
+    instance.use(GoldenRetriever, {
+      serviceWorker: true,
+      expires: GOLDEN_RETRIEVER_EXPIRES_MS,
+    });
 
     setUppy(instance);
 
     return () => {
+      uppyRef.current = null;
       instance.cancelAll();
-      multipartDataRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -276,147 +297,76 @@ const PortalUploader: React.FC<Props> = ({
     };
   }, [uppy, portalApi, destination.destinationId]);
 
-  // Configure S3 plugin callbacks when dependencies change
-  useEffect(() => {
-    if (!uppy) return;
+  /**
+   * Uppy 6's `signRequest` for the portal.
+   *
+   * The create request (PUT or CreateMultipartUpload POST; no uploadId) arrives with
+   * `file.id` as its key, resolves the session, and asks the portal API to validate the
+   * destination, record the batch directives and presign. The server's key is stamped onto
+   * the file so every later request (part, list, complete, abort) can be matched back to it,
+   * including after a Golden Retriever restore.
+   *
+   * Assigned on every render so it always sees the current path, destination and metadata.
+   */
+  const signRequestRef = useRef<
+    ((request: SignRequestInput) => Promise<SignRequestResult>) | undefined
+  >(undefined);
+  signRequestRef.current = async (request) => {
+    const instance = uppyRef.current;
+    if (!instance) throw new Error("Uploader is not ready");
 
-    const awsS3 = uppy.getPlugin("PortalS3") as any;
-    if (!awsS3) return;
+    if (isCreateRequest(request)) {
+      const file = instance.getFile(request.key);
+      if (!file) throw new Error(`Unknown file for upload key ${request.key}`);
+      const safeCurrent = currentPath ?? "";
+      const safeRoot = destination.rootPath ?? "";
+      const relativePath =
+        safeRoot && safeCurrent.startsWith(safeRoot)
+          ? safeCurrent.slice(safeRoot.length)
+          : safeCurrent;
+      try {
+        const sid = await ensureSession();
+        const result = await portalApi.createUpload({
+          filename: file.name ?? "",
+          contentType: contentTypeForSigning(file),
+          fileSize: file.size ?? 0,
+          path: relativePath,
+          destinationId: destination.destinationId,
+          method: createMethodOf(request),
+          metadata: metadataFields,
+          sessionId: sid,
+          batchToken: batchTokenRef.current,
+        });
+        fileCountRef.current += 1;
+        fileLocatorRef.current.set(file.id, { filename: file.name ?? "", path: relativePath });
+        stampS3Meta(instance, file.id, { key: result.key, bucket: result.bucket });
+        return { url: result.url, key: result.key };
+      } catch (e) {
+        return catchSessionExpired(e);
+      }
+    }
 
-    awsS3.setOptions({
-      getUploadParameters: async (file: any) => {
-        const safeCurrent = currentPath ?? "";
-        const safeRoot = destination.rootPath ?? "";
-        const relativePath =
-          safeRoot && safeCurrent.startsWith(safeRoot)
-            ? safeCurrent.slice(safeRoot.length)
-            : safeCurrent;
-        try {
-          const sid = await ensureSession();
-          const result = await portalApi.getPresignedUrl({
-            filename: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-            path: relativePath,
-            destinationId: destination.destinationId,
-            metadata: metadataFields,
-            sessionId: sid,
-            batchToken: batchTokenRef.current,
-          });
-          if (!result.presignedPost) throw new Error("Missing presigned post data");
-          fileCountRef.current += 1;
-          fileLocatorRef.current.set(file.id, {
-            filename: file.name,
-            path: relativePath,
-          });
-          return {
-            method: "POST" as const,
-            url: result.presignedPost.url,
-            fields: result.presignedPost.fields,
-          };
-        } catch (e) {
-          return catchSessionExpired(e);
-        }
-      },
-
-      createMultipartUpload: async (file: any) => {
-        const safeCurrent = currentPath ?? "";
-        const safeRoot = destination.rootPath ?? "";
-        const relativePath =
-          safeRoot && safeCurrent.startsWith(safeRoot)
-            ? safeCurrent.slice(safeRoot.length)
-            : safeCurrent;
-        try {
-          const sid = await ensureSession();
-          const result = await portalApi.getPresignedUrl({
-            filename: file.name,
-            contentType: file.type,
-            fileSize: file.size,
-            path: relativePath,
-            destinationId: destination.destinationId,
-            metadata: metadataFields,
-            sessionId: sid,
-            batchToken: batchTokenRef.current,
-          });
-          if (!result.uploadId || !result.key || !result.bucket) {
-            throw new Error("Missing multipart data");
-          }
-          fileCountRef.current += 1;
-          fileLocatorRef.current.set(file.id, {
-            filename: file.name,
-            path: relativePath,
-          });
-          multipartDataRef.current.set(file.id, {
-            uploadId: result.uploadId,
-            key: result.key,
-            bucket: result.bucket,
-          });
-          return { uploadId: result.uploadId, key: result.key };
-        } catch (e) {
-          return catchSessionExpired(e);
-        }
-      },
-
-      signPart: async (file: any, partData: any) => {
-        const data = multipartDataRef.current.get(file.id);
-        if (!data) throw new Error("Multipart data not found");
-        try {
-          const result = await portalApi.signPart({
-            uploadId: data.uploadId,
-            key: data.key,
-            partNumber: partData.partNumber,
-            destinationId: destination.destinationId,
-          });
-          return { url: result.presignedUrl };
-        } catch (e) {
-          return catchSessionExpired(e);
-        }
-      },
-
-      completeMultipartUpload: async (file: any, data: any) => {
-        const mp = multipartDataRef.current.get(file.id);
-        if (!mp) throw new Error("Multipart data not found");
-        try {
-          const result = await portalApi.completeMultipart({
-            uploadId: mp.uploadId,
-            key: mp.key,
-            parts: data.parts,
-            destinationId: destination.destinationId,
-          });
-          multipartDataRef.current.delete(file.id);
-          return { location: result.location };
-        } catch (e) {
-          multipartDataRef.current.delete(file.id);
-          return catchSessionExpired(e);
-        }
-      },
-
-      abortMultipartUpload: async (file: any) => {
-        const mp = multipartDataRef.current.get(file.id);
-        if (mp) {
-          try {
-            await portalApi.abortMultipart({
-              uploadId: mp.uploadId,
-              key: mp.key,
-              destinationId: destination.destinationId,
-            });
-          } catch {
-            // best-effort
-          }
-          multipartDataRef.current.delete(file.id);
-        }
-      },
-    });
-  }, [
-    uppy,
-    portalApi,
-    currentPath,
-    destination.destinationId,
-    destination.rootPath,
-    metadataFields,
-    catchSessionExpired,
-    ensureSession,
-  ]);
+    // Later multipart requests carry the server key; the destination is the one the
+    // uploader is mounted for, so only the operation needs mapping.
+    const operation = multipartOperationOf(request);
+    if (!findFileForS3Key(instance, request.key)) {
+      // Not fatal: the server validates the key against the destination root. Logged
+      // because a miss here means a restored upload lost its file state.
+      console.warn(`Portal upload key ${request.key} does not match a known file`);
+    }
+    try {
+      const result = await portalApi.signMultipart({
+        uploadId: request.uploadId as string,
+        key: request.key,
+        destinationId: destination.destinationId,
+        operation,
+        ...(operation === "part" ? { partNumber: request.partNumber } : {}),
+      });
+      return { url: result.presignedUrl };
+    } catch (e) {
+      return catchSessionExpired(e);
+    }
+  };
 
   // --- Heartbeat lives at the page level ---
   // The session heartbeat is driven by UploadPortalPage for the entire life of

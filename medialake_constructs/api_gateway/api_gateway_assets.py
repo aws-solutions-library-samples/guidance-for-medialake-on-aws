@@ -659,116 +659,9 @@ class AssetsConstruct(Construct):
         )
         apply_custom_authorization(upload_post, props.authorizer)
 
-        # Add Lambda functions for multipart upload completion and abort
-        # Create multipart complete Lambda
-        multipart_complete_lambda = Lambda(
-            self,
-            "MultipartCompleteLambda",
-            config=LambdaConfig(
-                name="upload_multipart_complete",
-                layers=[search_layer.layer],
-                entry="lambdas/api/assets/upload/multipart_complete",
-                timeout_minutes=2,
-                memory_size=256,
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
-                    "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
-                },
-            ),
-        )
-
-        # Add DynamoDB permissions for multipart complete Lambda
-        multipart_complete_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"],
-                resources=[props.connector_table.table_arn],
-            )
-        )
-
-        # Add S3 permissions for multipart complete Lambda
-        multipart_complete_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "s3:ListMultipartUploadParts",
-                    "s3:PutObject",
-                ],
-                resources=["arn:aws:s3:::*/*"],
-            )
-        )
-
-        # Add KMS permissions for multipart complete Lambda
-        multipart_complete_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "kms:Decrypt",
-                    "kms:DescribeKey",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add S3 bucket-level permissions for GetBucketLocation
-        multipart_complete_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:GetBucketLocation"],
-                resources=["arn:aws:s3:::*"],
-            )
-        )
-
-        # Create multipart abort Lambda
-        multipart_abort_lambda = Lambda(
-            self,
-            "MultipartAbortLambda",
-            config=LambdaConfig(
-                name="upload_multipart_abort",
-                layers=[search_layer.layer],
-                entry="lambdas/api/assets/upload/multipart_abort",
-                timeout_minutes=1,
-                environment_variables={
-                    "X_ORIGIN_VERIFY_SECRET_ARN": props.x_origin_verify_secret.secret_arn,
-                    "MEDIALAKE_ASSET_TABLE": props.asset_table.table_name,
-                    "MEDIALAKE_CONNECTOR_TABLE": props.connector_table.table_name,
-                },
-            ),
-        )
-
-        # Add DynamoDB permissions for multipart abort Lambda
-        multipart_abort_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["dynamodb:GetItem"],
-                resources=[props.connector_table.table_arn],
-            )
-        )
-
-        # Add S3 permissions for multipart abort Lambda
-        multipart_abort_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:AbortMultipartUpload"],
-                resources=["arn:aws:s3:::*/*"],
-            )
-        )
-
-        # Add KMS permissions for multipart abort Lambda
-        multipart_abort_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "kms:Decrypt",
-                    "kms:DescribeKey",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # Add S3 bucket-level permissions for GetBucketLocation
-        multipart_abort_lambda.function.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["s3:GetBucketLocation"],
-                resources=["arn:aws:s3:::*"],
-            )
-        )
-
-        # Create multipart sign Lambda for on-demand part URL generation
+        # Multipart sign Lambda: presigns UploadPart, ListParts, CompleteMultipartUpload
+        # and AbortMultipartUpload on demand. The browser (Uppy 6 @uppy/aws-s3) performs
+        # every S3 request itself, so there is no server-side complete or abort any more.
         multipart_sign_lambda = Lambda(
             self,
             "MultipartSignLambda",
@@ -795,11 +688,16 @@ class AssetsConstruct(Construct):
         )
 
         # Add S3 permissions for multipart sign Lambda
-        # The Lambda generates presigned URLs for upload_part — S3 validates
-        # the signer's permissions when the URL is used, so PutObject is required.
+        # S3 evaluates the *signer's* permissions when a presigned URL is used.
+        # PutObject covers UploadPart and CompleteMultipartUpload; ListParts (resume
+        # after a page refresh) and Abort (cancel) need their own actions.
         multipart_sign_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=["s3:PutObject"],
+                actions=[
+                    "s3:PutObject",
+                    "s3:ListMultipartUploadParts",
+                    "s3:AbortMultipartUpload",
+                ],
                 resources=["arn:aws:s3:::*/*"],
             )
         )
@@ -829,9 +727,7 @@ class AssetsConstruct(Construct):
         if props.personal_assets_bucket:
             for fn in [
                 upload_lambda.function,
-                multipart_complete_lambda.function,
                 multipart_sign_lambda.function,
-                multipart_abort_lambda.function,
             ]:
                 props.personal_assets_bucket.grant_put(fn)
                 fn.add_to_role_policy(
@@ -851,61 +747,7 @@ class AssetsConstruct(Construct):
 
         # Create API Gateway resources for multipart endpoints
         multipart_resource = upload_resource.add_resource("multipart")
-        complete_resource = multipart_resource.add_resource("complete")
-        abort_resource = multipart_resource.add_resource("abort")
         sign_resource = multipart_resource.add_resource("sign")
-
-        # Add POST method to /assets/upload/multipart/complete
-        complete_post = complete_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(
-                multipart_complete_lambda.function,
-                proxy=True,
-                integration_responses=[
-                    api_gateway.IntegrationResponse(
-                        status_code="200",
-                        response_parameters={
-                            "method.response.header.Access-Control-Allow-Origin": "'*'",
-                        },
-                    )
-                ],
-            ),
-            method_responses=[
-                api_gateway.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True,
-                    },
-                )
-            ],
-        )
-        apply_custom_authorization(complete_post, props.authorizer)
-
-        # Add POST method to /assets/upload/multipart/abort
-        abort_post = abort_resource.add_method(
-            "POST",
-            api_gateway.LambdaIntegration(
-                multipart_abort_lambda.function,
-                proxy=True,
-                integration_responses=[
-                    api_gateway.IntegrationResponse(
-                        status_code="200",
-                        response_parameters={
-                            "method.response.header.Access-Control-Allow-Origin": "'*'",
-                        },
-                    )
-                ],
-            ),
-            method_responses=[
-                api_gateway.MethodResponse(
-                    status_code="200",
-                    response_parameters={
-                        "method.response.header.Access-Control-Allow-Origin": True,
-                    },
-                )
-            ],
-        )
-        apply_custom_authorization(abort_post, props.authorizer)
 
         # Add POST method to /assets/upload/multipart/sign
         sign_post = sign_resource.add_method(
@@ -1199,8 +1041,6 @@ class AssetsConstruct(Construct):
         add_cors_options_method(transcript_resource)
         add_cors_options_method(upload_resource)
         add_cors_options_method(multipart_resource)
-        add_cors_options_method(complete_resource)
-        add_cors_options_method(abort_resource)
         add_cors_options_method(sign_resource)
 
         # Add bulk download functionality if feature is enabled and required props are provided

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Entry point for the MediaLake CDK application."""
+
 import os
 from dataclasses import dataclass
 
@@ -371,6 +372,7 @@ class MediaLakeStack(cdk.Stack):
                 cloudfront_domain=props.cloudfront_domain,
                 pipelines_event_bus_name=props.base_infrastructure.pipelines_event_bus.event_bus_name,
                 pipelines_event_bus_arn=props.base_infrastructure.pipelines_event_bus.event_bus_arn,
+                upload_directives_table=props.base_infrastructure.upload_directives_table,
             ),
         )
         portal_api_stack.add_dependency(api_gateway_stack)

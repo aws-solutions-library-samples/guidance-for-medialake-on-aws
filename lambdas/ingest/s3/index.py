@@ -197,6 +197,70 @@ def _read_overflow_directive(bucket: str, key: str) -> list:
         return []
 
 
+def _read_upload_directives(bucket: str, key: str) -> Dict[str, str]:
+    """The ``ml-*`` directive map the upload API recorded for this object, or ``{}``.
+
+    The browser uploads directly to S3 with presigned URLs and sends no object metadata,
+    so the upload APIs (``POST /assets/upload`` and the portal) write what they used to
+    stamp as ``x-amz-meta-*`` into the upload-directives table instead, under the same
+    ``UPLOADDIR#<bucket>#<key>`` key the overflow side-record used.
+
+    Best-effort and read-only: a missing table or a failed read means "no directives",
+    which is exactly the situation for objects that arrived by any other route.
+    """
+    if not UPLOAD_DIRECTIVES_TABLE_NAME:
+        return {}
+    try:
+        resp = (
+            boto3.resource("dynamodb")
+            .Table(UPLOAD_DIRECTIVES_TABLE_NAME)
+            .get_item(Key={"PK": f"UPLOADDIR#{bucket}#{key}"})
+        )
+        directives = (resp.get("Item") or {}).get("directives") or {}
+        if not isinstance(directives, dict):
+            return {}
+        return {
+            str(k).lower(): str(v)
+            for k, v in directives.items()
+            if isinstance(k, str) and v is not None
+        }
+    except Exception as e:
+        logger.warning(f"Failed to read upload directives for {bucket}/{key}: {e}")
+        return {}
+
+
+def merge_upload_directives(head_response: dict, bucket: str, key: str) -> dict:
+    """Fold the recorded directives into the object's user metadata, in place.
+
+    Called on the ``head_object`` response before the asset record is built, so the
+    directives land at ``Metadata.ObjectMetadata.S3.Metadata`` exactly as stamped metadata
+    would have — and every reader that finds ``ml-*`` keys by searching the asset record
+    (Layer C collection association here, ``mark_upload_complete``, ``mark_asset_failed``,
+    ``get_upload_session_metadata``) keeps working unchanged.
+
+    Only consulted when the object itself carries no ``ml-source``: an object stamped by
+    the previous client is authoritative, and the lookup is skipped for the vast majority
+    of objects, which were never uploaded through the app. On a key conflict the object's
+    own metadata wins.
+    """
+    user_md = head_response.get("Metadata")
+    if not isinstance(user_md, dict):
+        user_md = {}
+        head_response["Metadata"] = user_md
+    if any(isinstance(k, str) and k.lower() == ML_SOURCE_KEY for k in user_md):
+        return head_response
+    directives = _read_upload_directives(bucket, key)
+    if not directives:
+        return head_response
+    for k, v in directives.items():
+        user_md.setdefault(k, v)
+    logger.info(
+        f"Applied upload directives from the directives table for {bucket}/{key}: "
+        f"{sorted(directives)}"
+    )
+    return head_response
+
+
 def _collection_exists(collection_id: str) -> bool:
     """Check if a collection exists and is not deleted (Req 10.3)."""
     try:
@@ -1444,6 +1508,11 @@ class AssetProcessor:
                     # Release lock before raising
                     release_processing_lock(bucket, key, version_id)
                     raise
+
+            # Browser uploads carry their ml-* directives in the upload-directives table
+            # rather than as object metadata; fold them in before anything reads
+            # response["Metadata"].
+            merge_upload_directives(response, bucket, key)
 
             # Early check for asset type
             content_type = response.get("ContentType", "")

@@ -55,41 +55,67 @@ vi.mock("@/permissions", () => ({
   }),
 }));
 
-const mockGetPresignedUrl = vi.fn().mockResolvedValue({
-  presigned_post: { url: "https://s3.example.com", fields: {} },
-});
+const createUploadResponse = {
+  bucket: "test-bucket",
+  key: "uploads/a.jpg",
+  url: "https://s3.example.com/put",
+  method: "PUT",
+  multipart: false,
+  expires_in: 3600,
+};
+const mockCreateUpload = vi.fn().mockResolvedValue(createUploadResponse);
 
 vi.mock("../hooks/useS3Upload", () => ({
   default: () => ({
-    getPresignedUrl: mockGetPresignedUrl,
-    signPart: vi.fn(),
-    completeMultipartUpload: vi.fn(),
-    abortMultipartUpload: vi.fn(),
+    createUpload: mockCreateUpload,
+    signMultipart: vi.fn(),
   }),
 }));
 
-// Stub Uppy to avoid browser-only side effects
-const mockSetOptions = vi.fn();
+// Stub Uppy to avoid browser-only side effects. `use` records the plugin options so tests
+// can pull out the `signRequest` the component hands to @uppy/aws-s3.
+const mockUse = vi.fn();
+const fakeFile = { id: "file-1", name: "a.jpg", type: "image/jpeg", size: 10, meta: {} };
 vi.mock("@uppy/core", () => {
   class MockUppy {
     on = vi.fn().mockReturnThis();
     off = vi.fn().mockReturnThis();
     cancelAll = vi.fn();
-    use = vi.fn();
-    getPlugin = vi.fn(() => ({ setOptions: mockSetOptions }));
+    use = mockUse;
     getState = vi.fn(() => ({ meta: {} }));
     setOptions = vi.fn();
     removeFile = vi.fn();
     info = vi.fn();
+    // Plain functions, not vi.fn(): vi.resetAllMocks() in beforeEach would otherwise
+    // strip their implementations and the sign path would not find its file.
+    getFile = (id: string) => (id === fakeFile.id ? fakeFile : undefined);
+    getFiles = () => [fakeFile];
+    setFileMeta = () => undefined;
   }
   return { default: MockUppy };
 });
+
+/** The `signRequest` callback the component installed on the AwsS3 plugin. */
+const signRequest = () => {
+  const call = [...mockUse.mock.calls].reverse().find((c) => c[1]?.signRequest);
+  if (!call) throw new Error("AwsS3 plugin was not installed");
+  return call[1].signRequest as (request: {
+    method: string;
+    key: string;
+    uploadId?: string;
+    partNumber?: number;
+  }) => Promise<{ url: string; key?: string }>;
+};
+
+/** Ask the component to sign the request that creates a single-part object. */
+const signCreate = () => signRequest()({ method: "PUT", key: fakeFile.id });
 
 vi.mock("@uppy/react/dashboard", () => ({
   default: () => <div data-testid="uppy-dashboard" />,
 }));
 
 vi.mock("@uppy/aws-s3", () => ({ default: vi.fn() }));
+vi.mock("@uppy/golden-retriever", () => ({ default: vi.fn() }));
 vi.mock("./PathBrowser", () => ({ default: () => null }));
 // CollectionSelector is exercised by its own tests; stub it here so this
 // suite stays focused on connector/destination selection and doesn't require
@@ -129,6 +155,8 @@ const activeConnector = (id: string, name: string) => ({
 describe("FileUploader", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // resetAllMocks wipes implementations; re-arm the ones the sign path depends on.
+    mockCreateUpload.mockResolvedValue(createUploadResponse);
     mockCanUploadConnector = true;
     mockCanViewConnector = true;
     mockUploadSettings = {};
@@ -247,11 +275,6 @@ describe("FileUploader", () => {
   });
 
   it("configures upload callbacks with My Assets connector ID and prefix when switching from S3", async () => {
-    // Re-set the presigned URL mock after beforeEach reset
-    mockGetPresignedUrl.mockResolvedValue({
-      presigned_post: { url: "https://s3.example.com", fields: {} },
-    });
-
     const { default: FileUploader } = await import("./FileUploader");
     const { rerender } = render(
       <FileUploader defaultConnectorId="my-assets-1" defaultObjectPrefix="personal/user123/" />
@@ -267,23 +290,18 @@ describe("FileUploader", () => {
       />
     );
 
-    // The S3 plugin setOptions should have been called with upload callbacks
-    // even though "my-assets-1" is not in the filtered S3 connectors list
-    expect(mockSetOptions).toHaveBeenCalled();
+    // The AwsS3 plugin is installed with a signRequest even though "my-assets-1" is not
+    // in the filtered S3 connectors list
+    const awsS3Options = [...mockUse.mock.calls].reverse().find((c) => c[1]?.signRequest)?.[1];
+    expect(awsS3Options).toBeDefined();
+    expect(awsS3Options).toHaveProperty("signRequest");
+    expect(awsS3Options).toHaveProperty("generateObjectKey");
+    expect(awsS3Options).toHaveProperty("shouldUseMultipart");
 
-    // Verify the last call includes upload callback functions
-    const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-    expect(lastCall).toHaveProperty("getUploadParameters");
-    expect(lastCall).toHaveProperty("createMultipartUpload");
-    expect(lastCall).toHaveProperty("signPart");
-    expect(lastCall).toHaveProperty("completeMultipartUpload");
-    expect(lastCall).toHaveProperty("abortMultipartUpload");
+    // Sign the create request and verify it passes the My Assets connector ID
+    await signCreate();
 
-    // Invoke getUploadParameters and verify it passes the My Assets connector ID
-    const fakeFile = { name: "test.jpg", type: "image/jpeg", size: 1024 };
-    await lastCall.getUploadParameters(fakeFile);
-
-    expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+    expect(mockCreateUpload).toHaveBeenCalledWith(
       expect.objectContaining({
         connector_id: "my-assets-1",
         path: "personal/user123/",
@@ -306,25 +324,18 @@ describe("FileUploader", () => {
 
     it("restores the last upload location, overriding the My Assets default", async () => {
       mockUploadSettings = lastLocation("conn-2", "projects/b/");
-      mockGetPresignedUrl.mockResolvedValue({
-        presigned_post: { url: "https://s3.example.com", fields: {} },
-      });
 
       await renderUploader({ defaultConnectorId: "my-assets-1" });
 
-      const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-      await lastCall.getUploadParameters({ name: "a.jpg", type: "image/jpeg", size: 10 });
+      await signCreate();
 
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({ connector_id: "conn-2", path: "projects/b/" })
       );
     });
 
     it("does not restore the last location when the caller pinned one with lockConnector", async () => {
       mockUploadSettings = lastLocation("conn-2", "projects/b/");
-      mockGetPresignedUrl.mockResolvedValue({
-        presigned_post: { url: "https://s3.example.com", fields: {} },
-      });
 
       await renderUploader({
         defaultConnectorId: "my-assets-1",
@@ -332,62 +343,49 @@ describe("FileUploader", () => {
         lockConnector: true,
       });
 
-      const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-      await lastCall.getUploadParameters({ name: "a.jpg", type: "image/jpeg", size: 10 });
+      await signCreate();
 
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({ connector_id: "my-assets-1" })
       );
     });
 
     it("does not restore the last location when the caller passed an explicit path", async () => {
       mockUploadSettings = lastLocation("conn-2", "projects/b/");
-      mockGetPresignedUrl.mockResolvedValue({
-        presigned_post: { url: "https://s3.example.com", fields: {} },
-      });
 
       await renderUploader({ defaultConnectorId: "my-assets-1", path: "caller/pinned/" });
 
-      const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-      await lastCall.getUploadParameters({ name: "a.jpg", type: "image/jpeg", size: 10 });
+      await signCreate();
 
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({ connector_id: "my-assets-1", path: "caller/pinned/" })
       );
     });
 
     it("ignores a remembered location whose connector no longer exists", async () => {
       mockUploadSettings = lastLocation("deleted-connector", "gone/");
-      mockGetPresignedUrl.mockResolvedValue({
-        presigned_post: { url: "https://s3.example.com", fields: {} },
-      });
 
       await renderUploader({ defaultConnectorId: "my-assets-1" });
 
-      const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-      await lastCall.getUploadParameters({ name: "a.jpg", type: "image/jpeg", size: 10 });
+      await signCreate();
 
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({ connector_id: "my-assets-1" })
       );
     });
 
     it("remembers My Assets without the personal prefix, and still uploads to it", async () => {
       mockUploadSettings = lastLocation("my-assets-1", "");
-      mockGetPresignedUrl.mockResolvedValue({
-        presigned_post: { url: "https://s3.example.com", fields: {} },
-      });
 
       await renderUploader({
         defaultConnectorId: "my-assets-1",
         defaultObjectPrefix: "personal/user123/",
       });
 
-      const lastCall = mockSetOptions.mock.calls[mockSetOptions.mock.calls.length - 1][0];
-      await lastCall.getUploadParameters({ name: "a.jpg", type: "image/jpeg", size: 10 });
+      await signCreate();
 
       // The stored empty path is resolved back to the personal prefix for the actual upload.
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({ connector_id: "my-assets-1", path: "personal/user123/" })
       );
     });

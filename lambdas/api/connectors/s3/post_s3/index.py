@@ -1094,7 +1094,12 @@ def manage_bucket_cors(
         medialake_cors_rule = {
             "ID": cors_rule_id,
             "AllowedOrigins": allowed_origins,
-            "AllowedMethods": ["PUT", "POST", "HEAD", "GET"],
+            # The browser performs every S3 request of an upload itself (Uppy 6
+            # @uppy/aws-s3): PUT for objects and parts, POST for CreateMultipartUpload
+            # and CompleteMultipartUpload, GET for ListParts when resuming, and DELETE
+            # for AbortMultipartUpload when a user cancels. Without DELETE a cancel
+            # fails preflight and leaves the multipart upload open in the bucket.
+            "AllowedMethods": ["PUT", "POST", "HEAD", "GET", "DELETE"],
             "AllowedHeaders": [
                 "*",
                 "Content-Type",

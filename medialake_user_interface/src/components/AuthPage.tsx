@@ -22,6 +22,10 @@ import {
   resetPassword,
   confirmResetPassword,
 } from "aws-amplify/auth";
+// Return types for the Authenticator `services` overrides below. Annotating the overrides
+// with these makes the `signInStep` strings in their return objects contextually typed as
+// members of Amplify's discriminated `nextStep` union rather than widening to `string`.
+import type { ConfirmSignInOutput, SignInOutput } from "aws-amplify/auth";
 import { useAuth } from "../common/hooks/auth-context";
 import { useAwsConfig } from "../common/hooks/aws-config-context";
 import { StorageHelper } from "../common/helpers/storage-helper";
@@ -578,7 +582,7 @@ const AuthPage = () => {
                       },
                     }}
                     services={{
-                      async handleSignIn(input) {
+                      async handleSignIn(input): Promise<SignInOutput> {
                         try {
                           const signInResult = await signIn(input);
 
@@ -614,7 +618,7 @@ const AuthPage = () => {
                           throw error;
                         }
                       },
-                      async handleConfirmSignIn(input) {
+                      async handleConfirmSignIn(input): Promise<ConfirmSignInOutput> {
                         try {
                           await confirmSignIn(input);
 

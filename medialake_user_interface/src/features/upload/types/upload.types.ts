@@ -9,27 +9,58 @@ export interface Connector {
   status: string;
 }
 
-export interface S3PresignedPostUrl {
-  url: string;
-  fields: Record<string, string>;
+/**
+ * Which S3 request the browser is about to make for a new object, mirroring the ``method``
+ * Uppy's ``signRequest`` receives: ``PUT`` writes the object in one request, ``POST``
+ * (without an upload id) creates a multipart upload.
+ */
+export type UploadCreateMethod = "PUT" | "POST";
+
+/** Request body for ``POST /assets/upload`` — sign the request that creates the object. */
+export interface CreateUploadRequest {
+  connector_id: string;
+  filename: string;
+  content_type: string;
+  file_size: number;
+  path?: string;
+  collection_ids?: string[];
+  method: UploadCreateMethod;
 }
 
-export interface S3UploadResponse {
+/**
+ * Response of ``POST /assets/upload``.
+ *
+ * ``key`` is authoritative: the client proposed a placeholder and must use this key for the
+ * rest of the upload. ``url`` is a presigned PutObject (``PUT``) or CreateMultipartUpload
+ * (``POST``); the browser talks to S3 directly from here on.
+ */
+export interface CreateUploadResponse {
   bucket: string;
   key: string;
-  presigned_post?: {
-    url: string;
-    fields: Record<string, string>;
-  };
-  upload_id?: string;
-  part_urls?: Array<{
-    part_number: number;
-    presigned_url: string;
-  }>;
-  expires_in: number;
+  url: string;
+  method: UploadCreateMethod;
   multipart: boolean;
-  part_size?: number;
-  total_parts?: number;
+  expires_in: number;
+}
+
+/** One S3 request of an in-flight multipart upload that the server presigns. */
+export type MultipartSignOperation = "part" | "list" | "complete" | "abort";
+
+export interface SignMultipartRequest {
+  connector_id: string;
+  upload_id: string;
+  key: string;
+  operation: MultipartSignOperation;
+  /** Required for ``part``. */
+  part_number?: number;
+}
+
+export interface SignMultipartResponse {
+  operation: MultipartSignOperation;
+  method: "PUT" | "GET" | "POST" | "DELETE";
+  presigned_url: string;
+  expires_in: number;
+  part_number?: number;
 }
 
 export interface UploadFile {
@@ -44,55 +75,8 @@ export interface UploadFile {
   status: "waiting" | "uploading" | "success" | "error";
 }
 
-export interface UploadRequest {
-  connector_id: string;
-  filename: string;
-  content_type: string;
-  file_size: number;
-  path?: string;
-}
-
 export interface UploadProgress {
   bytesUploaded: number;
   bytesTotal: number;
   percentage: number;
-}
-
-export interface MultipartUploadMetadata {
-  uploadId: string;
-  key: string;
-  bucket: string;
-  connector_id: string;
-}
-
-export interface CompleteMultipartRequest {
-  connector_id: string;
-  upload_id: string;
-  key: string;
-  parts: Array<{ PartNumber: number; ETag: string }>;
-}
-
-export interface CompleteMultipartResponse {
-  location: string;
-  bucket: string;
-  key: string;
-}
-
-export interface AbortMultipartRequest {
-  connector_id: string;
-  upload_id: string;
-  key: string;
-}
-
-export interface SignPartRequest {
-  connector_id: string;
-  upload_id: string;
-  key: string;
-  part_number: number;
-}
-
-export interface SignPartResponse {
-  part_number: number;
-  presigned_url: string;
-  expires_in: number;
 }

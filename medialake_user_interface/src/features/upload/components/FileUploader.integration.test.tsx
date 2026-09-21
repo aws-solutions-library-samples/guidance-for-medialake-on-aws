@@ -29,6 +29,9 @@ let mockUppyInstance: {
   setOptions: ReturnType<typeof vi.fn>;
   getState: ReturnType<typeof vi.fn>;
   getPlugin: ReturnType<typeof vi.fn>;
+  getFile: ReturnType<typeof vi.fn>;
+  getFiles: ReturnType<typeof vi.fn>;
+  setFileMeta: ReturnType<typeof vi.fn>;
   cancelAll: ReturnType<typeof vi.fn>;
   removeFile: ReturnType<typeof vi.fn>;
   info: ReturnType<typeof vi.fn>;
@@ -36,14 +39,14 @@ let mockUppyInstance: {
   _emit: (event: string, ...args: any[]) => void;
 };
 
-let mockPluginSetOptions: ReturnType<typeof vi.fn>;
+// Options the component hands to the AwsS3 plugin via uppy.use(AwsS3, opts); the tests
+// drive its `signRequest` the way the plugin would.
 let capturedPluginOptions: any;
+// Files "in" the mock Uppy, keyed by id, so signRequest can resolve the create request.
+const mockFiles = new Map<string, any>();
 
 function createMockUppy() {
   const eventHandlers = new Map<string, UppyEventHandler[]>();
-  mockPluginSetOptions = vi.fn((opts: any) => {
-    capturedPluginOptions = opts;
-  });
 
   mockUppyInstance = {
     on: vi.fn((event: string, handler: UppyEventHandler) => {
@@ -58,12 +61,18 @@ function createMockUppy() {
         handlers.filter((h) => h !== handler)
       );
     }),
-    use: vi.fn(),
+    use: vi.fn((_plugin: unknown, opts: any) => {
+      if (opts?.signRequest) capturedPluginOptions = opts;
+    }),
     setOptions: vi.fn(),
     getState: vi.fn(() => ({ meta: {} })),
-    getPlugin: vi.fn(() => ({
-      setOptions: mockPluginSetOptions,
-    })),
+    getPlugin: vi.fn(),
+    getFile: vi.fn((id: string) => mockFiles.get(id)),
+    getFiles: vi.fn(() => [...mockFiles.values()]),
+    setFileMeta: vi.fn((id: string, meta: Record<string, unknown>) => {
+      const file = mockFiles.get(id);
+      if (file) file.meta = { ...(file.meta ?? {}), ...meta };
+    }),
     cancelAll: vi.fn(),
     removeFile: vi.fn(),
     info: vi.fn(),
@@ -97,8 +106,11 @@ vi.mock("@uppy/react/dashboard", () => ({
   ),
 }));
 
-// --- Mock @uppy/aws-s3 ---
+// --- Mock @uppy/aws-s3 and @uppy/golden-retriever ---
 vi.mock("@uppy/aws-s3", () => ({
+  default: vi.fn(),
+}));
+vi.mock("@uppy/golden-retriever", () => ({
   default: vi.fn(),
 }));
 
@@ -113,22 +125,27 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-// --- Mock getPresignedUrl ---
-const mockGetPresignedUrl = vi.fn();
-const mockSignPart = vi.fn();
-const mockCompleteMultipartUpload = vi.fn();
-const mockAbortMultipartUpload = vi.fn();
+// --- Mock the presign API hook ---
+const mockCreateUpload = vi.fn();
+const mockSignMultipart = vi.fn();
 
 vi.mock("../hooks/useS3Upload", () => ({
   default: () => ({
-    getPresignedUrl: mockGetPresignedUrl,
-    signPart: mockSignPart,
-    completeMultipartUpload: mockCompleteMultipartUpload,
-    abortMultipartUpload: mockAbortMultipartUpload,
+    createUpload: mockCreateUpload,
+    signMultipart: mockSignMultipart,
     isLoading: false,
     error: null,
   }),
 }));
+
+/** Register a file with the mock Uppy and sign its create request as the plugin would. */
+async function signCreateFor(
+  file: { id: string; name: string; type: string; size: number },
+  method: "PUT" | "POST" = "PUT"
+) {
+  mockFiles.set(file.id, { ...file, meta: {} });
+  return capturedPluginOptions.signRequest({ method, key: file.id });
+}
 
 // --- Mock useSearchConnectors ---
 // Two connectors so the merged FileUploader renders the connector dropdown.
@@ -245,16 +262,16 @@ describe("FileUploader integration tests — upload carry-through (Task 7.3)", (
     capturedPluginOptions = null;
     collectionSelectorOnChange = null;
     collectionSelectorDisabled = false;
-    mockGetPresignedUrl.mockReset();
-    mockGetPresignedUrl.mockResolvedValue({
+    mockFiles.clear();
+    mockCreateUpload.mockReset();
+    mockSignMultipart.mockReset();
+    mockCreateUpload.mockResolvedValue({
       bucket: "test-bucket",
       key: "uploads/test.jpg",
-      presigned_post: {
-        url: "https://s3.amazonaws.com/test-bucket",
-        fields: { key: "uploads/test.jpg" },
-      },
-      expires_in: 3600,
+      url: "https://s3.amazonaws.com/test-bucket/uploads/test.jpg?X-Amz-Signature=abc",
+      method: "PUT",
       multipart: false,
+      expires_in: 3600,
     });
   });
 
@@ -315,7 +332,7 @@ describe("FileUploader integration tests — upload carry-through (Task 7.3)", (
   // ─── Requirement 7.2, 7.3: collection_ids in presigned-URL requests ──────
 
   describe("collection_ids in presigned-URL requests (Req 7.2, 7.3)", () => {
-    it("passes collection_ids in single-part presigned-URL request via getUploadParameters", async () => {
+    it("passes collection_ids on the single-part create request (PUT)", async () => {
       const user = userEvent.setup();
       render(<FileUploader />, { wrapper: createWrapper() });
 
@@ -324,40 +341,57 @@ describe("FileUploader integration tests — upload carry-through (Task 7.3)", (
       // Select collections
       await user.click(screen.getByTestId("collection-selector-trigger"));
 
-      // Wait for plugin options to be configured
+      // Wait for the AwsS3 plugin to be installed with a signRequest
       await waitFor(() => {
         expect(capturedPluginOptions).not.toBeNull();
-        expect(capturedPluginOptions.getUploadParameters).toBeDefined();
+        expect(capturedPluginOptions.signRequest).toBeDefined();
       });
 
-      // Simulate a single-part upload by calling getUploadParameters
-      const mockFile = { name: "photo.jpg", type: "image/jpeg", size: 1024 };
-      await capturedPluginOptions.getUploadParameters(mockFile);
+      // Simulate the single-part create request (PUT) the plugin would sign
+      const mockFile = { id: "file-1", name: "photo.jpg", type: "image/jpeg", size: 1024 };
+      const signed = await signCreateFor(mockFile, "PUT");
 
-      // Assert getPresignedUrl was called with collection_ids
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      // Assert createUpload was called with collection_ids and the PUT method
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({
           connector_id: "connector-1",
           filename: "photo.jpg",
           content_type: "image/jpeg",
           file_size: 1024,
           collection_ids: ["col-1", "col-2"],
+          method: "PUT",
         })
+      );
+      // The server's key and URL are handed back to the plugin, and the key is stamped on
+      // the file so later multipart requests can be routed.
+      expect(signed).toEqual({
+        url: "https://s3.amazonaws.com/test-bucket/uploads/test.jpg?X-Amz-Signature=abc",
+        key: "uploads/test.jpg",
+      });
+      expect(mockUppyInstance.setFileMeta).toHaveBeenCalledWith(
+        "file-1",
+        expect.objectContaining({ s3Key: "uploads/test.jpg", s3ConnectorId: "connector-1" })
       );
     });
 
-    it("passes collection_ids in multipart presigned-URL request via createMultipartUpload", async () => {
+    it("passes collection_ids on the CreateMultipartUpload request and routes later requests", async () => {
       const user = userEvent.setup();
 
-      // Mock getPresignedUrl to return multipart response for large files
-      mockGetPresignedUrl.mockResolvedValue({
+      // The create request for a large file is a CreateMultipartUpload (POST)
+      mockCreateUpload.mockResolvedValue({
         bucket: "test-bucket",
         key: "uploads/large-video.mp4",
-        upload_id: "upload-123",
+        url: "https://s3.amazonaws.com/test-bucket/uploads/large-video.mp4?uploads",
+        method: "POST",
         multipart: true,
-        part_size: 5 * 1024 * 1024,
-        total_parts: 20,
         expires_in: 3600,
+      });
+      mockSignMultipart.mockResolvedValue({
+        operation: "part",
+        method: "PUT",
+        presigned_url: "https://s3.amazonaws.com/part",
+        expires_in: 3600,
+        part_number: 1,
       });
 
       render(<FileUploader />, { wrapper: createWrapper() });
@@ -367,31 +401,68 @@ describe("FileUploader integration tests — upload carry-through (Task 7.3)", (
       // Select collections
       await user.click(screen.getByTestId("collection-selector-trigger"));
 
-      // Wait for plugin options to be configured
+      // Wait for the AwsS3 plugin to be installed with a signRequest
       await waitFor(() => {
         expect(capturedPluginOptions).not.toBeNull();
-        expect(capturedPluginOptions.createMultipartUpload).toBeDefined();
+        expect(capturedPluginOptions.signRequest).toBeDefined();
       });
 
-      // Simulate a multipart upload by calling createMultipartUpload
+      // Simulate the CreateMultipartUpload request (POST, no uploadId)
       const mockFile = {
         id: "file-1",
         name: "large-video.mp4",
         type: "video/mp4",
         size: 200 * 1024 * 1024,
       };
-      await capturedPluginOptions.createMultipartUpload(mockFile);
+      expect(capturedPluginOptions.shouldUseMultipart(mockFile)).toBe(true);
+      const created = await signCreateFor(mockFile, "POST");
 
-      // Assert getPresignedUrl was called with collection_ids
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      // Assert createUpload was called with collection_ids and the POST method
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({
           connector_id: "connector-1",
           filename: "large-video.mp4",
           content_type: "video/mp4",
           file_size: 200 * 1024 * 1024,
           collection_ids: ["col-1", "col-2"],
+          method: "POST",
         })
       );
+      expect(created.key).toBe("uploads/large-video.mp4");
+
+      // Every later request carries the server key and an uploadId and is routed to the
+      // connector stamped on the file: a part, the ListParts used to resume, the completion
+      // and the abort.
+      await capturedPluginOptions.signRequest({
+        method: "PUT",
+        key: "uploads/large-video.mp4",
+        uploadId: "upload-123",
+        partNumber: 1,
+      });
+      expect(mockSignMultipart).toHaveBeenLastCalledWith({
+        connector_id: "connector-1",
+        upload_id: "upload-123",
+        key: "uploads/large-video.mp4",
+        operation: "part",
+        part_number: 1,
+      });
+      for (const [method, operation] of [
+        ["GET", "list"],
+        ["POST", "complete"],
+        ["DELETE", "abort"],
+      ] as const) {
+        await capturedPluginOptions.signRequest({
+          method,
+          key: "uploads/large-video.mp4",
+          uploadId: "upload-123",
+        });
+        expect(mockSignMultipart).toHaveBeenLastCalledWith({
+          connector_id: "connector-1",
+          upload_id: "upload-123",
+          key: "uploads/large-video.mp4",
+          operation,
+        });
+      }
     });
   });
 
@@ -559,18 +630,17 @@ describe("FileUploader integration tests — upload carry-through (Task 7.3)", (
 
       // Do NOT select any collections — the default state is empty
 
-      // Wait for plugin options to be configured
+      // Wait for the AwsS3 plugin to be installed with a signRequest
       await waitFor(() => {
         expect(capturedPluginOptions).not.toBeNull();
-        expect(capturedPluginOptions.getUploadParameters).toBeDefined();
+        expect(capturedPluginOptions.signRequest).toBeDefined();
       });
 
       // Simulate a single-part upload
-      const mockFile = { name: "photo.jpg", type: "image/jpeg", size: 1024 };
-      await capturedPluginOptions.getUploadParameters(mockFile);
+      await signCreateFor({ id: "file-1", name: "photo.jpg", type: "image/jpeg", size: 1024 });
 
-      // Assert getPresignedUrl was called with empty collection_ids
-      expect(mockGetPresignedUrl).toHaveBeenCalledWith(
+      // Assert createUpload was called with empty collection_ids
+      expect(mockCreateUpload).toHaveBeenCalledWith(
         expect.objectContaining({
           connector_id: "connector-1",
           filename: "photo.jpg",

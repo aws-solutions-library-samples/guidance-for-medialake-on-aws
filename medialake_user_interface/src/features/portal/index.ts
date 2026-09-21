@@ -15,5 +15,5 @@ export type {
   PathSegmentRule,
   PortalAuthCredentials,
   PortalSessionState,
-  PortalMultipartMetadata,
+  PortalUploadLocation,
 } from "./types/portal.types";

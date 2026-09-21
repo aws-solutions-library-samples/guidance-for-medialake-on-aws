@@ -2,106 +2,57 @@ import { useCallback, useState } from "react";
 import { apiClient } from "@/api/apiClient";
 import { API_ENDPOINTS } from "@/api/endpoints";
 import {
-  CompleteMultipartRequest,
-  CompleteMultipartResponse,
-  AbortMultipartRequest,
-  SignPartRequest,
-  SignPartResponse,
+  CreateUploadRequest,
+  CreateUploadResponse,
+  SignMultipartRequest,
+  SignMultipartResponse,
 } from "../types/upload.types";
 
-interface UploadRequest {
-  connector_id: string;
-  filename: string;
-  content_type: string;
-  file_size: number;
-  path?: string;
-  collection_ids?: string[];
-}
-
-interface S3UploadResponse {
-  bucket: string;
-  key: string;
-  presigned_post?: {
-    url: string;
-    fields: Record<string, string>;
-  };
-  upload_id?: string;
-  part_urls?: Array<{
-    part_number: number;
-    presigned_url: string;
-  }>;
-  expires_in: number;
-  multipart: boolean;
-  part_size?: number;
-  total_parts?: number;
+interface ApiEnvelope<T> {
+  status: string;
+  message: string;
+  data: T;
 }
 
 interface UseS3UploadReturn {
-  getPresignedUrl: (request: UploadRequest) => Promise<S3UploadResponse>;
-  signPart: (request: SignPartRequest) => Promise<SignPartResponse>;
-  completeMultipartUpload: (
-    request: CompleteMultipartRequest
-  ) => Promise<CompleteMultipartResponse>;
-  abortMultipartUpload: (request: AbortMultipartRequest) => Promise<void>;
+  /** Sign the request that creates the object (PUT or CreateMultipartUpload). */
+  createUpload: (request: CreateUploadRequest) => Promise<CreateUploadResponse>;
+  /** Sign one request of an in-flight multipart upload (part, list, complete, abort). */
+  signMultipart: (request: SignMultipartRequest) => Promise<SignMultipartResponse>;
   isLoading: boolean;
   error: Error | null;
 }
 
 /**
- * Hook to get presigned URLs for S3 uploads
+ * The two server calls behind Uppy's `signRequest`.
+ *
+ * The browser performs every S3 request itself against presigned URLs; the server only
+ * presigns (and records the collection directives at create time). See
+ * `assets/docs/uppy-6-upgrade.md`.
  */
 const useS3Upload = (): UseS3UploadReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const getPresignedUrl = useCallback(async (request: UploadRequest): Promise<S3UploadResponse> => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.post<{
-        status: string;
-        message: string;
-        data: S3UploadResponse;
-      }>(API_ENDPOINTS.ASSETS.UPLOAD, request);
-
-      if (response.data.status === "success" && response.data.data) {
-        return response.data.data;
-      }
-
-      throw new Error(response.data.message || "Failed to generate presigned URL");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      const error = new Error(`Error generating presigned URL: ${errorMessage}`);
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const completeMultipartUpload = useCallback(
-    async (request: CompleteMultipartRequest): Promise<CompleteMultipartResponse> => {
+  const createUpload = useCallback(
+    async (request: CreateUploadRequest): Promise<CreateUploadResponse> => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await apiClient.post<{
-          status: string;
-          message: string;
-          data: CompleteMultipartResponse;
-        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/complete`, request);
+        const response = await apiClient.post<ApiEnvelope<CreateUploadResponse>>(
+          API_ENDPOINTS.ASSETS.UPLOAD,
+          request
+        );
 
         if (response.data.status === "success" && response.data.data) {
           return response.data.data;
         }
 
-        throw new Error(response.data.message || "Failed to complete multipart upload");
+        throw new Error(response.data.message || "Failed to create upload");
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-        const error = new Error(
-          `Error completing multipart upload for ${request.key}: ${errorMessage}`
-        );
+        const error = new Error(`Error creating upload: ${errorMessage}`);
         setError(error);
         throw error;
       } finally {
@@ -111,76 +62,54 @@ const useS3Upload = (): UseS3UploadReturn => {
     []
   );
 
-  const signPart = useCallback(async (request: SignPartRequest): Promise<SignPartResponse> => {
-    // Don't set loading state for individual part signing to avoid UI flickering.
-    // Retry transient failures (network blips, 502/503/504) up to 3 times with
-    // exponential backoff — this is the hottest path during large uploads.
-    const MAX_RETRIES = 3;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const response = await apiClient.post<{
-          status: string;
-          message: string;
-          data: SignPartResponse;
-        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/sign`, request);
+  const signMultipart = useCallback(
+    async (request: SignMultipartRequest): Promise<SignMultipartResponse> => {
+      // No loading state for individual signs to avoid UI flicker. Retry transient
+      // failures (network blips, 429/502/503/504) with backoff — this is the hottest path
+      // during large uploads, one call per part.
+      const MAX_RETRIES = 3;
+      const label =
+        request.operation === "part"
+          ? `part ${request.part_number}`
+          : `${request.operation} for ${request.key}`;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const response = await apiClient.post<ApiEnvelope<SignMultipartResponse>>(
+            `${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/sign`,
+            request
+          );
 
-        if (response.data.status === "success" && response.data.data) {
-          return response.data.data;
+          if (response.data.status === "success" && response.data.data) {
+            return response.data.data;
+          }
+
+          throw new Error(response.data.message || `Failed to sign ${label}`);
+        } catch (err: any) {
+          const status = err?.response?.status;
+          const isRetryable =
+            !status || status === 429 || status === 502 || status === 503 || status === 504;
+
+          if (isRetryable && attempt < MAX_RETRIES) {
+            // Exponential backoff with jitter to avoid thundering herd
+            const baseDelay = 500 * Math.pow(2, attempt);
+            const jitter = baseDelay * (0.5 + Math.random() * 0.5); // 50-100% of base
+            await new Promise((r) => setTimeout(r, jitter));
+            continue;
+          }
+
+          const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+          throw new Error(`Error signing ${label}: ${errorMessage}`);
         }
-
-        throw new Error(response.data.message || "Failed to sign part");
-      } catch (err: any) {
-        const status = err?.response?.status;
-        const isRetryable =
-          !status || status === 429 || status === 502 || status === 503 || status === 504;
-
-        if (isRetryable && attempt < MAX_RETRIES) {
-          // Exponential backoff with jitter to avoid thundering herd
-          const baseDelay = 500 * Math.pow(2, attempt);
-          const jitter = baseDelay * (0.5 + Math.random() * 0.5); // 50-100% of base
-          await new Promise((r) => setTimeout(r, jitter));
-          continue;
-        }
-
-        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-        throw new Error(`Error signing part ${request.part_number}: ${errorMessage}`);
       }
-    }
-    // Unreachable, but TypeScript needs it
-    throw new Error(`Error signing part ${request.part_number}: max retries exceeded`);
-  }, []);
-
-  const abortMultipartUpload = useCallback(
-    async (request: AbortMultipartRequest): Promise<void> => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        await apiClient.post<{
-          status: string;
-          message: string;
-        }>(`${API_ENDPOINTS.ASSETS.UPLOAD}/multipart/abort`, request);
-
-        // Success - no return value needed
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-        const error = new Error(
-          `Error aborting multipart upload for ${request.key}: ${errorMessage}`
-        );
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
+      // Unreachable, but TypeScript needs it
+      throw new Error(`Error signing ${label}: max retries exceeded`);
     },
     []
   );
 
   return {
-    getPresignedUrl,
-    signPart,
-    completeMultipartUpload,
-    abortMultipartUpload,
+    createUpload,
+    signMultipart,
     isLoading,
     error,
   };

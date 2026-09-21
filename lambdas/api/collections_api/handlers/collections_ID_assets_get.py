@@ -128,6 +128,19 @@ def fetch_assets_from_opensearch(asset_ids: List[str]) -> Dict[str, Dict]:
     return assets_data
 
 
+def _row_inventory_id(collection_item: Dict) -> str:
+    """The asset InventoryID a collection row points at, for either SK format.
+
+    ``ASSET#`` rows carry it as ``assetId``; legacy ``ITEM#{uuid}`` rows carry it as
+    ``itemId`` (falling back to the uuid in the SK).
+    """
+    sk = collection_item["SK"]
+    if sk.startswith(ASSET_SK_PREFIX):
+        return collection_item.get("assetId") or ""
+    item_id = sk.replace(ITEM_SK_PREFIX, "")
+    return collection_item.get("itemId") or item_id
+
+
 def format_asset_as_search_result(
     collection_item: Dict,
     asset_data: Optional[Dict],
@@ -136,15 +149,15 @@ def format_asset_as_search_result(
 ) -> Dict[str, Any]:
     """Format asset data as search result with CloudFront URLs and clip information"""
     sk = collection_item["SK"]
-
-    # Handle both old ITEM# and new ASSET# formats
-    if sk.startswith(ASSET_SK_PREFIX):
-        inventory_id = collection_item.get("assetId", "")
-    else:
-        item_id = sk.replace(ITEM_SK_PREFIX, "")
-        inventory_id = collection_item.get("itemId", item_id)
+    inventory_id = _row_inventory_id(collection_item)
 
     clip_boundary = collection_item.get("clipBoundary", {})
+
+    # The row's SK ("ITEM#uuid", "ASSET#id#FULL" or "ASSET#id#CLIP#start_end"). Kept on
+    # every result because it is the only identifier that is unique per *clip*: `id` and
+    # `InventoryID` are shared by the whole asset and each of its clips, so a consumer that
+    # falls back to them cannot tell two clips of one asset apart when removing one.
+    collection_item_id = sk
 
     if not asset_data:
         logger.warning(
@@ -160,6 +173,7 @@ def format_asset_as_search_result(
             "thumbnailUrl": None,
             "proxyUrl": None,
             "id": inventory_id.split(":")[-1] if ":" in inventory_id else inventory_id,
+            "collectionItemId": collection_item_id,
             "addedAt": collection_item.get("addedAt", ""),
             "addedBy": collection_item.get("addedBy", ""),
             "clipBoundary": clip_boundary,
@@ -174,10 +188,6 @@ def format_asset_as_search_result(
 
     # Extract UUID part from inventory ID for id field
     asset_id = inventory_id.split(":")[-1] if ":" in inventory_id else inventory_id
-
-    # Extract the item ID from SK for deletion purposes
-    # SK is like "ITEM#uuid" or "ASSET#uuid", we need to keep this for deletion
-    collection_item_id = collection_item["SK"]
 
     result = {
         "InventoryID": inventory_id,
@@ -305,15 +315,14 @@ def register_route(app):
             end_idx = start_idx + query_params.page_size
             paginated_items = asset_items[start_idx:end_idx]
 
-            # Extract unique asset IDs from paginated items
+            # Extract unique asset IDs from paginated items. Several rows can point at one
+            # asset (the full file plus each of its clips), and everything below that is
+            # keyed by asset — the OpenSearch fetch, the CloudFront URL batch — is done once
+            # per asset, not once per row.
             asset_ids = []
             seen_asset_ids = set()
             for item in paginated_items:
-                if item["SK"].startswith(ASSET_SK_PREFIX):
-                    asset_id = item.get("assetId")
-                else:
-                    asset_id = item.get("itemId")
-
+                asset_id = _row_inventory_id(item)
                 if asset_id and asset_id not in seen_asset_ids:
                     asset_ids.append(asset_id)
                     seen_asset_ids.add(asset_id)
@@ -328,15 +337,10 @@ def register_route(app):
                     f"[ASSETS_HANDLER] Retrieved {len(assets_data)} assets from OpenSearch"
                 )
 
-            # Collect CloudFront URL requests
+            # Collect CloudFront URL requests, once per unique asset. Iterating the rows
+            # here instead queued the same request_id once per clip of an asset.
             url_requests = []
-            for item in paginated_items:
-                if item["SK"].startswith(ASSET_SK_PREFIX):
-                    inventory_id = item.get("assetId", "")
-                else:
-                    item_id = item["SK"].replace(ITEM_SK_PREFIX, "")
-                    inventory_id = item.get("itemId", item_id)
-
+            for inventory_id in asset_ids:
                 asset_data = assets_data.get(inventory_id)
                 if asset_data:
                     requests = collect_cloudfront_url_requests(asset_data, inventory_id)
@@ -350,16 +354,10 @@ def register_route(app):
                 f"[URL_GENERATION] Generated {len(cloudfront_urls)} CloudFront URLs"
             )
 
-            # Format results
+            # Format results — one per row, so each clip stays its own entry.
             results = []
             for item in paginated_items:
-                if item["SK"].startswith(ASSET_SK_PREFIX):
-                    inventory_id = item.get("assetId", "")
-                else:
-                    item_id = item["SK"].replace(ITEM_SK_PREFIX, "")
-                    inventory_id = item.get("itemId", item_id)
-
-                asset_data = assets_data.get(inventory_id)
+                asset_data = assets_data.get(_row_inventory_id(item))
                 result = format_asset_as_search_result(
                     item, asset_data, cloudfront_urls
                 )

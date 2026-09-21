@@ -279,6 +279,23 @@ export function getCollectionItemDisplayName(
 }
 
 /**
+ * The clip boundary to send when a collection item is added to another collection, or
+ * undefined when the item is the whole asset.
+ *
+ * A collection item carries its range as `clipBoundary`, not the search-result `clipData`
+ * shape, so copying a clip between collections has to read this field — reading `clipData`
+ * silently added the full asset instead. Returns both timecodes or nothing: the add-item
+ * API rejects a partial boundary, and a half-open range is not a clip.
+ */
+export function collectionItemClipBoundary(
+  boundary?: ClipBoundary | null
+): { startTime: string; endTime: string } | undefined {
+  const startTime = boundary?.startTime?.trim();
+  const endTime = boundary?.endTime?.trim();
+  return startTime && endTime ? { startTime, endTime } : undefined;
+}
+
+/**
  * The display-ready time range for a search-result clip, or null when the asset
  * is not a clip (or carries no usable range).
  *

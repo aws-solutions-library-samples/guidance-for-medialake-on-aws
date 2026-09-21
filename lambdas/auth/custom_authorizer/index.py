@@ -1053,6 +1053,10 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
     return {
         # Assets endpoints
         "post /assets/upload": "assets:upload",
+        # Presigns UploadPart/ListParts/Complete/Abort for an upload created above; the
+        # same permission gates both halves of the flow. Previously unmapped, which let
+        # any authenticated caller reach it.
+        "post /assets/upload/multipart/sign": "assets:upload",
         "delete /assets/{id}": "assets:delete",
         "put /assets/{id}": "assets:edit",
         "get /assets/{id}": "assets:view",

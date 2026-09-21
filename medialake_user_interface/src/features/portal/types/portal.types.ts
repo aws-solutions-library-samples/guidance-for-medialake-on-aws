@@ -160,8 +160,11 @@ export interface PortalAuthResponse {
   accessMode: "public" | "token-protected" | "cognito-groups";
 }
 
-export interface PortalMultipartMetadata {
-  uploadId: string;
+/**
+ * Where a portal upload landed, as recorded on `file.meta` once the server has chosen the
+ * key. Later multipart requests arrive with that key and are routed back to the file.
+ */
+export interface PortalUploadLocation {
   key: string;
   bucket: string;
 }

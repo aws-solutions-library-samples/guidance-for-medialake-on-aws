@@ -13,6 +13,7 @@ the portal routes are attached to the same physical API Gateway.
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import Duration, Fn, RemovalPolicy
@@ -44,6 +45,9 @@ class PortalApiStackProps:
     cloudfront_domain: str = ""
     pipelines_event_bus_name: str = ""
     pipelines_event_bus_arn: str = ""
+    # Upload-directives table: the portal records the ml-* directives it used to stamp
+    # as S3 object metadata here (browser uploads via presigned URLs carry none).
+    upload_directives_table: Optional[dynamodb.ITable] = None
 
 
 class PortalApiStack(cdk.NestedStack):
@@ -237,9 +241,21 @@ class PortalApiStack(cdk.NestedStack):
                     # URLs resolved at read time.
                     "IAC_ASSETS_BUCKET_NAME": props.iac_assets_bucket.bucket_name,
                     "UPLOAD_SESSIONS_TABLE_NAME": self._upload_sessions_table_name,
+                    **(
+                        {
+                            "UPLOAD_DIRECTIVES_TABLE_NAME": props.upload_directives_table.table_name
+                        }
+                        if props.upload_directives_table
+                        else {}
+                    ),
                 },
             ),
         )
+
+        if props.upload_directives_table:
+            props.upload_directives_table.grant_write_data(
+                self._portal_public_lambda.function
+            )
 
         self._portal_public_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
@@ -264,6 +280,10 @@ class PortalApiStack(cdk.NestedStack):
             )
         )
 
+        # S3 evaluates the *signer's* permissions when the browser uses a presigned URL,
+        # so this role needs every action the browser performs: PutObject (covers
+        # PutObject, CreateMultipartUpload, UploadPart, CompleteMultipartUpload),
+        # ListMultipartUploadParts (resume after a refresh) and AbortMultipartUpload.
         self._portal_public_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
@@ -274,8 +294,6 @@ class PortalApiStack(cdk.NestedStack):
                     "s3:GetBucketLocation",
                     "s3:AbortMultipartUpload",
                     "s3:ListMultipartUploadParts",
-                    "s3:CreateMultipartUpload",
-                    "s3:CompleteMultipartUpload",
                 ],
                 resources=["arn:aws:s3:::*", "arn:aws:s3:::*/*"],
             )
@@ -344,12 +362,6 @@ class PortalApiStack(cdk.NestedStack):
         portal_slug_multipart_sign_resource = (
             portal_slug_multipart_resource.add_resource("sign")
         )
-        portal_slug_multipart_complete_resource = (
-            portal_slug_multipart_resource.add_resource("complete")
-        )
-        portal_slug_multipart_abort_resource = (
-            portal_slug_multipart_resource.add_resource("abort")
-        )
 
         # Upload-session routes under /portal/{slug}/upload-session
         portal_slug_upload_session_resource = portal_slug_resource.add_resource(
@@ -393,12 +405,6 @@ class PortalApiStack(cdk.NestedStack):
         portal_slug_multipart_sign_resource.add_method(
             "POST", portal_public_integration, **portal_method_config
         )
-        portal_slug_multipart_complete_resource.add_method(
-            "POST", portal_public_integration, **portal_method_config
-        )
-        portal_slug_multipart_abort_resource.add_method(
-            "POST", portal_public_integration, **portal_method_config
-        )
 
         # Upload-session endpoint methods
         portal_slug_upload_session_resource.add_method(
@@ -426,8 +432,6 @@ class PortalApiStack(cdk.NestedStack):
             portal_slug_folder_resource,
             portal_slug_multipart_resource,
             portal_slug_multipart_sign_resource,
-            portal_slug_multipart_complete_resource,
-            portal_slug_multipart_abort_resource,
             portal_slug_upload_session_resource,
             portal_slug_upload_session_id_resource,
             portal_slug_upload_session_heartbeat_resource,

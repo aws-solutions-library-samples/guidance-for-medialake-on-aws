@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.22.2] - 2026-09-21
+
+### Bug Fixes
+
+- fix(collections): keep clip identity when copying and listing collection items
+
+### Code Refactoring
+
+- refactor: Upgrade Uppy to 6.x with Golden Retriever resumable uploads
+
 ## [1.22.1] - 2026-08-30
 
 ### Bug Fixes

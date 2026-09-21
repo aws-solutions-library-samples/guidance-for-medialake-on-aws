@@ -815,7 +815,7 @@ const ConnectorModal: React.FC<ConnectorModalProps> = ({
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", ml: 4 }}>
           {t(
             "connectors.form.allowUploadsHelper",
-            "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, and POST requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache)."
+            "Enable direct browser uploads to this S3 bucket. This adds a CORS rule to the bucket allowing GET, HEAD, PUT, POST, and DELETE requests from the MediaLake application origin (standard and x-amz-* headers, ETag exposed, 1-hour preflight cache)."
           )}
         </Typography>
       </Box>
