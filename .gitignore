@@ -13,7 +13,14 @@ npm-debug.log
 yarn.lock
 yarn-debug.log
 yarn-error.log
+# Lockfiles are ignored by default, but the frontend's is committed on purpose (see the
+# negation below): CodeBuild caches medialake_user_interface/node_modules, and without a
+# lockfile `npm install` re-resolves package.json against that stale tree and fails
+# (ERESOLVE) after any dependency bump. A committed lockfile makes npm reify the tree to
+# the locked versions instead, and pins builds so an upstream release cannot change them
+# mid-flight.
 package-lock.json
+!medialake_user_interface/package-lock.json
 
 # TypeScript
 *.tsbuildinfo

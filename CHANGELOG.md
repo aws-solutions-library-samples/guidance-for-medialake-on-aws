@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.4] - 2026-09-21
+
+### Bug Fixes
+
+- fix(deploy): commit the frontend lockfile so released builds survive a cached node_modules
+
 ## [1.22.3] - 2026-09-21
 
 ### Bug Fixes
