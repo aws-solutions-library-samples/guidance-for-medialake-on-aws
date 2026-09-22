@@ -16,6 +16,13 @@ from pydantic import (
     root_validator,
 )
 
+# Cache for the personal-assets bucket name probe, keyed by (region, parameter
+# path). The probe hits SSM, and the name is read during synthesis of more than
+# one stack, so without this a single `cdk deploy` would make the same call
+# repeatedly. Module-level rather than an instance attribute because CDKConfig is
+# a pydantic model; tests clear it directly.
+_PERSONAL_ASSETS_NAME_PROBE_CACHE: Dict[tuple, Optional[str]] = {}
+
 
 class DeploymentSize(str, Enum):
     SMALL = "small"
@@ -873,23 +880,41 @@ class CDKConfig(BaseModel):
     # ── Personal-assets bucket naming ────────────────────────────────────
     #
     # Controls whether the personal-assets bucket name carries the full AWS
-    # account id (True, the default) or only its first 7 digits (False, the
-    # historical behaviour).
+    # account id (True) or only its first 7 digits (False, the historical
+    # behaviour).
     #
-    # ⚠️  SET THIS TO ``false`` FOR ANY DEPLOYMENT CREATED BEFORE THIS FLAG
-    #     EXISTED, OTHERWISE THE BUCKET IS REPLACED AND ITS OBJECTS ARE LOST.
+    # ``None`` (the default) means *auto*: keep whatever name this deployment is
+    # already on, and use the full-account-id form for a brand-new deployment.
+    # The existing name is read from ``{ssm_prefix}/personal-assets-bucket-name``,
+    # which the storage-connectors stack writes on every deploy. Setting the flag
+    # explicitly overrides the probe in both directions.
     #
-    # ``BucketName`` is a replacement-triggering CloudFormation property, and
-    # this bucket is declared ``destroy_on_delete=True``. Flipping the name on a
-    # live deployment therefore makes CloudFormation create a new empty bucket
-    # and *delete* the old one along with every personal asset in it — there is
-    # no rename in place and nothing is left behind to recover from.
+    # Why auto is the default: ``BucketName`` is a replacement-triggering
+    # CloudFormation property and this bucket is declared
+    # ``destroy_on_delete=True``, so changing the name makes CloudFormation
+    # create a new empty bucket and *delete* the old one along with every
+    # personal asset in it. There is no rename in place.
     #
-    # Why the default is True: S3 bucket names are globally unique across all
-    # AWS accounts, and the 7-digit form does not contain enough of the account
-    # id to guarantee that. Two accounts whose ids share those 7 digits,
-    # deploying the same resource_prefix / region / environment, generate an
-    # identical name; the second deployment fails with BucketAlreadyExists
+    # In practice the delete is not even reached. The bucket ARN is exported to
+    # MediaLakeAssetsApi, and CloudFormation refuses to update an export another
+    # stack imports, so the whole MediaLakeStack update is canceled:
+    #
+    #     Update canceled. Cannot update export MediaLakeStack:ExportsOutput...
+    #     PersonalAssetsBucketS3Bucket...Arn as it is in use by MediaLakeAssetsApi.
+    #
+    # A hard-coded default of True did exactly that to every deployment created
+    # before the flag existed, because neither .cicd/config.json-template nor the
+    # release buildspec sets this key — so those operators had no way to opt out
+    # and their upgrade simply stopped. Auto-detection removes that trap.
+    #
+    # ⚠️  Setting this to ``true`` on a deployment currently on the 7-digit form
+    #     DELETES the existing bucket and every personal asset in it.
+    #
+    # Why a new deployment gets the full id: S3 bucket names are globally unique
+    # across all AWS accounts, and the 7-digit form does not contain enough of
+    # the account id to guarantee that. Two accounts whose ids share those 7
+    # digits, deploying the same resource_prefix / region / environment, generate
+    # an identical name; the second deployment fails with BucketAlreadyExists
     # (S3 409), which takes down the MediaLakeStorageConnectors nested stack and
     # rolls back MediaLakeStack with it. That failure is unrecoverable from the
     # operator's side, because the name is owned by an account they cannot
@@ -897,11 +922,10 @@ class CDKConfig(BaseModel):
     # is also what every other bucket in this project uses (-vectors-,
     # -nodes-templates-, -access-logs-, -user-interface-).
     #
-    # Existing deployment checklist: set this to ``false`` in config.json before
-    # your next deploy. To confirm which name you are currently on, read
+    # To see which form a deployment is on, read
     # ``{ssm_prefix}/personal-assets-bucket-name`` — if the segment after
-    # "-personal-assets-" is 7 digits rather than 12, you need ``false``.
-    unique_personal_assets_bucket_name: bool = True
+    # "-personal-assets-" is 7 digits rather than 12, it is on the legacy form.
+    unique_personal_assets_bucket_name: Optional[bool] = None
     deployment_options: DeploymentOptionsConfig = Field(
         default_factory=DeploymentOptionsConfig
     )
@@ -948,12 +972,117 @@ class CDKConfig(BaseModel):
             return ""
         return f"{self.resource_prefix}-{self.environment}-"
 
+    def _personal_assets_bucket_name_for(self, unique: bool) -> str:
+        """Build either candidate personal-assets bucket name.
+
+        Kept separate from the ``personal_assets_bucket_name`` property so the
+        resolver below can compare both candidates against the deployed name
+        without recursing back into the property.
+        """
+        account_segment = self.account_id if unique else self.account_id[:7]
+        return (
+            f"{self.resource_prefix}-personal-assets-"
+            f"{account_segment}-{self.primary_region}-"
+            f"{self.environment}"
+        ).lower()
+
+    def _probe_deployed_personal_assets_bucket_name(self) -> Optional[str]:
+        """Read this deployment's current bucket name from SSM, or None.
+
+        ``{ssm_prefix}/personal-assets-bucket-name`` is written by the
+        storage-connectors stack on every deploy, so its presence means "this
+        deployment already has a personal-assets bucket, and this is its name".
+        Absent means a first deploy.
+
+        Deliberately total: any failure (no credentials, no ``ssm:GetParameter``,
+        no such parameter, offline synth) returns None and the caller falls back
+        to the full-account-id name, which is the behaviour that shipped before
+        auto-detection existed. Timeouts are short and retries disabled so that
+        ``cdk synth`` without AWS access stays fast instead of hanging on the
+        botocore default of 60s x 5 attempts.
+        """
+        if os.environ.get("MEDIALAKE_DISABLE_SSM_NAME_PROBE"):
+            return None
+
+        param = self.ssm_param("personal-assets-bucket-name")
+        cache_key = (self.primary_region, param)
+        if cache_key in _PERSONAL_ASSETS_NAME_PROBE_CACHE:
+            return _PERSONAL_ASSETS_NAME_PROBE_CACHE[cache_key]
+
+        value: Optional[str] = None
+        try:
+            import boto3
+            from botocore.config import Config as BotocoreConfig
+
+            client = boto3.client(
+                "ssm",
+                region_name=self.primary_region,
+                config=BotocoreConfig(
+                    connect_timeout=2,
+                    read_timeout=3,
+                    retries={"max_attempts": 1},
+                ),
+            )
+            value = (
+                client.get_parameter(Name=param)["Parameter"]["Value"].strip() or None
+            )
+        except Exception as exc:  # noqa: BLE001 - see docstring: probe is advisory
+            print(
+                f"personal-assets bucket name probe: could not read {param} "
+                f"({type(exc).__name__}: {exc}); assuming a new deployment and "
+                f"using the full-account-id name."
+            )
+
+        _PERSONAL_ASSETS_NAME_PROBE_CACHE[cache_key] = value
+        return value
+
+    def _use_unique_personal_assets_bucket_name(self) -> bool:
+        """Resolve the tri-state ``unique_personal_assets_bucket_name`` flag.
+
+        Explicit ``true``/``false`` in config.json wins outright. ``None`` (the
+        default) means auto: match whatever the deployment is already running so
+        the name never changes underneath a live bucket.
+        """
+        if self.unique_personal_assets_bucket_name is not None:
+            return self.unique_personal_assets_bucket_name
+
+        deployed = self._probe_deployed_personal_assets_bucket_name()
+        if deployed is None:
+            return True
+
+        if deployed == self._personal_assets_bucket_name_for(unique=False):
+            print(
+                f"personal-assets bucket name: keeping the legacy 7-digit name "
+                f"{deployed!r} that this deployment already uses. Renaming it "
+                f"would replace the bucket and delete every personal asset in "
+                f"it. Set unique_personal_assets_bucket_name explicitly to "
+                f"override."
+            )
+            return False
+
+        if deployed != self._personal_assets_bucket_name_for(unique=True):
+            # Neither candidate matches — resource_prefix, region or environment
+            # changed since the bucket was created, so this deploy renames it no
+            # matter which branch we pick. Say so loudly and take the documented
+            # default rather than guessing.
+            print(
+                f"personal-assets bucket name: deployed name {deployed!r} matches "
+                f"neither candidate for this config; using "
+                f"{self._personal_assets_bucket_name_for(unique=True)!r}. This "
+                f"replaces the bucket and loses its contents."
+            )
+        return True
+
     @property
     def personal_assets_bucket_name(self) -> str:
         """Physical name of the personal-assets S3 bucket.
 
-        Unique (default):  ``{resource_prefix}-personal-assets-{account_id}-{region}-{environment}``
-        Legacy (opt-out):  ``{resource_prefix}-personal-assets-{account_id[:7]}-{region}-{environment}``
+        Unique:  ``{resource_prefix}-personal-assets-{account_id}-{region}-{environment}``
+        Legacy:  ``{resource_prefix}-personal-assets-{account_id[:7]}-{region}-{environment}``
+
+        Which form is used comes from ``_use_unique_personal_assets_bucket_name``:
+        an explicit ``unique_personal_assets_bucket_name`` if set, otherwise
+        whichever form this deployment is already on.
 
         The account id is the only component that makes the name globally unique,
         so the truncated legacy form can collide with an unrelated AWS account
@@ -965,16 +1094,9 @@ class CDKConfig(BaseModel):
         Lowercased because S3 rejects uppercase characters in bucket names, and
         ``resource_prefix`` is not otherwise constrained to lowercase here.
         """
-        account_segment = (
-            self.account_id
-            if self.unique_personal_assets_bucket_name
-            else self.account_id[:7]
+        name = self._personal_assets_bucket_name_for(
+            unique=self._use_unique_personal_assets_bucket_name()
         )
-        name = (
-            f"{self.resource_prefix}-personal-assets-"
-            f"{account_segment}-{self.primary_region}-"
-            f"{self.environment}"
-        ).lower()
 
         # Fail here rather than let S3 reject it mid-deploy. The fixed segments
         # ("-personal-assets-" plus the account id and region) consume ~40-55

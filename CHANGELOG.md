@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.5] - 2026-09-22
+
+### Bug Fixes
+
+- fix(storage): stop renaming the personal-assets bucket on existing deployments
+
 ## [1.22.4] - 2026-09-21
 
 ### Bug Fixes

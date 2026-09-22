@@ -276,13 +276,24 @@ Key configuration parameters include:
     - After deployment, you must create a DNS CNAME or Alias record pointing your domain to the CloudFront distribution domain
   - **Note**: This configuration is entirely optional. If omitted, MediaLake will use the default CloudFront domain name
 - **use_prefixed_names** (optional): Set to `true` for additional deployments in the same account/region. When enabled, all CloudFormation stack names, SSM parameters, and exports are prefixed with `resource_prefix` and `environment` to avoid collisions. Defaults to `false` for backward compatibility with existing deployments.
-- **unique_personal_assets_bucket_name** (optional): Controls how much of the AWS account ID appears in the personal-assets S3 bucket name. Defaults to `true`, which uses the full account ID and makes the name globally unique.
+- **unique_personal_assets_bucket_name** (optional): Controls how much of the AWS account ID appears in the personal-assets S3 bucket name. **Leave it unset.** The default is auto-detection: MediaLake reads the SSM parameter `/medialake/<environment>/personal-assets-bucket-name` (or `/<resource_prefix>/<environment>/...` when `use_prefixed_names` is enabled) and keeps whichever name your deployment already uses, so upgrades never rename the bucket. A brand-new deployment gets the full account ID, which makes the name globally unique.
 
-  > ⚠️ **Existing deployments must set this to `false`.** If your deployment was created before this option existed, its bucket name contains only the first 7 digits of the account ID. `BucketName` forces resource replacement in CloudFormation and this bucket is created with `destroy_on_delete`, so letting the name change will **delete the existing bucket and every personal asset stored in it**. Set `"unique_personal_assets_bucket_name": false` in `config.json` before your next deploy to keep the current bucket.
+  Set it explicitly only to override that:
+  - `false` — force the legacy form (first 7 digits of the account ID).
+  - `true` — force the full account ID.
+
+  > ⚠️ **Setting this to `true` on a deployment currently on the 7-digit form destroys data.** `BucketName` forces resource replacement in CloudFormation and this bucket is created with `destroy_on_delete`, so changing the name **deletes the existing bucket and every personal asset stored in it**. In practice CloudFormation cancels the update before it gets that far, because the bucket ARN is exported to `MediaLakeAssetsApi` and an in-use export cannot be updated:
   >
-  > To check which form you are on, read the SSM parameter `/medialake/<environment>/personal-assets-bucket-name` (or `/<resource_prefix>/<environment>/...` when `use_prefixed_names` is enabled). If the segment after `-personal-assets-` is 7 digits rather than 12, you need `false`.
+  > ```
+  > Update canceled. Cannot update export MediaLakeStack:ExportsOutputFnGetAtt...
+  > PersonalAssetsBucketS3Bucket...Arn as it is in use by MediaLakeAssetsApi.
+  > ```
   >
-  > New deployments should leave this at `true`. The 7-digit form does not contain enough of the account ID to guarantee global uniqueness: another AWS account whose ID shares those 7 digits and that deploys the same `resource_prefix`, region, and `environment` produces an identical bucket name, and your deployment then fails with `BucketAlreadyExists` — unrecoverably, since the name is owned by an account you cannot access.
+  > Auto-detection exists specifically to avoid this. Earlier releases defaulted to `true` with no way to opt out through the release template, which blocked upgrades for every deployment created before the option existed.
+  >
+  > To check which form you are on, read the SSM parameter above. If the segment after `-personal-assets-` is 7 digits rather than 12, you are on the legacy form.
+  >
+  > Why new deployments get the full ID: the 7-digit form does not contain enough of the account ID to guarantee global uniqueness. Another AWS account whose ID shares those 7 digits and that deploys the same `resource_prefix`, region, and `environment` produces an identical bucket name, and your deployment then fails with `BucketAlreadyExists` — unrecoverably, since the name is owned by an account you cannot access.
 
 See the [`config-example.json`](config-example.json) for a complete configuration example.
 
