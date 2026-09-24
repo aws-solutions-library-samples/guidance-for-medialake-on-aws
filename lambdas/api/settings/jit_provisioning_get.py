@@ -32,10 +32,10 @@ def build_response_payload(item: dict | None) -> dict:
     """Merge the stored record with the deploy-time defaults.
 
     ``capabilityEnabled`` reflects whether the deployment was synthesized with
-    JIT provisioning turned on. When it is false the feature cannot run no
-    matter what the stored record says, because the Cognito trigger has not been
-    granted the permissions it needs. The UI uses this to explain that a
-    redeploy is required.
+    federated default-group assignment turned on. When it is false the feature
+    cannot run no matter what the stored record says, because the post
+    confirmation trigger that performs the assignment was never deployed. The
+    UI uses this to explain that a redeploy is required.
     """
     capability_enabled = _env_flag("JIT_PROVISIONING_ENABLED", False)
     default_group_fallback = os.environ.get("JIT_DEFAULT_GROUP") or "read-only"

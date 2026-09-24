@@ -835,7 +835,6 @@ class NodesStack(cdk.NestedStack):
         Security Considerations:
         - S3 access scoped to MediaLake bucket naming patterns
         - KMS access restricted via ViaService condition to S3 only
-        - KMS keys must be tagged with Application={resource_prefix}
         - CloudWatch logs scoped to /aws/mediaconvert/* log groups
 
         Returns:
@@ -863,7 +862,8 @@ class NodesStack(cdk.NestedStack):
         # Users upload media to their own buckets, so we cannot restrict by bucket name pattern.
         # Security is enforced through:
         # 1. MediaConvert service role trust policy (only MediaConvert can assume this role)
-        # 2. KMS key conditions (see KMSEncryption policy below)
+        # 2. The KMSEncryption policy below (S3-only, in-region) plus each
+        #    key's own key policy
         # 3. Bucket policies on user buckets (users control access to their own buckets)
         mediaconvert_role.add_to_policy(
             iam.PolicyStatement(
@@ -890,8 +890,14 @@ class NodesStack(cdk.NestedStack):
         #
         # Security Controls:
         # 1. kms:ViaService condition restricts to S3 service usage only
-        # 2. aws:ResourceTag condition limits to MediaLake-tagged keys
-        # 3. Region-scoped to prevent cross-region key access
+        # 2. Region-scoped to prevent cross-region key access
+        #
+        # There is deliberately no aws:ResourceTag condition. Keys used by
+        # source buckets are often not MediaLake's own, and even MediaLake's
+        # Application tag does not reliably survive on the key in every
+        # account; a missing tag made every encrypted read or write fail
+        # with AccessDenied. Each key's own key policy still decides
+        # whether this role may use it.
         mediaconvert_role.add_to_policy(
             iam.PolicyStatement(
                 sid="KMSEncryption",
@@ -905,10 +911,6 @@ class NodesStack(cdk.NestedStack):
                     "StringEquals": {
                         # Only allow KMS operations via S3 service in this region
                         "kms:ViaService": [f"s3.{self.region}.amazonaws.com"]
-                    },
-                    "StringLike": {
-                        # Restrict to KMS keys tagged with MediaLake application
-                        "aws:ResourceTag/Application": config.resource_prefix
                     },
                 },
             )

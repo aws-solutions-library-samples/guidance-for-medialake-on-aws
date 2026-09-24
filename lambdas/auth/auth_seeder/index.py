@@ -37,101 +37,6 @@ PREFIX_METADATA = "METADATA"
 # Permission set schema version - increment this to force update of system permission sets
 PERMISSION_SCHEMA_VERSION = "2.5.0"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Auth behavior version
-#
-# Some corrections to token generation change observable behavior, so they must
-# not be applied silently to a deployment that is already running. This marker
-# records which set of behaviors a deployment uses:
-#
-#   1  legacy   - preserve the exact behavior shipped before the correction
-#   2  current  - the corrected behavior
-#
-# It is written exactly once, and never changed automatically. A brand-new
-# deployment gets version 2; an existing one gets version 1 and can be moved to
-# 2 deliberately once the operator has reviewed the change.
-#
-# "Brand-new" is decided by whether the built-in groups already exist, which is
-# checked *before* seeding creates them. A new CloudFormation custom resource
-# cannot be used for this: adding one fires a Create event on existing
-# deployments too, which would misclassify every current install as new.
-# ─────────────────────────────────────────────────────────────────────────────
-PK_AUTH_CONFIG = "CONFIG#AUTH"
-AUTH_BEHAVIOR_VERSION_LEGACY = 1
-AUTH_BEHAVIOR_VERSION_CURRENT = 2
-
-# Presence of this group means the deployment has been seeded before.
-EXISTING_DEPLOYMENT_MARKER_GROUP = "superAdministrators"
-
-
-def ensure_auth_behavior_version() -> int:
-    """Record the deployment's auth behavior version if it is not already set.
-
-    Returns the effective version. Never overwrites an existing value, so an
-    operator who moves a deployment to version 2 is not reverted by the next
-    deploy.
-    """
-    try:
-        table = dynamodb.Table(AUTH_TABLE_NAME)
-
-        existing = table.get_item(
-            Key={"PK": PK_AUTH_CONFIG, "SK": PREFIX_METADATA}, ConsistentRead=True
-        ).get("Item")
-        if existing and existing.get("authBehaviorVersion") is not None:
-            version = int(existing["authBehaviorVersion"])
-            logger.info(f"Auth behavior version already set to {version}")
-            return version
-
-        # Checked before seeding runs, so this genuinely distinguishes a fresh
-        # deployment from one that has been seeded before.
-        marker = table.get_item(
-            Key={
-                "PK": f"{PREFIX_GROUP}{EXISTING_DEPLOYMENT_MARKER_GROUP}",
-                "SK": PREFIX_METADATA,
-            },
-            ConsistentRead=True,
-        ).get("Item")
-
-        is_existing_deployment = marker is not None
-        version = (
-            AUTH_BEHAVIOR_VERSION_LEGACY
-            if is_existing_deployment
-            else AUTH_BEHAVIOR_VERSION_CURRENT
-        )
-
-        current_time = datetime.datetime.now().isoformat()
-        try:
-            table.put_item(
-                Item={
-                    "PK": PK_AUTH_CONFIG,
-                    "SK": PREFIX_METADATA,
-                    "entity": "authConfig",
-                    "authBehaviorVersion": version,
-                    "reason": (
-                        "existing deployment detected at first marker write"
-                        if is_existing_deployment
-                        else "new deployment"
-                    ),
-                    "createdAt": current_time,
-                    "updatedAt": current_time,
-                },
-                ConditionExpression="attribute_not_exists(PK) AND attribute_not_exists(SK)",
-            )
-            logger.info(
-                f"Auth behavior version set to {version} "
-                f"({'existing' if is_existing_deployment else 'new'} deployment)"
-            )
-        except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
-            # A concurrent run won; whatever it wrote is authoritative.
-            logger.info("Auth behavior version was written concurrently")
-
-        return version
-    except Exception as e:
-        logger.error(f"Error setting auth behavior version: {str(e)}")
-        # Legacy is the safe answer: it preserves existing behavior.
-        return AUTH_BEHAVIOR_VERSION_LEGACY
-
-
 # Default groups definitions
 DEFAULT_GROUPS = [
     {
@@ -582,10 +487,6 @@ def create_handler(event: Dict[str, Any], context: Any) -> None:
     """
     logger.info("Creating default groups and permission sets")
 
-    # Must run before seeding, which creates the groups used to tell a fresh
-    # deployment from an existing one.
-    ensure_auth_behavior_version()
-
     # Seed groups first
     group_success_count = 0
     group_failure_count = 0
@@ -631,10 +532,6 @@ def update_handler(event: Dict[str, Any], context: Any) -> None:
         context: Lambda context
     """
     logger.info("Creating default groups and permission sets")
-
-    # Also run on update, so deployments that predate this marker get one. They
-    # already have the built-in groups, so they are correctly recorded as legacy.
-    ensure_auth_behavior_version()
 
     # Seed groups first
     group_success_count = 0

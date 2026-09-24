@@ -23,7 +23,8 @@ Two things it deliberately does *not* do:
 * It does not assign a default group. This trigger fires on every sign-in, so
   doing that here would re-apply the default after an administrator had moved
   the user somewhere else. The default is applied once per user by the
-  pre-token-generation trigger instead.
+  post confirmation trigger instead, which Cognito invokes only on a federated
+  user's first sign-in.
 * It does not confirm or verify users. Those are pre sign-up trigger
   responsibilities and have no equivalent in this trigger's response.
 
@@ -260,7 +261,7 @@ def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         else:
             # Nothing survived the allowlist. Remove the claim so a stale value
             # is not carried over from a previous sign-in, and let the
-            # pre-token-generation trigger fall back to the default group.
+            # post confirmation trigger fall back to the default group.
             attributes_to_map.pop(claim_key, None)
 
         event.setdefault("response", {})

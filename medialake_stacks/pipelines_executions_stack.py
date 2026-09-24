@@ -64,6 +64,31 @@ class PipelinesExecutionsStack(Stack):
             targets=[targets.EventBus(self._pipelines_executions_event_bus.event_bus)],
         )
 
+        # ────────────────────────────────────────────────────────────────
+        # Pipeline executions table
+        #
+        # StatusStartTimeIndex exists so the executions list can be served by a
+        # Query instead of a full-table Scan. The base table is keyed by
+        # execution_id, which gives no way to read executions newest-first, so
+        # the list endpoint used to scan every item and sort in memory — and
+        # timed out once a deployment accumulated enough executions.
+        #
+        # Why status is the partition key rather than a constant:
+        #   * Every item already carries `status` and `start_time`, so the index
+        #     backfills itself from existing data. A synthetic constant key would
+        #     be absent on every pre-existing item, and the list would read empty
+        #     until a migration rewrote the whole table.
+        #   * The UI's status column filter becomes a single-partition Query.
+        #   * Status comes straight off the Step Functions EventBridge event, so
+        #     the value set is AWS's closed ExecutionStatus enum.
+        #
+        # Listing across all statuses is a k-way merge over those partitions
+        # (see the get_executions lambda), which is why the set of statuses is
+        # pinned in one place there.
+        #
+        # NOTE: DynamoDB permits only one *new* GSI per UpdateTable, so adding a
+        # second index here in the same release would fail the stack update.
+        # ────────────────────────────────────────────────────────────────
         dynamodb_table = DynamoDB(
             self,
             "PipelinesExecutionsTable",
@@ -73,6 +98,20 @@ class PipelinesExecutionsStack(Stack):
                 partition_key_type=dynamodb.AttributeType.STRING,
                 sort_key_name="start_time",
                 sort_key_type=dynamodb.AttributeType.NUMBER,
+                global_secondary_indexes=[
+                    dynamodb.GlobalSecondaryIndexPropsV2(
+                        index_name="StatusStartTimeIndex",
+                        partition_key=dynamodb.Attribute(
+                            name="status",
+                            type=dynamodb.AttributeType.STRING,
+                        ),
+                        sort_key=dynamodb.Attribute(
+                            name="start_time",
+                            type=dynamodb.AttributeType.NUMBER,
+                        ),
+                        projection_type=dynamodb.ProjectionType.ALL,
+                    ),
+                ],
             ),
         )
         self._pipelnes_executions_table = dynamodb_table.table

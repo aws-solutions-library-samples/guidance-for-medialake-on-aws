@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.23.0] - 2026-09-24
+
+### Features
+
+- feat(collections): run a pipeline across a whole collection
+
+### Bug Fixes
+
+- fix(layers): build resvg with a current Rust toolchain on both paths
+- fix(auth): stop Cognito's own federation group blocking JIT provisioning
+- fix(executions): serve the executions list from an index instead of scanning
+
+### Code Refactoring
+
+- refactor: assign SSO default group in a post confirmation trigger
+- refactor: drop KMS key tag condition from MediaConvert role
+
+### Other Changes
+
+- revert: "feat(collections): run a pipeline across a whole collection"
+
 ## [1.22.5] - 2026-09-22
 
 ### Bug Fixes

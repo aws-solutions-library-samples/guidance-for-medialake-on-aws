@@ -68,6 +68,10 @@ def lambda_handler(event, context):
         inbound_federation_lambda_arn = event["ResourceProperties"].get(
             "InboundFederationLambdaArn", ""
         )
+        # Optional: only present when federated default-group assignment is on.
+        post_confirmation_lambda_arn = event["ResourceProperties"].get(
+            "PostConfirmationLambdaArn", ""
+        )
         cloudfront_domain_ssm_param = event["ResourceProperties"].get(
             "CloudFrontDomainSsmParam", ""
         )
@@ -119,6 +123,23 @@ def lambda_handler(event, context):
                 # trigger pointing at a Lambda that may no longer exist.
                 lambda_config.pop("InboundFederation", None)
                 logger.info("Detaching inbound federation trigger")
+
+            # Add, update or remove the post confirmation trigger, which assigns
+            # the default group to a federated user on their first sign-in.
+            # Unlike the versioned configs above, this LambdaConfig key takes a
+            # plain function ARN.
+            if post_confirmation_lambda_arn:
+                lambda_config["PostConfirmation"] = post_confirmation_lambda_arn
+                logger.info("Attaching post confirmation trigger")
+            else:
+                # Only detach a trigger this resource attached previously. A post
+                # confirmation trigger attached out of band is left alone.
+                old_arn = (event.get("OldResourceProperties") or {}).get(
+                    "PostConfirmationLambdaArn", ""
+                )
+                if old_arn and lambda_config.get("PostConfirmation") == old_arn:
+                    lambda_config.pop("PostConfirmation", None)
+                    logger.info("Detaching post confirmation trigger")
 
             # Update the user pool with the new Lambda configuration
             # Only include parameters that are valid for update_user_pool API
@@ -215,6 +236,14 @@ def lambda_handler(event, context):
                     and inbound_config.get("LambdaArn") == inbound_federation_lambda_arn
                 ):
                     lambda_config.pop("InboundFederation", None)
+                    changed = True
+
+                if (
+                    post_confirmation_lambda_arn
+                    and lambda_config.get("PostConfirmation")
+                    == post_confirmation_lambda_arn
+                ):
+                    lambda_config.pop("PostConfirmation", None)
                     changed = True
 
                 if changed:

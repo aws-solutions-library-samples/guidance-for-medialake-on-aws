@@ -1,11 +1,12 @@
 """
 Cognito Update Stack for Media Lake.
 
-This stack handles additional Cognito User Pool configuration and triggers that need to be
-applied after the core Cognito resources are created. This includes:
-- Pre-signup Lambda trigger configuration
-- Additional Lambda trigger setup
-- User pool updates that might conflict if done during initial creation
+This stack attaches the Lambda triggers to the Cognito User Pool after the core
+Cognito resources are created, through a custom resource rather than the pool's
+own LambdaConfig, to avoid circular dependencies between stacks:
+- Pre token generation (always): resolves groups into the permissions claim
+- Post confirmation (when federated default-group assignment is enabled)
+- Inbound federation (when IdP group mapping is enabled)
 """
 
 import datetime
@@ -31,7 +32,7 @@ class CognitoUpdateStackProps:
     cognito_user_pool_id: str
     cognito_user_pool_arn: str
     auth_table_name: str
-    # Passed as a name rather than a table object: the pre-token-generation
+    # Passed as a name rather than a table object: the post confirmation
     # Lambda's IAM policy is built here with an inline ARN to avoid the
     # cross-stack dependency cycle that importing the table would create.
     system_settings_table_name: Optional[str] = None
@@ -51,46 +52,13 @@ class CognitoUpdateStack(Stack):
     ):
         super().__init__(scope, id, **kwargs)
 
-        common_env_vars = {
-            "AUTH_TABLE_NAME": props.auth_table_name,
-            "COGNITO_USER_POOL_ID": props.cognito_user_pool_id,
-        }
-
-        # TODO: Create the Cognito Pre-Signup Lambda for additional signup validation
-        # Commented out for now as requested
-        # self._pre_signup_lambda = Lambda(
-        #     self,
-        #     "PreSignupLambda",
-        #     config=LambdaConfig(
-        #         name="cognito_pre_signup",
-        #         entry="lambdas/auth/cognito_pre_signup",
-        #         memory_size=256,
-        #         timeout_minutes=1,
-        #         environment_variables=common_env_vars,
-        #     ),
-        # )
-
-        # Create the Pre-Token Generation Lambda
         from config import config as app_config
 
         jit = app_config.authZ.jit_provisioning
 
-        pre_token_env_vars = {
-            **common_env_vars,
-            "DEBUG_MODE": "true",
-            # Just-in-time provisioning for first-time federated users. The
-            # master switch is deploy-time because it also controls whether the
-            # IAM permissions below exist; the default group itself is a runtime
-            # setting an administrator edits in System Settings.
-            "JIT_PROVISIONING_ENABLED": str(jit.enabled).lower(),
-            "JIT_DEFAULT_GROUP": jit.default_group,
-            "JIT_ALLOW_IDP_GROUP_ASSERTIONS": str(
-                jit.allow_idp_group_assertions
-            ).lower(),
-            "JIT_IDP_GROUP_MAPPING": json.dumps(jit.idp_group_mapping or {}),
-            "SYSTEM_SETTINGS_TABLE_NAME": props.system_settings_table_name or "",
-        }
-
+        # Create the Pre-Token Generation Lambda. It only shapes claims: it
+        # resolves the user's Cognito groups into the custom:permissions claim
+        # and never changes group membership.
         self._pre_token_generation_lambda = Lambda(
             self,
             "PreTokenGenerationLambda",
@@ -100,36 +68,66 @@ class CognitoUpdateStack(Stack):
                 timeout_minutes=1,
                 lambda_handler="handler",
                 snap_start=False,
-                environment_variables=pre_token_env_vars,
+                environment_variables={
+                    "AUTH_TABLE_NAME": props.auth_table_name,
+                    "DEBUG_MODE": "true",
+                },
             ),
         )
 
-        # Grant permissions for the pre-token generation lambda to interact with the auth table
+        # Read-only: group records and permission sets are fetched by key.
         auth_table_arn = f"arn:aws:dynamodb:{self.region}:{self.account}:table/{props.auth_table_name}"
-
         self._pre_token_generation_lambda.function.add_to_role_policy(
             iam.PolicyStatement(
-                actions=[
-                    "dynamodb:GetItem",
-                    "dynamodb:PutItem",
-                    "dynamodb:UpdateItem",
-                    "dynamodb:Query",
-                    "dynamodb:Scan",
-                ],
+                actions=["dynamodb:GetItem"],
                 resources=[auth_table_arn],
             )
         )
 
-        # Extra permissions required only by just-in-time provisioning. Granted
-        # conditionally so that deployments with the feature off do not hand the
-        # token-path Lambda the ability to change group membership.
+        # Post confirmation trigger: assigns the default group to a federated
+        # user on their first sign-in. Cognito invokes it once per user, right
+        # after it creates the profile, so the assignment is never re-applied
+        # over an administrator's later change.
+        #
+        # Only created when the feature is enabled, so that deployments with it
+        # off have no Lambda able to change group membership. The default group
+        # is carried in as an environment variable and can be overridden at
+        # runtime from System Settings.
+        self._post_confirmation_lambda = None
         if jit.enabled:
-            self._pre_token_generation_lambda.function.add_to_role_policy(
+            self._post_confirmation_lambda = Lambda(
+                self,
+                "PostConfirmationLambda",
+                config=LambdaConfig(
+                    name="post_confirmation",
+                    entry="lambdas/auth/post_confirmation",
+                    # Cognito allows a trigger 5 seconds regardless.
+                    timeout_minutes=1,
+                    lambda_handler="handler",
+                    snap_start=False,
+                    environment_variables={
+                        "JIT_DEFAULT_GROUP": jit.default_group,
+                        "SYSTEM_SETTINGS_TABLE_NAME": (
+                            props.system_settings_table_name or ""
+                        ),
+                        "JIT_ALLOW_IDP_GROUP_ASSERTIONS": str(
+                            jit.allow_idp_group_assertions
+                        ).lower(),
+                        "JIT_IDP_GROUP_MAPPING": json.dumps(
+                            jit.idp_group_mapping or {}
+                        ),
+                        # With the inbound federation trigger attached,
+                        # custom:groups already holds mapped Media Lake ids.
+                        "JIT_GROUPS_PRE_MAPPED": str(
+                            jit.inbound_federation_trigger_enabled
+                        ).lower(),
+                    },
+                ),
+            )
+
+            self._post_confirmation_lambda.function.add_to_role_policy(
                 iam.PolicyStatement(
-                    actions=[
-                        "cognito-idp:AdminAddUserToGroup",
-                        "cognito-idp:AdminListGroupsForUser",
-                    ],
+                    actions=["cognito-idp:AdminAddUserToGroup"],
                     resources=[props.cognito_user_pool_arn],
                 )
             )
@@ -139,12 +137,18 @@ class CognitoUpdateStack(Stack):
                     f"arn:aws:dynamodb:{self.region}:{self.account}:"
                     f"table/{props.system_settings_table_name}"
                 )
-                self._pre_token_generation_lambda.function.add_to_role_policy(
+                self._post_confirmation_lambda.function.add_to_role_policy(
                     iam.PolicyStatement(
                         actions=["dynamodb:GetItem"],
                         resources=[system_settings_table_arn],
                     )
                 )
+
+            self._post_confirmation_lambda.function.add_permission(
+                "CognitoInvokePermissionPostConfirmation",
+                principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
+                source_arn=props.cognito_user_pool_arn,
+            )
 
         # Inbound federation trigger. Normalizes and remaps the group assertion
         # coming from an external identity provider before Cognito creates or
@@ -247,8 +251,14 @@ class CognitoUpdateStack(Stack):
             service_token=cognito_update_provider.service_token,
             properties={
                 "UserPoolId": props.cognito_user_pool_id,
-                # "PreSignupLambdaArn": self._pre_signup_lambda.function.function_arn,  # Commented out for now
                 "PreTokenGenerationLambdaArn": self._pre_token_generation_lambda.function.function_arn,
+                # Empty when the feature is not enabled, which the custom
+                # resource treats as "detach it if present".
+                "PostConfirmationLambdaArn": (
+                    self._post_confirmation_lambda.function.function_arn
+                    if self._post_confirmation_lambda
+                    else ""
+                ),
                 # Empty when the inbound federation trigger is not enabled, which
                 # the custom resource treats as "detach it if present".
                 "InboundFederationLambdaArn": (
@@ -263,13 +273,6 @@ class CognitoUpdateStack(Stack):
             },
         )
 
-        # TODO: Grant permissions for Cognito to invoke pre-signup Lambda (commented out for now)
-        # self._pre_signup_lambda.function.add_permission(
-        #     "CognitoInvokePermissionPreSignup",
-        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-        #     source_arn=props.cognito_user_pool_arn,
-        # )
-
         # Grant permissions for Cognito to invoke the pre-token generation Lambda
         self._pre_token_generation_lambda.function.add_permission(
             "CognitoInvokePermissionPreTokenGeneration",
@@ -277,16 +280,19 @@ class CognitoUpdateStack(Stack):
             source_arn=props.cognito_user_pool_arn,
         )
 
-    # TODO: Re-enable when pre-signup lambda is uncommented
-    # @property
-    # def pre_signup_lambda(self):
-    #     """Return the pre-signup Lambda function"""
-    #     return self._pre_signup_lambda.function
-
     @property
     def pre_token_generation_lambda(self):
         """Return the pre-token generation Lambda function"""
         return self._pre_token_generation_lambda.function
+
+    @property
+    def post_confirmation_lambda(self):
+        """Return the post confirmation Lambda function, if it was created."""
+        return (
+            self._post_confirmation_lambda.function
+            if self._post_confirmation_lambda
+            else None
+        )
 
     @property
     def inbound_federation_lambda(self):

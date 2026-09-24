@@ -291,12 +291,18 @@ class ResvgCliLayer(Construct):
                         """
                         set -euo pipefail
 
-                        # Install Rust toolchain and dependencies
+                        # Install build dependencies (AL2's packaged rust/cargo is
+                        # too old to compile current resvg, so use rustup instead)
                         yum -y update
-                        yum -y install rust cargo fontconfig fontconfig-devel
+                        yum -y install gcc fontconfig fontconfig-devel tar gzip
+
+                        # Install a current stable Rust toolchain via rustup
+                        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+                            | sh -s -- -y --default-toolchain stable --profile minimal
+                        source "$HOME/.cargo/env"
 
                         # Compile resvg from source (latest stable version)
-                        cargo install resvg
+                        cargo install resvg --locked
 
                         # Package binary into Lambda layer structure with secure permissions
                         mkdir -p /asset-output/bin

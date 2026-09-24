@@ -82,18 +82,10 @@ class CognitoConstruct(Construct):
         )
         self._auth_table = DynamoDB(self, "AuthorizationTable", self._auth_table_props)
 
-        # Create Lambda functions
-        # self._cognito_trigger_lambda = Lambda(
-        #     self,
-        #     "CognitoTrigger",
-        #     LambdaConfig(
-        #         name="cognito-trigger",
-        #         entry="lambdas/auth/cognito_trigger",
-        #     ),
-        # )
-
-        # Pre-Token Generation Lambda is now created in CognitoUpdateStack
-        # This avoids circular dependencies and timing issues
+        # Lambda triggers are not attached here. CognitoUpdateStack creates the
+        # pre token generation, post confirmation and inbound federation
+        # triggers and attaches them through a custom resource, which avoids
+        # circular dependencies and timing issues.
 
         # Create User Pool using L1 construct, needed for configuration parameters
         user_pool_props = {
@@ -155,11 +147,7 @@ class CognitoConstruct(Construct):
                     temporary_password_validity_days=self.props.temporary_password_validity_days,
                 )
             ),
-            # "lambda_config": cognito.CfnUserPool.LambdaConfigProperty(
-            #     pre_sign_up=self._cognito_trigger_lambda.function.function_arn,
-            #     post_confirmation=self._cognito_trigger_lambda.function.function_arn,
-            #     # Pre-token generation config is now set via CognitoUpdateStack
-            # ),
+            # No lambda_config: triggers are attached by CognitoUpdateStack.
             "user_pool_add_ons": cognito.CfnUserPool.UserPoolAddOnsProperty(
                 advanced_security_mode="ENFORCED"
             ),
@@ -224,23 +212,6 @@ class CognitoConstruct(Construct):
         self._user_pool = cognito.UserPool.from_user_pool_id(
             self, "MediaLakeUserPoolL2", cfn_user_pool.ref
         )
-
-        # Grant permissions AFTER the user pool is created
-        # Grant permission for pre-signup lambda (same as post confirmation)
-        # self._cognito_trigger_lambda.function.add_permission(
-        #     "CognitoInvokePreSignUp",
-        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-        #     source_arn=cfn_user_pool.attr_arn,
-        # )
-
-        # # Grant permission for post confirmation lambda
-        # self._cognito_trigger_lambda.function.add_permission(
-        #     "CognitoInvokePostConfirmation",
-        #     principal=iam.ServicePrincipal("cognito-idp.amazonaws.com"),
-        #     source_arn=cfn_user_pool.attr_arn,
-        # )
-
-        # Pre-token generation lambda permissions are now granted in CognitoUpdateStack
 
         # Using stack name, region, account, and environment ensures uniqueness across different deployments
         unique_id = hashlib.md5(

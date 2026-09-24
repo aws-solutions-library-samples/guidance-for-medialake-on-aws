@@ -126,8 +126,3 @@ class CognitoStack(Stack):
     def cognito_domain_prefix(self):
         """Return the Cognito Domain Prefix."""
         return self._cognito_construct.cognito_domain_prefix
-
-    @property
-    def pre_token_generation_lambda(self):
-        """Return the Pre-Token Generation Lambda."""
-        return self._cognito_construct._pre_token_generation_lambda

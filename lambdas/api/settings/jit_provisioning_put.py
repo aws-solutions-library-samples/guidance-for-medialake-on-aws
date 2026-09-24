@@ -4,9 +4,10 @@ Updates the just-in-time (JIT) provisioning policy applied to users arriving
 from an external identity provider.
 
 The chosen group is validated against the Cognito user pool rather than trusted
-blindly: assigning a group that does not exist in the pool would make
-``AdminAddUserToGroup`` fail *inside the sign-in path*, which is a far worse
-failure mode than rejecting the save here.
+blindly: assigning a group that does not exist in the pool would make the post
+confirmation trigger's ``AdminAddUserToGroup`` fail *inside the sign-in path*.
+That trigger fires only once per user, so the user would be left with no group
+at all -- a far worse failure mode than rejecting the save here.
 """
 
 import os

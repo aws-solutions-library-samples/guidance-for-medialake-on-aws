@@ -387,23 +387,25 @@ class IdentityProviderConfig(BaseModel):
 
 
 class JitProvisioningConfig(BaseModel):
-    """Just-in-time (JIT) provisioning for federated (SAML/OIDC) users.
+    """Default-group assignment for federated (SAML/OIDC) users.
 
-    When ``enabled``, the first time a user signs in through an external
-    identity provider they are added to a default group so that they receive
-    baseline permissions in their very first token.
+    When ``enabled``, a post confirmation Lambda trigger is attached to the user
+    pool. The first time a user signs in through an external identity provider,
+    Cognito creates their profile and invokes that trigger, which adds them to a
+    default group so they receive baseline permissions.
 
-    The assignment happens **exactly once per user**. A sentinel record is
-    written to the authorization table on first assignment, so group changes
-    made later by an administrator are never undone by a subsequent sign-in —
-    including the case where an administrator removes every group in order to
-    revoke access.
+    The assignment happens **exactly once per user**, because Cognito only
+    invokes the post confirmation trigger for a federated user on their first
+    sign-in. Group changes made later by an administrator are therefore never
+    undone by a subsequent sign-in — including the case where an administrator
+    removes every group in order to revoke access.
 
     The *runtime* value of the default group lives in the system-settings
     DynamoDB table and is editable from System Settings in the UI.
-    ``default_group`` here seeds that record and acts as the fallback when the
-    record is absent, so the feature still behaves predictably before an
-    administrator has visited the settings page.
+    ``default_group`` here is passed to the trigger as its ``JIT_DEFAULT_GROUP``
+    environment variable and acts as the fallback when the record is absent, so
+    the feature still behaves predictably before an administrator has visited
+    the settings page.
     """
 
     enabled: bool = False
