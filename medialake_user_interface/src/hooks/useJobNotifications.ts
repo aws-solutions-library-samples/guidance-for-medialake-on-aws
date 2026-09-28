@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useCallback } from "react";
 import { useUserBulkDownloadJobs, useUserBatchDeleteJobs } from "@/api/hooks/useAssets";
-import { useNotifications, Notification } from "@/components/NotificationCenter";
+import { useNotifications, Notification, jobStatusKey } from "@/components/NotificationCenter";
 
 interface DownloadJobData {
   jobId: string;
@@ -15,7 +15,7 @@ interface DownloadJobData {
         singleFiles?: string[];
       }
     | string[];
-  expiresAt?: string;
+  expiresAt?: string | number;
   expiresIn?: string;
   error?: string;
   totalSize?: number;
@@ -43,6 +43,11 @@ type JobData = DownloadJobData | DeleteJobData;
 
 export const useJobNotifications = () => {
   const { notifications, add, dismiss, update } = useNotifications();
+  // Read notifications through a ref wherever depending on them would cycle: the
+  // sync effect writes notifications via add/update/dismiss, so a dependency on
+  // the array itself would re-run it forever.
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
   const { data: downloadJobsResponse } = useUserBulkDownloadJobs();
   const { data: deleteJobsResponse } = useUserBatchDeleteJobs();
   const syncedJobsRef = useRef<Set<string>>(new Set());
@@ -96,15 +101,20 @@ export const useJobNotifications = () => {
     // Keep sticky notifications in sync
   }, [notifications, dismiss, markJobAsDismissed]);
 
-  // Get user jobs from both download and delete responses
-  const downloadJobs = downloadJobsResponse?.data?.jobs || [];
-  const deleteJobs = deleteJobsResponse?.data?.jobs || [];
-
-  // Combine all jobs with a type marker
-  const allJobs: Array<JobData & { jobType: "download" | "delete" }> = [
-    ...downloadJobs.map((job) => ({ ...job, jobType: "download" as const })),
-    ...deleteJobs.map((job) => ({ ...job, jobType: "delete" as const })),
-  ];
+  // Combine both job lists with a type marker.
+  //
+  // Memoised because `allJobs` is a dependency of the sync effect below. Built
+  // inline it was a fresh array of fresh objects on every render, so the effect
+  // ran on every render of a component mounted at the app root, re-reading,
+  // re-parsing and re-writing the notification keys each time.
+  const allJobs = useMemo<Array<JobData & { jobType: "download" | "delete" }>>(() => {
+    const downloadJobs = downloadJobsResponse?.data?.jobs || [];
+    const deleteJobs = deleteJobsResponse?.data?.jobs || [];
+    return [
+      ...downloadJobs.map((job) => ({ ...job, jobType: "download" as const })),
+      ...deleteJobs.map((job) => ({ ...job, jobType: "delete" as const })),
+    ];
+  }, [downloadJobsResponse, deleteJobsResponse]);
 
   const getUnseenNotifications = useCallback((): Set<string> => {
     try {
@@ -127,21 +137,32 @@ export const useJobNotifications = () => {
 
   const isJobNotificationSeen = useCallback(
     (jobId: string, status: string): boolean => {
-      const seenJobs = getSeenJobNotifications();
-      const jobKey = `${jobId}:${status}`;
-      return seenJobs.has(jobKey);
+      return getSeenJobNotifications().has(jobStatusKey(jobId, status));
     },
     [getSeenJobNotifications]
   );
 
+  /**
+   * Record that a job reached a status the user has not looked at yet.
+   *
+   * Keyed by `jobId:status` — the same key shape `isJobNotificationSeen` reads —
+   * so the write is idempotent: re-creating the notification for a job that is
+   * still at the same status produces the same key and the set does not grow.
+   *
+   * It previously keyed on the notification's `crypto.randomUUID()`, which is
+   * minted fresh every time a notification is created. Nothing ever matched those
+   * ids again (the set is only ever read for its `.size`, to badge the bell), and
+   * the sync re-creates a notification on every load for any job whose
+   * notification is missing from state — so each load appended another uuid that
+   * nothing could ever remove short of opening the bell. That is how this key
+   * reached 1.7 MB and started throwing QuotaExceededError out of an effect at
+   * the app root.
+   */
   const markAsUnseen = useCallback(
-    (notificationId: string) => {
-      const unseenNotifications = getUnseenNotifications();
-      unseenNotifications.add(notificationId);
-      localStorage.setItem(
-        "medialake_unseen_notifications",
-        JSON.stringify([...unseenNotifications])
-      );
+    (jobId: string, status: string) => {
+      const unseen = getUnseenNotifications();
+      unseen.add(jobStatusKey(jobId, status));
+      localStorage.setItem("medialake_unseen_notifications", JSON.stringify([...unseen]));
     },
     [getUnseenNotifications]
   );
@@ -312,7 +333,7 @@ export const useJobNotifications = () => {
 
       // Only mark as unseen if this job+status combination hasn't been seen before
       if (!isJobNotificationSeen(job.jobId, job.status)) {
-        markAsUnseen(notificationId);
+        markAsUnseen(job.jobId, job.status);
       }
 
       return notificationId;
@@ -336,7 +357,7 @@ export const useJobNotifications = () => {
         // Mark as unseen if status changed to completed and this completion hasn't been seen before
         if (job.status === "COMPLETED" && existingNotification.jobStatus !== "COMPLETED") {
           if (!isJobNotificationSeen(job.jobId, "COMPLETED")) {
-            markAsUnseen(existingNotification.id);
+            markAsUnseen(job.jobId, "COMPLETED");
           }
         }
       }
@@ -357,12 +378,6 @@ export const useJobNotifications = () => {
   );
 
   // Sync backend jobs with notifications.
-  // IMPORTANT: We read notifications via a ref to avoid a dependency cycle.
-  // The effect writes to notifications (via add/update/dismiss), so depending
-  // on `notifications` directly would cause an infinite re-render loop.
-  const notificationsRef = useRef(notifications);
-  notificationsRef.current = notifications;
-
   useEffect(() => {
     if (allJobs.length === 0) return;
 
