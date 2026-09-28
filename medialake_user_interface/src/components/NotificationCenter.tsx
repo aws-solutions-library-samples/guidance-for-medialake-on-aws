@@ -194,14 +194,49 @@ const STORAGE_KEY = "medialake_notifications";
  */
 export const jobStatusKey = (jobId: string, status: string): string => `${jobId}:${status}`;
 
-/** Badge count: unseen job/status pairs whose notification is still on screen. */
+/**
+ * Badge count: unseen job/status pairs that still have a notification on screen.
+ *
+ * Counts *keys*, not matching notifications. The sync can briefly hold two
+ * notifications for one job — it re-creates from a `notificationsRef` snapshot
+ * that is only as fresh as the last render, so a second pass can add a duplicate
+ * before its own dedupe lands — and a job-level key matches every duplicate.
+ * Counting notifications therefore badged a single unseen download as "2" until
+ * the dedupe pass caught up. The previous uuid keying masked this because a uuid
+ * belongs to exactly one notification.
+ */
 export const countUnseen = (
   notifications: Pick<Notification, "jobId" | "jobStatus">[],
   unseenKeys: Set<string>
-): number =>
-  notifications.filter(
-    (n) => n.jobId && n.jobStatus && unseenKeys.has(jobStatusKey(n.jobId, n.jobStatus))
-  ).length;
+): number => {
+  const onScreen = new Set<string>();
+  for (const n of notifications) {
+    if (n.jobId && n.jobStatus) onScreen.add(jobStatusKey(n.jobId, n.jobStatus));
+  }
+
+  return unseenKeys.intersection(onScreen).size;
+};
+
+/**
+ * Badge count while jobs are still running: distinct jobs, not notifications.
+ *
+ * Same hazard as `countUnseen` — the sync can briefly hold two notifications for
+ * one job, and counting rows badged one in-flight download as "2". This is the
+ * counter the badge falls back to before the job completes (`markAsUnseen` only
+ * fires on COMPLETED, so `unseenCount` is 0 until then), which is why fixing
+ * `countUnseen` alone left the symptom intact for the whole in-flight window.
+ */
+export const countActiveJobs = (
+  notifications: Pick<Notification, "jobId" | "jobStatus">[]
+): number => {
+  const active = new Set<string>();
+  for (const n of notifications) {
+    if (n.jobId && n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED") {
+      active.add(n.jobId);
+    }
+  }
+  return active.size;
+};
 
 export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -314,11 +349,7 @@ export const NotificationCenter: React.FC = () => {
   };
 
   // Calculate active jobs count (not COMPLETED or FAILED)
-  const getActiveJobsCount = (): number => {
-    return notifications.filter(
-      (n) => n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED"
-    ).length;
-  };
+  const getActiveJobsCount = (): number => countActiveJobs(notifications);
 
   const [unseenCount, setUnseenCount] = useState(getUnseenCount());
   const [activeJobsCount, setActiveJobsCount] = useState(getActiveJobsCount());
