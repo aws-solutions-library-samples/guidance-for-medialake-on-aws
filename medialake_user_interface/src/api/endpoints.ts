@@ -79,6 +79,14 @@ export const API_ENDPOINTS = {
     SETTING: (namespace: string, key: string) =>
       `/users/settings/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`,
   },
+  SEARCH_HISTORY: {
+    BASE: "/users/search-history",
+    ENTRY: (fingerprint: string) => `/users/search-history/${encodeURIComponent(fingerprint)}`,
+  },
+  SAVED_SEARCHES: {
+    BASE: "/users/saved-searches",
+    ITEM: (id: string) => `/users/saved-searches/${encodeURIComponent(id)}`,
+  },
   COLLECTIONS: {
     BASE: "/collections",
     COLLECTION_TYPES: "/collections/collection-types",

@@ -816,6 +816,9 @@ user_interface_stack = UserInterfaceStack(
         cognito_identity_pool=cognito_stack.identity_pool,
         cognito_user_pool_arn=cognito_stack.user_pool_arn,
         cognito_domain_prefix=cognito_stack.cognito_domain_prefix,
+        cognito_explicit_auth_flows=list(
+            cognito_stack.user_pool_client.node.default_child.explicit_auth_flows or []
+        ),
         # Use CloudFormation imports to avoid circular dependencies
         api_gateway_rest_id="",  # Will be imported from CloudFormation
         api_gateway_stage="",  # Will be read from SSM Parameter Store

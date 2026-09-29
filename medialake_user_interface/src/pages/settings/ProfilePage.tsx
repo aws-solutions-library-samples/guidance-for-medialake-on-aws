@@ -36,30 +36,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useDirection } from "../../contexts/DirectionContext";
-
-// BUG-19 fix: every locale registered in ``src/i18n/i18n.ts`` MUST appear here,
-// or the Profile language selector renders a subset that ships translation
-// weight but is unreachable. Adding a locale is now a one-line change instead
-// of a duplicated 55-line MenuItem block. Keep in sync with ``i18n/i18n.ts``.
-type ProfileLocale = {
-  code: string;
-  flag: string; // 2-letter country code shown as a text-only "flag" placeholder
-  translationKey: string; // key under ``languages`` in each locale bundle
-};
-
-const PROFILE_LOCALES: ReadonlyArray<ProfileLocale> = [
-  { code: "en", flag: "GB", translationKey: "languages.english" },
-  { code: "de", flag: "DE", translationKey: "languages.german" },
-  { code: "es", flag: "ES", translationKey: "languages.spanish" },
-  { code: "pt", flag: "PT", translationKey: "languages.portuguese" },
-  { code: "fr", flag: "FR", translationKey: "languages.french" },
-  { code: "ja", flag: "JP", translationKey: "languages.japanese" },
-  { code: "ko", flag: "KR", translationKey: "languages.korean" },
-  { code: "zh", flag: "CN", translationKey: "languages.chinese" },
-  { code: "hi", flag: "IN", translationKey: "languages.hindi" },
-  { code: "ar", flag: "SA", translationKey: "languages.arabic" },
-  { code: "he", flag: "IL", translationKey: "languages.hebrew" },
-];
+import { SearchHistoryProfileSection } from "@/features/search-history/components/SearchHistoryProfileSection";
+import { PROFILE_LOCALES, selectedProfileLocale } from "./profileLocales";
 
 const ProfilePage: React.FC = () => {
   const theme = useTheme();
@@ -458,7 +436,7 @@ const ProfilePage: React.FC = () => {
                         }}
                       >
                         <Select
-                          value={i18n.language}
+                          value={selectedProfileLocale(i18n.language, i18n.resolvedLanguage)}
                           sx={{
                             textAlign: isRTL ? "right" : "left",
                             "& .MuiSelect-select": {
@@ -550,6 +528,9 @@ const ProfilePage: React.FC = () => {
             </Paper>
           </Grid>
         </Grid>
+
+        {/* The user's saved and recent searches */}
+        <SearchHistoryProfileSection />
       </Box>
     </ThemeProvider>
   );

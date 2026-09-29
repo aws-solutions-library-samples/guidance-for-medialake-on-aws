@@ -437,6 +437,37 @@ def _validate_collection_nodes(request_data: Dict[str, Any]) -> list[dict]:
     return problems
 
 
+def _validate_parallel_nodes(request_data: Dict[str, Any]) -> list[dict]:
+    """Reject caller-supplied Step Functions ``branches`` on any node.
+
+    The builder used to copy ``configuration.branches`` verbatim into the ASL of
+    a Parallel state, letting a request embed arbitrary states (including Task
+    states with any ``Resource``). The pipeline editor never sets ``branches``,
+    so legitimate pipelines are unaffected; the builder now ignores the field and
+    this check makes the rejection explicit (400) before anything is deployed.
+
+    Returns ``[{"node": <label>, "errors": [...]}]`` (empty = all good).
+    """
+    problems: list[dict] = []
+    configuration = request_data.get("configuration") or {}
+    for index, node in enumerate(configuration.get("nodes") or []):
+        data = (node or {}).get("data") or {}
+        node_config = data.get("configuration") or {}
+        if not isinstance(node_config, dict) or not node_config.get("branches"):
+            continue
+        label = data.get("label") or data.get("id") or f"node[{index}]"
+        problems.append(
+            {
+                "node": label,
+                "errors": [
+                    "configuration.branches is not supported; parallel branches "
+                    "are built from the pipeline graph."
+                ],
+            }
+        )
+    return problems
+
+
 @app.post("/pipelines")
 @tracer.capture_method
 def create_pipeline() -> Dict[str, Any]:
@@ -480,7 +511,8 @@ def create_pipeline() -> Dict[str, Any]:
         # any pipeline record or start the creation state machine.
         portal_problems = _validate_portal_nodes(request_data)
         collection_problems = _validate_collection_nodes(request_data)
-        node_problems = portal_problems + collection_problems
+        parallel_problems = _validate_parallel_nodes(request_data)
+        node_problems = portal_problems + collection_problems + parallel_problems
         if node_problems:
             logger.info(f"Rejecting pipeline - invalid node(s): {node_problems}")
             return _api_response(

@@ -3446,6 +3446,146 @@ components:
         - itemId
         - itemType
 
+    SearchDefinition:
+      type: object
+      description: |
+        A search as the user ran it, version 1. The server normalizes it
+        (drops empty values, sorts lists, removes absolute dates when a
+        relative date range is set) before storing or fingerprinting it.
+        Sort order is not part of a search definition.
+      properties:
+        v:
+          type: integer
+          enum: [1]
+          description: Definition version
+        q:
+          type: string
+          maxLength: 1000
+          description: Query text
+          example: "sunset"
+        semantic:
+          type: boolean
+          description: Whether semantic search was on
+        semanticMode:
+          type: string
+          enum: [full, clip]
+          description: Semantic result mode (semantic searches only)
+        searchModes:
+          type: array
+          description: Semantic search modalities (semantic searches only)
+          items:
+            type: string
+            enum: [visual, audio, transcript]
+        filters:
+          type: object
+          description: Facet filters, using the same names as the search API query parameters
+          properties:
+            type:
+              type: string
+              description: Comma-separated asset types
+            extension:
+              type: string
+              description: Comma-separated file extensions
+            filename:
+              type: string
+            asset_size_gte:
+              type: number
+            asset_size_lte:
+              type: number
+            LargerThan:
+              type: number
+            ingested_date_gte:
+              type: string
+              format: date-time
+            ingested_date_lte:
+              type: string
+              format: date-time
+            date_range_option:
+              type: string
+              enum: [24h, 7d, 14d, 30d]
+              description: Relative date range, recomputed each time the search runs
+            customMetadataFilters:
+              type: array
+              maxItems: 25
+              items:
+                type: object
+                additionalProperties: true
+      required:
+        - q
+        - semantic
+
+    SearchHistoryEntry:
+      type: object
+      properties:
+        fingerprint:
+          type: string
+          description: Stable identifier of the normalized definition
+          example: "b7373423767600939a7c90cb98e79d1d"
+        definition:
+          $ref: "#/components/schemas/SearchDefinition"
+        searchedAt:
+          type: string
+          format: date-time
+      required:
+        - fingerprint
+        - definition
+        - searchedAt
+
+    SearchHistory:
+      type: object
+      properties:
+        items:
+          type: array
+          description: Most recent first
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/SearchHistoryEntry"
+        limit:
+          type: integer
+          example: 5
+      required:
+        - items
+        - limit
+
+    SavedSearch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+          example: "Sunset shots"
+        definition:
+          $ref: "#/components/schemas/SearchDefinition"
+        fingerprint:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - definition
+        - fingerprint
+
+    SearchApiResponse:
+      type: object
+      description: Envelope used by the search history and saved search endpoints
+      properties:
+        status:
+          type: string
+          example: "200"
+        message:
+          type: string
+      required:
+        - status
+        - message
+
     UserSettings:
       type: object
       properties:
@@ -8513,5 +8653,346 @@ paths:
                   - data
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /users/search-history:
+    get:
+      operationId: getSearchHistory
+      summary: Get recent searches
+      description: |
+        Returns the authenticated user's last five searches, most recent first.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      responses:
+        "200":
+          description: Search history retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SearchHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: recordSearch
+      summary: Record a search
+      description: |
+        Adds a search to the top of the user's history. Running a search that
+        is already in the history moves it to the top instead of adding a
+        duplicate. The history keeps at most five entries. A blank search
+        (empty query, no filters) is not recorded.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                definition:
+                  $ref: "#/components/schemas/SearchDefinition"
+              required:
+                - definition
+      responses:
+        "200":
+          description: Search recorded; returns the updated history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SearchHistory"
+        "400":
+          description: The request body or search definition is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      operationId: clearSearchHistory
+      summary: Clear recent searches
+      description: Removes all of the user's recent searches. Saved searches are not affected.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      responses:
+        "200":
+          description: Search history cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SearchHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /users/search-history/{fingerprint}:
+    parameters:
+      - name: fingerprint
+        in: path
+        description: Fingerprint of the history entry to remove
+        required: true
+        schema:
+          type: string
+
+    delete:
+      operationId: removeSearchFromHistory
+      summary: Remove one recent search
+      description: Removes one entry from the user's history. Removing an entry that is not there succeeds.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      responses:
+        "200":
+          description: Entry removed; returns the updated history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SearchHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /users/saved-searches:
+    get:
+      operationId: listSavedSearches
+      summary: List saved searches
+      description: Returns the user's saved searches, most recently updated first.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      responses:
+        "200":
+          description: Saved searches retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/SavedSearch"
+                          count:
+                            type: integer
+                          limit:
+                            type: integer
+                            example: 50
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: createSavedSearch
+      summary: Save a search
+      description: |
+        Saves a search under a name. Saving a search that is already saved
+        (same normalized definition) returns the existing saved search with
+        `existing: true` and status 200 instead of creating a duplicate.
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                definition:
+                  $ref: "#/components/schemas/SearchDefinition"
+              required:
+                - name
+                - definition
+      responses:
+        "200":
+          description: The search was already saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/SavedSearch"
+                          - type: object
+                            properties:
+                              existing:
+                                type: boolean
+                                enum: [true]
+        "201":
+          description: Search saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/SavedSearch"
+                          - type: object
+                            properties:
+                              existing:
+                                type: boolean
+                                enum: [false]
+        "400":
+          description: Missing or invalid name or definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: The user already has the maximum of 50 saved searches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /users/saved-searches/{searchId}:
+    parameters:
+      - name: searchId
+        in: path
+        description: Saved search ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    patch:
+      operationId: updateSavedSearch
+      summary: Rename or update a saved search
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provide a name, a definition, or both
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                definition:
+                  $ref: "#/components/schemas/SearchDefinition"
+      responses:
+        "200":
+          description: Saved search updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/SavedSearch"
+        "400":
+          description: Nothing to update, or an invalid name or definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      operationId: deleteSavedSearch
+      summary: Delete a saved search
+      tags:
+        - Users
+      security:
+        - CognitoAuth: []
+      responses:
+        "200":
+          description: Saved search deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SearchApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchApiResponse"
         "500":
           $ref: "#/components/responses/InternalServerError"

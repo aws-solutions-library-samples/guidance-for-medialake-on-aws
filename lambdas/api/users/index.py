@@ -11,7 +11,11 @@ from typing import Any, Dict
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
+from aws_lambda_powertools.event_handler import (
+    APIGatewayRestResolver,
+    CORSConfig,
+    Response,
+)
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from collections_migration import (
@@ -26,6 +30,17 @@ from favorites_post import handle_post_favorite
 from profile_change_password_post import handle_change_password
 from profile_get import handle_get_profile
 from profile_put import handle_put_profile
+from saved_searches import (
+    handle_create_saved_search,
+    handle_delete_saved_search,
+    handle_get_saved_searches,
+    handle_update_saved_search,
+)
+from search_history import (
+    handle_delete_search_history,
+    handle_get_search_history,
+    handle_record_search,
+)
 from settings_get import handle_get_settings
 from settings_put import handle_put_setting
 from users_delete import handle_delete_user
@@ -231,6 +246,114 @@ def delete_favorite(item_type: str, item_id: str):
     """DELETE /users/favorites/{itemType}/{itemId} - Remove a favorite"""
     return handle_delete_favorite(
         item_type, item_id, app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+    )
+
+
+def _as_http(result: Dict[str, Any]) -> Response:
+    """Return a handler's proxy-style dict as a real HTTP response.
+
+    The older routes above return the dict itself, which the resolver serializes
+    as a 200 whose body carries the real status (their clients unwrap it). The
+    search history and saved search routes return the status code for real.
+    """
+    return Response(
+        status_code=result["statusCode"],
+        content_type="application/json",
+        body=result["body"],
+    )
+
+
+# Search history routes (the caller's own history only)
+@app.get("/users/search-history")
+@tracer.capture_method
+def get_search_history():
+    """GET /users/search-history - Most recent distinct searches"""
+    return _as_http(
+        handle_get_search_history(
+            app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
+    )
+
+
+@app.post("/users/search-history")
+@tracer.capture_method
+def record_search():
+    """POST /users/search-history - Record a committed search"""
+    return _as_http(
+        handle_record_search(app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer)
+    )
+
+
+@app.delete("/users/search-history")
+@tracer.capture_method
+def clear_search_history():
+    """DELETE /users/search-history - Clear the whole history"""
+    return _as_http(
+        handle_delete_search_history(
+            app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
+    )
+
+
+@app.delete("/users/search-history/<fingerprint>")
+@tracer.capture_method
+def delete_search_history_entry(fingerprint: str):
+    """DELETE /users/search-history/{fingerprint} - Remove one entry"""
+    return _as_http(
+        handle_delete_search_history(
+            app,
+            dynamodb,
+            USER_TABLE_NAME,
+            logger,
+            metrics,
+            tracer,
+            fingerprint=fingerprint,
+        )
+    )
+
+
+# Saved search routes (the caller's own saved searches only)
+@app.get("/users/saved-searches")
+@tracer.capture_method
+def get_saved_searches():
+    """GET /users/saved-searches - List saved searches"""
+    return _as_http(
+        handle_get_saved_searches(
+            app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
+    )
+
+
+@app.post("/users/saved-searches")
+@tracer.capture_method
+def create_saved_search():
+    """POST /users/saved-searches - Save a search"""
+    return _as_http(
+        handle_create_saved_search(
+            app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
+    )
+
+
+@app.patch("/users/saved-searches/<search_id>")
+@tracer.capture_method
+def update_saved_search(search_id: str):
+    """PATCH /users/saved-searches/{searchId} - Rename or update a saved search"""
+    return _as_http(
+        handle_update_saved_search(
+            search_id, app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
+    )
+
+
+@app.delete("/users/saved-searches/<search_id>")
+@tracer.capture_method
+def delete_saved_search(search_id: str):
+    """DELETE /users/saved-searches/{searchId} - Delete a saved search"""
+    return _as_http(
+        handle_delete_saved_search(
+            search_id, app, dynamodb, USER_TABLE_NAME, logger, metrics, tracer
+        )
     )
 
 

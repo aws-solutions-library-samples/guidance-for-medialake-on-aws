@@ -119,6 +119,29 @@ def find_dict_by_value(dict_list: list[Dict], key: str, value: Any) -> Dict:
     return {}
 
 
+def _as_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def combined_file_totals(
+    event: Dict[str, Any], clip_bytes: int, small_clips: int, large_clips: int
+) -> Dict[str, int]:
+    """Whole-file totals from assess_scale plus the encoded sub-clips.
+
+    Returns the values to store on the job record and pass downstream:
+    totalSize (bytes the user will download), smallFilesCount (zipped files)
+    and largeFilesCount (individual presigned files).
+    """
+    return {
+        "totalSize": _as_int(event.get("totalSize")) + clip_bytes,
+        "smallFilesCount": _as_int(event.get("smallFilesCount")) + small_clips,
+        "largeFilesCount": _as_int(event.get("largeFilesCount")) + large_clips,
+    }
+
+
 @tracer.capture_method
 def split_s3_uri(s3_uri: str) -> Tuple[str, str]:
     """
@@ -179,6 +202,9 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         )
 
         # Sort subclips into large/small file arrays
+        clip_bytes = 0
+        small_clip_count = 0
+        large_clip_count = 0
         for sub_clip in processed_sub_clips:
             # The MediaConvert task does not provide the output file extension as part of the destination
             # value in the task output, so we'll need to get it from the original config inputs.
@@ -199,9 +225,11 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
             # Get the size of the sub-clip
             bucket, key = split_s3_uri(output_location)
             size_bytes = get_s3_object_size(bucket, key)
+            clip_bytes += size_bytes
 
             # If it qualifies as a small file, add to smallFiles for zipping
             if size_bytes <= SMALL_FILE_THRESHOLD_MB * 1024 * 1024:
+                small_clip_count += 1
                 event["smallFiles"].append(
                     {
                         "jobId": job_id,
@@ -213,6 +241,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                     }
                 )
             else:
+                large_clip_count += 1
                 event["largeFiles"].append(
                     {
                         "jobId": job_id,
@@ -229,8 +258,19 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
         event.pop("subClips", None)
         event.pop("processedSubClips", None)
 
+        # assess_scale counted only whole files (a clip's size is unknown until
+        # it is encoded). Now that every clip exists, report the job's real
+        # download: clips counted as zipped or large files, and their output
+        # bytes added to the whole-file total. Absolute values (not ADD), so a
+        # retried invocation cannot double-count.
+        totals = combined_file_totals(
+            event, clip_bytes, small_clip_count, large_clip_count
+        )
+        event.update(totals)
+
         logger.info(
             "Updating Dynamo Job Status",
+            extra={"jobId": job_id, **totals},
         )
 
         # Update dynamo job status in user table
@@ -244,14 +284,24 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
 
         user_table.update_item(
             Key={"userId": formatted_user_id, "itemKey": item_key},
-            UpdateExpression=("SET #status = :status, " "#updatedAt = :updatedAt"),
+            UpdateExpression=(
+                "SET #status = :status, #updatedAt = :updatedAt, "
+                "#totalSize = :totalSize, #smallFilesCount = :smallFilesCount, "
+                "#largeFilesCount = :largeFilesCount"
+            ),
             ExpressionAttributeNames={
                 "#status": "status",
                 "#updatedAt": "updatedAt",
+                "#totalSize": "totalSize",
+                "#smallFilesCount": "smallFilesCount",
+                "#largeFilesCount": "largeFilesCount",
             },
             ExpressionAttributeValues={
                 ":status": "SUB_CLIPPING_COMPLETE",
                 ":updatedAt": datetime.utcnow().isoformat(),
+                ":totalSize": totals["totalSize"],
+                ":smallFilesCount": totals["smallFilesCount"],
+                ":largeFilesCount": totals["largeFilesCount"],
             },
         )
 

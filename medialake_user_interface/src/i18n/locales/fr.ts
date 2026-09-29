@@ -503,6 +503,58 @@ export default {
     },
   },
   search: {
+    history: {
+      title: "Recherches récentes",
+      allAssets: "Toutes les ressources",
+      remove: "Retirer de l'historique",
+      removeNamed: "Retirer {{query}} de l'historique",
+      suggestionsLabel: "Recherches enregistrées et récentes",
+      clear: "Effacer l'historique",
+      clearTitle: "Effacer l'historique de recherche",
+      clearConfirm:
+        "Supprimer toutes vos recherches récentes ? Les recherches enregistrées ne sont pas concernées.",
+      removeFailed: "Impossible de retirer cette recherche",
+      clearFailed: "Impossible d'effacer l'historique de recherche",
+      loadFailed: "Impossible de charger cette liste. Réessayez plus tard.",
+      empty: "Vos cinq dernières recherches apparaîtront ici.",
+      describe: {
+        semantic: "Sémantique",
+        semanticFull: "Sémantique · Complète",
+        lastRange: "Derniers {{range}}",
+        dateRange: "Période",
+        size: "Taille",
+        file: "Fichier : {{name}}",
+        metadataFilters: "{{count}} filtres de métadonnées",
+      },
+    },
+    saved: {
+      title: "Recherches enregistrées",
+      saveButton: "Enregistrer la recherche",
+      savedButton: "Enregistrée",
+      savedAs: "Enregistrée sous « {{name}} »",
+      saveTitle: "Enregistrer cette recherche",
+      renameTitle: "Renommer la recherche enregistrée",
+      nameLabel: "Nom",
+      nameHelp:
+        "Les recherches enregistrées conservent la requête, les options sémantiques et les filtres.",
+      nameTooLong: "{{max}} caractères maximum",
+      untitled: "Recherche sans titre",
+      rename: "Renommer",
+      renameNamed: "Renommer {{name}}",
+      remove: "Retirer des recherches enregistrées",
+      deleteNamed: "Supprimer {{name}}",
+      deleteTitle: "Supprimer la recherche enregistrée",
+      deleteConfirm: "Supprimer « {{name}} » ? Cette action est irréversible.",
+      saved: "Recherche enregistrée",
+      alreadySaved: "Cette recherche est déjà enregistrée sous « {{name}} »",
+      saveFailed: "Impossible d'enregistrer cette recherche",
+      renameFailed: "Impossible de renommer cette recherche",
+      deleteFailed: "Impossible de supprimer cette recherche enregistrée",
+      manage: "Gérer les recherches enregistrées",
+      seeAll: "Voir les {{count}} recherches enregistrées",
+      empty:
+        "Vous n'avez encore enregistré aucune recherche. Lancez une recherche et choisissez « Enregistrer la recherche ».",
+    },
     mode: {
       fullTooltip: "Regrouper toutes les correspondances sous chaque ressource",
       clipTooltip: "Afficher chaque correspondance comme un résultat séparé",
@@ -1876,6 +1928,12 @@ export default {
   },
   dashboard: {
     widgets: {
+      savedSearches: {
+        title: "Recherches enregistrées",
+        emptyTitle: "Aucune recherche enregistrée",
+        emptyDescription:
+          "Lancez une recherche et choisissez « Enregistrer la recherche » pour la garder ici.",
+      },
       customName: {
         label: "Nom du Widget",
         placeholder: "Entrez un nom personnalisé...",

@@ -37,7 +37,8 @@ export type WidgetType =
   | "collections"
   | "recent-assets"
   | "collection-group"
-  | "my-assets";
+  | "my-assets"
+  | "saved-searches";
 
 export interface WidgetDefinition {
   type: WidgetType;

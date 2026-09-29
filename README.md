@@ -331,6 +331,8 @@ Deploy all stacks using CDK:
 cdk deploy --all --profile <profile> --region <region>
 ```
 
+The media-processing Lambda layers (ffmpeg, ffprobe, resvg, NumPy, OpenEXR) are built in Docker during synthesis. Each build is cached in `~/.cache/medialake/lambda-layers` and reused on later deploys until its recipe changes or the build is 7 days old. The first deploy on a machine builds them all; later ones skip the builds. To change this, set `MEDIALAKE_LAYER_CACHE=off` (always rebuild), `MEDIALAKE_LAYER_CACHE_DIR` (cache location) or `MEDIALAKE_LAYER_CACHE_MAX_AGE_DAYS`. Delete the cache directory to force a rebuild.
+
 ---
 
 ## Deployment Validation

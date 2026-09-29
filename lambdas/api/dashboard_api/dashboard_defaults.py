@@ -22,6 +22,12 @@ WIDGET_CONSTRAINTS = {
         "minSize": {"w": 3, "h": 2},
         "maxSize": {"w": 12, "h": 8},
     },
+    # Matches WIDGET_DEFINITIONS["saved-searches"] in the frontend store.
+    "saved-searches": {
+        "defaultSize": {"w": 4, "h": 4},
+        "minSize": {"w": 3, "h": 3},
+        "maxSize": {"w": 12, "h": 8},
+    },
 }
 
 # Default layout configuration with 3 widgets

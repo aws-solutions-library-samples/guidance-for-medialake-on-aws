@@ -19,7 +19,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -61,28 +61,22 @@ class BulkDownloadError(Exception):
         self.message = message
 
 
-def timecode_to_frames(timecode: str) -> int:
-    """Convert timecode string to total frame count."""
-    normalized = timecode.replace(";", ":")
-    parts = normalized.split(":")
-    hours, minutes, seconds, frames = (
-        int(parts[0]),
-        int(parts[1]),
-        int(parts[2]),
-        int(parts[3]),
-    )
-    # This below math isn't strictly accurate from a frame-count perspective,
-    # since the length of time a frame represents changes depending on the framerate
-    # of the source (e.g. each frame in 30fps content contains twice the time of 60fps content).
-    # Doesn't matter for this though, we just need a rough absolute int value for comparison
-    # since the start/end times for a single piece of source content will resolve to the
-    # framerate of that source.
-    return (hours * 3600 + minutes * 60 + seconds) + frames
+def timecode_to_tuple(timecode: str) -> Tuple[int, int, int, int]:
+    """Split an HH:MM:SS:FF (or drop-frame HH:MM:SS;FF) timecode into ints."""
+    hours, minutes, seconds, frames = timecode.replace(";", ":").split(":")
+    return int(hours), int(minutes), int(seconds), int(frames)
 
 
 def is_start_before_end(start_time: str, end_time: str) -> bool:
-    """Compare two timecodes to verify start is before end."""
-    return timecode_to_frames(start_time) < timecode_to_frames(end_time)
+    """Compare two timecodes to verify start is before end.
+
+    Both timecodes address the same source, so they share one frame rate and
+    the frame field is always smaller than one second's worth of frames.
+    Comparing (h, m, s, f) lexicographically is therefore exact without
+    knowing the fps. Summing the fields instead (frames weighted as whole
+    seconds) rejected valid clips such as 00:00:16:19 -> 00:00:17:11.
+    """
+    return timecode_to_tuple(start_time) < timecode_to_tuple(end_time)
 
 
 @tracer.capture_method

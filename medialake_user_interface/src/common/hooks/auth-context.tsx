@@ -3,6 +3,7 @@ import { StorageHelper } from "../helpers/storage-helper";
 import { authService } from "../../api/authService";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { useAwsConfig } from "./aws-config-context";
+import { federatedProviders } from "../helpers/identityProviders";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -53,13 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Check if this is a SAML redirect first
-        const hasSamlProvider = awsConfig?.Auth?.identity_providers.some(
-          (provider) => provider.identity_provider_method === "saml"
-        );
+        // A hosted-UI (SAML or OIDC) redirect lands back here with a code
+        const hasFederatedProvider =
+          federatedProviders(awsConfig?.Auth?.identity_providers).length > 0;
 
         if (
-          hasSamlProvider &&
+          hasFederatedProvider &&
           (window.location.hash.includes("id_token") || window.location.search.includes("code="))
         ) {
           // Don't try to get current user yet, just wait for session

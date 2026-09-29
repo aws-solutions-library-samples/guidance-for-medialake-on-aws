@@ -34,6 +34,8 @@ interface MasterResultsViewProps {
     pageSize: number;
   };
   searchTerm: string;
+  /** Extra actions shown beside the results title. */
+  headerActions?: React.ReactNode;
   error?: { status: string; message: string } | null;
   isLoading?: boolean;
 
@@ -107,6 +109,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
   results,
   searchMetadata,
   searchTerm,
+  headerActions,
   error,
   isLoading,
 
@@ -434,6 +437,7 @@ const MasterResultsView: React.FC<MasterResultsViewProps> = ({
         onPageSizeChange={onPageSizeChange}
         searchTerm={searchTerm}
         title={t("search.results.title")}
+        headerActions={headerActions}
         groupByType={groupByType}
         onGroupByTypeChange={onGroupByTypeChange}
         viewMode={viewMode}

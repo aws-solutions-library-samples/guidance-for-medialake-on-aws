@@ -8,6 +8,7 @@ import {
   Schedule as RecentIcon,
   FolderSpecial as FolderSpecialIcon,
   Person as PersonIcon,
+  Bookmark as SavedSearchIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,8 @@ import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
 import { CollectionGroupWidget } from "./widgets/CollectionGroupWidget";
 import { MyAssetsWidget } from "./widgets/MyAssetsWidget";
+import { SavedSearchesWidget } from "./widgets/SavedSearchesWidget";
+import { QUERY_KEYS } from "@/api/queryKeys";
 import type { WidgetType, CollectionsWidgetConfig, CollectionGroupWidgetConfig } from "../types";
 
 // Widget component map
@@ -33,6 +36,7 @@ const WIDGET_COMPONENTS: Record<
   "recent-assets": RecentAssetsWidget,
   "collection-group": CollectionGroupWidget,
   "my-assets": MyAssetsWidget,
+  "saved-searches": SavedSearchesWidget,
 };
 
 // Widget icon map
@@ -42,6 +46,7 @@ const WIDGET_ICONS: Record<WidgetType, React.ReactNode> = {
   "recent-assets": <RecentIcon />,
   "collection-group": <FolderSpecialIcon />,
   "my-assets": <PersonIcon />,
+  "saved-searches": <SavedSearchIcon />,
 };
 
 export const ExpandedWidgetModal: React.FC = () => {
@@ -68,6 +73,8 @@ export const ExpandedWidgetModal: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ["search"] });
       } else if (widget.type === "my-assets") {
         queryClient.invalidateQueries({ queryKey: ["search"] });
+      } else if (widget.type === "saved-searches") {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SAVED_SEARCHES.all });
       }
     }
   }, [expandedWidgetId, layout.widgets, queryClient]);

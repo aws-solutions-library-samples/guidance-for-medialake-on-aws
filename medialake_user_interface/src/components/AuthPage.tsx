@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   Box,
   CircularProgress,
@@ -29,7 +29,12 @@ import type { ConfirmSignInOutput, SignInOutput } from "aws-amplify/auth";
 import { useAuth } from "../common/hooks/auth-context";
 import { useAwsConfig } from "../common/hooks/aws-config-context";
 import { StorageHelper } from "../common/helpers/storage-helper";
+import {
+  federatedProviders,
+  hasCognitoProvider as hasCognito,
+} from "../common/helpers/identityProviders";
 import { theme, components } from "./auth/theme";
+import { getPostLoginPath } from "./auth/postLoginRedirect";
 import { colorTokens } from "../theme/tokens";
 import { useTranslation } from "react-i18next";
 
@@ -55,6 +60,9 @@ const inputSx = {
 const AuthPage = () => {
   const { completeLogin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Deep link the user was redirected from (validated; defaults to "/").
+  const postLoginPath = getPostLoginPath(location.state);
   const [searchParams] = useSearchParams();
   const awsConfig = useAwsConfig();
   const { t } = useTranslation();
@@ -77,20 +85,18 @@ const AuthPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/");
+      navigate(postLoginPath);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, postLoginPath]);
 
   if (!awsConfig) {
     return <CircularProgress />;
   }
 
-  const hasSamlProvider = awsConfig.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "saml"
-  );
-  const hasCognitoProvider = awsConfig.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "cognito"
-  );
+  // SAML and OIDC providers each get a "Sign in with ..." hosted-UI button
+  const federated = federatedProviders(awsConfig.Auth.identity_providers);
+  const hasFederatedProvider = federated.length > 0;
+  const hasCognitoProvider = hasCognito(awsConfig.Auth.identity_providers);
 
   const handleSendResetCode = async () => {
     setFpError("");
@@ -419,40 +425,34 @@ const AuthPage = () => {
         </Box>
 
         <Stack spacing={2} sx={{ mt: 2 }}>
-          {hasSamlProvider &&
-            awsConfig.Auth.identity_providers.map((provider) => {
-              if (provider.identity_provider_method === "saml") {
-                return (
-                  <Button
-                    key={provider.identity_provider_name}
-                    onClick={() => {
-                      signInWithRedirect({
-                        provider: { custom: provider.identity_provider_name },
-                      }).catch((error) => {
-                        console.error("SAML redirect error:", error);
-                      });
-                    }}
-                    sx={{
-                      padding: "12px 24px",
-                      fontSize: "1rem",
-                      backgroundColor: "rgba(255, 255, 255, 0.2)",
-                      color: "white",
-                      height: "40px",
-                      width: "100%",
-                      textTransform: "none",
-                      "&:hover": {
-                        backgroundColor: "rgba(255, 255, 255, 0.3)",
-                      },
-                    }}
-                  >
-                    Sign in with {provider.identity_provider_name}
-                  </Button>
-                );
-              }
-              return null;
-            })}
+          {federated.map((provider) => (
+            <Button
+              key={provider.identity_provider_name}
+              onClick={() => {
+                signInWithRedirect({
+                  provider: { custom: provider.identity_provider_name },
+                }).catch((error) => {
+                  console.error("Federated sign-in redirect error:", error);
+                });
+              }}
+              sx={{
+                padding: "12px 24px",
+                fontSize: "1rem",
+                backgroundColor: "rgba(255, 255, 255, 0.2)",
+                color: "white",
+                height: "40px",
+                width: "100%",
+                textTransform: "none",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.3)",
+                },
+              }}
+            >
+              Sign in with {provider.identity_provider_name}
+            </Button>
+          ))}
 
-          {hasSamlProvider && hasCognitoProvider && (
+          {hasFederatedProvider && hasCognitoProvider && (
             <Divider sx={{ my: 2, borderColor: "rgba(255, 255, 255, 0.2)" }}>
               <Typography sx={{ color: "rgba(255, 255, 255, 0.7)" }}>OR</Typography>
             </Divider>
@@ -604,7 +604,7 @@ const AuthPage = () => {
                           if (token) {
                             StorageHelper.setToken(token);
                             completeLogin();
-                            navigate("/");
+                            navigate(postLoginPath);
                           }
 
                           return {
@@ -628,7 +628,7 @@ const AuthPage = () => {
                           if (token) {
                             StorageHelper.setToken(token);
                             completeLogin();
-                            navigate("/");
+                            navigate(postLoginPath);
                           }
 
                           return {

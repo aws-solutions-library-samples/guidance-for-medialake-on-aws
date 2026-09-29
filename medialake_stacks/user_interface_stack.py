@@ -1,6 +1,7 @@
 import secrets
 import string
 from dataclasses import dataclass
+from typing import List, Optional
 
 from aws_cdk import CfnOutput, Fn, Stack, Token
 from aws_cdk import aws_iam as iam
@@ -27,6 +28,8 @@ class UserInterfaceStackProps:
     cognito_user_pool_arn: str
     cloudfront_waf_acl_arn: str
     cognito_domain_prefix: str
+    # Auth flows of the Cognito stack's app client (see UIConstructProps).
+    cognito_explicit_auth_flows: Optional[List[str]] = None
 
 
 def generate_random_password(length=16):
@@ -165,6 +168,7 @@ class UserInterfaceStack(Stack):
                 media_assets_bucket_kms_key_arn=media_assets_bucket_kms_key_arn,
                 cloudfront_waf_acl_arn=waf_acl_arn,
                 cognito_domain_prefix=props.cognito_domain_prefix,
+                cognito_explicit_auth_flows=props.cognito_explicit_auth_flows,
                 parameter_name=parameter_name,
                 custom_domain_name=custom_domain_name,
                 certificate_arn=certificate_arn,

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from aws_cdk import CfnOutput, RemovalPolicy, SecretValue, Stack
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
-from aws_cdk import custom_resources as cr
 from aws_cdk.aws_cognito_identitypool import (
     IdentityPool,
     IdentityPoolAuthenticationProviders,
@@ -53,7 +52,6 @@ class CognitoConstruct(Construct):
         stack = Stack.of(self)
         region = stack.region
         self.props = props or CognitoProps()
-        self._cloudfront_domain = None
 
         # Create the DynamoDB table for authorization configuration
         self._auth_table_props = DynamoDBProps(
@@ -466,63 +464,3 @@ class CognitoConstruct(Construct):
     def auth_table_name(self) -> str:
         """Return the authorization table name"""
         return self._auth_table.table_name
-
-    def update_callback_urls(self, cloudfront_domain: str) -> None:
-        """
-        Updates the callback URLs for the Cognito User Pool Client with the CloudFront domain.
-        This should be called after the CloudFront distribution is created.
-
-        Args:
-            cloudfront_domain: The CloudFront distribution domain name
-        """
-        if not cloudfront_domain:
-            return
-
-        self._cloudfront_domain = cloudfront_domain
-
-        _ = cr.AwsCustomResource(
-            self,
-            "UpdateUserPoolClientCallbacks",
-            on_update=cr.AwsSdkCall(
-                service="CognitoIdentityServiceProvider",
-                action="updateUserPoolClient",
-                parameters={
-                    "UserPoolId": self._user_pool.user_pool_id,
-                    "ClientId": self._user_pool_client.user_pool_client_id,
-                    "CallbackURLs": [
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
-                        f"https://{cloudfront_domain}",
-                        f"https://{cloudfront_domain}/",
-                        f"https://{cloudfront_domain}/login",
-                    ],
-                    "LogoutURLs": [
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/",
-                        f"https://{self._domain_prefix.lower()}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
-                        f"https://{cloudfront_domain}",
-                        f"https://{cloudfront_domain}/",
-                        f"https://{cloudfront_domain}/sign-in",
-                    ],
-                    "AllowedOAuthFlows": ["code", "implicit"],
-                    "AllowedOAuthScopes": ["email", "openid", "profile"],
-                    "AllowedOAuthFlowsUserPoolClient": True,
-                    # Every external provider must be listed here. This call
-                    # replaces the client's provider list wholesale, so omitting
-                    # a provider silently detaches it from the client and breaks
-                    # sign-in through it.
-                    "SupportedIdentityProviders": ["COGNITO"]
-                    + [
-                        provider.identity_provider_name
-                        for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method in ("saml", "oidc")
-                    ],
-                },
-                physical_resource_id=cr.PhysicalResourceId.of(
-                    f"{config.resource_prefix}-cognito-callback-urls-update"
-                ),
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
-                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
-            ),
-        )

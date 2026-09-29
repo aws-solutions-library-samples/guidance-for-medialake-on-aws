@@ -2,13 +2,11 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { StorageHelper } from "../helpers/storage-helper";
 import { Amplify } from "aws-amplify";
 import { useTranslation } from "react-i18next";
-
-interface IdentityProvider {
-  identity_provider_method: "cognito" | "saml";
-  identity_provider_name?: string;
-  identity_provider_metadata_url?: string;
-  identity_provider_metadata_path?: string;
-}
+import {
+  federatedProviders,
+  hasCognitoProvider,
+  type IdentityProvider,
+} from "../helpers/identityProviders";
 
 interface AwsConfig {
   Auth: {
@@ -53,12 +51,9 @@ const configureAmplify = (config: AwsConfig) => {
   };
 
   // Configure login methods based on identity providers
-  const hasCognito = config.Auth.identity_providers.some(
-    (provider) => provider.identity_provider_method === "cognito"
-  );
-  const samlProviders = config.Auth.identity_providers.filter(
-    (provider) => provider.identity_provider_method === "saml"
-  );
+  const hasCognito = hasCognitoProvider(config.Auth.identity_providers);
+  const federated = federatedProviders(config.Auth.identity_providers);
+  const hasSaml = federated.some((p) => p.identity_provider_method === "saml");
 
   // Enable username/password login if Cognito is configured
   if (hasCognito) {
@@ -66,11 +61,12 @@ const configureAmplify = (config: AwsConfig) => {
     amplifyConfig.Auth.Cognito.loginWith.email = true;
   }
 
-  // Add SAML configuration if any SAML providers are configured
-  if (samlProviders.length > 0) {
+  // SAML and OIDC providers both sign in through the hosted UI redirect,
+  // which needs the redirect URLs as lists.
+  if (federated.length > 0) {
     amplifyConfig.Auth.Cognito.loginWith.oauth = {
       ...amplifyConfig.Auth.Cognito.loginWith.oauth,
-      providers: ["SAML"],
+      ...(hasSaml ? { providers: ["SAML"] } : {}),
       redirectSignIn: [
         window.location.origin,
         window.location.origin + "/",

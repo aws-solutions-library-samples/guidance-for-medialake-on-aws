@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ from typing import Dict, List, Optional
 import jsii
 from aws_cdk import (
     BundlingOptions,
+    CustomResource,
     DockerImage,
     Duration,
     ILocalBundling,
@@ -30,6 +32,11 @@ from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 from config import config
+from medialake_constructs.cognito_hosted_ui import (
+    hosted_ui_identity_providers,
+    hosted_ui_urls,
+)
+from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaConfig
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
@@ -88,6 +95,9 @@ class UIConstructProps:
     cognito_construct: Optional[Construct] = None
     parameter_name: Optional[str] = None
     custom_domain_name: Optional[str] = None
+    # The Cognito stack's app client auth flows, restored on the client by the
+    # hosted-UI custom resource (see _apply_hosted_ui_app_client_urls).
+    cognito_explicit_auth_flows: Optional[List[str]] = None
     certificate_arn: Optional[str] = None
     app_path: str = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "medialake_user_interface"
@@ -954,54 +964,10 @@ function handler(event) {
             ),
         )
 
-        _ = cr.AwsCustomResource(
-            self,
-            "UpdateUserPoolClientCallbacks",
-            on_update=cr.AwsSdkCall(
-                service="CognitoIdentityServiceProvider",
-                action="updateUserPoolClient",
-                parameters={
-                    "UserPoolId": props.cognito_user_pool_id,
-                    "ClientId": props.cognito_user_pool_client_id,
-                    "CallbackURLs": [
-                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/oauth2/idpresponse",
-                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/saml2/idpresponse",
-                        f"https://{self._get_distribution_domain()}",
-                        f"https://{self._get_distribution_domain()}/",
-                        f"https://{self._get_distribution_domain()}/sign-in",
-                        f"https://localhost:5173",
-                        f"https://localhost:5173/",
-                        f"https://localhost:5173/login",
-                    ],
-                    "LogoutURLs": [
-                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com",
-                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/",
-                        f"https://{props.cognito_domain_prefix}.auth.{Stack.of(self).region}.amazoncognito.com/sign-in",
-                        f"https://{self._get_distribution_domain()}",
-                        f"https://{self._get_distribution_domain()}/",
-                        f"https://{self._get_distribution_domain()}/sign-in",
-                        f"https://localhost:5173",
-                        f"https://localhost:5173/",
-                        f"https://localhost:5173/login",
-                    ],
-                    "AllowedOAuthFlows": ["code", "implicit"],
-                    "AllowedOAuthScopes": ["email", "openid", "profile"],
-                    "AllowedOAuthFlowsUserPoolClient": True,
-                    "SupportedIdentityProviders": ["COGNITO"]
-                    + [
-                        provider.identity_provider_name
-                        for provider in config.authZ.identity_providers
-                        if provider.identity_provider_method == "saml"
-                    ],
-                },
-                physical_resource_id=cr.PhysicalResourceId.of(
-                    f"{config.resource_prefix}-cognito-callback-urls-update"
-                ),
-            ),
-            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
-                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE
-            ),
-        )
+        # Callback/logout URLs, OAuth settings and identity providers on the
+        # Cognito app client, re-applied on every deploy (see
+        # medialake_constructs/cognito_hosted_ui.py).
+        self._apply_hosted_ui_app_client_urls(props)
 
         # Add dependencies
         config_resource.node.add_dependency(self.cloudfront_distribution)
@@ -1030,6 +996,87 @@ function handler(event) {
             distribution_paths=["/*"],
             memory_limit=1024,
             exclude=["aws-exports.json"],
+        )
+
+    def _apply_hosted_ui_app_client_urls(self, props: "UIConstructProps") -> None:
+        """Add the UI's URLs to the Cognito app client on every deploy.
+
+        CloudFormation resets the client's callback URLs to the Cognito
+        stack's hosted-domain pair whenever it updates the client, so the
+        resource carries a per-deploy value and always runs. The handler reads
+        the current client and merges the UI's URLs, OAuth settings, identity
+        providers and auth flows into it without removing anything, since
+        UpdateUserPoolClient resets anything omitted (the previous
+        AwsCustomResource silently dropped ExplicitAuthFlows) and callbacks
+        added by hand must survive deploys.
+        """
+        stack = Stack.of(self)
+        callback_urls, logout_urls = hosted_ui_urls(
+            cognito_domain=(
+                f"{props.cognito_domain_prefix}.auth.{stack.region}.amazoncognito.com"
+            ),
+            cloudfront_domain=self.cloudfront_distribution.distribution_domain_name,
+            custom_domain=props.custom_domain_name,
+        )
+
+        handler = Lambda(
+            self,
+            "HostedUiAppClientUrlsLambda",
+            config=LambdaConfig(
+                name="app_client_callbacks",
+                entry="lambdas/custom_resources/auth/app_client_callbacks",
+                lambda_handler="handler",
+                memory_size=256,
+                timeout_minutes=2,
+                snap_start=False,
+            ),
+        )
+        handler.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "cognito-idp:DescribeUserPoolClient",
+                    "cognito-idp:ListIdentityProviders",
+                    "cognito-idp:UpdateUserPoolClient",
+                ],
+                resources=[
+                    stack.format_arn(
+                        service="cognito-idp",
+                        resource="userpool",
+                        resource_name=props.cognito_user_pool_id,
+                    )
+                ],
+            )
+        )
+        provider = cr.Provider(
+            self,
+            "HostedUiAppClientUrlsProvider",
+            on_event_handler=handler.function,
+        )
+        CustomResource(
+            self,
+            "HostedUiAppClientUrls",
+            service_token=provider.service_token,
+            resource_type="Custom::HostedUiAppClientUrls",
+            properties={
+                "UserPoolId": props.cognito_user_pool_id,
+                "ClientId": props.cognito_user_pool_client_id,
+                "CallbackURLs": callback_urls,
+                "LogoutURLs": logout_urls,
+                "AllowedOAuthFlows": ["code", "implicit"],
+                "AllowedOAuthScopes": ["email", "openid", "profile"],
+                "AllowedOAuthFlowsUserPoolClient": "true",
+                "SupportedIdentityProviders": hosted_ui_identity_providers(
+                    config.authZ.identity_providers
+                ),
+                # The Cognito stack's own auth flows; the handler keeps the
+                # client's current ones when this is empty.
+                "ExplicitAuthFlows": list(
+                    getattr(props, "cognito_explicit_auth_flows", None) or []
+                ),
+                # Changes every synth, so the URLs are re-applied after any
+                # Cognito stack update in the same deploy.
+                "DeployedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            },
         )
 
     def _get_distribution_domain(self) -> str:

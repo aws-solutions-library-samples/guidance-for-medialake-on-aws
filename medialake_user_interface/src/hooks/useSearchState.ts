@@ -7,6 +7,7 @@ import {
   useDomainActions,
 } from "../stores/searchStore";
 import { FacetFilters, CustomMetadataApiFilter } from "../types/facetSearch";
+import { parseSemanticParams } from "../features/search-history/searchDefinition";
 
 interface UseSearchStateProps {
   initialQuery?: string;
@@ -91,7 +92,15 @@ export const useSearchState = ({
   const storeQuery = useSearchQuery();
   const storeIsSemantic = useSemanticSearch();
   const storeFilters = useSearchFilters();
-  const { setQuery, setIsSemantic, setFilters, updateFilter, clearFilters } = useDomainActions();
+  const {
+    setQuery,
+    setIsSemantic,
+    setFilters,
+    updateFilter,
+    clearFilters,
+    setSemanticMode,
+    setSearchModes,
+  } = useDomainActions();
 
   // ── Compute effective state from URL (pure computation, no side effects) ──
   const currentParamsKey = searchParams.toString();
@@ -142,6 +151,14 @@ export const useSearchState = ({
     const urlSemantic = searchParams.get("semantic") === "true";
     const urlFilters = parseFiltersFromParams(searchParams);
     const hasUrlFilters = Object.keys(urlFilters).length > 0;
+
+    // Semantic options (Full/Clip, Visual/Audio/Transcript) are only in the URL
+    // when a search was built with them. Older links without them keep
+    // whatever the store already holds, exactly as before.
+    const { semanticMode: urlSemanticMode, searchModes: urlSearchModes } =
+      parseSemanticParams(searchParams);
+    if (urlSemanticMode) setSemanticMode(urlSemanticMode);
+    if (urlSearchModes) setSearchModes(urlSearchModes);
 
     if (isFirstMount.current) {
       isFirstMount.current = false;

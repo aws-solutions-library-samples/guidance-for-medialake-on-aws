@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.24.0] - 2026-09-29
+
+### Features
+
+- feat(search): search history and saved searches
+
+### Bug Fixes
+
+- fix(assets): count and size sub-clips in bulk download jobs and list every active job
+- fix: compare clip timecodes correctly in bulk download validation
+- fix: make sub-clip bulk downloads complete and surface failures
+- fix(i18n): restore saved language from localStorage on startup
+- fix(auth): return to the requested deep link after sign-in
+- fix(auth): never log credentials in the custom authorizer
+- fix(pipelines): never copy parallel branches from the request into the ASL
+- fix(nodes): redact auth headers and bodies in api_handler logs
+- fix(search): add socket timeouts to Coactive search HTTP calls
+- fix: make the dismiss download notification dialog readable in dark mode
+- fix(auth): never remove anything from the app client when applying the UI's URLs
+- fix(auth): re-apply the UI's sign-in callback URLs on every deploy
+- fix(auth): keep hosted-UI callbacks and OIDC providers on the app client
+- fix(ui): stop retrying failed searches and fix first-visit API base URL
+- fix(auth): let every user reach their own profile and settings routes
+
+### Code Refactoring
+
+- refactor: remove dead Cognito and SAML sign-in code
+
+### Other Changes
+
+- rafactor: show saved searches on one line in the search dropdown
+- ci: cache the Docker-built Lambda layers across synths
+- test: fix the dashboard API and portal authorizer unit tests
+
 ## [1.23.0] - 2026-09-24
 
 ### Features

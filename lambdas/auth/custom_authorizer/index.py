@@ -243,12 +243,9 @@ def decode_and_verify_token(token: str, correlation_id: str) -> Dict[str, Any]:
         header = jwt.get_unverified_header(token)
         unverified_claims = jwt.get_unverified_claims(token)
 
-        # Log token details for debugging (production-safe)
+        # Log non-secret token details for debugging. Never log the token
+        # itself or its raw header, whatever the environment.
         if ENVIRONMENT != "prod":
-            logger.info(
-                f"Token header: {json.dumps(header)}",
-                extra={"correlation_id": correlation_id},
-            )
             logger.info(
                 f"Token audience (aud): {unverified_claims.get('aud')}",
                 extra={"correlation_id": correlation_id},
@@ -1249,6 +1246,29 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /users/favorites": None,
         "post /users/favorites": None,
         "delete /users/favorites/{itemType}/{itemId}": None,
+        # The caller's OWN profile and settings. These handlers only ever read
+        # or write the partition of the authenticated user (derived from the
+        # token, never from the path or body), so every authenticated user may
+        # use them. They must be listed explicitly: unmapped routes fall back
+        # to the first same-shaped pattern, so "/users/profile" and
+        # "/users/settings" otherwise resolve to "/users/{user_id}" and demand
+        # users:view / users:edit, which only administrators hold.
+        "get /users/profile": None,
+        "put /users/profile": None,
+        "post /users/profile/change-password": None,
+        "get /users/settings": None,
+        "put /users/settings/{namespace}/{key}": None,
+        # Search history and saved searches: the caller's own partition only.
+        # Gated on search:view (every built-in group has it) since they only
+        # exist to run searches.
+        "get /users/search-history": "search:view",
+        "post /users/search-history": "search:view",
+        "delete /users/search-history": "search:view",
+        "delete /users/search-history/{fingerprint}": "search:view",
+        "get /users/saved-searches": "search:view",
+        "post /users/saved-searches": "search:view",
+        "patch /users/saved-searches/{searchId}": "search:view",
+        "delete /users/saved-searches/{searchId}": "search:view",
     }
 
 
@@ -1983,16 +2003,13 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
         extra={"correlation_id": correlation_id},
     )
 
-    # In production, don't log the full event as it may contain sensitive information
-    if ENVIRONMENT == "prod":
-        logger.info(
-            "Event received (details redacted in production)",
-            extra={"correlation_id": correlation_id},
-        )
-    else:
-        logger.info(
-            f"Event: {json.dumps(event)}", extra={"correlation_id": correlation_id}
-        )
+    # Never log the full event: it carries the Authorization header, the
+    # X-Api-Key header and authorizationToken. This must not depend on
+    # ENVIRONMENT, whose value is deployment-specific ("prod", "production"...).
+    logger.info(
+        "Event received (credentials redacted)",
+        extra={"correlation_id": correlation_id},
+    )
 
     logger.info(
         f"Environment: DEBUG_MODE={DEBUG_MODE}, ENVIRONMENT={ENVIRONMENT}",
@@ -2013,19 +2030,13 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
         # First, check for API key authentication
         headers = event.get("headers", {})
 
-        # Log all headers for debugging (production-safe)
-        if ENVIRONMENT != "prod":
-            logger.info(
-                f"All request headers: {json.dumps(headers)}",
-                extra={"correlation_id": correlation_id},
-            )
-        else:
-            # In production, only log header names (not values)
-            header_names = list(headers.keys()) if headers else []
-            logger.info(
-                f"Request header names: {header_names}",
-                extra={"correlation_id": correlation_id},
-            )
+        # Only log header names, never values (Authorization / X-Api-Key are
+        # credentials).
+        header_names = list(headers.keys()) if headers else []
+        logger.info(
+            f"Request header names: {header_names}",
+            extra={"correlation_id": correlation_id},
+        )
 
         api_key = extract_api_key_from_header(headers)
 

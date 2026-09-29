@@ -380,12 +380,17 @@ def calculate_job_size(assets: List[Dict[str, Any]]) -> Tuple[int, int, int, int
         for asset in assets:
             # Get file size in bytes
             file_size = asset.get("sourceAssetMetadata", {}).get("size", 0)
-            total_size += file_size
 
             # Determine if this is a sub-clip request or small or large whole-file request
             if is_sub_clip_request(asset):
+                # A sub-clip's download size is its encoded output, not the
+                # source file; subclips_size_sort adds each clip's real size
+                # (and counts it as a zipped or large file) once it exists.
                 sub_clips_count += 1
-            elif file_size <= SMALL_FILE_THRESHOLD * MB:
+                continue
+
+            total_size += file_size
+            if file_size <= SMALL_FILE_THRESHOLD * MB:
                 small_files_count += 1
             else:
                 large_files_count += 1

@@ -71,6 +71,9 @@ export interface AssetResultsViewProps<T> {
   availableFields?: FieldInfo[];
   onSelectedFieldsChange?: (fields: string[]) => void;
 
+  /** Extra actions shown beside the title, e.g. "Save search" on search results. */
+  headerActions?: React.ReactNode;
+
   // Select all (used by AssetViewControls toolbar)
   hasSelectedAssets?: boolean;
   selectAllState?: "none" | "some" | "all";
@@ -85,6 +88,7 @@ function AssetResultsView<T>({
   onPageSizeChange,
   searchTerm,
   title = "Results",
+  headerActions,
   error,
   isLoading,
 
@@ -301,9 +305,16 @@ function AssetResultsView<T>({
           }}
         >
           <Box>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: "primary.main" }}>
-              {title}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Typography
+                variant="h4"
+                component="h1"
+                sx={{ fontWeight: 700, color: "primary.main" }}
+              >
+                {title}
+              </Typography>
+              {headerActions}
+            </Box>
             {searchMetadata?.totalResults > 0 && searchTerm && (
               <Typography variant="body1" sx={{ color: "text.secondary", mt: 0.5 }}>
                 {t("search.results.found", {

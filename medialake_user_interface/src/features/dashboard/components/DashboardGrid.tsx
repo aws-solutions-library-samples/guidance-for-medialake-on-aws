@@ -31,6 +31,7 @@ import { CollectionsWidget } from "./widgets/CollectionsWidget";
 import { CollectionGroupWidget } from "./widgets/CollectionGroupWidget";
 import { RecentAssetsWidget } from "./widgets/RecentAssetsWidget";
 import { MyAssetsWidget } from "./widgets/MyAssetsWidget";
+import { SavedSearchesWidget } from "./widgets/SavedSearchesWidget";
 import type {
   WidgetType,
   LayoutItem,
@@ -61,6 +62,7 @@ const WIDGET_COMPONENTS: Record<
   "collection-group": CollectionGroupWidget,
   "recent-assets": RecentAssetsWidget,
   "my-assets": MyAssetsWidget,
+  "saved-searches": SavedSearchesWidget,
 };
 
 interface DashboardGridProps {

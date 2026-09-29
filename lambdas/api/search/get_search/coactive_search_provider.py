@@ -24,6 +24,10 @@ from unified_search_models import (
 )
 from unified_search_provider import ExternalSemanticServiceProvider
 
+# Socket timeout for Coactive HTTP calls. The search Lambda sits behind API
+# Gateway's 29s integration limit, so never wait longer than that.
+COACTIVE_HTTP_TIMEOUT_SECONDS = 25
+
 
 class CoactiveSearchProvider(ExternalSemanticServiceProvider):
     """Coactive external semantic service provider"""
@@ -193,7 +197,9 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
                     auth_host = parsed_auth.netloc
                     auth_path = parsed_auth.path
 
-                    conn = http.client.HTTPSConnection(auth_host)
+                    conn = http.client.HTTPSConnection(
+                        auth_host, timeout=COACTIVE_HTTP_TIMEOUT_SECONDS
+                    )
                     headers = {
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {personal_token}",
@@ -385,7 +391,7 @@ class CoactiveSearchProvider(ExternalSemanticServiceProvider):
         self.logger.info(f"Making POST request to {host}{path}")
 
         # Make HTTP request using http.client
-        conn = http.client.HTTPSConnection(host)
+        conn = http.client.HTTPSConnection(host, timeout=COACTIVE_HTTP_TIMEOUT_SECONDS)
         body = json.dumps(payload)
         conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()

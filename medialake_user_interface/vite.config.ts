@@ -39,7 +39,6 @@ export default defineConfig({
             id.includes("node_modules/react-error-boundary/") ||
             id.includes("node_modules/aws-amplify/") ||
             id.includes("node_modules/@aws-amplify/") ||
-            id.includes("node_modules/amazon-cognito-identity-js/") ||
             id.includes("node_modules/xstate/") ||
             id.includes("node_modules/@xstate/") ||
             id.includes("node_modules/@radix-ui/")

@@ -1,0 +1,153 @@
+{
+  "_comment": "Shared by lambdas/api/users/search_definition.py and src/features/search-history/searchDefinition.ts; both test suites assert against it. Regenerate from the Python implementation.",
+  "vectors": [
+    {
+      "name": "plain keyword query",
+      "input": {
+        "v": 1,
+        "q": "sunset",
+        "semantic": false
+      },
+      "canonical": "{\"q\":\"sunset\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "ba59730bac7f2847ad846f894dcc8b9d"
+    },
+    {
+      "name": "whitespace collapses",
+      "input": {
+        "v": 1,
+        "q": "  sunset   beach ",
+        "semantic": false
+      },
+      "canonical": "{\"q\":\"sunset beach\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "d053fdb6d8bfad9c27b613f433e286b9"
+    },
+    {
+      "name": "semantic modes only count when semantic",
+      "input": {
+        "v": 1,
+        "q": "dog",
+        "semantic": false,
+        "semanticMode": "full",
+        "searchModes": ["audio"]
+      },
+      "canonical": "{\"q\":\"dog\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "53fd9d0900cfc4cbf4589abe42058118"
+    },
+    {
+      "name": "semantic with modes sorted and deduped",
+      "input": {
+        "v": 1,
+        "q": "dog running",
+        "semantic": true,
+        "semanticMode": "clip",
+        "searchModes": ["transcript", "visual", "visual"]
+      },
+      "canonical": "{\"q\":\"dog running\",\"searchModes\":[\"transcript\",\"visual\"],\"semantic\":true,\"semanticMode\":\"clip\",\"v\":1}",
+      "fingerprint": "171458c7f30117859f6e4fbf4f223bd7"
+    },
+    {
+      "name": "list filters sorted, extensions upper-cased",
+      "input": {
+        "v": 1,
+        "q": "",
+        "semantic": false,
+        "filters": {
+          "type": "Video, Image",
+          "extension": "mp4,jpg ,MP4"
+        }
+      },
+      "canonical": "{\"filters\":{\"extension\":\"JPG,MP4\",\"type\":\"Image,Video\"},\"q\":\"\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "79314605e64506e39d4b78fa6e652017"
+    },
+    {
+      "name": "relative date range drops absolute dates",
+      "input": {
+        "v": 1,
+        "q": "news",
+        "semantic": false,
+        "filters": {
+          "date_range_option": "7d",
+          "ingested_date_gte": "2026-09-17T00:00:00.000Z",
+          "ingested_date_lte": "2026-09-24T00:00:00.000Z"
+        }
+      },
+      "canonical": "{\"filters\":{\"date_range_option\":\"7d\"},\"q\":\"news\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "3d35e2e0a5ced5156eccf7d0ec148295"
+    },
+    {
+      "name": "custom date range keeps absolute dates",
+      "input": {
+        "v": 1,
+        "q": "news",
+        "semantic": false,
+        "filters": {
+          "ingested_date_gte": "2026-01-01T00:00:00.000Z",
+          "ingested_date_lte": "2026-02-01T00:00:00.000Z"
+        }
+      },
+      "canonical": "{\"filters\":{\"ingested_date_gte\":\"2026-01-01T00:00:00.000Z\",\"ingested_date_lte\":\"2026-02-01T00:00:00.000Z\"},\"q\":\"news\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "db8894256d5835e474dfb1e4e01f1145"
+    },
+    {
+      "name": "empty values dropped, integral floats become ints",
+      "input": {
+        "v": 1,
+        "q": "x",
+        "semantic": false,
+        "filters": {
+          "filename": "",
+          "asset_size_gte": 1048576.0,
+          "asset_size_lte": null,
+          "type": ""
+        }
+      },
+      "canonical": "{\"filters\":{\"asset_size_gte\":1048576},\"q\":\"x\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "38a6761060a2969bfc47d96d7a1b2026"
+    },
+    {
+      "name": "custom metadata filters sorted",
+      "input": {
+        "v": 1,
+        "q": "",
+        "semantic": false,
+        "filters": {
+          "customMetadataFilters": [
+            {
+              "field": "Metadata.b",
+              "operator": "term",
+              "value": "2"
+            },
+            {
+              "field": "Metadata.a",
+              "operator": "range",
+              "gte": 1.5,
+              "lte": 10.0,
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "canonical": "{\"filters\":{\"customMetadataFilters\":[{\"field\":\"Metadata.a\",\"gte\":1.5,\"lte\":10,\"operator\":\"range\",\"type\":\"number\"},{\"field\":\"Metadata.b\",\"operator\":\"term\",\"value\":\"2\"}]},\"q\":\"\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "292f5657b56224758d17dbfe5c2db626"
+    },
+    {
+      "name": "non-ascii query",
+      "input": {
+        "v": 1,
+        "q": "café ñandú 日本",
+        "semantic": false
+      },
+      "canonical": "{\"q\":\"café ñandú 日本\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "ece7b23931bc46ca1f3550a08b03f2d8"
+    },
+    {
+      "name": "missing version defaults to 1",
+      "input": {
+        "q": "legacy",
+        "semantic": false
+      },
+      "canonical": "{\"q\":\"legacy\",\"semantic\":false,\"v\":1}",
+      "fingerprint": "32ae6a10ccca3d7104e3a69ade2b6179"
+    }
+  ]
+}

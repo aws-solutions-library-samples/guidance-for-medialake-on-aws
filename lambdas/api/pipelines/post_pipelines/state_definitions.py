@@ -524,12 +524,19 @@ class StateDefinitionFactory:
                     "Default": f"__PLACEHOLDER__{node.id}_FALSE__",  # Placeholder to be replaced later
                 }
         elif step_name == "parallel":
-            # Parallel state
-            branches = node.data.configuration.get("branches", [])
-            state_def = {"Type": "Parallel", "Branches": branches, "End": True}
+            # Parallel state. Branches are never taken from the request: a
+            # caller-supplied ``configuration.branches`` would be copied verbatim
+            # into the ASL and could embed arbitrary Task Resources. The editor
+            # never sets it, so legitimate pipelines always compiled to an empty
+            # list; the API front (post_pipelines_async) rejects non-empty values.
+            if node.data.configuration.get("branches"):
+                logger.warning(
+                    f"Ignoring user-supplied branches on parallel node {node.id}"
+                )
+            state_def = {"Type": "Parallel", "Branches": [], "End": True}
         elif step_name == "map":
-            # Map state
-            iterator = node.data.configuration.get("iterator", {})
+            # Map state. The iterator is always built from the graph (processor
+            # chain) or a default Pass iterator below; never from the request.
 
             # Check if this Map node has a processor chain
             processor_chain = []

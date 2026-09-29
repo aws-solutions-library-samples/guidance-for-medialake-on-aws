@@ -23,7 +23,9 @@ i18n
       escapeValue: false,
     },
     detection: {
-      order: ["navigator", "htmlTag", "path", "subdomain"],
+      // localStorage first so the language the user picked (cached under
+      // "i18nextLng") is restored on every startup, not just on the profile page.
+      order: ["localStorage", "navigator", "htmlTag", "path", "subdomain"],
       lookupFromPathIndex: 0,
       caches: ["localStorage"],
     },

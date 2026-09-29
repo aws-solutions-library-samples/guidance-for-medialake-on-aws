@@ -40,7 +40,6 @@
     "@uppy/golden-retriever": "6.0.0",
     "@uppy/react": "6.0.0",
     "@xyflow/react": "12.10.1",
-    "amazon-cognito-identity-js": "^6.3.12",
     "aws-amplify": "^6.15.7",
     "axios": "^1.7.7",
     "date-fns": "^4.1.0",

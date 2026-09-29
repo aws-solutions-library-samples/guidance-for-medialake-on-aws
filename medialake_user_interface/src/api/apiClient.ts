@@ -50,6 +50,19 @@ class ApiClient extends ApiClientBase {
   private setupInterceptors() {
     this.axiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
+        // The client is created when this module loads, which on a first
+        // visit is before AwsConfigProvider has fetched and cached
+        // aws-exports.json, so the base URL starts out empty. Relative API
+        // paths would then hit CloudFront's SPA fallback and get index.html
+        // back. Resolve it lazily until it is known.
+        if (!config.baseURL) {
+          const baseURL = this.getBaseURL();
+          if (baseURL) {
+            this.axiosInstance.defaults.baseURL = baseURL;
+            config.baseURL = baseURL;
+          }
+        }
+
         // Proactively refresh the token if it's expiring within 60 seconds
         // so we never send an almost-expired token to the API
         const currentToken = StorageHelper.getToken();
@@ -57,9 +70,9 @@ class ApiClient extends ApiClientBase {
           const { isTokenExpiringSoon } = await import("@/common/helpers/token-helper");
           if (isTokenExpiringSoon(currentToken, 60)) {
             try {
-              const newToken = await authService.refreshToken();
-              if (newToken) {
-              }
+              // refreshToken() stores the new token, which getHeaders() below
+              // reads, so the return value isn't needed here.
+              await authService.refreshToken();
             } catch (e) {
               console.warn("⚠️ Proactive token refresh failed, using current token", e);
             }

@@ -8,6 +8,23 @@ import {
 import { Hub, type HubCapsule } from "aws-amplify/utils";
 import { StorageHelper } from "../common/helpers/storage-helper";
 import PermissionTokenCache from "../permissions/utils/permission-token-cache";
+import { getPostLoginPath } from "../components/auth/postLoginRedirect";
+
+/**
+ * Where the post-sign-in full reload should land.
+ *
+ * Still on /sign-in: the router's history state carries `from` (set by
+ * ProtectedRoute / PermissionGuard), validated by getPostLoginPath. Already
+ * navigated away (AuthPage ran first): reload the page the app is on.
+ */
+export function resolvePostSignInReloadPath(): string {
+  const { pathname, search, hash } = window.location;
+  if (pathname === "/sign-in" || pathname.startsWith("/sign-in/")) {
+    const routerState = (window.history.state as { usr?: unknown } | null)?.usr;
+    return getPostLoginPath(routerState);
+  }
+  return getPostLoginPath({ from: { pathname, search, hash } });
+}
 
 class AuthService {
   constructor() {
@@ -27,7 +44,9 @@ class AuthService {
           break;
         case "signedIn":
           await this.handleAuthenticationCheck();
-          window.location.replace("/");
+          // Full reload after sign-in, but keep the deep link the user was
+          // sent to /sign-in from (see getPostLoginPath).
+          window.location.replace(resolvePostSignInReloadPath());
           break;
         case "signedOut":
           this.clearTokens();

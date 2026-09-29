@@ -57,6 +57,9 @@ import { useSemanticSearchStatus } from "@/features/settings/system/hooks/useSys
 import { getThresholdsForModel } from "@/components/common/utils";
 import { useMetadataFieldPreferences } from "@/hooks/useMetadataFieldPreferences";
 import { useDebounce } from "@/hooks/useDebounce";
+import { definitionFromState } from "@/features/search-history/searchDefinition";
+import { useRecordSearchOnSettle, useSemanticOptionsInUrl } from "@/features/search-history/hooks";
+import { SaveSearchButton } from "@/features/search-history/components/SaveSearchButton";
 
 interface LocationState {
   query?: string;
@@ -178,6 +181,23 @@ const SearchPage: React.FC = () => {
   const searchModes = useSearchModes();
   const facetFilters = searchState.filters;
 
+  // Keep Full/Clip and Visual/Audio/Transcript in the URL, so a copied link or
+  // a replayed search reproduces the exact results.
+  useSemanticOptionsInUrl(searchParams, setSearchParams);
+
+  // The search on screen, as it would be saved or recorded in history.
+  const currentDefinition = useMemo(
+    () =>
+      definitionFromState({
+        query: currentQuery,
+        isSemantic: currentSemantic,
+        semanticMode,
+        searchModes,
+        filters: facetFilters,
+      }),
+    [currentQuery, currentSemantic, semanticMode, searchModes, facetFilters]
+  );
+
   // State for selected fields — synced with localStorage via hook
   const { selectedFields, setSelectedFields } = useMetadataFieldPreferences();
   // Debounce field changes to coalesce rapid toggles into a single search re-fetch
@@ -220,6 +240,12 @@ const SearchPage: React.FC = () => {
   const searchData = isModeTransition ? null : data?.data;
   const searchResults = searchData?.results || [];
   const searchMetadata = searchData?.searchMetadata;
+
+  // Record in search history once the results (including "no results") have
+  // stayed on screen for a moment; see useRecordSearchOnSettle.
+  useRecordSearchOnSettle(currentDefinition, {
+    settled: !isFetching && !error && !!searchMetadata,
+  });
 
   // Sync aggregations from search response into the Zustand store for FilterModal.
   // Use a ref to track the previous value and skip store writes when the reference
@@ -654,7 +680,10 @@ const SearchPage: React.FC = () => {
             }}
           >
             {searchMetadata?.totalResults === 0 && currentQuery && (
-              <NoResultsFound query={currentQuery} />
+              <NoResultsFound
+                query={currentQuery}
+                action={<SaveSearchButton definition={currentDefinition} />}
+              />
             )}
 
             {(filteredResults.length > 0 && searchMetadata && !error) || error ? (
@@ -668,6 +697,7 @@ const SearchPage: React.FC = () => {
                 onPageChange={(newPage) => handleSearch({ page: newPage })}
                 onPageSizeChange={handlePageSizeChange}
                 searchTerm={currentQuery}
+                headerActions={!error && <SaveSearchButton definition={currentDefinition} />}
                 isSemantic={currentSemantic}
                 confidenceThreshold={confidenceThreshold}
                 onConfidenceThresholdChange={setConfidenceThreshold}

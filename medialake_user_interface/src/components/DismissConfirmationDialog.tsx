@@ -8,6 +8,7 @@ import {
   Typography,
   Box,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { Warning as WarningIcon } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 
@@ -46,9 +47,25 @@ export const DismissConfirmationDialog: React.FC<DismissConfirmationDialogProps>
           links.
         </Typography>
 
-        <Box sx={{ mt: 2, p: 2, bgcolor: "grey.100", borderRadius: 1 }}>
+        {/* Theme-aware surface: a fixed light grey made the light dark-mode
+            text unreadable. */}
+        <Box
+          data-testid="dismiss-notification-summary"
+          sx={{
+            mt: 2,
+            p: 2,
+            borderRadius: 1,
+            border: 1,
+            borderColor: "divider",
+            bgcolor: (theme) =>
+              alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.06 : 0.04),
+          }}
+        >
           <Typography variant="body2" color="text.secondary">
-            <strong>{t("notifications.label")}:</strong> {notificationMessage}
+            <Box component="strong" sx={{ color: "text.primary" }}>
+              {t("notifications.label")}:
+            </Box>{" "}
+            {notificationMessage}
           </Typography>
         </Box>
 

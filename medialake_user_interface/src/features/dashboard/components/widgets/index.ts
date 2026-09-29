@@ -5,3 +5,4 @@ export { CollectionsWidget } from "./CollectionsWidget";
 export { CollectionGroupWidget } from "./CollectionGroupWidget";
 export { RecentAssetsWidget } from "./RecentAssetsWidget";
 export { MyAssetsWidget } from "./MyAssetsWidget";
+export { SavedSearchesWidget } from "./SavedSearchesWidget";

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+from collections.abc import Mapping
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
@@ -25,6 +26,76 @@ logger = Logger()
 tracer = Tracer(disabled=True)
 metrics = Metrics(namespace="ApiStandardLambda")
 
+# Connect timeout only: a dead host fails fast, while long-running requests
+# (e.g. large uploads or slow responses) are not cut off by a read timeout.
+HTTP_TIMEOUT = (10, None)
+
+_REDACTED = "***REDACTED***"
+_SENSITIVE_KEY_MARKERS = (
+    "authorization",
+    "api-key",
+    "apikey",
+    "token",
+    "secret",
+    "password",
+    "cookie",
+    "credential",
+)
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    k = str(key).lower().replace("_", "-")
+    return any(marker in k for marker in _SENSITIVE_KEY_MARKERS)
+
+
+def _redact(value: Any, _depth: int = 0) -> Any:
+    """Return a copy of ``value`` safe for logging: values of auth/token-like
+    keys (``Authorization``, ``x-api-key``, ``*token*``, ...) are masked.
+    The input is never modified."""
+    if _depth > 20:
+        return "<max depth>"
+    if isinstance(value, Mapping):
+        return {
+            k: _REDACTED if _is_sensitive_key(k) else _redact(v, _depth + 1)
+            for k, v in value.items()
+        }
+    if isinstance(value, tuple):
+        # multipart form fields: ("name", (None, "value"))
+        if (
+            len(value) == 2
+            and isinstance(value[0], str)
+            and _is_sensitive_key(value[0])
+        ):
+            return (value[0], _REDACTED)
+        return tuple(_redact(v, _depth + 1) for v in value)
+    if isinstance(value, list):
+        return [_redact(v, _depth + 1) for v in value]
+    return value
+
+
+def _payload_size(data: Any) -> int:
+    """Approximate serialized size of a request/response payload, for logs."""
+    if data is None:
+        return 0
+    if isinstance(data, (bytes, bytearray)):
+        return len(data)
+    if isinstance(data, str):
+        return len(data.encode("utf-8"))
+    try:
+        return len(json.dumps(data, default=str))
+    except (TypeError, ValueError):
+        return len(str(data))
+
+
+def _parse_rendered_body(rendered: str) -> Any:
+    """Parse a rendered request template: JSON first (``true``/``false``/``null``),
+    then Python literals for templates that emit them (e.g. multipart tuples)."""
+    try:
+        return json.loads(rendered)
+    except ValueError:
+        return ast.literal_eval(rendered)
+
+
 ################################################################################
 # THE EXISTING LAMBDA FUNCTION CODE
 ################################################################################
@@ -44,7 +115,9 @@ def make_api_call(
     try:
         logger.info(f"Making {method} API call to: {url}")
 
-        logger.info(f"Data: {data}")
+        logger.info(
+            f"Request body: type={type(data).__name__}, size={_payload_size(data)}"
+        )
         logger.info(f"API Auth Type: {api_auth_type}")
         logger.info(f"Region: {region}")
         logger.info(f"Service: {service}")
@@ -69,17 +142,27 @@ def make_api_call(
             logger.info("Created AWS4Auth object")
 
             if method.lower() == "get":
-                response = requests.get(url, auth=auth, headers=headers, params=params)
+                response = requests.get(
+                    url,
+                    auth=auth,
+                    headers=headers,
+                    params=params,
+                    timeout=HTTP_TIMEOUT,
+                )
             elif method.lower() == "post":
-                response = requests.post(url, auth=auth, headers=headers, data=data)
+                response = requests.post(
+                    url, auth=auth, headers=headers, data=data, timeout=HTTP_TIMEOUT
+                )
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
         else:
             if method.lower() == "get":
                 response = (
-                    requests.get(url, headers=headers, params=params)
+                    requests.get(
+                        url, headers=headers, params=params, timeout=HTTP_TIMEOUT
+                    )
                     if params
-                    else requests.get(url, headers=headers)
+                    else requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
                 )
             elif method.lower() == "post":
                 if data:
@@ -91,31 +174,33 @@ def make_api_call(
                         and isinstance(data[0], tuple)
                     ):
                         # TwelveLabs format: use files parameter for multipart form data
-                        response = requests.post(url, headers=headers, files=data)
+                        response = requests.post(
+                            url, headers=headers, files=data, timeout=HTTP_TIMEOUT
+                        )
                     else:
                         # Standard JSON format: use json parameter
-                        response = requests.post(url, headers=headers, json=data)
+                        response = requests.post(
+                            url, headers=headers, json=data, timeout=HTTP_TIMEOUT
+                        )
                 else:
-                    response = requests.post(url, headers=headers)
+                    response = requests.post(url, headers=headers, timeout=HTTP_TIMEOUT)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
-        logger.info(f"Response status code: {response.status_code}")
-        logger.info(f"Response headers: {response.headers}")
-        logger.info(f"Response content: {response.text}")
+        logger.info(
+            f"Response status code: {response.status_code}, "
+            f"size: {len(response.content or b'')} bytes"
+        )
 
         if 200 <= response.status_code < 300:
             response_data = response.json()
-            truncated = _truncate_floats(response_data, max_items=10)
-
-            logger.info(f"Raw API call response: {truncated}")
             return {
                 "statusCode": response.status_code,
                 "body": json.dumps(response_data),
             }
         else:
             logger.error(f"API call failed with status code: {response.status_code}")
-            logger.error(f"API call failed with reason: {response.text}")
+            logger.error(f"API call failed with reason: {(response.text or '')[:300]}")
             return {
                 "statusCode": response.status_code,
                 "body": json.dumps(
@@ -196,11 +281,13 @@ def load_and_execute_function_from_s3(
 
         dynamic_function = getattr(module, function_name)
         logger.info(f"Calling function {function_name} with event type: {type(event)}")
-        logger.info(f"Event parameter: {event}")
+        logger.info(
+            f"Event parameter keys: {list(event.keys()) if isinstance(event, dict) else type(event).__name__}"
+        )
 
         result = dynamic_function(event)
         logger.info(
-            f"Function {function_name} returned: {result} (type: {type(result)})"
+            f"Function {function_name} returned: {_redact(result)} (type: {type(result)})"
         )
         return result
     except ClientError as e:
@@ -328,7 +415,7 @@ def create_request_body(s3_templates, api_template_bucket, event):
     env.filters["jsonify"] = json.dumps
     query_template = env.from_string(request_template)
     request_body = query_template.render(variables=mapping)
-    request_body = ast.literal_eval(request_body)
+    request_body = _parse_rendered_body(request_body)
     return request_body
 
 
@@ -378,7 +465,7 @@ def create_response_output(s3_templates, api_template_bucket, response_body, eve
     logger.info(f"Response template path: {response_template_path}")
     logger.info(f"Response mapping path: {response_mapping_path}")
     logger.info(f"Response body type: {type(response_body)}")
-    logger.info(f"Response body content: {response_body}")
+    logger.info(f"Response body size: {_payload_size(response_body)}")
     logger.info(f"Event type: {type(event)}")
     logger.info(
         f"Event keys: {list(event.keys()) if isinstance(event, dict) else 'Not a dict'}"
@@ -629,7 +716,7 @@ def load_and_execute_pre_request_custom_code(api_template_bucket: str, event: di
                             logger.info(f"Result keys: {list(result.keys())}")
                             if "headers" in result:
                                 logger.info(
-                                    f"Headers added by custom code: {result['headers']}"
+                                    f"Headers added by custom code: {_redact(result['headers'])}"
                                 )
 
                         return result
@@ -785,7 +872,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         raise RuntimeError(f"Error building S3 template paths: {str(e)}")
 
     request_headers = request_header_creation()
-    logger.info(f"Request headers are: {request_headers}")
+    logger.info(f"Request headers are: {_redact(request_headers)}")
 
     auth_credentials = create_authentication(api_auth_type, api_key_secret_arn)
     if api_auth_type == "api_key" and auth_credentials:
@@ -795,7 +882,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         request_body = create_request_body(s3_templates, api_template_bucket, event)
         # Check if the request mapping added headers to the event
         if "headers" in event and event["headers"]:
-            logger.info(f"Found headers from request mapping: {event['headers']}")
+            logger.info(
+                f"Found headers from request mapping: {_redact(event['headers'])}"
+            )
             request_headers.update(event["headers"])
     else:
         request_body = None
@@ -829,7 +918,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Check if the pre-request custom code added headers to the event
                 if "headers" in event and event["headers"]:
                     logger.info(
-                        f"Found headers from pre-request custom code: {event['headers']}"
+                        f"Found headers from pre-request custom code: {_redact(event['headers'])}"
                     )
                     request_headers.update(event["headers"])
             except Exception as e:
@@ -854,9 +943,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
         truncated = _truncate_floats(response_output, max_items=10)
-        logger.info(
-            f"Formatted response output (truncated) is {response_body} {truncated}"
-        )
+        logger.info(f"Formatted response output (truncated) is {_redact(truncated)}")
 
         return response_output
 

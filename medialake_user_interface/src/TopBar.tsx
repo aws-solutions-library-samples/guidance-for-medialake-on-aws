@@ -39,8 +39,24 @@ import {
   useDomainActions,
   useUIActions,
   useActiveFilterCount,
-  appendFiltersToUrlParams,
+  useSearchStore,
 } from "./stores/searchStore";
+import type { FacetFilters } from "./types/facetSearch";
+import {
+  definitionToSearchParams,
+  SEARCH_DEFINITION_VERSION,
+} from "./features/search-history/searchDefinition";
+import {
+  useRunSearch,
+  useSearchSuggestions,
+  type SuggestionItem,
+} from "./features/search-history/hooks";
+import { useClearSearchHistory, useRemoveHistoryEntry } from "./features/search-history/api";
+import {
+  SearchSuggestionsPanel,
+  SUGGESTIONS_LISTBOX_ID,
+  suggestionOptionId,
+} from "./features/search-history/components/SearchSuggestionsPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { QUERY_KEYS } from "./api/queryKeys";
 import SemanticModeToggle from "./components/TopBar/SemanticModeToggle";
@@ -50,6 +66,24 @@ import { useSemanticSearchStatus } from "./features/settings/system/hooks/useSys
 interface SearchTag {
   key: string;
   value: string;
+}
+
+/** Filter values that identify a cached search result list. */
+function facetParamsFor(filters: FacetFilters): Record<string, unknown> {
+  const facetParams: Record<string, unknown> = {
+    type: filters.type,
+    extension: filters.extension,
+    asset_size_gte: filters.asset_size_gte,
+    asset_size_lte: filters.asset_size_lte,
+    ingested_date_gte: filters.ingested_date_gte,
+    ingested_date_lte: filters.ingested_date_lte,
+    filename: filters.filename,
+    customMetadataFilters: filters.customMetadataFilters,
+  };
+  Object.keys(facetParams).forEach((key) => {
+    if (facetParams[key] === undefined) delete facetParams[key];
+  });
+  return facetParams;
 }
 
 function TopBar() {
@@ -100,6 +134,107 @@ function TopBar() {
   const storeIsSemanticRef = useRef(storeIsSemantic);
   storeIsSemanticRef.current = storeIsSemantic;
 
+  /**
+   * Navigate to /search for `query` with the current semantic options and
+   * filters. The URL carries everything needed to reproduce the search,
+   * including Full/Clip and the Visual/Audio/Transcript modes.
+   */
+  const goToSearch = useCallback(
+    (query: string) => {
+      const currentFilters = filtersRef.current;
+      const currentIsSemantic = storeIsSemanticRef.current;
+      const { semanticMode, searchModes } = useSearchStore.getState();
+
+      setQuery(query);
+      setIsSemantic(currentIsSemantic);
+
+      // Invalidate so re-submitting identical parameters still refetches.
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.SEARCH.list(
+          query,
+          1,
+          50,
+          currentIsSemantic,
+          [],
+          facetParamsFor(currentFilters)
+        ),
+      });
+
+      const params = definitionToSearchParams({
+        v: SEARCH_DEFINITION_VERSION,
+        q: query,
+        semantic: currentIsSemantic,
+        semanticMode,
+        searchModes,
+        // Raw filters, not normalized: the live search keeps its absolute dates.
+        filters: currentFilters,
+      });
+      navigate(`/search?${params.toString()}`);
+    },
+    [navigate, setQuery, setIsSemantic, queryClient]
+  );
+
+  // ── Saved / recent searches dropdown ──
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string | null>(null);
+  const skipNextEnterRef = useRef(false);
+  const suggestions = useSearchSuggestions(searchInput);
+  const runSearch = useRunSearch();
+  const removeHistoryEntry = useRemoveHistoryEntry();
+  const clearHistory = useClearSearchHistory();
+  const showSuggestions = suggestionsOpen && suggestions.items.length > 0;
+
+  const closeSuggestions = useCallback(() => {
+    setSuggestionsOpen(false);
+    setActiveSuggestionId(null);
+  }, []);
+
+  const handleSelectSuggestion = useCallback(
+    (item: SuggestionItem) => {
+      closeSuggestions();
+      setSearchTags([]);
+      setSearchInput("");
+      runSearch(item.definition);
+    },
+    [closeSuggestions, runSearch]
+  );
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent) => {
+    const items = suggestions.items;
+    if (event.key === "Escape") {
+      if (suggestionsOpen) {
+        event.preventDefault();
+        closeSuggestions();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!items.length) return;
+      event.preventDefault();
+      setSuggestionsOpen(true);
+      const index = items.findIndex((i) => i.id === activeSuggestionId);
+      const next =
+        event.key === "ArrowDown"
+          ? (index + 1) % items.length
+          : index <= 0
+            ? items.length - 1
+            : index - 1;
+      setActiveSuggestionId(items[next].id);
+      return;
+    }
+    const active = showSuggestions ? items.find((i) => i.id === activeSuggestionId) : undefined;
+    if (event.key === "Enter" && active) {
+      event.preventDefault();
+      skipNextEnterRef.current = true;
+      handleSelectSuggestion(active);
+      return;
+    }
+    if (event.key === "Delete" && active?.kind === "history" && event.shiftKey) {
+      event.preventDefault();
+      removeHistoryEntry.mutate(active.entry.fingerprint);
+    }
+  };
+
   // Initialize semantic search from URL params on mount
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -129,51 +264,10 @@ function TopBar() {
     () =>
       debounce((query: string) => {
         if (query.trim()) {
-          // Read latest values from refs to avoid stale closures
-          const currentFilters = filtersRef.current;
-          const currentIsSemantic = storeIsSemanticRef.current;
-
-          // Update store state first
-          setQuery(query);
-          setIsSemantic(currentIsSemantic);
-
-          // Build facet parameters for cache invalidation
-          const facetParams: Record<string, any> = {
-            type: currentFilters.type,
-            extension: currentFilters.extension,
-            asset_size_gte: currentFilters.asset_size_gte,
-            asset_size_lte: currentFilters.asset_size_lte,
-            ingested_date_gte: currentFilters.ingested_date_gte,
-            ingested_date_lte: currentFilters.ingested_date_lte,
-            filename: currentFilters.filename,
-            customMetadataFilters: currentFilters.customMetadataFilters,
-          };
-
-          // Remove undefined values from facetParams
-          Object.keys(facetParams).forEach((key) => {
-            if (facetParams[key] === undefined) {
-              delete facetParams[key];
-            }
-          });
-
-          // Invalidate search cache to force refetch
-          queryClient.invalidateQueries({
-            queryKey: QUERY_KEYS.SEARCH.list(query, 1, 50, currentIsSemantic, [], facetParams),
-          });
-
-          // Build URL with semantic parameter
-          const params = new URLSearchParams();
-          params.set("q", query);
-          params.set("semantic", currentIsSemantic.toString());
-
-          // Add filters to URL (includes customMetadataFilters as JSON)
-          appendFiltersToUrlParams(params, currentFilters);
-
-          // Navigate with URL parameters
-          navigate(`/search?${params.toString()}`);
+          goToSearch(query);
         }
       }, 500),
-    [navigate, setQuery, setIsSemantic, queryClient]
+    [goToSearch]
   );
 
   // Handle search results from session storage
@@ -225,39 +319,7 @@ function TopBar() {
         };
         setSearchTags((prev) => [...prev, newTag]);
         setSearchInput("");
-        const searchQuery = getSearchQuery();
-
-        // Build facet parameters for cache invalidation
-        const facetParams = {
-          type: filters.type,
-          extension: filters.extension,
-          asset_size_gte: filters.asset_size_gte,
-          asset_size_lte: filters.asset_size_lte,
-          ingested_date_gte: filters.ingested_date_gte,
-          ingested_date_lte: filters.ingested_date_lte,
-          filename: filters.filename,
-          customMetadataFilters: filters.customMetadataFilters,
-        };
-
-        // Remove undefined values from facetParams
-        Object.keys(facetParams).forEach((key) => {
-          if (facetParams[key as keyof typeof facetParams] === undefined) {
-            delete facetParams[key as keyof typeof facetParams];
-          }
-        });
-
-        // Invalidate search cache to force refetch
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
-        });
-
-        // Build URL with parameters
-        const params = new URLSearchParams();
-        params.set("q", searchQuery);
-        params.set("semantic", storeIsSemantic.toString());
-        appendFiltersToUrlParams(params, filters);
-
-        navigate(`/search?${params.toString()}`);
+        goToSearch(getSearchQuery());
         return true;
       }
     }
@@ -267,6 +329,8 @@ function TopBar() {
   const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setSearchInput(value);
+    setSuggestionsOpen(true);
+    setActiveSuggestionId(null);
 
     if (value.endsWith(" ") && value.includes(":")) {
       const potentialTag = value.trim();
@@ -286,6 +350,11 @@ function TopBar() {
   };
 
   const handleSearchKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && skipNextEnterRef.current) {
+      // The keydown already ran the highlighted saved/recent search.
+      skipNextEnterRef.current = false;
+      return;
+    }
     if (event.key === "Enter") {
       event.preventDefault();
       handleSearchSubmit();
@@ -293,6 +362,7 @@ function TopBar() {
   };
 
   const handleSearchSubmit = () => {
+    closeSuggestions();
     if (searchInput.includes(":")) {
       createTagFromInput(searchInput);
     } else {
@@ -300,45 +370,7 @@ function TopBar() {
       // query, which the backend treats as "match all" and returns every asset
       // (any active filters are still applied). The box is cleared after
       // navigating, so it stays blank.
-      const searchQuery = getSearchQuery();
-
-      // Update store state first
-      setQuery(searchQuery);
-      setIsSemantic(storeIsSemantic);
-
-      // Build facet parameters for cache invalidation
-      const facetParams = {
-        type: filters.type,
-        extension: filters.extension,
-        asset_size_gte: filters.asset_size_gte,
-        asset_size_lte: filters.asset_size_lte,
-        ingested_date_gte: filters.ingested_date_gte,
-        ingested_date_lte: filters.ingested_date_lte,
-        filename: filters.filename,
-        customMetadataFilters: filters.customMetadataFilters,
-      };
-
-      // Remove undefined values from facetParams
-      Object.keys(facetParams).forEach((key) => {
-        if (facetParams[key as keyof typeof facetParams] === undefined) {
-          delete facetParams[key as keyof typeof facetParams];
-        }
-      });
-
-      // Invalidate search cache to force refetch even with identical parameters
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
-      });
-
-      // Build URL with parameters
-      const params = new URLSearchParams();
-      params.set("q", searchQuery);
-      params.set("semantic", storeIsSemantic.toString());
-
-      // Add current filters to URL (includes customMetadataFilters as JSON)
-      appendFiltersToUrlParams(params, filters);
-
-      navigate(`/search?${params.toString()}`);
+      goToSearch(getSearchQuery());
 
       // Clear the search input after navigation
       setSearchInput("");
@@ -350,39 +382,7 @@ function TopBar() {
       const newTags = prev.filter(
         (tag) => !(tag.key === tagToDelete.key && tag.value === tagToDelete.value)
       );
-      const searchQuery = newTags.map((tag) => `${tag.key}: ${tag.value}`).join(" ");
-
-      // Build facet parameters for cache invalidation
-      const facetParams = {
-        type: filters.type,
-        extension: filters.extension,
-        asset_size_gte: filters.asset_size_gte,
-        asset_size_lte: filters.asset_size_lte,
-        ingested_date_gte: filters.ingested_date_gte,
-        ingested_date_lte: filters.ingested_date_lte,
-        filename: filters.filename,
-        customMetadataFilters: filters.customMetadataFilters,
-      };
-
-      // Remove undefined values from facetParams
-      Object.keys(facetParams).forEach((key) => {
-        if (facetParams[key as keyof typeof facetParams] === undefined) {
-          delete facetParams[key as keyof typeof facetParams];
-        }
-      });
-
-      // Invalidate search cache to force refetch
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.SEARCH.list(searchQuery, 1, 50, storeIsSemantic, [], facetParams),
-      });
-
-      // Build URL with parameters
-      const params = new URLSearchParams();
-      params.set("q", searchQuery);
-      params.set("semantic", storeIsSemantic.toString());
-      appendFiltersToUrlParams(params, filters);
-
-      navigate(`/search?${params.toString()}`);
+      goToSearch(newTags.map((tag) => `${tag.key}: ${tag.value}`).join(" "));
       return newTags;
     });
   };
@@ -538,6 +538,22 @@ function TopBar() {
               value={searchInput}
               onChange={handleSearchInputChange}
               onKeyUp={handleSearchKeyPress}
+              onKeyDown={handleSearchKeyDown}
+              onFocus={() => setSuggestionsOpen(true)}
+              onBlur={closeSuggestions}
+              inputProps={{
+                role: "combobox",
+                "aria-label": t("search.bar.label", "Search"),
+                "aria-autocomplete": "list",
+                "aria-expanded": showSuggestions,
+                "aria-controls": showSuggestions ? SUGGESTIONS_LISTBOX_ID : undefined,
+                "aria-activedescendant":
+                  showSuggestions && activeSuggestionId
+                    ? suggestionOptionId(
+                        suggestions.items.find((i) => i.id === activeSuggestionId)!
+                      )
+                    : undefined,
+              }}
               fullWidth
               sx={{
                 textAlign: isRTL ? "right" : "left",
@@ -815,6 +831,25 @@ function TopBar() {
         )}
         defaultConnectorId={myAssetsEnabled ? myAssetsConnector?.id : undefined}
         defaultObjectPrefix={myAssetsEnabled ? myAssetsConnector?.objectPrefix : undefined}
+      />
+
+      {/* Saved and recent searches (renders nothing when the user has none) */}
+      <SearchSuggestionsPanel
+        open={showSuggestions}
+        anchorEl={searchBoxRef.current}
+        savedItems={suggestions.savedItems}
+        historyItems={suggestions.historyItems}
+        totalSaved={suggestions.totalSaved}
+        activeId={activeSuggestionId}
+        onSelect={handleSelectSuggestion}
+        onRemoveHistory={(fingerprint) => removeHistoryEntry.mutate(fingerprint)}
+        onClearHistory={() => clearHistory.mutate()}
+        onManage={() => {
+          closeSuggestions();
+          navigate("/settings/profile#saved-searches");
+        }}
+        onClose={closeSuggestions}
+        onHover={setActiveSuggestionId}
       />
 
       {/* Filter Modal */}

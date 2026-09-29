@@ -11,7 +11,7 @@ for managing assets, including:
 from dataclasses import dataclass
 from typing import Optional
 
-from aws_cdk import Duration, RemovalPolicy, Stack
+from aws_cdk import ArnFormat, Duration, RemovalPolicy, Stack
 from aws_cdk import aws_apigateway as api_gateway
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
@@ -41,6 +41,11 @@ from medialake_constructs.shared_constructs.mediaconvert import (
     MediaConvert,
     MediaConvertProps,
 )
+
+# Upper bound for one MediaConvert sub-clip job (including time queued), so a
+# job that never finishes fails its task instead of holding the execution
+# until the 6 h state machine timeout.
+BULK_DOWNLOAD_SUBCLIP_TASK_TIMEOUT_HOURS = 2
 
 
 def apply_custom_authorization(
@@ -1128,6 +1133,10 @@ class AssetsConstruct(Construct):
             props.asset_table.table_name, props
         )
 
+        # Mark the job FAILED whenever an execution fails, times out or is
+        # aborted, so no job is left "in progress" forever.
+        self._create_bulk_download_failure_handler()
+
         # Create API Gateway endpoints
         self._create_bulk_download_api_endpoints(props)
 
@@ -2169,6 +2178,12 @@ class AssetsConstruct(Construct):
                     },
                 },
                 integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+                # A sub-clip that never finishes should fail this task (and the
+                # job, via the execution-failure rule) well before the 6 h
+                # state machine timeout.
+                task_timeout=sfn.Timeout.duration(
+                    Duration.hours(BULK_DOWNLOAD_SUBCLIP_TASK_TIMEOUT_HOURS)
+                ),
             )
         )
 
@@ -2241,6 +2256,75 @@ class AssetsConstruct(Construct):
 
         # Add permissions to the state machine
         self._add_state_machine_permissions()
+
+    def _create_bulk_download_failure_handler(self):
+        """Mark a bulk download job FAILED when its execution does not succeed.
+
+        The state machine has no Catch, and only the job's Lambdas write FAILED
+        (for their own exceptions). A failure anywhere else -- the MediaConvert
+        sub-clip task, a Map or Pass state, a task timeout, the 6 h execution
+        timeout, or a manual stop -- ended the execution and left the job record
+        at its last status forever. An EventBridge rule on the execution's
+        terminal status covers every one of those cases without restructuring
+        the workflow.
+        """
+        self._mark_failed_lambda = Lambda(
+            self,
+            "AssetsBulkDownloadMarkFailedLambda",
+            config=LambdaConfig(
+                name="assets_bulk_download_mark_failed",
+                entry="lambdas/api/assets/download/bulk/post_bulk/mark_failed",
+                environment_variables={
+                    "USER_TABLE_NAME": f"{config.resource_prefix}-user-{config.environment}",
+                },
+                timeout_minutes=1,
+            ),
+        )
+        self._mark_failed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["dynamodb:Query", "dynamodb:UpdateItem"],
+                resources=[
+                    self._users_table.table_arn,
+                    f"{self._users_table.table_arn}/index/*",
+                ],
+            )
+        )
+        # EventBridge drops execution inputs over its size limit; the Lambda
+        # then reads the input from the execution itself.
+        self._mark_failed_lambda.function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:DescribeExecution"],
+                resources=[
+                    Stack.of(self).format_arn(
+                        service="states",
+                        resource="execution",
+                        resource_name=f"{self._state_machine.state_machine_name}:*",
+                        arn_format=ArnFormat.COLON_RESOURCE_NAME,
+                    )
+                ],
+            )
+        )
+
+        events.Rule(
+            self,
+            "AssetsBulkDownloadExecutionFailedRule",
+            description="Mark bulk download jobs FAILED when their execution fails, times out or is aborted",
+            event_pattern=events.EventPattern(
+                source=["aws.states"],
+                detail_type=["Step Functions Execution Status Change"],
+                detail={
+                    "stateMachineArn": [self._state_machine.state_machine_arn],
+                    "status": ["FAILED", "TIMED_OUT", "ABORTED"],
+                },
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self._mark_failed_lambda.function,
+                    retry_attempts=8,
+                    max_event_age=Duration.hours(2),
+                )
+            ],
+        )
 
     def _add_state_machine_permissions(self):
         """Add necessary permissions to the state machine role."""

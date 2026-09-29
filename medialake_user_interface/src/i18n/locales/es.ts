@@ -502,6 +502,58 @@ export default {
     },
   },
   search: {
+    history: {
+      title: "Búsquedas recientes",
+      allAssets: "Todos los recursos",
+      remove: "Quitar del historial",
+      removeNamed: "Quitar {{query}} del historial",
+      suggestionsLabel: "Búsquedas guardadas y recientes",
+      clear: "Borrar historial",
+      clearTitle: "Borrar historial de búsqueda",
+      clearConfirm:
+        "¿Quitar todas tus búsquedas recientes? Las búsquedas guardadas no se ven afectadas.",
+      removeFailed: "No se pudo quitar esa búsqueda",
+      clearFailed: "No se pudo borrar el historial de búsqueda",
+      loadFailed: "No se pudo cargar esta lista. Inténtalo más tarde.",
+      empty: "Tus últimas cinco búsquedas aparecerán aquí.",
+      describe: {
+        semantic: "Semántica",
+        semanticFull: "Semántica · Completa",
+        lastRange: "Últimos {{range}}",
+        dateRange: "Rango de fechas",
+        size: "Tamaño",
+        file: "Archivo: {{name}}",
+        metadataFilters: "{{count}} filtros de metadatos",
+      },
+    },
+    saved: {
+      title: "Búsquedas guardadas",
+      saveButton: "Guardar búsqueda",
+      savedButton: "Guardada",
+      savedAs: "Guardada como «{{name}}»",
+      saveTitle: "Guardar esta búsqueda",
+      renameTitle: "Cambiar nombre de la búsqueda guardada",
+      nameLabel: "Nombre",
+      nameHelp:
+        "Las búsquedas guardadas conservan la consulta, las opciones semánticas y los filtros.",
+      nameTooLong: "Usa como máximo {{max}} caracteres",
+      untitled: "Búsqueda sin título",
+      rename: "Cambiar nombre",
+      renameNamed: "Cambiar nombre de {{name}}",
+      remove: "Quitar de búsquedas guardadas",
+      deleteNamed: "Eliminar {{name}}",
+      deleteTitle: "Eliminar búsqueda guardada",
+      deleteConfirm: "¿Eliminar «{{name}}»? No se puede deshacer.",
+      saved: "Búsqueda guardada",
+      alreadySaved: "Esta búsqueda ya está guardada como «{{name}}»",
+      saveFailed: "No se pudo guardar esta búsqueda",
+      renameFailed: "No se pudo cambiar el nombre de esta búsqueda",
+      deleteFailed: "No se pudo eliminar esta búsqueda guardada",
+      manage: "Administrar búsquedas guardadas",
+      seeAll: "Ver las {{count}} búsquedas guardadas",
+      empty:
+        "Aún no has guardado ninguna búsqueda. Ejecuta una búsqueda y elige «Guardar búsqueda» para conservarla aquí.",
+    },
     mode: {
       fullTooltip: "Agrupar todas las coincidencias bajo cada activo",
       clipTooltip: "Mostrar cada coincidencia como un resultado separado",
@@ -1873,6 +1925,11 @@ export default {
   },
   dashboard: {
     widgets: {
+      savedSearches: {
+        title: "Búsquedas guardadas",
+        emptyTitle: "No hay búsquedas guardadas",
+        emptyDescription: "Ejecuta una búsqueda y elige «Guardar búsqueda» para conservarla aquí.",
+      },
       customName: {
         label: "Nombre del Widget",
         placeholder: "Ingrese un nombre personalizado...",

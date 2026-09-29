@@ -45,6 +45,103 @@ MEDIA_ASSETS_BUCKET = os.environ["MEDIA_ASSETS_BUCKET"]
 user_table = dynamodb.Table(USER_TABLE_NAME)  # User table for bulk download jobs
 asset_table = dynamodb.Table(ASSET_TABLE)
 
+# Valid MediaConvert AAC-LC CODING_MODE_2_0 (stereo) CBR bitrates per output
+# sample rate. Source: "AAC output reference tables" in the MediaConvert
+# user guide (https://docs.aws.amazon.com/mediaconvert/latest/ug/aac-support.html).
+# MediaConvert rejects the whole job for any other value.
+AAC_LC_STEREO_CBR_BITRATES: Dict[int, Tuple[int, ...]] = {
+    8000: (16000, 20000),
+    12000: (16000, 20000),
+    16000: (16000, 20000, 24000, 28000, 32000),
+    22050: (32000,),
+    24000: (32000,),
+    32000: (
+        40000,
+        48000,
+        56000,
+        64000,
+        80000,
+        96000,
+        112000,
+        128000,
+        160000,
+        192000,
+        224000,
+        256000,
+        288000,
+        320000,
+        384000,
+    ),
+    44100: (
+        64000,
+        80000,
+        96000,
+        112000,
+        128000,
+        160000,
+        192000,
+        224000,
+        256000,
+        288000,
+        320000,
+        384000,
+        448000,
+        512000,
+    ),
+    48000: (
+        64000,
+        80000,
+        96000,
+        112000,
+        128000,
+        160000,
+        192000,
+        224000,
+        256000,
+        288000,
+        320000,
+        384000,
+        448000,
+        512000,
+        576000,
+    ),
+    88200: (576000,),
+    96000: (256000, 288000, 320000, 384000, 448000, 512000, 576000),
+}
+
+# H.264 Bitrate / MaxBitrate range accepted by MediaConvert.
+H264_MIN_BITRATE = 1000
+H264_MAX_BITRATE = 1_152_000_000
+
+# Extension MediaConvert appends for the MP4 container used for sub-clips.
+SUBCLIP_OUTPUT_EXTENSION = ".mp4"
+
+
+def aac_output_sample_rate(source_sample_rate: int) -> int:
+    """Nearest AAC-LC stereo output sample rate to the source's.
+
+    Ties go to the higher rate. Common rates (44100, 48000) are unchanged.
+    """
+    return min(
+        AAC_LC_STEREO_CBR_BITRATES,
+        key=lambda rate: (abs(rate - source_sample_rate), -rate),
+    )
+
+
+def aac_output_bitrate(source_bitrate: int, sample_rate: int) -> int:
+    """Nearest valid AAC-LC stereo CBR bitrate for the output sample rate.
+
+    The source value is a measurement (e.g. 128089 bps for nominal 128 kbps
+    AAC, or 1536000 bps for 48 kHz 16-bit PCM), not a valid encoder setting.
+    Ties go to the higher bitrate; values beyond the table are clamped.
+    """
+    allowed = AAC_LC_STEREO_CBR_BITRATES[sample_rate]
+    return min(allowed, key=lambda rate: (abs(rate - source_bitrate), -rate))
+
+
+def _h264_bitrate(value: int) -> int:
+    return max(H264_MIN_BITRATE, min(H264_MAX_BITRATE, value))
+
 
 @tracer.capture_method
 def get_existing_job_item_key(job_id: str) -> str:
@@ -157,9 +254,14 @@ def create_paths(
         formatted_start_time = start_time.replace(":", "-").replace(";", "-")
         formatted_end_time = end_time.replace(":", "-").replace(";", "-")
 
-        # The path for the output sub-clip
-        name, extension = os.path.splitext(os.path.basename(file_path))
-        output_location = f"s3://{MEDIA_ASSETS_BUCKET}/temp/subClips/{job_id}/{name}_{formatted_start_time}_{formatted_end_time}{extension}"
+        # The path for the output sub-clip. MediaConvert always writes an MP4
+        # container (see generate_mediaconvert_job_settings) and names the file
+        # "<destination>.mp4", so the expected output must use ".mp4" rather
+        # than the source's extension. Using the source's (".mov", or ".MP4" on
+        # camera files) made the size-sort step HeadObject a key that does not
+        # exist, which S3 reports as 403 Forbidden.
+        name = os.path.splitext(os.path.basename(file_path))[0]
+        output_location = f"s3://{MEDIA_ASSETS_BUCKET}/temp/subClips/{job_id}/{name}_{formatted_start_time}_{formatted_end_time}{SUBCLIP_OUTPUT_EXTENSION}"
 
         return source_location, output_location
 
@@ -188,6 +290,11 @@ def generate_mediaconvert_output_video_description(video_in_info: Dict) -> Dict:
 
     if not rate_control_mode or not bitrate or not max_bitrate:
         raise ValueError("Video-In missing required information.")
+
+    # Keep the measured source values inside MediaConvert's accepted range,
+    # and never ask for a peak below the average.
+    bitrate = _h264_bitrate(bitrate)
+    max_bitrate = max(_h264_bitrate(max_bitrate), bitrate)
 
     h264_settings["RateControlMode"] = rate_control_mode
     h264_settings["Bitrate"] = bitrate
@@ -225,13 +332,17 @@ def generate_mediaconvert_output_audio_description(audio_in_info: Dict) -> Dict:
     if not rate_control_mode or not bitrate or not sample_rate:
         raise ValueError("Audio-In missing required information.")
 
+    # The source's measured values are rarely valid AAC settings (e.g. 128089
+    # bps, or 1536000 bps for PCM), and MediaConvert rejects the whole job.
+    sample_rate = aac_output_sample_rate(sample_rate)
+
     aac_settings["CodingMode"] = "CODING_MODE_2_0"
     aac_settings["SampleRate"] = sample_rate
     aac_settings["RateControlMode"] = rate_control_mode
     aac_settings["CodecProfile"] = "LC"
 
     if rate_control_mode == "CBR":
-        aac_settings["Bitrate"] = bitrate
+        aac_settings["Bitrate"] = aac_output_bitrate(bitrate, sample_rate)
     elif rate_control_mode == "VBR":
         aac_settings["VbrQuality"] = "HIGH"
 

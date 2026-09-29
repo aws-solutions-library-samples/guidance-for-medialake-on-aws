@@ -61,6 +61,20 @@ export interface SearchResponseType {
 
 export interface SearchError extends Error {
   apiResponse?: SearchResponseType;
+  /** false when retrying the same request cannot succeed */
+  retryable?: boolean;
+}
+
+const MAX_SEARCH_RETRIES = 3;
+
+/**
+ * Retry transport failures (network errors, timeouts, gateway 5xx), but not
+ * failures the search API reported in its response body, and not 403s.
+ */
+export function shouldRetrySearch(failureCount: number, error: SearchError): boolean {
+  if (error?.retryable === false) return false;
+  if ((error as { response?: { status?: number } })?.response?.status === 403) return false;
+  return failureCount < MAX_SEARCH_RETRIES;
 }
 
 export const useSearch = (query: string, params?: SearchParams) => {
@@ -154,6 +168,10 @@ export const useSearch = (query: string, params?: SearchParams) => {
         if (response.data?.status && !response.data.status.startsWith("2")) {
           const error = new Error(response.data.message || "Search request failed") as SearchError;
           error.apiResponse = response.data;
+          // The search Lambda answered and reported the failure itself (e.g.
+          // semantic search not configured). Re-sending the same request
+          // won't change that, so don't retry it.
+          error.retryable = false;
           throw error;
         }
 
@@ -176,6 +194,9 @@ export const useSearch = (query: string, params?: SearchParams) => {
             error.response.data.message || "Search request failed"
           ) as SearchError;
           apiError.apiResponse = error.response.data;
+          // A 4xx (bad query, forbidden, ...) fails the same way every time.
+          const httpStatus = error.response.status;
+          apiError.retryable = !(httpStatus >= 400 && httpStatus < 500);
           throw apiError;
         }
 
@@ -184,6 +205,7 @@ export const useSearch = (query: string, params?: SearchParams) => {
       }
     },
     placeholderData: keepPreviousData,
+    retry: shouldRetrySearch,
     staleTime: 1000 * 30, // 30 seconds — data is fresh for half a minute, then refetches on next mount
     gcTime: 1000 * 60 * 5, // Keep unused results for 5 minutes for back-navigation
     refetchOnMount: true, // Refetch when a new component mounts with this query

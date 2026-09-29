@@ -161,11 +161,13 @@ def validate_widget_configs(widgets: List[Dict[str, Any]]) -> ValidationResult:
     for widget in widgets:
         widget_id = widget.get("id")
         widget_type = widget.get("type")
-        config = widget.get("config", {})
+        config = widget.get("config")
 
         # Validate collections widget config
         if widget_type == "collections":
-            if not config:
+            # A missing (or non-object) config is one error; an empty object
+            # falls through so each missing field is reported on its own.
+            if not isinstance(config, dict):
                 result.add_error(
                     f"widgets[{widget_id}].config",
                     "Collections widget requires a config object",

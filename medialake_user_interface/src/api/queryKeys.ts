@@ -112,6 +112,12 @@ export const QUERY_KEYS = {
     all: ["userSettings"] as const,
     namespace: (namespace: string) => [...QUERY_KEYS.USER_SETTINGS.all, { namespace }] as const,
   },
+  SEARCH_HISTORY: {
+    all: ["searchHistory"] as const,
+  },
+  SAVED_SEARCHES: {
+    all: ["savedSearches"] as const,
+  },
   API_KEYS: {
     all: ["api-keys"] as const,
     lists: () => [...QUERY_KEYS.API_KEYS.all, "list"] as const,

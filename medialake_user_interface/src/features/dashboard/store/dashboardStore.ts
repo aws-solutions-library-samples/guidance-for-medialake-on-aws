@@ -67,6 +67,15 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, WidgetDefinition> = {
     minSize: { w: 4, h: 4 },
     maxSize: { w: 12, h: 12 },
   },
+  "saved-searches": {
+    type: "saved-searches",
+    title: "Saved Searches",
+    description: "Your saved searches; click one to see its results",
+    icon: "bookmark",
+    defaultSize: { w: 4, h: 4 },
+    minSize: { w: 3, h: 3 },
+    maxSize: { w: 12, h: 8 },
+  },
 };
 
 // Default layout configuration

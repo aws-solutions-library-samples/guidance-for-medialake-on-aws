@@ -164,10 +164,24 @@ class UsersApi(Construct):
             favorites_item_type_resource.add_resource("{itemId}")
         )
 
-        # Create Lambda integration (proxy integration for all methods)
+        # /users/search-history and /users/search-history/{fingerprint}
+        search_history_resource = users_resource.add_resource("search-history")
+        search_history_entry_resource = search_history_resource.add_resource(
+            "{fingerprint}"
+        )
+
+        # /users/saved-searches and /users/saved-searches/{searchId}
+        saved_searches_resource = users_resource.add_resource("saved-searches")
+        saved_search_resource = saved_searches_resource.add_resource("{searchId}")
+
+        # Create Lambda integration (proxy integration for all methods).
+        # allow_test_invoke=False: every method otherwise adds a second
+        # console "Test" invoke statement to the Lambda resource policy, and
+        # with this many routes the policy exceeds Lambda's 20 KB limit.
         lambda_integration = api_gateway.LambdaIntegration(
             users_lambda.function,
             proxy=True,
+            allow_test_invoke=False,
         )
 
         # Add methods to resources
@@ -319,6 +333,22 @@ class UsersApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # Search history and saved searches. All scoped to the caller.
+        for resource, http_method in (
+            (search_history_resource, "GET"),
+            (search_history_resource, "POST"),
+            (search_history_resource, "DELETE"),
+            (search_history_entry_resource, "DELETE"),
+            (saved_searches_resource, "GET"),
+            (saved_searches_resource, "POST"),
+            (saved_search_resource, "PATCH"),
+            (saved_search_resource, "DELETE"),
+        ):
+            method = resource.add_method(http_method, lambda_integration)
+            cfn_method = method.node.default_child
+            cfn_method.authorization_type = "CUSTOM"
+            cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # Add CORS support to all resources
         add_cors_options_method(users_resource)
         add_cors_options_method(user_id_resource)
@@ -333,6 +363,10 @@ class UsersApi(Construct):
         add_cors_options_method(favorites_resource)
         add_cors_options_method(favorites_item_type_resource)
         add_cors_options_method(favorites_item_type_item_id_resource)
+        add_cors_options_method(search_history_resource)
+        add_cors_options_method(search_history_entry_resource)
+        add_cors_options_method(saved_searches_resource)
+        add_cors_options_method(saved_search_resource)
 
         # Store reference to the unified Lambda
         self._users_lambda = users_lambda

@@ -4,9 +4,11 @@ import SearchOffIcon from "@mui/icons-material/SearchOff";
 
 interface NoResultsFoundProps {
   query: string;
+  /** Optional action shown under the message, e.g. "Save search". */
+  action?: React.ReactNode;
 }
 
-const NoResultsFound: React.FC<NoResultsFoundProps> = ({ query }) => {
+const NoResultsFound: React.FC<NoResultsFoundProps> = ({ query, action }) => {
   return (
     <Box
       sx={{
@@ -47,6 +49,7 @@ const NoResultsFound: React.FC<NoResultsFoundProps> = ({ query }) => {
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Try adjusting your search or filters to find what you're looking for
         </Typography>
+        {action && <Box sx={{ mt: 1 }}>{action}</Box>}
       </Paper>
     </Box>
   );

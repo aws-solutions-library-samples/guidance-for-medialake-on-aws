@@ -27,6 +27,7 @@ from aws_cdk import aws_lambda as lambda_
 from constructs import Construct
 
 from .layer_base import LambdaLayer, LambdaLayerConfig
+from .layer_build_cache import bundled_layer_code
 
 
 @dataclass
@@ -136,17 +137,13 @@ class ZipmergeLayer(Construct):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             compatible_architectures=[architecture],
             description="Static zipmerge binary for ZIP file operations (rsc.io/zipmerge)",
-            code=lambda_.Code.from_asset(
-                path=".",
-                bundling=BundlingOptions(
-                    user="root",
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        f"""
+            code=bundled_layer_code(
+                "zipmerge",
+                "public.ecr.aws/amazonlinux/amazonlinux:2023",
+                command=[
+                    "/bin/bash",
+                    "-c",
+                    f"""
                         set -euo pipefail
 
                         # Install build dependencies
@@ -171,8 +168,7 @@ class ZipmergeLayer(Construct):
                         cp "$BIN_PATH" /asset-output/bin/zipmerge
                         chmod 755 /asset-output/bin/zipmerge
                         """,
-                    ],
-                ),
+                ],
             ),
         )
 
@@ -278,17 +274,13 @@ class ResvgCliLayer(Construct):
             code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build from source locally
-            code = lambda_.Code.from_asset(
-                path=".",
-                bundling=BundlingOptions(
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64"
-                    ),
-                    user="root",
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        """
+            code = bundled_layer_code(
+                "resvg",
+                "public.ecr.aws/amazonlinux/amazonlinux:2.0.20250305.0-amd64",
+                command=[
+                    "/bin/bash",
+                    "-c",
+                    """
                         set -euo pipefail
 
                         # Install build dependencies (AL2's packaged rust/cargo is
@@ -309,8 +301,7 @@ class ResvgCliLayer(Construct):
                         cp ~/.cargo/bin/resvg /asset-output/bin/
                         chmod 755 /asset-output/bin/resvg
                         """,
-                    ],
-                ),
+                ],
             )
 
         self.layer = lambda_.LayerVersion(
@@ -354,17 +345,13 @@ class NumpyLayer(Construct):
             code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build locally with Docker for development
-            code = lambda_.Code.from_asset(
-                path=".",
-                bundling=BundlingOptions(
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
-                    user="root",
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        """
+            code = bundled_layer_code(
+                "numpy",
+                "public.ecr.aws/amazonlinux/amazonlinux:2023",
+                command=[
+                    "/bin/bash",
+                    "-c",
+                    """
                         set -euo pipefail
 
                         # Install Python 3.12 and pip (matches Lambda runtime)
@@ -410,8 +397,7 @@ class NumpyLayer(Construct):
                         # Strip debug symbols from shared objects to reduce size and attack surface
                         find . -name "*.so*" -type f -exec strip --strip-debug {} \\; 2>/dev/null || true
                         """,
-                    ],
-                ),
+                ],
             )
 
         self.layer = lambda_.LayerVersion(
@@ -466,17 +452,13 @@ class OpenEXRLayer(Construct):
             code = lambda_.Code.from_asset(ci_asset_path)
         else:
             # Build from source locally
-            code = lambda_.Code.from_asset(
-                path=".",
-                bundling=BundlingOptions(
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/amazonlinux/amazonlinux:2023"
-                    ),
-                    user="root",
-                    command=[
-                        "/bin/bash",
-                        "-c",
-                        """
+            code = bundled_layer_code(
+                "openexr",
+                "public.ecr.aws/amazonlinux/amazonlinux:2023",
+                command=[
+                    "/bin/bash",
+                    "-c",
+                    """
                         set -euo pipefail
 
                         # Install Python 3.12 and dependencies
@@ -591,8 +573,7 @@ class OpenEXRLayer(Construct):
                         # Strip debug symbols from .so files
                         find . -name "*.so*" -type f -exec strip --strip-debug {} \\; 2>/dev/null || true
                         """,
-                    ],
-                ),
+                ],
             )
 
         self.layer = lambda_.LayerVersion(
@@ -640,13 +621,13 @@ class FFProbeLayer(Construct):
                 layer_version_name="ffprobe-layer",
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
                 description="Lambda layer with ffprobe for media metadata extraction",
-                code=lambda_.Code.from_asset(
-                    path=".",
-                    bundling=BundlingOptions(
-                        command=[
-                            "/bin/bash",
-                            "-c",
-                            f"""
+                code=bundled_layer_code(
+                    "ffprobe",
+                    "public.ecr.aws/amazonlinux/amazonlinux:latest",
+                    command=[
+                        "/bin/bash",
+                        "-c",
+                        f"""
                             set -euo pipefail
 
                             # Install download tools
@@ -669,12 +650,7 @@ class FFProbeLayer(Construct):
                             cd /
                             rm -rf $TEMP_DIR
                             """,
-                        ],
-                        user="root",
-                        image=DockerImage.from_registry(
-                            "public.ecr.aws/amazonlinux/amazonlinux:latest"
-                        ),
-                    ),
+                    ],
                 ),
             )
 
@@ -714,13 +690,13 @@ class FFmpegLayer(Construct):
                 layer_version_name="ffmpeg-layer",
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
                 description="Lambda layer with FFmpeg for video/audio processing",
-                code=lambda_.Code.from_asset(
-                    path=".",
-                    bundling=BundlingOptions(
-                        command=[
-                            "/bin/bash",
-                            "-c",
-                            f"""
+                code=bundled_layer_code(
+                    "ffmpeg",
+                    "public.ecr.aws/amazonlinux/amazonlinux:latest",
+                    command=[
+                        "/bin/bash",
+                        "-c",
+                        f"""
                             set -e
                             yum update -y && yum install -y wget xz zip tar
 
@@ -741,12 +717,7 @@ class FFmpegLayer(Construct):
                             cd /
                             rm -rf $TEMP_DIR
                             """,
-                        ],
-                        user="root",
-                        image=DockerImage.from_registry(
-                            "public.ecr.aws/amazonlinux/amazonlinux:latest"
-                        ),
-                    ),
+                    ],
                 ),
             )
 

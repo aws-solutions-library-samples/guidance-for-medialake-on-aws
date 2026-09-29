@@ -16,7 +16,7 @@ The function implements AWS best practices including:
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -41,6 +41,11 @@ USER_TABLE_NAME = os.environ[
 
 # Initialize DynamoDB table
 user_table = dynamodb.Table(USER_TABLE_NAME)
+
+# Unpaged job listing (the notification bell): read this many per query and
+# return at most this many unexpired jobs.
+ACTIVE_JOBS_PAGE_SIZE = 25
+MAX_ACTIVE_JOBS = 100
 
 
 class BulkDownloadError(Exception):
@@ -116,18 +121,10 @@ def get_user_jobs(
         BulkDownloadError: If job retrieval fails
     """
     try:
-        # Query user table for bulk download jobs
-        formatted_user_id = f"USER#{user_id}"
-
-        query_params = {
-            "KeyConditionExpression": "userId = :userId AND begins_with(itemKey, :prefix)",
-            "ExpressionAttributeValues": {
-                ":userId": formatted_user_id,
-                ":prefix": "BULK_DOWNLOAD#",
-            },
-            "ScanIndexForward": False,  # Sort by itemKey in descending order (newest first due to reverse timestamp)
-            "Limit": limit,
-        }
+        # Query user table for bulk download jobs, newest first. The base-table
+        # sort key is BULK_DOWNLOAD#{jobId}#{reverseTs} -- it orders by job id,
+        # not time -- so read GSI1, keyed (userId, ITEM_TYPE#BULK_DOWNLOAD#{reverseTs}).
+        query_params = _jobs_by_time_query(user_id, limit)
 
         # Add pagination token if provided
         if next_token:
@@ -154,6 +151,71 @@ def get_user_jobs(
             },
         )
         raise BulkDownloadError(f"Failed to retrieve user jobs: {str(e)}", 500)
+
+
+@tracer.capture_method
+def get_active_user_jobs(user_id: str, now: Optional[int] = None) -> Dict[str, Any]:
+    """Every bulk download job of the user that has not expired yet.
+
+    Used when the caller does not ask for a page size (the notification bell).
+    A fixed page of 10 hid all other jobs, so jobs whose downloads were still
+    valid never reached the bell.
+
+    GSI1 orders jobs newest first and every job expires a fixed time after it
+    is created, so reading stops at the first expired job. Items without an
+    expiresAt are kept. At most MAX_ACTIVE_JOBS are returned; nextToken is
+    set when more remain and can be passed back to continue the listing.
+    """
+    now = int(datetime.utcnow().timestamp()) if now is None else now
+    query_params = _jobs_by_time_query(user_id, ACTIVE_JOBS_PAGE_SIZE)
+    jobs: List[Dict[str, Any]] = []
+    try:
+        while True:
+            response = user_table.query(**query_params)
+            for item in response.get("Items", []):
+                expires_at = item.get("expiresAt")
+                if expires_at and int(expires_at) <= now:
+                    return {"jobs": jobs, "nextToken": None}
+                jobs.append(item)
+                if len(jobs) >= MAX_ACTIVE_JOBS:
+                    return {"jobs": jobs, "nextToken": json.dumps(_gsi1_key(item))}
+            last_key = response.get("LastEvaluatedKey")
+            if not last_key:
+                return {"jobs": jobs, "nextToken": None}
+            query_params["ExclusiveStartKey"] = last_key
+    except ClientError as e:
+        logger.error(
+            "Failed to retrieve active user jobs from user table",
+            extra={"error": str(e), "userId": user_id},
+        )
+        raise BulkDownloadError(f"Failed to retrieve user jobs: {str(e)}", 500)
+
+
+def _jobs_by_time_query(user_id: str, limit: int) -> Dict[str, Any]:
+    """GSI1 query for a user's bulk download jobs, newest first.
+
+    gsi1Sk is ITEM_TYPE#BULK_DOWNLOAD#{9999999999999 - createdMs}, so ascending
+    order is newest first. Every writer of a job record sets it.
+    """
+    return {
+        "IndexName": "GSI1",
+        "KeyConditionExpression": "userId = :userId AND begins_with(gsi1Sk, :prefix)",
+        "ExpressionAttributeValues": {
+            ":userId": f"USER#{user_id}",
+            ":prefix": "ITEM_TYPE#BULK_DOWNLOAD#",
+        },
+        "ScanIndexForward": True,
+        "Limit": limit,
+    }
+
+
+def _gsi1_key(item: Dict[str, Any]) -> Dict[str, Any]:
+    """ExclusiveStartKey for GSI1 positioned at this item."""
+    return {
+        "userId": item["userId"],
+        "itemKey": item["itemKey"],
+        "gsi1Sk": item["gsi1Sk"],
+    }
 
 
 def create_response(status_code: int, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -336,11 +398,15 @@ def lambda_handler(
         if path.endswith("/user"):
             # Get query parameters
             query_params = event.get("queryStringParameters", {}) or {}
-            limit = int(query_params.get("limit", "10"))
             next_token = query_params.get("nextToken")
 
-            # Get user jobs
-            result = get_user_jobs(user_id, limit, next_token)
+            if "limit" in query_params or next_token:
+                # Explicit paging, as before.
+                limit = int(query_params.get("limit", "10"))
+                result = get_user_jobs(user_id, limit, next_token)
+            else:
+                # Default (the notification bell): every unexpired job.
+                result = get_active_user_jobs(user_id)
 
             # Format response
             jobs = [format_job_response(job) for job in result["jobs"]]
