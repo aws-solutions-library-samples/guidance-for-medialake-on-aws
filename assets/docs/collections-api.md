@@ -126,7 +126,8 @@ curl -X POST "https://api.example.com/v1/collections" \
 
 **Behavior Notes:**
 
-- A unique ID is generated in the format `col_{uuid8}`.
+- A unique ID is generated in the format `col_{uuid4 hex}` (32 hex characters, e.g. `col_3f2b8c1e9a4d4e6f8b7a1c2d3e4f5a6b`). Collections created before this format keep their shorter `col_{uuid8}` IDs; treat IDs as opaque strings.
+- Creation is conditional: an existing collection with the same ID is never overwritten.
 - The authenticated user is automatically assigned as the owner.
 - A user-collection relationship record (`OWNER`) is created transactionally.
 - If `parentId` is provided, a child reference is created in the parent collection and the parent's `childCollectionCount` is incremented — all within a single DynamoDB transaction.

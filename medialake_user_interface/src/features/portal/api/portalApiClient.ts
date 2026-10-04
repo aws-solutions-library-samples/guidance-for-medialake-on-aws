@@ -4,6 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { StorageHelper } from "@/common/helpers/storage-helper";
+import { ensureWafCaptchaSdk } from "./wafCaptchaSdk";
 
 function getBaseURL(): string {
   return StorageHelper.getAwsConfig()?.API?.REST?.RestApi?.endpoint || "";
@@ -101,6 +102,12 @@ export function createPortalApiClient(
 
   if (useCaptchaIntegration) {
     instance.defaults.adapter = wafFetchAdapter;
+    // Lazy-load the deployment's WAF CAPTCHA SDK (from aws-exports.json)
+    // before the first request; rejects if it is not configured.
+    instance.interceptors.request.use(async (config) => {
+      await ensureWafCaptchaSdk();
+      return config;
+    });
   }
 
   instance.interceptors.request.use((config) => {

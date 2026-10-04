@@ -121,7 +121,8 @@ def create_collection_group(table, group_data: Dict[str, Any]) -> Dict[str, Any]
         if group_data.get("description"):
             item["description"] = group_data["description"]
 
-        table.put_item(Item=item)
+        # Never overwrite an existing group on an ID collision.
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(PK)")
 
         logger.info(
             {

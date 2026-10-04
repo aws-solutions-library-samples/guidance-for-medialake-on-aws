@@ -5,6 +5,7 @@ import warnings
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from aws_cdk import aws_logs as logs
 from pydantic import (
@@ -844,7 +845,51 @@ class CDKConfig(BaseModel):
     external_nodes_bucket: Optional[str] = None
     ses_from_address: Optional[str] = None
     portal_rate_limit_per_5min: Optional[int] = 1000
+    # AWS WAF CAPTCHA for upload portals with "Require CAPTCHA" enabled. Both
+    # come from the AWS WAF console (Application integration > CAPTCHA
+    # integration) of the account that owns the CloudFront web ACL. When unset,
+    # CAPTCHA-enabled portals show "CAPTCHA configuration is missing".
+    waf_captcha_integration_url: Optional[str] = None
+    waf_captcha_api_key: Optional[str] = None
     temporary_password_validity_days: int = 7
+
+    @field_validator("waf_captcha_integration_url", mode="before")
+    @classmethod
+    def _validate_waf_captcha_integration_url(cls, v: Any) -> Optional[str]:
+        """Normalise to the jsapi.js script URL.
+
+        Accepts the integration URL with or without the trailing
+        ``/jsapi.js``. It must be an https ``*.awswaf.com`` URL, the only
+        third-party script origin the UI Content-Security-Policy allows.
+        """
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if not isinstance(v, str):
+            raise ValueError("waf_captcha_integration_url must be a string")
+        url = v.strip()
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or not host.endswith(".awswaf.com"):
+            raise ValueError(
+                "waf_captcha_integration_url must be an https://*.awswaf.com URL "
+                "(the AWS WAF CAPTCHA integration URL)"
+            )
+        if parsed.query or parsed.fragment:
+            raise ValueError(
+                "waf_captcha_integration_url must not have a query or fragment"
+            )
+        if not parsed.path.endswith(".js"):
+            url = url.rstrip("/") + "/jsapi.js"
+        return url
+
+    @field_validator("waf_captcha_api_key", mode="before")
+    @classmethod
+    def _validate_waf_captcha_api_key(cls, v: Any) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if not isinstance(v, str):
+            raise ValueError("waf_captcha_api_key must be a string")
+        return v.strip()
 
     @field_validator("temporary_password_validity_days", mode="before")
     @classmethod

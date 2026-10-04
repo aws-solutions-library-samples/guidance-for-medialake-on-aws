@@ -115,6 +115,26 @@ def _strip_conflicting_field(
     return healed if removed else None
 
 
+def _esm_failure_batch_info(body: Any) -> Optional[Dict[str, Any]]:
+    """
+    Return the batch metadata when a DLQ message is an event source mapping
+    on_failure record rather than a document parked by the stream indexer.
+
+    When the stream Lambda invocation fails and the mapping's retries are
+    exhausted, Lambda publishes a JSON record describing the batch (shard and
+    sequence-number range under ``DDBStreamBatchInfo``) to the same queue. It
+    carries no document, so it cannot be replayed into OpenSearch here.
+    """
+    if not isinstance(body, dict):
+        return None
+    batch_info = body.get("DDBStreamBatchInfo")
+    if isinstance(batch_info, dict):
+        return batch_info
+    if "requestContext" in body and "responseContext" in body:
+        return {}
+    return None
+
+
 def prepare_bulk_action(record: Dict[str, Any], message_type: str) -> Dict[str, Any]:
     """
     Prepare a single bulk action from a DLQ message.
@@ -173,11 +193,37 @@ def lambda_handler(event, context):
     # doc_id -> action, so a failed item can be healed and retried
     action_by_id: Dict[str, Dict[str, Any]] = {}
     failed_records = []
+    esm_failure_records = 0
 
     for sqs_record in event.get("Records", []):
         try:
             # Parse SQS message body
             body = json.loads(sqs_record["body"])
+
+            # Event source mapping on_failure records describe a failed batch
+            # but hold no document: log them for manual follow-up and skip.
+            batch_info = _esm_failure_batch_info(body)
+            if batch_info is not None:
+                esm_failure_records += 1
+                request_context = body.get("requestContext") or {}
+                logger.error(
+                    "Skipping event source mapping failure record: the stream "
+                    "batch it describes was not indexed and must be re-synced "
+                    "(for example by re-running the asset sync/backfill)",
+                    extra={
+                        "message_id": sqs_record.get("messageId"),
+                        "condition": request_context.get("condition"),
+                        "approximate_invoke_count": request_context.get(
+                            "approximateInvokeCount"
+                        ),
+                        "shard_id": batch_info.get("shardId"),
+                        "start_sequence_number": batch_info.get("startSequenceNumber"),
+                        "end_sequence_number": batch_info.get("endSequenceNumber"),
+                        "batch_size": batch_info.get("batchSize"),
+                        "stream_arn": batch_info.get("streamArn"),
+                    },
+                )
+                continue
 
             # Get message attributes
             message_attrs = sqs_record.get("messageAttributes", {})
@@ -405,6 +451,7 @@ def lambda_handler(event, context):
             "total_success": total_success,
             "total_failed": total_failed,
             "preparation_failures": len(failed_records),
+            "esm_failure_records": esm_failure_records,
         },
     )
 
@@ -417,6 +464,7 @@ def lambda_handler(event, context):
                 "success": total_success,
                 "failed": total_failed,
                 "preparation_failures": len(failed_records),
+                "esm_failure_records": esm_failure_records,
             }
         ),
     }

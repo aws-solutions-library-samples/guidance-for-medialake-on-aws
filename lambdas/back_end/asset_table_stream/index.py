@@ -1003,8 +1003,11 @@ def chunk_bulk_actions(actions: List[dict]) -> List[List[dict]]:
 # max_retries trimmed 15 -> 8 (2026-07-23): at 15 a sustained 429 storm held
 # a batch slot for ~11.5 minutes of sleep inside one invocation, stalling the
 # stream shard and aging the iterator (observed 6-9.6h lag in prd). At 8 the
-# worst case is ~4.5 minutes; the event source mapping's own retries (3x with
-# DLQ on-failure) still protect the records themselves.
+# worst case is ~4.5 minutes. Once these retries are exhausted the handler parks
+# the chunk's records on the DLQ itself and treats them as handled, so the event
+# source mapping's retries (3x, with on_failure to the same DLQ) do NOT re-run
+# them; those only fire when the invocation fails (a record could not be parked
+# on the DLQ, a timeout, or a crash).
 @retry_with_backoff(max_retries=8, base_delay=3, max_delay=60)
 def execute_bulk_operation(
     actions: List[dict], action_to_record_map: dict
@@ -1449,7 +1452,26 @@ def _coerce_error_status(status) -> int:
         return 0
 
 
-def send_to_dlq(records: List[dict], reason: str, error_details_map: dict = None):
+class DLQDeliveryError(RuntimeError):
+    """Raised when failed records could not be parked on the DLQ.
+
+    Raising (rather than returning) makes the event source mapping retry the
+    batch and, once its retries are exhausted, publish its own on_failure
+    record, instead of the records being silently lost.
+    """
+
+
+def _raise_if_undelivered(undelivered: List[dict]) -> None:
+    if undelivered:
+        metrics.add_metric(name="DLQSendFailures", unit="Count", value=len(undelivered))
+        raise DLQDeliveryError(
+            f"{len(undelivered)} failed record(s) could not be sent to the DLQ"
+        )
+
+
+def send_to_dlq(
+    records: List[dict], reason: str, error_details_map: dict = None
+) -> List[dict]:
     """
     Send failed records to DLQ with detailed error information.
 
@@ -1457,9 +1479,15 @@ def send_to_dlq(records: List[dict], reason: str, error_details_map: dict = None
         records: List of DynamoDB stream records that failed
         reason: General failure reason
         error_details_map: Optional dict mapping InventoryID to detailed error info
+
+    Returns:
+        The records that could NOT be sent to the DLQ (empty when all were
+        parked). Callers must not treat these as handled.
     """
     if error_details_map is None:
         error_details_map = {}
+
+    undelivered: List[dict] = []
 
     for record in records:
         try:
@@ -1553,6 +1581,9 @@ def send_to_dlq(records: List[dict], reason: str, error_details_map: dict = None
                 f"Failed to send record to DLQ",
                 extra={"error": str(e), "record": record},
             )
+            undelivered.append(record)
+
+    return undelivered
 
 
 @tracer.capture_lambda_handler
@@ -1590,6 +1621,10 @@ def lambda_handler(event, context):
     except Exception as lag_err:  # never let diagnostics break processing
         logger.warning(f"Could not compute stream lag: {lag_err}")
 
+    # Records that failed AND could not be parked on the DLQ. Any entry here
+    # makes the invocation raise so the event source mapping retries the batch.
+    undelivered: List[dict] = []
+
     try:
         if VERBOSE_LOGGING:
             logger.info(
@@ -1607,10 +1642,13 @@ def lambda_handler(event, context):
                     "Sending failed preparation records to DLQ",
                     extra={"failed_prep_count": len(failed_prep)},
                 )
-            send_to_dlq(failed_prep, "Failed to prepare bulk action")
+            undelivered.extend(
+                send_to_dlq(failed_prep, "Failed to prepare bulk action")
+            )
 
         if not bulk_actions:
             logger.info("No bulk actions to process")
+            _raise_if_undelivered(undelivered)
             return {"statusCode": 200, "body": json.dumps("No actions to process")}
 
         # Split into chunks if needed
@@ -1661,7 +1699,11 @@ def lambda_handler(event, context):
                                 ),
                             },
                         )
-                    send_to_dlq(failed_records, "Bulk operation failed", error_details)
+                    undelivered.extend(
+                        send_to_dlq(
+                            failed_records, "Bulk operation failed", error_details
+                        )
+                    )
                 elif VERBOSE_LOGGING:
                     logger.info(f"Chunk {i+1} completed successfully with no failures")
 
@@ -1695,8 +1737,10 @@ def lambda_handler(event, context):
                                 "failed_count": len(chunk_failed_records),
                             },
                         )
-                    send_to_dlq(
-                        chunk_failed_records, f"Chunk processing failed: {str(e)}"
+                    undelivered.extend(
+                        send_to_dlq(
+                            chunk_failed_records, f"Chunk processing failed: {str(e)}"
+                        )
                     )
                 total_failed += len(chunk)
 
@@ -1717,6 +1761,8 @@ def lambda_handler(event, context):
             name="RecordsProcessedFailed", unit="Count", value=total_failed
         )
 
+        _raise_if_undelivered(undelivered)
+
         return {
             "statusCode": 200,
             "body": json.dumps(
@@ -1729,11 +1775,16 @@ def lambda_handler(event, context):
             ),
         }
 
+    except DLQDeliveryError:
+        # Must reach the event source mapping: do not fall through to the
+        # catch-all below, which would treat the batch as handled.
+        raise
+
     except Exception as e:
         logger.exception("Unhandled exception processing stream")
         metrics.add_metric(name="UnhandledErrors", unit="Count", value=1)
 
         # Send all records to DLQ as fallback
-        send_to_dlq(records, f"Unhandled exception: {str(e)}")
+        _raise_if_undelivered(send_to_dlq(records, f"Unhandled exception: {str(e)}"))
 
         return {"statusCode": 500, "body": json.dumps(f"Error processing stream: {e}")}

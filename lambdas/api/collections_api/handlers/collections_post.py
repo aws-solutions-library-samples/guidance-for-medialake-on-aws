@@ -64,8 +64,9 @@ def register_route(app):
                 )
                 raise BadRequestError(f"Validation error: {str(e)}")
 
-            # Generate ID and timestamp
-            collection_id = f"col_{str(uuid.uuid4())[:8]}"
+            # Generate ID and timestamp. Full uuid4 hex: an 8-hex prefix gave a
+            # ~1% collision chance by ~9k collections.
+            collection_id = f"col_{uuid.uuid4().hex}"
             current_timestamp = datetime.utcnow().isoformat() + "Z"
 
             # Create collection model instance
@@ -132,7 +133,11 @@ def register_route(app):
             # collection-name trigger filters match on) without an extra read.
             parent_name = None
             with TransactWrite(connection=connection) as transaction:
-                transaction.save(collection)
+                # Never overwrite an existing collection (and its ownerId) on
+                # an ID collision: the whole transaction is cancelled instead.
+                transaction.save(
+                    collection, condition=CollectionModel.PK.does_not_exist()
+                )
                 transaction.save(user_relationship)
 
                 # If this is a child collection, create CHILD# reference in parent

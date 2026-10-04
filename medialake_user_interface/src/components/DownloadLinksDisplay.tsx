@@ -6,6 +6,7 @@ import {
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { expiresAtToMs } from "./NotificationCenter";
 
 interface DownloadLinksDisplayProps {
   downloadUrls:
@@ -15,7 +16,7 @@ interface DownloadLinksDisplayProps {
         singleFiles?: string[];
       }
     | string[];
-  expiresAt?: string;
+  expiresAt?: string | number;
   description?: string;
 }
 
@@ -25,24 +26,18 @@ export const DownloadLinksDisplay: React.FC<DownloadLinksDisplayProps> = ({
   description,
 }) => {
   const { t } = useTranslation();
-  // Check if links have expired
+  // Both of these used to re-implement the epoch-seconds handling inline. They
+  // now share `expiresAtToMs` with the notification-expiry filter, which had the
+  // same job to do and got it wrong — one parser, one place to be right.
   const isExpired = React.useMemo(() => {
     if (!expiresAt) return false;
-
-    // Handle Unix timestamp (string of numbers) or ISO date string
-    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
-    const expirationDate = new Date(timestamp);
-
-    if (isNaN(expirationDate.getTime())) return false;
-
-    return new Date() > expirationDate;
+    const expiry = expiresAtToMs(expiresAt);
+    return expiry !== null && Date.now() > expiry;
   }, [expiresAt]);
 
-  // Format expiration date
-  const formatExpirationDate = React.useCallback((expiresAt: string) => {
-    const timestamp = /^\d+$/.test(expiresAt) ? parseInt(expiresAt, 10) * 1000 : expiresAt;
-    const date = new Date(timestamp);
-    return isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
+  const formatExpirationDate = React.useCallback((value: string | number) => {
+    const expiry = expiresAtToMs(value);
+    return expiry === null ? "Unknown" : new Date(expiry).toLocaleString();
   }, []);
   // Handle legacy format (array of URLs)
   if (Array.isArray(downloadUrls)) {

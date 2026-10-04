@@ -1,10 +1,14 @@
 import json
 import os
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver
+from aws_lambda_powertools.event_handler import (
+    APIGatewayRestResolver,
+    Response,
+    content_types,
+)
 from aws_lambda_powertools.event_handler.api_gateway import CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
@@ -45,6 +49,49 @@ class PipelineResponse(BaseModel):
     status: str
     message: str
     data: Optional[dict]
+
+
+# Fields a client may change through PUT. Everything else on the record
+# (dependentResources, stateMachineArn, type, system, definition, webhook*,
+# status, timestamps, ...) is server-owned and written only by the deploy path.
+# dependentResources in particular drives EventBridge enable/disable here and
+# resource deletion in DELETE, so it must never be client-writable.
+_UPDATABLE_FIELD_TYPES = {
+    "name": str,
+    "description": str,
+    "active": bool,
+    "configuration": dict,
+}
+
+
+def _bad_request(message: str) -> Response:
+    return Response(
+        status_code=400,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps(
+            PipelineResponse(status="error", message=message, data=None).dict()
+        ),
+    )
+
+
+def _extract_updates(body: Any) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Return ``(updates, error)`` keeping only allow-listed, well-typed fields."""
+    if not isinstance(body, dict):
+        return {}, "Request body must be a JSON object"
+    updates = {k: body[k] for k in _UPDATABLE_FIELD_TYPES if k in body}
+    if not updates:
+        allowed = ", ".join(_UPDATABLE_FIELD_TYPES)
+        return {}, f"Request body must include at least one of: {allowed}"
+    for key, value in updates.items():
+        # bool is a subclass of int but never of str/dict, so isinstance is exact
+        # for these types.
+        if not isinstance(value, _UPDATABLE_FIELD_TYPES[key]):
+            expected = _UPDATABLE_FIELD_TYPES[key].__name__
+            return {}, f"Field '{key}' must be of type {expected}"
+    ignored = sorted(set(body) - set(updates))
+    if ignored:
+        logger.warning(f"Ignoring non-updatable pipeline fields: {ignored}")
+    return updates, None
 
 
 def update_eventbridge_rule_state(rule_name: str, enabled: bool) -> None:
@@ -132,9 +179,14 @@ def put_pipeline(pipeline_id: str):
                 status="error", message="Request body is required", data=None
             ).dict()
 
+        updates, error = _extract_updates(body)
+        if error:
+            logger.warning(f"Rejecting pipeline update for {pipeline_id}: {error}")
+            return _bad_request(error)
+
         # Check if active state is being updated
-        if "active" in body:
-            active = body.get("active")
+        if "active" in updates:
+            active = updates["active"]
             try:
                 # Update EventBridge rules based on active state
                 update_pipeline_active_state(pipeline_id, active)
@@ -143,12 +195,13 @@ def put_pipeline(pipeline_id: str):
                 logger.error(f"Failed to update EventBridge rules: {e}")
                 # Continue with the update even if EventBridge update fails
 
-        # Update DynamoDB
+        # Update DynamoDB. Placeholder names come from the fixed allow-list,
+        # never from client-supplied keys.
         update_expression = "SET "
         expression_attribute_values = {}
         expression_attribute_names = {}
 
-        for key, value in body.items():
+        for key, value in updates.items():
             update_expression += f"#{key} = :{key}, "
             expression_attribute_values[f":{key}"] = value
             expression_attribute_names[f"#{key}"] = key

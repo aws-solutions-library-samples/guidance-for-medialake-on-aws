@@ -57,7 +57,7 @@
         "OutputGroupSettings": {
           "Type": "FILE_GROUP_SETTINGS",
           "FileGroupSettings": {
-            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "Destination": {{ ("s3://" ~ variables.output_bucket ~ "/" ~ variables.output_key) | jsonify }},
             "DestinationSettings": {
               "S3Settings": {
                 "AccessControl": {
@@ -95,7 +95,7 @@
         "OutputGroupSettings": {
           "Type": "FILE_GROUP_SETTINGS",
           "FileGroupSettings": {
-            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}"
+            "Destination": {{ ("s3://" ~ variables.output_bucket ~ "/" ~ variables.output_key) | jsonify }}
           }
         }
       }
@@ -113,7 +113,7 @@
           }
         },
         "VideoSelector": {},
-        "FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}"
+        "FileInput": {{ ("s3://" ~ variables.input_bucket ~ "/" ~ variables.input_key) | jsonify }}
       }
     ],
     "FollowSource": 1

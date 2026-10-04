@@ -74,8 +74,8 @@ def _resolve_params(event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _generate_collection_id() -> str:
-    """Generate a short prefixed collection ID matching the API's format."""
-    return f"col_{uuid.uuid4().hex[:8]}"
+    """Generate a prefixed collection ID matching the API's format."""
+    return f"col_{uuid.uuid4().hex}"
 
 
 def _parse_asset_ids(explicit: Any, payload: Dict[str, Any]) -> List[str]:
@@ -269,7 +269,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if tags:
             item["tags"] = tags  # list (matches CollectionModel.tags + OpenSearch)
 
-        table.put_item(Item=item)
+        # Never overwrite an existing collection (and its ownerId) on an ID
+        # collision.
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(PK)")
         # Owner relationship row so it shows in the owner's collections and is
         # reassigned (not orphaned) if the owner is deleted.
         _write_owner_relationship(table, owner_id, collection_id, current_timestamp)

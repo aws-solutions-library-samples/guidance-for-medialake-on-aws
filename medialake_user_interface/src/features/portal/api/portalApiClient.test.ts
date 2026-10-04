@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createPortalApiClient } from "./portalApiClient";
+import { WafCaptchaNotConfiguredError, resetWafCaptchaSdkForTests } from "./wafCaptchaSdk";
 import { StorageHelper } from "@/common/helpers/storage-helper";
 
 // ---------------------------------------------------------------------------
@@ -196,5 +197,68 @@ describe("createPortalApiClient", () => {
 
     const result = fulfilledHandler.fulfilled(mockConfig);
     expect(result.headers["X-Portal-Session"]).toBe(SESSION_JWT);
+  });
+});
+
+describe("createPortalApiClient WAF CAPTCHA SDK loading", () => {
+  const SDK_URL = "https://abc123.edge.captcha-sdk.awswaf.com/abc123/jsapi.js";
+
+  const sdkScripts = () =>
+    Array.from(document.querySelectorAll<HTMLScriptElement>('script[src*="awswaf.com"]'));
+
+  beforeEach(() => {
+    removeWafGlobal();
+    resetWafCaptchaSdkForTests();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  });
+
+  afterEach(() => {
+    resetWafCaptchaSdkForTests();
+    vi.restoreAllMocks();
+  });
+
+  it("loads the SDK from aws-exports.json before the first WAF request", async () => {
+    StorageHelper.setAwsConfig({
+      API: { REST: { RestApi: { endpoint: FAKE_ENDPOINT } } },
+      Portal: { captchaSdkUrl: SDK_URL },
+    });
+    mockWafFetch.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const client = createPortalApiClient(SESSION_JWT, true);
+    const request = client.get("/portal/test-slug");
+
+    await vi.waitFor(() => expect(sdkScripts()).toHaveLength(1));
+    expect(sdkScripts()[0].src).toBe(SDK_URL);
+    expect(mockWafFetch).not.toHaveBeenCalled();
+
+    installWafGlobal();
+    sdkScripts()[0].dispatchEvent(new Event("load"));
+
+    await expect(request).resolves.toMatchObject({ data: { ok: true } });
+    expect(mockWafFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects WAF requests when the SDK is not configured", async () => {
+    const client = createPortalApiClient(SESSION_JWT, true);
+
+    await expect(client.get("/portal/test-slug")).rejects.toBeInstanceOf(
+      WafCaptchaNotConfiguredError
+    );
+    expect(sdkScripts()).toHaveLength(0);
+  });
+
+  it("never loads the SDK for non-CAPTCHA clients", () => {
+    createPortalApiClient(SESSION_JWT, false);
+    expect(sdkScripts()).toHaveLength(0);
   });
 });

@@ -3,6 +3,7 @@ GET  /groups/{groupId}/permissions - Get group permissions
 PUT  /groups/{groupId}/permissions - Update group permissions (auto-syncs Permission Set)
 """
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -123,6 +124,45 @@ def _create_error_response(status_code: int, message: str) -> Dict[str, Any]:
         "headers": CORS_HEADERS,
         "body": error_response.model_dump_json(),
     }
+
+
+def _loads_if_str(value: Any) -> Any:
+    if isinstance(value, str):
+        return json.loads(value)
+    return value
+
+
+def _caller_permissions(raw_event: Dict[str, Any]) -> List[str]:
+    """Flat ``resource:action`` permissions of the caller, from the authorizer.
+
+    The custom authorizer passes the decoded token as the JSON string
+    ``requestContext.authorizer.claims``. For a Cognito user the permissions are
+    the ``custom:permissions`` claim (itself a JSON-encoded list); for an API key
+    they are the synthetic ``customPermissions`` claim. Returns an empty list
+    when nothing usable is present.
+    """
+    try:
+        authorizer = (raw_event.get("requestContext") or {}).get("authorizer") or {}
+        claims = _loads_if_str(authorizer.get("claims"))
+        if not isinstance(claims, dict):
+            return []
+        for key in ("custom:permissions", "customPermissions"):
+            permissions = _loads_if_str(claims.get(key))
+            if isinstance(permissions, list):
+                return [p for p in permissions if isinstance(p, str)]
+    except (TypeError, ValueError):
+        pass
+    return []
+
+
+def _caller_has_permission(raw_event: Dict[str, Any], permission: str) -> bool:
+    """Whether the caller holds ``permission``, or its legacy ``settings.`` form.
+
+    Mirrors the custom authorizer, which also accepts ``settings.groups:edit``
+    (from permission sets seeded with the nested ``settings`` block).
+    """
+    held = _caller_permissions(raw_event)
+    return permission in held or f"settings.{permission}" in held
 
 
 def _get_group_metadata(table, group_id: str) -> Optional[Dict[str, Any]]:
@@ -531,6 +571,18 @@ def handle_put_group_permissions(
         if not group_id:
             return _create_error_response(400, "Missing group ID")
 
+        # Defence in depth: the authorizer maps this route to groups:edit, but a
+        # group's permissions end up in its members' tokens, so the write must
+        # never depend on that mapping alone.
+        if not _caller_has_permission(app.current_event.raw_event, "groups:edit"):
+            logger.warning(
+                "Caller lacks groups:edit for group permissions update",
+                extra={"group_id": group_id},
+            )
+            return _create_error_response(
+                403, "Access denied: Missing required permission 'groups:edit'"
+            )
+
         # Extract user ID from authorizer context
         request_context = app.current_event.raw_event.get("requestContext", {})
         authorizer = request_context.get("authorizer", {})
@@ -541,9 +593,7 @@ def handle_put_group_permissions(
             claims_raw = authorizer.get("claims", {})
             if isinstance(claims_raw, str):
                 try:
-                    import json as _json
-
-                    claims = _json.loads(claims_raw)
+                    claims = json.loads(claims_raw)
                     user_id = claims.get("sub")
                 except (Exception,):
                     pass

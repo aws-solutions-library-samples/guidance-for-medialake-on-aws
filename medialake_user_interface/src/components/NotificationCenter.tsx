@@ -40,6 +40,28 @@ const formatFileSize = (bytes: string | number, t: (key: string) => string): str
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 };
 
+/**
+ * A job's `expiresAt` in milliseconds, or null when there is no usable value.
+ *
+ * The bulk-download lambdas store this as epoch *seconds*
+ * (`int(expiration_time.timestamp())`), and `new Date()` reads a bare number as
+ * milliseconds — so feeding it through directly dated every completed download
+ * to January 1970. The notification was then filtered out as expired the moment
+ * it was created, and the sync re-created it under a fresh id on the next load,
+ * forever. ISO strings are accepted too: the value has been written both ways.
+ */
+export const expiresAtToMs = (expiresAt: string | number): number | null => {
+  const asNumber = typeof expiresAt === "number" ? expiresAt : Number(expiresAt);
+  if (Number.isFinite(asNumber)) {
+    // Epoch seconds are ~1.8e9 today and epoch milliseconds ~1.8e12, so 1e12
+    // separates them with several millennia of headroom either side.
+    return asNumber < 1e12 ? asNumber * 1000 : asNumber;
+  }
+
+  const parsed = new Date(expiresAt).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 // Helper function to format dates
 const formatDate = (dateString: string, t: (key: string) => string): string => {
   if (!dateString) return t("notifications.date.unknown");
@@ -126,8 +148,8 @@ export interface Notification {
   createdAt?: string;
   /** Job last updated timestamp */
   updatedAt?: string;
-  /** Download expiration timestamp */
-  expiresAt?: string;
+  /** Download expiration timestamp. Epoch seconds from the API; ISO in older rows. */
+  expiresAt?: string | number;
   /** Download expiration in seconds */
   expiresIn?: string;
   /** Job progress percentage (0-100) */
@@ -163,6 +185,66 @@ export const useNotifications = (): NotificationContextValue => {
 
 const STORAGE_KEY = "medialake_notifications";
 
+/**
+ * The key identifying "this job reached this status".
+ *
+ * Shared by the unseen set, the seen set and the badge. These three were
+ * previously written and read by four separate inline template literals, and a
+ * change to one of them silently zeroed the badge — so the shape lives here now.
+ */
+export const jobStatusKey = (jobId: string, status: string): string => `${jobId}:${status}`;
+
+/**
+ * Badge count: unseen job/status pairs that still have a notification on screen.
+ *
+ * Counts *keys*, not matching notifications. The sync can briefly hold two
+ * notifications for one job — it re-creates from a `notificationsRef` snapshot
+ * that is only as fresh as the last render, so a second pass can add a duplicate
+ * before its own dedupe lands — and a job-level key matches every duplicate.
+ * Counting notifications therefore badged a single unseen download as "2" until
+ * the dedupe pass caught up. The previous uuid keying masked this because a uuid
+ * belongs to exactly one notification.
+ */
+export const countUnseen = (
+  notifications: Pick<Notification, "jobId" | "jobStatus">[],
+  unseenKeys: Set<string>
+): number => {
+  const onScreen = new Set<string>();
+  for (const n of notifications) {
+    if (n.jobId && n.jobStatus) onScreen.add(jobStatusKey(n.jobId, n.jobStatus));
+  }
+
+  // Manual intersection rather than `Set.prototype.intersection`: that is
+  // ES2025 and is not polyfilled here, so older Safari/Firefox would throw and
+  // the caller's catch would silently zero the badge.
+  let count = 0;
+  for (const key of onScreen) {
+    if (unseenKeys.has(key)) count++;
+  }
+  return count;
+};
+
+/**
+ * Badge count while jobs are still running: distinct jobs, not notifications.
+ *
+ * Same hazard as `countUnseen` — the sync can briefly hold two notifications for
+ * one job, and counting rows badged one in-flight download as "2". This is the
+ * counter the badge falls back to before the job completes (`markAsUnseen` only
+ * fires on COMPLETED, so `unseenCount` is 0 until then), which is why fixing
+ * `countUnseen` alone left the symptom intact for the whole in-flight window.
+ */
+export const countActiveJobs = (
+  notifications: Pick<Notification, "jobId" | "jobStatus">[]
+): number => {
+  const active = new Set<string>();
+  for (const n of notifications) {
+    if (n.jobId && n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED") {
+      active.add(n.jobId);
+    }
+  }
+  return active.size;
+};
+
 export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -175,10 +257,11 @@ export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ childr
         // Filter out expired notifications
         const now = Date.now();
         const validNotifications = parsedNotifications.filter((n) => {
-          if (n.expiresAt) {
-            return new Date(n.expiresAt).getTime() > now;
-          }
-          return true;
+          if (!n.expiresAt) return true;
+          const expiry = expiresAtToMs(n.expiresAt);
+          // Keep anything we cannot read rather than dropping it: a value in an
+          // unexpected shape is not evidence that the download has expired.
+          return expiry === null || expiry > now;
         });
         setNotifications(validNotifications);
       }
@@ -254,23 +337,26 @@ export const NotificationCenter: React.FC = () => {
 
   const open = Boolean(anchorEl);
 
-  // Calculate unseen count based on localStorage tracking
+  // Calculate unseen count based on localStorage tracking.
+  //
+  // Keyed by `jobId:status`, matching what `markAsUnseen` writes. It used to key
+  // on the notification's uuid, which meant the stored set could only ever be
+  // read through this intersection — correct for the badge, but nothing pruned
+  // the stored array, so it grew by a fresh uuid on every load until it blew the
+  // localStorage quota. The intersection against live notifications is kept: a
+  // job the user has not looked at should only badge while its notification is
+  // actually on screen.
   const getUnseenCount = (): number => {
     try {
       const unseen = localStorage.getItem("medialake_unseen_notifications");
-      const unseenIds = new Set(unseen ? JSON.parse(unseen) : []);
-      return notifications.filter((n) => unseenIds.has(n.id)).length;
+      return countUnseen(notifications, new Set<string>(unseen ? JSON.parse(unseen) : []));
     } catch {
       return 0;
     }
   };
 
   // Calculate active jobs count (not COMPLETED or FAILED)
-  const getActiveJobsCount = (): number => {
-    return notifications.filter(
-      (n) => n.jobStatus && n.jobStatus !== "COMPLETED" && n.jobStatus !== "FAILED"
-    ).length;
-  };
+  const getActiveJobsCount = (): number => countActiveJobs(notifications);
 
   const [unseenCount, setUnseenCount] = useState(getUnseenCount());
   const [activeJobsCount, setActiveJobsCount] = useState(getActiveJobsCount());
@@ -301,8 +387,7 @@ export const NotificationCenter: React.FC = () => {
       if (n.jobId && n.jobStatus) {
         // Mark this job+status combination as seen
         const seenJobs = getSeenJobNotifications();
-        const jobKey = `${n.jobId}:${n.jobStatus}`;
-        seenJobs.add(jobKey);
+        seenJobs.add(jobStatusKey(n.jobId, n.jobStatus));
         localStorage.setItem("medialake_seen_job_notifications", JSON.stringify([...seenJobs]));
       }
       if (!n.seen) markAsSeen(n.id);

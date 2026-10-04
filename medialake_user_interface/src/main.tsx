@@ -5,9 +5,16 @@ import { Amplify } from "aws-amplify";
 import { useTranslation } from "react-i18next";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { registerGoldenRetrieverServiceWorker } from "./features/upload/utils/uppySignRequest";
+import { pruneOversizedNotificationStorage } from "./common/helpers/notification-storage";
 
 // Import and initialize i18next configuration
 import "./i18n/i18n";
+
+// Repair storage before anything mounts. A notification key that has grown past
+// the quota makes the first `setItem` of the session throw, and that throw comes
+// out of an effect at the app root — taking every route down, share pages
+// included, with no way for the user to recover short of devtools.
+pruneOversizedNotificationStorage();
 
 // Auto-reload when Vite chunk imports fail after a deploy (stale hash in cached index.html).
 // The flag prevents an infinite reload loop if the new index.html also fails for some reason.

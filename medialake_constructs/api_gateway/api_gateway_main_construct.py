@@ -171,12 +171,15 @@ class ApiGatewayConstruct(Construct):
             tracing_enabled=True,
             metrics_enabled=True,
             throttling_rate_limit=2500,
-            data_trace_enabled=True,
+            # Keep in sync with ApiGatewayDeploymentConstruct's live stage: no
+            # data trace (it logs bearer tokens and bodies), ERROR-level
+            # execution logging.
+            data_trace_enabled=False,
             access_log_destination=apigateway.LogGroupLogDestination(
                 rest_api_log_group
             ),
             access_log_format=access_log_format,
-            logging_level=apigateway.MethodLoggingLevel.INFO,
+            logging_level=apigateway.MethodLoggingLevel.ERROR,
         )
 
         # Create the API without deploying it by default

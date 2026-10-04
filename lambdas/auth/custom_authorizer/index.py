@@ -80,6 +80,15 @@ token_verification_cache = {}
 api_key_validation_cache = {}
 
 
+class AuthenticationError(Exception):
+    """Credentials are missing, expired or invalid.
+
+    The handler turns this into ``Exception("Unauthorized")`` (exact message),
+    which API Gateway maps to the 401 UNAUTHORIZED gateway response. Genuine
+    permission denials still return a Deny policy (403 ACCESS_DENIED).
+    """
+
+
 @tracer.capture_method
 def extract_api_key_from_header(headers: Dict[str, str]) -> Optional[str]:
     """
@@ -816,6 +825,53 @@ def _lazy_migrate_permissions(
 
 
 @tracer.capture_method
+def _verify_api_key_secret(
+    api_key_item: Dict[str, Any], provided_secret: str, correlation_id: str
+) -> None:
+    """
+    Fetch the stored secret from Secrets Manager and compare it with the
+    provided one in constant time.
+
+    Raises:
+        Exception: If the secret cannot be retrieved or does not match
+    """
+    # Retrieve the actual secret from Secrets Manager with error handling
+    try:
+        secret_response = secretsmanager.get_secret_value(
+            SecretId=api_key_item["secretArn"]
+        )
+
+        if "SecretString" not in secret_response:
+            raise Exception("Secret value not found in Secrets Manager response")
+
+        stored_secret = secret_response["SecretString"]
+
+        if not stored_secret:
+            raise Exception("Empty secret value retrieved from Secrets Manager")
+
+    except Exception as secret_err:
+        metrics.add_metric(
+            name="validate.api_key.secrets_manager_error",
+            unit=MetricUnit.Count,
+            value=1,
+        )
+        logger.error(
+            f"Error retrieving secret for API key {api_key_item['id']}: {str(secret_err)}",
+            extra={"correlation_id": correlation_id},
+        )
+        raise Exception(f"Error retrieving API key secret: {str(secret_err)}")
+
+    # Compare provided secret with stored secret using constant-time comparison
+    if not secrets.compare_digest(provided_secret, stored_secret):
+        metrics.add_metric(
+            name="validate.api_key.invalid_secret",
+            unit=MetricUnit.Count,
+            value=1,
+        )
+        raise Exception("Invalid API key secret")
+
+
+@tracer.capture_method
 def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
     """
     Validate an API key by looking it up in DynamoDB and verifying against Secrets Manager.
@@ -832,23 +888,11 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
     """
     start_time = time.time()
 
-    # Check cache first
+    # The DynamoDB item (existence, isEnabled, permissions) is read on every
+    # request so that disabling or deleting a key takes effect immediately.
+    # Only the expensive Secrets Manager lookup + secret comparison is cached.
     cache_key = hashlib.sha256(api_key_value.encode()).hexdigest()
-    cache_entry = api_key_validation_cache.get(cache_key)
 
-    if cache_entry and cache_entry["expiry"] > time.time():
-        metrics.add_metric(
-            name="validate.api_key.cache_hit", unit=MetricUnit.Count, value=1
-        )
-        logger.debug(
-            "Using cached API key validation result",
-            extra={"correlation_id": correlation_id},
-        )
-        return cache_entry["api_key_item"]
-
-    metrics.add_metric(
-        name="validate.api_key.cache_miss", unit=MetricUnit.Count, value=1
-    )
     logger.info("Validating API key", extra={"correlation_id": correlation_id})
 
     try:
@@ -950,46 +994,35 @@ def validate_api_key(api_key_value: str, correlation_id: str) -> Dict[str, Any]:
             )
             raise Exception("API key is disabled")
 
-        # Retrieve the actual secret from Secrets Manager with error handling
-        try:
-            secret_response = secretsmanager.get_secret_value(
-                SecretId=api_key_item["secretArn"]
-            )
-
-            if "SecretString" not in secret_response:
-                raise Exception("Secret value not found in Secrets Manager response")
-
-            stored_secret = secret_response["SecretString"]
-
-            if not stored_secret:
-                raise Exception("Empty secret value retrieved from Secrets Manager")
-
-        except Exception as secret_err:
+        # Reuse a recent successful secret verification for this exact key
+        # value, but only while the item still points at the same secret and
+        # has not been updated since (e.g. key rotation bumps updatedAt).
+        cache_entry = api_key_validation_cache.get(cache_key)
+        if (
+            cache_entry
+            and cache_entry["expiry"] > time.time()
+            and cache_entry["secretArn"] == api_key_item["secretArn"]
+            and cache_entry["updatedAt"] == api_key_item["updatedAt"]
+        ):
             metrics.add_metric(
-                name="validate.api_key.secrets_manager_error",
-                unit=MetricUnit.Count,
-                value=1,
+                name="validate.api_key.cache_hit", unit=MetricUnit.Count, value=1
             )
-            logger.error(
-                f"Error retrieving secret for API key {api_key_item['id']}: {str(secret_err)}",
+            logger.debug(
+                "Using cached API key secret verification",
                 extra={"correlation_id": correlation_id},
             )
-            raise Exception(f"Error retrieving API key secret: {str(secret_err)}")
-
-        # Compare provided secret with stored secret using constant-time comparison
-        if not secrets.compare_digest(provided_secret, stored_secret):
+        else:
             metrics.add_metric(
-                name="validate.api_key.invalid_secret",
-                unit=MetricUnit.Count,
-                value=1,
+                name="validate.api_key.cache_miss", unit=MetricUnit.Count, value=1
             )
-            raise Exception("Invalid API key secret")
+            _verify_api_key_secret(api_key_item, provided_secret, correlation_id)
 
-        # Cache successful validation (5 minutes TTL)
-        api_key_validation_cache[cache_key] = {
-            "api_key_item": api_key_item,
-            "expiry": time.time() + 300,
-        }
+            # Cache the successful secret verification (5 minutes TTL)
+            api_key_validation_cache[cache_key] = {
+                "secretArn": api_key_item["secretArn"],
+                "updatedAt": api_key_item["updatedAt"],
+                "expiry": time.time() + 300,
+            }
 
         # Clean up expired cache entries periodically (1% chance per request)
         if hash(cache_key) % 100 == 0:
@@ -1059,8 +1092,14 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /assets/{id}": "assets:view",
         "post /assets/{id}/rename": "assets:edit",
         "get /assets/{id}/transcript": "assets:view",
-        "get /assets/{id}/related_versions": "assets:view",
-        "post /assets/generate_presigned_url": "assets:upload",
+        # Keys must match the API Gateway resource template exactly. These two
+        # were previously spelled "related_versions" / "generate_presigned_url",
+        # never matched, and left both routes ungated.
+        "get /assets/{id}/relatedversions": "assets:view",
+        # Returns a presigned GET URL for an asset representation: every UI
+        # caller is a download action, so it needs assets:download (held by
+        # every built-in group), not assets:upload.
+        "post /assets/generate-presigned-url": "assets:download",
         # Batch-delete job routes. A batch delete is an asset-delete
         # operation, so the mutating routes require assets:delete; listing
         # your own jobs is a read gated on assets:view.
@@ -1079,13 +1118,17 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         # Clearing a finished batch-delete job (BUG-26) is a delete op on the
         # caller's own delete artifact and requires assets:delete.
         "delete /assets/batch/{jobId}": "assets:delete",
-        # Download endpoints
-        "get /download/bulk": "assets:download",
-        "post /download/bulk": "assets:download",
-        "get /download/bulk/{jobId}": "assets:download",
-        "put /download/bulk/{jobId}/downloaded": "assets:download",
-        "delete /download/bulk/{jobId}": "assets:download",
-        "get /download/bulk/user": "assets:download",
+        # Bulk download endpoints (deployed under /assets; the former
+        # "/download/bulk..." keys lacked the prefix and never matched).
+        "post /assets/download/bulk": "assets:download",
+        "get /assets/download/bulk/{jobId}": "assets:download",
+        "put /assets/download/bulk/{jobId}": "assets:download",
+        "delete /assets/download/bulk/{jobId}": "assets:download",
+        # Like get /assets/batch/user above, this is polled every 15s for every
+        # user by the notification center (useJobNotifications) and returns only
+        # the caller's own jobs, so it stays on assets:view rather than
+        # assets:download.
+        "get /assets/download/bulk/user": "assets:view",
         # Collections endpoints
         "get /collections": "collections:view",
         "post /collections": "collections:create",
@@ -1115,6 +1158,28 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "get /collections/{collectionId}/ancestors": "collections:view",
         "get /collections/shared-with-me": "collections:view",
         "get /collections/shared-by-me": "collections:view",
+        # API Gateway exposes collections as ANY /collections/{collectionId} and
+        # ANY /collections/{collectionId}/{proxy+}, and the authorizer sees
+        # those templates, so the per-sub-route keys above (items/{itemId},
+        # rules/{ruleId}, share/{userId}) never match a live request. The
+        # entries below are the baseline actually enforced for the proxy; the
+        # collections Lambda then checks the caller's per-collection role
+        # (e.g. require_collection_role). The baseline stays at
+        # collections:view because the proxy also carries routes that
+        # viewers use, such as leaving a collection shared with them
+        # (DELETE share/{self}) and managing collection groups
+        # (POST /collections/groups is POST /collections/{collectionId}).
+        "post /collections/{collectionId}": "collections:view",
+        # GET and POST keep what they already resolved to via the pattern
+        # fallback, made explicit so they no longer depend on dict order.
+        "get /collections/{collectionId}/{proxy+}": "collections:view",
+        "post /collections/{collectionId}/{proxy+}": [
+            "collections:add_assets",
+            "collections:edit",
+        ],
+        "put /collections/{collectionId}/{proxy+}": "collections:view",
+        "patch /collections/{collectionId}/{proxy+}": "collections:view",
+        "delete /collections/{collectionId}/{proxy+}": "collections:view",
         # Connectors endpoints
         "get /connectors": "connectors:view",
         "post /connectors": "connectors:create",
@@ -1133,8 +1198,14 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         # Groups endpoints
         "get /groups": "groups:view",
         "post /groups": "groups:create",
+        "get /groups/{groupId}": "groups:view",
         "put /groups/{id}": "groups:edit",
         "delete /groups/{id}": "groups:delete",
+        # A group's permissions are baked into its members' tokens, so writing
+        # them is as privileged as editing the group (previously unmapped: any
+        # authenticated caller could grant their own group users:edit).
+        "get /groups/{groupId}/permissions": "groups:view",
+        "put /groups/{groupId}/permissions": "groups:edit",
         # Group membership is managed through the users endpoints below, which
         # write Cognito group membership. The former /groups/{groupId}/members
         # routes have been removed; note the entries here never matched them
@@ -1147,6 +1218,20 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         # Nodes endpoints
         "get /nodes": "nodes:view",
         "get /nodes/{id}": "nodes:view",
+        "get /nodes/{id}/methods": "nodes:view",
+        # The unconfigured-methods catalog feeds the pipeline editor sidebar
+        # and the integrations settings page. Groups built in the Permissions
+        # UI cannot be granted nodes:view (it is not in the UI's resource
+        # matrix), so the pipelines/integrations permissions those pages
+        # require are accepted too; otherwise such groups would lose the node
+        # palette they can use today.
+        "get /nodes/methods/unconfigured": [
+            "nodes:view",
+            "pipelines:view",
+            "pipelines:create",
+            "pipelines:edit",
+            "integrations:view",
+        ],
         # Permissions endpoints
         "get /permissions": "permissions:view",
         "post /permissions": "permissions:create",
@@ -1194,6 +1279,7 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         # Settings endpoints
         "get /settings/api-keys": "api-keys:view",  # pragma: allowlist secret
         "post /settings/api-keys": "api-keys:create",  # pragma: allowlist secret
+        "get /settings/api-keys/{id}": "api-keys:view",
         "put /settings/api-keys/{id}": "api-keys:edit",
         "put /settings/api-keys/{id}/permissions": "api-keys:edit",
         "delete /settings/api-keys/{id}": "api-keys:delete",
@@ -1203,13 +1289,19 @@ def create_permission_mapping() -> Dict[str, Union[str, List[str], None]]:
         "post /settings/collection-types": "collection-types:create",
         "put /settings/collection-types/{type_id}": "collection-types:edit",
         "delete /settings/collection-types/{type_id}": "collection-types:delete",
-        "post /settings/collection-types/{type_id}/migrate": "collection-types:edit",
+        # Migrate is POST /settings/collection-types/{type_id}/migrate, which
+        # API Gateway routes through the {proxy+} resource; the authorizer sees
+        # the proxy template, so a "{type_id}/migrate" key would never match.
+        "post /settings/collection-types/{proxy+}": "collection-types:edit",
         # System settings endpoints
         # GET system settings are needed by all users for app initialization
         "get /settings/system": None,
         "get /settings/system/search": None,
         "post /settings/system/search": "system:edit",
         "put /settings/system/search": "system:edit",
+        # Deletes the search provider and force-deletes its secret; as much a
+        # system-settings write as POST/PUT above.
+        "delete /settings/system/search": "system:edit",
         # Just-in-time provisioning policy for federated users. Readable by
         # anyone holding system:view (present in every seeded permission set, so
         # the settings page can render); only administrators may change it.
@@ -1371,6 +1463,15 @@ def normalize_resource_path(
         Normalized path with placeholders (e.g., "/api/assets/{id}")
     """
     if not path_parameters:
+        return resource_path
+
+    # API Gateway passes requestContext.resourcePath as the resource TEMPLATE
+    # (e.g. "/groups/{groupId}/permissions"), which is already normalized.
+    # Substituting parameter values into a template can only corrupt it: a
+    # caller-chosen value that is a prefix of a literal segment (groupId "p"
+    # turns "/permissions" into "/{groupId}ermissions") would make the route
+    # match no mapping entry and fall through to "no permission required".
+    if "{" in resource_path:
         return resource_path
 
     normalized_path = resource_path
@@ -2082,7 +2183,10 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
             # Validate API key
             try:
-                api_key_item = validate_api_key(api_key, correlation_id)
+                try:
+                    api_key_item = validate_api_key(api_key, correlation_id)
+                except Exception as key_err:
+                    raise AuthenticationError(str(key_err)) from key_err
 
                 # Generate synthetic claims for API key
                 try:
@@ -2416,6 +2520,8 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 metrics.add_metric(
                     name="request.api_key_error", unit=MetricUnit.Count, value=1
                 )
+                if isinstance(e, AuthenticationError):
+                    raise
                 raise Exception(f"Unauthorized: {str(e)}")
         else:
             logger.error(
@@ -2425,7 +2531,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             metrics.add_metric(
                 name="request.missing_credentials", unit=MetricUnit.Count, value=1
             )
-            raise Exception("Unauthorized: No authentication credentials found")
+            raise AuthenticationError("No authentication credentials found")
 
         # Continue with JWT authentication flow if we have a bearer token
         if not bearer_token:
@@ -2434,7 +2540,10 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
 
         # Parse and verify the token
         try:
-            parsed_token = decode_and_verify_token(bearer_token, correlation_id)
+            try:
+                parsed_token = decode_and_verify_token(bearer_token, correlation_id)
+            except Exception as token_err:
+                raise AuthenticationError(str(token_err)) from token_err
 
             # Extract HTTP method and resource path
             http_method = (
@@ -2661,23 +2770,15 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                 name="request.token_error", unit=MetricUnit.Count, value=1
             )
 
-            # Check if this is a token expiration error
-            # Raise Unauthorized so API Gateway returns 401 (not 403 Deny policy)
-            # This allows the frontend to distinguish expired tokens from
-            # genuine permission denials and trigger a token refresh
-            is_expired = any(
-                phrase in error_str.lower()
-                for phrase in ["expired", "token has expired", "exp claim"]
-            )
-
-            if is_expired:
-                logger.info(
-                    "Token expired - raising Unauthorized for 401 response",
-                    extra={"correlation_id": correlation_id},
-                )
-                metrics.add_metric(
-                    name="request.token_expired", unit=MetricUnit.Count, value=1
-                )
+            # Missing, expired or invalid token: let it propagate so the
+            # handler raises Exception("Unauthorized") and API Gateway returns
+            # 401 (not a 403 Deny policy). The frontend refreshes the token
+            # and retries on 401.
+            if isinstance(e, AuthenticationError):
+                if "expired" in error_str.lower():
+                    metrics.add_metric(
+                        name="request.token_expired", unit=MetricUnit.Count, value=1
+                    )
 
                 # Record execution time
                 execution_time = (time.time() - start_time) * 1000
@@ -2687,7 +2788,7 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
                     value=execution_time,
                 )
 
-                raise Exception("Unauthorized: The incoming token has expired")
+                raise
 
             policy = {
                 "principalId": "denied_user",
@@ -2722,6 +2823,18 @@ def handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
             )
 
             return policy
+
+    except AuthenticationError as e:
+        logger.warning(
+            f"Authentication failed, returning 401: {str(e)}",
+            extra={"correlation_id": correlation_id},
+        )
+        metrics.add_metric(
+            name="request.result_unauthorized", unit=MetricUnit.Count, value=1
+        )
+        # API Gateway only maps this exact message to the 401 UNAUTHORIZED
+        # gateway response; any other message becomes a 500.
+        raise Exception("Unauthorized")
 
     except Exception as e:
         logger.error(

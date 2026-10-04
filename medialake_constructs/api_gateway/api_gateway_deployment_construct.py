@@ -95,8 +95,12 @@ class ApiGatewayDeploymentConstruct(Construct):
             metrics_enabled=True,
             throttling_rate_limit=2500,
             throttling_burst_limit=5000,
-            data_trace_enabled=True,
-            logging_level=apigateway.MethodLoggingLevel.INFO,
+            # Data trace writes full request/response bodies and headers
+            # (including Authorization bearer tokens and x-api-key) to the
+            # execution log group, so it stays off. Execution logging is kept
+            # at ERROR; access logs, metrics and X-Ray tracing are unchanged.
+            data_trace_enabled=False,
+            logging_level=apigateway.MethodLoggingLevel.ERROR,
             access_log_destination=apigateway.LogGroupLogDestination(
                 rest_api_log_group
             ),

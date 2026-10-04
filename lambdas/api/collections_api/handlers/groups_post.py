@@ -56,8 +56,8 @@ def register_route(app):
                 )
                 raise BadRequestError(f"Validation error: {str(e)}")
 
-            # Generate ID
-            group_id = f"grp_{str(uuid.uuid4())[:8]}"
+            # Generate ID (full uuid4 hex; see collections_post)
+            group_id = f"grp_{uuid.uuid4().hex}"
 
             # Prepare group data
             group_data = {

@@ -40,6 +40,21 @@ from medialake_constructs.shared_constructs.lambda_base import Lambda, LambdaCon
 from medialake_constructs.shared_constructs.s3bucket import S3Bucket, S3BucketProps
 
 
+def portal_aws_exports(cfg) -> Dict[str, str]:
+    """The ``Portal`` section of aws-exports.json.
+
+    Carries the deployment's own AWS WAF CAPTCHA SDK URL and API key for
+    CAPTCHA-enabled upload portals. Each key is emitted only when configured,
+    so an unconfigured deployment's aws-exports.json is unchanged.
+    """
+    portal: Dict[str, str] = {}
+    if getattr(cfg, "waf_captcha_integration_url", None):
+        portal["captchaSdkUrl"] = cfg.waf_captcha_integration_url
+    if getattr(cfg, "waf_captcha_api_key", None):
+        portal["captchaApiKey"] = cfg.waf_captcha_api_key
+    return portal
+
+
 @jsii.implements(ILocalBundling)
 class LocalBundling:
     def __init__(self, app_path: str, build_path: str):
@@ -176,7 +191,9 @@ class UIConstruct(Construct):
         # Production is strict: no 'unsafe-eval' and no 'unsafe-inline' in
         # script-src (the Vite production build loads only external module
         # scripts, and the AWS WAF captcha SDK is the sole third-party script
-        # origin). Dev deployments additionally allow the Vite dev server on
+        # origin; config.py only accepts an https://*.awswaf.com
+        # waf_captcha_integration_url, so it stays within script-src below).
+        # Dev deployments additionally allow the Vite dev server on
         # localhost ports 5173-5175 and 'unsafe-eval'/'unsafe-inline', which
         # Vite HMR and dev tooling rely on.
         is_dev = config.environment == "dev"
@@ -910,6 +927,9 @@ function handler(event) {
                 }
             },
         }
+        portal_exports = portal_aws_exports(config)
+        if portal_exports:
+            config_content["Portal"] = portal_exports
 
         config_resource = cr.AwsCustomResource(
             self,

@@ -73,6 +73,8 @@
   "video_download_enabled": true,
   "ses_from_address": "noreply@example.com",
   "portal_rate_limit_per_5min": 1000,
+  "waf_captcha_integration_url": "https://EXAMPLE.edge.captcha-sdk.awswaf.com/EXAMPLE/jsapi.js",
+  "waf_captcha_api_key": "YOUR-WAF-CAPTCHA-API-KEY",
   "temporary_password_validity_days": 7,
   "external_nodes_bucket": "my-custom-pipeline-nodes"
 }

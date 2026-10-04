@@ -51,7 +51,7 @@
         "OutputGroupSettings": {
           "Type": "FILE_GROUP_SETTINGS",
           "FileGroupSettings": {
-            "Destination": "s3://{{ variables.output_bucket }}/{{ variables.output_key }}",
+            "Destination": {{ ("s3://" ~ variables.output_bucket ~ "/" ~ variables.output_key) | jsonify }},
             "DestinationSettings": {
               "S3Settings": {
                 "AccessControl": {
@@ -78,7 +78,7 @@
             "EndTimecode": "{{ variables.segment_end }}"
           }
         ],
-        {% endif %}"FileInput": "s3://{{ variables.input_bucket }}/{{ variables.input_key }}"
+        {% endif %}"FileInput": {{ ("s3://" ~ variables.input_bucket ~ "/" ~ variables.input_key) | jsonify }}
       }
     ],
     "FollowSource": 1

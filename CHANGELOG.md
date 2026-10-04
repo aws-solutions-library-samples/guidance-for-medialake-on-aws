@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.24.1] - 2026-10-04
+
+### Bug Fixes
+
+- fix(notifications): bound unseen-notification storage and repair oversized keys (GitHub #46, thanks @khaitruong922)
+- fix(assets): fail the asset stream batch when failed records cannot reach the DLQ
+- fix(pipelines): restrict PUT /pipelines/{id} to client-updatable fields
+- fix(nodes): JSON-escape S3 URIs in MediaConvert request templates
+- fix(api): disable API Gateway data trace and log execution errors only
+- fix(auth): permission-map unmapped API routes and guard group permission writes
+- fix(auth): return 401 for missing, expired or invalid credentials
+- fix(auth): check API key isEnabled on every request
+- fix(collections): use full uuid4 IDs and never overwrite on create
+- fix(portal): load the WAF CAPTCHA SDK from deployment config
+
 ## [1.24.0] - 2026-09-29
 
 ### Features

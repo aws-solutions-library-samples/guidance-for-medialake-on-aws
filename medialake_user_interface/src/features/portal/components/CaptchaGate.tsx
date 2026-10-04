@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
+import {
+  WafCaptchaNotConfiguredError,
+  loadWafCaptchaSdk,
+  resolveWafCaptchaConfig,
+} from "../api/wafCaptchaSdk";
 
 interface CaptchaGateProps {
   captchaEnabled: boolean;
@@ -7,11 +12,10 @@ interface CaptchaGateProps {
   children: React.ReactNode;
 }
 
-/**
- * WAF CAPTCHA API key — injected at build time.
- * Safe to embed client-side; it only authorises CAPTCHA widget rendering.
- */
-const WAF_CAPTCHA_API_KEY = import.meta.env.VITE_WAF_CAPTCHA_API_KEY as string | undefined;
+const LOAD_FAILED_MESSAGE =
+  "The CAPTCHA verification could not be loaded. Please check your network connection and try again.";
+const CONFIG_MISSING_MESSAGE =
+  "CAPTCHA configuration is missing. Please contact the portal administrator.";
 
 const CaptchaGate: React.FC<CaptchaGateProps> = ({
   captchaEnabled,
@@ -28,32 +32,47 @@ const CaptchaGate: React.FC<CaptchaGateProps> = ({
     setCaptchaSolved(!captchaEnabled);
   }, [captchaEnabled]);
 
-  const renderCaptcha = useCallback(() => {
+  const renderCaptcha = useCallback(async () => {
     if (!containerRef.current) return;
 
     setError(null);
     setLoading(true);
 
-    if (typeof AwsWafCaptcha === "undefined") {
+    // The SDK URL and API key come from aws-exports.json (Portal.*); the SDK
+    // is injected only now, when a CAPTCHA-enabled portal needs it. Missing
+    // configuration fails closed: the children are never rendered.
+    const { sdkUrl, apiKey } = await resolveWafCaptchaConfig();
+    if (!apiKey) {
+      setLoading(false);
+      setError(CONFIG_MISSING_MESSAGE);
+      return;
+    }
+
+    try {
+      await loadWafCaptchaSdk(sdkUrl);
+    } catch (err) {
       setLoading(false);
       setError(
-        "The CAPTCHA verification could not be loaded. Please check your network connection and try again."
+        err instanceof WafCaptchaNotConfiguredError ? CONFIG_MISSING_MESSAGE : LOAD_FAILED_MESSAGE
       );
       return;
     }
 
-    if (!WAF_CAPTCHA_API_KEY) {
+    const container = containerRef.current;
+    if (!container) return; // unmounted while loading
+
+    if (typeof AwsWafCaptcha === "undefined") {
       setLoading(false);
-      setError("CAPTCHA configuration is missing. Please contact the portal administrator.");
+      setError(LOAD_FAILED_MESSAGE);
       return;
     }
 
     // Clear previous widget content before re-rendering
-    containerRef.current.innerHTML = "";
+    container.innerHTML = "";
 
     try {
-      AwsWafCaptcha.renderCaptcha(containerRef.current, {
-        apiKey: WAF_CAPTCHA_API_KEY,
+      AwsWafCaptcha.renderCaptcha(container, {
+        apiKey,
         onSuccess: () => {
           setCaptchaSolved(true);
           onCaptchaComplete();
@@ -70,9 +89,7 @@ const CaptchaGate: React.FC<CaptchaGateProps> = ({
     } catch (err) {
       console.error("CAPTCHA render error:", err);
       setLoading(false);
-      setError(
-        "The CAPTCHA verification could not be loaded. Please check your network connection and try again."
-      );
+      setError(LOAD_FAILED_MESSAGE);
     }
   }, [onCaptchaComplete]);
 
