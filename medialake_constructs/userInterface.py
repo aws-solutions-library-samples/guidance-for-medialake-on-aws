@@ -55,6 +55,63 @@ def portal_aws_exports(cfg) -> Dict[str, str]:
     return portal
 
 
+DEV_LOCAL_ORIGINS = " ".join(
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1")
+    for port in (5173, 5174, 5175)
+)
+
+
+def build_ui_content_security_policy(is_dev: bool) -> str:
+    """Content-Security-Policy header for the deployed UI.
+
+    Production is strict: no 'unsafe-eval' and no 'unsafe-inline' in
+    script-src (the Vite production build loads only external module scripts,
+    and the AWS WAF captcha SDK is the sole third-party script origin;
+    config.py only accepts an https://*.awswaf.com waf_captcha_integration_url,
+    so it stays within script-src below). Dev deployments additionally allow
+    the Vite dev server on localhost ports 5173-5175 and
+    'unsafe-eval'/'unsafe-inline', which Vite HMR and dev tooling rely on.
+
+    script-src includes ``blob:`` because AudioWorklet modules are governed by
+    script-src, not worker-src. Omakase Player builds its sync-audio-worklet
+    processor as a Blob URL and loads it with ``audioWorklet.addModule``;
+    without ``blob:`` that load is rejected with an AbortError, which surfaces
+    as an unhandled "Uncaught (in promise)" and leaves the player without its
+    sync tick, so audio-only and DRM playback never emit time/progress updates.
+    Blob URLs can only be minted by script already running on this origin, so
+    this does not admit any new script source.
+    """
+    script_src = "script-src 'self' blob: https://*.awswaf.com"
+    connect_src = (
+        "connect-src 'self' data: blob: https://*.amazonaws.com "
+        "https://*.amazoncognito.com https://*.cloudfront.net "
+        "https://*.awswaf.com"
+    )
+    if is_dev:
+        script_src += f" 'unsafe-inline' 'unsafe-eval' {DEV_LOCAL_ORIGINS}"
+        connect_src += (
+            f" {DEV_LOCAL_ORIGINS} ws://localhost:5173 ws://localhost:5174"
+            " ws://localhost:5175"
+        )
+
+    return (
+        "default-src 'self'; "
+        f"{script_src}; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "style-src-attr 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https: blob:; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
+        f"{connect_src}; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "worker-src 'self' blob:; "
+        "object-src 'none'"
+    )
+
+
 @jsii.implements(ILocalBundling)
 class LocalBundling:
     def __init__(self, app_path: str, build_path: str):
@@ -186,52 +243,15 @@ class UIConstruct(Construct):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # Content-Security-Policy for the deployed UI.
-        #
-        # Production is strict: no 'unsafe-eval' and no 'unsafe-inline' in
-        # script-src (the Vite production build loads only external module
-        # scripts, and the AWS WAF captcha SDK is the sole third-party script
-        # origin; config.py only accepts an https://*.awswaf.com
-        # waf_captcha_integration_url, so it stays within script-src below).
-        # Dev deployments additionally allow the Vite dev server on
-        # localhost ports 5173-5175 and 'unsafe-eval'/'unsafe-inline', which
-        # Vite HMR and dev tooling rely on.
-        is_dev = config.environment == "dev"
-        dev_local_origins = " ".join(
-            f"http://{host}:{port}"
-            for host in ("localhost", "127.0.0.1")
-            for port in (5173, 5174, 5175)
-        )
-        script_src = "script-src 'self' https://*.awswaf.com"
-        connect_src = (
-            "connect-src 'self' data: blob: https://*.amazonaws.com "
-            "https://*.amazoncognito.com https://*.cloudfront.net "
-            "https://*.awswaf.com"
-        )
-        if is_dev:
-            script_src += f" 'unsafe-inline' 'unsafe-eval' {dev_local_origins}"
-            connect_src += f" {dev_local_origins} ws://localhost:5173 ws://localhost:5174 ws://localhost:5175"
-
+        # Content-Security-Policy: see build_ui_content_security_policy.
         # Enhanced security headers policy
         ui_response_headers_policy = cloudfront.ResponseHeadersPolicy(
             self,
             "UISecurityHeadersPolicy",
             security_headers_behavior=cloudfront.ResponseSecurityHeadersBehavior(
                 content_security_policy={
-                    "content_security_policy": (
-                        "default-src 'self'; "
-                        f"{script_src}; "
-                        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                        "style-src-attr 'self' 'unsafe-inline'; "
-                        "img-src 'self' data: https: blob:; "
-                        "font-src 'self' data: https://fonts.gstatic.com; "
-                        "media-src 'self' blob: data: https://*.amazonaws.com https://*.cloudfront.net; "
-                        f"{connect_src}; "
-                        "frame-ancestors 'none'; "
-                        "base-uri 'self'; "
-                        "form-action 'self'; "
-                        "worker-src 'self' blob:; "
-                        "object-src 'none'"
+                    "content_security_policy": build_ui_content_security_policy(
+                        is_dev=config.environment == "dev"
                     ),
                     "override": True,
                 },

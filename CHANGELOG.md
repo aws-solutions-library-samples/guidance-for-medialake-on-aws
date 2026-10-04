@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.24.2] - 2026-10-04
+
+### Bug Fixes
+
+- fix(ui): allow blob: in script-src so Omakase's audio worklet loads
+
 ## [1.24.1] - 2026-10-04
 
 ### Bug Fixes
