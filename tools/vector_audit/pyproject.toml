@@ -1,0 +1,21 @@
+[project]
+name = "vector-audit"
+version = "0.1.0"
+description = "Audit an S3 Vectors library for embedding-metadata filterability."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.35",
+    "click>=8.1",
+]
+
+[project.scripts]
+vector-audit = "vector_audit.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 79

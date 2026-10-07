@@ -12,7 +12,32 @@ from typing import Any, Dict, List, Optional
 
 import boto3
 from api_utils import get_api_key, get_search_provider_config
+from bedrock_embedding_model import build_text_payload, resolve_inference_profile
 from twelvelabs import TwelveLabs
+
+
+def _resolve_marengo_version(search_provider_config: Dict[str, Any]) -> str:
+    """Derive the Marengo version ("3.0"/"2.7") from provider config.
+
+    Priority: explicit type ("...-3-0"/"...-2-7") > dimensions (512->3.0,
+    1024->2.7) > name substring. Defaults to 2.7 when nothing is specified.
+    """
+    provider_type = str(search_provider_config.get("type", "") or "")
+    if "3-0" in provider_type or "3.0" in provider_type:
+        return "3.0"
+    if "2-7" in provider_type or "2.7" in provider_type:
+        return "2.7"
+
+    dimensions = str(search_provider_config.get("dimensions", "") or "")
+    if dimensions == "512":
+        return "3.0"
+    if dimensions == "1024":
+        return "2.7"
+
+    provider_name = str(search_provider_config.get("name", "") or "")
+    if "3.0" in provider_name or "3-0" in provider_name:
+        return "3.0"
+    return "2.7"
 
 # Module-level cached AWS clients for reuse across invocations
 _aws_region = os.environ.get("AWS_REGION", "us-west-2")
@@ -98,8 +123,16 @@ class BaseEmbeddingStore(ABC):
         )
         self.logger.info(f"Using search provider type: {provider_type}")
 
+        # Resolve the Marengo version so the query is embedded with the SAME model
+        # as the stored vectors. Mismatched versions land in incompatible spaces
+        # (cosine distances collapse to ~1.0, ranking becomes random).
+        model_version = _resolve_marengo_version(search_provider_config)
+        self.logger.info(f"Resolved Marengo version for query embedding: {model_version}")
+
         if provider_type in ["twelvelabs-bedrock", "twelvelabs-bedrock-3-0"]:
-            return self._generate_embedding_via_bedrock(query_text, start_time)
+            return self._generate_embedding_via_bedrock(
+                query_text, start_time, model_version
+            )
         else:
             return self._generate_embedding_via_twelvelabs_api(query_text, start_time)
 
@@ -141,7 +174,7 @@ class BaseEmbeddingStore(ABC):
         return inference_profile_id
 
     def _generate_embedding_via_bedrock(
-        self, query_text: str, start_time: float
+        self, query_text: str, start_time: float, model_version: str = "2.7"
     ) -> List[float]:
         """
         Generate text embedding using TwelveLabs model via AWS Bedrock InvokeModel with inference profile.
@@ -149,6 +182,8 @@ class BaseEmbeddingStore(ABC):
         Args:
             query_text: The text to generate embedding for
             start_time: Start time for performance logging
+            model_version: Marengo version ("3.0" or "2.7") — must match the
+                stored vectors so query and documents share an embedding space.
 
         Returns:
             List of float values representing the embedding
@@ -157,14 +192,13 @@ class BaseEmbeddingStore(ABC):
         try:
             bedrock_client = _bedrock_runtime_client
 
-            # Determine the correct inference profile based on AWS region
-            inference_profile_id = self._get_regional_inference_profile()
+            # Select the inference profile + payload schema for the resolved
+            # Marengo version (3.0 nests text; 2.7 is flat).
+            aws_region = os.environ.get("AWS_REGION", "us-east-1")
+            inference_profile_id = resolve_inference_profile(model_version, aws_region)
+            payload = build_text_payload(model_version, query_text)
 
             self.logger.info(f"Using Bedrock inference profile: {inference_profile_id}")
-
-            # Prepare model input for TwelveLabs Marengo on Bedrock
-            # Based on AWS docs: for text input with InvokeModel, use {"inputType": "text"}
-            payload = {"inputType": "text", "inputText": query_text}
 
             # Invoke model using inference profile ARN
             embedding_start = time.time()

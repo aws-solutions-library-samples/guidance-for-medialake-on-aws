@@ -60,25 +60,15 @@ const PIPELINES: PipelineConfig[] = [
   {
     file: "Semantic Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs Bedrock Marengo 3.0 Video Embedding to OpenSearch.json",
   },
-  // Bedrock OpenSearch — Marengo 2.7 (no API key)
+  // Bedrock S3 Vectors — Marengo 3.0 (no API key)
   {
-    file: "Semantic Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs Bedrock Marengo 2.7 Audio Embedding to OpenSearch.json",
+    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 3.0 Audio Embedding to S3 Vectors.json",
   },
   {
-    file: "Semantic Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs Bedrock Marengo 2.7 Image Embedding to OpenSearch.json",
+    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 3.0 Image Embedding to S3 Vectors.json",
   },
   {
-    file: "Semantic Search/TwelveLabs/Bedrock/OpenSearch/TwelveLabs Bedrock Marengo 2.7 Video Embedding to OpenSearch.json",
-  },
-  // Bedrock S3 Vectors — Marengo 2.7 (no API key)
-  {
-    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 2.7 Audio Embedding to S3 Vectors.json",
-  },
-  {
-    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 2.7 Image Embedding to S3 Vectors.json",
-  },
-  {
-    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 2.7 Video Embedding to S3 Vectors.json",
+    file: "Semantic Search/TwelveLabs/Bedrock/S3 Vectors/TwelveLabs Bedrock Marengo 3.0 Video Embedding to S3 Vectors.json",
   },
   // API OpenSearch (requires TWELVELABS_API_KEY)
   {
