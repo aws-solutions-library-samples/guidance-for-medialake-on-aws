@@ -932,8 +932,9 @@ class CDKConfig(BaseModel):
     #
     # ``None`` (the default) means *auto*: keep whatever name this deployment is
     # already on, and use the full-account-id form for a brand-new deployment.
-    # The existing name is read from ``{ssm_prefix}/personal-assets-bucket-name``,
-    # which the storage-connectors stack writes on every deploy. Setting the flag
+    # The existing name is read from
+    # ``/medialake/{environment}/personal-assets-bucket-name``, which the
+    # storage-connectors stack writes on every deploy. Setting the flag
     # explicitly overrides the probe in both directions.
     #
     # Why auto is the default: ``BucketName`` is a replacement-triggering
@@ -970,8 +971,9 @@ class CDKConfig(BaseModel):
     # -nodes-templates-, -access-logs-, -user-interface-).
     #
     # To see which form a deployment is on, read
-    # ``{ssm_prefix}/personal-assets-bucket-name`` — if the segment after
-    # "-personal-assets-" is 7 digits rather than 12, it is on the legacy form.
+    # ``/medialake/{environment}/personal-assets-bucket-name`` — if the segment
+    # after "-personal-assets-" is 7 digits rather than 12, it is on the legacy
+    # form.
     unique_personal_assets_bucket_name: Optional[bool] = None
     deployment_options: DeploymentOptionsConfig = Field(
         default_factory=DeploymentOptionsConfig
@@ -1036,7 +1038,7 @@ class CDKConfig(BaseModel):
     def _probe_deployed_personal_assets_bucket_name(self) -> Optional[str]:
         """Read this deployment's current bucket name from SSM, or None.
 
-        ``{ssm_prefix}/personal-assets-bucket-name`` is written by the
+        ``/medialake/{environment}/personal-assets-bucket-name`` is written by the
         storage-connectors stack on every deploy, so its presence means "this
         deployment already has a personal-assets bucket, and this is its name".
         Absent means a first deploy.
@@ -1051,7 +1053,10 @@ class CDKConfig(BaseModel):
         if os.environ.get("MEDIALAKE_DISABLE_SSM_NAME_PROBE"):
             return None
 
-        param = self.ssm_param("personal-assets-bucket-name")
+        # Must match the path StorageConnectorsStack writes, which is not
+        # prefix-scoped. ssm_param() is prefixed for additional deployments, so
+        # the probe never found an existing bucket there and renamed it.
+        param = f"/medialake/{self.environment}/personal-assets-bucket-name"
         cache_key = (self.primary_region, param)
         if cache_key in _PERSONAL_ASSETS_NAME_PROBE_CACHE:
             return _PERSONAL_ASSETS_NAME_PROBE_CACHE[cache_key]
