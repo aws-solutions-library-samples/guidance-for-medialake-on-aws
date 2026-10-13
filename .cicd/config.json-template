@@ -59,7 +59,11 @@
             {
                 "identity_provider_method": "cognito"
             }
-        ]
+        ],
+        "jit_provisioning": {
+            "enabled": true,
+            "default_group": "read-only"
+        }
     },
     "external_nodes_bucket": "",
     "upload_portals": {
