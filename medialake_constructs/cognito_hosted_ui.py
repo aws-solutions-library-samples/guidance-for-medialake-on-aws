@@ -16,10 +16,12 @@ from typing import Iterable, List, Optional, Tuple
 FEDERATED_METHODS = ("saml", "oidc")
 
 # Local development (vite dev server). Kept from the original callback list.
+# Custom: adding here also the DaVinci Resolve plugin's OAuth loopback redirect
 LOCAL_CALLBACK_URLS = (
     "https://localhost:5173",
     "https://localhost:5173/",
     "https://localhost:5173/login",
+    "http://localhost:8712/callback",
 )
 
 
