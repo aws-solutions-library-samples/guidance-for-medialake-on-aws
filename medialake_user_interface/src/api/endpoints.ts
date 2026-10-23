@@ -101,6 +101,7 @@ export const API_ENDPOINTS = {
     SHARES: (id: string) => `/collections/${id}/share`,
     SHARED_WITH_ME: "/collections/shared-with-me",
     SHARED_BY_ME: "/collections/shared-by-me",
+    MEMBERSHIP: "/collections/membership",
     ITEMS: (id: string) => `/collections/${id}/items`,
     ASSETS: (id: string) => `/collections/${id}/assets`,
     THUMBNAIL: (id: string) => `/collections/${id}/thumbnail`,

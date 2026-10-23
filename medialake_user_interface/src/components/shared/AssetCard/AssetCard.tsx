@@ -22,6 +22,7 @@ import { useOmakasePlayer } from "./useOmakasePlayer";
 import type { ClipData } from "./markerHelpers";
 import AssetCardThumbnail from "./AssetCardThumbnail";
 import AssetCardActions from "./AssetCardActions";
+import AssetCardCollectionBadge from "./AssetCardCollectionBadge";
 import AssetCardSelection from "./AssetCardSelection";
 import AssetCardMetadata from "./AssetCardMetadata";
 import AssetCardCompactInfo from "./AssetCardCompactInfo";
@@ -55,6 +56,7 @@ export interface AssetCardProps {
   showMetadata?: boolean;
   menuOpen?: boolean;
   isFavorite?: boolean;
+  isInCollection?: boolean;
   onFavoriteToggle?: (event: React.MouseEvent<HTMLElement>) => void;
   isSelected?: boolean;
   onSelectToggle?: (id: string, event: React.MouseEvent<HTMLElement>) => void;
@@ -94,6 +96,7 @@ const AssetCard = React.memo<AssetCardProps>(
     showMetadata = true,
     menuOpen = false,
     isFavorite = false,
+    isInCollection = false,
     onFavoriteToggle,
     isSelected = false,
     onSelectToggle,
@@ -198,6 +201,8 @@ const AssetCard = React.memo<AssetCardProps>(
             onFavoriteToggle={onFavoriteToggle}
           />
         )}
+
+        <AssetCardCollectionBadge visible={isInCollection} />
 
         <AssetCardSelection
           id={id}

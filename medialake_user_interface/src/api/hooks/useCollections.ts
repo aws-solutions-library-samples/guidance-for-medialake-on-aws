@@ -810,6 +810,7 @@ export const useDeleteCollection = () => {
       }
     },
     onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.COLLECTIONS.membershipAll() });
       // Find the deleted collection's parentId from the cache (if it's a sub-collection)
       let parentId: string | undefined;
       const allCollData = queryClient.getQueryData<PaginatedCollectionsResponse>(
@@ -920,6 +921,7 @@ export const useDeleteItemFromCollection = () => {
       }
     },
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.COLLECTIONS.membershipAll() });
       // Invalidate the specific collection's assets query
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.COLLECTIONS.assets(variables.collectionId),
@@ -1004,6 +1006,7 @@ export const useAddItemToCollection = () => {
       }
     },
     onSuccess: (response, { collectionId, data }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.COLLECTIONS.membershipAll() });
       // Optimistically bump itemCount so the card updates immediately without
       // waiting for the refetch (which may still show the old count due to
       // OpenSearch eventual consistency).

@@ -162,6 +162,9 @@ export const QUERY_KEYS = {
     shared: () => [...QUERY_KEYS.COLLECTIONS.all, "shared"] as const,
     sharedWithMe: () => [...QUERY_KEYS.COLLECTIONS.all, "sharedWithMe"] as const,
     sharedByMe: () => [...QUERY_KEYS.COLLECTIONS.all, "sharedByMe"] as const,
+    membershipAll: () => [...QUERY_KEYS.COLLECTIONS.all, "membership"] as const,
+    membership: (assetIds: string[]) =>
+      [...QUERY_KEYS.COLLECTIONS.membershipAll(), assetIds] as const,
     shares: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "shares"] as const,
     items: (id: string) => [...QUERY_KEYS.COLLECTIONS.detail(id), "items"] as const,
     assets: (id: string, filters?: Record<string, any>) =>

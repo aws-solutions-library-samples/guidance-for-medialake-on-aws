@@ -206,6 +206,7 @@ export default {
     },
   },
   assets: {
+    inCollection: "In a collection",
     fileInformation: "File Information",
     technicalDetails: "Technical Details",
     fields: {

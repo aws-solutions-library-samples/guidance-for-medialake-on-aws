@@ -46,6 +46,7 @@ export interface AssetEditingState {
   isRenaming?: boolean;
   renamingAssetId?: string;
   isAssetFavorited?: (assetId: string) => boolean;
+  isAssetInCollection?: (assetId: string) => boolean;
   isAssetSelected?: (assetId: string) => boolean;
   isSemantic?: boolean;
   confidenceThreshold?: number;
@@ -124,6 +125,7 @@ export function AssetItemProvider<T>({
       isRenaming: value.isRenaming,
       renamingAssetId: value.renamingAssetId,
       isAssetFavorited: value.isAssetFavorited,
+      isAssetInCollection: value.isAssetInCollection,
       isAssetSelected: value.isAssetSelected,
       isSemantic: value.isSemantic,
       confidenceThreshold: value.confidenceThreshold,
@@ -135,6 +137,7 @@ export function AssetItemProvider<T>({
       value.isRenaming,
       value.renamingAssetId,
       value.isAssetFavorited,
+      value.isAssetInCollection,
       value.isAssetSelected,
       value.isSemantic,
       value.confidenceThreshold,

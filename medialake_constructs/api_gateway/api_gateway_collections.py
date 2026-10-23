@@ -441,6 +441,16 @@ class CollectionsApi(Construct):
         cfn_method.authorization_type = "CUSTOM"
         cfn_method.authorizer_id = props.authorizer.authorizer_id
 
+        # /collections/membership (static route must come before variable route)
+        membership_resource = collections_resource.add_resource("membership")
+        membership_method = membership_resource.add_method(
+            "ANY",
+            collections_integration,
+        )
+        cfn_method = membership_method.node.default_child
+        cfn_method.authorization_type = "CUSTOM"
+        cfn_method.authorizer_id = props.authorizer.authorizer_id
+
         # /collections/shared-by-me (static route must come before variable route)
         shared_by_me_resource = collections_resource.add_resource("shared-by-me")
         shared_by_me_method = shared_by_me_resource.add_method(
@@ -501,6 +511,7 @@ class CollectionsApi(Construct):
         add_cors_options_method(collections_resource)
         add_cors_options_method(shared_with_me_resource)
         add_cors_options_method(shared_by_me_resource)
+        add_cors_options_method(membership_resource)
         add_cors_options_method(collection_types_sub_resource)
         add_cors_options_method(collections_users_resource)
         add_cors_options_method(collection_id_resource)

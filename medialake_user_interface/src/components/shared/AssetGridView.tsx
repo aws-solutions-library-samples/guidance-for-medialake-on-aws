@@ -67,6 +67,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   isEditing,
   editedName,
   isFavorite,
+  isInCollection,
   isSelected,
   isCardRenaming,
   isSemantic,
@@ -101,6 +102,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
   isEditing: boolean;
   editedName?: string;
   isFavorite: boolean;
+  isInCollection: boolean;
   isSelected: boolean;
   isCardRenaming: boolean;
   isSemantic: boolean;
@@ -186,6 +188,7 @@ const AssetGridItem = React.memo(function AssetGridItem<T>({
       thumbnailScale={thumbnailScale}
       showMetadata={showMetadata}
       isFavorite={isFavorite}
+      isInCollection={isInCollection}
       onFavoriteToggle={onFavoriteToggle ? handleFavorite : undefined}
       isSelected={isSelected}
       onSelectToggle={onSelectToggle ? handleSelect : undefined}
@@ -230,6 +233,7 @@ function AssetGridItemWrapper<T>({
   // can skip re-renders when another card's editing state changes
   const isEditing = editing.editingAssetId === assetId;
   const isFavorite = editing.isAssetFavorited ? editing.isAssetFavorited(assetId) : false;
+  const isInCollection = editing.isAssetInCollection ? editing.isAssetInCollection(assetId) : false;
   const isSelected = editing.isAssetSelected ? editing.isAssetSelected(assetId) : false;
   const isCardRenaming = !!(editing.isRenaming && editing.renamingAssetId === assetId);
 
@@ -245,6 +249,7 @@ function AssetGridItemWrapper<T>({
       isEditing={isEditing}
       editedName={isEditing ? editing.editedName : undefined}
       isFavorite={isFavorite}
+      isInCollection={isInCollection}
       isSelected={isSelected}
       isCardRenaming={isCardRenaming}
       isSemantic={editing.isSemantic ?? false}

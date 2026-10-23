@@ -35,6 +35,7 @@ import {
 import { useAssetOperations } from "@/hooks/useAssetOperations";
 import { useAssetSelection } from "@/hooks/useAssetSelection";
 import { useGetFavorites, useAddFavorite, useRemoveFavorite } from "@/api/hooks/useFavorites";
+import { useAssetCollectionMembership } from "@/api/hooks/useAssetCollectionMembership";
 import { useAddItemToCollection } from "@/api/hooks/useCollections";
 import { AddToCollectionModal } from "@/components/collections/AddToCollectionModal";
 import { RightSidebarProvider, RightSidebar } from "@/components/common/RightSidebar";
@@ -178,6 +179,13 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
     },
     [favorites]
   );
+
+  // Collection membership for the assets on this page
+  const pageAssetIds = useMemo(
+    () => (searchResponse?.data?.results || []).map((asset) => asset.InventoryID),
+    [searchResponse]
+  );
+  const { isAssetInCollection } = useAssetCollectionMembership(pageAssetIds);
 
   // Handle favorite toggle
   const handleFavoriteToggle = useCallback(
@@ -678,6 +686,7 @@ const AssetExplorer: React.FC<AssetExplorerProps> = ({
                   editingAssetId,
                   editedName,
                   isAssetFavorited,
+                  isAssetInCollection,
                   onFavoriteToggle: handleFavoriteToggle,
                   isAssetSelected: stableIsAssetSelected,
                   onSelectToggle: assetSelection.handleSelectToggle,
