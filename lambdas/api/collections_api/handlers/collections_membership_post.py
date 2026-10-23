@@ -14,7 +14,7 @@ from collections_utils import (
     create_success_response,
 )
 from user_auth import extract_user_context
-from utils.item_utils import generate_asset_sk
+from utils.item_utils import ASSET_SK_PREFIX, generate_asset_sk
 
 logger = Logger(
     service="collections-membership-post", level=os.environ.get("LOG_LEVEL", "INFO")
@@ -44,6 +44,24 @@ def _user_can_see(user_id: str, collection_id: str, cache: dict) -> bool:
     return cache[collection_id]
 
 
+def _in_visible_collection(gsi2_pk: str, user_id: str, cache: dict) -> bool:
+    """True when any collection holding the item (GSI2_PK) is visible to the user."""
+    query_kwargs = {
+        "IndexName": "ItemCollectionsGSI",
+        "KeyConditionExpression": Key("GSI2_PK").eq(gsi2_pk),
+    }
+    while True:
+        response = collections_table.query(**query_kwargs)
+        for item in response.get("Items", []):
+            collection_id = item["GSI2_SK"][len(COLLECTION_PK_PREFIX) :]
+            if _user_can_see(user_id, collection_id, cache):
+                return True
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return False
+        query_kwargs["ExclusiveStartKey"] = last_key
+
+
 def register_route(app):
     """Register POST /collections/membership route"""
 
@@ -71,27 +89,17 @@ def register_route(app):
             visibility_cache: dict = {}
             in_collection = []
             for asset_id in dict.fromkeys(asset_ids):
-                # Items are written with GSI2_PK equal to their SK; full-file adds use
-                # the #FULL form (clip adds are a different item and don't count here).
-                query_kwargs = {
-                    "IndexName": "ItemCollectionsGSI",
-                    "KeyConditionExpression": Key("GSI2_PK").eq(
-                        generate_asset_sk(asset_id)
-                    ),
-                }
-                found = False
-                while not found:
-                    response = collections_table.query(**query_kwargs)
-                    for item in response.get("Items", []):
-                        collection_id = item["GSI2_SK"][len(COLLECTION_PK_PREFIX) :]
-                        if _user_can_see(user_id, collection_id, visibility_cache):
-                            found = True
-                            break
-                    last_key = response.get("LastEvaluatedKey")
-                    if found or not last_key:
-                        break
-                    query_kwargs["ExclusiveStartKey"] = last_key
-                if found:
+                # Items are written with GSI2_PK equal to their SK. The API and S3 ingest
+                # use the #FULL form; the pipeline collection_manager node writes the bare
+                # ASSET#{id} form. Clip adds are a different item and don't count here.
+                lookup_keys = (
+                    generate_asset_sk(asset_id),
+                    f"{ASSET_SK_PREFIX}{asset_id}",
+                )
+                if any(
+                    _in_visible_collection(key, user_id, visibility_cache)
+                    for key in lookup_keys
+                ):
                     in_collection.append(asset_id)
 
             metrics.add_metric(name="MembershipChecks", unit=MetricUnit.Count, value=1)
